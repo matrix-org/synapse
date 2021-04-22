@@ -123,7 +123,6 @@ class OidcHandler:
         Args:
             request: the incoming request from the browser.
         """
-
         # The provider might redirect with an error.
         # In that case, just display it as-is.
         if b"error" in request.args:
@@ -137,8 +136,12 @@ class OidcHandler:
             # either the provider misbehaving or Synapse being misconfigured.
             # The only exception of that is "access_denied", where the user
             # probably cancelled the login flow. In other cases, log those errors.
-            if error != "access_denied":
-                logger.error("Error from the OIDC provider: %s %s", error, description)
+            logger.log(
+                logging.INFO if error == "access_denied" else logging.ERROR,
+                "Received OIDC callback with error: %s %s",
+                error,
+                description,
+            )
 
             self._sso_handler.render_error(request, error, description)
             return
@@ -149,7 +152,7 @@ class OidcHandler:
         # Fetch the session cookie
         session = request.getCookie(SESSION_COOKIE_NAME)  # type: Optional[bytes]
         if session is None:
-            logger.info("No session cookie found")
+            logger.info("Received OIDC callback, with no session cookie")
             self._sso_handler.render_error(
                 request, "missing_session", "No session cookie found"
             )
@@ -169,7 +172,7 @@ class OidcHandler:
 
         # Check for the state query parameter
         if b"state" not in request.args:
-            logger.info("State parameter is missing")
+            logger.info("Received OIDC callback, with no state parameter")
             self._sso_handler.render_error(
                 request, "invalid_request", "State parameter is missing"
             )
@@ -183,13 +186,15 @@ class OidcHandler:
                 session, state
             )
         except (MacaroonDeserializationException, ValueError) as e:
-            logger.exception("Invalid session")
+            logger.exception("Invalid session for OIDC callback")
             self._sso_handler.render_error(request, "invalid_session", str(e))
             return
         except MacaroonInvalidSignatureException as e:
-            logger.exception("Could not verify session")
+            logger.exception("Could not verify session for OIDC callback")
             self._sso_handler.render_error(request, "mismatching_session", str(e))
             return
+
+        logger.info("Received OIDC callback for IdP %s", session_data.idp_id)
 
         oidc_provider = self._providers.get(session_data.idp_id)
         if not oidc_provider:
@@ -565,12 +570,15 @@ class OidcProvider:
         Returns:
             UserInfo: an object representing the user.
         """
+        logger.debug("Using the OAuth2 access_token to request userinfo")
         metadata = await self.load_metadata()
 
         resp = await self._http_client.get_json(
             metadata["userinfo_endpoint"],
             headers={"Authorization": ["Bearer {}".format(token["access_token"])]},
         )
+
+        logger.debug("Retrieved user info from userinfo endpoint: %r", resp)
 
         return UserInfo(resp)
 
@@ -600,17 +608,19 @@ class OidcProvider:
             claims_cls = ImplicitIDToken
 
         alg_values = metadata.get("id_token_signing_alg_values_supported", ["RS256"])
-
         jwt = JsonWebToken(alg_values)
 
         claim_options = {"iss": {"values": [metadata["issuer"]]}}
+
+        id_token = token["id_token"]
+        logger.debug("Attempting to decode JWT id_token %r", id_token)
 
         # Try to decode the keys in cache first, then retry by forcing the keys
         # to be reloaded
         jwk_set = await self.load_jwks()
         try:
             claims = jwt.decode(
-                token["id_token"],
+                id_token,
                 key=jwk_set,
                 claims_cls=claims_cls,
                 claims_options=claim_options,
@@ -620,12 +630,14 @@ class OidcProvider:
             logger.info("Reloading JWKS after decode error")
             jwk_set = await self.load_jwks(force=True)  # try reloading the jwks
             claims = jwt.decode(
-                token["id_token"],
+                id_token,
                 key=jwk_set,
                 claims_cls=claims_cls,
                 claims_options=claim_options,
                 claims_params=claims_params,
             )
+
+        logger.debug("Decoded id_token JWT %r; validating", claims)
 
         claims.validate(leeway=120)  # allows 2 min of clock skew
         return UserInfo(claims)
@@ -726,19 +738,18 @@ class OidcProvider:
         """
         # Exchange the code with the provider
         try:
-            logger.debug("Exchanging code")
+            logger.debug("Exchanging OAuth2 code for a token")
             token = await self._exchange_code(code)
         except OidcError as e:
-            logger.exception("Could not exchange code")
+            logger.exception("Could not exchange OAuth2 code")
             self._sso_handler.render_error(request, e.error, e.error_description)
             return
 
-        logger.debug("Successfully obtained OAuth2 access token")
+        logger.debug("Successfully obtained OAuth2 token data: %r", token)
 
         # Now that we have a token, get the userinfo, either by decoding the
         # `id_token` or by fetching the `userinfo_endpoint`.
         if self._uses_userinfo:
-            logger.debug("Fetching userinfo")
             try:
                 userinfo = await self._fetch_userinfo(token)
             except Exception as e:
@@ -746,7 +757,6 @@ class OidcProvider:
                 self._sso_handler.render_error(request, "fetch_error", str(e))
                 return
         else:
-            logger.debug("Extracting userinfo from id_token")
             try:
                 userinfo = await self._parse_id_token(token, nonce=session_data.nonce)
             except Exception as e:

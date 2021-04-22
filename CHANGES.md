@@ -5,6 +5,8 @@ Note that this release includes a change in Synapse to use Redis as a cache ─ 
 
 This release also changes the callback URI for OpenID Connect (OIDC) identity providers. If your server is configured to use single sign-on via an OIDC/OAuth2 IdP, you may need to make configuration changes. Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes.
 
+This release also changes escaping of variables in the HTML templates for SSO or email notifications. If you have customised these templates, please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes.
+
 
 Features
 --------
