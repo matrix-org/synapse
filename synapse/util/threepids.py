@@ -98,3 +98,5 @@ def validate_email(address: str) -> str:
 
     if len(address) > MAX_EMAIL_ADDRESS_LENGTH:
         raise ValueError("Unable to parse email address")
+
+    return address
