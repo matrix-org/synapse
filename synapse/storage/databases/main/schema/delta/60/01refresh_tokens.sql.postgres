@@ -3,7 +3,7 @@ CREATE TABLE refresh_tokens (
   user_id TEXT NOT NULL,
   device_id TEXT,
   token TEXT NOT NULL,
-  replaced_by BIGINT REFERENCES refresh_tokens (id) ON DELETE CASCADE,
+  next_token_id BIGINT REFERENCES refresh_tokens (id) ON DELETE CASCADE,
   UNIQUE(token)
 );
 
