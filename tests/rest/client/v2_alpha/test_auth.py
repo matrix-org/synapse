@@ -475,7 +475,9 @@ class UIAuthTests(unittest.HomeserverTestCase):
         session_id = channel.json_body["session"]
 
         # do the OIDC auth, but auth as the wrong user
-        channel = self.helper.auth_via_oidc({"sub": "wrong_user"}, ui_auth_session_id=session_id)
+        channel = self.helper.auth_via_oidc(
+            {"sub": "wrong_user"}, ui_auth_session_id=session_id
+        )
 
         # that should return a failure message
         self.assertSubstring("We were unable to validate", channel.text_body)

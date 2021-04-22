@@ -722,7 +722,7 @@ class SimpleHttpClient:
                 read_body_with_max_size(response, output_stream, max_size)
             )
         except BodyExceededMaxSize:
-            SynapseError(
+            raise SynapseError(
                 502,
                 "Requested file is too large > %r bytes" % (max_size,),
                 Codes.TOO_LARGE,
