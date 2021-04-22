@@ -82,13 +82,19 @@ def canonicalise_email(address: str) -> str:
     return parts[0].casefold() + "@" + parts[1].lower()
 
 
-def validate_email(address: str) -> None:
+def validate_email(address: str) -> str:
     """Does some basic validation on an email address.
+
+    Returns the canonicalised email, as returned by `canonicalise_email`.
 
     Raises a ValueError if the email is invalid.
     """
     # First we try canonicalising in case that fails
     address = canonicalise_email(address)
+
+    # Email addresses have to be at least 3 characters.
+    if len(address) < 3:
+        raise ValueError("Unable to parse email address")
 
     if len(address) > MAX_EMAIL_ADDRESS_LENGTH:
         raise ValueError("Unable to parse email address")

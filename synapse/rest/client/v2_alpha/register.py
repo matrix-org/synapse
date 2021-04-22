@@ -115,8 +115,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         # (See on_POST in EmailThreepidRequestTokenRestServlet
         # in synapse/rest/client/v2_alpha/account.py)
         try:
-            validate_email(body["email"])
-            email = canonicalise_email(body["email"])
+            email = validate_email(body["email"])
         except ValueError as e:
             raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
