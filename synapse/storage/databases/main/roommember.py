@@ -70,6 +70,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
+        # Used by `_get_joined_hosts` to ensure only one thing mutates the cache
+        # at a time. Keyed by room_id.
         self._joined_host_linearizer = Linearizer("_JoinedHostsCache")
 
         # Is the current_state_events.membership up to date? Or is the
@@ -759,13 +761,16 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # on it. However, its important that its never None, since two current_state's
         # with a state_group of None are likely to be different.
         assert state_group is not None
+        assert state_entry.state_group is None or state_entry.state_group == state_group
 
         # We use a secondary cache of previous work to allow us to build up the
         # joined hosts for the given state group based on previous state groups.
         #
         # We cache one object per room containing the results of the last state
-        # group we got joined hosts for, with the idea being that generally
-        # `get_joined_hosts` with the "current" state group for the room.
+        # group we got joined hosts for. The idea being that generally
+        # `get_joined_hosts` is called with the "current" state group for the
+        # room, and so consecutive calls will be for consecutive state groups
+        # which point to the previous state group.
         cache = await self._get_joined_hosts_cache(room_id)
 
         # If the state group in the cache matches, we already have the data we need.
@@ -775,7 +780,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # Since we'll mutate the cache we need to lock.
         with (await self._joined_host_linearizer.queue(room_id)):
             if state_entry.state_group == cache.state_group:
-                # Same state group, so nothing to do
+                # Same state group, so nothing to do. We've already checked for
+                # this above, but the cache may have changed while waiting on
+                # the lock.
                 pass
             elif state_entry.prev_group == cache.state_group:
                 # The cached work is for the previous state group, so we work out
@@ -1129,12 +1136,14 @@ class RoomMemberStore(RoomMemberWorkerStore, RoomMemberBackgroundUpdateStore):
 
 @attr.s(slots=True)
 class _JoinedHostsCache:
-    """Cache for joined hosts in a room that is optimised to handle updates
-    via state deltas.
-    """
+    """The cached data used by the `_get_joined_hosts_cache`."""
 
     # Dict of host to the set of their users in the room at the state group.
     hosts_to_joined_users = attr.ib(type=Dict[str, Set[str]], factory=dict)
+
+    # The state group `hosts_to_joined_users` is derived from. Will be an object
+    # if the class is newly created or if the state is not based on a state
+    # group.
     state_group = attr.ib(type=Union[object, int], factory=object)
 
     def __len__(self):
