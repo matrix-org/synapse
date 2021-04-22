@@ -1,1 +1,0 @@
-Do not automatically calculate `public_baseurl` since it can be wrong in some situations.
