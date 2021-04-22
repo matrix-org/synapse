@@ -18,6 +18,7 @@
 import logging
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 
@@ -30,6 +31,11 @@ logger = logging.getLogger(__name__)
 # TODO: Audit log for admins (profile updates, membership changes, users who tried
 #       to join but were rejected, etc)
 # TODO: Flairs
+
+
+# Note that the maximum lengths are somewhat arbitrary.
+MAX_SHORT_DESC_LEN = 1000
+MAX_LONG_DESC_LEN = 10000
 
 
 class GroupsServerWorkerHandler:
@@ -508,11 +514,26 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         )
 
         profile = {}
-        for keyname in ("name", "avatar_url", "short_description", "long_description"):
+        for keyname, max_length in (
+            ("name", MAX_DISPLAYNAME_LEN),
+            ("avatar_url", MAX_AVATAR_URL_LEN),
+            ("short_description", MAX_SHORT_DESC_LEN),
+            ("long_description", MAX_LONG_DESC_LEN),
+        ):
             if keyname in content:
                 value = content[keyname]
                 if not isinstance(value, str):
-                    raise SynapseError(400, "%r value is not a string" % (keyname,))
+                    raise SynapseError(
+                        400,
+                        "%r value is not a string" % (keyname,),
+                        errcode=Codes.INVALID_PARAM,
+                    )
+                if len(value) > max_length:
+                    raise SynapseError(
+                        400,
+                        "Invalid %s parameter" % (keyname,),
+                        errcode=Codes.INVALID_PARAM,
+                    )
                 profile[keyname] = value
 
         await self.store.update_group_profile(group_id, profile)
