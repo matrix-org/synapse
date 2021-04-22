@@ -15,6 +15,7 @@
 # limitations under the License.
 
 import string
+from collections import Counter
 from typing import Iterable, Optional, Tuple, Type
 
 import attr
@@ -43,6 +44,16 @@ class OIDCConfig(Config):
         except DependencyException as e:
             raise ConfigError(e.message) from e
 
+        # check we don't have any duplicate idp_ids now. (The SSO handler will also
+        # check for duplicates when the REST listeners get registered, but that happens
+        # after synapse has forked so doesn't give nice errors.)
+        c = Counter([i.idp_id for i in self.oidc_providers])
+        for idp_id, count in c.items():
+            if count > 1:
+                raise ConfigError(
+                    "Multiple OIDC providers have the idp_id %r." % idp_id
+                )
+
         public_baseurl = self.public_baseurl
         self.oidc_callback_url = public_baseurl + "_synapse/oidc/callback"
 
@@ -69,7 +80,9 @@ class OIDCConfig(Config):
         #
         #   idp_icon: An optional icon for this identity provider, which is presented
         #       by identity picker pages. If given, must be an MXC URI of the format
-        #       mxc://<server-name>/<media-id>
+        #       mxc://<server-name>/<media-id>. (An easy way to obtain such an MXC URI
+        #       is to upload an image to an (unencrypted) room and then copy the "url"
+        #       from the source of the event.)
         #
         #   discover: set to 'false' to disable the use of the OIDC discovery mechanism
         #       to discover endpoints. Defaults to true.
@@ -155,13 +168,16 @@ class OIDCConfig(Config):
         #
         # For backwards compatibility, it is also possible to configure a single OIDC
         # provider via an 'oidc_config' setting. This is now deprecated and admins are
-        # advised to migrate to the 'oidc_providers' format.
+        # advised to migrate to the 'oidc_providers' format. (When doing that migration,
+        # use 'oidc' for the idp_id to ensure that existing users continue to be
+        # recognised.)
         #
         oidc_providers:
           # Generic example
           #
           #- idp_id: my_idp
           #  idp_name: "My OpenID provider"
+          #  idp_icon: "mxc://example.com/mediaid"
           #  discover: false
           #  issuer: "https://accounts.example.com/"
           #  client_id: "provided-by-your-issuer"
@@ -185,8 +201,8 @@ class OIDCConfig(Config):
 
           # For use with Github
           #
-          #- idp_id: google
-          #  idp_name: Google
+          #- idp_id: github
+          #  idp_name: Github
           #  discover: false
           #  issuer: "https://github.com/"
           #  client_id: "your-client-id" # TO BE FILLED
@@ -210,6 +226,8 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
     "type": "object",
     "required": ["issuer", "client_id", "client_secret"],
     "properties": {
+        # TODO: fix the maxLength here depending on what MSC2528 decides
+        #   remember that we prefix the ID given here with `oidc-`
         "idp_id": {"type": "string", "minLength": 1, "maxLength": 128},
         "idp_name": {"type": "string"},
         "idp_icon": {"type": "string"},
@@ -335,6 +353,8 @@ def _parse_oidc_config_dict(
     # enforce those limits now.
     # TODO: factor out this stuff to a generic function
     idp_id = oidc_config.get("idp_id", "oidc")
+
+    # TODO: update this validity check based on what MSC2858 decides.
     valid_idp_chars = set(string.ascii_lowercase + string.digits + "-._")
 
     if any(c not in valid_idp_chars for c in idp_id):
@@ -347,6 +367,17 @@ def _parse_oidc_config_dict(
         raise ConfigError(
             "idp_id must start with a-z", config_path + ("idp_id",),
         )
+
+    # prefix the given IDP with a prefix specific to the SSO mechanism, to avoid
+    # clashes with other mechs (such as SAML, CAS).
+    #
+    # We allow "oidc" as an exception so that people migrating from old-style
+    # "oidc_config" format (which has long used "oidc" as its idp_id) can migrate to
+    # a new-style "oidc_providers" entry without changing the idp_id for their provider
+    # (and thereby invalidating their user_external_ids data).
+
+    if idp_id != "oidc":
+        idp_id = "oidc-" + idp_id
 
     # MSC2858 also specifies that the idp_icon must be a valid MXC uri
     idp_icon = oidc_config.get("idp_icon")
