@@ -44,7 +44,7 @@ as follows:
 
 To enable the OpenID integration, you should then add a section to the `oidc_providers`
 setting in your configuration file (or uncomment one of the existing examples).
-See [sample_config.yaml](./sample_config.yaml) for some sample settings, as well as 
+See [sample_config.yaml](./sample_config.yaml) for some sample settings, as well as
 the text below for example configurations for specific providers.
 
 ## Sample configs
@@ -52,11 +52,11 @@ the text below for example configurations for specific providers.
 Here are a few configs for providers that should work with Synapse.
 
 ### Microsoft Azure Active Directory
-Azure AD can act as an OpenID Connect Provider. Register a new application under 
+Azure AD can act as an OpenID Connect Provider. Register a new application under
 *App registrations* in the Azure AD management console. The RedirectURI for your
 application should point to your matrix server: `[synapse public baseurl]/_synapse/oidc/callback`
 
-Go to *Certificates & secrets* and register a new client secret. Make note of your 
+Go to *Certificates & secrets* and register a new client secret. Make note of your
 Directory (tenant) ID as it will be used in the Azure links.
 Edit your Synapse config file and change the `oidc_config` section:
 
@@ -118,7 +118,7 @@ oidc_providers:
 ```
 ### [Keycloak][keycloak-idp]
 
-[Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat. 
+[Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat.
 
 Follow the [Getting Started Guide](https://www.keycloak.org/getting-started) to install Keycloak and set up a realm.
 
@@ -194,7 +194,7 @@ Synapse config:
 
 ```yaml
 oidc_providers:
-  - idp_id: auth0 
+  - idp_id: auth0
     idp_name: Auth0
     issuer: "https://your-tier.eu.auth0.com/" # TO BE FILLED
     client_id: "your-client-id" # TO BE FILLED
@@ -307,3 +307,46 @@ oidc_providers:
         localpart_template: '{{ user.nickname }}'
         display_name_template: '{{ user.name }}'
 ```
+
+### Facebook
+
+Like Github, Facebook provide a custom OAuth2 API rather than an OIDC-compliant
+one so requires a little more configuration.
+
+0. You will need a Facebook developer account. You can register for one
+   [here](https://developers.facebook.com/async/registration/).
+1. On the [apps](https://developers.facebook.com/apps/) page of the developer
+   console, "Create App", and choose "Build Connected Experiences".
+2. Once the app is created, add "Facebook Login" and choose "Web". You don't
+   need to go through the whole form here.
+3. In the left-hand menu, open "Products"/"Facebook Login"/"Settings".
+   * Add `[synapse public baseurl]/_synapse/oidc/callback` as an OAuth Redirect
+     URL.
+4. In the left-hand menu, open "Settings/Basic". Here you can copy the "App ID"
+   and "App Secret" for use below.
+
+Synapse config:
+
+```yaml
+  - idp_id: facebook
+    idp_name: Facebook
+    idp_brand: "org.matrix.facebook"  # optional: styling hint for clients
+    discover: false
+    issuer: "https://facebook.com"
+    client_id: "your-client-id" # TO BE FILLED
+    client_secret: "your-client-secret" # TO BE FILLED
+    scopes: ["openid", "email"]
+    authorization_endpoint: https://facebook.com/dialog/oauth
+    token_endpoint: https://graph.facebook.com/v9.0/oauth/access_token
+    user_profile_method: "userinfo_endpoint"
+    userinfo_endpoint: "https://graph.facebook.com/v9.0/me?fields=id,name,email,picture"
+    user_mapping_provider:
+      config:
+        subject_claim: "id"
+        display_name_template: "{{ user.name }}"
+```
+
+Relevant documents:
+ * https://developers.facebook.com/docs/facebook-login/manually-build-a-login-flow
+ * Using Facebook's Graph API: https://developers.facebook.com/docs/graph-api/using-graph-api/
+ * Reference to the User endpoint: https://developers.facebook.com/docs/graph-api/reference/user
