@@ -926,6 +926,9 @@ class DeviceListUpdater:
         else:
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
             if cached_devices == {d["device_id"]: d for d in devices}:
+                logging.info(
+                    "Skipping device list resync for %s, as our cache matches already."
+                )
                 devices = []
                 ignore_devices = True
 
@@ -941,6 +944,9 @@ class DeviceListUpdater:
             await self.store.update_remote_device_list_cache(
                 user_id, devices, stream_id
             )
+        # mark the cache as valid, whether or not we actually processed any device
+        # list updates.
+        await self.store.mark_remote_user_device_cache_as_valid(user_id)
         device_ids = [device["device_id"] for device in devices]
 
         # Handle cross-signing keys.

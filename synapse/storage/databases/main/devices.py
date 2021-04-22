@@ -720,6 +720,13 @@ class DeviceWorkerStore(SQLBaseStore):
             desc="make_remote_user_device_cache_as_stale",
         )
 
+    async def mark_remote_user_device_cache_as_valid(self, user_id: str) -> None:
+        # Remove the database entry that says we need to resync devices, after a resync
+        await self.db_pool.simple_delete(
+            table="device_lists_remote_resync",
+            keyvalues={"user_id": user_id},
+        )
+
     async def mark_remote_user_device_list_as_unsubscribed(self, user_id: str) -> None:
         """Mark that we no longer track device lists for remote user."""
 
@@ -1287,15 +1294,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             # we don't need to lock, because we can assume we are the only thread
             # updating this user's extremity.
             lock=False,
-        )
-
-        # If we're replacing the remote user's device list cache presumably
-        # we've done a full resync, so we remove the entry that says we need
-        # to resync
-        self.db_pool.simple_delete_txn(
-            txn,
-            table="device_lists_remote_resync",
-            keyvalues={"user_id": user_id},
         )
 
     async def add_device_change_to_streams(
