@@ -151,28 +151,14 @@ sudo pacman -S base-devel python python-pip \
 
 ##### CentOS/Fedora
 
-Installing prerequisites on CentOS 8 or Fedora>26:
+Installing prerequisites on CentOS or Fedora Linux:
 
 ```sh
 sudo dnf install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                 libwebp-devel tk-devel redhat-rpm-config \
-                 python3-virtualenv libffi-devel openssl-devel
+                 libwebp-devel libxml2-devel libxslt-devel libpq-devel \
+                 python3-virtualenv libffi-devel openssl-devel python3-devel
 sudo dnf groupinstall "Development Tools"
 ```
-
-Installing prerequisites on CentOS 7 or Fedora<=25:
-
-```sh
-sudo yum install libtiff-devel libjpeg-devel libzip-devel freetype-devel \
-                 lcms2-devel libwebp-devel tcl-devel tk-devel redhat-rpm-config \
-                 python3-virtualenv libffi-devel openssl-devel
-sudo yum groupinstall "Development Tools"
-```
-
-Note that Synapse does not support versions of SQLite before 3.11, and CentOS 7
-uses SQLite 3.7. You may be able to work around this by installing a more
-recent SQLite version, but it is recommended that you instead use a Postgres
-database: see [docs/postgres.md](docs/postgres.md).
 
 ##### macOS
 
