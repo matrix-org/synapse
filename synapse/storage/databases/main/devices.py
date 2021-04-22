@@ -717,7 +717,7 @@ class DeviceWorkerStore(SQLBaseStore):
             keyvalues={"user_id": user_id},
             values={},
             insertion_values={"added_ts": self._clock.time_msec()},
-            desc="make_remote_user_device_cache_as_stale",
+            desc="mark_remote_user_device_cache_as_stale",
         )
 
     async def mark_remote_user_device_cache_as_valid(self, user_id: str) -> None:
@@ -725,6 +725,7 @@ class DeviceWorkerStore(SQLBaseStore):
         await self.db_pool.simple_delete(
             table="device_lists_remote_resync",
             keyvalues={"user_id": user_id},
+            desc="mark_remote_user_device_cache_as_valid",
         )
 
     async def mark_remote_user_device_list_as_unsubscribed(self, user_id: str) -> None:
