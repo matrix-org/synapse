@@ -71,7 +71,7 @@ logger = logging.getLogger("synapse_port_db")
 
 BOOLEAN_COLUMNS = {
     "events": ["processed", "outlier", "contains_url"],
-    "rooms": ["is_public"],
+    "rooms": ["is_public", "has_auth_chain_index"],
     "event_edges": ["is_state"],
     "presence_list": ["accepted"],
     "presence_stream": ["currently_active"],
