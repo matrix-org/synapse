@@ -76,9 +76,6 @@ def _is_valid_3pe_result(r, field):
     fields = r["fields"]
     if not isinstance(fields, dict):
         return False
-    for k in fields.keys():
-        if not isinstance(fields[k], str):
-            return False
 
     return True
 
