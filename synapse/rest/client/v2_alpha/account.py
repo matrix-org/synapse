@@ -98,7 +98,7 @@ class EmailPasswordRequestTokenRestServlet(RestServlet):
         try:
             email = body["email"]
             validate_email(email)
-            email = canonicalise_email(body["email"])
+            email = canonicalise_email(email)
         except ValueError as e:
             raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]

@@ -82,7 +82,7 @@ def canonicalise_email(address: str) -> str:
     return parts[0].casefold() + "@" + parts[1].lower()
 
 
-def validate_email(address: str):
+def validate_email(address: str) -> None:
     """Does some basic validation on an email address.
 
     Raises a ValueError if the email is invalid.
