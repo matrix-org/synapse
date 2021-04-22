@@ -927,7 +927,8 @@ class DeviceListUpdater:
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
             if cached_devices == {d["device_id"]: d for d in devices}:
                 logging.info(
-                    "Skipping device list resync for %s, as our cache matches already."
+                    "Skipping device list resync for %s, as our cache matches already",
+                    user_id,
                 )
                 devices = []
                 ignore_devices = True
