@@ -430,7 +430,17 @@ class MakeRoomAdminRestServlet(RestServlet):
             if not admin_users:
                 raise SynapseError(400, "No local admin user in room")
 
-            admin_user_id = admin_users[-1]
+            admin_user_id = None
+
+            for admin_user in reversed(admin_users):
+                if room_state.get((EventTypes.Member, admin_user)):
+                    admin_user_id = admin_user
+                    break
+
+            if not admin_user_id:
+                raise SynapseError(
+                    400, "No local admin user in room",
+                )
 
             pl_content = power_levels.content
         else:

@@ -31,3 +31,6 @@ class ExperimentalConfig(Config):
         if self.msc2403_enabled:
             # Enable the MSC2403 unstable room version
             KNOWN_ROOM_VERSIONS.update({RoomVersions.V7.identifier: RoomVersions.V7})
+
+        # MSC2858 (multiple SSO identity providers)
+        self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
