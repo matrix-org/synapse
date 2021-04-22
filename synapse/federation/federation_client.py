@@ -44,7 +44,6 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     HttpResponseException,
-    ProxiedRequestError,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -524,15 +523,6 @@ class FederationClient(FederationBase):
                     destination,
                     e.code,
                     e.args[0],
-                )
-            except ProxiedRequestError as e:
-                # If an auth error comes back from a federation endpoint, pass
-                # it back to the client.
-                if e.code == 403:
-                    raise
-
-                logger.warning(
-                    "Failed to %s via %s", description, destination, exc_info=True
                 )
             except Exception:
                 logger.warning(
