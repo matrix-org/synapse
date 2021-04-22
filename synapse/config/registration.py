@@ -68,13 +68,6 @@ class RegistrationConfig(Config):
             raise ConfigError(
                 "account_threepid_delegates.msisdn must begin with http:// or https://"
             )
-        if self.account_threepid_delegate_msisdn and not self.public_baseurl:
-            raise ConfigError(
-                "The configuration option `public_baseurl` is required if "
-                "`account_threepid_delegate.msisdn` is set, such that "
-                "clients know where to submit validation tokens to. Please "
-                "configure `public_baseurl`."
-            )
 
         self.default_identity_server = config.get("default_identity_server")
         self.allow_guest_access = config.get("allow_guest_access", False)
@@ -282,8 +275,7 @@ class RegistrationConfig(Config):
         # The identity server which we suggest that clients should use when users log
         # in on this server.
         #
-        # (By default, no suggestion is made, so it is left up to the client.
-        # This setting is ignored unless public_baseurl is also set.)
+        # (By default, no suggestion is made, so it is left up to the client.)
         #
         #default_identity_server: https://matrix.org
 
@@ -331,8 +323,6 @@ class RegistrationConfig(Config):
         # Servers handling the these requests must answer the `/requestToken` endpoints defined
         # by the Matrix Identity Service API specification:
         # https://matrix.org/docs/spec/identity_service/latest
-        #
-        # If a delegate is specified, the config option public_baseurl must also be filled out.
         #
         account_threepid_delegates:
             #email: https://example.com     # Delegate email sending to example.com
