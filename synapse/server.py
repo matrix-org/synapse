@@ -54,6 +54,7 @@ from synapse.federation.sender import FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
+from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
 from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
@@ -704,6 +705,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
         return ModuleApi(self, self.get_auth_handler())
+
+    @cache_in_self
+    def get_account_data_handler(self) -> AccountDataHandler:
+        return AccountDataHandler(self)
 
     async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
         return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)

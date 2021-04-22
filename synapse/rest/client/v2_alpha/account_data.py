@@ -38,14 +38,12 @@ class AccountDataServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.handler = hs.get_account_data_handler()
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None
         self._profile_handler = hs.get_profile_handler()
 
     async def on_PUT(self, request, user_id, account_data_type):
-        if self._is_worker:
-            raise Exception("Cannot handle PUT /account_data on worker")
-
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
@@ -57,10 +55,9 @@ class AccountDataServlet(RestServlet):
             hide_profile = body.get("hide_profile")
             await self._profile_handler.set_active([user], not hide_profile, True)
 
-        max_id = await self.store.add_account_data_for_user(
+        max_id = await self.handler.add_account_data_for_user(
             user_id, account_data_type, body
         )
-
         self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
         return 200, {}
@@ -96,13 +93,9 @@ class RoomAccountDataServlet(RestServlet):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.notifier = hs.get_notifier()
-        self._is_worker = hs.config.worker_app is not None
+        self.handler = hs.get_account_data_handler()
 
     async def on_PUT(self, request, user_id, room_id, account_data_type):
-        if self._is_worker:
-            raise Exception("Cannot handle PUT /account_data on worker")
-
         requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
@@ -116,11 +109,9 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
             )
 
-        max_id = await self.store.add_account_data_to_room(
+        await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
-
-        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
 
         return 200, {}
 
