@@ -38,7 +38,7 @@ from six.moves import filter
 from unpaddedbase64 import decode_base64
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.util.stringutils import parse_and_validate_server_name
 
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService

@@ -271,6 +271,9 @@ class OidcProvider:
         # user-facing name of this auth provider
         self.idp_name = provider.idp_name
 
+        # MXC URI for icon for this auth provider
+        self.idp_icon = provider.idp_icon
+
         self._sso_handler = hs.get_sso_handler()
 
         self._sso_handler.register_identity_provider(self)
