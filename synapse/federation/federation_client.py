@@ -451,6 +451,20 @@ class FederationClient(FederationBase):
 
         return signed_auth
 
+    def _is_unknown_endpoint(
+        self, e: HttpResponseException, synapse_error: SynapseError
+    ) -> bool:
+        """
+        Returns true if the response was due to an endpoint being unimplemented.
+        """
+        # There is no good way to detect an "unknown" endpoint.
+        #
+        # Dendrite returns a 404 (with no body); synapse returns a 400
+        # with M_UNRECOGNISED.
+        return e.code == 404 or (
+            e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
+        )
+
     async def _try_destination_list(
         self,
         description: str,
@@ -492,8 +506,7 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                res = await callback(destination)
-                return res
+                return await callback(destination)
             except InvalidResponseError as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
             except UnsupportedRoomVersionError:
@@ -502,17 +515,15 @@ class FederationClient(FederationBase):
                 synapse_error = e.to_synapse_error()
                 failover = False
 
+                # Failover on an internal server error, or if the destination
+                # doesn't implemented the endpoint for some reason.
                 if 500 <= e.code < 600:
                     failover = True
 
-                elif failover_on_unknown_endpoint:
-                    # there is no good way to detect an "unknown" endpoint. Dendrite
-                    # returns a 404 (with no body); synapse returns a 400
-                    # with M_UNRECOGNISED.
-                    if e.code == 404 or (
-                        e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
-                    ):
-                        failover = True
+                elif failover_on_unknown_endpoint and self._is_unknown_endpoint(
+                    e, synapse_error
+                ):
+                    failover = True
 
                 if not failover:
                     raise synapse_error from e
@@ -744,15 +755,10 @@ class FederationClient(FederationBase):
                 content=pdu.get_pdu_json(time_now),
             )
         except HttpResponseException as e:
-            if e.code in [400, 404]:
-                err = e.to_synapse_error()
-
-                # If we receive an error response that isn't a generic error, or an
-                # unrecognised endpoint error, we  assume that the remote understands
-                # the v2 invite API and this is a legitimate error.
-                if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
-                    raise
-            else:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # and raise.
+            if not self._is_unknown_endpoint(e, e.to_synapse_error()):
                 raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
@@ -886,15 +892,10 @@ class FederationClient(FederationBase):
                 content=pdu.get_pdu_json(time_now),
             )
         except HttpResponseException as e:
-            if e.code in [400, 404]:
-                err = e.to_synapse_error()
-
-                # If we receive an error response that isn't a generic error, or an
-                # unrecognised endpoint error, we  assume that the remote understands
-                # the v2 invite API and this is a legitimate error.
-                if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
-                    raise
-            else:
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # and raise.
+            if not self._is_unknown_endpoint(e, e.to_synapse_error()):
                 raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
