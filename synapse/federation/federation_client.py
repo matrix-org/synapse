@@ -812,7 +812,7 @@ class FederationClient(FederationBase):
                         "User's homeserver does not support this room version",
                         Codes.UNSUPPORTED_ROOM_VERSION,
                     )
-            elif e.code == 403:
+            elif e.code in (403, 429):
                 raise e.to_synapse_error()
             else:
                 raise
