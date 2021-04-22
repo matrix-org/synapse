@@ -266,10 +266,10 @@ using):
     ^/_synapse/client/sso_register$
 
     # OpenID Connect requests.
-    ^/_synapse/oidc/callback$
+    ^/_synapse/client/oidc/callback$
 
     # SAML requests.
-    ^/_matrix/saml2/authn_response$
+    ^/_synapse/client/saml2/authn_response$
 
     # CAS requests.
     ^/_matrix/client/(api/v1|r0|unstable)/login/cas/ticket$

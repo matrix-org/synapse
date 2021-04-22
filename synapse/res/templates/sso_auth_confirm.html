@@ -12,7 +12,7 @@
         <header>
             <h1>Confirm it's you to continue</h1>
             <p>
-                A client is trying to {{ description | e }}. To confirm this action
+                A client is trying to {{ description }}. To confirm this action
                 re-authorize your account with single sign-on.
             </p>
             <p><strong>
@@ -20,8 +20,8 @@
             </strong></p>
         </header>
         <main>
-            <a href="{{ redirect_url | e }}" class="primary-button">
-                Continue with {{ idp.idp_name | e }}
+            <a href="{{ redirect_url }}" class="primary-button">
+                Continue with {{ idp.idp_name }}
             </a>
         </main>
     </body>

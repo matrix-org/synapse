@@ -1,1 +1,0 @@
-The `service_url` parameter in `cas_config` is deprecated in favor of `public_baseurl`.

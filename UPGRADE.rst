@@ -88,6 +88,21 @@ for example:
 Upgrading to v1.27.0
 ====================
 
+Changes to callback URI for OAuth2 / OpenID Connect
+---------------------------------------------------
+
+This version changes the URI used for callbacks from OAuth2 identity providers. If
+your server is configured for single sign-on via an OpenID Connect or OAuth2 identity
+provider, you will need to add ``[synapse public baseurl]/_synapse/client/oidc/callback``
+to the list of permitted "redirect URIs" at the identity provider.
+
+See `docs/openid.md <docs/openid.md>`_ for more information on setting up OpenID
+Connect.
+
+(Note: a similar change is being made for SAML2; in this case the old URI
+``[synapse public baseurl]/_matrix/saml2`` is being deprecated, but will continue to
+work, so no immediate changes are required for existing installations.)
+
 Changes to HTML templates
 -------------------------
 
@@ -235,7 +250,7 @@ shown below:
 
           return {"localpart": localpart}
 
-Removal historical Synapse Admin API 
+Removal historical Synapse Admin API
 ------------------------------------
 
 Historically, the Synapse Admin API has been accessible under:
