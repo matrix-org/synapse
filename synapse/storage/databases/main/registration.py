@@ -1598,7 +1598,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         device_id: Optional[str] = None,
     ) -> List[Tuple[str, int, Optional[str]]]:
         """
-        Invalidate access tokens belonging to a user
+        Invalidate access and refresh tokens belonging to a user
 
         Args:
             user_id: ID of user the tokens belong to
@@ -1618,7 +1618,13 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             items = keyvalues.items()
             where_clause = " AND ".join(k + " = ?" for k, _ in items)
             values = [v for _, v in items]  # type: List[Union[str, int]]
+            # Conveniently, refresh_tokens and access_tokens both use the user_id and device_id fields. Only caveat
+            # is the `except_token_id` param that is tricky to get right, so for now we're just using the same where
+            # clause and values before we handle that. This seems to be only used in the "set password" handler.
+            refresh_where_clause = where_clause
+            refresh_values = values.copy()
             if except_token_id:
+                # TODO: support that for refresh tokens
                 where_clause += " AND id != ?"
                 values.append(except_token_id)
 
@@ -1635,6 +1641,11 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 )
 
             txn.execute("DELETE FROM access_tokens WHERE %s" % where_clause, values)
+
+            txn.execute(
+                "DELETE FROM refresh_tokens WHERE %s" % refresh_where_clause,
+                refresh_values,
+            )
 
             return tokens_and_devices
 
