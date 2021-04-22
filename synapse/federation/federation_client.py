@@ -751,9 +751,9 @@ class FederationClient(FederationBase):
                 # unrecognised endpoint error, we  assume that the remote understands
                 # the v2 invite API and this is a legitimate error.
                 if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
-                    raise err
+                    raise
             else:
-                raise e.to_synapse_error()
+                raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
 
@@ -893,9 +893,9 @@ class FederationClient(FederationBase):
                 # unrecognised endpoint error, we  assume that the remote understands
                 # the v2 invite API and this is a legitimate error.
                 if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
-                    raise err
+                    raise
             else:
-                raise e.to_synapse_error()
+                raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
 
