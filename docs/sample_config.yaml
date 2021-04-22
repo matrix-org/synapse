@@ -2057,10 +2057,6 @@ cas_config:
   #
   #server_url: "https://cas-server.com"
 
-  # The public URL of the homeserver.
-  #
-  #service_url: "https://homeserver.domain.com:8448"
-
   # The attribute of the CAS response to use as the display name.
   #
   # If unset, no displayname will be set.
