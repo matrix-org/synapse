@@ -106,6 +106,8 @@ class BulkPushRuleEvaluator:
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
+        # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
+        # time. Keyed off room_id.
         self._rules_linearizer = Linearizer(name="rules_for_room")
 
         self.room_push_rule_cache_metrics = register_cache(
@@ -347,6 +349,8 @@ class RulesForRoom:
         self.store = hs.get_datastore()
         self.room_push_rule_cache_metrics = room_push_rule_cache_metrics
 
+        # Used to ensure only one thing mutates the cache at a time. Keyed off
+        # room_id.
         self.linearizer = linearizer
 
         self.data = cached_data
@@ -515,18 +519,6 @@ class RulesForRoom:
         )
 
         self.update_cache(sequence, members, ret_rules_by_user, state_group)
-
-    def invalidate_all(self) -> None:
-        # Note: Don't hand this function directly to an invalidation callback
-        # as it keeps a reference to self and will stop this instance from being
-        # GC'd if it gets dropped from the rules_to_user cache. Instead use
-        # `self.invalidate_all_cb`
-        logger.debug("Invalidating RulesForRoom for %r", self.room_id)
-        self.data.sequence += 1
-        self.data.state_group = object()
-        self.data.member_map = {}
-        self.data.rules_by_user = {}
-        push_rules_invalidation_counter.inc()
 
     def update_cache(self, sequence, members, rules_by_user, state_group) -> None:
         if sequence == self.data.sequence:
