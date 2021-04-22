@@ -2147,8 +2147,13 @@ sso:
     #
     #     * providers: a list of available Identity Providers. Each element is
     #       an object with the following attributes:
+    #
     #         * idp_id: unique identifier for the IdP
     #         * idp_name: user-facing name for the IdP
+    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+    #              for the IdP
+    #         * idp_brand: if specified in the IdP config, a textual identifier
+    #              for the brand of the IdP
     #
     #   The rendered HTML page should contain a form which submits its results
     #   back as a GET request, with the following query parameters:
@@ -2186,6 +2191,28 @@ sso:
     #   The template should render a form which submits the following fields:
     #
     #     * username: the localpart of the user's chosen user id
+    #
+    # * HTML page allowing the user to consent to the server's terms and
+    #   conditions. This is only shown for new users, and only if
+    #   `user_consent.require_at_registration` is set.
+    #
+    #   When rendering, this template is given the following variables:
+    #
+    #     * server_name: the homeserver's name.
+    #
+    #     * user_id: the user's matrix proposed ID.
+    #
+    #     * user_profile.display_name: the user's proposed display name, if any.
+    #
+    #     * consent_version: the version of the terms that the user will be
+    #       shown
+    #
+    #     * terms_url: a link to the page showing the terms.
+    #
+    #   The template should render a form which submits the following fields:
+    #
+    #     * accepted_version: the version of the terms accepted by the user
+    #       (ie, 'consent_version' from the input variables).
     #
     # * HTML page for a confirmation step before redirecting back to the client
     #   with the login token: 'sso_redirect_confirm.html'.
@@ -2225,6 +2252,16 @@ sso:
     #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
     #
     #     * description: the operation which the user is being asked to confirm
+    #
+    #     * idp: details of the Identity Provider that we will use to confirm
+    #       the user's identity: an object with the following attributes:
+    #
+    #         * idp_id: unique identifier for the IdP
+    #         * idp_name: user-facing name for the IdP
+    #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+    #              for the IdP
+    #         * idp_brand: if specified in the IdP config, a textual identifier
+    #              for the brand of the IdP
     #
     # * HTML page shown after a successful user interactive authentication session:
     #   'sso_auth_success.html'.
