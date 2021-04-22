@@ -4,6 +4,7 @@
   * [Quarantining media by ID](#quarantining-media-by-id)
   * [Quarantining media in a room](#quarantining-media-in-a-room)
   * [Quarantining all media of a user](#quarantining-all-media-of-a-user)
+  * [Protecting media from being quarantined](#protecting-media-from-being-quarantined)
 - [Delete local media](#delete-local-media)
   * [Delete a specific local media](#delete-a-specific-local-media)
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
@@ -122,6 +123,29 @@ Response:
 The following fields are returned in the JSON response body:
 
 * `num_quarantined`: integer - The number of media items successfully quarantined
+
+## Protecting media from being quarantined
+
+This API protects a single piece of local media from being quarantined using the
+above APIs. This is useful for sticker packs and other shared media which you do
+not want to get quarantined, especially when
+[quarantining media in a room](#quarantining-media-in-a-room).
+
+Request:
+
+```
+POST /_synapse/admin/v1/media/protect/<media_id>
+
+{}
+```
+
+Where `media_id` is in the  form of `abcdefg12345...`.
+
+Response:
+
+```json
+{}
+```
 
 # Delete local media
 This API deletes the *local* media from the disk of your own server.
