@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 from typing import TYPE_CHECKING
 
 import pkg_resources
@@ -20,8 +21,7 @@ from twisted.web.http import Request
 from twisted.web.resource import Resource
 from twisted.web.static import File
 
-from synapse.api.errors import SynapseError
-from synapse.handlers.sso import USERNAME_MAPPING_SESSION_COOKIE_NAME
+from synapse.handlers.sso import get_username_mapping_session_cookie_from_request
 from synapse.http.server import DirectServeHtmlResource, DirectServeJsonResource
 from synapse.http.servlet import parse_string
 from synapse.http.site import SynapseRequest
@@ -61,12 +61,10 @@ class AvailabilityCheckResource(DirectServeJsonResource):
     async def _async_render_GET(self, request: Request):
         localpart = parse_string(request, "username", required=True)
 
-        session_id = request.getCookie(USERNAME_MAPPING_SESSION_COOKIE_NAME)
-        if not session_id:
-            raise SynapseError(code=400, msg="missing session_id")
+        session_id = get_username_mapping_session_cookie_from_request(request)
 
         is_available = await self._sso_handler.check_username_availability(
-            localpart, session_id.decode("ascii", errors="replace")
+            localpart, session_id
         )
         return 200, {"available": is_available}
 
@@ -79,10 +77,8 @@ class SubmitResource(DirectServeHtmlResource):
     async def _async_render_POST(self, request: SynapseRequest):
         localpart = parse_string(request, "username", required=True)
 
-        session_id = request.getCookie(USERNAME_MAPPING_SESSION_COOKIE_NAME)
-        if not session_id:
-            raise SynapseError(code=400, msg="missing session_id")
+        session_id = get_username_mapping_session_cookie_from_request(request)
 
         await self._sso_handler.handle_submit_username_request(
-            request, localpart, session_id.decode("ascii", errors="replace")
+            request, localpart, session_id
         )
