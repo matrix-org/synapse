@@ -432,9 +432,17 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
+        avatar_url_to_set = new_avatar_url  # type: Optional[str]
+        if new_avatar_url == "":
+            avatar_url_to_set = None
+
         # Enforce a max avatar size if one is defined
-        if self.max_avatar_size or self.allowed_avatar_mimetypes:
-            media_id = self._validate_and_parse_media_id_from_avatar_url(new_avatar_url)
+        if avatar_url_to_set and (
+            self.max_avatar_size or self.allowed_avatar_mimetypes
+        ):
+            media_id = self._validate_and_parse_media_id_from_avatar_url(
+                avatar_url_to_set
+            )
 
             # Check that this media exists locally
             media_info = await self.store.get_local_media(media_id)
@@ -477,7 +485,7 @@ class ProfileHandler(BaseHandler):
             new_batchnum = None
 
         await self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url, new_batchnum
+            target_user.localpart, avatar_url_to_set, new_batchnum
         )
 
         if self.hs.config.user_directory_search_all_users:

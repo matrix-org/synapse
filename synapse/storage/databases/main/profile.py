@@ -145,7 +145,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_avatar_url(
-        self, user_localpart: str, new_avatar_url: str, batchnum: int
+        self, user_localpart: str, new_avatar_url: Optional[str], batchnum: int
     ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_avatar_url.invalidate((user_localpart,))

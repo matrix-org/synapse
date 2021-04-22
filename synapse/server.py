@@ -282,10 +282,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         return self._reactor
 
-    def get_ip_from_request(self, request) -> str:
-        # X-Forwarded-For is handled by our custom request type.
-        return request.getClientIP()
-
     def is_mine(self, domain_specific_string: DomainSpecificString) -> bool:
         return domain_specific_string.domain == self.hostname
 
@@ -499,7 +495,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return InitialSyncHandler(self)
 
     @cache_in_self
-    def get_profile_handler(self):
+    def get_profile_handler(self) -> ProfileHandler:
         return ProfileHandler(self)
 
     @cache_in_self

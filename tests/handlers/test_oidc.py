@@ -14,7 +14,7 @@
 # limitations under the License.
 import json
 import re
-from typing import Dict
+from typing import Dict, Optional
 from urllib.parse import parse_qs, urlencode, urlparse
 
 from mock import ANY, Mock, patch
@@ -349,9 +349,13 @@ class OidcHandlerTestCase(HomeserverTestCase):
         cookie = args[1]
 
         macaroon = pymacaroons.Macaroon.deserialize(cookie)
-        state = self.handler._get_value_from_macaroon(macaroon, "state")
-        nonce = self.handler._get_value_from_macaroon(macaroon, "nonce")
-        redirect = self.handler._get_value_from_macaroon(
+        state = self.handler._token_generator._get_value_from_macaroon(
+            macaroon, "state"
+        )
+        nonce = self.handler._token_generator._get_value_from_macaroon(
+            macaroon, "nonce"
+        )
+        redirect = self.handler._token_generator._get_value_from_macaroon(
             macaroon, "client_redirect_url"
         )
 
@@ -411,12 +415,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         client_redirect_url = "http://client/redirect"
         user_agent = "Browser"
         ip_address = "10.0.0.1"
-        session = self.handler._generate_oidc_session_token(
-            state=state,
-            nonce=nonce,
-            client_redirect_url=client_redirect_url,
-            ui_auth_session_id=None,
-        )
+        session = self._generate_oidc_session_token(state, nonce, client_redirect_url)
         request = _build_callback_request(
             code, state, session, user_agent=user_agent, ip_address=ip_address
         )
@@ -500,11 +499,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError("invalid_session")
 
         # Mismatching session
-        session = self.handler._generate_oidc_session_token(
-            state="state",
-            nonce="nonce",
-            client_redirect_url="http://client/redirect",
-            ui_auth_session_id=None,
+        session = self._generate_oidc_session_token(
+            state="state", nonce="nonce", client_redirect_url="http://client/redirect",
         )
         request.args = {}
         request.args[b"state"] = [b"mismatching state"]
@@ -623,11 +619,8 @@ class OidcHandlerTestCase(HomeserverTestCase):
 
         state = "state"
         client_redirect_url = "http://client/redirect"
-        session = self.handler._generate_oidc_session_token(
-            state=state,
-            nonce="nonce",
-            client_redirect_url=client_redirect_url,
-            ui_auth_session_id=None,
+        session = self._generate_oidc_session_token(
+            state=state, nonce="nonce", client_redirect_url=client_redirect_url,
         )
         request = _build_callback_request("code", state, session)
 
@@ -841,6 +834,24 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         self.assertRenderedError("mapping_error", "localpart is invalid: ")
 
+    def _generate_oidc_session_token(
+        self,
+        state: str,
+        nonce: str,
+        client_redirect_url: str,
+        ui_auth_session_id: Optional[str] = None,
+    ) -> str:
+        from synapse.handlers.oidc_handler import OidcSessionData
+
+        return self.handler._token_generator.generate_oidc_session_token(
+            state=state,
+            session_data=OidcSessionData(
+                nonce=nonce,
+                client_redirect_url=client_redirect_url,
+                ui_auth_session_id=ui_auth_session_id,
+            ),
+        )
+
 
 class UsernamePickerTestCase(HomeserverTestCase):
     if not HAS_OIDC:
@@ -965,17 +976,19 @@ async def _make_callback_with_userinfo(
         userinfo: the OIDC userinfo dict
         client_redirect_url: the URL to redirect to on success.
     """
+    from synapse.handlers.oidc_handler import OidcSessionData
+
     handler = hs.get_oidc_handler()
     handler._exchange_code = simple_async_mock(return_value={})
     handler._parse_id_token = simple_async_mock(return_value=userinfo)
     handler._fetch_userinfo = simple_async_mock(return_value=userinfo)
 
     state = "state"
-    session = handler._generate_oidc_session_token(
+    session = handler._token_generator.generate_oidc_session_token(
         state=state,
-        nonce="nonce",
-        client_redirect_url=client_redirect_url,
-        ui_auth_session_id=None,
+        session_data=OidcSessionData(
+            nonce="nonce", client_redirect_url=client_redirect_url,
+        ),
     )
     request = _build_callback_request("code", state, session)
 
@@ -1011,7 +1024,7 @@ def _build_callback_request(
             "addCookie",
             "requestHeaders",
             "getClientIP",
-            "get_user_agent",
+            "getHeader",
         ]
     )
 
@@ -1020,5 +1033,4 @@ def _build_callback_request(
     request.args[b"code"] = [code.encode("utf-8")]
     request.args[b"state"] = [state.encode("utf-8")]
     request.getClientIP.return_value = ip_address
-    request.get_user_agent.return_value = user_agent
     return request

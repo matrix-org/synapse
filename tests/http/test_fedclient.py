@@ -560,4 +560,4 @@ class FederationClientTests(HomeserverTestCase):
         self.pump()
 
         f = self.failureResultOf(test_d)
-        self.assertIsInstance(f.value, ValueError)
+        self.assertIsInstance(f.value, RequestSendFailed)
