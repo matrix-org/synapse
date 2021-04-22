@@ -225,6 +225,7 @@ Synapse config:
 oidc_providers:
   - idp_id: github
     idp_name: Github
+    idp_brand: "org.matrix.github"  # optional: styling hint for clients
     discover: false
     issuer: "https://github.com/"
     client_id: "your-client-id" # TO BE FILLED
@@ -250,6 +251,7 @@ oidc_providers:
    oidc_providers:
      - idp_id: google
        idp_name: Google
+       idp_brand: "org.matrix.google"  # optional: styling hint for clients
        issuer: "https://accounts.google.com/"
        client_id: "your-client-id" # TO BE FILLED
        client_secret: "your-client-secret" # TO BE FILLED
@@ -296,6 +298,7 @@ Synapse config:
 oidc_providers:
   - idp_id: gitlab
     idp_name: Gitlab
+    idp_brand: "org.matrix.gitlab"  # optional: styling hint for clients
     issuer: "https://gitlab.com/"
     client_id: "your-client-id" # TO BE FILLED
     client_secret: "your-client-secret" # TO BE FILLED

@@ -92,11 +92,11 @@ Changes to HTML templates
 -------------------------
 
 The HTML templates for SSO and email notifications now have `Jinja2's autoescape <https://jinja.palletsprojects.com/en/2.11.x/api/#autoescaping>`_
-enabled for files ending in ``.html``, ``.htm``, and ``.xml``. If you hae customised
+enabled for files ending in ``.html``, ``.htm``, and ``.xml``. If you have customised
 these templates and see issues when viewing them you might need to update them.
 It is expected that most configurations will need no changes.
 
-If you have customised the templates *names* for these templates it is recommended
+If you have customised the templates *names* for these templates, it is recommended
 to verify they end in ``.html`` to ensure autoescape is enabled.
 
 The above applies to the following templates:
