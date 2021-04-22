@@ -266,8 +266,6 @@ class RegistrationHandler(BaseHandler):
         else:
             # autogen a sequential user ID
             fail_count = 0
-            # If a default display name is not given, generate one.
-            generate_display_name = default_display_name is None
             # This breaks on successful registration *or* errors after 10 failures.
             while True:
                 # Fail after being unable to find a suitable ID a few times
@@ -278,7 +276,7 @@ class RegistrationHandler(BaseHandler):
                 user = UserID(localpart, self.hs.hostname)
                 user_id = user.to_string()
                 self.check_user_id_not_appservice_exclusive(user_id)
-                if generate_display_name:
+                if default_display_name is None:
                     default_display_name = localpart
                 try:
                     await self.register_with_store(
