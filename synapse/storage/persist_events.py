@@ -17,7 +17,7 @@
 import itertools
 import logging
 from collections import deque, namedtuple
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter, Histogram
 
@@ -32,7 +32,6 @@ from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
-    Collection,
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
