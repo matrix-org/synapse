@@ -21,6 +21,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import make_event_from_dict
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
+from synapse.storage.databases.main.events import PersistEventsStore
 from synapse.storage.types import Cursor
 from synapse.types import JsonDict
 
@@ -833,8 +834,12 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             #
             # Annoyingly we need to gut wrench into the persit event store so that
             # we can reuse the function to calculate the chain cover for rooms.
-            self.hs.get_datastores().persist_events._add_chain_cover_index(
-                txn, event_to_room_id, event_to_types, event_to_auth_chain,
+            PersistEventsStore._add_chain_cover_index(
+                txn,
+                self.db_pool,
+                event_to_room_id,
+                event_to_types,
+                event_to_auth_chain,
             )
 
             return new_last_depth, new_last_stream, count

@@ -457,3 +457,30 @@ class UIAuthTests(unittest.HomeserverTestCase):
         self.assertIn({"stages": ["m.login.password"]}, flows)
         self.assertIn({"stages": ["m.login.sso"]}, flows)
         self.assertEqual(len(flows), 2)
+
+    @skip_unless(HAS_OIDC, "requires OIDC")
+    @override_config({"oidc_config": TEST_OIDC_CONFIG})
+    def test_ui_auth_fails_for_incorrect_sso_user(self):
+        """If the user tries to authenticate with the wrong SSO user, they get an error
+        """
+        # log the user in
+        login_resp = self.helper.login_via_oidc(UserID.from_string(self.user).localpart)
+        self.assertEqual(login_resp["user_id"], self.user)
+
+        # start a UI Auth flow by attempting to delete a device
+        channel = self.delete_device(self.user_tok, self.device_id, 401)
+
+        flows = channel.json_body["flows"]
+        self.assertIn({"stages": ["m.login.sso"]}, flows)
+        session_id = channel.json_body["session"]
+
+        # do the OIDC auth, but auth as the wrong user
+        channel = self.helper.auth_via_oidc("wrong_user", ui_auth_session_id=session_id)
+
+        # that should return a failure message
+        self.assertSubstring("We were unable to validate", channel.text_body)
+
+        # ... and the delete op should now fail with a 403
+        self.delete_device(
+            self.user_tok, self.device_id, 403, body={"auth": {"session": session_id}}
+        )
