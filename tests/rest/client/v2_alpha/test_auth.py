@@ -411,7 +411,7 @@ class UIAuthTests(unittest.HomeserverTestCase):
         # run the UIA-via-SSO flow
         session_id = channel.json_body["session"]
         channel = self.helper.auth_via_oidc(
-            remote_user_id=remote_user_id, ui_auth_session_id=session_id
+            {"sub": remote_user_id}, ui_auth_session_id=session_id
         )
 
         # that should serve a confirmation page
