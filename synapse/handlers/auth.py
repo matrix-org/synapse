@@ -263,10 +263,6 @@ class AuthHandler(BaseHandler):
         # authenticating for an operation to occur on their account.
         self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
 
-        # The following template is shown after a successful user interactive
-        # authentication session. It tells the user they can close the window.
-        self._sso_auth_success_template = hs.config.sso_auth_success_template
-
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (
@@ -1383,27 +1379,6 @@ class AuthHandler(BaseHandler):
         return self._sso_auth_confirm_template.render(
             description=session.description, redirect_url=redirect_url,
         )
-
-    async def complete_sso_ui_auth(
-        self, registered_user_id: str, session_id: str, request: Request,
-    ):
-        """Having figured out a mxid for this user, complete the HTTP request
-
-        Args:
-            registered_user_id: The registered user ID to complete SSO login for.
-            session_id: The ID of the user-interactive auth session.
-            request: The request to complete.
-        """
-        # Mark the stage of the authentication as successful.
-        # Save the user who authenticated with SSO, this will be used to ensure
-        # that the account be modified is also the person who logged in.
-        await self.store.mark_ui_auth_stage_complete(
-            session_id, LoginType.SSO, registered_user_id
-        )
-
-        # Render the HTML and return.
-        html = self._sso_auth_success_template
-        respond_with_html(request, 200, html)
 
     async def complete_sso_login(
         self,
