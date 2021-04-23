@@ -563,6 +563,9 @@ class Auth:
         Returns:
             bool: False if no access_token was given, True otherwise.
         """
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         query_params = request.args.get(b"access_token")
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         return bool(query_params) or bool(auth_headers)
@@ -579,6 +582,8 @@ class Auth:
             MissingClientTokenError: If there isn't a single access_token in the
                 request
         """
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
 
         auth_headers = request.requestHeaders.getRawHeaders(b"Authorization")
         query_params = request.args.get(b"access_token")

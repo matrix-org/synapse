@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # The script to build the Debian package, as ran inside the Docker image.
 

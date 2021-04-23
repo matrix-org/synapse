@@ -1938,6 +1938,9 @@ saml2_config:
 #       Note that, if this is changed, users authenticating via that provider
 #       will no longer be recognised as the same user!
 #
+#       (Use "oidc" here if you are migrating from an old "oidc_config"
+#       configuration.)
+#
 #   idp_name: A user-facing name for this identity provider, which is used to
 #       offer the user a choice of login mechanisms.
 #
@@ -2106,37 +2109,6 @@ oidc_providers:
   #  attribute_requirements:
   #    - attribute: userGroup
   #      value: "synapseUsers"
-
-  # For use with Keycloak
-  #
-  #- idp_id: keycloak
-  #  idp_name: Keycloak
-  #  issuer: "https://127.0.0.1:8443/auth/realms/my_realm_name"
-  #  client_id: "synapse"
-  #  client_secret: "copy secret generated in Keycloak UI"
-  #  scopes: ["openid", "profile"]
-  #  attribute_requirements:
-  #    - attribute: groups
-  #      value: "admin"
-
-  # For use with Github
-  #
-  #- idp_id: github
-  #  idp_name: Github
-  #  idp_brand: github
-  #  discover: false
-  #  issuer: "https://github.com/"
-  #  client_id: "your-client-id" # TO BE FILLED
-  #  client_secret: "your-client-secret" # TO BE FILLED
-  #  authorization_endpoint: "https://github.com/login/oauth/authorize"
-  #  token_endpoint: "https://github.com/login/oauth/access_token"
-  #  userinfo_endpoint: "https://api.github.com/user"
-  #  scopes: ["read:user"]
-  #  user_mapping_provider:
-  #    config:
-  #      subject_claim: "id"
-  #      localpart_template: "{{ user.login }}"
-  #      display_name_template: "{{ user.name }}"
 
 
 # Enable Central Authentication Service (CAS) for registration and login.

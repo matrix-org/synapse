@@ -149,6 +149,9 @@ class OidcHandler:
         Args:
             request: the incoming request from the browser.
         """
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         # The provider might redirect with an error.
         # In that case, just display it as-is.
         if b"error" in request.args:
