@@ -349,6 +349,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             config=worker_hs.config.server.listeners[0],
             resource=resource,
             server_version_string="1",
+            reactor=self.reactor,
         )
 
         if worker_hs.config.redis.redis_enabled:
