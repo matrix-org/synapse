@@ -814,6 +814,11 @@ class FederationClient(FederationBase):
 
         Returns:
             The event as a dict as returned by the remote server
+
+        Raises:
+            SynapseError: if the remote server returns an error or if the server
+                only supports the v1 endpoint and a room version other than "1"
+                or "2" is requested.
         """
         time_now = self._clock.time_msec()
 
