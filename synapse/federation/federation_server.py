@@ -22,6 +22,7 @@ from typing import (
     Awaitable,
     Callable,
     Dict,
+    Iterable,
     List,
     Optional,
     Tuple,
@@ -91,16 +92,15 @@ pdu_process_time = Histogram(
     "Time taken to process an event",
 )
 
-
-last_pdu_age_metric = Gauge(
-    "synapse_federation_last_received_pdu_age",
-    "The age (in seconds) of the last PDU successfully received from the given domain",
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_received_pdu_time",
+    "The timestamp of the last PDU which was successfully received from the given domain",
     labelnames=("server_name",),
 )
 
 
 class FederationServer(FederationBase):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.auth = hs.get_auth()
@@ -120,7 +120,7 @@ class FederationServer(FederationBase):
 
         # We cache results for transaction with the same ID
         self._transaction_resp_cache = ResponseCache(
-            hs, "fed_txn_handler", timeout_ms=30000
+            hs.get_clock(), "fed_txn_handler", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
         self.transaction_actions = TransactionActions(self.store)
@@ -130,10 +130,10 @@ class FederationServer(FederationBase):
         # We cache responses to state queries, as they take a while and often
         # come in waves.
         self._state_resp_cache = ResponseCache(
-            hs, "state_resp", timeout_ms=30000
+            hs.get_clock(), "state_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
         self._state_ids_resp_cache = ResponseCache(
-            hs, "state_ids_resp", timeout_ms=30000
+            hs.get_clock(), "state_ids_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
 
         self._federation_metrics_domains = (
@@ -370,8 +370,7 @@ class FederationServer(FederationBase):
         )
 
         if newest_pdu_ts and origin in self._federation_metrics_domains:
-            newest_pdu_age = self._clock.time_msec() - newest_pdu_ts
-            last_pdu_age_metric.labels(server_name=origin).set(newest_pdu_age / 1000)
+            last_pdu_ts_metric.labels(server_name=origin).set(newest_pdu_ts / 1000)
 
         return pdu_results
 
@@ -456,7 +455,9 @@ class FederationServer(FederationBase):
         self, room_id: str, event_id: str
     ) -> Dict[str, list]:
         if event_id:
-            pdus = await self.handler.get_state_for_pdu(room_id, event_id)
+            pdus = await self.handler.get_state_for_pdu(
+                room_id, event_id
+            )  # type: Iterable[EventBase]
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 

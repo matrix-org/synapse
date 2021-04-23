@@ -124,6 +124,13 @@ This version changes the URI used for callbacks from OAuth2 and SAML2 identity p
   need to add ``[synapse public baseurl]/_synapse/client/saml2/authn_response`` as a permitted
   "ACS location" (also known as "allowed callback URLs") at the identity provider.
 
+  The "Issuer" in the "AuthnRequest" to the SAML2 identity provider is also updated to
+  ``[synapse public baseurl]/_synapse/client/saml2/metadata.xml``. If your SAML2 identity
+  provider uses this property to validate or otherwise identify Synapse, its configuration
+  will need to be updated to use the new URL. Alternatively you could create a new, separate
+  "EntityDescriptor" in your SAML2 identity provider with the new URLs and leave the URLs in
+  the existing "EntityDescriptor" as they were.
+
 Changes to HTML templates
 -------------------------
 
