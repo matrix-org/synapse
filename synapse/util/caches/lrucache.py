@@ -36,9 +36,6 @@ from synapse.util.caches.treecache import TreeCache
 try:
     from pympler.asizeof import Asizer
 
-    sizer = Asizer()
-    sizer.exclude_refs((), None, "")
-
     def _get_size_of(val: Any, *, recurse=True) -> int:
         """Get an estimate of the size in bytes of the object.
 
@@ -47,12 +44,14 @@ try:
             recurse: If true will include referenced values in the size,
                 otherwise only sizes the given object.
         """
+        sizer = Asizer()
+        sizer.exclude_refs((), None, "")
         return sizer.asizeof(val, limit=100 if recurse else 0)
 
 
 except ImportError:
 
-    def _get_size_of(val: Any, recurse=True) -> int:
+    def _get_size_of(val: Any, *, recurse=True) -> int:
         return 0
 
 
