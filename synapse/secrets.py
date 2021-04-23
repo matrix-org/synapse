@@ -15,30 +15,14 @@
 """
 Injectable secrets module for Synapse.
 
-See https://docs.python.org/3/library/secrets.html#module-secrets for the API
-used in Python 3.6, and the API emulated in Python 2.7.
+See https://docs.python.org/3/library/secrets.html#module-secrets for the API.
 """
-import sys
-
-# secrets is available since python 3.6
-if sys.version_info[0:2] >= (3, 6):
-    import secrets
-
-    class Secrets:
-        def token_bytes(self, nbytes: int = 32) -> bytes:
-            return secrets.token_bytes(nbytes)
-
-        def token_hex(self, nbytes: int = 32) -> str:
-            return secrets.token_hex(nbytes)
+import secrets
 
 
-else:
-    import binascii
-    import os
+class Secrets:
+    def token_bytes(self, nbytes: int = 32) -> bytes:
+        return secrets.token_bytes(nbytes)
 
-    class Secrets:
-        def token_bytes(self, nbytes: int = 32) -> bytes:
-            return os.urandom(nbytes)
-
-        def token_hex(self, nbytes: int = 32) -> str:
-            return binascii.hexlify(self.token_bytes(nbytes)).decode("ascii")
+    def token_hex(self, nbytes: int = 32) -> str:
+        return secrets.token_hex(nbytes)
