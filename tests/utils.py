@@ -153,6 +153,10 @@ def default_config(name, parse=False):
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_invites": {
+            "per_room": {"per_second": 10000, "burst_count": 10000},
+            "per_user": {"per_second": 10000, "burst_count": 10000},
+        },
         "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
         "public_baseurl": None,
