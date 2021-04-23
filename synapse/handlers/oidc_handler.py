@@ -29,6 +29,7 @@ from authlib.oidc.discovery import OpenIDProviderMetadata, get_well_known_url
 from jinja2 import Environment, Template
 from pymacaroons.exceptions import (
     MacaroonDeserializationException,
+    MacaroonInitException,
     MacaroonInvalidSignatureException,
 )
 from typing_extensions import TypedDict
@@ -217,7 +218,7 @@ class OidcHandler:
             session_data = self._token_generator.verify_oidc_session_token(
                 session, state
             )
-        except (MacaroonDeserializationException, KeyError) as e:
+        except (MacaroonInitException, MacaroonDeserializationException, KeyError) as e:
             logger.exception("Invalid session for OIDC callback")
             self._sso_handler.render_error(request, "invalid_session", str(e))
             return
@@ -329,6 +330,9 @@ class OidcProvider:
 
         # optional brand identifier for this auth provider
         self.idp_brand = provider.idp_brand
+
+        # Optional brand identifier for the unstable API (see MSC2858).
+        self.unstable_idp_brand = provider.unstable_idp_brand
 
         self._sso_handler = hs.get_sso_handler()
 

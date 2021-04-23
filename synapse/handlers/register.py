@@ -213,8 +213,7 @@ class RegistrationHandler(BaseHandler):
               admin api, otherwise False.
             user_agent_ips: Tuples of IP addresses and user-agents used
                 during the registration process.
-            auth_provider_id: The SSO IdP the user used, if any (just used for the
-                prometheus metrics).
+            auth_provider_id: The SSO IdP the user used, if any.
         Returns:
             The registered user_id.
         Raises:
@@ -226,6 +225,7 @@ class RegistrationHandler(BaseHandler):
             threepid,
             localpart,
             user_agent_ips or [],
+            auth_provider_id=auth_provider_id,
         )
 
         if result == RegistrationBehaviour.DENY:

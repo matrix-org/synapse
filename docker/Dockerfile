@@ -69,6 +69,7 @@ RUN apt-get update && apt-get install -y \
     libpq5 \
     libwebp6 \
     xmlsec1 \
+    libjemalloc2 \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
