@@ -157,11 +157,6 @@ class Auth:
         with Measure(self.clock, "check_host_in_room"):
             return await self.store.is_host_joined(room_id, host)
 
-    def can_federate(self, event, auth_events):
-        creation_event = auth_events.get((EventTypes.Create, ""))
-
-        return creation_event.content.get("m.federate", True) is True
-
     def get_public_keys(self, invite_event: EventBase) -> List[Dict[str, str]]:
         return event_auth.get_public_keys(invite_event)
 
