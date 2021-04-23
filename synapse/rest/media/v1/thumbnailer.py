@@ -96,9 +96,14 @@ class Thumbnailer:
     def _resize(self, width: int, height: int) -> Image:
         # 1-bit or 8-bit color palette images need converting to RGB
         # otherwise they will be scaled using nearest neighbour which
-        # looks awful
-        if self.image.mode in ["1", "P"]:
-            self.image = self.image.convert("RGB")
+        # looks awful.
+        #
+        # If the image has transparency, use RGBA instead.
+        if self.image.mode in ["1", "L", "P"]:
+            mode = "RGB"
+            if self.image.info.get("transparency", None) is not None:
+                mode = "RGBA"
+            self.image = self.image.convert(mode)
         return self.image.resize((width, height), Image.ANTIALIAS)
 
     def scale(self, width: int, height: int, output_type: str) -> BytesIO:
