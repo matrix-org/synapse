@@ -55,7 +55,6 @@ from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.keys import SlavedKeyStore
-from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.replication.slave.storage.profile import SlavedProfileStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
@@ -64,7 +63,7 @@ from synapse.replication.slave.storage.registration import SlavedRegistrationSto
 from synapse.replication.slave.storage.room import RoomStore
 from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events, login, room
+from synapse.rest.client.v1 import events, login, presence, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
 from synapse.rest.client.v1.profile import (
     ProfileAvatarURLRestServlet,
@@ -110,6 +109,7 @@ from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
+from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.search import SearchWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
@@ -119,26 +119,6 @@ from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
-
-
-class PresenceStatusStubServlet(RestServlet):
-    """If presence is disabled this servlet can be used to stub out setting
-    presence status.
-    """
-
-    PATTERNS = client_patterns("/presence/(?P<user_id>[^/]*)/status")
-
-    def __init__(self, hs):
-        super().__init__()
-        self.auth = hs.get_auth()
-
-    async def on_GET(self, request, user_id):
-        await self.auth.get_user_by_req(request)
-        return 200, {"presence": "offline"}
-
-    async def on_PUT(self, request, user_id):
-        await self.auth.get_user_by_req(request)
-        return 200, {}
 
 
 class KeyUploadServlet(RestServlet):
@@ -241,6 +221,7 @@ class GenericWorkerSlavedStore(
     StatsStore,
     UIAuthWorkerStore,
     EndToEndRoomKeyStore,
+    PresenceStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedReceiptsStore,
@@ -259,7 +240,6 @@ class GenericWorkerSlavedStore(
     SlavedTransactionStore,
     SlavedProfileStore,
     SlavedClientIpStore,
-    SlavedPresenceStore,
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
@@ -327,10 +307,7 @@ class GenericWorkerServer(HomeServer):
 
                     user_directory.register_servlets(self, resource)
 
-                    # If presence is disabled, use the stub servlet that does
-                    # not allow sending presence
-                    if not self.config.use_presence:
-                        PresenceStatusStubServlet(self).register(resource)
+                    presence.register_servlets(self, resource)
 
                     groups.register_servlets(self, resource)
 
