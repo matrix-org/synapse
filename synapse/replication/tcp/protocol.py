@@ -46,7 +46,6 @@ indicate which side is sending, these are *not* included on the wire::
     > ERROR server stopping
     * connection closed by server *
 """
-import abc
 import fcntl
 import logging
 import struct
@@ -54,6 +53,7 @@ from inspect import isawaitable
 from typing import TYPE_CHECKING, List, Optional
 
 from prometheus_client import Counter
+from zope.interface import Interface, implementer
 
 from twisted.internet import task
 from twisted.protocols.basic import LineOnlyReceiver
@@ -121,6 +121,14 @@ class ConnectionStates:
     CLOSED = "closed"
 
 
+class IReplicationConnection(Interface):
+    """An interface for replication connections."""
+
+    def send_command(cmd: Command):
+        """Send the command down the connection"""
+
+
+@implementer(IReplicationConnection)
 class BaseReplicationStreamProtocol(LineOnlyReceiver):
     """Base replication protocol shared between client and server.
 
@@ -493,20 +501,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         logger.info("[%s] Subscribing to replication streams", self.id())
 
         self.send_command(ReplicateCommand())
-
-
-class AbstractConnection(abc.ABC):
-    """An interface for replication connections."""
-
-    @abc.abstractmethod
-    def send_command(self, cmd: Command):
-        """Send the command down the connection"""
-        pass
-
-
-# This tells python that `BaseReplicationStreamProtocol` implements the
-# interface.
-AbstractConnection.register(BaseReplicationStreamProtocol)
 
 
 # The following simply registers metrics for the replication connections

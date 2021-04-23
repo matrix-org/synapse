@@ -164,7 +164,7 @@ class Auth:
 
     async def get_user_by_req(
         self,
-        request: Request,
+        request: SynapseRequest,
         allow_guest: bool = False,
         rights: str = "access",
         allow_expired: bool = False,
