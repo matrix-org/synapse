@@ -42,7 +42,7 @@ class SetPasswordHandler(BaseHandler):
         logout_devices: bool,
         requester: Optional[Requester] = None,
     ) -> None:
-        if not self.hs.config.password_localdb_enabled:
+        if not self._auth_handler.can_change_password():
             raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
 
         try:
