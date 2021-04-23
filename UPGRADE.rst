@@ -88,20 +88,21 @@ for example:
 Upgrading to v1.27.0
 ====================
 
-Changes to callback URI for OAuth2 / OpenID Connect
----------------------------------------------------
+Changes to callback URI for OAuth2 / OpenID Connect and SAML2
+-------------------------------------------------------------
 
-This version changes the URI used for callbacks from OAuth2 identity providers. If
-your server is configured for single sign-on via an OpenID Connect or OAuth2 identity
-provider, you will need to add ``[synapse public baseurl]/_synapse/client/oidc/callback``
-to the list of permitted "redirect URIs" at the identity provider.
+This version changes the URI used for callbacks from OAuth2 and SAML2 identity providers:
 
-See `docs/openid.md <docs/openid.md>`_ for more information on setting up OpenID
-Connect.
+* If your server is configured for single sign-on via an OpenID Connect or OAuth2 identity
+  provider, you will need to add ``[synapse public baseurl]/_synapse/client/oidc/callback``
+  to the list of permitted "redirect URIs" at the identity provider.
 
-(Note: a similar change is being made for SAML2; in this case the old URI
-``[synapse public baseurl]/_matrix/saml2`` is being deprecated, but will continue to
-work, so no immediate changes are required for existing installations.)
+  See `docs/openid.md <docs/openid.md>`_ for more information on setting up OpenID
+  Connect.
+
+* If your server is configured for single sign-on via a SAML2 identity provider, you will
+  need to add ``[synapse public baseurl]/_synapse/client/saml2/authn_response`` as a permitted
+  "ACS location" (also known as "allowed callback URLs") at the identity provider.
 
 Changes to HTML templates
 -------------------------
