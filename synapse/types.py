@@ -199,7 +199,7 @@ def get_localpart_from_id(string):
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, repr=False)
 class DomainSpecificString(metaclass=abc.ABCMeta):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
@@ -268,35 +268,35 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
     __repr__ = to_string
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, repr=False)
 class UserID(DomainSpecificString):
     """Structure representing a user ID."""
 
     SIGIL = "@"
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, repr=False)
 class RoomAlias(DomainSpecificString):
     """Structure representing a room name."""
 
     SIGIL = "#"
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, repr=False)
 class RoomID(DomainSpecificString):
     """Structure representing a room id. """
 
     SIGIL = "!"
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, repr=False)
 class EventID(DomainSpecificString):
     """Structure representing an event id. """
 
     SIGIL = "$"
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, repr=False)
 class GroupID(DomainSpecificString):
     """Structure representing a group ID."""
 
