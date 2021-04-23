@@ -202,6 +202,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    async def forget(self, user: UserID, room_id: str) -> None:
+        raise NotImplementedError()
+
     def ratelimit_invite(self, room_id: Optional[str], invitee_user_id: str):
         """Ratelimit invites by room and by target user.
 

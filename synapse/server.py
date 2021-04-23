@@ -96,7 +96,7 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
 )
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberMasterHandler
+from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.set_password import SetPasswordHandler
@@ -630,7 +630,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ThirdPartyEventRules(self)
 
     @cache_in_self
-    def get_room_member_handler(self):
+    def get_room_member_handler(self) -> RoomMemberHandler:
         if self.config.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
