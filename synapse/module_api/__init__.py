@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -14,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Iterable, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -50,10 +49,20 @@ class ModuleApi:
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
+        self._presence_stream = hs.get_event_sources().sources["presence"]
+        self._state = hs.get_state_handler()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
+
+        # The next time these users sync, they will receive the current presence
+        # state of all local users. Users are added by send_local_online_presence_to,
+        # and removed after a successful sync.
+        #
+        # We make this a private variable to deter modules from accessing it directly,
+        # though other classes in Synapse will still do so.
+        self._send_full_presence_to_local_users = set()
 
     @property
     def http_client(self):
@@ -118,7 +127,7 @@ class ModuleApi:
         return defer.ensureDeferred(self._auth_handler.check_user_exists(user_id))
 
     @defer.inlineCallbacks
-    def register(self, localpart, displayname=None, emails=[]):
+    def register(self, localpart, displayname=None, emails: Optional[List[str]] = None):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Also returns an access token for the new user.
@@ -138,11 +147,13 @@ class ModuleApi:
         logger.warning(
             "Using deprecated ModuleApi.register which creates a dummy user device."
         )
-        user_id = yield self.register_user(localpart, displayname, emails)
+        user_id = yield self.register_user(localpart, displayname, emails or [])
         _, access_token = yield self.register_device(user_id)
         return user_id, access_token
 
-    def register_user(self, localpart, displayname=None, emails=[]):
+    def register_user(
+        self, localpart, displayname=None, emails: Optional[List[str]] = None
+    ):
         """Registers a new user with given localpart and optional displayname, emails.
 
         Args:
@@ -161,7 +172,7 @@ class ModuleApi:
             self._hs.get_registration_handler().register_user(
                 localpart=localpart,
                 default_display_name=displayname,
-                bind_emails=emails,
+                bind_emails=emails or [],
             )
         )
 
@@ -203,11 +214,26 @@ class ModuleApi:
         )
 
     def generate_short_term_login_token(
-        self, user_id: str, duration_in_ms: int = (2 * 60 * 1000)
+        self,
+        user_id: str,
+        duration_in_ms: int = (2 * 60 * 1000),
+        auth_provider_id: str = "",
     ) -> str:
-        """Generate a login token suitable for m.login.token authentication"""
+        """Generate a login token suitable for m.login.token authentication
+
+        Args:
+            user_id: gives the ID of the user that the token is for
+
+            duration_in_ms: the time that the token will be valid for
+
+            auth_provider_id: the ID of the SSO IdP that the user used to authenticate
+               to get this token, if any. This is encoded in the token so that
+               /login can report stats on number of successful logins by IdP.
+        """
         return self._hs.get_macaroon_generator().generate_short_term_login_token(
-            user_id, duration_in_ms
+            user_id,
+            auth_provider_id,
+            duration_in_ms,
         )
 
     @defer.inlineCallbacks
@@ -275,11 +301,19 @@ class ModuleApi:
                 redirect them directly if whitelisted).
         """
         self._auth_handler._complete_sso_login(
-            registered_user_id, request, client_redirect_url,
+            registered_user_id,
+            "<unknown>",
+            request,
+            client_redirect_url,
         )
 
     async def complete_sso_login_async(
-        self, registered_user_id: str, request: SynapseRequest, client_redirect_url: str
+        self,
+        registered_user_id: str,
+        request: SynapseRequest,
+        client_redirect_url: str,
+        new_user: bool = False,
+        auth_provider_id: str = "<unknown>",
     ):
         """Complete a SSO login by redirecting the user to a page to confirm whether they
         want their access token sent to `client_redirect_url`, or redirect them to that
@@ -291,15 +325,23 @@ class ModuleApi:
             request: The request to respond to.
             client_redirect_url: The URL to which to offer to redirect the user (or to
                 redirect them directly if whitelisted).
+            new_user: set to true to use wording for the consent appropriate to a user
+                who has just registered.
+            auth_provider_id: the ID of the SSO IdP which was used to log in. This
+                is used to track counts of sucessful logins by IdP.
         """
         await self._auth_handler.complete_sso_login(
-            registered_user_id, request, client_redirect_url,
+            registered_user_id,
+            auth_provider_id,
+            request,
+            client_redirect_url,
+            new_user=new_user,
         )
 
     @defer.inlineCallbacks
     def get_state_events_in_room(
         self, room_id: str, types: Iterable[Tuple[str, Optional[str]]]
-    ) -> defer.Deferred:
+    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
         """Gets current state events for the given room.
 
         (This is exposed for compatibility with the old SpamCheckerApi. We should
@@ -346,10 +388,56 @@ class ModuleApi:
             event,
             _,
         ) = await self._hs.get_event_creation_handler().create_and_send_nonmember_event(
-            requester, event_dict, ratelimit=False, ignore_shadow_ban=True,
+            requester,
+            event_dict,
+            ratelimit=False,
+            ignore_shadow_ban=True,
         )
 
         return event
+
+    async def send_local_online_presence_to(self, users: Iterable[str]) -> None:
+        """
+        Forces the equivalent of a presence initial_sync for a set of local or remote
+        users. The users will receive presence for all currently online users that they
+        are considered interested in.
+
+        Updates to remote users will be sent immediately, whereas local users will receive
+        them on their next sync attempt.
+
+        Note that this method can only be run on the main or federation_sender worker
+        processes.
+        """
+        if not self._hs.should_send_federation():
+            raise Exception(
+                "send_local_online_presence_to can only be run "
+                "on processes that send federation",
+            )
+
+        for user in users:
+            if self._hs.is_mine_id(user):
+                # Modify SyncHandler._generate_sync_entry_for_presence to call
+                # presence_source.get_new_events with an empty `from_key` if
+                # that user's ID were in a list modified by ModuleApi somewhere.
+                # That user would then get all presence state on next incremental sync.
+
+                # Force a presence initial_sync for this user next time
+                self._send_full_presence_to_local_users.add(user)
+            else:
+                # Retrieve presence state for currently online users that this user
+                # is considered interested in
+                presence_events, _ = await self._presence_stream.get_new_events(
+                    UserID.from_string(user), from_key=None, include_offline=False
+                )
+
+                # Send to remote destinations.
+
+                # We pull out the presence handler here to break a cyclic
+                # dependency between the presence router and module API.
+                presence_handler = self._hs.get_presence_handler()
+                await presence_handler.maybe_send_presence_to_interested_destinations(
+                    presence_events
+                )
 
 
 class PublicRoomListManager:

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -210,7 +209,9 @@ def start(config_options):
     config.update_user_directory = False
     config.run_background_tasks = False
     config.start_pushers = False
+    config.pusher_shard_config.instances = []
     config.send_federation = False
+    config.federation_shard_config.instances = []
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 

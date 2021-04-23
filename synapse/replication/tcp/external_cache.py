@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -60,8 +59,7 @@ class ExternalCache:
         return self._redis_connection is not None
 
     async def set(self, cache_name: str, key: str, value: Any, expiry_ms: int) -> None:
-        """Add the key/value to the named cache, with the expiry time given.
-        """
+        """Add the key/value to the named cache, with the expiry time given."""
 
         if self._redis_connection is None:
             return
@@ -76,13 +74,14 @@ class ExternalCache:
 
         return await make_deferred_yieldable(
             self._redis_connection.set(
-                self._get_redis_key(cache_name, key), encoded_value, pexpire=expiry_ms,
+                self._get_redis_key(cache_name, key),
+                encoded_value,
+                pexpire=expiry_ms,
             )
         )
 
     async def get(self, cache_name: str, key: str) -> Optional[Any]:
-        """Look up a key/value in the named cache.
-        """
+        """Look up a key/value in the named cache."""
 
         if self._redis_connection is None:
             return None

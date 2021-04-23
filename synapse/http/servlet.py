@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -258,7 +257,7 @@ def assert_params_in_dict(body, required):
 
 class RestServlet:
 
-    """ A Synapse REST Servlet.
+    """A Synapse REST Servlet.
 
     An implementing class can either provide its own custom 'register' method,
     or use the automatic pattern handling provided by the base class.

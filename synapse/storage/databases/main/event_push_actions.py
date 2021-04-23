@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -54,8 +53,7 @@ def _serialize_action(actions, is_highlight):
 
 
 def _deserialize_action(actions, is_highlight):
-    """Custom deserializer for actions. This allows us to "compress" common actions
-    """
+    """Custom deserializer for actions. This allows us to "compress" common actions"""
     if actions:
         return db_to_json(actions)
 
@@ -91,7 +89,10 @@ class EventPushActionsWorkerStore(SQLBaseStore):
 
     @cached(num_args=3, tree=True, max_entries=5000)
     async def get_unread_event_push_actions_by_room_for_user(
-        self, room_id: str, user_id: str, last_read_event_id: Optional[str],
+        self,
+        room_id: str,
+        user_id: str,
+        last_read_event_id: Optional[str],
     ) -> Dict[str, int]:
         """Get the notification count, the highlight count and the unread message count
         for a given user in a given room after the given read receipt.
@@ -120,13 +121,19 @@ class EventPushActionsWorkerStore(SQLBaseStore):
         )
 
     def _get_unread_counts_by_receipt_txn(
-        self, txn, room_id, user_id, last_read_event_id,
+        self,
+        txn,
+        room_id,
+        user_id,
+        last_read_event_id,
     ):
         stream_ordering = None
 
         if last_read_event_id is not None:
             stream_ordering = self.get_stream_id_for_event_txn(
-                txn, last_read_event_id, allow_none=True,
+                txn,
+                last_read_event_id,
+                allow_none=True,
             )
 
         if stream_ordering is None:

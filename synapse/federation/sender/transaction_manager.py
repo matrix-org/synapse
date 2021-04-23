@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,9 +35,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-last_pdu_age_metric = Gauge(
-    "synapse_federation_last_sent_pdu_age",
-    "The age (in seconds) of the last PDU successfully sent to the given domain",
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_sent_pdu_time",
+    "The timestamp of the last PDU which was successfully sent to the given domain",
     labelnames=("server_name",),
 )
 
@@ -57,7 +56,7 @@ class TransactionManager:
         self._transport_layer = hs.get_federation_transport_client()
 
         self._federation_metrics_domains = (
-            hs.get_config().federation.federation_metrics_domains
+            hs.config.federation.federation_metrics_domains
         )
 
         # HACK to get unique tx id
@@ -65,16 +64,16 @@ class TransactionManager:
 
     @measure_func("_send_new_transaction")
     async def send_new_transaction(
-        self, destination: str, pdus: List[EventBase], edus: List[Edu],
-    ) -> bool:
+        self,
+        destination: str,
+        pdus: List[EventBase],
+        edus: List[Edu],
+    ) -> None:
         """
         Args:
             destination: The destination to send to (e.g. 'example.org')
             pdus: In-order list of PDUs to send
             edus: List of EDUs to send
-
-        Returns:
-            True iff the transaction was successful
         """
 
         # Make a transaction-sending opentracing span. This span follows on from
@@ -93,8 +92,6 @@ class TransactionManager:
                 edu.strip_context()
 
         with start_active_span_follows_from("send_transaction", span_contexts):
-            success = True
-
             logger.debug("TX [%s] _attempt_new_transaction", destination)
 
             txn_id = str(self._next_txn_id)
@@ -149,45 +146,29 @@ class TransactionManager:
                 response = await self._transport_layer.send_transaction(
                     transaction, json_data_cb
                 )
-                code = 200
             except HttpResponseException as e:
                 code = e.code
                 response = e.response
 
-                if e.code in (401, 404, 429) or 500 <= e.code:
-                    logger.info(
-                        "TX [%s] {%s} got %d response", destination, txn_id, code
-                    )
-                    raise e
+                set_tag(tags.ERROR, True)
 
-            logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
+                logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
+                raise
 
-            if code == 200:
-                for e_id, r in response.get("pdus", {}).items():
-                    if "error" in r:
-                        logger.warning(
-                            "TX [%s] {%s} Remote returned error for %s: %s",
-                            destination,
-                            txn_id,
-                            e_id,
-                            r,
-                        )
-            else:
-                for p in pdus:
+            logger.info("TX [%s] {%s} got 200 response", destination, txn_id)
+
+            for e_id, r in response.get("pdus", {}).items():
+                if "error" in r:
                     logger.warning(
-                        "TX [%s] {%s} Failed to send event %s",
+                        "TX [%s] {%s} Remote returned error for %s: %s",
                         destination,
                         txn_id,
-                        p.event_id,
+                        e_id,
+                        r,
                     )
-                success = False
 
-            if success and pdus and destination in self._federation_metrics_domains:
+            if pdus and destination in self._federation_metrics_domains:
                 last_pdu = pdus[-1]
-                last_pdu_age = self.clock.time_msec() - last_pdu.origin_server_ts
-                last_pdu_age_metric.labels(server_name=destination).set(
-                    last_pdu_age / 1000
+                last_pdu_ts_metric.labels(server_name=destination).set(
+                    last_pdu.origin_server_ts / 1000
                 )
-
-            set_tag(tags.ERROR, not success)
-            return success

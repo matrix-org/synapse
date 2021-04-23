@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the 'License');
@@ -90,7 +89,8 @@ class EventChainStoreTestCase(HomeserverTestCase):
                     "content": {"tag": "power"},
                 },
             ).build(
-                prev_event_ids=[], auth_event_ids=[create.event_id, bob_join.event_id],
+                prev_event_ids=[],
+                auth_event_ids=[create.event_id, bob_join.event_id],
             )
         )
 
@@ -226,7 +226,8 @@ class EventChainStoreTestCase(HomeserverTestCase):
 
             self.assertFalse(
                 link_map.exists_path_from(
-                    chain_map[create.event_id], chain_map[event.event_id],
+                    chain_map[create.event_id],
+                    chain_map[event.event_id],
                 ),
             )
 
@@ -287,7 +288,8 @@ class EventChainStoreTestCase(HomeserverTestCase):
                     "content": {"tag": "power"},
                 },
             ).build(
-                prev_event_ids=[], auth_event_ids=[create.event_id, bob_join.event_id],
+                prev_event_ids=[],
+                auth_event_ids=[create.event_id, bob_join.event_id],
             )
         )
 
@@ -373,7 +375,8 @@ class EventChainStoreTestCase(HomeserverTestCase):
             )
 
     def persist(
-        self, events: List[EventBase],
+        self,
+        events: List[EventBase],
     ):
         """Persist the given events and check that the links generated match
         those given.
@@ -394,7 +397,10 @@ class EventChainStoreTestCase(HomeserverTestCase):
             persist_events_store._persist_event_auth_chain_txn(txn, events)
 
         self.get_success(
-            persist_events_store.db_pool.runInteraction("_persist", _persist,)
+            persist_events_store.db_pool.runInteraction(
+                "_persist",
+                _persist,
+            )
         )
 
     def fetch_chains(
@@ -447,8 +453,7 @@ class EventChainStoreTestCase(HomeserverTestCase):
 
 class LinkMapTestCase(unittest.TestCase):
     def test_simple(self):
-        """Basic tests for the LinkMap.
-        """
+        """Basic tests for the LinkMap."""
         link_map = _LinkMap()
 
         link_map.add_link((1, 1), (2, 1), new=False)
@@ -490,8 +495,7 @@ class EventChainBackgroundUpdateTestCase(HomeserverTestCase):
         self.requester = create_requester(self.user_id)
 
     def _generate_room(self) -> Tuple[str, List[Set[str]]]:
-        """Insert a room without a chain cover index.
-        """
+        """Insert a room without a chain cover index."""
         room_id = self.helper.create_room_as(self.user_id, tok=self.token)
 
         # Mark the room as not having a chain cover index

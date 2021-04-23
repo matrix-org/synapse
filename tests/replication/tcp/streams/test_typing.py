@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.handlers.typing import RoomMember
 from synapse.replication.tcp.streams import TypingStream
@@ -69,6 +68,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         self.assert_request_is_get_repl_stream_updates(request, "typing")
 
         # The from token should be the token from the last RDATA we got.
+        assert request.args is not None
         self.assertEqual(int(request.args[b"from_token"][0]), token)
 
         self.test_handler.on_rdata.assert_called_once()

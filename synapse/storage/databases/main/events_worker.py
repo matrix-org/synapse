@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,11 +11,20 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import itertools
+
 import logging
 import threading
 from collections import namedtuple
-from typing import Dict, Iterable, List, Optional, Tuple, overload
+from typing import (
+    Collection,
+    Container,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    overload,
+)
 
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
@@ -45,7 +53,8 @@ from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_cla
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
-from synapse.types import Collection, JsonDict, get_domain_from_id
+from synapse.storage.util.sequence import build_sequence_generator
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
@@ -120,7 +129,9 @@ class EventsWorkerStore(SQLBaseStore):
             # SQLite).
             if hs.get_instance_name() in hs.config.worker.writers.events:
                 self._stream_id_gen = StreamIdGenerator(
-                    db_conn, "events", "stream_ordering",
+                    db_conn,
+                    "events",
+                    "stream_ordering",
                 )
                 self._backfill_id_gen = StreamIdGenerator(
                     db_conn,
@@ -140,7 +151,8 @@ class EventsWorkerStore(SQLBaseStore):
         if hs.config.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
-                self._cleanup_old_transaction_ids, 5 * 60 * 1000,
+                self._cleanup_old_transaction_ids,
+                5 * 60 * 1000,
             )
 
         self._get_event_cache = LruCache(
@@ -152,6 +164,21 @@ class EventsWorkerStore(SQLBaseStore):
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
         self._event_fetch_ongoing = 0
+
+        # We define this sequence here so that it can be referenced from both
+        # the DataStore and PersistEventStore.
+        def get_chain_id_txn(txn):
+            txn.execute("SELECT COALESCE(max(chain_id), 0) FROM event_auth_chains")
+            return txn.fetchone()[0]
+
+        self.event_chain_id_gen = build_sequence_generator(
+            db_conn,
+            database.engine,
+            get_chain_id_txn,
+            "event_auth_chain_id",
+            table="event_auth_chains",
+            id_column="chain_id",
+        )
 
     def process_replication_rows(self, stream_name, instance_name, token, rows):
         if stream_name == EventsStream.NAME:
@@ -525,7 +552,7 @@ class EventsWorkerStore(SQLBaseStore):
     async def get_stripped_room_state_from_event_context(
         self,
         context: EventContext,
-        state_types_to_include: List[EventTypes],
+        state_types_to_include: Container[str],
         membership_user_id: Optional[str] = None,
     ) -> List[JsonDict]:
         """
@@ -780,6 +807,7 @@ class EventsWorkerStore(SQLBaseStore):
                 rejected_reason=rejected_reason,
             )
             original_ev.internal_metadata.stream_ordering = row["stream_ordering"]
+            original_ev.internal_metadata.outlier = row["outlier"]
 
             event_map[event_id] = original_ev
 
@@ -886,7 +914,8 @@ class EventsWorkerStore(SQLBaseStore):
                   ej.json,
                   ej.format_version,
                   r.room_version,
-                  rej.reason
+                  rej.reason,
+                  e.outlier
                 FROM events AS e
                   JOIN event_json AS ej USING (event_id)
                   LEFT JOIN rooms r ON r.room_id = e.room_id
@@ -910,6 +939,7 @@ class EventsWorkerStore(SQLBaseStore):
                     "room_version_id": row[5],
                     "rejected_reason": row[6],
                     "redactions": [],
+                    "outlier": row[7],
                 }
 
             # check for redactions
@@ -1025,7 +1055,8 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             set[str]: The events we have already seen.
         """
-        results = set()
+        # if the event cache contains the event, obviously we've seen it.
+        results = {x for x in event_ids if self._get_event_cache.contains(x)}
 
         def have_seen_events_txn(txn, chunk):
             sql = "SELECT event_id FROM events as e WHERE "
@@ -1033,12 +1064,9 @@ class EventsWorkerStore(SQLBaseStore):
                 txn.database_engine, "e.event_id", chunk
             )
             txn.execute(sql + clause, args)
-            for (event_id,) in txn:
-                results.add(event_id)
+            results.update(row[0] for row in txn)
 
-        # break the input up into chunks of 100
-        input_iterator = iter(event_ids)
-        for chunk in iter(lambda: list(itertools.islice(input_iterator, 100)), []):
+        for chunk in batch_iter((x for x in event_ids if x not in results), 100):
             await self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )
@@ -1325,8 +1353,7 @@ class EventsWorkerStore(SQLBaseStore):
         return rows, to_token, True
 
     async def is_event_after(self, event_id1, event_id2):
-        """Returns True if event_id1 is after event_id2 in the stream
-        """
+        """Returns True if event_id1 is after event_id2 in the stream"""
         to_1, so_1 = await self.get_event_ordering(event_id1)
         to_2, so_2 = await self.get_event_ordering(event_id2)
         return (to_1, so_1) > (to_2, so_2)
@@ -1428,8 +1455,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     @wrap_as_background_process("_cleanup_old_transaction_ids")
     async def _cleanup_old_transaction_ids(self):
-        """Cleans out transaction id mappings older than 24hrs.
-        """
+        """Cleans out transaction id mappings older than 24hrs."""
 
         def _cleanup_old_transaction_ids_txn(txn):
             sql = """
@@ -1440,5 +1466,6 @@ class EventsWorkerStore(SQLBaseStore):
             txn.execute(sql, (one_day_ago,))
 
         return await self.db_pool.runInteraction(
-            "_cleanup_old_transaction_ids", _cleanup_old_transaction_ids_txn,
+            "_cleanup_old_transaction_ids",
+            _cleanup_old_transaction_ids_txn,
         )

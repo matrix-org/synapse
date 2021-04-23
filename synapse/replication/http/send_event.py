@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +39,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
                                 // containing the event
             "event_format_version": .., // 1,2,3 etc: the event format version
             "internal_metadata": { .. serialized internal_metadata .. },
+            "outlier": true|false,
             "rejected_reason": ..,   // The event.rejected_reason field
             "context": { .. serialized event context .. },
             "requester": { .. serialized requester .. },
@@ -79,7 +79,6 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             ratelimit (bool)
             extra_users (list(UserID)): Any extra users to notify about event
         """
-
         serialized_context = await context.serialize(event, store)
 
         payload = {
@@ -87,6 +86,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             "room_version": event.room_version.identifier,
             "event_format_version": event.format_version,
             "internal_metadata": event.internal_metadata.get_dict(),
+            "outlier": event.internal_metadata.is_outlier(),
             "rejected_reason": event.rejected_reason,
             "context": serialized_context,
             "requester": requester.serialize(),
@@ -108,6 +108,7 @@ class ReplicationSendEventRestServlet(ReplicationEndpoint):
             event = make_event_from_dict(
                 event_dict, room_ver, internal_metadata, rejected_reason
             )
+            event.internal_metadata.outlier = content["outlier"]
 
             requester = Requester.deserialize(self.store, content["requester"])
             context = EventContext.deserialize(self.storage, content["context"])

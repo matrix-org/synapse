@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -52,8 +51,7 @@ class _GetStateGroupDelta(
 
 # this inherits from EventsWorkerStore because it calls self.get_events
 class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
-    """The parts of StateGroupStore that can be called from workers.
-    """
+    """The parts of StateGroupStore that can be called from workers."""
 
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
@@ -191,7 +189,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
 
     # FIXME: how should this be cached?
     async def get_filtered_current_state_ids(
-        self, room_id: str, state_filter: StateFilter = StateFilter.all()
+        self, room_id: str, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """Get the current state event of a given type for a room based on the
         current_state_events table.  This may not be as up-to-date as the result
@@ -206,7 +204,9 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             Map from type/state_key to event ID.
         """
 
-        where_clause, where_args = state_filter.make_sql_filter_clause()
+        where_clause, where_args = (
+            state_filter or StateFilter.all()
+        ).make_sql_filter_clause()
 
         if not where_clause:
             # We delegate to the cached version
@@ -276,8 +276,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         num_args=1,
     )
     async def _get_state_group_for_events(self, event_ids):
-        """Returns mapping event_id -> state_group
-        """
+        """Returns mapping event_id -> state_group"""
         rows = await self.db_pool.simple_select_many_batch(
             table="event_to_state_groups",
             column="event_id",
@@ -338,7 +337,8 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
             columns=["state_group"],
         )
         self.db_pool.updates.register_background_update_handler(
-            self.DELETE_CURRENT_STATE_UPDATE_NAME, self._background_remove_left_rooms,
+            self.DELETE_CURRENT_STATE_UPDATE_NAME,
+            self._background_remove_left_rooms,
         )
 
     async def _background_remove_left_rooms(self, progress, batch_size):
@@ -487,7 +487,7 @@ class MainStateBackgroundUpdateStore(RoomMemberWorkerStore):
 
 
 class StateStore(StateGroupWorkerStore, MainStateBackgroundUpdateStore):
-    """ Keeps track of the state at a given event.
+    """Keeps track of the state at a given event.
 
     This is done by the concept of `state groups`. Every event is a assigned
     a state group (identified by an arbitrary string), which references a

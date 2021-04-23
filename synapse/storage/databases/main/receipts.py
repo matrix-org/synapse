@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -160,7 +159,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: List of room_ids.
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -189,7 +188,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             room_ids: The room id.
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -208,8 +207,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[dict]:
-        """See get_linearized_receipts_for_room
-        """
+        """See get_linearized_receipts_for_room"""
 
         def f(txn):
             if from_key:
@@ -304,7 +302,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         }
         return results
 
-    @cached(num_args=2,)
+    @cached(
+        num_args=2,
+    )
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
     ) -> Dict[str, JsonDict]:
@@ -312,7 +312,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         to a limit of the latest 100 read receipts.
 
         Args:
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 

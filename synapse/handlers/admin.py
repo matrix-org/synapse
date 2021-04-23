@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +24,7 @@ from synapse.visibility import filter_events_for_client
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -203,13 +202,11 @@ class AdminHandler(BaseHandler):
 
 
 class ExfiltrationWriter(metaclass=abc.ABCMeta):
-    """Interface used to specify how to write exported data.
-    """
+    """Interface used to specify how to write exported data."""
 
     @abc.abstractmethod
     def write_events(self, room_id: str, events: List[EventBase]) -> None:
-        """Write a batch of events for a room.
-        """
+        """Write a batch of events for a room."""
         raise NotImplementedError()
 
     @abc.abstractmethod

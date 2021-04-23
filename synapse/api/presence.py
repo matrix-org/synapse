@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -56,8 +55,7 @@ class UserPresenceState(
 
     @classmethod
     def default(cls, user_id):
-        """Returns a default presence state.
-        """
+        """Returns a default presence state."""
         return cls(
             user_id=user_id,
             state=PresenceState.OFFLINE,

@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2016 OpenMarket Ltd
+# Copyright 2016-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
-from twisted.internet import defer
-
-import tests.unittest
-import tests.utils
+from tests.unittest import HomeserverTestCase
 
 USER_ID = "@user:example.com"
 
@@ -30,37 +26,31 @@ HIGHLIGHT = [
 ]
 
 
-class EventPushActionsStoreTestCase(tests.unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
+class EventPushActionsStoreTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.persist_events_store = hs.get_datastores().persist_events
 
-    @defer.inlineCallbacks
     def test_get_unread_push_actions_for_user_in_range_for_http(self):
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.get_unread_push_actions_for_user_in_range_for_http(
                 USER_ID, 0, 1000, 20
             )
         )
 
-    @defer.inlineCallbacks
     def test_get_unread_push_actions_for_user_in_range_for_email(self):
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.get_unread_push_actions_for_user_in_range_for_email(
                 USER_ID, 0, 1000, 20
             )
         )
 
-    @defer.inlineCallbacks
     def test_count_aggregation(self):
         room_id = "!foo:example.com"
         user_id = "@user1235:example.com"
 
-        @defer.inlineCallbacks
         def _assert_counts(noitf_count, highlight_count):
-            counts = yield defer.ensureDeferred(
+            counts = self.get_success(
                 self.store.db_pool.runInteraction(
                     "", self.store._get_unread_counts_by_pos_txn, room_id, user_id, 0
                 )
@@ -74,7 +64,6 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
                 },
             )
 
-        @defer.inlineCallbacks
         def _inject_actions(stream, action):
             event = Mock()
             event.room_id = room_id
@@ -82,12 +71,14 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             event.internal_metadata.stream_ordering = stream
             event.depth = stream
 
-            yield defer.ensureDeferred(
+            self.get_success(
                 self.store.add_push_actions_to_staging(
-                    event.event_id, {user_id: action}, False,
+                    event.event_id,
+                    {user_id: action},
+                    False,
                 )
             )
-            yield defer.ensureDeferred(
+            self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
                     self.persist_events_store._set_push_actions_for_event_and_users_txn,
@@ -97,14 +88,14 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             )
 
         def _rotate(stream):
-            return defer.ensureDeferred(
+            self.get_success(
                 self.store.db_pool.runInteraction(
                     "", self.store._rotate_notifs_before_txn, stream
                 )
             )
 
         def _mark_read(stream, depth):
-            return defer.ensureDeferred(
+            self.get_success(
                 self.store.db_pool.runInteraction(
                     "",
                     self.store._remove_old_push_actions_before_txn,
@@ -114,49 +105,48 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
                 )
             )
 
-        yield _assert_counts(0, 0)
-        yield _inject_actions(1, PlAIN_NOTIF)
-        yield _assert_counts(1, 0)
-        yield _rotate(2)
-        yield _assert_counts(1, 0)
+        _assert_counts(0, 0)
+        _inject_actions(1, PlAIN_NOTIF)
+        _assert_counts(1, 0)
+        _rotate(2)
+        _assert_counts(1, 0)
 
-        yield _inject_actions(3, PlAIN_NOTIF)
-        yield _assert_counts(2, 0)
-        yield _rotate(4)
-        yield _assert_counts(2, 0)
+        _inject_actions(3, PlAIN_NOTIF)
+        _assert_counts(2, 0)
+        _rotate(4)
+        _assert_counts(2, 0)
 
-        yield _inject_actions(5, PlAIN_NOTIF)
-        yield _mark_read(3, 3)
-        yield _assert_counts(1, 0)
+        _inject_actions(5, PlAIN_NOTIF)
+        _mark_read(3, 3)
+        _assert_counts(1, 0)
 
-        yield _mark_read(5, 5)
-        yield _assert_counts(0, 0)
+        _mark_read(5, 5)
+        _assert_counts(0, 0)
 
-        yield _inject_actions(6, PlAIN_NOTIF)
-        yield _rotate(7)
+        _inject_actions(6, PlAIN_NOTIF)
+        _rotate(7)
 
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.db_pool.simple_delete(
                 table="event_push_actions", keyvalues={"1": 1}, desc=""
             )
         )
 
-        yield _assert_counts(1, 0)
+        _assert_counts(1, 0)
 
-        yield _mark_read(7, 7)
-        yield _assert_counts(0, 0)
+        _mark_read(7, 7)
+        _assert_counts(0, 0)
 
-        yield _inject_actions(8, HIGHLIGHT)
-        yield _assert_counts(1, 1)
-        yield _rotate(9)
-        yield _assert_counts(1, 1)
-        yield _rotate(10)
-        yield _assert_counts(1, 1)
+        _inject_actions(8, HIGHLIGHT)
+        _assert_counts(1, 1)
+        _rotate(9)
+        _assert_counts(1, 1)
+        _rotate(10)
+        _assert_counts(1, 1)
 
-    @defer.inlineCallbacks
     def test_find_first_stream_ordering_after_ts(self):
         def add_event(so, ts):
-            return defer.ensureDeferred(
+            self.get_success(
                 self.store.db_pool.simple_insert(
                     "events",
                     {
@@ -175,24 +165,16 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             )
 
         # start with the base case where there are no events in the table
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(11)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(11))
         self.assertEqual(r, 0)
 
         # now with one event
-        yield add_event(2, 10)
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(9)
-        )
+        add_event(2, 10)
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(9))
         self.assertEqual(r, 2)
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(10)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(10))
         self.assertEqual(r, 2)
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(11)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(11))
         self.assertEqual(r, 3)
 
         # add a bunch of dummy events to the events table
@@ -203,39 +185,27 @@ class EventPushActionsStoreTestCase(tests.unittest.TestCase):
             (10, 130),
             (20, 140),
         ):
-            yield add_event(stream_ordering, ts)
+            add_event(stream_ordering, ts)
 
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(110)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(110))
         self.assertEqual(r, 3, "First event after 110ms should be 3, was %i" % r)
 
         # 4 and 5 are both after 120: we want 4 rather than 5
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(120)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(120))
         self.assertEqual(r, 4, "First event after 120ms should be 4, was %i" % r)
 
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(129)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(129))
         self.assertEqual(r, 10, "First event after 129ms should be 10, was %i" % r)
 
         # check we can get the last event
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(140)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(140))
         self.assertEqual(r, 20, "First event after 14ms should be 20, was %i" % r)
 
         # off the end
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(160)
-        )
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(160))
         self.assertEqual(r, 21)
 
         # check we can find an event at ordering zero
-        yield add_event(0, 5)
-        r = yield defer.ensureDeferred(
-            self.store.find_first_stream_ordering_after_ts(1)
-        )
+        add_event(0, 5)
+        r = self.get_success(self.store.find_first_stream_ordering_after_ts(1))
         self.assertEqual(r, 0)

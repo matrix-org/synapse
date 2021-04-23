@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +24,7 @@ from synapse.config._util import json_error_to_config_error
 
 
 def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
-    """ Loads a synapse module with its config
+    """Loads a synapse module with its config
 
     Args:
         provider: a dict with keys 'module' (the module name) and 'config'

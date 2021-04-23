@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -42,7 +41,9 @@ from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchEntry
+from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
+from synapse.storage.util.sequence import SequenceGenerator
 from synapse.types import StateMap, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.iterutils import batch_iter, sorted_topologically
@@ -90,7 +91,11 @@ class PersistEventsStore:
     """
 
     def __init__(
-        self, hs: "HomeServer", db: DatabasePool, main_data_store: "DataStore"
+        self,
+        hs: "HomeServer",
+        db: DatabasePool,
+        main_data_store: "DataStore",
+        db_conn: Connection,
     ):
         self.hs = hs
         self.db_pool = db
@@ -165,7 +170,7 @@ class PersistEventsStore:
             )
 
         async with stream_ordering_manager as stream_orderings:
-            for (event, context), stream in zip(events_and_contexts, stream_orderings):
+            for (event, _), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
             await self.db_pool.runInteraction(
@@ -292,7 +297,7 @@ class PersistEventsStore:
                 txn.execute(sql + clause, args)
                 to_recursively_check = []
 
-                for event_id, prev_event_id, metadata, rejected in txn:
+                for _, prev_event_id, metadata, rejected in txn:
                     if prev_event_id in existing_prevs:
                         continue
 
@@ -314,8 +319,8 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool,
-        state_delta_for_room: Dict[str, DeltaState] = {},
-        new_forward_extremeties: Dict[str, List[str]] = {},
+        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
+        new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
     ):
         """Insert some number of room events into the necessary database tables.
 
@@ -336,6 +341,9 @@ class PersistEventsStore:
                 extremities.
 
         """
+        state_delta_for_room = state_delta_for_room or {}
+        new_forward_extremeties = new_forward_extremeties or {}
+
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
@@ -399,7 +407,9 @@ class PersistEventsStore:
         self._update_current_state_txn(txn, state_delta_for_room, min_stream_order)
 
     def _persist_event_auth_chain_txn(
-        self, txn: LoggingTransaction, events: List[EventBase],
+        self,
+        txn: LoggingTransaction,
+        events: List[EventBase],
     ) -> None:
 
         # We only care about state events, so this if there are no state events.
@@ -470,7 +480,12 @@ class PersistEventsStore:
         event_to_room_id = {e.event_id: e.room_id for e in state_events.values()}
 
         self._add_chain_cover_index(
-            txn, self.db_pool, event_to_room_id, event_to_types, event_to_auth_chain,
+            txn,
+            self.db_pool,
+            self.store.event_chain_id_gen,
+            event_to_room_id,
+            event_to_types,
+            event_to_auth_chain,
         )
 
     @classmethod
@@ -478,6 +493,7 @@ class PersistEventsStore:
         cls,
         txn,
         db_pool: DatabasePool,
+        event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -517,7 +533,10 @@ class PersistEventsStore:
             # simple_select_many, but this case happens rarely and almost always
             # with a single row.)
             auth_events = db_pool.simple_select_onecol_txn(
-                txn, "event_auth", keyvalues={"event_id": event_id}, retcol="auth_id",
+                txn,
+                "event_auth",
+                keyvalues={"event_id": event_id},
+                retcol="auth_id",
             )
 
             events_to_calc_chain_id_for.add(event_id)
@@ -550,7 +569,9 @@ class PersistEventsStore:
                 WHERE
             """
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "event_id", missing_auth_chains,
+                txn.database_engine,
+                "event_id",
+                missing_auth_chains,
             )
             txn.execute(sql + clause, args)
 
@@ -619,6 +640,7 @@ class PersistEventsStore:
         new_chain_tuples = cls._allocate_chain_ids(
             txn,
             db_pool,
+            event_chain_id_gen,
             event_to_room_id,
             event_to_types,
             event_to_auth_chain,
@@ -704,7 +726,8 @@ class PersistEventsStore:
                 if chain_map[a_id][0] != chain_id
             }
             for start_auth_id, end_auth_id in itertools.permutations(
-                event_to_auth_chain.get(event_id, []), r=2,
+                event_to_auth_chain.get(event_id, []),
+                r=2,
             ):
                 if chain_links.exists_path_from(
                     chain_map[start_auth_id], chain_map[end_auth_id]
@@ -756,6 +779,7 @@ class PersistEventsStore:
     def _allocate_chain_ids(
         txn,
         db_pool: DatabasePool,
+        event_chain_id_gen: SequenceGenerator,
         event_to_room_id: Dict[str, str],
         event_to_types: Dict[str, Tuple[str, str]],
         event_to_auth_chain: Dict[str, List[str]],
@@ -868,7 +892,7 @@ class PersistEventsStore:
             chain_to_max_seq_no[new_chain_tuple[0]] = new_chain_tuple[1]
 
         # Generate new chain IDs for all unallocated chain IDs.
-        newly_allocated_chain_ids = db_pool.event_chain_id_gen.get_next_mult_txn(
+        newly_allocated_chain_ids = event_chain_id_gen.get_next_mult_txn(
             txn, len(unallocated_chain_ids)
         )
 
@@ -888,8 +912,7 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
     ):
-        """Persist the mapping from transaction IDs to event IDs (if defined).
-        """
+        """Persist the mapping from transaction IDs to event IDs (if defined)."""
 
         to_insert = []
         for event, _ in events_and_contexts:
@@ -909,7 +932,9 @@ class PersistEventsStore:
 
         if to_insert:
             self.db_pool.simple_insert_many_txn(
-                txn, table="event_txn_id", values=to_insert,
+                txn,
+                table="event_txn_id",
+                values=to_insert,
             )
 
     def _update_current_state_txn(
@@ -941,7 +966,9 @@ class PersistEventsStore:
                 txn.execute(sql, (stream_id, self._instance_name, room_id))
 
                 self.db_pool.simple_delete_txn(
-                    txn, table="current_state_events", keyvalues={"room_id": room_id},
+                    txn,
+                    table="current_state_events",
+                    keyvalues={"room_id": room_id},
                 )
             else:
                 # We're still in the room, so we update the current state as normal.
@@ -1050,7 +1077,7 @@ class PersistEventsStore:
             # Figure out the changes of membership to invalidate the
             # `get_rooms_for_user` cache.
             # We find out which membership events we may have deleted
-            # and which we have added, then we invlidate the caches for all
+            # and which we have added, then we invalidate the caches for all
             # those users.
             members_changed = {
                 state_key
@@ -1100,7 +1127,7 @@ class PersistEventsStore:
     def _update_forward_extremities_txn(
         self, txn, new_forward_extremities, max_stream_order
     ):
-        for room_id, new_extrem in new_forward_extremities.items():
+        for room_id in new_forward_extremities.keys():
             self.db_pool.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
@@ -1245,8 +1272,10 @@ class PersistEventsStore:
                     logger.exception("")
                     raise
 
+                # update the stored internal_metadata to update the "outlier" flag.
+                # TODO: This is unused as of Synapse 1.31. Remove it once we are happy
+                #  to drop backwards-compatibility with 1.30.
                 metadata_json = json_encoder.encode(event.internal_metadata.get_dict())
-
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
 
@@ -1294,6 +1323,19 @@ class PersistEventsStore:
             d.pop("redacted_because", None)
             return d
 
+        def get_internal_metadata(event):
+            im = event.internal_metadata.get_dict()
+
+            # temporary hack for database compatibility with Synapse 1.30 and earlier:
+            # store the `outlier` flag inside the internal_metadata json as well as in
+            # the `events` table, so that if anyone rolls back to an older Synapse,
+            # things keep working. This can be removed once we are happy to drop support
+            # for that
+            if event.internal_metadata.is_outlier():
+                im["outlier"] = True
+
+            return im
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
@@ -1302,7 +1344,7 @@ class PersistEventsStore:
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "internal_metadata": json_encoder.encode(
-                        event.internal_metadata.get_dict()
+                        get_internal_metadata(event)
                     ),
                     "json": json_encoder.encode(event_dict(event)),
                     "format_version": event.format_version,
@@ -1336,24 +1378,28 @@ class PersistEventsStore:
             ],
         )
 
-        for event, _ in events_and_contexts:
-            if not event.internal_metadata.is_redacted():
-                # If we're persisting an unredacted event we go and ensure
-                # that we mark any redactions that reference this event as
-                # requiring censoring.
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="redactions",
-                    keyvalues={"redacts": event.event_id},
-                    updatevalues={"have_censored": False},
+        # If we're persisting an unredacted event we go and ensure
+        # that we mark any redactions that reference this event as
+        # requiring censoring.
+        sql = "UPDATE redactions SET have_censored = ? WHERE redacts = ?"
+        txn.execute_batch(
+            sql,
+            (
+                (
+                    False,
+                    event.event_id,
                 )
+                for event, _ in events_and_contexts
+                if not event.internal_metadata.is_redacted()
+            ),
+        )
 
         state_events_and_contexts = [
             ec for ec in events_and_contexts if ec[0].is_state()
         ]
 
         state_values = []
-        for event, context in state_events_and_contexts:
+        for event, _ in state_events_and_contexts:
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
@@ -1422,7 +1468,7 @@ class PersistEventsStore:
             # nothing to do here
             return
 
-        for event, context in events_and_contexts:
+        for event, _ in events_and_contexts:
             if event.type == EventTypes.Redaction and event.redacts is not None:
                 # Remove the entries in the event_push_actions table for the
                 # redacted event.
@@ -1608,8 +1654,7 @@ class PersistEventsStore:
         )
 
     def _store_room_members_txn(self, txn, events, backfilled):
-        """Store a room member in the database.
-        """
+        """Store a room member in the database."""
 
         def str_or_none(val: Any) -> Optional[str]:
             return val if isinstance(val, str) else None
@@ -1840,19 +1885,27 @@ class PersistEventsStore:
                 ),
             )
 
-        for event, _ in events_and_contexts:
-            user_ids = self.db_pool.simple_select_onecol_txn(
-                txn,
-                table="event_push_actions_staging",
-                keyvalues={"event_id": event.event_id},
-                retcol="user_id",
-            )
+            room_to_event_ids = {}  # type: Dict[str, List[str]]
+            for e, _ in events_and_contexts:
+                room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
 
-            for uid in user_ids:
-                txn.call_after(
-                    self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                    (event.room_id, uid),
+            for room_id, event_ids in room_to_event_ids.items():
+                rows = self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="event_push_actions_staging",
+                    column="event_id",
+                    iterable=event_ids,
+                    keyvalues={},
+                    retcols=("user_id",),
                 )
+
+                user_ids = {row["user_id"] for row in rows}
+
+                for user_id in user_ids:
+                    txn.call_after(
+                        self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+                        (room_id, user_id),
+                    )
 
         # Now we delete the staging area for *all* events that were being
         # persisted.
@@ -2001,8 +2054,7 @@ class PersistEventsStore:
 
 @attr.s(slots=True)
 class _LinkMap:
-    """A helper type for tracking links between chains.
-    """
+    """A helper type for tracking links between chains."""
 
     # Stores the set of links as nested maps: source chain ID -> target chain ID
     # -> source sequence number -> target sequence number.
@@ -2108,7 +2160,9 @@ class _LinkMap:
                 yield (src_chain, src_seq, target_chain, target_seq)
 
     def exists_path_from(
-        self, src_tuple: Tuple[int, int], target_tuple: Tuple[int, int],
+        self,
+        src_tuple: Tuple[int, int],
+        target_tuple: Tuple[int, int],
     ) -> bool:
         """Checks if there is a path between the source chain ID/sequence and
         target chain ID/sequence.

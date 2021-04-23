@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,7 +48,7 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import List
+from typing import List, Optional
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.events import EventBase
@@ -68,7 +67,7 @@ MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
 
 
 class ApplicationServiceScheduler:
-    """ Public facing API for this module. Does the required DI to tie the
+    """Public facing API for this module. Does the required DI to tie the
     components together. This also serves as the "event_pool", which in this
     case is a simple array.
     """
@@ -191,11 +190,11 @@ class _TransactionController:
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: List[JsonDict] = [],
+        ephemeral: Optional[List[JsonDict]] = None,
     ):
         try:
             txn = await self.store.create_appservice_txn(
-                service=service, events=events, ephemeral=ephemeral
+                service=service, events=events, ephemeral=ephemeral or []
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:

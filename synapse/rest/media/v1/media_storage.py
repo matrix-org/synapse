@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,13 +15,17 @@ import contextlib
 import logging
 import os
 import shutil
-from typing import IO, TYPE_CHECKING, Any, Optional, Sequence
+from typing import IO, TYPE_CHECKING, Any, Callable, Optional, Sequence
+
+import attr
 
 from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 
+from synapse.api.errors import NotFoundError
 from synapse.logging.context import defer_to_thread, make_deferred_yieldable
+from synapse.util import Clock
 from synapse.util.file_consumer import BackgroundFileConsumer
 
 from ._base import FileInfo, Responder
@@ -58,6 +61,8 @@ class MediaStorage:
         self.local_media_directory = local_media_directory
         self.filepaths = filepaths
         self.storage_providers = storage_providers
+        self.spam_checker = hs.get_spam_checker()
+        self.clock = hs.get_clock()
 
     async def store_file(self, source: IO, file_info: FileInfo) -> str:
         """Write `source` to the on disk media store, and also any other
@@ -79,8 +84,7 @@ class MediaStorage:
         return fname
 
     async def write_to_file(self, source: IO, output: IO):
-        """Asynchronously write the `source` to `output`.
-        """
+        """Asynchronously write the `source` to `output`."""
         await defer_to_thread(self.reactor, _write_file_synchronously, source, output)
 
     @contextlib.contextmanager
@@ -127,18 +131,29 @@ class MediaStorage:
                     f.flush()
                     f.close()
 
+                    spam = await self.spam_checker.check_media_file_for_spam(
+                        ReadableFileWrapper(self.clock, fname), file_info
+                    )
+                    if spam:
+                        logger.info("Blocking media due to spam checker")
+                        # Note that we'll delete the stored media, due to the
+                        # try/except below. The media also won't be stored in
+                        # the DB.
+                        raise SpamMediaException()
+
                     for provider in self.storage_providers:
                         await provider.store_file(path, file_info)
 
                     finished_called[0] = True
 
                 yield f, fname, finish
-        except Exception:
+        except Exception as e:
             try:
                 os.remove(fname)
             except Exception:
                 pass
-            raise
+
+            raise e from None
 
         if not finished_called:
             raise Exception("Finished callback not called")
@@ -228,7 +243,7 @@ class MediaStorage:
                     await consumer.wait()
                 return local_path
 
-        raise Exception("file could not be found")
+        raise NotFoundError()
 
     def _file_info_to_path(self, file_info: FileInfo) -> str:
         """Converts file_info into a relative path.
@@ -302,3 +317,38 @@ class FileResponder(Responder):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.open_file.close()
+
+
+class SpamMediaException(NotFoundError):
+    """The media was blocked by a spam checker, so we simply 404 the request (in
+    the same way as if it was quarantined).
+    """
+
+
+@attr.s(slots=True)
+class ReadableFileWrapper:
+    """Wrapper that allows reading a file in chunks, yielding to the reactor,
+    and writing to a callback.
+
+    This is simplified `FileSender` that takes an IO object rather than an
+    `IConsumer`.
+    """
+
+    CHUNK_SIZE = 2 ** 14
+
+    clock = attr.ib(type=Clock)
+    path = attr.ib(type=str)
+
+    async def write_chunks_to(self, callback: Callable[[bytes], None]):
+        """Reads the file in chunks and calls the callback with each chunk."""
+
+        with open(self.path, "rb") as file:
+            while True:
+                chunk = file.read(self.CHUNK_SIZE)
+                if not chunk:
+                    break
+
+                callback(chunk)
+
+                # We yield to the reactor by sleeping for 0 seconds.
+                await self.clock.sleep(0)

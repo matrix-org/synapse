@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +16,7 @@ import os
 from collections import namedtuple
 from typing import Dict, List
 
-from netaddr import IPSet
-
-from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST
+from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
@@ -54,7 +51,7 @@ MediaStorageProviderConfig = namedtuple(
 
 
 def parse_thumbnail_requirements(thumbnail_sizes):
-    """ Takes a list of dictionaries with "width", "height", and "method" keys
+    """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 
@@ -73,6 +70,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/jpg", []).append(jpeg_thumbnail)
         requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
@@ -178,7 +176,9 @@ class ContentRepositoryConfig(Config):
                 check_requirements("url_preview")
 
             except DependencyException as e:
-                raise ConfigError(e.message)
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
@@ -187,16 +187,17 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            self.url_preview_ip_range_blacklist = IPSet(
-                config["url_preview_ip_range_blacklist"]
-            )
-
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist.update(["0.0.0.0", "::"])
+            self.url_preview_ip_range_blacklist = generate_ip_set(
+                config["url_preview_ip_range_blacklist"],
+                ["0.0.0.0", "::"],
+                config_path=("url_preview_ip_range_blacklist",),
+            )
 
-            self.url_preview_ip_range_whitelist = IPSet(
-                config.get("url_preview_ip_range_whitelist", ())
+            self.url_preview_ip_range_whitelist = generate_ip_set(
+                config.get("url_preview_ip_range_whitelist", ()),
+                config_path=("url_preview_ip_range_whitelist",),
             )
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
@@ -207,7 +208,6 @@ class ContentRepositoryConfig(Config):
 
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
-        uploads_path = os.path.join(data_dir_path, "uploads")
 
         formatted_thumbnail_sizes = "".join(
             THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES

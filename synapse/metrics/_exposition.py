@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2019 Prometheus Python Client Developers
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
@@ -216,7 +215,7 @@ class MetricsHandler(BaseHTTPRequestHandler):
     @classmethod
     def factory(cls, registry):
         """Returns a dynamic MetricsHandler class tied
-           to the passed registry.
+        to the passed registry.
         """
         # This implementation relies on MetricsHandler.registry
         #  (defined above and defaulted to REGISTRY).

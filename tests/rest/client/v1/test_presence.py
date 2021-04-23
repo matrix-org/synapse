@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
+from synapse.handlers.presence import PresenceHandler
 from synapse.rest.client.v1 import presence
 from synapse.types import UserID
 
@@ -33,7 +33,7 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        presence_handler = Mock()
+        presence_handler = Mock(spec=PresenceHandler)
         presence_handler.set_state.return_value = defer.succeed(None)
 
         hs = self.setup_test_homeserver(
@@ -60,12 +60,12 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 1)
 
+    @unittest.override_config({"use_presence": False})
     def test_put_presence_disabled(self):
         """
         PUT to the status endpoint with use_presence disabled will NOT call
         set_state on the presence handler.
         """
-        self.hs.config.use_presence = False
 
         body = {"presence": "here", "status_msg": "beep boop"}
         channel = self.make_request(

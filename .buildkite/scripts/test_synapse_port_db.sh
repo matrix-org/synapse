@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Test script for 'synapse_port_db', which creates a virtualenv, installs Synapse along
 # with additional dependencies needed for the test (such as coverage or the PostgreSQL

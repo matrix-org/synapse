@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -100,6 +99,7 @@ class ConsentResource(DirectServeHtmlResource):
 
         consent_template_directory = hs.config.user_consent_template_dir
 
+        # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(consent_template_directory)
         self._jinja_env = jinja2.Environment(
             loader=loader, autoescape=jinja2.select_autoescape(["html", "htm", "xml"])

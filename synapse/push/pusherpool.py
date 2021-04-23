@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,12 +18,14 @@ from typing import TYPE_CHECKING, Dict, Iterable, Optional
 
 from prometheus_client import Gauge
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
 )
 from synapse.push import Pusher, PusherConfig, PusherConfigException
 from synapse.push.pusher import PusherFactory
+from synapse.replication.http.push import ReplicationRemovePusherRestServlet
 from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.async_helpers import concurrently_execute
 
@@ -58,15 +59,26 @@ class PusherPool:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.pusher_factory = PusherFactory(hs)
-        self._should_start_pushers = hs.config.start_pushers
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
-        self._account_validity = hs.config.account_validity
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
 
         # We shard the handling of push notifications by user ID.
         self._pusher_shard_config = hs.config.push.pusher_shard_config
         self._instance_name = hs.get_instance_name()
+        self._should_start_pushers = (
+            self._instance_name in self._pusher_shard_config.instances
+        )
+
+        # We can only delete pushers on master.
+        self._remove_pusher_client = None
+        if hs.config.worker.worker_app:
+            self._remove_pusher_client = ReplicationRemovePusherRestServlet.make_client(
+                hs
+            )
 
         # Record the last stream ID that we were poked about so we can get
         # changes since then. We set this to the current max stream ID on
@@ -78,8 +90,7 @@ class PusherPool:
         self.pushers = {}  # type: Dict[str, Dict[str, Pusher]]
 
     def start(self) -> None:
-        """Starts the pushers off in a background process.
-        """
+        """Starts the pushers off in a background process."""
         if not self._should_start_pushers:
             logger.info("Not starting pushers because they are disabled in the config")
             return
@@ -103,6 +114,11 @@ class PusherPool:
         Returns:
             The newly created pusher.
         """
+
+        if kind == "email":
+            email_owner = await self.store.get_user_id_by_threepid("email", pushkey)
+            if email_owner != user_id:
+                raise SynapseError(400, "Email not found", Codes.THREEPID_NOT_FOUND)
 
         time_now_msec = self.clock.time_msec()
 
@@ -176,9 +192,6 @@ class PusherPool:
             user_id: user to remove pushers for
             access_tokens: access token *ids* to remove pushers for
         """
-        if not self._pusher_shard_config.should_handle(self._instance_name, user_id):
-            return
-
         tokens = set(access_tokens)
         for p in await self.store.get_pushers_by_user_id(user_id):
             if p.access_token in tokens:
@@ -225,7 +238,7 @@ class PusherPool:
 
             for u in users_affected:
                 # Don't push if the user account has expired
-                if self._account_validity.enabled:
+                if self._account_validity_enabled:
                     expired = await self.store.is_account_expired(
                         u, self.clock.time_msec()
                     )
@@ -255,7 +268,7 @@ class PusherPool:
 
             for u in users_affected:
                 # Don't push if the user account has expired
-                if self._account_validity.enabled:
+                if self._account_validity_enabled:
                     expired = await self.store.is_account_expired(
                         u, self.clock.time_msec()
                     )
@@ -297,8 +310,7 @@ class PusherPool:
         return pusher
 
     async def _start_pushers(self) -> None:
-        """Start all the pushers
-        """
+        """Start all the pushers"""
         pushers = await self.store.get_all_pushers()
 
         # Stagger starting up the pushers so we don't completely drown the
@@ -335,7 +347,8 @@ class PusherPool:
             return None
         except Exception:
             logger.exception(
-                "Couldn't start pusher id %i: caught Exception", pusher_config.id,
+                "Couldn't start pusher id %i: caught Exception",
+                pusher_config.id,
             )
             return None
 
@@ -381,6 +394,12 @@ class PusherPool:
 
             synapse_pushers.labels(type(pusher).__name__, pusher.app_id).dec()
 
-        await self.store.delete_pusher_by_app_id_pushkey_user_id(
-            app_id, pushkey, user_id
-        )
+        # We can only delete pushers on master.
+        if self._remove_pusher_client:
+            await self._remove_pusher_client(
+                app_id=app_id, pushkey=pushkey, user_id=user_id
+            )
+        else:
+            await self.store.delete_pusher_by_app_id_pushkey_user_id(
+                app_id, pushkey, user_id
+            )

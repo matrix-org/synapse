@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -60,15 +59,13 @@ from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
-from synapse.rest.synapse.client.pick_idp import PickIdpResource
-from synapse.rest.synapse.client.pick_username import pick_username_resource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
 from synapse.util.versionstring import get_version_string
 
@@ -129,19 +126,20 @@ class SynapseHomeServer(HomeServer):
         else:
             root_resource = OptionsResource()
 
-        root_resource = create_resource_tree(resources, root_resource)
+        site = SynapseSite(
+            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+            site_tag,
+            listener_config,
+            create_resource_tree(resources, root_resource),
+            self.version_string,
+            reactor=self.get_reactor(),
+        )
 
         if tls:
             ports = listen_ssl(
                 bind_addresses,
                 port,
-                SynapseSite(
-                    "synapse.access.https.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                    self.version_string,
-                ),
+                site,
                 self.tls_server_context_factory,
                 reactor=self.get_reactor(),
             )
@@ -151,13 +149,7 @@ class SynapseHomeServer(HomeServer):
             ports = listen_tcp(
                 bind_addresses,
                 port,
-                SynapseSite(
-                    "synapse.access.http.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                    self.version_string,
-                ),
+                site,
                 reactor=self.get_reactor(),
             )
             logger.info("Synapse now listening on TCP port %d", port)
@@ -190,22 +182,11 @@ class SynapseHomeServer(HomeServer):
                     "/_matrix/client/versions": client_resource,
                     "/.well-known/matrix/client": WellKnownResource(self),
                     "/_synapse/admin": AdminRestResource(self),
-                    "/_synapse/client/pick_username": pick_username_resource(self),
-                    "/_synapse/client/pick_idp": PickIdpResource(self),
+                    **build_synapse_client_resource_tree(self),
                 }
             )
 
-            if self.get_config().oidc_enabled:
-                from synapse.rest.oidc import OIDCResource
-
-                resources["/_synapse/oidc"] = OIDCResource(self)
-
-            if self.get_config().saml2_enabled:
-                from synapse.rest.saml2 import SAML2Resource
-
-                resources["/_matrix/saml2"] = SAML2Resource(self)
-
-            if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -244,7 +225,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.get_config().enable_media_repo:
+            if self.config.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
@@ -258,7 +239,7 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_loc = self.get_config().web_client_location
+            webclient_loc = self.config.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
@@ -279,7 +260,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.get_config().enable_metrics:
+        if name == "metrics" and self.config.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -288,9 +269,7 @@ class SynapseHomeServer(HomeServer):
         return resources
 
     def start_listening(self, listeners: Iterable[ListenerConfig]):
-        config = self.get_config()
-
-        if config.redis_enabled:
+        if self.config.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
@@ -298,14 +277,12 @@ class SynapseHomeServer(HomeServer):
 
         for listener in listeners:
             if listener.type == "http":
-                self._listening_services.extend(self._listener_http(config, listener))
+                self._listening_services.extend(
+                    self._listener_http(self.config, listener)
+                )
             elif listener.type == "manhole":
-                listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                _base.listen_manhole(
+                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
                 )
             elif listener.type == "replication":
                 services = listen_tcp(
@@ -316,7 +293,7 @@ class SynapseHomeServer(HomeServer):
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
-                if not self.get_config().enable_metrics:
+                if not self.config.enable_metrics:
                     logger.warning(
                         (
                             "Metrics listener configured, but "

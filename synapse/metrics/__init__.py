@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -155,8 +154,7 @@ class InFlightGauge:
             self._registrations.setdefault(key, set()).add(callback)
 
     def unregister(self, key, callback):
-        """Registers that we've exited a block with labels `key`.
-        """
+        """Registers that we've exited a block with labels `key`."""
 
         with self._lock:
             self._registrations.setdefault(key, set()).discard(callback)
@@ -215,7 +213,12 @@ class GaugeBucketCollector:
     Prometheus, and optimise for that case.
     """
 
-    __slots__ = ("_name", "_documentation", "_bucket_bounds", "_metric")
+    __slots__ = (
+        "_name",
+        "_documentation",
+        "_bucket_bounds",
+        "_metric",
+    )
 
     def __init__(
         self,
@@ -243,11 +246,16 @@ class GaugeBucketCollector:
         if self._bucket_bounds[-1] != float("inf"):
             self._bucket_bounds.append(float("inf"))
 
-        self._metric = self._values_to_metric([])
+        # We initially set this to None. We won't report metrics until
+        # this has been initialised after a successful data update
+        self._metric = None  # type: Optional[GaugeHistogramMetricFamily]
+
         registry.register(self)
 
     def collect(self):
-        yield self._metric
+        # Don't report metrics unless we've already collected some data
+        if self._metric is not None:
+            yield self._metric
 
     def update_data(self, values: Iterable[float]):
         """Update the data to be reported by the metric
@@ -402,7 +410,9 @@ class PyPyGCStats:
         #     Total time spent in GC:  0.073                  # s.total_gc_time
 
         pypy_gc_time = CounterMetricFamily(
-            "pypy_gc_time_seconds_total", "Total time spent in PyPy GC", labels=[],
+            "pypy_gc_time_seconds_total",
+            "Total time spent in PyPy GC",
+            labels=[],
         )
         pypy_gc_time.add_metric([], s.total_gc_time / 1000)
         yield pypy_gc_time
@@ -526,7 +536,7 @@ class ReactorLastSeenMetric:
 REGISTRY.register(ReactorLastSeenMetric())
 
 
-def runUntilCurrentTimer(func):
+def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
     def f(*args, **kwargs):
         now = reactor.seconds()
@@ -589,13 +599,14 @@ def runUntilCurrentTimer(func):
 
 try:
     # Ensure the reactor has all the attributes we expect
-    reactor.runUntilCurrent
-    reactor._newTimedCalls
-    reactor.threadCallQueue
+    reactor.seconds  # type: ignore
+    reactor.runUntilCurrent  # type: ignore
+    reactor._newTimedCalls  # type: ignore
+    reactor.threadCallQueue  # type: ignore
 
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
-    reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+    reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,

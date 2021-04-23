@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.unittest import HomeserverTestCase, override_config
 
 ALICE = "@alice:a"
 BOB = "@bob:b"
@@ -25,73 +21,52 @@ BOBBY = "@bobby:a"
 BELA = "@somenickname:a"
 
 
-class UserDirectoryStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.hs = yield setup_test_homeserver(self.addCleanup)
-        self.store = self.hs.get_datastore()
+class UserDirectoryStoreTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
 
         # alice and bob are both in !room_id. bobby is not but shares
         # a homeserver with alice.
-        yield defer.ensureDeferred(
-            self.store.update_profile_in_user_dir(ALICE, "alice", None)
-        )
-        yield defer.ensureDeferred(
-            self.store.update_profile_in_user_dir(BOB, "bob", None)
-        )
-        yield defer.ensureDeferred(
-            self.store.update_profile_in_user_dir(BOBBY, "bobby", None)
-        )
-        yield defer.ensureDeferred(
-            self.store.update_profile_in_user_dir(BELA, "Bela", None)
-        )
-        yield defer.ensureDeferred(
-            self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB))
-        )
+        self.get_success(self.store.update_profile_in_user_dir(ALICE, "alice", None))
+        self.get_success(self.store.update_profile_in_user_dir(BOB, "bob", None))
+        self.get_success(self.store.update_profile_in_user_dir(BOBBY, "bobby", None))
+        self.get_success(self.store.update_profile_in_user_dir(BELA, "Bela", None))
+        self.get_success(self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB)))
 
-    @defer.inlineCallbacks
     def test_search_user_dir(self):
         # normally when alice searches the directory she should just find
         # bob because bobby doesn't share a room with her.
-        r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
+        r = self.get_success(self.store.search_user_dir(ALICE, "bob", 10))
         self.assertFalse(r["limited"])
         self.assertEqual(1, len(r["results"]))
         self.assertDictEqual(
             r["results"][0], {"user_id": BOB, "display_name": "bob", "avatar_url": None}
         )
 
-    @defer.inlineCallbacks
+    @override_config({"user_directory": {"search_all_users": True}})
     def test_search_user_dir_all_users(self):
-        self.hs.config.user_directory_search_all_users = True
-        try:
-            r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "bob", 10))
-            self.assertFalse(r["limited"])
-            self.assertEqual(2, len(r["results"]))
-            self.assertDictEqual(
-                r["results"][0],
-                {"user_id": BOB, "display_name": "bob", "avatar_url": None},
-            )
-            self.assertDictEqual(
-                r["results"][1],
-                {"user_id": BOBBY, "display_name": "bobby", "avatar_url": None},
-            )
-        finally:
-            self.hs.config.user_directory_search_all_users = False
+        r = self.get_success(self.store.search_user_dir(ALICE, "bob", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(2, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": BOB, "display_name": "bob", "avatar_url": None},
+        )
+        self.assertDictEqual(
+            r["results"][1],
+            {"user_id": BOBBY, "display_name": "bobby", "avatar_url": None},
+        )
 
-    @defer.inlineCallbacks
+    @override_config({"user_directory": {"search_all_users": True}})
     def test_search_user_dir_stop_words(self):
         """Tests that a user can look up another user by searching for the start if its
         display name even if that name happens to be a common English word that would
         usually be ignored in full text searches.
         """
-        self.hs.config.user_directory_search_all_users = True
-        try:
-            r = yield defer.ensureDeferred(self.store.search_user_dir(ALICE, "be", 10))
-            self.assertFalse(r["limited"])
-            self.assertEqual(1, len(r["results"]))
-            self.assertDictEqual(
-                r["results"][0],
-                {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
-            )
-        finally:
-            self.hs.config.user_directory_search_all_users = False
+        r = self.get_success(self.store.search_user_dir(ALICE, "be", 10))
+        self.assertFalse(r["limited"])
+        self.assertEqual(1, len(r["results"]))
+        self.assertDictEqual(
+            r["results"][0],
+            {"user_id": BELA, "display_name": "Bela", "avatar_url": None},
+        )

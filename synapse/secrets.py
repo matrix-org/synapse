@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -26,10 +25,10 @@ if sys.version_info[0:2] >= (3, 6):
     import secrets
 
     class Secrets:
-        def token_bytes(self, nbytes=32):
+        def token_bytes(self, nbytes: int = 32) -> bytes:
             return secrets.token_bytes(nbytes)
 
-        def token_hex(self, nbytes=32):
+        def token_hex(self, nbytes: int = 32) -> str:
             return secrets.token_hex(nbytes)
 
 
@@ -38,8 +37,8 @@ else:
     import os
 
     class Secrets:
-        def token_bytes(self, nbytes=32):
+        def token_bytes(self, nbytes: int = 32) -> bytes:
             return os.urandom(nbytes)
 
-        def token_hex(self, nbytes=32):
+        def token_hex(self, nbytes: int = 32) -> str:
             return binascii.hexlify(self.token_bytes(nbytes)).decode("ascii")

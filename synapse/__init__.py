@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-9 New Vector Ltd
 #
@@ -48,7 +47,7 @@ try:
 except ImportError:
     pass
 
-__version__ = "1.26.0"
+__version__ = "1.32.2"
 
 if bool(os.environ.get("SYNAPSE_TEST_PATCH_LOG_CONTEXTS", False)):
     # We import here so that we don't have to install a bunch of deps when

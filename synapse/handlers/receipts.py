@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +19,7 @@ from synapse.handlers._base import BaseHandler
 from synapse.types import JsonDict, ReadReceipt, get_domain_from_id
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -49,15 +48,15 @@ class ReceiptsHandler(BaseHandler):
             )
         else:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.receipt", hs.config.worker.writers.receipts,
+                "m.receipt",
+                hs.config.worker.writers.receipts,
             )
 
         self.clock = self.hs.get_clock()
         self.state = hs.get_state_handler()
 
     async def _received_remote_receipt(self, origin: str, content: JsonDict) -> None:
-        """Called when we receive an EDU of type m.receipt from a remote HS.
-        """
+        """Called when we receive an EDU of type m.receipt from a remote HS."""
         receipts = []
         for room_id, room_values in content.items():
             for receipt_type, users in room_values.items():
@@ -83,8 +82,7 @@ class ReceiptsHandler(BaseHandler):
         await self._handle_new_receipts(receipts)
 
     async def _handle_new_receipts(self, receipts: List[ReadReceipt]) -> bool:
-        """Takes a list of receipts, stores them and informs the notifier.
-        """
+        """Takes a list of receipts, stores them and informs the notifier."""
         min_batch_id = None  # type: Optional[int]
         max_batch_id = None  # type: Optional[int]
 

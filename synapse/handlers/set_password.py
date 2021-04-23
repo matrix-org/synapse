@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,7 +20,7 @@ from synapse.types import Requester
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class SetPasswordHandler(BaseHandler):
         logout_devices: bool,
         requester: Optional[Requester] = None,
     ) -> None:
-        if not self.hs.config.password_localdb_enabled:
+        if not self._auth_handler.can_change_password():
             raise SynapseError(403, "Password change disabled", errcode=Codes.FORBIDDEN)
 
         try:

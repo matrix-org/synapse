@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -23,7 +22,7 @@ from synapse.types import Requester, UserID, create_requester
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,9 @@ class DeactivateAccountHandler(BaseHandler):
         if hs.config.run_background_tasks:
             hs.get_reactor().callWhenRunning(self._start_user_parting)
 
-        self._account_validity_enabled = hs.config.account_validity.enabled
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
 
     async def deactivate_account(
         self,
@@ -119,6 +120,11 @@ class DeactivateAccountHandler(BaseHandler):
         await self._auth_handler.delete_access_tokens_for_user(user_id)
 
         await self.store.user_set_password_hash(user_id, None)
+
+        # Most of the pushers will have been deleted when we logged out the
+        # associated devices above, but we still need to delete pushers not
+        # associated with devices, e.g. email pushers.
+        await self.store.delete_all_pushers_for_user(user_id)
 
         # Add the user to a table of users pending deactivation (ie.
         # removal from all the rooms they're a member of)
@@ -196,8 +202,7 @@ class DeactivateAccountHandler(BaseHandler):
             run_as_background_process("user_parter_loop", self._user_parter_loop)
 
     async def _user_parter_loop(self) -> None:
-        """Loop that parts deactivated users from rooms
-        """
+        """Loop that parts deactivated users from rooms"""
         self._user_parter_running = True
         logger.info("Starting user parter")
         try:
@@ -214,8 +219,7 @@ class DeactivateAccountHandler(BaseHandler):
             self._user_parter_running = False
 
     async def _part_user(self, user_id: str) -> None:
-        """Causes the given user_id to leave all the rooms they're joined to
-        """
+        """Causes the given user_id to leave all the rooms they're joined to"""
         user = UserID.from_string(user_id)
 
         rooms_for_user = await self.store.get_rooms_for_user(user_id)

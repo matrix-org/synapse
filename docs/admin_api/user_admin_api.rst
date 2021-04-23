@@ -29,8 +29,9 @@ It returns a JSON body like the following:
             }
         ],
         "avatar_url": "<avatar_url>",
-        "admin": false,
-        "deactivated": false,
+        "admin": 0,
+        "deactivated": 0,
+        "shadow_banned": 0,
         "password_hash": "$2b$12$p9B4GkqYdRTPGD",
         "creation_ts": 1560432506,
         "appservice_id": null,
@@ -110,35 +111,16 @@ List Accounts
 =============
 
 This API returns all local user accounts.
+By default, the response is ordered by ascending user ID.
 
-The api is::
+The API is::
 
     GET /_synapse/admin/v2/users?from=0&limit=10&guests=false
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
 server admin: see `README.rst <README.rst>`_.
 
-The parameter ``from`` is optional but used for pagination, denoting the
-offset in the returned results. This should be treated as an opaque value and
-not explicitly set to anything other than the return value of ``next_token``
-from a previous call.
-
-The parameter ``limit`` is optional but is used for pagination, denoting the
-maximum number of items to return in this call. Defaults to ``100``.
-
-The parameter ``user_id`` is optional and filters to only return users with user IDs
-that contain this value. This parameter is ignored when using the ``name`` parameter.
-
-The parameter ``name`` is optional and filters to only return users with user ID localparts
-**or** displaynames that contain this value.
-
-The parameter ``guests`` is optional and if ``false`` will **exclude** guest users.
-Defaults to ``true`` to include guest users.
-
-The parameter ``deactivated`` is optional and if ``true`` will **include** deactivated users.
-Defaults to ``false`` to exclude deactivated users.
-
-A JSON body is returned with the following shape:
+A response body like the following is returned:
 
 .. code:: json
 
@@ -150,6 +132,7 @@ A JSON body is returned with the following shape:
                 "admin": 0,
                 "user_type": null,
                 "deactivated": 0,
+                "shadow_banned": 0,
                 "displayname": "<User One>",
                 "avatar_url": null
             }, {
@@ -158,6 +141,7 @@ A JSON body is returned with the following shape:
                 "admin": 1,
                 "user_type": null,
                 "deactivated": 0,
+                "shadow_banned": 0,
                 "displayname": "<User Two>",
                 "avatar_url": "<avatar_url>"
             }
@@ -171,6 +155,66 @@ with ``from`` set to the value of ``next_token``. This will return a new page.
 
 If the endpoint does not return a ``next_token`` then there are no more users
 to paginate through.
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - Is optional and filters to only return users with user IDs
+  that contain this value. This parameter is ignored when using the ``name`` parameter.
+- ``name`` - Is optional and filters to only return users with user ID localparts
+  **or** displaynames that contain this value.
+- ``guests`` - string representing a bool - Is optional and if ``false`` will **exclude** guest users.
+  Defaults to ``true`` to include guest users.
+- ``deactivated`` - string representing a bool - Is optional and if ``true`` will **include** deactivated users.
+  Defaults to ``false`` to exclude deactivated users.
+- ``limit`` - string representing a positive integer - Is optional but is used for pagination,
+  denoting the maximum number of items to return in this call. Defaults to ``100``.
+- ``from`` - string representing a positive integer - Is optional but used for pagination,
+  denoting the offset in the returned results. This should be treated as an opaque value and
+  not explicitly set to anything other than the return value of ``next_token`` from a previous call.
+  Defaults to ``0``.
+- ``order_by`` - The method by which to sort the returned list of users.
+  If the ordered field has duplicates, the second order is always by ascending ``name``,
+  which guarantees a stable ordering. Valid values are:
+
+  - ``name`` - Users are ordered alphabetically by ``name``. This is the default.
+  - ``is_guest`` - Users are ordered by ``is_guest`` status.
+  - ``admin`` - Users are ordered by ``admin`` status.
+  - ``user_type`` - Users are ordered alphabetically by ``user_type``.
+  - ``deactivated`` - Users are ordered by ``deactivated`` status.
+  - ``shadow_banned`` - Users are ordered by ``shadow_banned`` status.
+  - ``displayname`` - Users are ordered alphabetically by ``displayname``.
+  - ``avatar_url`` - Users are ordered alphabetically by avatar URL.
+
+- ``dir`` - Direction of media order. Either ``f`` for forwards or ``b`` for backwards.
+  Setting this value to ``b`` will reverse the above sort order. Defaults to ``f``.
+
+Caution. The database only has indexes on the columns ``name`` and ``created_ts``.
+This means that if a different sort order is used (``is_guest``, ``admin``,
+``user_type``, ``deactivated``, ``shadow_banned``, ``avatar_url`` or ``displayname``),
+this can cause a large load on the database, especially for large environments.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``users`` - An array of objects, each containing information about an user.
+  User objects contain the following fields:
+
+  - ``name`` - string - Fully-qualified user ID (ex. ``@user:server.com``).
+  - ``is_guest`` - bool - Status if that user is a guest account.
+  - ``admin`` - bool - Status if that user is a server administrator.
+  - ``user_type`` - string - Type of the user. Normal users are type ``None``.
+    This allows user type specific behaviour. There are also types ``support`` and ``bot``. 
+  - ``deactivated`` - bool - Status if that user has been marked as deactivated.
+  - ``shadow_banned`` - bool - Status if that user has been marked as shadow banned.
+  - ``displayname`` - string - The user's display name if they have set one.
+  - ``avatar_url`` - string -  The user's avatar URL if they have set one.
+
+- ``next_token``: string representing a positive integer - Indication for pagination. See above.
+- ``total`` - integer - Total number of media.
+
 
 Query current sessions for a user
 =================================
@@ -262,7 +306,7 @@ The following actions are performed when deactivating an user:
 - Reject all pending invites
 - Remove all account validity information related to the user
 
-The following additional actions are performed during deactivation if``erase``
+The following additional actions are performed during deactivation if ``erase``
 is set to ``true``:
 
 - Remove the user's display name
@@ -376,11 +420,12 @@ The following fields are returned in the JSON response body:
 - ``total`` - Number of rooms.
 
 
-List media of an user
-================================
+List media of a user
+====================
 Gets a list of all local media that a specific ``user_id`` has created.
-The response is ordered by creation date descending and media ID descending.
-The newest media is on top.
+By default, the response is ordered by descending creation date and ascending media ID.
+The newest media is on top. You can change the order with parameters
+``order_by`` and ``dir``.
 
 The API is::
 
@@ -437,6 +482,35 @@ The following parameters should be set in the URL:
   denoting the offset in the returned results. This should be treated as an opaque value and
   not explicitly set to anything other than the return value of ``next_token`` from a previous call.
   Defaults to ``0``.
+- ``order_by`` - The method by which to sort the returned list of media.
+  If the ordered field has duplicates, the second order is always by ascending ``media_id``,
+  which guarantees a stable ordering. Valid values are:
+
+  - ``media_id`` - Media are ordered alphabetically by ``media_id``.
+  - ``upload_name`` - Media are ordered alphabetically by name the media was uploaded with.
+  - ``created_ts`` - Media are ordered by when the content was uploaded in ms.
+    Smallest to largest. This is the default.
+  - ``last_access_ts`` - Media are ordered by when the content was last accessed in ms.
+    Smallest to largest.
+  - ``media_length`` - Media are ordered by length of the media in bytes.
+    Smallest to largest.
+  - ``media_type`` - Media are ordered alphabetically by MIME-type.
+  - ``quarantined_by`` - Media are ordered alphabetically by the user ID that
+    initiated the quarantine request for this media.
+  - ``safe_from_quarantine`` - Media are ordered by the status if this media is safe
+    from quarantining.
+
+- ``dir`` - Direction of media order. Either ``f`` for forwards or ``b`` for backwards.
+  Setting this value to ``b`` will reverse the above sort order. Defaults to ``f``.
+
+If neither ``order_by`` nor ``dir`` is set, the default order is newest media on top
+(corresponds to ``order_by`` = ``created_ts`` and ``dir`` = ``b``).
+
+Caution. The database only has indexes on the columns ``media_id``,
+``user_id`` and ``created_ts``. This means that if a different sort order is used
+(``upload_name``, ``last_access_ts``, ``media_length``, ``media_type``,
+``quarantined_by`` or ``safe_from_quarantine``), this can cause a large load on the
+database, especially for large environments.
 
 **Response**
 
@@ -790,3 +864,118 @@ The following parameters should be set in the URL:
 
 - ``user_id`` - The fully qualified MXID: for example, ``@user:server.com``. The user must
   be local.
+
+Override ratelimiting for users
+===============================
+
+This API allows to override or disable ratelimiting for a specific user.
+There are specific APIs to set, get and delete a ratelimit.
+
+Get status of ratelimit
+-----------------------
+
+The API is::
+
+  GET /_synapse/admin/v1/users/<user_id>/override_ratelimit
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "messages_per_second": 0,
+      "burst_count": 0
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - The fully qualified MXID: for example, ``@user:server.com``. The user must
+  be local.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``messages_per_second`` - integer - The number of actions that can
+  be performed in a second. `0` mean that ratelimiting is disabled for this user.
+- ``burst_count`` - integer - How many actions that can be performed before
+  being limited.
+
+If **no** custom ratelimit is set, an empty JSON dict is returned.
+
+.. code:: json
+
+    {}
+
+Set ratelimit
+-------------
+
+The API is::
+
+  POST /_synapse/admin/v1/users/<user_id>/override_ratelimit
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+A response body like the following is returned:
+
+.. code:: json
+
+    {
+      "messages_per_second": 0,
+      "burst_count": 0
+    }
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - The fully qualified MXID: for example, ``@user:server.com``. The user must
+  be local.
+
+Body parameters:
+
+- ``messages_per_second`` - positive integer, optional. The number of actions that can
+  be performed in a second. Defaults to ``0``.
+- ``burst_count`` - positive integer, optional. How many actions that can be performed
+  before being limited. Defaults to ``0``.
+
+To disable users' ratelimit set both values to ``0``.
+
+**Response**
+
+The following fields are returned in the JSON response body:
+
+- ``messages_per_second`` - integer - The number of actions that can
+  be performed in a second.
+- ``burst_count`` - integer - How many actions that can be performed before
+  being limited.
+
+Delete ratelimit
+----------------
+
+The API is::
+
+  DELETE /_synapse/admin/v1/users/<user_id>/override_ratelimit
+
+To use it, you will need to authenticate by providing an ``access_token`` for a
+server admin: see `README.rst <README.rst>`_.
+
+An empty JSON dict is returned.
+
+.. code:: json
+
+    {}
+
+**Parameters**
+
+The following parameters should be set in the URL:
+
+- ``user_id`` - The fully qualified MXID: for example, ``@user:server.com``. The user must
+  be local.
+

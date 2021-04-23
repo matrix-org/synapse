@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -27,6 +26,11 @@ MAX_ALIAS_LENGTH = 255
 # the maximum length for a user id is 255 characters
 MAX_USERID_LENGTH = 255
 
+# The maximum length for a group id is 255 characters
+MAX_GROUPID_LENGTH = 255
+MAX_GROUP_CATEGORYID_LENGTH = 255
+MAX_GROUP_ROLEID_LENGTH = 255
+
 
 class Membership:
 
@@ -46,6 +50,7 @@ class PresenceState:
     OFFLINE = "offline"
     UNAVAILABLE = "unavailable"
     ONLINE = "online"
+    BUSY = "org.matrix.msc3026.busy"
 
 
 class JoinRules:
@@ -53,6 +58,8 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC3083.
+    MSC3083_RESTRICTED = "restricted"
 
 
 class LoginType:
@@ -63,6 +70,11 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+
+
+# This is used in the `type` parameter for /register when called by
+# an appservice to register a new user.
+APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
 
 
 class EventTypes:
@@ -93,9 +105,15 @@ class EventTypes:
 
     Retention = "m.room.retention"
 
-    Presence = "m.presence"
-
     Dummy = "org.matrix.dummy_event"
+
+    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
+    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+
+
+class EduTypes:
+    Presence = "m.presence"
+    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:
@@ -128,8 +146,7 @@ class UserTypes:
 
 
 class RelationTypes:
-    """The types of relations known to this server.
-    """
+    """The types of relations known to this server."""
 
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
@@ -152,6 +169,9 @@ class EventContentFields:
     # Timestamp to delete the event after
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
+
+    # cf https://github.com/matrix-org/matrix-doc/pull/1772
+    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 
 class RoomEncryptionAlgorithms:

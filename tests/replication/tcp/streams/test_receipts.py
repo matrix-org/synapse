@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 # type: ignore
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.replication.tcp.streams._base import ReceiptsStream
 

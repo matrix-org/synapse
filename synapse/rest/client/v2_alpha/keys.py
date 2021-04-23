@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -271,7 +270,10 @@ class SigningKeyUploadServlet(RestServlet):
         body = parse_json_object_from_request(request)
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, request, body, "add a device signing key to your account",
+            requester,
+            request,
+            body,
+            "add a device signing key to your account",
         )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)

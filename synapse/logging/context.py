@@ -22,7 +22,6 @@ them.
 
 See doc/log_contexts.rst for details on how this works.
 """
-
 import inspect
 import logging
 import threading
@@ -30,6 +29,7 @@ import types
 import warnings
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
+import attr
 from typing_extensions import Literal
 
 from twisted.internet import defer, threads
@@ -181,6 +181,29 @@ class ContextResourceUsage:
         return res
 
 
+@attr.s(slots=True)
+class ContextRequest:
+    """
+    A bundle of attributes from the SynapseRequest object.
+
+    This exists to:
+
+    * Avoid a cycle between LoggingContext and SynapseRequest.
+    * Be a single variable that can be passed from parent LoggingContexts to
+      their children.
+    """
+
+    request_id = attr.ib(type=str)
+    ip_address = attr.ib(type=str)
+    site_tag = attr.ib(type=str)
+    requester = attr.ib(type=Optional[str])
+    authenticated_entity = attr.ib(type=Optional[str])
+    method = attr.ib(type=str)
+    url = attr.ib(type=str)
+    protocol = attr.ib(type=str)
+    user_agent = attr.ib(type=str)
+
+
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 
 
@@ -235,7 +258,8 @@ class LoggingContext:
           child to the parent
 
     Args:
-        name (str): Name for the context for debugging.
+        name: Name for the context for logging. If this is omitted, it is
+           inherited from the parent context.
         parent_context (LoggingContext|None): The parent of the new context
     """
 
@@ -256,10 +280,9 @@ class LoggingContext:
         self,
         name: Optional[str] = None,
         parent_context: "Optional[LoggingContext]" = None,
-        request: Optional[str] = None,
+        request: Optional[ContextRequest] = None,
     ) -> None:
         self.previous_context = current_context()
-        self.name = name
 
         # track the resources used by this context so far
         self._resource_usage = ContextResourceUsage()
@@ -281,16 +304,27 @@ class LoggingContext:
         self.parent_context = parent_context
 
         if self.parent_context is not None:
-            self.parent_context.copy_to(self)
+            # we track the current request_id
+            self.request = self.parent_context.request
+
+            # we also track the current scope:
+            self.scope = self.parent_context.scope
 
         if request is not None:
             # the request param overrides the request from the parent context
             self.request = request
 
+        # if we don't have a `name`, but do have a parent context, use its name.
+        if self.parent_context and name is None:
+            name = str(self.parent_context)
+        if name is None:
+            raise ValueError(
+                "LoggingContext must be given either a name or a parent context"
+            )
+        self.name = name
+
     def __str__(self) -> str:
-        if self.request:
-            return str(self.request)
-        return "%s@%x" % (self.name, id(self))
+        return self.name
 
     @classmethod
     def current_context(cls) -> LoggingContextOrSentinel:
@@ -338,7 +372,10 @@ class LoggingContext:
         if self.previous_context != old_context:
             logcontext_error(
                 "Expected previous context %r, found %r"
-                % (self.previous_context, old_context,)
+                % (
+                    self.previous_context,
+                    old_context,
+                )
             )
         return self
 
@@ -553,8 +590,23 @@ class LoggingContextFilter(logging.Filter):
         # we end up in a death spiral of infinite loops, so let's check, for
         # robustness' sake.
         if context is not None:
-            # Logging is interested in the request.
-            record.request = context.request  # type: ignore
+            # Logging is interested in the request ID. Note that for backwards
+            # compatibility this is stored as the "request" on the record.
+            record.request = str(context)  # type: ignore
+
+            # Add some data from the HTTP request.
+            request = context.request
+            if request is None:
+                return True
+
+            record.ip_address = request.ip_address  # type: ignore
+            record.site_tag = request.site_tag  # type: ignore
+            record.requester = request.requester  # type: ignore
+            record.authenticated_entity = request.authenticated_entity  # type: ignore
+            record.method = request.method  # type: ignore
+            record.url = request.url  # type: ignore
+            record.protocol = request.protocol  # type: ignore
+            record.user_agent = request.user_agent  # type: ignore
 
         return True
 
@@ -562,7 +614,7 @@ class LoggingContextFilter(logging.Filter):
 class PreserveLoggingContext:
     """Context manager which replaces the logging context
 
-     The previous logging context is restored on exit."""
+    The previous logging context is restored on exit."""
 
     __slots__ = ["_old_context", "_new_context"]
 
@@ -585,7 +637,10 @@ class PreserveLoggingContext:
             else:
                 logcontext_error(
                     "Expected logging context %s but found %s"
-                    % (self._new_context, context,)
+                    % (
+                        self._new_context,
+                        context,
+                    )
                 )
 
 
@@ -624,8 +679,8 @@ def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSe
 def nested_logging_context(suffix: str) -> LoggingContext:
     """Creates a new logging context as a child of another.
 
-    The nested logging context will have a 'request' made up of the parent context's
-    request, plus the given suffix.
+    The nested logging context will have a 'name' made up of the parent context's
+    name, plus the given suffix.
 
     CPU/db usage stats will be added to the parent context's on exit.
 
@@ -635,7 +690,7 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             # ... do stuff
 
     Args:
-        suffix: suffix to add to the parent context's 'request'.
+        suffix: suffix to add to the parent context's 'name'.
 
     Returns:
         LoggingContext: new logging context.
@@ -646,12 +701,14 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             "Starting nested logging context from sentinel context: metrics will be lost"
         )
         parent_context = None
-        prefix = ""
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        prefix = str(parent_context.request)
-    return LoggingContext(parent_context=parent_context, request=prefix + "-" + suffix)
+    prefix = str(curr_context)
+    return LoggingContext(
+        prefix + "-" + suffix,
+        parent_context=parent_context,
+    )
 
 
 def preserve_fn(f):
@@ -663,7 +720,7 @@ def preserve_fn(f):
     return g
 
 
-def run_in_background(f, *args, **kwargs):
+def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
     deferred returned by the function completes.
@@ -683,7 +740,7 @@ def run_in_background(f, *args, **kwargs):
     current = current_context()
     try:
         res = f(*args, **kwargs)
-    except:  # noqa: E722
+    except Exception:
         # the assumption here is that the caller doesn't want to be disturbed
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
@@ -691,8 +748,10 @@ def run_in_background(f, *args, **kwargs):
     if isinstance(res, types.CoroutineType):
         res = defer.ensureDeferred(res)
 
+    # At this point we should have a Deferred, if not then f was a synchronous
+    # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
-        return res
+        return defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
@@ -839,7 +898,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         parent_context = curr_context
 
     def g():
-        with LoggingContext(parent_context=parent_context):
+        with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 
     return make_deferred_yieldable(threads.deferToThreadPool(reactor, threadpool, g))

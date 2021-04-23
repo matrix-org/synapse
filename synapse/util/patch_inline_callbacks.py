@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -204,16 +203,13 @@ def _check_yield_points(f: Callable, changes: List[str]):
                 # We don't raise here as its perfectly valid for contexts to
                 # change in a function, as long as it sets the correct context
                 # on resolving (which is checked separately).
-                err = (
-                    "%s changed context from %s to %s, happened between lines %d and %d in %s"
-                    % (
-                        frame.f_code.co_name,
-                        expected_context,
-                        current_context(),
-                        last_yield_line_no,
-                        frame.f_lineno,
-                        frame.f_code.co_filename,
-                    )
+                err = "%s changed context from %s to %s, happened between lines %d and %d in %s" % (
+                    frame.f_code.co_name,
+                    expected_context,
+                    current_context(),
+                    last_yield_line_no,
+                    frame.f_lineno,
+                    frame.f_code.co_filename,
                 )
                 changes.append(err)
 

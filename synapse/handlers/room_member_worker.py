@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.handlers.room_member import RoomMemberHandler
@@ -25,11 +24,14 @@ from synapse.replication.http.membership import (
 )
 from synapse.types import Requester, UserID
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class RoomMemberWorkerHandler(RoomMemberHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self._remote_join_client = ReplRemoteJoin.make_client(hs)
@@ -44,8 +46,7 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         user: UserID,
         content: dict,
     ) -> Tuple[str, int]:
-        """Implements RoomMemberHandler._remote_join
-        """
+        """Implements RoomMemberHandler._remote_join"""
         if len(remote_room_hosts) == 0:
             raise SynapseError(404, "No known servers")
 
@@ -80,8 +81,10 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         return ret["event_id"], ret["stream_id"]
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
-        """Implements RoomMemberHandler._user_left_room
-        """
+        """Implements RoomMemberHandler._user_left_room"""
         await self._notify_change_client(
             user_id=target.to_string(), room_id=room_id, change="left"
         )
+
+    async def forget(self, target: UserID, room_id: str) -> None:
+        raise RuntimeError("Cannot forget rooms on workers.")

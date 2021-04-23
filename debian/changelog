@@ -1,8 +1,68 @@
-matrix-synapse-py3 (1.26.0+nmu1) UNRELEASED; urgency=medium
+matrix-synapse-py3 (1.32.2) stable; urgency=medium
 
+  * New synapse release 1.32.2.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 22 Apr 2021 12:43:52 +0100
+
+matrix-synapse-py3 (1.32.1) stable; urgency=medium
+
+  * New synapse release 1.32.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 21 Apr 2021 14:00:55 +0100
+
+matrix-synapse-py3 (1.32.0) stable; urgency=medium
+
+  [ Dan Callahan ]
+  * Skip tests when DEB_BUILD_OPTIONS contains "nocheck".
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.32.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 20 Apr 2021 14:28:39 +0100
+
+matrix-synapse-py3 (1.31.0) stable; urgency=medium
+
+  * New synapse release 1.31.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 06 Apr 2021 13:08:29 +0100
+
+matrix-synapse-py3 (1.30.1) stable; urgency=medium
+
+  * New synapse release 1.30.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Fri, 26 Mar 2021 12:01:28 +0000
+
+matrix-synapse-py3 (1.30.0) stable; urgency=medium
+
+  * New synapse release 1.30.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 22 Mar 2021 13:15:34 +0000
+
+matrix-synapse-py3 (1.29.0) stable; urgency=medium
+
+  [ Jonathan de Jong ]
+  * Remove the python -B flag (don't generate bytecode) in scripts and documentation.
+
+  [ Synapse Packaging team ]
+  * New synapse release 1.29.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Mon, 08 Mar 2021 13:51:50 +0000
+
+matrix-synapse-py3 (1.28.0) stable; urgency=medium
+
+  * New synapse release 1.28.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Thu, 25 Feb 2021 10:21:57 +0000
+
+matrix-synapse-py3 (1.27.0) stable; urgency=medium
+
+  [ Dan Callahan ]
   * Fix build on Ubuntu 16.04 LTS (Xenial).
 
- -- Dan Callahan <danc@element.io>  Thu, 28 Jan 2021 16:21:03 +0000
+  [ Synapse Packaging team ]
+  * New synapse release 1.27.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 16 Feb 2021 13:11:28 +0000
 
 matrix-synapse-py3 (1.26.0) stable; urgency=medium
 

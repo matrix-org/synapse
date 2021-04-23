@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -123,7 +122,7 @@ class RoomDirectoryConfig(Config):
             alias (str)
 
         Returns:
-            boolean: True if user is allowed to crate the alias
+            boolean: True if user is allowed to create the alias
         """
         for rule in self._alias_creation_rules:
             if rule.matches(user_id, room_id, [alias]):

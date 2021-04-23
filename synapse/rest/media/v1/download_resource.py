@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -16,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
 from synapse.http.servlet import parse_boolean
@@ -24,8 +23,8 @@ from synapse.http.servlet import parse_boolean
 from ._base import parse_media_id, respond_404
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +50,8 @@ class DownloadResource(DirectServeJsonResource):
             b" object-src 'self';",
         )
         request.setHeader(
-            b"Referrer-Policy", b"no-referrer",
+            b"Referrer-Policy",
+            b"no-referrer",
         )
         server_name, media_id, name = parse_media_id(request)
         if server_name == self.server_name:

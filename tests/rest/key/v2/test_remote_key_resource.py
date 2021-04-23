@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,7 @@
 # limitations under the License.
 import urllib.parse
 from io import BytesIO, StringIO
-
-from mock import Mock
+from unittest.mock import Mock
 
 import signedjson.key
 from canonicaljson import encode_canonical_json
@@ -180,7 +178,8 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
         async def post_json(destination, path, data):
             self.assertEqual(destination, self.hs.hostname)
             self.assertEqual(
-                path, "/_matrix/key/v2/query",
+                path,
+                "/_matrix/key/v2/query",
             )
 
             channel = FakeChannel(self.site, self.reactor)
@@ -188,7 +187,9 @@ class EndToEndPerspectivesTests(BaseRemoteKeyResourceTestCase):
             req.content = BytesIO(encode_canonical_json(data))
 
             req.requestReceived(
-                b"POST", path.encode("utf-8"), b"1.1",
+                b"POST",
+                path.encode("utf-8"),
+                b"1.1",
             )
             channel.await_result()
             self.assertEqual(channel.code, 200)

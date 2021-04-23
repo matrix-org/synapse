@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -30,7 +29,7 @@ import yaml
 
 from synapse.config import find_config_files
 
-SYNAPSE = [sys.executable, "-B", "-m", "synapse.app.homeserver"]
+SYNAPSE = [sys.executable, "-m", "synapse.app.homeserver"]
 
 GREEN = "\x1b[1;32m"
 YELLOW = "\x1b[1;33m"
@@ -117,7 +116,6 @@ def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
 
     args = [
         sys.executable,
-        "-B",
         "-m",
         app,
         "-c",

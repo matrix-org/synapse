@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -105,7 +104,13 @@ class Measure:
         "start",
     ]
 
-    def __init__(self, clock, name):
+    def __init__(self, clock, name: str):
+        """
+        Args:
+            clock: A n object with a "time()" method, which returns the current
+                time in seconds.
+            name: The name of the metric to report.
+        """
         self.clock = clock
         self.name = name
         curr_context = current_context()
@@ -118,10 +123,8 @@ class Measure:
         else:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
-        self._logging_context = LoggingContext(
-            "Measure[%s]" % (self.name,), parent_context
-        )
-        self.start = None
+        self._logging_context = LoggingContext(str(curr_context), parent_context)
+        self.start = None  # type: Optional[int]
 
     def __enter__(self) -> "Measure":
         if self.start is not None:
@@ -161,8 +164,7 @@ class Measure:
         return self._logging_context.get_resource_usage()
 
     def _update_in_flight(self, metrics):
-        """Gets called when processing in flight metrics
-        """
+        """Gets called when processing in flight metrics"""
         duration = self.clock.time() - self.start
 
         metrics.real_time_max = max(metrics.real_time_max, duration)

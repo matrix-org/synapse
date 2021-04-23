@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
@@ -260,7 +260,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(
@@ -292,7 +295,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(

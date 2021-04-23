@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import platform
 
 from ._base import BaseDatabaseEngine, IncorrectDatabaseSetup
 from .postgres import PostgresEngine
@@ -28,11 +26,8 @@ def create_engine(database_config) -> BaseDatabaseEngine:
         return Sqlite3Engine(sqlite3, database_config)
 
     if name == "psycopg2":
-        # pypy requires psycopg2cffi rather than psycopg2
-        if platform.python_implementation() == "PyPy":
-            import psycopg2cffi as psycopg2  # type: ignore
-        else:
-            import psycopg2  # type: ignore
+        # Note that psycopg2cffi-compat provides the psycopg2 module on pypy.
+        import psycopg2  # type: ignore
 
         return PostgresEngine(psycopg2, database_config)
 

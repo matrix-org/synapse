@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,26 +12,28 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import abc
 import logging
-from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from prometheus_client import Counter
 
-from twisted.internet import defer
-
-import synapse
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
-from synapse.handlers.presence import get_interested_remotes
-from synapse.logging.context import (
-    make_deferred_yieldable,
-    preserve_fn,
-    run_in_background,
-)
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,
@@ -40,8 +41,12 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import ReadReceipt, RoomStreamToken
-from synapse.util.metrics import Measure, measure_func
+from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
+from synapse.util.metrics import Measure
+
+if TYPE_CHECKING:
+    from synapse.events.presence_router import PresenceRouter
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +70,82 @@ CATCH_UP_STARTUP_DELAY_SEC = 15
 CATCH_UP_STARTUP_INTERVAL_SEC = 5
 
 
-class FederationSender:
-    def __init__(self, hs: "synapse.server.HomeServer"):
+class AbstractFederationSender(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def notify_new_events(self, max_token: RoomStreamToken) -> None:
+        """This gets called when we have some new events we might want to
+        send out to other servers.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def send_read_receipt(self, receipt: ReadReceipt) -> None:
+        """Send a RR to any other servers in the room
+
+        Args:
+            receipt: receipt to be sent
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def send_presence_to_destinations(
+        self, states: Iterable[UserPresenceState], destinations: Iterable[str]
+    ) -> None:
+        """Send the given presence states to the given destinations.
+
+        Args:
+            destinations:
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def build_and_send_edu(
+        self,
+        destination: str,
+        edu_type: str,
+        content: JsonDict,
+        key: Optional[Hashable] = None,
+    ) -> None:
+        """Construct an Edu object, and queue it for sending
+
+        Args:
+            destination: name of server to send to
+            edu_type: type of EDU to send
+            content: content of EDU
+            key: clobbering key for this edu
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def send_device_messages(self, destination: str) -> None:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def wake_destination(self, destination: str) -> None:
+        """Called when we want to retry sending transactions to a remote.
+
+        This is mainly useful if the remote server has been down and we think it
+        might have come back.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def get_current_token(self) -> int:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def federation_ack(self, instance_name: str, token: int) -> None:
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    async def get_replication_rows(
+        self, instance_name: str, from_token: int, to_token: int, target_row_count: int
+    ) -> Tuple[List[Tuple[int, Tuple]], int, bool]:
+        raise NotImplementedError()
+
+
+class FederationSender(AbstractFederationSender):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.server_name = hs.hostname
 
@@ -76,6 +155,7 @@ class FederationSender:
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
+        self._presence_router = None  # type: Optional[PresenceRouter]
         self._transaction_manager = TransactionManager(hs)
 
         self._instance_name = hs.get_instance_name()
@@ -94,11 +174,6 @@ class FederationSender:
                 if d.transmission_loop_running
             ),
         )
-
-        # Map of user_id -> UserPresenceState for all the pending presence
-        # to be sent out by user_id. Entries here get processed and put in
-        # pending_presence_by_dest
-        self.pending_presence = {}  # type: Dict[str, UserPresenceState]
 
         LaterGauge(
             "synapse_federation_transaction_queue_pending_pdus",
@@ -119,8 +194,6 @@ class FederationSender:
 
         self._is_processing = False
         self._last_poked_id = -1
-
-        self._processing_pending_presence = False
 
         # map from room_id to a set of PerDestinationQueues which we believe are
         # awaiting a call to flush_read_receipts_for_room. The presence of an entry
@@ -189,15 +262,27 @@ class FederationSender:
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                async def handle_event(event: EventBase) -> None:
+                async def get_destinations_for_event(
+                    event: EventBase,
+                ) -> Collection[str]:
+                    """Computes the destinations to which this event must be sent.
+
+                    This returns an empty tuple when there are no destinations to send to,
+                    or if this event is not from this homeserver and it is not sending
+                    it on behalf of another server.
+
+                    Will also filter out destinations which this sender is not responsible for,
+                    if multiple federation senders exist.
+                    """
+
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
-                        return
+                        return ()
 
                     if not event.internal_metadata.should_proactively_send():
-                        return
+                        return ()
 
                     destinations = None  # type: Optional[Set[str]]
                     if not event.prev_event_ids():
@@ -232,7 +317,7 @@ class FederationSender:
                                 "Failed to calculate hosts in room for event: %s",
                                 event.event_id,
                             )
-                            return
+                            return ()
 
                     destinations = {
                         d
@@ -242,17 +327,15 @@ class FederationSender:
                         )
                     }
 
+                    destinations.discard(self.server_name)
+
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
                         # send the event to it.
                         destinations.discard(send_on_behalf_of)
 
-                    logger.debug("Sending %s to %r", event, destinations)
-
                     if destinations:
-                        await self._send_pdu(event, destinations)
-
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
 
@@ -260,24 +343,29 @@ class FederationSender:
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                async def handle_room_events(events: Iterable[EventBase]) -> None:
-                    with Measure(self.clock, "handle_room_events"):
-                        for event in events:
-                            await handle_event(event)
+                        return destinations
+                    return ()
 
-                events_by_room = {}  # type: Dict[str, List[EventBase]]
-                for event in events:
-                    events_by_room.setdefault(event.room_id, []).append(event)
+                async def get_federatable_events_and_destinations(
+                    events: Iterable[EventBase],
+                ) -> List[Tuple[EventBase, Collection[str]]]:
+                    with Measure(self.clock, "get_destinations_for_events"):
+                        # Fetch federation destinations per event,
+                        # skip if get_destinations_for_event returns an empty collection,
+                        # return list of event->destinations pairs.
+                        return [
+                            (event, dests)
+                            for (event, dests) in [
+                                (event, await get_destinations_for_event(event))
+                                for event in events
+                            ]
+                            if dests
+                        ]
 
-                await make_deferred_yieldable(
-                    defer.gatherResults(
-                        [
-                            run_in_background(handle_room_events, evs)
-                            for evs in events_by_room.values()
-                        ],
-                        consumeErrors=True,
-                    )
-                )
+                events_and_dests = await get_federatable_events_and_destinations(events)
+
+                # Send corresponding events to each destination queue
+                await self._distribute_events(events_and_dests)
 
                 await self.store.update_federation_out_pos("events", next_token)
 
@@ -295,7 +383,7 @@ class FederationSender:
                     events_processed_counter.inc(len(events))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
-                        len(events_by_room)
+                        len({event.room_id for event in events})
                     )
 
                 event_processing_loop_counter.labels("federation_sender").inc()
@@ -307,32 +395,53 @@ class FederationSender:
         finally:
             self._is_processing = False
 
-    async def _send_pdu(self, pdu: EventBase, destinations: Iterable[str]) -> None:
-        # We loop through all destinations to see whether we already have
-        # a transaction in progress. If we do, stick it in the pending_pdus
-        # table and we'll get back to it later.
+    async def _distribute_events(
+        self,
+        events_and_dests: Iterable[Tuple[EventBase, Collection[str]]],
+    ) -> None:
+        """Distribute events to the respective per_destination queues.
 
-        destinations = set(destinations)
-        destinations.discard(self.server_name)
-        logger.debug("Sending to: %s", str(destinations))
+        Also persists last-seen per-room stream_ordering to 'destination_rooms'.
 
-        if not destinations:
-            return
+        Args:
+            events_and_dests: A list of tuples, which are (event: EventBase, destinations: Collection[str]).
+                              Every event is paired with its intended destinations (in federation).
+        """
+        # Tuples of room_id + destination to their max-seen stream_ordering
+        room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
 
-        sent_pdus_destination_dist_total.inc(len(destinations))
-        sent_pdus_destination_dist_count.inc()
+        # List of events to send to each destination
+        events_by_dest = {}  # type: Dict[str, List[EventBase]]
 
-        assert pdu.internal_metadata.stream_ordering
+        # For each event-destinations pair...
+        for event, destinations in events_and_dests:
 
-        # track the fact that we have a PDU for these destinations,
-        # to allow us to perform catch-up later on if the remote is unreachable
-        # for a while.
-        await self.store.store_destination_rooms_entries(
-            destinations, pdu.room_id, pdu.internal_metadata.stream_ordering,
+            # (we got this from the database, it's filled)
+            assert event.internal_metadata.stream_ordering
+
+            sent_pdus_destination_dist_total.inc(len(destinations))
+            sent_pdus_destination_dist_count.inc()
+
+            # ...iterate over those destinations..
+            for destination in destinations:
+                # ...update their stream-ordering...
+                room_with_dest_stream_ordering[(event.room_id, destination)] = max(
+                    event.internal_metadata.stream_ordering,
+                    room_with_dest_stream_ordering.get((event.room_id, destination), 0),
+                )
+
+                # ...and add the event to each destination queue.
+                events_by_dest.setdefault(destination, []).append(event)
+
+        # Bulk-store destination_rooms stream_ids
+        await self.store.bulk_store_destination_rooms_entries(
+            room_with_dest_stream_ordering
         )
 
-        for destination in destinations:
-            self._get_per_destination_queue(destination).send_pdu(pdu)
+        for destination, pdus in events_by_dest.items():
+            logger.debug("Sending %d pdus to %s", len(pdus), destination)
+
+            self._get_per_destination_queue(destination).send_pdus(pdus)
 
     async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """Send a RR to any other servers in the room
@@ -429,58 +538,20 @@ class FederationSender:
         for queue in queues:
             queue.flush_read_receipts_for_room(room_id)
 
-    @preserve_fn  # the caller should not yield on this
-    async def send_presence(self, states: List[UserPresenceState]):
-        """Send the new presence states to the appropriate destinations.
-
-        This actually queues up the presence states ready for sending and
-        triggers a background task to process them and send out the transactions.
-        """
-        if not self.hs.config.use_presence:
-            # No-op if presence is disabled.
-            return
-
-        # First we queue up the new presence by user ID, so multiple presence
-        # updates in quick succession are correctly handled.
-        # We only want to send presence for our own users, so lets always just
-        # filter here just in case.
-        self.pending_presence.update(
-            {state.user_id: state for state in states if self.is_mine_id(state.user_id)}
-        )
-
-        # We then handle the new pending presence in batches, first figuring
-        # out the destinations we need to send each state to and then poking it
-        # to attempt a new transaction. We linearize this so that we don't
-        # accidentally mess up the ordering and send multiple presence updates
-        # in the wrong order
-        if self._processing_pending_presence:
-            return
-
-        self._processing_pending_presence = True
-        try:
-            while True:
-                states_map = self.pending_presence
-                self.pending_presence = {}
-
-                if not states_map:
-                    break
-
-                await self._process_presence_inner(list(states_map.values()))
-        except Exception:
-            logger.exception("Error sending presence states to servers")
-        finally:
-            self._processing_pending_presence = False
-
     def send_presence_to_destinations(
-        self, states: List[UserPresenceState], destinations: List[str]
+        self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
         """Send the given presence states to the given destinations.
-            destinations (list[str])
+        destinations (list[str])
         """
 
         if not states or not self.hs.config.use_presence:
             # No-op if presence is disabled.
             return
+
+        # Ensure we only send out presence states for local users.
+        for state in states:
+            assert self.is_mine_id(state.user_id)
 
         for destination in destinations:
             if destination == self.server_name:
@@ -491,32 +562,13 @@ class FederationSender:
                 continue
             self._get_per_destination_queue(destination).send_presence(states)
 
-    @measure_func("txnqueue._process_presence")
-    async def _process_presence_inner(self, states: List[UserPresenceState]):
-        """Given a list of states populate self.pending_presence_by_dest and
-        poke to send a new transaction to each destination
-        """
-        hosts_and_states = await get_interested_remotes(self.store, states, self.state)
-
-        for destinations, states in hosts_and_states:
-            for destination in destinations:
-                if destination == self.server_name:
-                    continue
-
-                if not self._federation_shard_config.should_handle(
-                    self._instance_name, destination
-                ):
-                    continue
-
-                self._get_per_destination_queue(destination).send_presence(states)
-
     def build_and_send_edu(
         self,
         destination: str,
         edu_type: str,
-        content: dict,
+        content: JsonDict,
         key: Optional[Hashable] = None,
-    ):
+    ) -> None:
         """Construct an Edu object, and queue it for sending
 
         Args:
@@ -543,7 +595,7 @@ class FederationSender:
 
         self.send_edu(edu, key)
 
-    def send_edu(self, edu: Edu, key: Optional[Hashable]):
+    def send_edu(self, edu: Edu, key: Optional[Hashable]) -> None:
         """Queue an EDU for sending
 
         Args:
@@ -561,7 +613,7 @@ class FederationSender:
         else:
             queue.send_edu(edu)
 
-    def send_device_messages(self, destination: str):
+    def send_device_messages(self, destination: str) -> None:
         if destination == self.server_name:
             logger.warning("Not sending device update to ourselves")
             return
@@ -573,7 +625,7 @@ class FederationSender:
 
         self._get_per_destination_queue(destination).attempt_new_transaction()
 
-    def wake_destination(self, destination: str):
+    def wake_destination(self, destination: str) -> None:
         """Called when we want to retry sending transactions to a remote.
 
         This is mainly useful if the remote server has been down and we think it
@@ -597,6 +649,10 @@ class FederationSender:
         # to a worker.
         return 0
 
+    def federation_ack(self, instance_name: str, token: int) -> None:
+        # It is not expected that this gets called on FederationSender.
+        raise NotImplementedError()
+
     @staticmethod
     async def get_replication_rows(
         instance_name: str, from_token: int, to_token: int, target_row_count: int
@@ -605,7 +661,7 @@ class FederationSender:
         # to a worker.
         return [], 0, False
 
-    async def _wake_destinations_needing_catchup(self):
+    async def _wake_destinations_needing_catchup(self) -> None:
         """
         Wakes up destinations that need catch-up and are not currently being
         backed off from.
@@ -616,8 +672,8 @@ class FederationSender:
         last_processed = None  # type: Optional[str]
 
         while True:
-            destinations_to_wake = await self.store.get_catch_up_outstanding_destinations(
-                last_processed
+            destinations_to_wake = (
+                await self.store.get_catch_up_outstanding_destinations(last_processed)
             )
 
             if not destinations_to_wake:
@@ -625,16 +681,18 @@ class FederationSender:
                 self._catchup_after_startup_timer = None
                 break
 
+            last_processed = destinations_to_wake[-1]
+
             destinations_to_wake = [
                 d
                 for d in destinations_to_wake
                 if self._federation_shard_config.should_handle(self._instance_name, d)
             ]
 
-            for last_processed in destinations_to_wake:
+            for destination in destinations_to_wake:
                 logger.info(
                     "Destination %s has outstanding catch-up, waking up.",
                     last_processed,
                 )
-                self.wake_destination(last_processed)
+                self.wake_destination(destination)
                 await self.clock.sleep(CATCH_UP_STARTUP_INTERVAL_SEC)

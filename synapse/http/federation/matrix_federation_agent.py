@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import List, Optional
+from typing import Any, Generator, List, Optional
 
 from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
@@ -35,6 +34,7 @@ from synapse.http.client import BlacklistingAgentWrapper
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.types import ISynapseReactor
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
@@ -68,7 +68,7 @@ class MatrixFederationAgent:
 
     def __init__(
         self,
-        reactor: IReactorCore,
+        reactor: ISynapseReactor,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
         ip_blacklist: IPSet,
@@ -116,7 +116,7 @@ class MatrixFederationAgent:
         uri: bytes,
         headers: Optional[Headers] = None,
         bodyProducer: Optional[IBodyProducer] = None,
-    ) -> defer.Deferred:
+    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
         """
         Args:
             method: HTTP method: GET/POST/etc
@@ -177,17 +177,17 @@ class MatrixFederationAgent:
         # We need to make sure the host header is set to the netloc of the
         # server and that a user-agent is provided.
         if headers is None:
-            headers = Headers()
+            request_headers = Headers()
         else:
-            headers = headers.copy()
+            request_headers = headers.copy()
 
-        if not headers.hasHeader(b"host"):
-            headers.addRawHeader(b"host", parsed_uri.netloc)
-        if not headers.hasHeader(b"user-agent"):
-            headers.addRawHeader(b"user-agent", self.user_agent)
+        if not request_headers.hasHeader(b"host"):
+            request_headers.addRawHeader(b"host", parsed_uri.netloc)
+        if not request_headers.hasHeader(b"user-agent"):
+            request_headers.addRawHeader(b"user-agent", self.user_agent)
 
         res = yield make_deferred_yieldable(
-            self._agent.request(method, uri, headers, bodyProducer)
+            self._agent.request(method, uri, request_headers, bodyProducer)
         )
 
         return res
@@ -195,8 +195,7 @@ class MatrixFederationAgent:
 
 @implementer(IAgentEndpointFactory)
 class MatrixHostnameEndpointFactory:
-    """Factory for MatrixHostnameEndpoint for parsing to an Agent.
-    """
+    """Factory for MatrixHostnameEndpoint for parsing to an Agent."""
 
     def __init__(
         self,
@@ -261,8 +260,7 @@ class MatrixHostnameEndpoint:
         self._srv_resolver = srv_resolver
 
     def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
-        """Implements IStreamClientEndpoint interface
-        """
+        """Implements IStreamClientEndpoint interface"""
 
         return run_in_background(self._do_connect, protocol_factory)
 
@@ -323,12 +321,19 @@ class MatrixHostnameEndpoint:
         if port or _is_ip_literal(host):
             return [Server(host, port or 8448)]
 
+        logger.debug("Looking up SRV record for %s", host.decode(errors="replace"))
         server_list = await self._srv_resolver.resolve_service(b"_matrix._tcp." + host)
 
         if server_list:
+            logger.debug(
+                "Got %s from SRV lookup for %s",
+                ", ".join(map(str, server_list)),
+                host.decode(errors="replace"),
+            )
             return server_list
 
         # No SRV records, so we fallback to host and 8448
+        logger.debug("No SRV records for %s", host.decode(errors="replace"))
         return [Server(host, 8448)]
 
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -38,11 +37,10 @@ from synapse.types import (
 )
 from synapse.util import json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer
-from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -61,8 +59,8 @@ class E2eKeysHandler:
 
         self._is_master = hs.config.worker_app is None
         if not self._is_master:
-            self._user_device_resync_client = ReplicationUserDevicesResyncRestServlet.make_client(
-                hs
+            self._user_device_resync_client = (
+                ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
         else:
             # Only register this edu handler on master as it requires writing
@@ -85,7 +83,7 @@ class E2eKeysHandler:
     async def query_devices(
         self, query_body: JsonDict, timeout: int, from_user_id: str
     ) -> JsonDict:
-        """ Handle a device key query from a client
+        """Handle a device key query from a client
 
         {
             "device_keys": {
@@ -391,8 +389,7 @@ class E2eKeysHandler:
     async def on_federation_query_client_keys(
         self, query_body: Dict[str, Dict[str, Optional[List[str]]]]
     ) -> JsonDict:
-        """ Handle a device key query from a federated server
-        """
+        """Handle a device key query from a federated server"""
         device_keys_query = query_body.get(
             "device_keys", {}
         )  # type: Dict[str, Optional[List[str]]]
@@ -1009,7 +1006,7 @@ class E2eKeysHandler:
         return signature_list, failures
 
     async def _get_e2e_cross_signing_verify_key(
-        self, user_id: str, key_type: str, from_user_id: str = None
+        self, user_id: str, key_type: str, from_user_id: Optional[str] = None
     ) -> Tuple[JsonDict, str, VerifyKey]:
         """Fetch locally or remotely query for a cross-signing public key.
 
@@ -1065,7 +1062,9 @@ class E2eKeysHandler:
         return key, key_id, verify_key
 
     async def _retrieve_cross_signing_keys_for_remote_user(
-        self, user: UserID, desired_key_type: str,
+        self,
+        user: UserID,
+        desired_key_type: str,
     ) -> Tuple[Optional[dict], Optional[str], Optional[VerifyKey]]:
         """Queries cross-signing keys for a remote user and saves them to the database
 
@@ -1269,8 +1268,7 @@ def _one_time_keys_match(old_key_json: str, new_key: JsonDict) -> bool:
 
 @attr.s(slots=True)
 class SignatureListItem:
-    """An item in the signature list as used by upload_signatures_for_device_keys.
-    """
+    """An item in the signature list as used by upload_signatures_for_device_keys."""
 
     signing_key_id = attr.ib(type=str)
     target_user_id = attr.ib(type=str)
@@ -1291,17 +1289,6 @@ class SigningKeyEduUpdater:
 
         # user_id -> list of updates waiting to be handled.
         self._pending_updates = {}  # type: Dict[str, List[Tuple[JsonDict, JsonDict]]]
-
-        # Recently seen stream ids. We don't bother keeping these in the DB,
-        # but they're useful to have them about to reduce the number of spurious
-        # resyncs.
-        self._seen_updates = ExpiringCache(
-            cache_name="signing_key_update_edu",
-            clock=self.clock,
-            max_len=10000,
-            expiry_ms=30 * 60 * 1000,
-            iterable=True,
-        )
 
     async def incoming_signing_key_update(
         self, origin: str, edu_content: JsonDict
@@ -1355,8 +1342,12 @@ class SigningKeyEduUpdater:
             logger.info("pending updates: %r", pending_updates)
 
             for master_key, self_signing_key in pending_updates:
-                new_device_ids = await device_list_updater.process_cross_signing_key_update(
-                    user_id, master_key, self_signing_key,
+                new_device_ids = (
+                    await device_list_updater.process_cross_signing_key_update(
+                        user_id,
+                        master_key,
+                        self_signing_key,
+                    )
                 )
                 device_ids = device_ids + new_device_ids
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,8 +70,10 @@ WELL_KNOWN_RETRY_ATTEMPTS = 3
 logger = logging.getLogger(__name__)
 
 
-_well_known_cache = TTLCache("well-known")
-_had_valid_well_known_cache = TTLCache("had-valid-well-known")
+_well_known_cache = TTLCache("well-known")  # type: TTLCache[bytes, Optional[bytes]]
+_had_valid_well_known_cache = TTLCache(
+    "had-valid-well-known"
+)  # type: TTLCache[bytes, bool]
 
 
 @attr.s(slots=True, frozen=True)
@@ -81,16 +82,15 @@ class WellKnownLookupResult:
 
 
 class WellKnownResolver:
-    """Handles well-known lookups for matrix servers.
-    """
+    """Handles well-known lookups for matrix servers."""
 
     def __init__(
         self,
         reactor: IReactorTime,
         agent: IAgent,
         user_agent: bytes,
-        well_known_cache: Optional[TTLCache] = None,
-        had_well_known_cache: Optional[TTLCache] = None,
+        well_known_cache: Optional[TTLCache[bytes, Optional[bytes]]] = None,
+        had_well_known_cache: Optional[TTLCache[bytes, bool]] = None,
     ):
         self._reactor = reactor
         self._clock = Clock(reactor)
@@ -323,7 +323,8 @@ def _cache_period_from_headers(
 
 def _parse_cache_control(headers: Headers) -> Dict[bytes, Optional[bytes]]:
     cache_controls = {}
-    for hdr in headers.getRawHeaders(b"cache-control", []):
+    cache_control_headers = headers.getRawHeaders(b"cache-control") or []
+    for hdr in cache_control_headers:
         for directive in hdr.split(b","):
             splits = [x.strip() for x in directive.split(b"=", 1)]
             k = splits[0].lower()

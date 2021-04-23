@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +14,15 @@
 
 import logging
 from inspect import isawaitable
-from typing import TYPE_CHECKING, Optional, Type, cast
+from typing import TYPE_CHECKING, Generic, Optional, Type, TypeVar, cast
 
+import attr
 import txredisapi
+from zope.interface import implementer
+
+from twisted.internet.address import IPv4Address, IPv6Address
+from twisted.internet.interfaces import IAddress, IConnector
+from twisted.python.failure import Failure
 
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import (
@@ -31,7 +36,7 @@ from synapse.replication.tcp.commands import (
     parse_command_from_line,
 )
 from synapse.replication.tcp.protocol import (
-    AbstractConnection,
+    IReplicationConnection,
     tcp_inbound_commands_counter,
     tcp_outbound_commands_counter,
 )
@@ -42,8 +47,27 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T")
+V = TypeVar("V")
 
-class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
+
+@attr.s
+class ConstantProperty(Generic[T, V]):
+    """A descriptor that returns the given constant, ignoring attempts to set
+    it.
+    """
+
+    constant = attr.ib()  # type: V
+
+    def __get__(self, obj: Optional[T], objtype: Optional[Type[T]] = None) -> V:
+        return self.constant
+
+    def __set__(self, obj: Optional[T], value: V):
+        pass
+
+
+@implementer(IReplicationConnection)
+class RedisSubscriber(txredisapi.SubscriberProtocol):
     """Connection to redis subscribed to replication stream.
 
     This class fulfils two functions:
@@ -52,7 +76,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
     connection, parsing *incoming* messages into replication commands, and passing them
     to `ReplicationCommandHandler`
 
-    (b) it implements the AbstractConnection API, where it sends *outgoing* commands
+    (b) it implements the IReplicationConnection API, where it sends *outgoing* commands
     onto outbound_redis_connection.
 
     Due to the vagaries of `txredisapi` we don't want to have a custom
@@ -104,8 +128,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
         self.synapse_handler.send_positions_to_connection(self)
 
     def messageReceived(self, pattern: str, channel: str, message: str):
-        """Received a message from redis.
-        """
+        """Received a message from redis."""
         with PreserveLoggingContext(self._logging_context):
             self._parse_and_dispatch_message(message)
 
@@ -118,7 +141,8 @@ class RedisSubscriber(txredisapi.SubscriberProtocol, AbstractConnection):
             cmd = parse_command_from_line(message)
         except Exception:
             logger.exception(
-                "Failed to parse replication line: %r", message,
+                "Failed to parse replication line: %r",
+                message,
             )
             return
 
@@ -195,6 +219,10 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
     we detect dead connections.
     """
 
+    # We want to *always* retry connecting, txredisapi will stop if there is a
+    # failure during certain operations, e.g. during AUTH.
+    continueTrying = cast(bool, ConstantProperty(True))
+
     def __init__(
         self,
         hs: "HomeServer",
@@ -230,6 +258,37 @@ class SynapseRedisFactory(txredisapi.RedisFactory):
             except Exception:
                 logger.warning("Failed to send ping to a redis connection")
 
+    # ReconnectingClientFactory has some logging (if you enable `self.noisy`), but
+    # it's rubbish. We add our own here.
+
+    def startedConnecting(self, connector: IConnector):
+        logger.info(
+            "Connecting to redis server %s", format_address(connector.getDestination())
+        )
+        super().startedConnecting(connector)
+
+    def clientConnectionFailed(self, connector: IConnector, reason: Failure):
+        logger.info(
+            "Connection to redis server %s failed: %s",
+            format_address(connector.getDestination()),
+            reason.value,
+        )
+        super().clientConnectionFailed(connector, reason)
+
+    def clientConnectionLost(self, connector: IConnector, reason: Failure):
+        logger.info(
+            "Connection to redis server %s lost: %s",
+            format_address(connector.getDestination()),
+            reason.value,
+        )
+        super().clientConnectionLost(connector, reason)
+
+
+def format_address(address: IAddress) -> str:
+    if isinstance(address, (IPv4Address, IPv6Address)):
+        return "%s:%i" % (address.host, address.port)
+    return str(address)
+
 
 class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
     """This is a reconnecting factory that connects to redis and immediately
@@ -243,7 +302,6 @@ class RedisDirectTcpReplicationClientFactory(SynapseRedisFactory):
     """
 
     maxDelay = 5
-    continueTrying = True
     protocol = RedisSubscriber
 
     def __init__(
@@ -306,6 +364,6 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(host, port, factory, 30)
+    reactor.connectTCP(host.encode(), port, factory, timeout=30, bindAddress=None)
 
     return factory.handler
