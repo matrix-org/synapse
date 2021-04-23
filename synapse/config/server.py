@@ -397,7 +397,6 @@ class ServerConfig(Config):
         if self.public_baseurl is not None:
             if self.public_baseurl[-1] != "/":
                 self.public_baseurl += "/"
-        self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before

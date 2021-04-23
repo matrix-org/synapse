@@ -845,22 +845,23 @@ class ShardedWorkerHandlingConfig:
 
     def should_handle(self, instance_name: str, key: str) -> bool:
         """Whether this instance is responsible for handling the given key."""
-        # If multiple instances are not defined we always return true
-        if not self.instances or len(self.instances) == 1:
-            return True
+        # If no instances are defined we assume some other worker is handling
+        # this.
+        if not self.instances:
+            return False
 
-        return self.get_instance(key) == instance_name
+        return self._get_instance(key) == instance_name
 
-    def get_instance(self, key: str) -> str:
+    def _get_instance(self, key: str) -> str:
         """Get the instance responsible for handling the given key.
 
-        Note: For things like federation sending the config for which instance
-        is sending is known only to the sender instance if there is only one.
-        Therefore `should_handle` should be used where possible.
+        Note: For federation sending and pushers the config for which instance
+        is sending is known only to the sender instance, so we don't expose this
+        method by default.
         """
 
         if not self.instances:
-            return "master"
+            raise Exception("Unknown worker")
 
         if len(self.instances) == 1:
             return self.instances[0]
@@ -875,6 +876,23 @@ class ShardedWorkerHandlingConfig:
         dest_int = int.from_bytes(dest_hash, byteorder="little")
         remainder = dest_int % (len(self.instances))
         return self.instances[remainder]
+
+
+@attr.s
+class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
+    """A version of `ShardedWorkerHandlingConfig` that is used for config
+    options where all instances know which instances are responsible for the
+    sharded work.
+    """
+
+    def __attrs_post_init__(self):
+        # We require that `self.instances` is non-empty.
+        if not self.instances:
+            raise Exception("Got empty list of instances for shard config")
+
+    def get_instance(self, key: str) -> str:
+        """Get the instance responsible for handling the given key."""
+        return self._get_instance(key)
 
 
 __all__ = ["Config", "RootConfig", "ShardedWorkerHandlingConfig"]
