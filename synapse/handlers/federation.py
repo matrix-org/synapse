@@ -146,6 +146,7 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
@@ -1673,16 +1674,46 @@ class FederationHandler(BaseHandler):
         # would introduce the danger of backwards-compatibility problems.
         event.internal_metadata.send_on_behalf_of = origin
 
+        # Calculate the event context.
         context = await self.state_handler.compute_event_context(event)
-        context = await self._auth_and_persist_event(origin, event, context)
+
+        # Get the state before the new event.
+        prev_state_ids = await context.get_prev_state_ids()
+
+        # Check if the user is already in the room or invited to the room.
+        user_id = event.state_key
+        prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
+        newly_joined = True
+        user_is_invited = False
+        if prev_member_event_id:
+            prev_member_event = await self.store.get_event(prev_member_event_id)
+            newly_joined = prev_member_event.membership != Membership.JOIN
+            user_is_invited = prev_member_event.membership == Membership.INVITE
+
+        # If the member is not already in the room, and not invited, check if
+        # they should be allowed access via membership in a space.
+        if (
+            newly_joined
+            and not user_is_invited
+            and not await self._event_auth_handler.can_join_without_invite(
+                prev_state_ids,
+                event.room_version,
+                user_id,
+            )
+        ):
+            raise AuthError(
+                403,
+                "You do not belong to any of the required spaces to join this room.",
+            )
+
+        # Persist the event.
+        await self._auth_and_persist_event(origin, event, context)
 
         logger.debug(
             "on_send_join_request: After _auth_and_persist_event: %s, sigs: %s",
             event.event_id,
             event.signatures,
         )
-
-        prev_state_ids = await context.get_prev_state_ids()
 
         state_ids = list(prev_state_ids.values())
         auth_chain = await self.store.get_auth_chain(event.room_id, state_ids)
@@ -2006,7 +2037,7 @@ class FederationHandler(BaseHandler):
         state: Optional[Iterable[EventBase]] = None,
         auth_events: Optional[MutableStateMap[EventBase]] = None,
         backfilled: bool = False,
-    ) -> EventContext:
+    ) -> None:
         """
         Process an event by performing auth checks and then persisting to the database.
 
@@ -2028,9 +2059,6 @@ class FederationHandler(BaseHandler):
                 event is an outlier), may be the auth events claimed by the remote
                 server.
             backfilled: True if the event was backfilled.
-
-        Returns:
-             The event context.
         """
         context = await self._check_event_auth(
             origin,
@@ -2059,8 +2087,6 @@ class FederationHandler(BaseHandler):
                 self.store.remove_push_actions_from_staging, event.event_id
             )
             raise
-
-        return context
 
     async def _auth_and_persist_events(
         self,
