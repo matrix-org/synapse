@@ -534,9 +534,10 @@ class MatrixFederationHttpClient:
                             response.code, response_phrase, body
                         )
 
-                        # Retry if the error is a 429 (Too Many Requests),
-                        # otherwise just raise a standard HttpResponseException
-                        if response.code == 429:
+                        # Retry if the error is a 5xx or a 429 (Too Many
+                        # Requests), otherwise just raise a standard
+                        # `HttpResponseException`
+                        if 500 <= response.code < 600 or response.code == 429:
                             raise RequestSendFailed(exc, can_retry=True) from exc
                         else:
                             raise exc
