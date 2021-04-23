@@ -159,7 +159,11 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profiles_active(
-        self, users: List[UserID], active: bool, hide: bool, batchnum: int,
+        self,
+        users: List[UserID],
+        active: bool,
+        hide: bool,
+        batchnum: int,
     ) -> None:
         """Given a set of users, set active and hidden flags on them.
 

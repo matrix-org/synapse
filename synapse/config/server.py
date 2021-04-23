@@ -263,6 +263,12 @@ class ServerConfig(Config):
             False,
         )
 
+        # Whether to retrieve and display profile data for a user when they
+        # are invited to a room
+        self.include_profile_data_on_invite = config.get(
+            "include_profile_data_on_invite", True
+        )
+
         if "restrict_public_rooms_to_local_users" in config and (
             "allow_public_rooms_without_auth" in config
             or "allow_public_rooms_over_federation" in config
@@ -853,6 +859,14 @@ class ServerConfig(Config):
         # requesting server. Defaults to 'false'.
         #
         #limit_profile_requests_to_users_who_share_rooms: true
+
+        # Uncomment to prevent a user's profile data from being retrieved and
+        # displayed in a room until they have joined it. By default, a user's
+        # profile data is included in an invite event, regardless of the values
+        # of the above two settings, and whether or not the users share a server.
+        # Defaults to 'true'.
+        #
+        #include_profile_data_on_invite: false
 
         # If set to 'true', removes the need for authentication to access the server's
         # public rooms directory through the client API, meaning that anyone can

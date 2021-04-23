@@ -408,7 +408,8 @@ class FederationHandler(BaseHandler):
                     # First though we need to fetch all the events that are in
                     # state_map, so we can build up the state below.
                     evs = await self.store.get_events(
-                        list(state_map.values()), get_prev_content=False,
+                        list(state_map.values()),
+                        get_prev_content=False,
                     )
                     event_map.update(evs)
 
@@ -1451,7 +1452,11 @@ class FederationHandler(BaseHandler):
 
     @log_function
     async def do_knock(
-        self, target_hosts: List[str], room_id: str, knockee: str, content: JsonDict,
+        self,
+        target_hosts: List[str],
+        room_id: str,
+        knockee: str,
+        content: JsonDict,
     ) -> Tuple[str, int]:
         """Sends the knock to the remote server.
 

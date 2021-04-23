@@ -1017,7 +1017,9 @@ class IdentityHandler(BaseHandler):
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
-                    "Error trying to call /store-invite on %s: %s", id_server_url, e,
+                    "Error trying to call /store-invite on %s: %s",
+                    id_server_url,
+                    e,
                 )
 
             if data is None:
@@ -1054,7 +1056,10 @@ class IdentityHandler(BaseHandler):
         return token, public_keys, fallback_public_key, display_name
 
     async def bind_email_using_internal_sydent_api(
-        self, id_server_url: str, email: str, user_id: str,
+        self,
+        id_server_url: str,
+        email: str,
+        user_id: str,
     ):
         """Bind an email to a fully qualified user ID using the internal API of an
         instance of Sydent.
@@ -1086,7 +1091,10 @@ class IdentityHandler(BaseHandler):
 
         # Remember where we bound the threepid
         await self.store.add_user_bound_threepid(
-            user_id=user_id, medium="email", address=email, id_server=id_server,
+            user_id=user_id,
+            medium="email",
+            address=email,
+            id_server=id_server,
         )
 
 

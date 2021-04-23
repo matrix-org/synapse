@@ -112,7 +112,11 @@ class RoomMemberWorkerHandler(RoomMemberHandler):
         return ret["event_id"], ret["stream_id"]
 
     async def remote_knock(
-        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
     ) -> Tuple[str, int]:
         """Sends a knock to a room.
 

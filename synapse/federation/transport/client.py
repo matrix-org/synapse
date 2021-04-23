@@ -309,7 +309,11 @@ class TransportLayerClient:
 
     @log_function
     async def send_knock_v2(
-        self, destination: str, room_id: str, event_id: str, content: JsonDict,
+        self,
+        destination: str,
+        room_id: str,
+        event_id: str,
+        content: JsonDict,
     ) -> JsonDict:
         """
         Sends a signed knock membership event to a remote server. This is the second

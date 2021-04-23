@@ -161,7 +161,11 @@ class ProfileTestCase(unittest.HomeserverTestCase):
 
         response = self.get_success(
             self.query_handlers["profile"](
-                {"user_id": "@caroline:test", "field": "displayname"}
+                {
+                    "user_id": "@caroline:test",
+                    "field": "displayname",
+                    "origin": "servername.tld",
+                }
             )
         )
 

@@ -284,8 +284,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         )
 
     def test_cannot_3pid_invite(self):
-        """Test that unbound 3pid invites get rejected.
-        """
+        """Test that unbound 3pid invites get rejected."""
         channel = self._create_room(self.admin_access_token)
         assert channel.result["code"] == b"200", channel.result
 
@@ -322,7 +321,9 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
         channel = self.make_request(
-            "POST", path, content=json.dumps(content).encode("utf8"),
+            "POST",
+            path,
+            content=json.dumps(content).encode("utf8"),
         )
 
         return channel

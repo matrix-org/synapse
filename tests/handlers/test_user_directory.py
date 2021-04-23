@@ -619,7 +619,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         [self.assertIn(user, remote_users) for user in received_user_id_ordering[3:]]
 
     def _add_user_to_room(
-        self, room_id: str, room_version: RoomVersion, user_id: str,
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+        user_id: str,
     ):
         # Add a user to the room.
         builder = self.event_builder_factory.for_room_version(

@@ -170,8 +170,8 @@ class RegistrationConfig(Config):
                 )
 
             # Remove trailing slashes
-            self.bind_new_user_emails_to_sydent = self.bind_new_user_emails_to_sydent.strip(
-                "/"
+            self.bind_new_user_emails_to_sydent = (
+                self.bind_new_user_emails_to_sydent.strip("/")
             )
 
     def generate_config_section(self, generate_secrets=False, **kwargs):

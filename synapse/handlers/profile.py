@@ -333,7 +333,10 @@ class ProfileHandler(BaseHandler):
         run_in_background(self._replicate_profiles)
 
     async def set_active(
-        self, users: List[UserID], active: bool, hide: bool,
+        self,
+        users: List[UserID],
+        active: bool,
+        hide: bool,
     ):
         """
         Sets the 'active' flag on a set of user profiles. If set to false, the
@@ -515,6 +518,15 @@ class ProfileHandler(BaseHandler):
         return avatar_pieces[-1]
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
+        """Handles federation profile query requests."""
+
+        if not self.hs.config.allow_profile_lookup_over_federation:
+            raise SynapseError(
+                403,
+                "Profile lookup over federation is disabled on this homeserver",
+                Codes.FORBIDDEN,
+            )
+
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")

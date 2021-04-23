@@ -53,7 +53,10 @@ class KnockRoomAliasServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_POST(
-        self, request: Request, room_identifier: str, txn_id: Optional[str] = None,
+        self,
+        request: Request,
+        room_identifier: str,
+        txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 

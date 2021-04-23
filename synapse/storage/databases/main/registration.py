@@ -383,7 +383,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def get_info_for_users(
-        self, user_ids: List[str],
+        self,
+        user_ids: List[str],
     ):
         """Return the user info for a given set of users
 

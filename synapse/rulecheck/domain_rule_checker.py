@@ -77,8 +77,7 @@ class DomainRuleChecker(object):
         )
 
     def check_event_for_spam(self, event):
-        """Implements synapse.events.SpamChecker.check_event_for_spam
-        """
+        """Implements synapse.events.SpamChecker.check_event_for_spam"""
         return False
 
     def user_may_invite(
@@ -90,8 +89,7 @@ class DomainRuleChecker(object):
         new_room,
         published_room=False,
     ):
-        """Implements synapse.events.SpamChecker.user_may_invite
-        """
+        """Implements synapse.events.SpamChecker.user_may_invite"""
         if self.can_only_invite_during_room_creation and not new_room:
             return False
 
@@ -121,8 +119,7 @@ class DomainRuleChecker(object):
     def user_may_create_room(
         self, userid, invite_list, third_party_invite_list, cloning
     ):
-        """Implements synapse.events.SpamChecker.user_may_create_room
-        """
+        """Implements synapse.events.SpamChecker.user_may_create_room"""
 
         if cloning:
             return True
@@ -138,18 +135,15 @@ class DomainRuleChecker(object):
         return True
 
     def user_may_create_room_alias(self, userid, room_alias):
-        """Implements synapse.events.SpamChecker.user_may_create_room_alias
-        """
+        """Implements synapse.events.SpamChecker.user_may_create_room_alias"""
         return True
 
     def user_may_publish_room(self, userid, room_id):
-        """Implements synapse.events.SpamChecker.user_may_publish_room
-        """
+        """Implements synapse.events.SpamChecker.user_may_publish_room"""
         return True
 
     def user_may_join_room(self, userid, room_id, is_invited):
-        """Implements synapse.events.SpamChecker.user_may_join_room
-        """
+        """Implements synapse.events.SpamChecker.user_may_join_room"""
         if self.can_only_join_rooms_with_invite and not is_invited:
             return False
 
@@ -157,8 +151,7 @@ class DomainRuleChecker(object):
 
     @staticmethod
     def parse_config(config):
-        """Implements synapse.events.SpamChecker.parse_config
-        """
+        """Implements synapse.events.SpamChecker.parse_config"""
         if "default" in config:
             return config
         else:

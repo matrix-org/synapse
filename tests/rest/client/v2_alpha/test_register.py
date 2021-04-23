@@ -735,8 +735,10 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # Check that the HTML we're getting is the one we expect when reusing a
         # token. The account expiration date should not have changed.
-        expected_html = self.hs.config.account_validity_account_previously_renewed_template.render(
-            expiration_ts=expiration_ts
+        expected_html = (
+            self.hs.config.account_validity_account_previously_renewed_template.render(
+                expiration_ts=expiration_ts
+            )
         )
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result

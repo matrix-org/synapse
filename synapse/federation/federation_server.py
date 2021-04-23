@@ -603,7 +603,10 @@ class FederationServer(FederationBase):
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
     async def on_send_knock_request(
-        self, origin: str, content: JsonDict, room_id: str,
+        self,
+        origin: str,
+        content: JsonDict,
+        room_id: str,
     ) -> Dict[str, List[JsonDict]]:
         """
         We have received a knock event for a room. Verify and send the event into the room
@@ -636,8 +639,10 @@ class FederationServer(FederationBase):
         # Retrieve stripped state events from the room and send them back to the remote
         # server. This will allow the remote server's clients to display information
         # related to the room while the knock request is pending.
-        stripped_room_state = await self.store.get_stripped_room_state_from_event_context(
-            event_context, DEFAULT_ROOM_STATE_TYPES
+        stripped_room_state = (
+            await self.store.get_stripped_room_state_from_event_context(
+                event_context, DEFAULT_ROOM_STATE_TYPES
+            )
         )
         return {"knock_state_events": stripped_room_state}
 
