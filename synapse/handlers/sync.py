@@ -80,7 +80,7 @@ class SyncConfig:
     filter_collection = attr.ib(type=FilterCollection)
     is_guest = attr.ib(type=bool)
     request_key = attr.ib(type=Tuple[Any, ...])
-    device_id = attr.ib(type=str)
+    device_id = attr.ib(type=Optional[str])
 
 
 @attr.s(slots=True, frozen=True)
@@ -737,7 +737,9 @@ class SyncHandler:
 
         return summary
 
-    def get_lazy_loaded_members_cache(self, cache_key: Tuple[str, str]) -> LruCache:
+    def get_lazy_loaded_members_cache(
+        self, cache_key: Tuple[str, Optional[str]]
+    ) -> LruCache:
         cache = self.lazy_loaded_members_cache.get(cache_key)
         if cache is None:
             logger.debug("creating LruCache for %r", cache_key)

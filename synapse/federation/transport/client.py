@@ -1031,6 +1031,38 @@ class TransportLayerClient:
 
         return self.client.get_json(destination=destination, path=path)
 
+    async def get_space_summary(
+        self,
+        destination: str,
+        room_id: str,
+        suggested_only: bool,
+        max_rooms_per_space: Optional[int],
+        exclude_rooms: List[str],
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server
+            room_id: The room ID to ask about.
+            suggested_only: if True, only suggested rooms will be returned
+            max_rooms_per_space: an optional limit to the number of children to be
+               returned per space
+            exclude_rooms: a list of any rooms we can skip
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/spaces/%s", room_id
+        )
+
+        params = {
+            "suggested_only": suggested_only,
+            "exclude_rooms": exclude_rooms,
+        }
+        if max_rooms_per_space is not None:
+            params["max_rooms_per_space"] = max_rooms_per_space
+
+        return await self.client.post_json(
+            destination=destination, path=path, data=params
+        )
+
     def get_info_of_users(self, destination: str, user_ids: List[str]):
         """
         Args:

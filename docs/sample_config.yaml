@@ -943,10 +943,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_joins:
 #  local:
 #    per_second: 0.1
-#    burst_count: 3
+#    burst_count: 10
 #  remote:
 #    per_second: 0.01
-#    burst_count: 3
+#    burst_count: 10
 #
 #rc_3pid_validation:
 #  per_second: 0.003

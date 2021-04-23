@@ -449,7 +449,7 @@ class StateGroupStorage:
         return self.stores.state._get_state_groups_from_groups(groups, state_filter)
 
     async def get_state_for_events(
-        self, event_ids: List[str], state_filter: StateFilter = StateFilter.all()
+        self, event_ids: Iterable[str], state_filter: StateFilter = StateFilter.all()
     ) -> Dict[str, StateMap[EventBase]]:
         """Given a list of event_ids and type tuples, return a list of state
         dicts for each event.
@@ -485,7 +485,7 @@ class StateGroupStorage:
         return {event: event_to_state[event] for event in event_ids}
 
     async def get_state_ids_for_events(
-        self, event_ids: List[str], state_filter: StateFilter = StateFilter.all()
+        self, event_ids: Iterable[str], state_filter: StateFilter = StateFilter.all()
     ) -> Dict[str, StateMap[str]]:
         """
         Get the state dicts corresponding to a list of events, containing the event_ids

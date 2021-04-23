@@ -98,11 +98,11 @@ class RatelimitConfig(Config):
 
         self.rc_joins_local = RateLimitConfig(
             config.get("rc_joins", {}).get("local", {}),
-            defaults={"per_second": 0.1, "burst_count": 3},
+            defaults={"per_second": 0.1, "burst_count": 10},
         )
         self.rc_joins_remote = RateLimitConfig(
             config.get("rc_joins", {}).get("remote", {}),
-            defaults={"per_second": 0.01, "burst_count": 3},
+            defaults={"per_second": 0.01, "burst_count": 10},
         )
 
         # Ratelimit cross-user key requests:
@@ -196,10 +196,10 @@ class RatelimitConfig(Config):
         #rc_joins:
         #  local:
         #    per_second: 0.1
-        #    burst_count: 3
+        #    burst_count: 10
         #  remote:
         #    per_second: 0.01
-        #    burst_count: 3
+        #    burst_count: 10
         #
         #rc_3pid_validation:
         #  per_second: 0.003
