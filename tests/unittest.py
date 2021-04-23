@@ -247,6 +247,7 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
+            reactor=self.reactor,
         )
 
         from tests.rest.client.v1.utils import RestHelper
