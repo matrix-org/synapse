@@ -757,9 +757,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         current_state_ids: StateMap[str],
         state_entry: "_StateCacheEntry",
     ) -> FrozenSet[str]:
-        # We don't use `state_group`, its there so that we can cache based
-        # on it. However, its important that its never None, since two current_state's
-        # with a state_group of None are likely to be different.
+        # We don't use `state_group`, its there so that we can cache based on
+        # it. However, its important that its never None, since two
+        # current_state's with a state_group of None are likely to be different.
+        #
+        # The `state_group` must match the `state_entry.state_group` (if not None).
         assert state_group is not None
         assert state_entry.state_group is None or state_entry.state_group == state_group
 
@@ -767,7 +769,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # joined hosts for the given state group based on previous state groups.
         #
         # We cache one object per room containing the results of the last state
-        # group we got joined hosts for. The idea being that generally
+        # group we got joined hosts for. The idea is that generally
         # `get_joined_hosts` is called with the "current" state group for the
         # room, and so consecutive calls will be for consecutive state groups
         # which point to the previous state group.
@@ -1142,8 +1144,9 @@ class _JoinedHostsCache:
     hosts_to_joined_users = attr.ib(type=Dict[str, Set[str]], factory=dict)
 
     # The state group `hosts_to_joined_users` is derived from. Will be an object
-    # if the class is newly created or if the state is not based on a state
-    # group.
+    # if the instance is newly created or if the state is not based on a state
+    # group. (An object is used as a sentinel value to ensure that it never is
+    # equal to anything else).
     state_group = attr.ib(type=Union[object, int], factory=object)
 
     def __len__(self):

@@ -292,6 +292,12 @@ def _condition_checker(
 
 @attr.s(slots=True)
 class RulesForRoomData:
+    """The data stored in the cache by `RulesForRoom`.
+
+    We don't store `RulesForRoom` directly in the cache as we want our caches to
+    *only* include data, and not references to e.g. the data stores.
+    """
+
     # event_id -> (user_id, state)
     member_map = attr.ib(type=Dict[str, Tuple[str, str]], factory=dict)
     # user_id -> rules
@@ -323,6 +329,10 @@ class RulesForRoom:
 
     This efficiently handles users joining/leaving the room by not invalidating
     the entire cache for the room.
+
+    A new instance is constructed for each call to
+    `BulkPushRuleEvaluator._get_rules_for_event`, with the cached data from
+    previous calls passed in.
     """
 
     def __init__(
@@ -341,8 +351,10 @@ class RulesForRoom:
             rules_for_room_cache: The cache object that caches these
                 RoomsForUser objects.
             room_push_rule_cache_metrics: The metrics object
-            linearizer:
-            cached_data:
+            linearizer: The linearizer used to ensure only one thing mutates
+                the cache at a time. Keyed off room_id
+            cached_data: Cached data from previous calls to `self.get_rules`,
+                can be mutated.
         """
         self.room_id = room_id
         self.is_mine_id = hs.is_mine_id
