@@ -20,8 +20,12 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
-from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
-from synapse.api.errors import AuthError
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    HistoryVisibility,
+    Membership,
+)
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -47,6 +51,7 @@ class SpaceSummaryHandler:
         self._auth = hs.get_auth()
         self._room_list_handler = hs.get_room_list_handler()
         self._state_handler = hs.get_state_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
@@ -339,6 +344,7 @@ class SpaceSummaryHandler:
         It should be included if:
 
         * The requester is joined or invited to the room.
+        * The requester can join without an invite (per MSC3083).
         * The history visibility is set to world readable.
 
         Args:
@@ -350,27 +356,36 @@ class SpaceSummaryHandler:
         Returns:
              True if the room should be included in the spaces summary.
         """
+        state_ids = await self._store.get_current_state_ids(room_id)
 
         # if we have an authenticated requesting user, first check if they are able to view
         # stripped state in the room.
         if requester:
-            try:
-                await self._auth.check_user_in_room(room_id, requester)
+            member_event_id = state_ids.get((EventTypes.Member, requester), None)
+
+            # If they're in the room they can see info on it.
+            if member_event_id:
+                member_event = await self._store.get_event(member_event_id)
+                if member_event.membership in (Membership.JOIN, Membership.INVITE):
+                    return True
+
+            # Otherwise, if they should be allowed access via membership in a space.
+            room_version = await self._store.get_room_version(room_id)
+            if await self._event_auth_handler.can_join_without_invite(
+                state_ids, room_version, requester
+            ):
                 return True
-            except AuthError:
-                pass
 
         # otherwise, check if the room is peekable
-        hist_vis_ev = await self._state_handler.get_current_state(
-            room_id, EventTypes.RoomHistoryVisibility, ""
-        )
-        if hist_vis_ev:
+        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""), None)
+        if hist_vis_event_id:
+            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
             hist_vis = hist_vis_ev.content.get("history_visibility")
             if hist_vis == HistoryVisibility.WORLD_READABLE:
                 return True
 
         logger.info(
-            "room %s is unpeekable and user %s is not a member, omitting from summary",
+            "room %s is unpeekable and user %s is not a member / not allowed to join, omitting from summary",
             room_id,
             requester,
         )
