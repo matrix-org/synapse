@@ -64,10 +64,14 @@ class WriterLocations:
     Attributes:
         events: The instances that write to the event and backfill streams.
         typing: The instance that writes to the typing stream.
-        to_device: The instance that writes to the to_device stream.
-        account_data: The instance that writes to the account data streams.
-        receipts: The instance that writes to the receipts stream.
-        presence: The instance that writes to the presence stream.
+        to_device: The instances that write to the to_device stream. Currently
+            can only be a single instance.
+        account_data: The instances that write to the account data streams. Currently
+            can only be a single instance.
+        receipts: The instances that write to the receipts stream. Currently
+            can only be a single instance.
+        presence: The instances that write to the presence stream. Currently
+            can only be a single instance.
     """
 
     events = attr.ib(
