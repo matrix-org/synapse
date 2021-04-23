@@ -159,7 +159,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         """Create a client that makes requests.
 
         Returns a callable that accepts the same parameters as
-        `_serialize_payload`, but also accepts an extra `instance_name`
+        `_serialize_payload`, and also accepts an optional `instance_name`
         parameter to specify which instance to hit (the instance must be in
         the `instance_map` config).
         """
