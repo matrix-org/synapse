@@ -15,6 +15,7 @@
 import heapq
 from itertools import islice
 from typing import (
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -25,8 +26,6 @@ from typing import (
     Tuple,
     TypeVar,
 )
-
-from synapse.types import Collection
 
 T = TypeVar("T")
 

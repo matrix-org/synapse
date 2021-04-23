@@ -14,11 +14,10 @@
 
 import logging
 import math
-from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Union
+from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 from sortedcontainers import SortedDict
 
-from synapse.types import Collection
 from synapse.util import caches
 
 logger = logging.getLogger(__name__)
