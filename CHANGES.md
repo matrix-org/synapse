@@ -1,3 +1,22 @@
+Synapse 1.30.1 (2021-03-26)
+===========================
+
+This is a security release to ensure that Synapse is running with a
+`cryptography` package built against a patched version of OpenSSL.
+
+
+Updates to the Docker image
+---------------------------
+
+- Ensure that the docker container has up to date versions of openssl. ([\#9697](https://github.com/matrix-org/synapse/issues/9697))
+
+
+Internal Changes
+----------------
+
+- Enforce that `cryptography` dependency is up to date to ensure it has the most recent openssl patches. ([\#9697](https://github.com/matrix-org/synapse/issues/9697))
+
+
 Synapse 1.30.0 (2021-03-22)
 ===========================
 
