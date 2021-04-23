@@ -25,7 +25,7 @@ from synapse.replication.http.account_data import (
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 class AccountDataHandler:

@@ -32,7 +32,7 @@ from synapse.util import json_encoder
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 logger = logging.getLogger(__name__)

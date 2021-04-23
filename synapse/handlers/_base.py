@@ -24,7 +24,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import UserID
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

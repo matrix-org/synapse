@@ -45,7 +45,7 @@ from synapse.util.retryutils import NotRetryingDestination
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
