@@ -21,7 +21,7 @@ from typing import Awaitable, Dict, Generator, List, Optional, Tuple
 
 from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
@@ -49,18 +49,20 @@ TEXT_CONTENT_TYPES = [
 
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     try:
+        # The type on postpath seems incorrect in Twisted 21.2.0.
+        postpath = request.postpath  # type: List[bytes]  # type: ignore
+        assert postpath
+
         # This allows users to append e.g. /test.png to the URL. Useful for
         # clients that parse the URL to see content type.
-        server_name, media_id = request.postpath[:2]
-
-        if isinstance(server_name, bytes):
-            server_name = server_name.decode("utf-8")
-            media_id = media_id.decode("utf8")
+        server_name_bytes, media_id_bytes = postpath[:2]
+        server_name = server_name_bytes.decode("utf-8")
+        media_id = media_id_bytes.decode("utf8")
 
         file_name = None
-        if len(request.postpath) > 2:
+        if len(postpath) > 2:
             try:
-                file_name = urllib.parse.unquote(request.postpath[-1].decode("utf-8"))
+                file_name = urllib.parse.unquote(postpath[-1].decode("utf-8"))
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
