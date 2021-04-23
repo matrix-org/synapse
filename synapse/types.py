@@ -15,13 +15,11 @@
 import abc
 import re
 import string
-import sys
 from collections import namedtuple
 from typing import (
     TYPE_CHECKING,
     Any,
     Dict,
-    Iterable,
     Mapping,
     MutableMapping,
     Optional,
@@ -49,18 +47,6 @@ from synapse.util.stringutils import parse_and_validate_server_name
 if TYPE_CHECKING:
     from synapse.appservice.api import ApplicationService
     from synapse.storage.databases.main import DataStore
-
-# define a version of typing.Collection that works on python 3.5
-if sys.version_info[:3] >= (3, 6, 0):
-    from typing import Collection
-else:
-    from typing import Container, Sized
-
-    T_co = TypeVar("T_co", covariant=True)
-
-    class Collection(Iterable[T_co], Container[T_co], Sized):  # type: ignore
-        __slots__ = ()
-
 
 # Define a state map type from type/state_key to T (usually an event ID or
 # event)

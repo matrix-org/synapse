@@ -258,7 +258,8 @@ class LoggingContext:
           child to the parent
 
     Args:
-        name (str): Name for the context for debugging.
+        name: Name for the context for logging. If this is omitted, it is
+           inherited from the parent context.
         parent_context (LoggingContext|None): The parent of the new context
     """
 
@@ -282,7 +283,6 @@ class LoggingContext:
         request: Optional[ContextRequest] = None,
     ) -> None:
         self.previous_context = current_context()
-        self.name = name
 
         # track the resources used by this context so far
         self._resource_usage = ContextResourceUsage()
@@ -314,10 +314,17 @@ class LoggingContext:
             # the request param overrides the request from the parent context
             self.request = request
 
+        # if we don't have a `name`, but do have a parent context, use its name.
+        if self.parent_context and name is None:
+            name = str(self.parent_context)
+        if name is None:
+            raise ValueError(
+                "LoggingContext must be given either a name or a parent context"
+            )
+        self.name = name
+
     def __str__(self) -> str:
-        if self.request:
-            return self.request.request_id
-        return "%s@%x" % (self.name, id(self))
+        return self.name
 
     @classmethod
     def current_context(cls) -> LoggingContextOrSentinel:
@@ -694,17 +701,13 @@ def nested_logging_context(suffix: str) -> LoggingContext:
             "Starting nested logging context from sentinel context: metrics will be lost"
         )
         parent_context = None
-        prefix = ""
-        request = None
     else:
         assert isinstance(curr_context, LoggingContext)
         parent_context = curr_context
-        prefix = str(parent_context.name)
-        request = parent_context.request
+    prefix = str(curr_context)
     return LoggingContext(
         prefix + "-" + suffix,
         parent_context=parent_context,
-        request=request,
     )
 
 
@@ -895,7 +898,7 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         parent_context = curr_context
 
     def g():
-        with LoggingContext(parent_context=parent_context):
+        with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 
     return make_deferred_yieldable(threads.deferToThreadPool(reactor, threadpool, g))
