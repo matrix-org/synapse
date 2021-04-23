@@ -61,6 +61,8 @@ class NewUserConsentResource(DirectServeHtmlResource):
             self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
             return
 
+        assert session.chosen_localpart
+
         user_id = UserID(session.chosen_localpart, self._server_name)
         user_profile = {
             "display_name": session.display_name,

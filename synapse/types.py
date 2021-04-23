@@ -199,9 +199,8 @@ def get_localpart_from_id(string):
 DS = TypeVar("DS", bound="DomainSpecificString")
 
 
-class DomainSpecificString(
-    namedtuple("DomainSpecificString", ("localpart", "domain")), metaclass=abc.ABCMeta
-):
+@attr.s(slots=True, frozen=True)
+class DomainSpecificString(metaclass=abc.ABCMeta):
     """Common base class among ID/name strings that have a local part and a
     domain name, prefixed with a sigil.
 
@@ -213,11 +212,8 @@ class DomainSpecificString(
 
     SIGIL = abc.abstractproperty()  # type: str  # type: ignore
 
-    # Deny iteration because it will bite you if you try to create a singleton
-    # set by:
-    #    users = set(user)
-    def __iter__(self):
-        raise ValueError("Attempted to iterate a %s" % (type(self).__name__,))
+    localpart = attr.ib(type=str)
+    domain = attr.ib(type=str)
 
     # Because this class is a namedtuple of strings and booleans, it is deeply
     # immutable.
@@ -272,30 +268,35 @@ class DomainSpecificString(
     __repr__ = to_string
 
 
+@attr.s(slots=True, frozen=True)
 class UserID(DomainSpecificString):
     """Structure representing a user ID."""
 
     SIGIL = "@"
 
 
+@attr.s(slots=True, frozen=True)
 class RoomAlias(DomainSpecificString):
     """Structure representing a room name."""
 
     SIGIL = "#"
 
 
+@attr.s(slots=True, frozen=True)
 class RoomID(DomainSpecificString):
     """Structure representing a room id. """
 
     SIGIL = "!"
 
 
+@attr.s(slots=True, frozen=True)
 class EventID(DomainSpecificString):
     """Structure representing an event id. """
 
     SIGIL = "$"
 
 
+@attr.s(slots=True, frozen=True)
 class GroupID(DomainSpecificString):
     """Structure representing a group ID."""
 

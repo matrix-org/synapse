@@ -957,6 +957,8 @@ class OidcProvider:
                 # and attempt to match it.
                 attributes = await oidc_response_to_user_attributes(failures=0)
 
+                assert attributes.localpart
+
                 user_id = UserID(attributes.localpart, self._server_name).to_string()
                 users = await self._store.get_users_by_id_case_insensitive(user_id)
                 if users:
