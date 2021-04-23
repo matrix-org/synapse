@@ -65,6 +65,7 @@ class Auth:
     """
     FIXME: This class contains a mix of functions for authenticating users
     of our client-server API and authenticating events added to room graphs.
+    The latter should be moved to synapse.handlers.event_auth.EventAuthHandler.
     """
 
     def __init__(self, hs):

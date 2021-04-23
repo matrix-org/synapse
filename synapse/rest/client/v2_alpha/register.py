@@ -49,7 +49,11 @@ from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
-from synapse.util.threepids import canonicalise_email, check_3pid_allowed
+from synapse.util.threepids import (
+    canonicalise_email,
+    check_3pid_allowed,
+    validate_email,
+)
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -111,7 +115,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         # (See on_POST in EmailThreepidRequestTokenRestServlet
         # in synapse/rest/client/v2_alpha/account.py)
         try:
-            email = canonicalise_email(body["email"])
+            email = validate_email(body["email"])
         except ValueError as e:
             raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
