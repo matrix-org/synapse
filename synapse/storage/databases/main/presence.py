@@ -43,10 +43,6 @@ class PresenceStore(SQLBaseStore):
         )
 
         if isinstance(database.engine, PostgresEngine):
-            self._can_persist_presence = (
-                self._instance_name in hs.config.worker.writers.presence
-            )
-
             self._presence_id_gen = MultiWriterIdGenerator(
                 db_conn=db_conn,
                 db=database,
@@ -57,7 +53,6 @@ class PresenceStore(SQLBaseStore):
                 writers=hs.config.worker.writers.to_device,
             )
         else:
-            self._can_persist_presence = True
             self._presence_id_gen = StreamIdGenerator(
                 db_conn, "presence_stream", "stream_id"
             )
