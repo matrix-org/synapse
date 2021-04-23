@@ -119,6 +119,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "creation_ts",
                 "user_type",
                 "deactivated",
+                "shadow_banned",
             ],
             allow_none=True,
             desc="get_user_by_id",
@@ -475,23 +476,25 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         """
 
         def set_shadow_banned_txn(txn):
+            user_id = user.to_string()
             self.db_pool.simple_update_one_txn(
                 txn,
                 table="users",
-                keyvalues={"name": user.to_string()},
+                keyvalues={"name": user_id},
                 updatevalues={"shadow_banned": shadow_banned},
             )
             # In order for this to apply immediately, clear the cache for this user.
             tokens = self.db_pool.simple_select_onecol_txn(
                 txn,
                 table="access_tokens",
-                keyvalues={"user_id": user.to_string()},
+                keyvalues={"user_id": user_id},
                 retcol="token",
             )
             for token in tokens:
                 self._invalidate_cache_and_stream(
                     txn, self.get_user_by_access_token, (token,)
                 )
+            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
 
         await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
