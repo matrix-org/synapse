@@ -452,11 +452,19 @@ class FederationClient(FederationBase):
         return signed_auth
 
     def _is_unknown_endpoint(
-        self, e: HttpResponseException, synapse_error: SynapseError
+        self, e: HttpResponseException, synapse_error: Optional[SynapseError] = None
     ) -> bool:
         """
         Returns true if the response was due to an endpoint being unimplemented.
+
+        Args:
+            e: The error response received from the remote server.
+            synapse_error: The above error converted to a SynapseError. This is
+                automatically generated if not provided.
+
         """
+        if synapse_error is None:
+            synapse_error = e.to_synapse_error()
         # There is no good way to detect an "unknown" endpoint.
         #
         # Dendrite returns a 404 (with no body); synapse returns a 400
@@ -758,7 +766,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise consider it a legitmate error
             # and raise.
-            if not self._is_unknown_endpoint(e, e.to_synapse_error()):
+            if not self._is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
@@ -886,7 +894,7 @@ class FederationClient(FederationBase):
             # If an error is received that is due to an unrecognised endpoint,
             # fallback to the v1 endpoint. Otherwise consider it a legitmate error
             # and raise.
-            if not self._is_unknown_endpoint(e, e.to_synapse_error()):
+            if not self._is_unknown_endpoint(e):
                 raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
