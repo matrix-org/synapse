@@ -120,6 +120,13 @@ class DeactivateAccountHandler(BaseHandler):
 
         await self.store.user_set_password_hash(user_id, None)
 
+        # Most of the pushers will have been deleted when we logged out the
+        # associated devices above, but we still need to delete pushers not
+        # associated with devices, e.g. email pushers.
+        await self.store.delete_all_pushers_for_user(user_id)
+
+        # Set the user as no longer active. This will prevent their profile
+        # from being replicated.
         user = UserID.from_string(user_id)
         await self._profile_handler.set_active([user], False, False)
 
