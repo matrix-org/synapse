@@ -33,6 +33,33 @@ from synapse.config import cache as cache_config
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
 
+try:
+    from pympler.asizeof import Asizer
+
+    sizer = Asizer()
+    sizer.exclude_refs((), None, "")
+
+    def _get_size_of(val: Any, *, recurse=True) -> int:
+        """Get an estimate of the size in bytes of the object.
+
+        Args:
+            val: The object to size.
+            recurse: If true will include referenced values in the size,
+                otherwise only sizes the given object.
+        """
+        return sizer.asizeof(val, limit=100 if recurse else 0)
+
+
+except ImportError:
+
+    def _get_size_of(val: Any, recurse=True) -> int:
+        return 0
+
+
+# Whether to track estimated memory usage of the LruCaches.
+TRACK_MEMORY_USAGE = True
+
+
 # Function type: the type used for invalidation callbacks
 FT = TypeVar("FT", bound=Callable[..., Any])
 
@@ -54,7 +81,7 @@ def enumerate_leaves(node, depth):
 
 
 class _Node:
-    __slots__ = ["prev_node", "next_node", "key", "value", "callbacks"]
+    __slots__ = ["prev_node", "next_node", "key", "value", "callbacks", "memory"]
 
     def __init__(
         self, prev_node, next_node, key, value, callbacks: Optional[set] = None
@@ -64,6 +91,16 @@ class _Node:
         self.key = key
         self.value = value
         self.callbacks = callbacks or set()
+
+        self.memory = 0
+        if TRACK_MEMORY_USAGE:
+            self.memory = (
+                _get_size_of(key)
+                + _get_size_of(value)
+                + _get_size_of(self.callbacks, recurse=False)
+                + _get_size_of(self, recurse=False)
+            )
+            self.memory += _get_size_of(self.memory, recurse=False)
 
 
 class LruCache(Generic[KT, VT]):
@@ -136,6 +173,9 @@ class LruCache(Generic[KT, VT]):
                 self,
                 collect_callback=metrics_collection_callback,
             )  # type: Optional[CacheMetric]
+
+            if TRACK_MEMORY_USAGE and metrics:
+                metrics.memory_usage = 0
         else:
             metrics = None
 
@@ -188,6 +228,9 @@ class LruCache(Generic[KT, VT]):
             if size_callback:
                 cached_cache_len[0] += size_callback(node.value)
 
+            if TRACK_MEMORY_USAGE and metrics:
+                metrics.memory_usage += node.memory
+
         def move_node_to_front(node):
             prev_node = node.prev_node
             next_node = node.next_node
@@ -214,6 +257,10 @@ class LruCache(Generic[KT, VT]):
             for cb in node.callbacks:
                 cb()
             node.callbacks.clear()
+
+            if TRACK_MEMORY_USAGE and metrics:
+                metrics.memory_usage -= node.memory
+
             return deleted_len
 
         @overload
@@ -331,6 +378,9 @@ class LruCache(Generic[KT, VT]):
             cache.clear()
             if size_callback:
                 cached_cache_len[0] = 0
+
+            if TRACK_MEMORY_USAGE and metrics:
+                metrics.memory_usage = 0
 
         @synchronized
         def cache_contains(key: KT) -> bool:

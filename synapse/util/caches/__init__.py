@@ -32,6 +32,11 @@ cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
 cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
 cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
 cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
+cache_memory_usage = Gauge(
+    "synapse_util_caches_cache_memory_usage",
+    "Estimated size in bytes of the caches",
+    ["name"],
+)
 
 response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
 response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
@@ -52,6 +57,7 @@ class CacheMetric:
     hits = attr.ib(default=0)
     misses = attr.ib(default=0)
     evicted_size = attr.ib(default=0)
+    memory_usage = attr.ib(default=None)
 
     def inc_hits(self):
         self.hits += 1
@@ -81,6 +87,8 @@ class CacheMetric:
                 cache_total.labels(self._cache_name).set(self.hits + self.misses)
                 if getattr(self._cache, "max_size", None):
                     cache_max_size.labels(self._cache_name).set(self._cache.max_size)
+                if self.memory_usage is not None:
+                    cache_memory_usage.labels(self._cache_name).set(self.memory_usage)
             if self._collect_callback:
                 self._collect_callback()
         except Exception as e:
