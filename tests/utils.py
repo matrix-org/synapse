@@ -269,7 +269,10 @@ def setup_test_homeserver(
         db_conn.close()
 
     hs = homeserver_to_use(
-        name, config=config, version_string="Synapse/tests", reactor=reactor,
+        name,
+        config=config,
+        version_string="Synapse/tests",
+        reactor=reactor,
     )
 
     # Install @cache_in_self attributes
@@ -371,7 +374,7 @@ class MockHttpResource:
     def trigger(
         self, http_method, path, content, mock_request, federation_auth_origin=None
     ):
-        """ Fire an HTTP event.
+        """Fire an HTTP event.
 
         Args:
             http_method : The HTTP method
@@ -534,8 +537,7 @@ class MockClock:
 
 
 async def create_room(hs, room_id: str, creator_id: str):
-    """Creates and persist a creation event for the given room
-    """
+    """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage().persistence
     store = hs.get_datastore()

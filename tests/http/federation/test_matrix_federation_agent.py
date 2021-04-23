@@ -518,8 +518,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.successResultOf(test_d)
 
     def test_get_well_known(self):
-        """Test the behaviour when the .well-known delegates elsewhere
-        """
+        """Test the behaviour when the .well-known delegates elsewhere"""
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -1135,8 +1134,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertIsNone(r.delegated_server)
 
     def test_srv_fallbacks(self):
-        """Test that other SRV results are tried if the first one fails.
-        """
+        """Test that other SRV results are tried if the first one fails."""
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [
                 Server(host=b"target.com", port=8443),

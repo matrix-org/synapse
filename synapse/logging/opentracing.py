@@ -238,8 +238,7 @@ try:
 
     @attr.s(slots=True, frozen=True)
     class _WrappedRustReporter:
-        """Wrap the reporter to ensure `report_span` never throws.
-        """
+        """Wrap the reporter to ensure `report_span` never throws."""
 
         _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
 
@@ -326,8 +325,7 @@ def noop_context_manager(*args, **kwargs):
 
 
 def init_tracer(hs: "HomeServer"):
-    """Set the whitelists and initialise the JaegerClient tracer
-    """
+    """Set the whitelists and initialise the JaegerClient tracer"""
     global opentracing
     if not hs.config.opentracer_enabled:
         # We don't have a tracer
@@ -384,7 +382,7 @@ def whitelisted_homeserver(destination):
 
     Args:
         destination (str)
-        """
+    """
 
     if _homeserver_whitelist:
         return _homeserver_whitelist.match(destination)

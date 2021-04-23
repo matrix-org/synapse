@@ -79,7 +79,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         # call `find_max_generated_user_id_localpart` each time, which is
         # expensive if there are many entries.
         self._user_id_seq = build_sequence_generator(
-            database.engine, find_max_generated_user_id_localpart, "user_id_seq",
+            database.engine,
+            find_max_generated_user_id_localpart,
+            "user_id_seq",
         )
 
         self._account_validity_enabled = hs.config.account_validity_enabled
@@ -91,7 +93,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
             if hs.config.run_background_tasks:
                 self._clock.call_later(
-                    0.0, self._set_expiration_date_when_missing,
+                    0.0,
+                    self._set_expiration_date_when_missing,
                 )
 
         # Create a background job for culling expired 3PID validity tokens

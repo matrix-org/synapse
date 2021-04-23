@@ -336,8 +336,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return len(users_to_work_on)
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id):
-        """Check if the room is either world_readable or publically joinable
-        """
+        """Check if the room is either world_readable or publically joinable"""
 
         # Create a state filter that only queries join and history state event
         types_to_filter = (
@@ -516,8 +515,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
     async def delete_all_from_user_dir(self) -> None:
-        """Delete the entire user directory
-        """
+        """Delete the entire user directory"""
 
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")

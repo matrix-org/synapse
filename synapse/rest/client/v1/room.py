@@ -360,7 +360,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 parse_and_validate_server_name(server)
             except ValueError:
                 raise SynapseError(
-                    400, "Invalid server name: %s" % (server,), Codes.INVALID_PARAM,
+                    400,
+                    "Invalid server name: %s" % (server,),
+                    Codes.INVALID_PARAM,
                 )
 
             try:
@@ -411,7 +413,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 parse_and_validate_server_name(server)
             except ValueError:
                 raise SynapseError(
-                    400, "Invalid server name: %s" % (server,), Codes.INVALID_PARAM,
+                    400,
+                    "Invalid server name: %s" % (server,),
+                    Codes.INVALID_PARAM,
                 )
 
             try:

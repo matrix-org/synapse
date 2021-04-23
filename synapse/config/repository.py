@@ -52,7 +52,7 @@ MediaStorageProviderConfig = namedtuple(
 
 
 def parse_thumbnail_requirements(thumbnail_sizes):
-    """ Takes a list of dictionaries with "width", "height", and "method" keys
+    """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 

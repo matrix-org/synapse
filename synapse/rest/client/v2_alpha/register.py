@@ -510,7 +510,10 @@ class RegisterRestServlet(RestServlet):
         # not this will raise a user-interactive auth error.
         try:
             auth_result, params, session_id = await self.auth_handler.check_ui_auth(
-                self._registration_flows, request, body, "register a new account",
+                self._registration_flows,
+                request,
+                body,
+                "register a new account",
             )
         except InteractiveAuthIncompleteError as e:
             # The user needs to provide more steps to complete auth.
@@ -752,7 +755,9 @@ class RegisterRestServlet(RestServlet):
             username, as_token, password, display_name
         )
         result = await self._create_registration_details(
-            user_id, body, is_appservice_ghost=True,
+            user_id,
+            body,
+            is_appservice_ghost=True,
         )
 
         auth_result = body.get("auth_result")

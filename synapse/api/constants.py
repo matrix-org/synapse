@@ -27,6 +27,11 @@ MAX_ALIAS_LENGTH = 255
 # the maximum length for a user id is 255 characters
 MAX_USERID_LENGTH = 255
 
+# The maximum length for a group id is 255 characters
+MAX_GROUPID_LENGTH = 255
+MAX_GROUP_CATEGORYID_LENGTH = 255
+MAX_GROUP_ROLEID_LENGTH = 255
+
 
 class Membership:
 
@@ -128,8 +133,7 @@ class UserTypes:
 
 
 class RelationTypes:
-    """The types of relations known to this server.
-    """
+    """The types of relations known to this server."""
 
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"

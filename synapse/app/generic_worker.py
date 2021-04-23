@@ -421,8 +421,7 @@ class GenericWorkerPresence(BasePresenceHandler):
         ]
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
-        """Set the presence state of the user.
-        """
+        """Set the presence state of the user."""
         presence = state["presence"]
 
         valid_presence = (

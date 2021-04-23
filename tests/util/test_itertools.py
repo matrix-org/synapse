@@ -24,28 +24,32 @@ class ChunkSeqTests(TestCase):
         parts = chunk_seq("123", 8)
 
         self.assertEqual(
-            list(parts), ["123"],
+            list(parts),
+            ["123"],
         )
 
     def test_long_seq(self):
         parts = chunk_seq("abcdefghijklmnop", 8)
 
         self.assertEqual(
-            list(parts), ["abcdefgh", "ijklmnop"],
+            list(parts),
+            ["abcdefgh", "ijklmnop"],
         )
 
     def test_uneven_parts(self):
         parts = chunk_seq("abcdefghijklmnop", 5)
 
         self.assertEqual(
-            list(parts), ["abcde", "fghij", "klmno", "p"],
+            list(parts),
+            ["abcde", "fghij", "klmno", "p"],
         )
 
     def test_empty_input(self):
         parts = chunk_seq([], 5)
 
         self.assertEqual(
-            list(parts), [],
+            list(parts),
+            [],
         )
 
 

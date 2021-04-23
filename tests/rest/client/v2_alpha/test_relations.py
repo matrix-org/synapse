@@ -83,14 +83,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_deny_membership(self):
-        """Test that we deny relations on membership events
-        """
+        """Test that we deny relations on membership events"""
         channel = self._send_relation(RelationTypes.ANNOTATION, EventTypes.Member)
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_deny_double_react(self):
-        """Test that we deny relations on membership events
-        """
+        """Test that we deny relations on membership events"""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
         self.assertEquals(200, channel.code, channel.json_body)
 
@@ -98,8 +96,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_basic_paginate_relations(self):
-        """Tests that calling pagination API correctly the latest relations.
-        """
+        """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
         self.assertEquals(200, channel.code, channel.json_body)
 
@@ -174,8 +171,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(found_event_ids, expected_event_ids)
 
     def test_aggregation_pagination_groups(self):
-        """Test that we can paginate annotation groups correctly.
-        """
+        """Test that we can paginate annotation groups correctly."""
 
         # We need to create ten separate users to send each reaction.
         access_tokens = [self.user_token, self.user2_token]
@@ -240,8 +236,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(sent_groups, found_groups)
 
     def test_aggregation_pagination_within_group(self):
-        """Test that we can paginate within an annotation group.
-        """
+        """Test that we can paginate within an annotation group."""
 
         # We need to create ten separate users to send each reaction.
         access_tokens = [self.user_token, self.user2_token]
@@ -311,8 +306,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(found_event_ids, expected_event_ids)
 
     def test_aggregation(self):
-        """Test that annotations get correctly aggregated.
-        """
+        """Test that annotations get correctly aggregated."""
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
@@ -344,8 +338,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_aggregation_redactions(self):
-        """Test that annotations get correctly aggregated after a redaction.
-        """
+        """Test that annotations get correctly aggregated after a redaction."""
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
@@ -379,8 +372,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_aggregation_must_be_annotation(self):
-        """Test that aggregations must be annotations.
-        """
+        """Test that aggregations must be annotations."""
 
         channel = self.make_request(
             "GET",
@@ -437,8 +429,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_edit(self):
-        """Test that a simple edit works.
-        """
+        """Test that a simple edit works."""
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
         channel = self._send_relation(

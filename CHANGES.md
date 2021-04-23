@@ -8,10 +8,10 @@ This release also changes the callback URI for OpenID Connect (OIDC) identity pr
 This release also changes escaping of variables in the HTML templates for SSO or email notifications. If you have customised these templates, please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes.
 
 
-Internal Changes
-----------------
+Bugfixes
+--------
 
-- Add rustc as a dependency when building Docker images. ([\#9405](https://github.com/matrix-org/synapse/issues/9405))
+- Fix building Docker images for armv7. ([\#9405](https://github.com/matrix-org/synapse/issues/9405))
 
 
 Synapse 1.27.0rc2 (2021-02-11)

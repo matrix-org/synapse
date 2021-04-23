@@ -43,7 +43,10 @@ class TestEventContext(unittest.HomeserverTestCase):
 
         event, context = self.get_success(
             create_event(
-                self.hs, room_id=self.room_id, type="m.test", sender=self.user_id,
+                self.hs,
+                room_id=self.room_id,
+                type="m.test",
+                sender=self.user_id,
             )
         )
 

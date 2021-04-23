@@ -290,7 +290,9 @@ class ApplicationServicesHandler:
             if not interested:
                 continue
             presence_events, _ = await presence_source.get_new_events(
-                user=user, service=service, from_key=from_key,
+                user=user,
+                service=service,
+                from_key=from_key,
             )
             time_now = self.clock.time_msec()
             events.extend(

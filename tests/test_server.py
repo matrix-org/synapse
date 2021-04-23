@@ -166,7 +166,10 @@ class JsonResourceTests(unittest.TestCase):
 
         res = JsonResource(self.homeserver)
         res.register_paths(
-            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet",
+            "GET",
+            [re.compile("^/_matrix/foo$")],
+            _callback,
+            "test_servlet",
         )
 
         # The path was registered as GET, but this is a HEAD request.

@@ -36,8 +36,7 @@ test_server_connection_factory = None
 
 
 class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
-    """Checks running multiple media repos work correctly.
-    """
+    """Checks running multiple media repos work correctly."""
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -124,8 +123,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         return channel, request
 
     def test_basic(self):
-        """Test basic fetching of remote media from a single worker.
-        """
+        """Test basic fetching of remote media from a single worker."""
         hs1 = self.make_worker_hs("synapse.app.generic_worker")
 
         channel, request = self._get_media_req(hs1, "example.com:443", "ABC123")
@@ -223,16 +221,14 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(start_count + 3, self._count_remote_thumbnails())
 
     def _count_remote_media(self) -> int:
-        """Count the number of files in our remote media directory.
-        """
+        """Count the number of files in our remote media directory."""
         path = os.path.join(
             self.hs.get_media_repository().primary_base_path, "remote_content"
         )
         return sum(len(files) for _, _, files in os.walk(path))
 
     def _count_remote_thumbnails(self) -> int:
-        """Count the number of files in our remote thumbnails directory.
-        """
+        """Count the number of files in our remote thumbnails directory."""
         path = os.path.join(
             self.hs.get_media_repository().primary_base_path, "remote_thumbnail"
         )

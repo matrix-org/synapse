@@ -195,8 +195,7 @@ class MatrixFederationAgent:
 
 @implementer(IAgentEndpointFactory)
 class MatrixHostnameEndpointFactory:
-    """Factory for MatrixHostnameEndpoint for parsing to an Agent.
-    """
+    """Factory for MatrixHostnameEndpoint for parsing to an Agent."""
 
     def __init__(
         self,
@@ -261,8 +260,7 @@ class MatrixHostnameEndpoint:
         self._srv_resolver = srv_resolver
 
     def connect(self, protocol_factory: IProtocolFactory) -> defer.Deferred:
-        """Implements IStreamClientEndpoint interface
-        """
+        """Implements IStreamClientEndpoint interface"""
 
         return run_in_background(self._do_connect, protocol_factory)
 

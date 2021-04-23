@@ -203,7 +203,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Check that the room has an encryption state event
         event_content = self.helper.get_state(
-            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
@@ -212,7 +214,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Check that the room has an encryption state event
         event_content = self.helper.get_state(
-            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
@@ -230,7 +234,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Check that the room has an encryption state event
         event_content = self.helper.get_state(
-            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
