@@ -1937,7 +1937,7 @@ class UserMembershipRestTestCase(unittest.HomeserverTestCase):
         # Create rooms and join
         other_user_tok = self.login("user", "pass")
         number_rooms = 5
-        for n in range(number_rooms):
+        for _ in range(number_rooms):
             self.helper.create_room_as(self.other_user, tok=other_user_tok)
 
         # Get rooms
@@ -2517,7 +2517,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
             user_token: Access token of the user
             number_media: Number of media to be created for the user
         """
-        for i in range(number_media):
+        for _ in range(number_media):
             # file size is 67 Byte
             image_data = unhexlify(
                 b"89504e470d0a1a0a0000000d4948445200000001000000010806"

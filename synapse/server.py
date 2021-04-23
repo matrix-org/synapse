@@ -70,13 +70,14 @@ from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
-from synapse.handlers.cas_handler import CasHandler
+from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
+from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
@@ -145,8 +146,8 @@ logger = logging.getLogger(__name__)
 if TYPE_CHECKING:
     from txredisapi import RedisProtocol
 
-    from synapse.handlers.oidc_handler import OidcHandler
-    from synapse.handlers.saml_handler import SamlHandler
+    from synapse.handlers.oidc import OidcHandler
+    from synapse.handlers.saml import SamlHandler
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -417,10 +418,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_presence_handler(self) -> BasePresenceHandler:
-        if self.config.worker_app:
-            return WorkerPresenceHandler(self)
-        else:
+        if self.get_instance_name() in self.config.worker.writers.presence:
             return PresenceHandler(self)
+        else:
+            return WorkerPresenceHandler(self)
 
     @cache_in_self
     def get_typing_writer_handler(self) -> TypingWriterHandler:
@@ -696,13 +697,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_saml_handler(self) -> "SamlHandler":
-        from synapse.handlers.saml_handler import SamlHandler
+        from synapse.handlers.saml import SamlHandler
 
         return SamlHandler(self)
 
     @cache_in_self
     def get_oidc_handler(self) -> "OidcHandler":
-        from synapse.handlers.oidc_handler import OidcHandler
+        from synapse.handlers.oidc import OidcHandler
 
         return OidcHandler(self)
 
@@ -745,6 +746,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_space_summary_handler(self) -> SpaceSummaryHandler:
         return SpaceSummaryHandler(self)
+
+    @cache_in_self
+    def get_event_auth_handler(self) -> EventAuthHandler:
+        return EventAuthHandler(self)
 
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:

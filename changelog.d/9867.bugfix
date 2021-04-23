@@ -1,0 +1,1 @@
+Fix a bug which could cause Synapse to get stuck in a loop of resyncing device lists.

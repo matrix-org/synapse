@@ -37,10 +37,7 @@ from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
-from synapse.config.oidc_config import (
-    OidcProviderClientSecretJwtKey,
-    OidcProviderConfig,
-)
+from synapse.config.oidc import OidcProviderClientSecretJwtKey, OidcProviderConfig
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -971,6 +968,11 @@ class OidcProvider:
                 # If allowing existing users we want to generate a single localpart
                 # and attempt to match it.
                 attributes = await oidc_response_to_user_attributes(failures=0)
+
+                if attributes.localpart is None:
+                    # If no localpart is returned then we will generate one, so
+                    # there is no need to search for existing users.
+                    return None
 
                 user_id = UserID(attributes.localpart, self._server_name).to_string()
                 users = await self._store.get_users_by_id_case_insensitive(user_id)

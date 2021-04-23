@@ -133,7 +133,7 @@ class TestCase(unittest.TestCase):
     def assertObjectHasAttributes(self, attrs, obj):
         """Asserts that the given object has each of the attributes given, and
         that the value of each matches according to assertEquals."""
-        for (key, value) in attrs.items():
+        for key in attrs.keys():
             if not hasattr(obj, key):
                 raise AssertionError("Expected obj to have a '.%s'" % key)
             try:
@@ -247,6 +247,7 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
+            reactor=self.reactor,
         )
 
         from tests.rest.client.v1.utils import RestHelper
