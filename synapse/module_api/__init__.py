@@ -500,28 +500,6 @@ class ModuleApi:
                     presence_events
                 )
 
-    def background_call_async(self, f: Callable, *args, **kwargs):
-        """Wraps an async function as a background process and runs it.
-
-        Args:
-            f(function): The function to call.
-            *args: Positional arguments to pass to function.
-            **kwargs: Key arguments to pass to function.
-
-        """
-
-        @wrap_as_background_process(f.__name__)
-        async def background_call(*args, **kwargs):
-            await f(*args, **kwargs)
-
-        if self._hs.config.run_background_tasks:
-            self._clock.call_later(0.0, background_call, *args, **kwargs)
-        else:
-            logger.warning(
-                "Not running looping call %s as the configuration forbids it",
-                f,
-            )
-
     def looping_background_call_async(self, f: Callable, msec: float, *args, **kwargs):
         """Wraps an async function as a background process and calls it repeatedly.
 
