@@ -12,14 +12,70 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+
 from synapse.config._base import Config, ConfigError
+from synapse.util.module_loader import load_module
+
+logger = logging.getLogger(__name__)
+
+LEGACY_ACCOUNT_VALIDITY_IN_USE = """
+You are using the deprecated account validity feature. It is recommended to change your
+configuration to be using one or more modules instead. This feature will be removed in a
+future version of Synapse, at which point it will only be available through custom
+modules.
+See the sample documentation file for more information:
+https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml
+--------------------------------------------------------------------------------------"""
 
 
 class AccountValidityConfig(Config):
     section = "account_validity"
 
     def read_config(self, config, **kwargs):
-        account_validity_config = config.get("account_validity") or {}
+        # Consider legacy account validity disabled unless proven otherwise
+        self.account_validity_enabled = False
+        self.account_validity_renew_by_email_enabled = False
+
+        # Read and store template content. We need to do that regardless of whether the
+        # configuration is using modules or the legacy account validity implementation,
+        # because we need these templates to register the account validity servlets.
+        (
+            self.account_validity_account_renewed_template,
+            self.account_validity_account_previously_renewed_template,
+            self.account_validity_invalid_token_template,
+        ) = self.read_templates(
+            [
+                "account_renewed.html",
+                "account_previously_renewed.html",
+                "invalid_token.html",
+            ],
+        )
+
+        # Initialise the list of modules, which will stay empty if no modules or the
+        # legacy config was provided.
+        self.account_validity_modules = []
+
+        account_validity_config = config.get("account_validity")
+        if account_validity_config is None:
+            return
+
+        if isinstance(account_validity_config, dict):
+            # If the configuration is for the legacy feature, then read it as such.
+            self.read_legacy_config(account_validity_config)
+        elif isinstance(account_validity_config, list):
+            for i, module in enumerate(account_validity_config):
+                config_path = ("account_validity", "<item %i>" % i)
+                if not isinstance(module, dict):
+                    raise ConfigError("expected a mapping", config_path)
+
+                self.account_validity_modules.append(load_module(module, config_path))
+        else:
+            raise ConfigError("account_validity syntax is incorrect")
+
+    def read_legacy_config(self, account_validity_config):
+        logger.warning(LEGACY_ACCOUNT_VALIDITY_IN_USE)
+
         self.account_validity_enabled = account_validity_config.get("enabled", False)
         self.account_validity_renew_by_email_enabled = (
             "renew_at" in account_validity_config
@@ -53,113 +109,30 @@ class AccountValidityConfig(Config):
             if not self.public_baseurl:
                 raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
-        # Load account validity templates.
-        account_validity_template_dir = account_validity_config.get("template_dir")
-
-        account_renewed_template_filename = account_validity_config.get(
-            "account_renewed_html_path", "account_renewed.html"
-        )
-        invalid_token_template_filename = account_validity_config.get(
-            "invalid_token_html_path", "invalid_token.html"
-        )
-
-        # Read and store template content
-        (
-            self.account_validity_account_renewed_template,
-            self.account_validity_account_previously_renewed_template,
-            self.account_validity_invalid_token_template,
-        ) = self.read_templates(
-            [
-                account_renewed_template_filename,
-                "account_previously_renewed.html",
-                invalid_token_template_filename,
-            ],
-            account_validity_template_dir,
-        )
-
     def generate_config_section(self, **kwargs):
         return """\
         ## Account Validity ##
 
-        # Optional account validity configuration. This allows for accounts to be denied
-        # any request after a given period.
+        # Server admins can (optionally) get Synapse to check the validity of all user
+        # accounts against one or more custom modules.
         #
-        # Once this feature is enabled, Synapse will look for registered users without an
-        # expiration date at startup and will add one to every account it found using the
-        # current settings at that time.
-        # This means that, if a validity period is set, and Synapse is restarted (it will
-        # then derive an expiration date from the current validity period), and some time
-        # after that the validity period changes and Synapse is restarted, the users'
-        # expiration dates won't be updated unless their account is manually renewed. This
-        # date will be randomly selected within a range [now + period - d ; now + period],
-        # where d is equal to 10% of the validity period.
+        # An account validity module must implement two APIs:
+        #
+        #  * `user_expired`, which takes a Matrix user ID and returns one boolean to
+        #    indicate whether the provided account has expired, and one boolean to
+        #    indicate whether it succeeded in figuring out this info. If this second
+        #    boolean value is False, the `user_expired function of the next module
+        #    (in the order modules are configured in this file) is called. If there
+        #    is no more module to use, Synapse will consider the account as not expired.
+        #
+        #  * `on_user_registration`, which is called after any successful registration
+        #    with the Matrix ID of the newly registered user.
         #
         account_validity:
-          # The account validity feature is disabled by default. Uncomment the
-          # following line to enable it.
-          #
-          #enabled: true
-
-          # The period after which an account is valid after its registration. When
-          # renewing the account, its validity period will be extended by this amount
-          # of time. This parameter is required when using the account validity
-          # feature.
-          #
-          #period: 6w
-
-          # The amount of time before an account's expiry date at which Synapse will
-          # send an email to the account's email address with a renewal link. By
-          # default, no such emails are sent.
-          #
-          # If you enable this setting, you will also need to fill out the 'email' and
-          # 'public_baseurl' configuration sections.
-          #
-          #renew_at: 1w
-
-          # The subject of the email sent out with the renewal link. '%(app)s' can be
-          # used as a placeholder for the 'app_name' parameter from the 'email'
-          # section.
-          #
-          # Note that the placeholder must be written '%(app)s', including the
-          # trailing 's'.
-          #
-          # If this is not set, a default value is used.
-          #
-          #renew_email_subject: "Renew your %(app)s account"
-
-          # Directory in which Synapse will try to find templates for the HTML files to
-          # serve to the user when trying to renew an account. If not set, default
-          # templates from within the Synapse package will be used.
-          #
-          # The currently available templates are:
-          #
-          # * account_renewed.html: Displayed to the user after they have successfully
-          #       renewed their account.
-          #
-          # * account_previously_renewed.html: Displayed to the user if they attempt to
-          #       renew their account with a token that is valid, but that has already
-          #       been used. In this case the account is not renewed again.
-          #
-          # * invalid_token.html: Displayed to the user when they try to renew an account
-          #       with an unknown or invalid renewal token.
-          #
-          # See https://github.com/matrix-org/synapse/tree/master/synapse/res/templates for
-          # default template contents.
-          #
-          # The file name of some of these templates can be configured below for legacy
-          # reasons.
-          #
-          #template_dir: "res/templates"
-
-          # A custom file name for the 'account_renewed.html' template.
-          #
-          # If not set, the file is assumed to be named "account_renewed.html".
-          #
-          #account_renewed_html_path: "account_renewed.html"
-
-          # A custom file name for the 'invalid_token.html' template.
-          #
-          # If not set, the file is assumed to be named "invalid_token.html".
-          #
-          #invalid_token_html_path: "invalid_token.html"
+           #- module: "my_custom_project.SomeAccountValidity"
+           #  config:
+           #    example_option: 'things'
+           #- module: "my_custom_project.SomeOtherAccountValidity"
+           #  config:
+           #    other_example_option: 'stuff'
         """
