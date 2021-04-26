@@ -60,7 +60,7 @@ except ImportError:
 
 
 # Whether to track estimated memory usage of the LruCaches.
-TRACK_MEMORY_USAGE = True
+TRACK_MEMORY_USAGE = False
 
 
 # Function type: the type used for invalidation callbacks

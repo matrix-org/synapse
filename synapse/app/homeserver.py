@@ -339,6 +339,7 @@ def setup(config_options):
         sys.exit(0)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.util.caches.lrucache.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     hs = SynapseHomeServer(
         config.server_name,

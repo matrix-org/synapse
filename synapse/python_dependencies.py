@@ -121,7 +121,7 @@ CONDITIONAL_REQUIREMENTS = {
     # hiredis is not a *strict* dependency, but it makes things much faster.
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
-    "cache_memroy": ["pympler"],
+    "cache_memory": ["pympler"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
