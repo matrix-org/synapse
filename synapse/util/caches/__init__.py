@@ -73,6 +73,19 @@ class CacheMetric:
     def inc_evictions(self, size=1):
         self.evicted_size += size
 
+    def inc_memory_usage(self, memory: int):
+        if self.memory_usage is None:
+            self.memory_usage = 0
+
+        self.memory_usage += memory
+
+    def dec_memory_usage(self, memory: int):
+        self.memory_usage -= memory
+
+    def clear_memory_usage(self, memory: int):
+        if self.memory_usage is not None:
+            self.memory_usage = 0
+
     def describe(self):
         return []
 

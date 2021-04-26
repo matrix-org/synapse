@@ -172,9 +172,6 @@ class LruCache(Generic[KT, VT]):
                 self,
                 collect_callback=metrics_collection_callback,
             )  # type: Optional[CacheMetric]
-
-            if TRACK_MEMORY_USAGE and metrics:
-                metrics.memory_usage = 0
         else:
             metrics = None
 
@@ -228,7 +225,7 @@ class LruCache(Generic[KT, VT]):
                 cached_cache_len[0] += size_callback(node.value)
 
             if TRACK_MEMORY_USAGE and metrics:
-                metrics.memory_usage += node.memory
+                metrics.inc_memory_usage(node.memory)
 
         def move_node_to_front(node):
             prev_node = node.prev_node
@@ -258,7 +255,7 @@ class LruCache(Generic[KT, VT]):
             node.callbacks.clear()
 
             if TRACK_MEMORY_USAGE and metrics:
-                metrics.memory_usage -= node.memory
+                metrics.dec_memory_usage(node.memory)
 
             return deleted_len
 
@@ -379,7 +376,7 @@ class LruCache(Generic[KT, VT]):
                 cached_cache_len[0] = 0
 
             if TRACK_MEMORY_USAGE and metrics:
-                metrics.memory_usage = 0
+                metrics.clear_memory_usage()
 
         @synchronized
         def cache_contains(key: KT) -> bool:
