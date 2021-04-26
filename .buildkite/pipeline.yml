@@ -10,6 +10,13 @@ x-yaml-aliases:
       apt-get update && apt-get install -y xmlsec1
       python -m pip install tox
 
+  retry: &retry_setup
+    automatic:
+      - exit_status: -1
+        limit: 2
+      - exit_status: 2
+        limit: 2
+
 env:
   COVERALLS_REPO_TOKEN: wsJWOby6j0uCYFiCes3r0XauxO27mx8lD
 
@@ -19,7 +26,7 @@ steps:
       - "python -m pip install tox"
       - "tox -e check_codestyle"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
           image: "python:3.6"
           mount-buildkite-agent: false
 
@@ -28,7 +35,7 @@ steps:
       - "python -m pip install tox"
       - "tox -e packaging"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
           image: "python:3.6"
           mount-buildkite-agent: false
 
@@ -37,7 +44,7 @@ steps:
       - "python -m pip install tox"
       - "tox -e check_isort"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
           image: "python:3.6"
           mount-buildkite-agent: false
 
@@ -46,7 +53,15 @@ steps:
       - "python -m pip install tox"
       - "tox -e check-sampleconfig"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
+          image: "python:3.6"
+          mount-buildkite-agent: false
+
+  - label: "\U0001F5A5 check unix line-endings"
+    command:
+      - "scripts-dev/check_line_terminators.sh"
+    plugins:
+      - docker#v3.7.0:
           image: "python:3.6"
           mount-buildkite-agent: false
 
@@ -55,202 +70,260 @@ steps:
       - "python -m pip install tox"
       - "tox -e mypy"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
           image: "python:3.7"
           mount-buildkite-agent: false
+
+  - label: ":package: build distribution files"
+    branches: "release-*"
+    agents:
+      queue: ephemeral-small
+    command:
+      - python setup.py sdist bdist_wheel
+    plugins:
+      - docker#v3.7.0:
+          image: "python:3.7"
+          mount-buildkite-agent: false
+      - artifacts#v1.3.0:
+          upload:
+            - dist/*
 
   - wait
 
   ################################################################################
   #
-  # `trial` tests
+  # Twisted `trial` tests
+  #
+  # Our Intent is to test:
+  #   - All supported Python versions (using SQLite) with current dependencies
+  #   - The oldest and newest supported pairings of Python and PostgreSQL
+  #
+  # We also test two special cases:
+  #   - The newest supported Python, without any optional dependencies
+  #   - The oldest supported Python, with its oldest supported dependency versions
   #
   ################################################################################
 
-  - label: ":python: 3.5 / SQLite / Old Deps"
+  # -- Special Case: Oldest Python w/ Oldest Deps
+
+  - label: ":python: 3.6 (Old Deps)"
     command:
       - ".buildkite/scripts/test_old_deps.sh"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
-      - docker#v3.0.1:
-          image: "ubuntu:xenial"  # We use xenial to get an old sqlite and python
+      - docker#v3.7.0:
+          # We use bionic to get an old python (3.6.5) and sqlite (3.22)
+          image: "ubuntu:bionic"
           workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: ":python: 3.5 / SQLite"
+  # -- Special Case: Newest Python w/o Optional Deps
+
+  - label: ":python: 3.9 (No Extras)"
     command:
       - *trial_setup
-      - "tox -e py35,combine"
+      - "tox -e py39-noextras,combine"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
-      - docker#v3.0.1:
-          image: "python:3.5"
+      - docker#v3.7.0:
+          image: "python:3.9"
           workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: ":python: 3.6 / SQLite"
+  # -- All Supported Python Versions (SQLite)
+
+  - label: ":python: 3.6"
     command:
       - *trial_setup
       - "tox -e py36,combine"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
           image: "python:3.6"
           workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: ":python: 3.7 / SQLite"
+  - label: ":python: 3.7"
     command:
       - *trial_setup
       - "tox -e py37,combine"
     env:
       TRIAL_FLAGS: "-j 2"
     plugins:
-      - docker#v3.0.1:
+      - docker#v3.7.0:
           image: "python:3.7"
           workdir: "/src"
           mount-buildkite-agent: false
           propagate-environment: true
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: ":python: 3.5 / :postgres: 9.5"
+  - label: ":python: 3.8"
+    command:
+      - *trial_setup
+      - "tox -e py38,combine"
+    env:
+      TRIAL_FLAGS: "-j 2"
+    plugins:
+      - docker#v3.7.0:
+          image: "python:3.8"
+          workdir: "/src"
+          mount-buildkite-agent: false
+          propagate-environment: true
+      - artifacts#v1.3.0:
+          upload: [ "_trial_temp/*/*.log" ]
+    retry: *retry_setup
+
+  - label: ":python: 3.9"
+    command:
+      - *trial_setup
+      - "tox -e py39,combine"
+    env:
+      TRIAL_FLAGS: "-j 2"
+    plugins:
+      - docker#v3.7.0:
+          image: "python:3.9"
+          workdir: "/src"
+          mount-buildkite-agent: false
+          propagate-environment: true
+      - artifacts#v1.3.0:
+          upload: [ "_trial_temp/*/*.log" ]
+    retry: *retry_setup
+
+  #  -- Oldest and Newest Supported Python and Postgres Pairings
+
+  - label: ":python: 3.6 :postgres: 9.6"
     agents:
       queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
-      PYTHON_VERSION: "3.5"
-      POSTGRES_VERSION: "9.5"
+      PYTHON_VERSION: "3.6"
+      POSTGRES_VERSION: "9.6"
     command:
       - *trial_setup
-      - "python -m tox -e py35-postgres,combine"
+      - "python -m tox -e py36-postgres,combine"
     plugins:
+      - matrix-org/download#v1.1.0:
+          urls:
+            - https://raw.githubusercontent.com/matrix-org/pipelines/master/synapse/docker-compose.yaml
+            - https://raw.githubusercontent.com/matrix-org/pipelines/master/synapse/docker-compose-env
       - docker-compose#v3.7.0:
           run: testenv
           config:
-            - .buildkite/docker-compose.yaml
+            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.yaml
       - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: ":python: 3.7 / :postgres: 11"
+  - label: ":python: 3.9 :postgres: 13"
     agents:
       queue: "medium"
     env:
       TRIAL_FLAGS: "-j 8"
-      PYTHON_VERSION: "3.7"
-      POSTGRES_VERSION: "11"
+      PYTHON_VERSION: "3.9"
+      POSTGRES_VERSION: "13"
     command:
       - *trial_setup
-      - "tox -e py37-postgres,combine"
+      - "python -m tox -e py39-postgres,combine"
     plugins:
+      - matrix-org/download#v1.1.0:
+          urls:
+            - https://raw.githubusercontent.com/matrix-org/pipelines/master/synapse/docker-compose.yaml
+            - https://raw.githubusercontent.com/matrix-org/pipelines/master/synapse/docker-compose-env
       - docker-compose#v3.7.0:
           run: testenv
           config:
-            - .buildkite/docker-compose.yaml
+            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.yaml
       - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: ":python: 3.8 / :postgres: 12"
-    agents:
-      queue: "medium"
-    env:
-      TRIAL_FLAGS: "-j 8"
-      PYTHON_VERSION: "3.8"
-      POSTGRES_VERSION: "12"
+  # -- Experimentally test against PyPy
+  #    Only runs when the build message includes the string "pypy"
+  #    This step is allowed to fail
+
+  - label: ":python: PyPy3.6"
+    if: "build.message =~ /pypy/i || build.branch =~ /pypy/i"
+    soft_fail: true
     command:
-      - *trial_setup
-      - "tox -e py38-postgres,combine"
+      # No *trial_setup due to docker-library/pypy#52
+      - "apt-get update && apt-get install -y xmlsec1"
+      - "pypy -m pip install tox"
+
+      - "tox -e pypy36,combine"
+    env:
+      TRIAL_FLAGS: "-j 2"
     plugins:
-      - docker-compose#v3.7.0:
-          run: testenv
-          config:
-            - .buildkite/docker-compose.yaml
+      - docker#v3.7.0:
+          image: "pypy:3.6"
+          workdir: "/src"
+          mount-buildkite-agent: false
+          propagate-environment: true
       - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
+
 
   ################################################################################
   #
   # Sytest
   #
+  # Our tests have three dimensions:
+  #   1. Topology (Monolith, Workers, Workers w/ Redis)
+  #   2. Database (SQLite, PostgreSQL)
+  #   3. Python Version
+  #
+  # Tests can run against either a single or multiple PostgreSQL databases.
+  # This is configured by setting `MULTI_POSTGRES=1` in the environment.
+  #
+  # We mostly care about testing each topology.
+  # To vary the Python and Postgres versions, we use Docker images which are based
+  # on an assortment of Linux distributions.
+  #   - "bionic" (Ubuntu 18.04) has Python 3.6 and Postgres 10
+  #   - "buster" (Debian 10) has Python 3.7 and Postgres 11
+  #   - "testing" (Debian 11) (currently) has Python 3.9 and Postgres 13
+  #
+  # TODO: this leaves us without sytests for Postgres 9.6. How much do we care
+  #    about that?
+  #
+  # Our intent is to test:
+  #   - Monolith:
+  #       - Older Distro + SQLite
+  #       - Older Python + Older PostgreSQL
+  #       - Newer Python + Newer PostgreSQL
+  #   - Workers:
+  #       - Older Python + Older PostgreSQL (MULTI_POSTGRES)
+  #       - Newer Python + Newer PostgreSQL (MULTI_POSTGRES)
+  #   - Workers w/ Redis:
+  #       - Newer Python + Newer PostgreSQL
+  #
   ################################################################################
 
-  - label: "SyTest - :python: 3.5 / SQLite / Monolith"
+  - label: "SyTest Monolith :sqlite::ubuntu: 18.04"
     agents:
       queue: "medium"
     command:
       - "bash .buildkite/merge_base_branch.sh"
       - "bash /bootstrap.sh synapse"
     plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic"
+      - docker#v3.7.0:
+          image: "matrixdotorg/sytest-synapse:bionic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -259,21 +332,14 @@ steps:
           shell: ["-x", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           style: "error"
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: "SyTest - :python: 3.5 / :postgres: 9.6 / Monolith"
+  - label: "SyTest Monolith :postgres::ubuntu: 18.04"
     agents:
       queue: "medium"
     env:
@@ -282,8 +348,8 @@ steps:
       - "bash .buildkite/merge_base_branch.sh"
       - "bash /bootstrap.sh synapse"
     plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic"
+      - docker#v3.7.0:
+          image: "matrixdotorg/sytest-synapse:bionic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -292,59 +358,14 @@ steps:
           shell: ["-x", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           style: "error"
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: "SyTest - :python: 3.5 / :postgres: 9.6 / Workers"
-    agents:
-      queue: "medium"
-    env:
-      MULTI_POSTGRES: "1"  # Test with split out databases
-      POSTGRES: "1"
-      WORKERS: "1"
-      BLACKLIST: "synapse-blacklist-with-workers"
-    command:
-      - "bash .buildkite/merge_base_branch.sh"
-      - "bash -c 'cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers'"
-      - "bash /bootstrap.sh synapse"
-    plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic"
-          propagate-environment: true
-          always-pull: true
-          workdir: "/src"
-          entrypoint: "/bin/sh"
-          init: false
-          shell: ["-x", "-c"]
-          mount-buildkite-agent: false
-          volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-      - matrix-org/annotate:
-          path: "logs/annotate.md"
-          style: "error"
- #     - matrix-org/coveralls#v1.0:
- #         parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
-
-
-  - label: "SyTest - :python: 3.8 / :postgres: 12 / Monolith"
+  - label: "SyTest Monolith :postgres::debian: testing"
     agents:
       queue: "medium"
     env:
@@ -353,8 +374,8 @@ steps:
       - "bash .buildkite/merge_base_branch.sh"
       - "bash /bootstrap.sh synapse"
     plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic"
+      - docker#v3.7.0:
+          image: "matrixdotorg/sytest-synapse:testing"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -363,23 +384,16 @@ steps:
           shell: ["-x", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           style: "error"
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-  - label: "SyTest - :python: 3.7 / :postgres: 11 / Workers"
+  - label: "SyTest Workers :postgres::ubuntu: 18.04"
     agents:
-      queue: "medium"
+      queue: "xlarge"
     env:
       MULTI_POSTGRES: "1"  # Test with split out databases
       POSTGRES: "1"
@@ -390,8 +404,8 @@ steps:
       - "bash -c 'cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers'"
       - "bash /bootstrap.sh synapse"
     plugins:
-      - docker#v3.0.1:
-          image: "matrixdotorg/sytest-synapse:dinsic"
+      - docker#v3.7.0:
+          image: "matrixdotorg/sytest-synapse:bionic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -400,92 +414,121 @@ steps:
           shell: ["-x", "-c"]
           mount-buildkite-agent: false
           volumes: ["./logs:/logs"]
-      - artifacts#v1.2.0:
+      - artifacts#v1.3.0:
           upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
       - matrix-org/annotate:
           path: "logs/annotate.md"
           style: "error"
- #     - matrix-org/coveralls#v1.0:
- #         parallel: "true"
-    retry:
-      automatic:
-        - exit_status: -1
-          limit: 2
-        - exit_status: 2
-          limit: 2
+    retry: *retry_setup
 
-# TODO: Enable once Synapse v1.13.0 is merged in
-# - label: "SyTest - :python: 3.7 / :postgres: 11 / Workers / :redis: Redis"
-#   agents:
-#     queue: "medium"
-#   command:
-#     - bash -c "cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers && ./.buildkite/merge_base_branch.sh && /bootstrap.sh synapse --redis-host redis"
-#   plugins:
-#     - matrix-org/download#v1.1.0:
-#         urls:
-#           - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose.sytest.py37.redis.yaml
-#           - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose-env
-#     - docker-compose#v2.1.0:
-#         run: sytest
-#         config:
-#           - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.sytest.py37.redis.yaml
-#     - artifacts#v1.2.0:
-#         upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-#     - matrix-org/annotate:
-#         path: "logs/annotate.md"
-#         style: "error"
-##     - matrix-org/coveralls#v1.0:
-##         parallel: "true"
-#   retry:
-#     automatic:
-#       - exit_status: -1
-#         limit: 2
-#       - exit_status: 2
-#         limit: 2
+  - label: "SyTest Workers :postgres::debian: 10"
+    agents:
+      queue: "xlarge"
+    env:
+      MULTI_POSTGRES: "1"  # Test with split out databases
+      POSTGRES: "1"
+      WORKERS: "1"
+      BLACKLIST: "synapse-blacklist-with-workers"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash -c 'cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers'"
+      - "bash /bootstrap.sh synapse"
+    plugins:
+      - docker#v3.7.0:
+          image: "matrixdotorg/sytest-synapse:buster"
+          propagate-environment: true
+          always-pull: true
+          workdir: "/src"
+          entrypoint: "/bin/sh"
+          init: false
+          shell: ["-x", "-c"]
+          mount-buildkite-agent: false
+          volumes: ["./logs:/logs"]
+      - artifacts#v1.3.0:
+          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
+      - matrix-org/annotate:
+          path: "logs/annotate.md"
+          style: "error"
+    retry: *retry_setup
+
+  - label: "SyTest Workers :redis::postgres::debian: 10"
+    agents:
+      # this one seems to need a lot of memory.
+      queue: "xlarge"
+    env:
+      POSTGRES: "1"
+      WORKERS: "1"
+      REDIS: "1"
+      BLACKLIST: "synapse-blacklist-with-workers"
+    command:
+      - "bash .buildkite/merge_base_branch.sh"
+      - "bash -c 'cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers'"
+      - "bash /bootstrap.sh synapse"
+    plugins:
+      - docker#v3.7.0:
+          image: "matrixdotorg/sytest-synapse:buster"
+          propagate-environment: true
+          always-pull: true
+          workdir: "/src"
+          entrypoint: "/bin/sh"
+          init: false
+          shell: ["-x", "-c"]
+          mount-buildkite-agent: false
+          volumes: ["./logs:/logs"]
+      - artifacts#v1.3.0:
+          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
+      - matrix-org/annotate:
+          path: "logs/annotate.md"
+          style: "error"
+    retry: *retry_setup
 
   ################################################################################
   #
   # synapse_port_db
   #
+  # Tests the oldest and newest supported pairings of Python and PostgreSQL
+  #
   ################################################################################
 
-  - label: "synapse_port_db / :python: 3.5 / :postgres: 9.5"
+  - label: "Port DB :python: 3.6 :postgres: 9.6"
     agents:
       queue: "medium"
+    env:
+      PYTHON_VERSION: "3.6"
+      POSTGRES_VERSION: "9.6"
     command:
       - "bash .buildkite/scripts/test_synapse_port_db.sh"
     plugins:
       - matrix-org/download#v1.1.0:
           urls:
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose.py35.pg95.yaml
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose-env
+            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/anoa/dinsic_release_1_31_0/.buildkite/docker-compose.yaml
+            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/anoa/dinsic_release_1_31_0/.buildkite/docker-compose-env
       - docker-compose#v2.1.0:
           run: testenv
           config:
-            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.py35.pg95.yaml
-      - artifacts#v1.2.0:
+            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.yaml
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
 
-  - label: "synapse_port_db / :python: 3.7 / :postgres: 11"
+  - label: "Port DB :python: 3.9 :postgres: 13"
     agents:
       queue: "medium"
+    env:
+      PYTHON_VERSION: "3.9"
+      POSTGRES_VERSION: "13"
     command:
       - "bash .buildkite/scripts/test_synapse_port_db.sh"
     plugins:
       - matrix-org/download#v1.1.0:
           urls:
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose.py37.pg11.yaml
-            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/dinsic/.buildkite/docker-compose-env
+            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/anoa/dinsic_release_1_31_0/.buildkite/docker-compose.yaml
+            - https://raw.githubusercontent.com/matrix-org/synapse-dinsic/anoa/dinsic_release_1_31_0/.buildkite/docker-compose-env
       - docker-compose#v2.1.0:
           run: testenv
           config:
-            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.py37.pg11.yaml
-      - artifacts#v1.2.0:
+            - /tmp/download-${BUILDKITE_BUILD_ID}/docker-compose.yaml
+      - artifacts#v1.3.0:
           upload: [ "_trial_temp/*/*.log" ]
-#      - matrix-org/coveralls#v1.0:
-#          parallel: "true"
 
 #  - wait: ~
 #    continue_on_failure: true
@@ -504,6 +547,10 @@ steps:
       - "docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile ."
       # We use the complement:latest image to provide Complement's dependencies, but want
       # to actually run against the latest version of Complement, so download it here.
+      # NOTE: We use the `anoa/knock_room_v7` branch here while knocking is still experimental on mainline.
+      # This branch essentially uses the stable identifiers for all knock-related room state so that things
+      # don't clash when rooms created on dinsic's Synapse potentially federate with mainline Synapse's in
+      # the future.
       - "wget https://github.com/matrix-org/complement/archive/anoa/knock_room_v7.tar.gz"
       - "tar -xzf knock_room_v7.tar.gz"
       # Build a second docker image on top of the above image. This one sets up Synapse with a generated config file,
@@ -511,7 +558,7 @@ steps:
       - "docker build -t complement-synapse -f complement-anoa-knock_room_v7/dockerfiles/Synapse.Dockerfile complement-anoa-knock_room_v7/dockerfiles"
       # Finally, compile and run the tests.
       - "cd complement-anoa-knock_room_v7"
-      - "COMPLEMENT_BASE_IMAGE=complement-synapse:latest go test -v -tags synapse_blacklist,msc2403 ./tests"
+      - "COMPLEMENT_BASE_IMAGE=complement-synapse:latest go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests"
     label: "\U0001F9EA Complement"
     agents:
       queue: "medium"
