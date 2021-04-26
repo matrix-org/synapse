@@ -44,6 +44,10 @@ try:
             recurse: If true will include referenced values in the size,
                 otherwise only sizes the given object.
         """
+        # Ignore singleton values when calculating memory usage.
+        if val in ((), None, ""):
+            return 0
+
         sizer = Asizer()
         sizer.exclude_refs((), None, "")
         return sizer.asizeof(val, limit=100 if recurse else 0)
