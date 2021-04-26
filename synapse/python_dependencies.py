@@ -123,8 +123,6 @@ CONDITIONAL_REQUIREMENTS = {
     "redis": ["txredisapi>=1.4.7", "hiredis"],
 }
 
-CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.790", "mypy-zope==0.2.8"]
-
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
