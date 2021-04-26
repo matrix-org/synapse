@@ -12,17 +12,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import email.utils
 import logging
-from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tuple
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
+
+import jinja2
 
 from twisted.internet import defer
+from twisted.web.server import Request
 
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, UserID, create_requester
+from synapse.util import Clock
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -46,11 +65,22 @@ class ModuleApi:
         self._hs = hs
 
         self._store = hs.get_datastore()
-        self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
         self._state = hs.get_state_handler()
+        self._sendmail = hs.get_sendmail()
+        self._clock = hs.get_clock()  # type: Clock
+
+        try:
+            app_name = self._hs.config.email_app_name
+
+            self._from_string = self._hs.config.email_notif_from % {"app": app_name}
+        except Exception:
+            # If substitution failed, fall back to the bare strings.
+            self._from_string = self._hs.config.email_notif_from
+
+        self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -81,13 +111,33 @@ class ModuleApi:
         """
         return self._public_room_list_manager
 
-    def get_user_by_req(self, req, allow_guest=False):
+    @property
+    def public_baseurl(self):
+        """Allow accessing the configured public base URL for this homeserver."""
+        return self._hs.config.public_baseurl
+
+    @property
+    def email_app_name(self):
+        """Allow accessing the application name configured in the homeserver's
+        configuration.
+        """
+        return self._hs.config.email_app_name
+
+    def get_user_by_req(
+        self,
+        req: Request,
+        allow_guest: bool = False,
+        allow_expired: bool = False,
+    ):
         """Check the access_token provided for a request
 
         Args:
-            req (twisted.web.server.Request): Incoming HTTP request
-            allow_guest (bool): True if guest users should be allowed. If this
+            req: Incoming HTTP request
+            allow_guest: True if guest users should be allowed. If this
                 is False, and the access token is for a guest user, an
+                AuthError will be thrown
+            allow_expired: True if expired users should be allowed. If this
+                is False, and the access token is for an expired user, an
                 AuthError will be thrown
         Returns:
             twisted.internet.defer.Deferred[synapse.types.Requester]:
@@ -96,7 +146,7 @@ class ModuleApi:
             synapse.api.errors.AuthError: if no user by that token exists,
                 or the token is invalid.
         """
-        return self._auth.get_user_by_req(req, allow_guest)
+        return self._hs.get_auth().get_user_by_req(req, allow_guest, allow_expired)
 
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary
@@ -252,7 +302,7 @@ class ModuleApi:
         """
         # see if the access token corresponds to a device
         user_info = yield defer.ensureDeferred(
-            self._auth.get_user_by_access_token(access_token)
+            self._hs.get_auth().get_user_by_access_token(access_token)
         )
         device_id = user_info.get("device_id")
         user_id = user_info["user"].to_string()
@@ -438,6 +488,144 @@ class ModuleApi:
                 await presence_handler.maybe_send_presence_to_interested_destinations(
                     presence_events
                 )
+
+    def background_call_async(self, f: Callable, *args, **kwargs):
+        """Wraps an async function as a background process and runs it.
+
+        Args:
+            f(function): The function to call.
+            *args: Positional arguments to pass to function.
+            **kwargs: Key arguments to pass to function.
+
+        """
+
+        @wrap_as_background_process(f.__name__)
+        async def background_call(*args, **kwargs):
+            await f(*args, **kwargs)
+
+        if self._hs.config.run_background_tasks:
+            self._clock.call_later(0.0, background_call, *args, **kwargs)
+        else:
+            logger.warning(
+                "Not running looping call %s as the configuration forbids it",
+                f,
+            )
+
+    def looping_background_call_async(self, f: Callable, msec: float, *args, **kwargs):
+        """Wraps an async function as a background process and calls it repeatedly.
+
+        Waits `msec` initially before calling `f` for the first time.
+
+        Args:
+            f(function): The function to call repeatedly.
+            msec(float): How long to wait between calls in milliseconds.
+            *args: Positional arguments to pass to function.
+            **kwargs: Key arguments to pass to function.
+        """
+
+        @wrap_as_background_process(f.__name__)
+        async def background_call(*args, **kwargs):
+            await f(*args, **kwargs)
+
+        if self._hs.config.run_background_tasks:
+            self._clock.looping_call(background_call, msec, *args, **kwargs)
+        else:
+            logger.warning(
+                "Not running looping call %s as the configuration forbids it",
+                f,
+            )
+
+    async def send_mail(
+        self,
+        recipient: str,
+        subject: str,
+        html: str,
+        text: str,
+    ):
+        """Send an email on behalf of the homeserver.
+
+        Args:
+            recipient: The email address for the recipient.
+            subject: The email's subject.
+            html: The email's HTML content.
+            text: The email's text content.
+        """
+        raw_to = email.utils.parseaddr(recipient)[1]
+
+        multipart_msg = MIMEMultipart("alternative")
+        multipart_msg["Subject"] = subject
+        multipart_msg["From"] = self._from_string
+        multipart_msg["To"] = recipient
+        multipart_msg["Date"] = email.utils.formatdate()
+        multipart_msg["Message-ID"] = email.utils.make_msgid()
+        multipart_msg.attach(MIMEText(html, "html", "utf8"))
+        multipart_msg.attach(MIMEText(text, "plain", "utf8"))
+
+        logger.info("Sending email to %s", recipient)
+
+        await make_deferred_yieldable(
+            self._sendmail(
+                self._hs.config.email_smtp_host,
+                self._raw_from,
+                raw_to,
+                multipart_msg.as_string().encode("utf8"),
+                reactor=self._hs.get_reactor(),
+                port=self._hs.config.email_smtp_port,
+                requireAuthentication=self._hs.config.email_smtp_user is not None,
+                username=self._hs.config.email_smtp_user,
+                password=self._hs.config.email_smtp_pass,
+                requireTransportSecurity=self._hs.config.require_transport_security,
+            )
+        )
+
+    def read_templates(
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
+    ) -> List[jinja2.Template]:
+        """Read and load the content of the template files at the given location.
+        By default, Synapse will look for these templates in its configured template
+        directory, but another directory to search in can be provided.
+
+        Args:
+            filenames: The name of the template files to look for.
+            custom_template_directory: An additional directory to look for the files in.
+
+        Returns:
+            A list containing the loaded templates, with the orders matching the one of
+            the filenames parameter.
+        """
+        return self._hs.config.read_templates(filenames, custom_template_directory)
+
+    async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
+        """Lookup the profile info for the user with the given localpart.
+
+        Args:
+            localpart: The localpart to lookup profile information for.
+
+        Returns:
+            The profile information (i.e. display name and avatar URL).
+        """
+        return await self._store.get_profileinfo(localpart)
+
+    async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
+        """Lookup the threepids (email addresses and phone numbers) associated with the
+        given Matrix user ID.
+
+        Args:
+            user_id: The Matrix user ID to lookup threepids for.
+
+        Returns:
+            A list of threepids, each threepid being represented by a dictionary
+            containing a "medium" key which value is "email" for email addresses and
+            "msisdn" for phone numbers, and an "address" key which value is the
+            threepid's address.
+        """
+        return await self._store.user_get_threepids(user_id)
+
+    def current_time_ms(self) -> int:
+        """Get the current time in milliseconds."""
+        return self._clock.time_msec()
 
 
 class PublicRoomListManager:
