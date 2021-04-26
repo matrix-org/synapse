@@ -82,7 +82,7 @@ class CacheMetric:
     def dec_memory_usage(self, memory: int):
         self.memory_usage -= memory
 
-    def clear_memory_usage(self, memory: int):
+    def clear_memory_usage(self):
         if self.memory_usage is not None:
             self.memory_usage = 0
 
