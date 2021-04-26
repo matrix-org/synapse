@@ -24,6 +24,11 @@ from synapse.config.cache import add_resizable_cache
 
 logger = logging.getLogger(__name__)
 
+
+# Whether to track estimated memory usage of the LruCaches.
+TRACK_MEMORY_USAGE = False
+
+
 caches_by_name = {}  # type: Dict[str, Sized]
 collectors_by_name = {}  # type: Dict[str, CacheMetric]
 

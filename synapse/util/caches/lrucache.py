@@ -30,7 +30,7 @@ from typing import (
 from typing_extensions import Literal
 
 from synapse.config import cache as cache_config
-from synapse.util.caches import CacheMetric, register_cache
+from synapse.util.caches import TRACK_MEMORY_USAGE, CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
 
 try:
@@ -57,10 +57,6 @@ except ImportError:
 
     def _get_size_of(val: Any, *, recurse=True) -> int:
         return 0
-
-
-# Whether to track estimated memory usage of the LruCaches.
-TRACK_MEMORY_USAGE = False
 
 
 # Function type: the type used for invalidation callbacks
