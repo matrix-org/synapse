@@ -36,7 +36,7 @@ from synapse.http.client import BlacklistingAgentWrapper
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
-from synapse.http.proxyagent import ProxyAgent
+from synapse.http.proxyagent import ProxyAgent, parse_username_password
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import ISynapseReactor
 from synapse.util import Clock
@@ -76,7 +76,7 @@ class MatrixFederationAgent:
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
         ip_blacklist: IPSet,
-        proxy_reactor: IReactorCore = None,
+        proxy_reactor: Optional[ISynapseReactor] = None,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
@@ -231,6 +231,8 @@ class MatrixHostnameEndpointFactory:
             srv_resolver = SrvResolver()
 
         self._srv_resolver = srv_resolver
+        self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
+
         self.https_proxy_endpoint = proxyagent.http_proxy_endpoint(
             https_proxy, proxy_reactor
         )
@@ -242,6 +244,7 @@ class MatrixHostnameEndpointFactory:
             self._srv_resolver,
             parsed_uri,
             self.https_proxy_endpoint,
+            self.https_proxy_creds,
         )
 
 
@@ -265,12 +268,15 @@ class MatrixHostnameEndpoint:
         srv_resolver: SrvResolver,
         parsed_uri: URI,
         https_proxy_endpoint: Optional[IStreamClientEndpoint],
+        https_proxy_creds,
     ):
         self._reactor = reactor
 
         self._parsed_uri = parsed_uri
 
         self.https_proxy_endpoint = https_proxy_endpoint
+
+        self.https_proxy_creds = https_proxy_creds
 
         # set up the TLS connection params
         #
@@ -309,8 +315,17 @@ class MatrixHostnameEndpoint:
                         port,
                         self.https_proxy_endpoint,
                     )
+                    connect_headers = Headers()
+                    # Determine whether we need to set Proxy-Authorization headers
+                    if self.https_proxy_creds:
+                        # Set a Proxy-Authorization header
+                        connect_headers.addRawHeader(
+                            b"Proxy-Authorization",
+                            self.https_proxy_creds.as_proxy_authorization_value(),
+                        )
+
                     endpoint = HTTPConnectProxyEndpoint(
-                        self._reactor, self.https_proxy_endpoint, host, port
+                        self._reactor, self.https_proxy_endpoint, host, port, headers=connect_headers
                     )
                 else:
                     logger.debug("Connecting to %s:%i", host.decode("ascii"), port)
