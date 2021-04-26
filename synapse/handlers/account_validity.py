@@ -19,7 +19,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from synapse.api.errors import StoreError, SynapseError
+from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.logging.context import make_deferred_yieldable
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
@@ -38,6 +38,8 @@ class AccountValidityHandler:
         self.store = self.hs.get_datastore()
         self.sendmail = self.hs.get_sendmail()
         self.clock = self.hs.get_clock()
+
+        self._new_account_validity = hs.get_account_validity()
 
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
@@ -109,6 +111,19 @@ class AccountValidityHandler:
         Raises:
             SynapseError if the user is not set to renew.
         """
+        # If a module supports sending a renewal email from here, do that, otherwise do
+        # the legacy dance.
+        try:
+            await self._new_account_validity.on_legacy_send_mail(user_id)
+            return
+        except NotImplementedError:
+            pass
+
+        if not self._account_validity_renew_by_email_enabled:
+            raise AuthError(
+                403, "Account renewal via email is disabled on this server."
+            )
+
         expiration_ts = await self.store.get_expiration_ts_for_user(user_id)
 
         # If this user isn't set to be expired, raise an error.
@@ -253,6 +268,13 @@ class AccountValidityHandler:
               * An int representing the user's expiry timestamp as milliseconds since the
                 epoch, or 0 if the token was invalid.
         """
+        # If a module supports triggering a renew from here, do that, otherwise do the
+        # legacy dance.
+        try:
+            return await self._new_account_validity.on_legacy_renew(renewal_token)
+        except NotImplementedError:
+            pass
+
         try:
             (
                 user_id,
