@@ -558,7 +558,7 @@ steps:
       - "docker build -t complement-synapse -f complement-anoa-knock_room_v7/dockerfiles/Synapse.Dockerfile complement-anoa-knock_room_v7/dockerfiles"
       # Finally, compile and run the tests.
       - "cd complement-anoa-knock_room_v7"
-      - "COMPLEMENT_BASE_IMAGE=complement-synapse:latest go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests"
+      - "COMPLEMENT_BASE_IMAGE=complement-synapse:latest go test -v -tags synapse_blacklist,msc2403 ./tests"
     label: "\U0001F9EA Complement"
     agents:
       queue: "medium"
