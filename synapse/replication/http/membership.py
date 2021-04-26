@@ -146,7 +146,7 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
 
     async def _handle_request(  # type: ignore
         self,
-        request: Request,
+        request: SynapseRequest,
         room_id: str,
         user_id: str,
     ):
@@ -284,7 +284,7 @@ class ReplicationRemoteRescindKnockRestServlet(ReplicationEndpoint):
 
     async def _handle_request(  # type: ignore
         self,
-        request: Request,
+        request: SynapseRequest,
         knock_event_id: str,
     ):
         content = parse_json_object_from_request(request)

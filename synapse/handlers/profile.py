@@ -87,8 +87,8 @@ class ProfileHandler(BaseHandler):
             )
 
             if len(self.hs.config.replicate_user_profiles_to) > 0:
-                reactor.callWhenRunning(self._do_assign_profile_replication_batches)
-                reactor.callWhenRunning(self._start_replicate_profiles)
+                reactor.callWhenRunning(self._do_assign_profile_replication_batches)  # type: ignore
+                reactor.callWhenRunning(self._start_replicate_profiles)  # type: ignore
                 # Add a looping call to replicate_profiles: this handles retries
                 # if the replication is unsuccessful when the user updated their
                 # profile.
