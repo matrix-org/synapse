@@ -148,6 +148,17 @@ class ModuleApi:
         """
         return self._hs.get_auth().get_user_by_req(req, allow_guest, allow_expired)
 
+    async def is_user_admin(self, user_id: str) -> bool:
+        """Checks if a user is a server admin.
+
+        Args:
+            user_id: The Matrix ID of the user to check.
+
+        Returns:
+            True if the user is a server admin, False otherwise.
+        """
+        return await self._store.is_server_admin(UserID.from_string(user_id))
+
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary
 
