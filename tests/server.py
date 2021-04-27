@@ -479,7 +479,7 @@ def get_clock():
 
 
 @implementer(ITransport)
-@attr.s(cmp=False)
+@attr.s(eq=False, order=False)
 class FakeTransport:
     """
     A twisted.internet.interfaces.ITransport implementation which sends all its data

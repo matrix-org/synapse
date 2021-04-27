@@ -61,7 +61,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, cmp=False)
+@attr.s(slots=True, eq=False, order=False)
 class VerifyJsonRequest:
     """
     A request to verify a JSON object.

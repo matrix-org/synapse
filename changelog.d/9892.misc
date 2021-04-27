@@ -1,0 +1,1 @@
+Remove usage of deprecated `cmp` argument in the `attr.s` decorator.

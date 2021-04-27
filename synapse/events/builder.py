@@ -34,7 +34,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 
-@attr.s(slots=True, cmp=False, frozen=True)
+@attr.s(slots=True, eq=False, order=False, frozen=True)
 class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.
