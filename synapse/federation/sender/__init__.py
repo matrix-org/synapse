@@ -14,7 +14,17 @@
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from prometheus_client import Counter
 
@@ -31,7 +41,7 @@ from synapse.metrics import (
     events_processed_counter,
 )
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import Collection, JsonDict, ReadReceipt, RoomStreamToken
+from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -538,6 +548,10 @@ class FederationSender(AbstractFederationSender):
         if not states or not self.hs.config.use_presence:
             # No-op if presence is disabled.
             return
+
+        # Ensure we only send out presence states for local users.
+        for state in states:
+            assert self.is_mine_id(state.user_id)
 
         for destination in destinations:
             if destination == self.server_name:

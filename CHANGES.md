@@ -1,11 +1,22 @@
+Synapse 1.32.2 (2021-04-22)
+===========================
+
+This release includes a fix for a regression introduced in 1.32.0.
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse 1.32.0 and 1.32.1 which caused `LoggingContext` errors in plugins. ([\#9857](https://github.com/matrix-org/synapse/issues/9857))
+
+
 Synapse 1.32.1 (2021-04-21)
 ===========================
 
 This release fixes [a regression](https://github.com/matrix-org/synapse/issues/9853)
-in Synapse 1.32.0 that caused connected Prometheus instances to become unstable. If you
-ran Synapse 1.32.0 with Prometheus metrics, first upgrade to Synapse 1.32.1 and follow
-[these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
-to clean up any excess writeahead logs.
+in Synapse 1.32.0 that caused connected Prometheus instances to become unstable. 
+
+However, as this release is still subject to the `LoggingContext` change in 1.32.0,
+it is recommended to remain on or downgrade to 1.31.0.
 
 Bugfixes
 --------
@@ -18,7 +29,14 @@ Synapse 1.32.0 (2021-04-20)
 
 **Note:** This release introduces [a regression](https://github.com/matrix-org/synapse/issues/9853)
 that can overwhelm connected Prometheus instances. This issue was not present in
-1.32.0rc1, and is fixed in 1.32.1. See the changelog for 1.32.1 above for more information.
+1.32.0rc1. If affected, it is recommended to downgrade to 1.31.0 in the meantime, and 
+follow [these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
+to clean up any excess writeahead logs.
+
+**Note:** This release also mistakenly included a change that may affected Synapse 
+modules that import `synapse.logging.context.LoggingContext`, such as
+[synapse-s3-storage-provider](https://github.com/matrix-org/synapse-s3-storage-provider).
+This will be fixed in a later Synapse version.
 
 **Note:** This release requires Python 3.6+ and Postgres 9.6+ or SQLite 3.22+.
 

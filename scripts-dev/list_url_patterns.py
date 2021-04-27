@@ -48,7 +48,7 @@ args = parser.parse_args()
 
 
 for directory in args.directories:
-    for root, dirs, files in os.walk(directory):
+    for root, _, files in os.walk(directory):
         for filename in files:
             if filename.endswith(".py"):
                 filepath = os.path.join(root, filename)

@@ -85,6 +85,29 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.33.0
+====================
+
+Account Validity HTML templates can now display a user's expiration date
+------------------------------------------------------------------------
+
+This may affect you if you have enabled the account validity feature, and have made use of a
+custom HTML template specified by the ``account_validity.template_dir`` or ``account_validity.account_renewed_html_path``
+Synapse config options.
+
+The template can now accept an ``expiration_ts`` variable, which represents the unix timestamp in milliseconds for the
+future date of which their account has been renewed until. See the
+`default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`_
+for an example of usage.
+
+ALso note that a new HTML template, ``account_previously_renewed.html``, has been added. This is is shown to users
+when they attempt to renew their account with a valid renewal token that has already been used before. The default
+template contents can been found
+`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_,
+and can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see
+upon attempting to use a valid renewal token more than once.
+
+
 Upgrading to v1.32.0
 ====================
 
@@ -93,11 +116,11 @@ Regression causing connected Prometheus instances to become overwhelmed
 
 This release introduces `a regression <https://github.com/matrix-org/synapse/issues/9853>`_
 that can overwhelm connected Prometheus instances. This issue is not present in
-Synapse v1.32.0rc1, and is fixed in Synapse v1.32.1.
+Synapse v1.32.0rc1.
 
-If you have been affected, please first upgrade to a more recent Synapse version.
-You then may need to remove excess writeahead logs in order for Prometheus to recover.
-Instructions for doing so are provided
+If you have been affected, please downgrade to 1.31.0. You then may need to
+remove excess writeahead logs in order for Prometheus to recover. Instructions
+for doing so are provided
 `here <https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183>`_.
 
 Dropping support for old Python, Postgres and SQLite versions

@@ -17,6 +17,9 @@
 
 """Contains constants from the specification."""
 
+# the max size of a (canonical-json-encoded) event
+MAX_PDU_SIZE = 65536
+
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2 ** 63 - 1
 

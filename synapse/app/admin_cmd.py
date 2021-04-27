@@ -70,12 +70,6 @@ class AdminCmdSlavedStore(
 class AdminCmdServer(HomeServer):
     DATASTORE_CLASS = AdminCmdSlavedStore
 
-    def _listen_http(self, listener_config):
-        pass
-
-    def start_listening(self, listeners):
-        pass
-
 
 async def export_data_command(hs, args):
     """Export data for a user.
@@ -232,7 +226,7 @@ def start(config_options):
 
     async def run():
         with LoggingContext("command"):
-            _base.start(ss, [])
+            _base.start(ss)
             await args.func(ss, args)
 
     _base.start_worker_reactor(
