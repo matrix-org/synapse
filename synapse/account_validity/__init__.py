@@ -71,6 +71,28 @@ class AccountValidity:
         if not implemented:
             raise NotImplementedError()
 
+    async def on_legacy_admin_request(self, request) -> int:
+        """DEPRECATED: Function called when receiving a request on the deprecated
+        /_synapse/admin/account_validity endpoint, after the requester has been
+        identified as a server admin. Modules that don't reimplement the legacy
+        email-based account validity feature should ignore this.
+        If several modules implement this hook, only the first one (in the orders modules
+        have been loaded at startup) gets called.
+
+        Args:
+            request: The admin request
+
+        Raises:
+            NotImplementedError: No configured module implement this hook.
+        """
+        implemented = False
+        for module in self.modules:
+            if hasattr(module, "on_legacy_admin_request"):
+                return await module.on_legacy_admin_request(request)
+
+        if not implemented:
+            raise NotImplementedError()
+
     async def user_expired(self, user_id: str) -> bool:
         """Check whether the user is expired.
 
