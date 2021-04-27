@@ -73,8 +73,8 @@ class AccountValidity:
 
     async def on_legacy_admin_request(self, request) -> int:
         """DEPRECATED: Function called when receiving a request on the deprecated
-        /_synapse/admin/account_validity endpoint, after the requester has been
-        identified as a server admin. Modules that don't reimplement the legacy
+        /_synapse/admin/v1/account_validity/validity endpoint, after the requester has
+        been identified as a server admin. Modules that don't reimplement the legacy
         email-based account validity feature should ignore this.
         If several modules implement this hook, only the first one (in the orders modules
         have been loaded at startup) gets called.
