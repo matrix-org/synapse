@@ -307,6 +307,7 @@ class MatrixHostnameEndpoint:
             host = server.host
             port = server.port
 
+            endpoint: IStreamClientEndpoint
             try:
                 if self.https_proxy_endpoint and not proxy_bypass(host.decode()):
                     logger.debug(
