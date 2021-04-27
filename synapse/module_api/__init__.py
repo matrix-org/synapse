@@ -65,6 +65,7 @@ class ModuleApi:
         self._hs = hs
 
         self._store = hs.get_datastore()
+        self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
@@ -146,7 +147,7 @@ class ModuleApi:
             synapse.api.errors.AuthError: if no user by that token exists,
                 or the token is invalid.
         """
-        return self._hs.get_auth().get_user_by_req(req, allow_guest, allow_expired)
+        return self._auth.get_user_by_req(req, allow_guest, allow_expired=allow_expired)
 
     async def is_user_admin(self, user_id: str) -> bool:
         """Checks if a user is a server admin.
