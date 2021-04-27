@@ -326,7 +326,11 @@ class MatrixHostnameEndpoint:
                         )
 
                     endpoint = HTTPConnectProxyEndpoint(
-                        self._reactor, self.https_proxy_endpoint, host, port, headers=connect_headers
+                        self._reactor,
+                        self.https_proxy_endpoint,
+                        host,
+                        port,
+                        headers=connect_headers,
                     )
                 else:
                     logger.debug("Connecting to %s:%i", host.decode("ascii"), port)

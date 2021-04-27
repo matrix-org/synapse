@@ -16,9 +16,8 @@ import logging
 import os
 from unittest.mock import patch
 
-from mock import Mock
-
 import treq
+from mock import Mock
 from netaddr import IPSet
 from service_identity import VerificationError
 from zope.interface import implementer

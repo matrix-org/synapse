@@ -267,7 +267,9 @@ def http_proxy_endpoint(proxy: Optional[bytes], reactor, **kwargs):
     return HostnameEndpoint(reactor, host, port, **kwargs)
 
 
-def parse_username_password(proxy: Optional[bytes]) -> Tuple[Optional[ProxyCredentials], bytes]:
+def parse_username_password(
+    proxy: Optional[bytes],
+) -> Tuple[Optional[ProxyCredentials], bytes]:
     """
     Parses the username and password from a proxy declaration e.g
     username:password@hostname:port.
