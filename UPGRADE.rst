@@ -85,6 +85,19 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.34.0
+====================
+
+Deprecation of the built-in account validity feature
+----------------------------------------------------
+
+As of Synapse v1.34.0, the built-in account validity feature is deprecated in favour of
+plugin modules. If you are using this feature and want to keep its current behaviour,
+please use the `synapse-email-account-validity <https://github.com/matrix-org/synapse-email-account-validity>`_
+module.
+
+Synapse's built-in account validity feature will be removed in a future release.
+
 Upgrading to v1.33.0
 ====================
 
