@@ -62,7 +62,16 @@ The appropriate dependencies must also be installed for Synapse. If using a
 virtualenv, these can be installed with:
 
 ```sh
-pip install "matrix-synapse[redis]"
+pip3 install 'matrix-synapse[redis]'
+```
+
+If you installed Synapse via your system package manager, you can access 
+the virtualenv at `/opt/venvs/matrix-synapse` like so:
+
+```sh
+cd /opt/venvs/matrix-synapse
+source bin/activate
+pip3 install 'matrix-synapse[redis]'
 ```
 
 Note that these dependencies are included when synapse is installed with `pip
@@ -117,6 +126,10 @@ redis:
     enabled: true
 ```
 
+**WARNING:** You should **EXTEND your existing `listeners:`** - if 
+you add this as a new block to your config, it will 
+**disable the default main process listener**.
+
 See the sample config for the full documentation of each option.
 
 Under **no circumstances** should the replication listener be exposed to the
@@ -135,7 +148,7 @@ replication port. If the worker will handle HTTP requests then the
 `worker_listeners` option should be set with a `http` listener, in the same way
 as the `listeners` option in the shared config.
 
-For example:
+For example, in `/etc/matrix-synapse/workers/generic.yaml`:
 
 ```yaml
 worker_app: synapse.app.generic_worker
@@ -147,6 +160,8 @@ worker_replication_http_port: 9093
 
 worker_listeners:
  - type: http
+   # The port which THIS WORKER listens on, for the main process
+   # or other workers to communicate with it.
    port: 8083
    resources:
      - names:
@@ -176,7 +191,43 @@ recommend the use of `systemd` where available: for information on setting up
 
 ## Available worker applications
 
+### Compact Regular Expressions (for webservers)
+
+If you want to be able to route to a worker with as few route/regex blocks
+as possible, especially when using a webserver such as Caddy or 
+NGinx - then you should use the appropriate compact regex line(s) listed below:
+    
+    # Sync Requests
+    /_matrix/client/(api/v1|v2_alpha|r0)/(events|initialSync|(rooms/[^/]+/initialSync))(/?(.*)?)$
+    
+    # SSO
+    /_matrix/client/(api/v1|r0|unstable)/login/(sso/redirect|cas/ticket)(/?(.*)?)$
+    /_synapse/client/(pick_idp|pick_username|new_user_consent|sso_register|oidc/callback|saml2/authn_response)(/?(.*)?)$
+    
+    # Federation Requests (inc. Inbound)
+    /_matrix/federation/(v1|v2)/(send|event|state|state_ids|backfill|get_missing_events|publicRooms|query|make_join|make_leave|send_join|send_leave|invite|query_auth|event_auth|exchange_third_party_invite|user/devices|get_groups_publicised|groups)(/?(.*)?)$
+    /_matrix/key/v2/query/?$
+    
+    # Client API Requests
+    /_matrix/client/(api/v1|r0|unstable)/(publicRooms|devices|keys/query|keys/changes|voip/turnServer|publicised_groups)/?$
+    /_matrix/client/(api/v1|r0|unstable)/rooms/.*/(joined_members|context|messages|members|state)(/?(.*)?)$
+    /_matrix/client/versions/?$
+    
+    # Media Repository requests
+    /_matrix/media(/?(.*)?)$
+    /_synapse/admin/v1/(purge_media_cache|((room|user)/.*/media.*)|media|quarantine_media)(/?(.*)?)$
+    
+    # Registration/Login Requests
+    /_matrix/client/(api/v1|r0|unstable)/(login|register)/?$
+    
+    # Event sending requests
+    /_matrix/client/(api/v1|r0|unstable)/rooms/.*/(redact|send|state|join|invite|leave|ban|unban|kick)(/?(.*)?)$
+    /_matrix/client/(api/v1|r0|unstable)/(join|profile)(/?(.*)?)$
+
+
 ### `synapse.app.generic_worker`
+
+Compact regular expressions for 
 
 This worker can handle API requests matching the following regular
 expressions:
@@ -280,6 +331,83 @@ For multiple workers not handling the SSO endpoints properly, see
 
 Note that a HTTP listener with `client` and `federation` resources must be
 configured in the `worker_listeners` option in the worker config.
+
+#### Example Webserver Configurations
+
+**NOTE:** In the following web server example configs, the following ports are assumed:
+
+ - `8008` - The main listener for the main Synapse service process
+ - `8015` - A separate `synapse.app.media_repository` worker process
+ - `8017` - A separate `synapse.app.federation_reader` worker process
+
+
+##### Caddy v2 - with Federation Reader + Media Repo endpoints
+
+This is a configuration for the [Caddy Webserver](https://caddyserver.com/), which 
+routes Federation and Media Repo endpoints to their respective worker on a 
+different port, while routing everything else to the main Synapse listener.
+
+At the top of the config, there are additional matchers that you can use if 
+desired, which match SSO, API Client, Registration/Login requests, and 
+Matrix Event Sending.
+
+```Caddyfile
+###
+# Below are some unused matchers for various types of matrix requests,
+# which can be used if you need to route them to a separate worker
+###
+
+# Single Sign On (SSO) requests
+@sso {
+    path_regexp /_matrix/client/(api/v1|r0|unstable)/login/(sso/redirect|cas/ticket)(/?(.*)?)$
+    path_regexp /_synapse/client/(pick_idp|pick_username|new_user_consent|sso_register|oidc/callback|saml2/authn_response)(/?(.*)?)$
+}
+# Matrix Generic Client API requests
+@matrix_client {
+    path_regexp /_matrix/client/(api/v1|r0|unstable)/(publicRooms|devices|keys/query|keys/changes|voip/turnServer|publicised_groups)/?$
+    path_regexp /_matrix/client/(api/v1|r0|unstable)/rooms/.*/(joined_members|context|messages|members|state)(/?(.*)?)$
+    path_regexp /_matrix/client/versions/?$
+}
+# Registration/Login requests
+@matrix_reglogin {
+    path_regexp /_matrix/client/(api/v1|r0|unstable)/(login|register)/?$
+}
+# Matrix Event Sending requests
+@matrix_event {
+    path_regexp /_matrix/client/(api/v1|r0|unstable)/rooms/.*/(redact|send|state|join|invite|leave|ban|unban|kick)(/?(.*)?)$
+    path_regexp /_matrix/client/(api/v1|r0|unstable)/(join|profile)(/?(.*)?)$
+}
+    
+####
+# We use regex to match the various norma + admin routes which need to go to the media worker on port 8015
+####
+@media {
+    path_regexp /_synapse/admin/v1/(purge_media_cache|((room|user)/.*/media.*)|media|quarantine_media)(/?(.*)?)$
+    path_regexp /_matrix/media(/?(.*)?)$
+}
+route @media {
+    reverse_proxy 127.0.0.1:8015
+}
+####
+# We use regex to match the various routes which need to go to the federation worker on port 8017
+####
+@federation {
+    path_regexp /_matrix/federation/(v1|v2)/(send|event|state|state_ids|backfill|get_missing_events|publicRooms|query|make_join|make_leave|send_join|send_leave|invite|query_auth|event_auth|exchange_third_party_invite|user/devices|get_groups_publicised|groups)(/?(.*)?)$
+    path_regexp /_matrix/key/v2/query/?$
+}
+route @federation {
+    reverse_proxy 127.0.0.1:8017
+}
+####
+# Anything which doesn't match a previous route, will get routed to the main Matrix Synapse process
+####
+route {
+    reverse_proxy 127.0.0.1:8008 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
+}
+```
 
 #### Load balancing
 
