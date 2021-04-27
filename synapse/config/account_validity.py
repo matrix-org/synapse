@@ -24,8 +24,11 @@ You are using the deprecated account validity feature. It is recommended to chan
 configuration to be using one or more modules instead. This feature will be removed in a
 future version of Synapse, at which point it will only be available through custom
 modules.
-See the sample documentation file for more information:
+See the sample configuration file for more information:
 https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml
+The behaviour and features of the deprecated account validity feature have been ported
+to a dedicated module:
+https://github.com/matrix-org/synapse-email-account-validity
 --------------------------------------------------------------------------------------"""
 
 
