@@ -572,7 +572,8 @@ class AccountValidityRenewServlet(RestServlet):
 
             if "user_id" not in body:
                 raise SynapseError(
-                    400, "Missing property 'user_id' in the request body",
+                    400,
+                    "Missing property 'user_id' in the request body",
                 )
 
             expiration_ts = await self.account_activity_handler.renew_account_for_user(
