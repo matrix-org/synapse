@@ -23,6 +23,7 @@ from synapse.logging.context import (
     LoggingContext,
     current_context,
 )
+from synapse.logging.opentracing import start_active_span
 from synapse.metrics import InFlightGauge
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,7 @@ class Measure:
         "name",
         "_logging_context",
         "start",
+        "_span",
     ]
 
     def __init__(self, clock, name: str):
@@ -126,13 +128,18 @@ class Measure:
         self._logging_context = LoggingContext(str(curr_context), parent_context)
         self.start = None  # type: Optional[int]
 
+        self._span = start_active_span(f"measure.{name}")
+
     def __enter__(self) -> "Measure":
         if self.start is not None:
             raise RuntimeError("Measure() objects cannot be re-used")
 
+        self._span.__enter__()
+
         self.start = self.clock.time()
         self._logging_context.__enter__()
         in_flight.register((self.name,), self._update_in_flight)
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -155,6 +162,8 @@ class Measure:
             block_db_sched_duration.labels(self.name).inc(usage.db_sched_duration_sec)
         except ValueError:
             logger.warning("Failed to save metrics! Usage: %s", usage)
+
+        self._span.__exit__(exc_type, exc_val, exc_tb)
 
     def get_resource_usage(self) -> ContextResourceUsage:
         """Get the resources used within this Measure block
