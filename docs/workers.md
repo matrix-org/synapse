@@ -227,8 +227,6 @@ NGinx - then you should use the appropriate compact regex line(s) listed below:
 
 ### `synapse.app.generic_worker`
 
-Compact regular expressions for 
-
 This worker can handle API requests matching the following regular
 expressions:
 
