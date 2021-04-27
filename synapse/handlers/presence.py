@@ -58,7 +58,6 @@ from synapse.replication.http.presence import (
 from synapse.replication.http.streams import ReplicationGetStreamUpdates
 from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
-from synapse.state import StateHandler
 from synapse.storage.databases.main import DataStore
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
@@ -291,7 +290,6 @@ class BasePresenceHandler(abc.ABC):
             self.store,
             self.presence_router,
             states,
-            self.state,
         )
 
         for destinations, states in hosts_and_states:
@@ -757,7 +755,6 @@ class PresenceHandler(BasePresenceHandler):
                     self.store,
                     self.presence_router,
                     list(to_federation_ping.values()),
-                    self.state,
                 )
 
                 for destinations, states in hosts_and_states:
@@ -1384,7 +1381,6 @@ class PresenceEventSource:
         self.get_presence_router = hs.get_presence_router
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
-        self.state = hs.get_state_handler()
 
     @log_function
     async def get_new_events(
@@ -1853,7 +1849,6 @@ async def get_interested_remotes(
     store: DataStore,
     presence_router: PresenceRouter,
     states: List[UserPresenceState],
-    state_handler: StateHandler,
 ) -> List[Tuple[Collection[str], List[UserPresenceState]]]:
     """Given a list of presence states figure out which remote servers
     should be sent which.
@@ -1864,7 +1859,6 @@ async def get_interested_remotes(
         store: The homeserver's data store.
         presence_router: A module for augmenting the destinations for presence updates.
         states: A list of incoming user presence updates.
-        state_handler:
 
     Returns:
         A list of 2-tuples of destinations and states, where for
@@ -1881,7 +1875,8 @@ async def get_interested_remotes(
     )
 
     for room_id, states in room_ids_to_states.items():
-        hosts = await state_handler.get_current_hosts_in_room(room_id)
+        user_ids = await store.get_users_in_room(room_id)
+        hosts = {get_domain_from_id(user_id) for user_id in user_ids}
         hosts_and_states.append((hosts, states))
 
     for user_id, states in users_to_states.items():
