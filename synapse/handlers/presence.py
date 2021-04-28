@@ -364,9 +364,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
     def mark_as_coming_online(self, user_id: str) -> None:
         """A user has started syncing. Send a UserSync to the presence writer,
         unless they had recently stopped syncing.
-
-        Args:
-            user_id (str)
         """
         going_offline = self.users_going_offline.pop(user_id, None)
         if not going_offline:
@@ -379,9 +376,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
         writer as its likely they'll come back soon. This allows us to avoid
         sending a stopped syncing immediately followed by a started syncing
         notification to the presence writer
-
-        Args:
-            user_id (str)
         """
         self.users_going_offline[user_id] = self.clock.time_msec()
 
@@ -1782,8 +1776,8 @@ def handle_update(
     Returns:
         3-tuple: `(new_state, persist_and_notify, federation_ping)` where:
             - new_state: is the state to actually persist
-            - persist_and_notify (bool): whether to persist and notify people
-            - federation_ping (bool): whether we should send a ping over federation
+            - persist_and_notify: whether to persist and notify people
+            - federation_ping: whether we should send a ping over federation
     """
     user_id = new_state.user_id
 
