@@ -51,6 +51,7 @@ from synapse.storage.state import StateFilter
 from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
 from synapse.util import json_decoder, json_encoder
 from synapse.util.async_helpers import Linearizer
+from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -446,6 +447,19 @@ class EventCreationHandler:
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
         self._external_cache = hs.get_external_cache()
+
+        # Stores the state groups we've recently added to the joined hosts
+        # external cache. Note that the timeout must be significantly less than
+        # the TTL on the external cache.
+        self._external_cache_joined_hosts_updates = (
+            None
+        )  # type: Optional[ExpiringCache]
+        if self._external_cache.is_enabled():
+            self._external_cache_joined_hosts_updates = ExpiringCache(
+                "_external_cache_joined_hosts_updates",
+                self.clock,
+                expiry_ms=30 * 60 * 1000,
+            )
 
     async def create_event(
         self,
@@ -957,7 +971,7 @@ class EventCreationHandler:
 
         await self.action_generator.handle_push_actions_for_event(event, context)
 
-        await self.cache_joined_hosts_for_event(event)
+        await self.cache_joined_hosts_for_event(event, context)
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -998,7 +1012,9 @@ class EventCreationHandler:
             await self.store.remove_push_actions_from_staging(event.event_id)
             raise
 
-    async def cache_joined_hosts_for_event(self, event: EventBase) -> None:
+    async def cache_joined_hosts_for_event(
+        self, event: EventBase, context: EventContext
+    ) -> None:
         """Precalculate the joined hosts at the event, when using Redis, so that
         external federation senders don't have to recalculate it themselves.
         """
@@ -1013,16 +1029,22 @@ class EventCreationHandler:
         # Note: We have to cache event ID -> prev state group, as we don't
         # store that in the DB.
         #
-        # Note: We always set the state group -> joined hosts cache, even if
-        # we already set it, so that the expiry time is reset.
+        # Note: We set the state group -> joined hosts cache if it hasn't been
+        # set for a while, so that the expiry time is reset.
 
         state_entry = await self.state.resolve_state_groups_for_events(
             event.room_id, event_ids=event.prev_event_ids()
         )
 
         if state_entry.state_group:
+            if self._external_cache_joined_hosts_updates:
+                if state_entry.state_group in self._external_cache_joined_hosts_updates:
+                    return
+
             joined_hosts = await self.store.get_joined_hosts(event.room_id, state_entry)
 
+            # Note that the expiry times must be larger than the expiry time in
+            # _external_cache_joined_hosts_updates.
             await self._external_cache.set(
                 "event_to_prev_state_group",
                 event.event_id,
@@ -1035,6 +1057,9 @@ class EventCreationHandler:
                 list(joined_hosts),
                 expiry_ms=60 * 60 * 1000,
             )
+
+            if self._external_cache_joined_hosts_updates:
+                self._external_cache_joined_hosts_updates[context.prev_group] = None
 
     async def _validate_canonical_alias(
         self, directory_handler, room_alias_str: str, expected_room_id: str
