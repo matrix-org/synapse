@@ -138,7 +138,7 @@ class DirectoryHandler(BaseHandler):
                     )
 
             if not await self.spam_checker.user_may_create_room_alias(
-                user_id, room_alias_str
+                user_id, room_alias
             ):
                 raise AuthError(403, "This user is not permitted to create this alias")
 
