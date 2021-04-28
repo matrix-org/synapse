@@ -116,9 +116,18 @@ class SpaceSummaryHandler:
             max_children = max_rooms_per_space if processed_rooms else None
 
             if is_in_room:
-                rooms, events = await self._summarize_local_room(
+                room, events = await self._summarize_local_room(
                     requester, None, room_id, suggested_only, max_children
                 )
+
+                logger.debug(
+                    "Query of local room %s returned events %s",
+                    room_id,
+                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
+                )
+
+                if room:
+                    rooms_result.append(room)
             else:
                 fed_rooms, fed_events = await self._summarize_remote_room(
                     queue_entry,
@@ -131,31 +140,30 @@ class SpaceSummaryHandler:
                 # as the requesting server, are allowed to see, but the requesting
                 # user is not permitted see. Handle that filtering.
                 room_ids = set()
-                rooms = []
+                rooms = []  # type: List[JsonDict]
                 events = []
                 for room in fed_rooms:
                     fed_room_id = room.get("room_id")
                     if fed_room_id and await self._is_room_accessible(
                         fed_room_id, requester, None
                     ):
-                        rooms.append(room)
+                        rooms_result.append(room)
                         room_ids.add(fed_room_id)
+
+                    # any rooms returned don't need visiting again (even if the user
+                    # didn't have access to them).
+                    processed_rooms.add(cast(str, room_id))
 
                 for event in fed_events:
                     if event.get("room_id") in room_ids:
                         events.append(event)
 
-            logger.debug(
-                "Query of %s returned rooms %s, events %s",
-                queue_entry.room_id,
-                [room.get("room_id") for room in rooms],
-                ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
-            )
-
-            rooms_result.extend(rooms)
-
-            # any rooms returned don't need visiting again
-            processed_rooms.update(cast(str, room.get("room_id")) for room in rooms)
+                logger.debug(
+                    "Query of %s returned rooms %s, events %s",
+                    room_id,
+                    [room.get("room_id") for room in rooms],
+                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
+                )
 
             # the room we queried may or may not have been returned, but don't process
             # it again, anyway.
@@ -231,14 +239,15 @@ class SpaceSummaryHandler:
 
             logger.debug("Processing room %s", room_id)
 
-            rooms, events = await self._summarize_local_room(
+            room, events = await self._summarize_local_room(
                 None, origin, room_id, suggested_only, max_rooms_per_space
             )
 
             processed_rooms.add(room_id)
 
-            rooms_result.extend(rooms)
-            events_result.extend(events)
+            if room:
+                rooms_result.append(room)
+                events_result.extend(events)
 
             # add any children to the queue
             room_queue.extend(edge_event["state_key"] for edge_event in events)
@@ -252,7 +261,7 @@ class SpaceSummaryHandler:
         room_id: str,
         suggested_only: bool,
         max_children: Optional[int],
-    ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
+    ) -> Tuple[Optional[JsonDict], Sequence[JsonDict]]:
         """
         Generate a room entry and a list of event entries for a given room.
 
@@ -278,7 +287,7 @@ class SpaceSummaryHandler:
                 to a maximum size or may include all children.
         """
         if not await self._is_room_accessible(room_id, requester, origin):
-            return (), ()
+            return None, ()
 
         room_entry = await self._build_room_entry(room_id)
 
@@ -302,7 +311,7 @@ class SpaceSummaryHandler:
                     event_format=format_event_for_client_v2,
                 )
             )
-        return (room_entry,), events_result
+        return room_entry, events_result
 
     async def _summarize_remote_room(
         self,
