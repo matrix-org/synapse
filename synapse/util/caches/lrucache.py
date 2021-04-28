@@ -73,11 +73,13 @@ class _Node:
 
         # Set of callbacks to run when the node gets deleted. We store as a list
         # rather than a set to keep memory usage down (and since we expect few
-        # entries per node, the performance of checking for duplication in a list
-        # vs using a set is negligible).
+        # entries per node, the performance of checking for duplication in a
+        # list vs using a set is negligible).
         #
         # Note that we store this as an optional list to keep the memory
-        # footprint down. Empty lists are 56 bytes (and empty sets are 216 bytes).
+        # footprint down. Storing `None` is free as its a singleton, while empty
+        # lists are 56 bytes (and empty sets are 216 bytes, if we did the naive
+        # thing and used sets).
         self.callbacks = None  # type: Optional[List[Callable[[], None]]]
 
         self.add_callbacks(callbacks)
