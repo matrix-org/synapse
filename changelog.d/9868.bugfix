@@ -1,1 +1,0 @@
-Fix a long-standing bug where errors from federation did not propagate to the client.
