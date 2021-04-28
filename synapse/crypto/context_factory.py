@@ -125,19 +125,24 @@ class FederationPolicyForHTTPS:
         self._no_verify_ssl_context = _no_verify_ssl.getContext()
         self._no_verify_ssl_context.set_info_callback(_context_info_cb)
 
-    def get_options(self, host: bytes):
+        self._should_verify = self._config.federation_verify_certificates
 
+        self._federation_certificate_verification_whitelist = (
+            self._config.federation_certificate_verification_whitelist
+        )
+
+    def get_options(self, host: bytes):
         # IPolicyForHTTPS.get_options takes bytes, but we want to compare
         # against the str whitelist. The hostnames in the whitelist are already
         # IDNA-encoded like the hosts will be here.
         ascii_host = host.decode("ascii")
 
         # Check if certificate verification has been enabled
-        should_verify = self._config.federation_verify_certificates
+        should_verify = self._should_verify
 
         # Check if we've disabled certificate verification for this host
-        if should_verify:
-            for regex in self._config.federation_certificate_verification_whitelist:
+        if self._should_verify:
+            for regex in self._federation_certificate_verification_whitelist:
                 if regex.match(ascii_host):
                     should_verify = False
                     break
@@ -186,7 +191,7 @@ def _context_info_cb(ssl_connection, where, ret):
         # ... we further assume that SSLClientConnectionCreator has set the
         # '_synapse_tls_verifier' attribute to a ConnectionVerifier object.
         tls_protocol._synapse_tls_verifier.verify_context_info_cb(ssl_connection, where)
-    except:  # noqa: E722, taken from the twisted implementation
+    except BaseException:  # taken from the twisted implementation
         logger.exception("Error during info_callback")
         f = Failure()
         tls_protocol.failVerification(f)
@@ -214,7 +219,7 @@ class SSLClientConnectionCreator:
         # ... and we also gut-wrench a '_synapse_tls_verifier' attribute into the
         # tls_protocol so that the SSL context's info callback has something to
         # call to do the cert verification.
-        setattr(tls_protocol, "_synapse_tls_verifier", self._verifier)
+        tls_protocol._synapse_tls_verifier = self._verifier
         return connection
 
 
@@ -227,7 +232,7 @@ class ConnectionVerifier:
 
     # This code is based on twisted.internet.ssl.ClientTLSOptions.
 
-    def __init__(self, hostname: bytes, verify_certs):
+    def __init__(self, hostname: bytes, verify_certs: bool):
         self._verify_certs = verify_certs
 
         _decoded = hostname.decode("ascii")

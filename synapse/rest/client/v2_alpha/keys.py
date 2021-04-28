@@ -274,7 +274,6 @@ class SigningKeyUploadServlet(RestServlet):
             requester,
             request,
             body,
-            self.hs.get_ip_from_request(request),
             "add a device signing key to your account",
         )
 

@@ -36,6 +36,7 @@ class AuthBlocking:
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_limits_reserved_threepids = hs.config.mau_limits_reserved_threepids
         self._server_name = hs.hostname
+        self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
 
     async def check_auth_blocking(
         self,
@@ -75,6 +76,12 @@ class AuthBlocking:
             elif requester.authenticated_entity == self._server_name:
                 # We never block the server from doing actions on behalf of
                 # users.
+                return
+            elif requester.app_service and not self._track_appservice_user_ips:
+                # If we're authenticated as an appservice then we only block
+                # auth if `track_appservice_user_ips` is set, as that option
+                # implicitly means that application services are part of MAU
+                # limits.
                 return
 
         # Never fail an auth check for the server notices users or support user

@@ -14,24 +14,27 @@
 # limitations under the License.
 
 import copy
+from typing import Any, Dict, List, Optional
 
 from synapse.push.rulekinds import PRIORITY_CLASS_INVERSE_MAP, PRIORITY_CLASS_MAP
+from synapse.types import UserID
 
 
-def format_push_rules_for_user(user, ruleslist):
+def format_push_rules_for_user(user: UserID, ruleslist) -> Dict[str, Dict[str, list]]:
     """Converts a list of rawrules and a enabled map into nested dictionaries
     to match the Matrix client-server format for push rules"""
 
     # We're going to be mutating this a lot, so do a deep copy
     ruleslist = copy.deepcopy(ruleslist)
 
-    rules = {"global": {}, "device": {}}
+    rules = {
+        "global": {},
+        "device": {},
+    }  # type: Dict[str, Dict[str, List[Dict[str, Any]]]]
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 
     for r in ruleslist:
-        rulearray = None
-
         template_name = _priority_class_to_template_name(r["priority_class"])
 
         # Remove internal stuff.
@@ -57,13 +60,13 @@ def format_push_rules_for_user(user, ruleslist):
     return rules
 
 
-def _add_empty_priority_class_arrays(d):
+def _add_empty_priority_class_arrays(d: Dict[str, list]) -> Dict[str, list]:
     for pc in PRIORITY_CLASS_MAP.keys():
         d[pc] = []
     return d
 
 
-def _rule_to_template(rule):
+def _rule_to_template(rule: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     unscoped_rule_id = None
     if "rule_id" in rule:
         unscoped_rule_id = _rule_id_from_namespaced(rule["rule_id"])
@@ -82,6 +85,10 @@ def _rule_to_template(rule):
             return None
         templaterule = {"actions": rule["actions"]}
         templaterule["pattern"] = thecond["pattern"]
+    else:
+        # This should not be reached unless this function is not kept in sync
+        # with PRIORITY_CLASS_INVERSE_MAP.
+        raise ValueError("Unexpected template_name: %s" % (template_name,))
 
     if unscoped_rule_id:
         templaterule["rule_id"] = unscoped_rule_id
@@ -90,9 +97,9 @@ def _rule_to_template(rule):
     return templaterule
 
 
-def _rule_id_from_namespaced(in_rule_id):
+def _rule_id_from_namespaced(in_rule_id: str) -> str:
     return in_rule_id.split("/")[-1]
 
 
-def _priority_class_to_template_name(pc):
+def _priority_class_to_template_name(pc: int) -> str:
     return PRIORITY_CLASS_INVERSE_MAP[pc]

@@ -71,6 +71,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.registration_handler = hs.get_registration_handler()
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self.account_data_handler = hs.get_account_data_handler()
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -90,6 +91,17 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_joins_remote.per_second,
             burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
+        )
+
+        self._invites_per_room_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
+            burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
+        )
+        self._invites_per_user_limiter = Ratelimiter(
+            clock=self.clock,
+            rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
+            burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
         # This is only used to get at ratelimit function, and
@@ -119,7 +131,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
     @abc.abstractmethod
     async def remote_knock(
-        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
     ) -> Tuple[str, int]:
         """Try and knock on a room that this server is not in
 
@@ -186,6 +202,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
+    @abc.abstractmethod
+    async def forget(self, user: UserID, room_id: str) -> None:
+        raise NotImplementedError()
+
+    def ratelimit_invite(self, room_id: Optional[str], invitee_user_id: str):
+        """Ratelimit invites by room and by target user.
+
+        If room ID is missing then we just rate limit by target user.
+        """
+        if room_id:
+            self._invites_per_room_limiter.ratelimit(room_id)
+
+        self._invites_per_user_limiter.ratelimit(invitee_user_id)
+
     async def _local_membership_update(
         self,
         requester: Requester,
@@ -212,7 +242,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # do it up front for efficiency.)
         if txn_id and requester.access_token_id:
             existing_event_id = await self.store.get_event_id_from_transaction_id(
-                room_id, requester.user.to_string(), requester.access_token_id, txn_id,
+                room_id,
+                requester.user.to_string(),
+                requester.access_token_id,
+                txn_id,
             )
             if existing_event_id:
                 event_pos = await self.store.get_position_for_event(existing_event_id)
@@ -246,7 +279,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
-            if newly_joined:
+            if newly_joined and ratelimit:
                 time_now_s = self.clock.time()
                 (
                     allowed,
@@ -259,7 +292,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
 
         result_event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[target], ratelimit=ratelimit,
+            requester,
+            event,
+            context,
+            extra_users=[target],
+            ratelimit=ratelimit,
         )
 
         if event.membership == Membership.LEAVE:
@@ -296,7 +333,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     direct_rooms[key].append(new_room_id)
 
                     # Save back to user's m.direct account data
-                    await self.store.add_account_data_for_user(
+                    await self.account_data_handler.add_account_data_for_user(
                         user_id, AccountDataTypes.DIRECT, direct_rooms
                     )
                     break
@@ -306,7 +343,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         # Copy each room tag to the new room
         for tag, tag_content in room_tags.items():
-            await self.store.add_tag_to_room(user_id, new_room_id, tag, tag_content)
+            await self.account_data_handler.add_tag_to_room(
+                user_id, new_room_id, tag, tag_content
+            )
 
     async def update_membership(
         self,
@@ -430,8 +469,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 raise SynapseError(403, "This room has been blocked on this server")
 
         if effective_membership_state == Membership.INVITE:
+            target_id = target.to_string()
+            if ratelimit:
+                # Don't ratelimit application services.
+                if not requester.app_service or requester.app_service.is_rate_limited():
+                    self.ratelimit_invite(room_id, target_id)
+
             # block any attempts to invite the server notices mxid
-            if target.to_string() == self._server_notices_mxid:
+            if target_id == self._server_notices_mxid:
                 raise SynapseError(HTTPStatus.FORBIDDEN, "Cannot invite this user")
 
             block_invite = False
@@ -456,9 +501,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
                 is_published = await self.store.is_room_published(room_id)
 
-                if not self.spam_checker.user_may_invite(
+                if not await self.spam_checker.user_may_invite(
                     requester.user.to_string(),
-                    target.to_string(),
+                    target_id,
                     third_party_invite=None,
                     room_id=room_id,
                     new_room=new_room,
@@ -560,16 +605,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     raise SynapseError(403, "Not allowed to join this room")
 
             if not is_host_in_room:
-                time_now_s = self.clock.time()
-                (
-                    allowed,
-                    time_allowed,
-                ) = self._join_rate_limiter_remote.can_requester_do_action(requester,)
-
-                if not allowed:
-                    raise LimitExceededError(
-                        retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                if ratelimit:
+                    time_now_s = self.clock.time()
+                    (
+                        allowed,
+                        time_allowed,
+                    ) = self._join_rate_limiter_remote.can_requester_do_action(
+                        requester,
                     )
+
+                    if not allowed:
+                        raise LimitExceededError(
+                            retry_after_ms=int(1000 * (time_allowed - time_now_s))
+                        )
 
                 inviter = await self._get_inviter(target.to_string(), room_id)
                 if inviter and not self.hs.is_mine(inviter):
@@ -624,7 +672,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         # send the rejection to the inviter's HS (with fallback to
                         # local event)
                         return await self.remote_reject_invite(
-                            invite.event_id, txn_id, requester, content,
+                            invite.event_id,
+                            txn_id,
+                            requester,
+                            content,
                         )
 
                     # the inviter was on our server, but has now left. Carry on
@@ -947,7 +998,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         is_published = await self.store.is_room_published(room_id)
 
-        if not self.spam_checker.user_may_invite(
+        if not await self.spam_checker.user_may_invite(
             requester.user.to_string(),
             invitee,
             third_party_invite={"medium": medium, "address": address},
@@ -1145,8 +1196,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         user: UserID,
         content: dict,
     ) -> Tuple[str, int]:
-        """Implements RoomMemberHandler._remote_join
-        """
+        """Implements RoomMemberHandler._remote_join"""
         # filter ourselves out of remote_room_hosts: do_invite_join ignores it
         # and if it is the only entry we'd like to return a 404 rather than a
         # 500.
@@ -1329,7 +1379,10 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         event.internal_metadata.out_of_band_membership = True
 
         result_event = await self.event_creation_handler.handle_new_client_event(
-            requester, event, context, extra_users=[UserID.from_string(target_user)],
+            requester,
+            event,
+            context,
+            extra_users=[UserID.from_string(target_user)],
         )
         # we know it was persisted, so must have a stream ordering
         assert result_event.internal_metadata.stream_ordering
@@ -1337,7 +1390,11 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def remote_knock(
-        self, remote_room_hosts: List[str], room_id: str, user: UserID, content: dict,
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
     ) -> Tuple[str, int]:
         """Sends a knock to a room. Attempts to do so via one remote out of a given list.
 
@@ -1363,8 +1420,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         )
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
-        """Implements RoomMemberHandler._user_left_room
-        """
+        """Implements RoomMemberHandler._user_left_room"""
         user_left_room(self.distributor, target, room_id)
 
     async def forget(self, user: UserID, room_id: str) -> None:

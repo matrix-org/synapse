@@ -34,7 +34,10 @@ KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
 
 class KnockingStrippedStateEventHelperMixin(TestCase):
     def send_example_state_events_to_room(
-        self, hs: "HomeServer", room_id: str, sender: str,
+        self,
+        hs: "HomeServer",
+        room_id: str,
+        sender: str,
     ) -> OrderedDict:
         """Adds some state to a room. State events are those that should be sent to a knocking
         user after they knock on the room, as well as some state that *shouldn't* be sent
@@ -133,7 +136,9 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         return room_state
 
     def check_knock_room_state_against_room_state(
-        self, knock_room_state: List[Dict], expected_room_state: Dict,
+        self,
+        knock_room_state: List[Dict],
+        expected_room_state: Dict,
     ) -> None:
         """Test a list of stripped room state events received over federation against a
         dict of expected state events.
@@ -227,7 +232,7 @@ class FederationKnockingTestCase(
             self.hs, room_id, user_id
         )
 
-        _, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/federation/unstable/%s/make_knock/%s/%s?ver=%s"
             % (
@@ -271,7 +276,7 @@ class FederationKnockingTestCase(
         )
 
         # Send the signed knock event into the room
-        _, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/federation/unstable/%s/send_knock/%s/%s"
             % (KNOCK_UNSTABLE_IDENTIFIER, room_id, signed_knock_event.event_id),

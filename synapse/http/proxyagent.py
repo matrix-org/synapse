@@ -179,7 +179,8 @@ class ProxyAgent(_AgentBase):
         should_skip_proxy = False
         if self.no_proxy is not None:
             should_skip_proxy = proxy_bypass_environment(
-                parsed_uri.host.decode(), proxies={"no": self.no_proxy},
+                parsed_uri.host.decode(),
+                proxies={"no": self.no_proxy},
             )
 
         if (

@@ -155,8 +155,7 @@ class InFlightGauge:
             self._registrations.setdefault(key, set()).add(callback)
 
     def unregister(self, key, callback):
-        """Registers that we've exited a block with labels `key`.
-        """
+        """Registers that we've exited a block with labels `key`."""
 
         with self._lock:
             self._registrations.setdefault(key, set()).discard(callback)
@@ -402,7 +401,9 @@ class PyPyGCStats:
         #     Total time spent in GC:  0.073                  # s.total_gc_time
 
         pypy_gc_time = CounterMetricFamily(
-            "pypy_gc_time_seconds_total", "Total time spent in PyPy GC", labels=[],
+            "pypy_gc_time_seconds_total",
+            "Total time spent in PyPy GC",
+            labels=[],
         )
         pypy_gc_time.add_metric([], s.total_gc_time / 1000)
         yield pypy_gc_time
@@ -526,7 +527,7 @@ class ReactorLastSeenMetric:
 REGISTRY.register(ReactorLastSeenMetric())
 
 
-def runUntilCurrentTimer(func):
+def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
     def f(*args, **kwargs):
         now = reactor.seconds()
@@ -589,13 +590,14 @@ def runUntilCurrentTimer(func):
 
 try:
     # Ensure the reactor has all the attributes we expect
-    reactor.runUntilCurrent
-    reactor._newTimedCalls
-    reactor.threadCallQueue
+    reactor.seconds  # type: ignore
+    reactor.runUntilCurrent  # type: ignore
+    reactor._newTimedCalls  # type: ignore
+    reactor.threadCallQueue  # type: ignore
 
     # runUntilCurrent is called when we have pending calls. It is called once
     # per iteratation after fd polling.
-    reactor.runUntilCurrent = runUntilCurrentTimer(reactor.runUntilCurrent)
+    reactor.runUntilCurrent = runUntilCurrentTimer(reactor, reactor.runUntilCurrent)  # type: ignore
 
     # We manually run the GC each reactor tick so that we can get some metrics
     # about time spent doing GC,

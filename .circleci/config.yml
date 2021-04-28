@@ -7,12 +7,14 @@ jobs:
       - checkout
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+      # for release builds, we want to get the amd64 image out asap, so first
+      # we do an amd64-only build, before following up with a multiarch build.
       - docker_build:
           tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
           platforms: linux/amd64
       - docker_build:
           tag: -t matrixdotorg/synapse:${CIRCLE_TAG}
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
 
   dockerhubuploadlatest:
     docker:
@@ -21,12 +23,11 @@ jobs:
       - checkout
       - docker_prepare
       - run: docker login --username $DOCKER_HUB_USERNAME --password $DOCKER_HUB_PASSWORD
+      # for `latest`, we don't want the arm images to disappear, so don't update the tag
+      # until all of the platforms are built.
       - docker_build:
           tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64
-      - docker_build:
-          tag: -t matrixdotorg/synapse:latest
-          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          platforms: linux/amd64,linux/arm64
 
 workflows:
   build:

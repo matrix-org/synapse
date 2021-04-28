@@ -45,7 +45,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
     ]
 
     def test_sync_argless(self):
-        request, channel = self.make_request("GET", "/sync")
+        channel = self.make_request("GET", "/sync")
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
@@ -65,7 +65,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         """
         self.hs.config.use_presence = False
 
-        request, channel = self.make_request("GET", "/sync")
+        channel = self.make_request("GET", "/sync")
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(
@@ -204,7 +204,7 @@ class SyncFilterTestCase(unittest.HomeserverTestCase):
             tok=tok,
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/sync?filter=%s" % sync_filter, access_token=tok
         )
         self.assertEqual(channel.code, 200, channel.result)
@@ -255,21 +255,19 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         self.helper.send(room, body="There!", tok=other_access_token)
 
         # Start typing.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
         )
         self.assertEquals(200, channel.code)
 
-        request, channel = self.make_request(
-            "GET", "/sync?access_token=%s" % (access_token,)
-        )
+        channel = self.make_request("GET", "/sync?access_token=%s" % (access_token,))
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
         # Stop typing.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": false}',
@@ -277,7 +275,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
 
         # Start typing.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             typing_url % (room, other_user_id, other_access_token),
             b'{"typing": true, "timeout": 30000}',
@@ -285,9 +283,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code)
 
         # Should return immediately
-        request, channel = self.make_request(
-            "GET", sync_url % (access_token, next_batch)
-        )
+        channel = self.make_request("GET", sync_url % (access_token, next_batch))
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -299,9 +295,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         # invalidate the stream token.
         self.helper.send(room, body="There!", tok=other_access_token)
 
-        request, channel = self.make_request(
-            "GET", sync_url % (access_token, next_batch)
-        )
+        channel = self.make_request("GET", sync_url % (access_token, next_batch))
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -309,9 +303,7 @@ class SyncTypingTests(unittest.HomeserverTestCase):
         # ahead, and therefore it's saying the typing (that we've actually
         # already seen) is new, since it's got a token above our new, now-reset
         # stream token.
-        request, channel = self.make_request(
-            "GET", sync_url % (access_token, next_batch)
-        )
+        channel = self.make_request("GET", sync_url % (access_token, next_batch))
         self.assertEquals(200, channel.code)
         next_batch = channel.json_body["next_batch"]
 
@@ -357,8 +349,10 @@ class SyncKnockTestCase(
         self.knocker_tok = self.login("knocker", "monkey")
 
         # Perform an initial sync for the knocking user.
-        _, channel = self.make_request(
-            "GET", self.url % self.next_batch, access_token=self.tok,
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
@@ -374,7 +368,7 @@ class SyncKnockTestCase(
     def test_knock_room_state(self):
         """Tests that /sync returns state from a room after knocking on it."""
         # Knock on a room
-        _, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/unstable/xyz.amorgan.knock/%s" % (self.room_id,),
             b"{}",
@@ -389,8 +383,10 @@ class SyncKnockTestCase(
         }
 
         # Check that /sync includes stripped state from the room
-        _, channel = self.make_request(
-            "GET", self.url % self.next_batch, access_token=self.knocker_tok,
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.knocker_tok,
         )
         self.assertEqual(channel.code, 200, channel.json_body)
 
@@ -476,7 +472,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Send a read receipt to tell the server we've read the latest event.
         body = json.dumps({"m.read": res["event_id"]}).encode("utf8")
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/rooms/%s/read_markers" % self.room_id,
             body,
@@ -489,13 +485,19 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Check that room name changes increase the unread counter.
         self.helper.send_state(
-            self.room_id, "m.room.name", {"name": "my super room"}, tok=self.tok2,
+            self.room_id,
+            "m.room.name",
+            {"name": "my super room"},
+            tok=self.tok2,
         )
         self._check_unread_count(1)
 
         # Check that room topic changes increase the unread counter.
         self.helper.send_state(
-            self.room_id, "m.room.topic", {"topic": "welcome!!!"}, tok=self.tok2,
+            self.room_id,
+            "m.room.topic",
+            {"topic": "welcome!!!"},
+            tok=self.tok2,
         )
         self._check_unread_count(2)
 
@@ -505,7 +507,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Check that custom events with a body increase the unread counter.
         self.helper.send_event(
-            self.room_id, "org.matrix.custom_type", {"body": "hello"}, tok=self.tok2,
+            self.room_id,
+            "org.matrix.custom_type",
+            {"body": "hello"},
+            tok=self.tok2,
         )
         self._check_unread_count(4)
 
@@ -543,15 +548,19 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     def _check_unread_count(self, expected_count: int):
         """Syncs and compares the unread count with the expected value."""
 
-        request, channel = self.make_request(
-            "GET", self.url % self.next_batch, access_token=self.tok,
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
         )
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
         room_entry = channel.json_body["rooms"]["join"][self.room_id]
         self.assertEqual(
-            room_entry["org.matrix.msc2654.unread_count"], expected_count, room_entry,
+            room_entry["org.matrix.msc2654.unread_count"],
+            expected_count,
+            room_entry,
         )
 
         # Store the next batch for the next request.

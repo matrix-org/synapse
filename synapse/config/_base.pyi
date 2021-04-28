@@ -1,9 +1,10 @@
-from typing import Any, List, Optional
+from typing import Any, Iterable, List, Optional
 
 from synapse.config import (
     account_validity,
     api,
     appservice,
+    auth,
     captcha,
     cas,
     consent_config,
@@ -16,10 +17,10 @@ from synapse.config import (
     logger,
     metrics,
     oidc_config,
-    password,
     password_auth_providers,
     push,
     ratelimiting,
+    redis,
     registration,
     repository,
     room_directory,
@@ -37,7 +38,10 @@ from synapse.config import (
     workers,
 )
 
-class ConfigError(Exception): ...
+class ConfigError(Exception):
+    def __init__(self, msg: str, path: Optional[Iterable[str]] = None):
+        self.msg = msg
+        self.path = path
 
 MISSING_REPORT_STATS_CONFIG_INSTRUCTIONS: str
 MISSING_REPORT_STATS_SPIEL: str
@@ -51,7 +55,7 @@ class RootConfig:
     tls: tls.TlsConfig
     database: database.DatabaseConfig
     logging: logger.LoggingConfig
-    ratelimit: ratelimiting.RatelimitConfig
+    ratelimiting: ratelimiting.RatelimitConfig
     media: repository.ContentRepositoryConfig
     captcha: captcha.CaptchaConfig
     voip: voip.VoipConfig
@@ -66,7 +70,7 @@ class RootConfig:
     sso: sso.SSOConfig
     oidc: oidc_config.OIDCConfig
     jwt: jwt_config.JWTConfig
-    password: password.PasswordConfig
+    auth: auth.AuthConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig
     authproviders: password_auth_providers.PasswordAuthProviderConfig
@@ -80,6 +84,7 @@ class RootConfig:
     roomdirectory: room_directory.RoomDirectoryConfig
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
     tracer: tracer.TracerConfig
+    redis: redis.RedisConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...
@@ -146,4 +151,8 @@ class ShardedWorkerHandlingConfig:
     instances: List[str]
     def __init__(self, instances: List[str]) -> None: ...
     def should_handle(self, instance_name: str, key: str) -> bool: ...
+
+class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
     def get_instance(self, key: str) -> str: ...
+
+def read_file(file_path: Any, config_path: Iterable[str]) -> str: ...

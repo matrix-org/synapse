@@ -18,12 +18,12 @@ from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import UserID, create_requester
+from synapse.types import Requester, UserID, create_requester
 
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +53,23 @@ class DeactivateAccountHandler(BaseHandler):
         self._account_validity_enabled = hs.config.account_validity_enabled
 
     async def deactivate_account(
-        self, user_id: str, erase_data: bool, id_server: Optional[str] = None
+        self,
+        user_id: str,
+        erase_data: bool,
+        requester: Requester,
+        id_server: Optional[str] = None,
+        by_admin: bool = False,
     ) -> bool:
         """Deactivate a user's account
 
         Args:
             user_id: ID of user to be deactivated
             erase_data: whether to GDPR-erase the user's data
+            requester: The user attempting to make this change.
             id_server: Use the given identity server when unbinding
                 any threepids. If None then will attempt to unbind using the
                 identity server specified when binding (if known).
+            by_admin: Whether this change was made by an administrator.
 
         Returns:
             True if identity server supports removing threepids, otherwise False.
@@ -113,6 +120,13 @@ class DeactivateAccountHandler(BaseHandler):
 
         await self.store.user_set_password_hash(user_id, None)
 
+        # Most of the pushers will have been deleted when we logged out the
+        # associated devices above, but we still need to delete pushers not
+        # associated with devices, e.g. email pushers.
+        await self.store.delete_all_pushers_for_user(user_id)
+
+        # Set the user as no longer active. This will prevent their profile
+        # from being replicated.
         user = UserID.from_string(user_id)
         await self._profile_handler.set_active([user], False, False)
 
@@ -125,6 +139,12 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Mark the user as erased, if they asked for that
         if erase_data:
+            user = UserID.from_string(user_id)
+            # Remove avatar URL from this user
+            await self._profile_handler.set_avatar_url(user, requester, "", by_admin)
+            # Remove displayname from this user
+            await self._profile_handler.set_displayname(user, requester, "", by_admin)
+
             logger.info("Marking %s as erased", user_id)
             await self.store.mark_user_erased(user_id)
 
@@ -186,8 +206,7 @@ class DeactivateAccountHandler(BaseHandler):
             run_as_background_process("user_parter_loop", self._user_parter_loop)
 
     async def _user_parter_loop(self) -> None:
-        """Loop that parts deactivated users from rooms
-        """
+        """Loop that parts deactivated users from rooms"""
         self._user_parter_running = True
         logger.info("Starting user parter")
         try:
@@ -204,8 +223,7 @@ class DeactivateAccountHandler(BaseHandler):
             self._user_parter_running = False
 
     async def _part_user(self, user_id: str) -> None:
-        """Causes the given user_id to leave all the rooms they're joined to
-        """
+        """Causes the given user_id to leave all the rooms they're joined to"""
         user = UserID.from_string(user_id)
 
         rooms_for_user = await self.store.get_rooms_for_user(user_id)

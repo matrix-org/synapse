@@ -16,11 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 import jsonschema
-
-from twisted.internet import defer
 
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
@@ -28,7 +24,6 @@ from synapse.api.filtering import Filter
 from synapse.events import make_event_from_dict
 
 from tests import unittest
-from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
 
 user_localpart = "test_user"
 
@@ -41,22 +36,9 @@ def MockEvent(**kwargs):
     return make_event_from_dict(kwargs)
 
 
-class FilteringTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.mock_federation_resource = MockHttpResource()
-
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
-            federation_http_client=self.mock_http_client,
-            keyring=Mock(),
-        )
-
+class FilteringTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         self.filtering = hs.get_filtering()
-
         self.datastore = hs.get_datastore()
 
     def test_errors_on_invalid_filters(self):
@@ -365,10 +347,9 @@ class FilteringTestCase(unittest.TestCase):
 
         self.assertTrue(Filter(definition).check(event))
 
-    @defer.inlineCallbacks
     def test_filter_presence_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
-        filter_id = yield defer.ensureDeferred(
+        filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart, user_filter=user_filter_json
             )
@@ -376,7 +357,7 @@ class FilteringTestCase(unittest.TestCase):
         event = MockEvent(sender="@foo:bar", type="m.profile")
         events = [event]
 
-        user_filter = yield defer.ensureDeferred(
+        user_filter = self.get_success(
             self.filtering.get_user_filter(
                 user_localpart=user_localpart, filter_id=filter_id
             )
@@ -385,11 +366,10 @@ class FilteringTestCase(unittest.TestCase):
         results = user_filter.filter_presence(events=events)
         self.assertEquals(events, results)
 
-    @defer.inlineCallbacks
     def test_filter_presence_no_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
 
-        filter_id = yield defer.ensureDeferred(
+        filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart + "2", user_filter=user_filter_json
             )
@@ -401,7 +381,7 @@ class FilteringTestCase(unittest.TestCase):
         )
         events = [event]
 
-        user_filter = yield defer.ensureDeferred(
+        user_filter = self.get_success(
             self.filtering.get_user_filter(
                 user_localpart=user_localpart + "2", filter_id=filter_id
             )
@@ -410,10 +390,9 @@ class FilteringTestCase(unittest.TestCase):
         results = user_filter.filter_presence(events=events)
         self.assertEquals([], results)
 
-    @defer.inlineCallbacks
     def test_filter_room_state_match(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
-        filter_id = yield defer.ensureDeferred(
+        filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart, user_filter=user_filter_json
             )
@@ -421,7 +400,7 @@ class FilteringTestCase(unittest.TestCase):
         event = MockEvent(sender="@foo:bar", type="m.room.topic", room_id="!foo:bar")
         events = [event]
 
-        user_filter = yield defer.ensureDeferred(
+        user_filter = self.get_success(
             self.filtering.get_user_filter(
                 user_localpart=user_localpart, filter_id=filter_id
             )
@@ -430,10 +409,9 @@ class FilteringTestCase(unittest.TestCase):
         results = user_filter.filter_room_state(events=events)
         self.assertEquals(events, results)
 
-    @defer.inlineCallbacks
     def test_filter_room_state_no_match(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
-        filter_id = yield defer.ensureDeferred(
+        filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart, user_filter=user_filter_json
             )
@@ -443,7 +421,7 @@ class FilteringTestCase(unittest.TestCase):
         )
         events = [event]
 
-        user_filter = yield defer.ensureDeferred(
+        user_filter = self.get_success(
             self.filtering.get_user_filter(
                 user_localpart=user_localpart, filter_id=filter_id
             )
@@ -468,11 +446,10 @@ class FilteringTestCase(unittest.TestCase):
 
         self.assertEquals(filtered_room_ids, ["!allowed:example.com"])
 
-    @defer.inlineCallbacks
     def test_add_filter(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
 
-        filter_id = yield defer.ensureDeferred(
+        filter_id = self.get_success(
             self.filtering.add_user_filter(
                 user_localpart=user_localpart, user_filter=user_filter_json
             )
@@ -482,7 +459,7 @@ class FilteringTestCase(unittest.TestCase):
         self.assertEquals(
             user_filter_json,
             (
-                yield defer.ensureDeferred(
+                self.get_success(
                     self.datastore.get_user_filter(
                         user_localpart=user_localpart, filter_id=0
                     )
@@ -490,17 +467,16 @@ class FilteringTestCase(unittest.TestCase):
             ),
         )
 
-    @defer.inlineCallbacks
     def test_get_filter(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
 
-        filter_id = yield defer.ensureDeferred(
+        filter_id = self.get_success(
             self.datastore.add_user_filter(
                 user_localpart=user_localpart, user_filter=user_filter_json
             )
         )
 
-        filter = yield defer.ensureDeferred(
+        filter = self.get_success(
             self.filtering.get_user_filter(
                 user_localpart=user_localpart, filter_id=filter_id
             )

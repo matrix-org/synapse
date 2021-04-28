@@ -18,6 +18,7 @@ from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import capabilities
 
 from tests import unittest
+from tests.unittest import override_config
 
 
 class CapabilitiesTestCase(unittest.HomeserverTestCase):
@@ -33,10 +34,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         hs = self.setup_test_homeserver()
         self.store = hs.get_datastore()
         self.config = hs.config
+        self.auth_handler = hs.get_auth_handler()
         return hs
 
     def test_check_auth_required(self):
-        request, channel = self.make_request("GET", self.url)
+        channel = self.make_request("GET", self.url)
 
         self.assertEqual(channel.code, 401)
 
@@ -44,7 +46,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.register_user("user", "pass")
         access_token = self.login("user", "pass")
 
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
@@ -56,21 +58,47 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             capabilities["m.room_versions"]["default"],
         )
 
-    def test_get_change_password_capabilities(self):
+    def test_get_change_password_capabilities_password_login(self):
         localpart = "user"
         password = "pass"
         user = self.register_user(localpart, password)
         access_token = self.login(user, password)
 
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
-
-        # Test case where password is handled outside of Synapse
         self.assertTrue(capabilities["m.change_password"]["enabled"])
-        self.get_success(self.store.user_set_password_hash(user, None))
-        request, channel = self.make_request("GET", self.url, access_token=access_token)
+
+    @override_config({"password_config": {"localdb_enabled": False}})
+    def test_get_change_password_capabilities_localdb_disabled(self):
+        localpart = "user"
+        password = "pass"
+        user = self.register_user(localpart, password)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["m.change_password"]["enabled"])
+
+    @override_config({"password_config": {"enabled": False}})
+    def test_get_change_password_capabilities_password_disabled(self):
+        localpart = "user"
+        password = "pass"
+        user = self.register_user(localpart, password)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)

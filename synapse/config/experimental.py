@@ -31,3 +31,10 @@ class ExperimentalConfig(Config):
         if self.msc2403_enabled:
             # Enable the MSC2403 unstable room version
             KNOWN_ROOM_VERSIONS.update({RoomVersions.V7.identifier: RoomVersions.V7})
+
+        # MSC2858 (multiple SSO identity providers)
+        self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
+        # Spaces (MSC1772, MSC2946, etc)
+        self.spaces_enabled = experimental.get("spaces_enabled", False)  # type: bool
+        # MSC3026 (busy presence state)
+        self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool

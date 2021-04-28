@@ -57,6 +57,38 @@ class DeviceWorkerStore(SQLBaseStore):
                 self._prune_old_outbound_device_pokes, 60 * 60 * 1000
             )
 
+    async def count_devices_by_users(self, user_ids: Optional[List[str]] = None) -> int:
+        """Retrieve number of all devices of given users.
+        Only returns number of devices that are not marked as hidden.
+
+        Args:
+            user_ids: The IDs of the users which owns devices
+        Returns:
+            Number of devices of this users.
+        """
+
+        def count_devices_by_users_txn(txn, user_ids):
+            sql = """
+                SELECT count(*)
+                FROM devices
+                WHERE
+                    hidden = '0' AND
+            """
+
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "user_id", user_ids
+            )
+
+            txn.execute(sql + clause, args)
+            return txn.fetchone()[0]
+
+        if not user_ids:
+            return 0
+
+        return await self.db_pool.runInteraction(
+            "count_devices_by_users", count_devices_by_users_txn, user_ids
+        )
+
     async def get_device(self, user_id: str, device_id: str) -> Dict[str, Any]:
         """Retrieve a device. Only returns devices that are not marked as
         hidden.
@@ -283,7 +315,8 @@ class DeviceWorkerStore(SQLBaseStore):
 
             # make sure we go through the devices in stream order
             device_ids = sorted(
-                user_devices.keys(), key=lambda i: query_map[(user_id, i)][0],
+                user_devices.keys(),
+                key=lambda i: query_map[(user_id, i)][0],
             )
 
             for device_id in device_ids:
@@ -334,8 +367,7 @@ class DeviceWorkerStore(SQLBaseStore):
     async def mark_as_sent_devices_by_remote(
         self, destination: str, stream_id: int
     ) -> None:
-        """Mark that updates have successfully been sent to the destination.
-        """
+        """Mark that updates have successfully been sent to the destination."""
         await self.db_pool.runInteraction(
             "mark_as_sent_devices_by_remote",
             self._mark_as_sent_devices_by_remote_txn,
@@ -649,7 +681,8 @@ class DeviceWorkerStore(SQLBaseStore):
         return results
 
     async def get_user_ids_requiring_device_list_resync(
-        self, user_ids: Optional[Collection[str]] = None,
+        self,
+        user_ids: Optional[Collection[str]] = None,
     ) -> Set[str]:
         """Given a list of remote users return the list of users that we
         should resync the device lists for. If None is given instead of a list,
@@ -689,8 +722,7 @@ class DeviceWorkerStore(SQLBaseStore):
         )
 
     async def mark_remote_user_device_list_as_unsubscribed(self, user_id: str) -> None:
-        """Mark that we no longer track device lists for remote user.
-        """
+        """Mark that we no longer track device lists for remote user."""
 
         def _mark_remote_user_device_list_as_unsubscribed_txn(txn):
             self.db_pool.simple_delete_txn(
@@ -865,12 +897,13 @@ class DeviceWorkerStore(SQLBaseStore):
                 DELETE FROM device_lists_outbound_last_success
                 WHERE destination = ? AND user_id = ?
             """
-            txn.executemany(sql, ((row[0], row[1]) for row in rows))
+            txn.execute_batch(sql, ((row[0], row[1]) for row in rows))
 
             logger.info("Pruned %d device list outbound pokes", count)
 
         await self.db_pool.runInteraction(
-            "_prune_old_outbound_device_pokes", _prune_txn,
+            "_prune_old_outbound_device_pokes",
+            _prune_txn,
         )
 
 
@@ -911,7 +944,8 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         # clear out duplicate device list outbound pokes
         self.db_pool.updates.register_background_update_handler(
-            BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, self._remove_duplicate_outbound_pokes,
+            BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES,
+            self._remove_duplicate_outbound_pokes,
         )
 
         # a pair of background updates that were added during the 1.14 release cycle,
@@ -972,17 +1006,23 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
             row = None
             for row in rows:
                 self.db_pool.simple_delete_txn(
-                    txn, "device_lists_outbound_pokes", {x: row[x] for x in KEY_COLS},
+                    txn,
+                    "device_lists_outbound_pokes",
+                    {x: row[x] for x in KEY_COLS},
                 )
 
                 row["sent"] = False
                 self.db_pool.simple_insert_txn(
-                    txn, "device_lists_outbound_pokes", row,
+                    txn,
+                    "device_lists_outbound_pokes",
+                    row,
                 )
 
             if row:
                 self.db_pool.updates._background_update_progress_txn(
-                    txn, BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES, {"last_row": row},
+                    txn,
+                    BG_UPDATE_REMOVE_DUP_OUTBOUND_POKES,
+                    {"last_row": row},
                 )
 
             return len(rows)
@@ -1254,7 +1294,9 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         # we've done a full resync, so we remove the entry that says we need
         # to resync
         self.db_pool.simple_delete_txn(
-            txn, table="device_lists_remote_resync", keyvalues={"user_id": user_id},
+            txn,
+            table="device_lists_remote_resync",
+            keyvalues={"user_id": user_id},
         )
 
     async def add_device_change_to_streams(
@@ -1304,14 +1346,16 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         stream_ids: List[str],
     ):
         txn.call_after(
-            self._device_list_stream_cache.entity_has_changed, user_id, stream_ids[-1],
+            self._device_list_stream_cache.entity_has_changed,
+            user_id,
+            stream_ids[-1],
         )
 
         min_stream_id = stream_ids[0]
 
         # Delete older entries in the table, as we really only care about
         # when the latest change happened.
-        txn.executemany(
+        txn.execute_batch(
             """
             DELETE FROM device_lists_stream
             WHERE user_id = ? AND device_id = ? AND stream_id < ?

@@ -45,7 +45,7 @@ from synapse.types import (
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -87,8 +87,8 @@ class ProfileHandler(BaseHandler):
             )
 
             if len(self.hs.config.replicate_user_profiles_to) > 0:
-                reactor.callWhenRunning(self._do_assign_profile_replication_batches)
-                reactor.callWhenRunning(self._start_replicate_profiles)
+                reactor.callWhenRunning(self._do_assign_profile_replication_batches)  # type: ignore
+                reactor.callWhenRunning(self._start_replicate_profiles)  # type: ignore
                 # Add a looping call to replicate_profiles: this handles retries
                 # if the replication is unsuccessful when the user updated their
                 # profile.
@@ -254,7 +254,7 @@ class ProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-            return result["displayname"]
+            return result.get("displayname")
 
     async def set_displayname(
         self,
@@ -305,7 +305,8 @@ class ProfileHandler(BaseHandler):
         # This must be done by the target user himself.
         if by_admin:
             requester = create_requester(
-                target_user, authenticated_entity=requester.authenticated_entity,
+                target_user,
+                authenticated_entity=requester.authenticated_entity,
             )
 
         if len(self.hs.config.replicate_user_profiles_to) > 0:
@@ -332,7 +333,10 @@ class ProfileHandler(BaseHandler):
         run_in_background(self._replicate_profiles)
 
     async def set_active(
-        self, users: List[UserID], active: bool, hide: bool,
+        self,
+        users: List[UserID],
+        active: bool,
+        hide: bool,
     ):
         """
         Sets the 'active' flag on a set of user profiles. If set to false, the
@@ -392,7 +396,7 @@ class ProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-            return result["avatar_url"]
+            return result.get("avatar_url")
 
     async def set_avatar_url(
         self,
@@ -432,9 +436,17 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
+        avatar_url_to_set = new_avatar_url  # type: Optional[str]
+        if new_avatar_url == "":
+            avatar_url_to_set = None
+
         # Enforce a max avatar size if one is defined
-        if self.max_avatar_size or self.allowed_avatar_mimetypes:
-            media_id = self._validate_and_parse_media_id_from_avatar_url(new_avatar_url)
+        if avatar_url_to_set and (
+            self.max_avatar_size or self.allowed_avatar_mimetypes
+        ):
+            media_id = self._validate_and_parse_media_id_from_avatar_url(
+                avatar_url_to_set
+            )
 
             # Check that this media exists locally
             media_info = await self.store.get_local_media(media_id)
@@ -477,7 +489,7 @@ class ProfileHandler(BaseHandler):
             new_batchnum = None
 
         await self.store.set_profile_avatar_url(
-            target_user.localpart, new_avatar_url, new_batchnum
+            target_user.localpart, avatar_url_to_set, new_batchnum
         )
 
         if self.hs.config.user_directory_search_all_users:
@@ -506,6 +518,15 @@ class ProfileHandler(BaseHandler):
         return avatar_pieces[-1]
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
+        """Handles federation profile query requests."""
+
+        if not self.hs.config.allow_profile_lookup_over_federation:
+            raise SynapseError(
+                403,
+                "Profile lookup over federation is disabled on this homeserver",
+                Codes.FORBIDDEN,
+            )
+
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")

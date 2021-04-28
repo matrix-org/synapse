@@ -20,13 +20,12 @@ import os
 import time
 import uuid
 import warnings
-from inspect import getcallargs
 from typing import Type
 from urllib import parse as urlparse
 
 from mock import Mock, patch
 
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
@@ -34,15 +33,12 @@ from synapse.api.room_versions import RoomVersions
 from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.federation.transport import server as federation_server
-from synapse.http.server import HttpServer
 from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
 from synapse.storage.prepare_database import prepare_database
-from synapse.util.ratelimitutils import FederationRateLimiter
 
 # set this to True to run the tests against postgres instead of sqlite.
 #
@@ -118,7 +114,6 @@ def default_config(name, parse=False):
         "server_name": name,
         "send_federation": False,
         "media_store_path": "media",
-        "uploads_path": "uploads",
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
@@ -161,6 +156,11 @@ def default_config(name, parse=False):
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_invites": {
+            "per_room": {"per_second": 10000, "burst_count": 10000},
+            "per_user": {"per_second": 10000, "burst_count": 10000},
+        },
+        "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
         "public_baseurl": None,
         "default_identity_server": None,
@@ -268,7 +268,10 @@ def setup_test_homeserver(
         db_conn.close()
 
     hs = homeserver_to_use(
-        name, config=config, version_string="Synapse/tests", reactor=reactor,
+        name,
+        config=config,
+        version_string="Synapse/tests",
+        reactor=reactor,
     )
 
     # Install @cache_in_self attributes
@@ -344,30 +347,7 @@ def setup_test_homeserver(
 
     hs.get_auth_handler().validate_hash = validate_hash
 
-    fed = kwargs.get("resource_for_federation", None)
-    if fed:
-        register_federation_servlets(hs, fed)
-
     return hs
-
-
-def register_federation_servlets(hs, resource):
-    federation_server.register_servlets(
-        hs,
-        resource=resource,
-        authenticator=federation_server.Authenticator(hs),
-        ratelimiter=FederationRateLimiter(
-            hs.get_clock(), config=hs.config.rc_federation
-        ),
-    )
-
-
-def get_mock_call_args(pattern_func, mock_func):
-    """ Return the arguments the mock function was called with interpreted
-    by the pattern functions argument list.
-    """
-    invoked_args, invoked_kargs = mock_func.call_args
-    return getcallargs(pattern_func, *invoked_args, **invoked_kargs)
 
 
 def mock_getRawHeaders(headers=None):
@@ -380,7 +360,7 @@ def mock_getRawHeaders(headers=None):
 
 
 # This is a mock /resource/ not an entire server
-class MockHttpResource(HttpServer):
+class MockHttpResource:
     def __init__(self, prefix=""):
         self.callbacks = []  # 3-tuple of method/pattern/function
         self.prefix = prefix
@@ -393,7 +373,7 @@ class MockHttpResource(HttpServer):
     def trigger(
         self, http_method, path, content, mock_request, federation_auth_origin=None
     ):
-        """ Fire an HTTP event.
+        """Fire an HTTP event.
 
         Args:
             http_method : The HTTP method
@@ -555,89 +535,8 @@ class MockClock:
         return d
 
 
-def _format_call(args, kwargs):
-    return ", ".join(
-        ["%r" % (a) for a in args] + ["%s=%r" % (k, v) for k, v in kwargs.items()]
-    )
-
-
-class DeferredMockCallable:
-    """A callable instance that stores a set of pending call expectations and
-    return values for them. It allows a unit test to assert that the given set
-    of function calls are eventually made, by awaiting on them to be called.
-    """
-
-    def __init__(self):
-        self.expectations = []
-        self.calls = []
-
-    def __call__(self, *args, **kwargs):
-        self.calls.append((args, kwargs))
-
-        if not self.expectations:
-            raise ValueError(
-                "%r has no pending calls to handle call(%s)"
-                % (self, _format_call(args, kwargs))
-            )
-
-        for (call, result, d) in self.expectations:
-            if args == call[1] and kwargs == call[2]:
-                d.callback(None)
-                return result
-
-        failure = AssertionError(
-            "Was not expecting call(%s)" % (_format_call(args, kwargs))
-        )
-
-        for _, _, d in self.expectations:
-            try:
-                d.errback(failure)
-            except Exception:
-                pass
-
-        raise failure
-
-    def expect_call_and_return(self, call, result):
-        self.expectations.append((call, result, defer.Deferred()))
-
-    @defer.inlineCallbacks
-    def await_calls(self, timeout=1000):
-        deferred = defer.DeferredList(
-            [d for _, _, d in self.expectations], fireOnOneErrback=True
-        )
-
-        timer = reactor.callLater(
-            timeout / 1000,
-            deferred.errback,
-            AssertionError(
-                "%d pending calls left: %s"
-                % (
-                    len([e for e in self.expectations if not e[2].called]),
-                    [e for e in self.expectations if not e[2].called],
-                )
-            ),
-        )
-
-        yield deferred
-
-        timer.cancel()
-
-        self.calls = []
-
-    def assert_had_no_calls(self):
-        if self.calls:
-            calls = self.calls
-            self.calls = []
-
-            raise AssertionError(
-                "Expected not to received any calls, got:\n"
-                + "\n".join(["call(%s)" % _format_call(c[0], c[1]) for c in calls])
-            )
-
-
 async def create_room(hs, room_id: str, creator_id: str):
-    """Creates and persist a creation event for the given room
-    """
+    """Creates and persist a creation event for the given room"""
 
     persistence_store = hs.get_storage().persistence
     store = hs.get_datastore()

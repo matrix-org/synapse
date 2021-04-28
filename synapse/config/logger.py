@@ -21,8 +21,10 @@ import threading
 from string import Template
 
 import yaml
+from zope.interface import implementer
 
 from twisted.logger import (
+    ILogObserver,
     LogBeginner,
     STDLibLogObserver,
     eventAsText,
@@ -162,7 +164,10 @@ class LoggingConfig(Config):
         )
 
         logging_group.add_argument(
-            "-f", "--log-file", dest="log_file", help=argparse.SUPPRESS,
+            "-f",
+            "--log-file",
+            dest="log_file",
+            help=argparse.SUPPRESS,
         )
 
     def generate_files(self, config, config_dir_path):
@@ -206,7 +211,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     # filter options, but care must when using e.g. MemoryHandler to buffer
     # writes.
 
-    log_context_filter = LoggingContextFilter(request="")
+    log_context_filter = LoggingContextFilter()
     log_metadata_filter = MetadataFilter({"server_name": config.server_name})
     old_factory = logging.getLogRecordFactory()
 
@@ -224,7 +229,8 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
 
     threadlocal = threading.local()
 
-    def _log(event):
+    @implementer(ILogObserver)
+    def _log(event: dict) -> None:
         if "log_text" in event:
             if event["log_text"].startswith("DNSDatagramProtocol starting on "):
                 return

@@ -17,7 +17,7 @@ import logging
 import re
 from typing import Any, Dict, Iterable, Optional, Set, Tuple
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
@@ -336,8 +336,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return len(users_to_work_on)
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id):
-        """Check if the room is either world_readable or publically joinable
-        """
+        """Check if the room is either world_readable or publically joinable"""
 
         # Create a state filter that only queries join and history state event
         types_to_filter = (
@@ -360,7 +359,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         if hist_vis_id:
             hist_vis_ev = await self.get_event(hist_vis_id, allow_none=True)
             if hist_vis_ev:
-                if hist_vis_ev.content.get("history_visibility") == "world_readable":
+                if (
+                    hist_vis_ev.content.get("history_visibility")
+                    == HistoryVisibility.WORLD_READABLE
+                ):
                     return True
 
         return False
@@ -393,9 +395,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     sql = """
                         INSERT INTO user_directory_search(user_id, vector)
                         VALUES (?,
-                            setweight(to_tsvector('english', ?), 'A')
-                            || setweight(to_tsvector('english', ?), 'D')
-                            || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                            setweight(to_tsvector('simple', ?), 'A')
+                            || setweight(to_tsvector('simple', ?), 'D')
+                            || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                         ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
                     """
                     txn.execute(
@@ -415,9 +417,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         sql = """
                             INSERT INTO user_directory_search(user_id, vector)
                             VALUES (?,
-                                setweight(to_tsvector('english', ?), 'A')
-                                || setweight(to_tsvector('english', ?), 'D')
-                                || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                                setweight(to_tsvector('simple', ?), 'A')
+                                || setweight(to_tsvector('simple', ?), 'D')
+                                || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                             )
                         """
                         txn.execute(
@@ -432,9 +434,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     elif new_entry is False:
                         sql = """
                             UPDATE user_directory_search
-                            SET vector = setweight(to_tsvector('english', ?), 'A')
-                                || setweight(to_tsvector('english', ?), 'D')
-                                || setweight(to_tsvector('english', COALESCE(?, '')), 'B')
+                            SET vector = setweight(to_tsvector('simple', ?), 'A')
+                                || setweight(to_tsvector('simple', ?), 'D')
+                                || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                             WHERE user_id = ?
                         """
                         txn.execute(
@@ -495,8 +497,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
     async def add_users_in_public_rooms(
         self, room_id: str, user_ids: Iterable[str]
     ) -> None:
-        """Insert entries into the users_who_share_private_rooms table. The first
-        user should be a local user.
+        """Insert entries into the users_in_public_rooms table.
 
         Args:
             room_id
@@ -513,8 +514,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
     async def delete_all_from_user_dir(self) -> None:
-        """Delete the entire user directory
-        """
+        """Delete the entire user directory"""
 
         def _delete_all_from_user_dir_txn(txn):
             txn.execute("DELETE FROM user_directory")
@@ -537,7 +537,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             desc="get_user_in_directory",
         )
 
-    async def update_user_directory_stream_pos(self, stream_id: str) -> None:
+    async def update_user_directory_stream_pos(self, stream_id: int) -> None:
         await self.db_pool.simple_update_one(
             table="user_directory_stream_pos",
             keyvalues={},
@@ -669,7 +669,6 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         users.update(rows)
         return list(users)
 
-    @cached()
     async def get_shared_rooms_for_users(
         self, user_id: str, other_user_id: str
     ) -> Set[str]:
@@ -711,7 +710,13 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
         return {row["room_id"] for row in rows}
 
-    async def get_user_directory_stream_pos(self) -> int:
+    async def get_user_directory_stream_pos(self) -> Optional[int]:
+        """
+        Get the stream ID of the user directory stream.
+
+        Returns:
+            The stream token or None if the initial background update hasn't happened yet.
+        """
         return await self.db_pool.simple_select_one_onecol(
             table="user_directory_stream_pos",
             keyvalues={},
@@ -781,7 +786,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 INNER JOIN user_directory AS d USING (user_id)
                 WHERE
                     %(where_clause)s
-                    AND vector @@ to_tsquery('english', ?)
+                    AND vector @@ to_tsquery('simple', ?)
                 ORDER BY
                     (CASE WHEN d.user_id IS NOT NULL THEN 4.0 ELSE 1.0 END)
                     * (CASE WHEN display_name IS NOT NULL THEN 1.2 ELSE 1.0 END)
@@ -790,13 +795,13 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                         3 * ts_rank_cd(
                             '{0.1, 0.1, 0.9, 1.0}',
                             vector,
-                            to_tsquery('english', ?),
+                            to_tsquery('simple', ?),
                             8
                         )
                         + ts_rank_cd(
                             '{0.1, 0.1, 0.9, 1.0}',
                             vector,
-                            to_tsquery('english', ?),
+                            to_tsquery('simple', ?),
                             8
                         )
                     )

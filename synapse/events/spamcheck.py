@@ -15,14 +15,20 @@
 # limitations under the License.
 
 import inspect
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+import logging
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
+from synapse.rest.media.v1._base import FileInfo
+from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import Collection
+from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
     import synapse.events
     import synapse.server
+
+logger = logging.getLogger(__name__)
 
 
 class SpamChecker:
@@ -39,7 +45,9 @@ class SpamChecker:
             else:
                 self.spam_checkers.append(module(config=config))
 
-    def check_event_for_spam(self, event: "synapse.events.EventBase") -> bool:
+    async def check_event_for_spam(
+        self, event: "synapse.events.EventBase"
+    ) -> Union[bool, str]:
         """Checks if a given event is considered "spammy" by this server.
 
         If the server considers an event spammy, then it will be rejected if
@@ -50,18 +58,19 @@ class SpamChecker:
             event: the event to be checked
 
         Returns:
-            True if the event is spammy.
+            True or a string if the event is spammy. If a string is returned it
+            will be used as the error message returned to the user.
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.check_event_for_spam(event):
+            if await maybe_awaitable(spam_checker.check_event_for_spam(event)):
                 return True
 
         return False
 
-    def user_may_invite(
+    async def user_may_invite(
         self,
         inviter_userid: str,
-        invitee_userid: str,
+        invitee_userid: Optional[str],
         third_party_invite: Optional[Dict],
         room_id: str,
         new_room: bool,
@@ -91,13 +100,15 @@ class SpamChecker:
         """
         for spam_checker in self.spam_checkers:
             if (
-                spam_checker.user_may_invite(
-                    inviter_userid,
-                    invitee_userid,
-                    third_party_invite,
-                    room_id,
-                    new_room,
-                    published_room,
+                await maybe_awaitable(
+                    spam_checker.user_may_invite(
+                        inviter_userid,
+                        invitee_userid,
+                        third_party_invite,
+                        room_id,
+                        new_room,
+                        published_room,
+                    )
                 )
                 is False
             ):
@@ -105,7 +116,7 @@ class SpamChecker:
 
         return True
 
-    def user_may_create_room(
+    async def user_may_create_room(
         self,
         userid: str,
         invite_list: List[str],
@@ -130,8 +141,10 @@ class SpamChecker:
         """
         for spam_checker in self.spam_checkers:
             if (
-                spam_checker.user_may_create_room(
-                    userid, invite_list, third_party_invite_list, cloning
+                await maybe_awaitable(
+                    spam_checker.user_may_create_room(
+                        userid, invite_list, third_party_invite_list, cloning
+                    )
                 )
                 is False
             ):
@@ -139,7 +152,7 @@ class SpamChecker:
 
         return True
 
-    def user_may_create_room_alias(self, userid: str, room_alias: str) -> bool:
+    async def user_may_create_room_alias(self, userid: str, room_alias: str) -> bool:
         """Checks if a given user may create a room alias
 
         If this method returns false, the association request will be rejected.
@@ -152,12 +165,17 @@ class SpamChecker:
             True if the user may create a room alias, otherwise False
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.user_may_create_room_alias(userid, room_alias) is False:
+            if (
+                await maybe_awaitable(
+                    spam_checker.user_may_create_room_alias(userid, room_alias)
+                )
+                is False
+            ):
                 return False
 
         return True
 
-    def user_may_publish_room(self, userid: str, room_id: str) -> bool:
+    async def user_may_publish_room(self, userid: str, room_id: str) -> bool:
         """Checks if a given user may publish a room to the directory
 
         If this method returns false, the publish request will be rejected.
@@ -170,7 +188,12 @@ class SpamChecker:
             True if the user may publish the room, otherwise False
         """
         for spam_checker in self.spam_checkers:
-            if spam_checker.user_may_publish_room(userid, room_id) is False:
+            if (
+                await maybe_awaitable(
+                    spam_checker.user_may_publish_room(userid, room_id)
+                )
+                is False
+            ):
                 return False
 
         return True
@@ -194,7 +217,7 @@ class SpamChecker:
 
         return True
 
-    def check_username_for_spam(self, user_profile: Dict[str, str]) -> bool:
+    async def check_username_for_spam(self, user_profile: Dict[str, str]) -> bool:
         """Checks if a user ID or display name are considered "spammy" by this server.
 
         If the server considers a username spammy, then it will not be included in
@@ -216,16 +239,17 @@ class SpamChecker:
             if checker:
                 # Make a copy of the user profile object to ensure the spam checker
                 # cannot modify it.
-                if checker(user_profile.copy()):
+                if await maybe_awaitable(checker(user_profile.copy())):
                     return True
 
         return False
 
-    def check_registration_for_spam(
+    async def check_registration_for_spam(
         self,
         email_threepid: Optional[dict],
         username: Optional[str],
         request_info: Collection[Tuple[str, str]],
+        auth_provider_id: Optional[str] = None,
     ) -> RegistrationBehaviour:
         """Checks if we should allow the given registration request.
 
@@ -234,6 +258,9 @@ class SpamChecker:
             username: The request user name, if any
             request_info: List of tuples of user agent and IP that
                 were used during the registration process.
+            auth_provider_id: The SSO IdP the user used, e.g "oidc", "saml",
+                "cas". If any. Note this does not include users registered
+                via a password provider.
 
         Returns:
             Enum for how the request should be handled
@@ -244,9 +271,72 @@ class SpamChecker:
             # spam checker
             checker = getattr(spam_checker, "check_registration_for_spam", None)
             if checker:
-                behaviour = checker(email_threepid, username, request_info)
+                # Provide auth_provider_id if the function supports it
+                checker_args = inspect.signature(checker)
+                if len(checker_args.parameters) == 4:
+                    d = checker(
+                        email_threepid,
+                        username,
+                        request_info,
+                        auth_provider_id,
+                    )
+                elif len(checker_args.parameters) == 3:
+                    d = checker(email_threepid, username, request_info)
+                else:
+                    logger.error(
+                        "Invalid signature for %s.check_registration_for_spam. Denying registration",
+                        spam_checker.__module__,
+                    )
+                    return RegistrationBehaviour.DENY
+
+                behaviour = await maybe_awaitable(d)
                 assert isinstance(behaviour, RegistrationBehaviour)
                 if behaviour != RegistrationBehaviour.ALLOW:
                     return behaviour
 
         return RegistrationBehaviour.ALLOW
+
+    async def check_media_file_for_spam(
+        self, file_wrapper: ReadableFileWrapper, file_info: FileInfo
+    ) -> bool:
+        """Checks if a piece of newly uploaded media should be blocked.
+
+        This will be called for local uploads, downloads of remote media, each
+        thumbnail generated for those, and web pages/images used for URL
+        previews.
+
+        Note that care should be taken to not do blocking IO operations in the
+        main thread. For example, to get the contents of a file a module
+        should do::
+
+            async def check_media_file_for_spam(
+                self, file: ReadableFileWrapper, file_info: FileInfo
+            ) -> bool:
+                buffer = BytesIO()
+                await file.write_chunks_to(buffer.write)
+
+                if buffer.getvalue() == b"Hello World":
+                    return True
+
+                return False
+
+
+        Args:
+            file: An object that allows reading the contents of the media.
+            file_info: Metadata about the file.
+
+        Returns:
+            True if the media should be blocked or False if it should be
+            allowed.
+        """
+
+        for spam_checker in self.spam_checkers:
+            # For backwards compatibility, only run if the method exists on the
+            # spam checker
+            checker = getattr(spam_checker, "check_media_file_for_spam", None)
+            if checker:
+                spam = await maybe_awaitable(checker(file_wrapper, file_info))
+                if spam:
+                    return True
+
+        return False

@@ -29,9 +29,11 @@ from synapse.api.errors import (
     ProxiedRequestError,
     SynapseError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.http import RequestTimedOutError
 from synapse.http.client import SimpleHttpClient
+from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict, Requester
 from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
@@ -47,7 +49,7 @@ class IdentityHandler(BaseHandler):
         super().__init__(hs)
 
         # An HTTP client for contacting trusted URLs.
-        self.http_client = hs.get_simple_http_client()
+        self.http_client = SimpleHttpClient(hs)
         # An HTTP client for contacting identity servers specified by clients.
         self.blacklisting_http_client = SimpleHttpClient(
             hs, ip_blacklist=hs.config.federation_ip_range_blacklist
@@ -55,12 +57,39 @@ class IdentityHandler(BaseHandler):
         self.federation_http_client = hs.get_federation_http_client()
         self.hs = hs
 
-        self.trusted_id_servers = set(hs.config.trusted_third_party_id_servers)
-        self.trust_any_id_server_just_for_testing_do_not_use = (
-            hs.config.use_insecure_ssl_client_just_for_testing_do_not_use
-        )
         self.rewrite_identity_server_urls = hs.config.rewrite_identity_server_urls
         self._enable_lookup = hs.config.enable_3pid_lookup
+
+        self._web_client_location = hs.config.invite_client_location
+
+        # Ratelimiters for `/requestToken` endpoints.
+        self._3pid_validation_ratelimiter_ip = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
+            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+        )
+        self._3pid_validation_ratelimiter_address = Ratelimiter(
+            clock=hs.get_clock(),
+            rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
+            burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
+        )
+
+    def ratelimit_request_token_requests(
+        self,
+        request: SynapseRequest,
+        medium: str,
+        address: str,
+    ):
+        """Used to ratelimit requests to `/requestToken` by IP and address.
+
+        Args:
+            request: The associated request
+            medium: The type of threepid, e.g. "msisdn" or "email"
+            address: The actual threepid ID, e.g. the phone number or email address
+        """
+
+        self._3pid_validation_ratelimiter_ip.ratelimit((medium, request.getClientIP()))
+        self._3pid_validation_ratelimiter_address.ratelimit((medium, address))
 
     async def threepid_from_creds(
         self, id_server_url: str, creds: Dict[str, str]
@@ -529,6 +558,8 @@ class IdentityHandler(BaseHandler):
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
 
+        # It is already checked that public_baseurl is configured since this code
+        # should only be used if account_threepid_delegate_msisdn is true.
         assert self.hs.config.public_baseurl
 
         # we need to tell the client to send the token back to us, since it doesn't
@@ -940,6 +971,9 @@ class IdentityHandler(BaseHandler):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+        # If a custom web client location is available, include it in the request.
+        if self._web_client_location:
+            invite_config["org.matrix.web_client_location"] = self._web_client_location
 
         # Rewrite the identity server URL if necessary
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
@@ -983,7 +1017,9 @@ class IdentityHandler(BaseHandler):
                 raise SynapseError(500, "Timed out contacting identity server")
             except HttpResponseException as e:
                 logger.warning(
-                    "Error trying to call /store-invite on %s: %s", id_server_url, e,
+                    "Error trying to call /store-invite on %s: %s",
+                    id_server_url,
+                    e,
                 )
 
             if data is None:
@@ -1020,7 +1056,10 @@ class IdentityHandler(BaseHandler):
         return token, public_keys, fallback_public_key, display_name
 
     async def bind_email_using_internal_sydent_api(
-        self, id_server_url: str, email: str, user_id: str,
+        self,
+        id_server_url: str,
+        email: str,
+        user_id: str,
     ):
         """Bind an email to a fully qualified user ID using the internal API of an
         instance of Sydent.
@@ -1052,7 +1091,10 @@ class IdentityHandler(BaseHandler):
 
         # Remember where we bound the threepid
         await self.store.add_user_bound_threepid(
-            user_id=user_id, medium="email", address=email, id_server=id_server,
+            user_id=user_id,
+            medium="email",
+            address=email,
+            id_server=id_server,
         )
 
 

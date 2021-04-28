@@ -27,8 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
-    """Checks pusher sharding works
-    """
+    """Checks pusher sharding works"""
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -67,7 +66,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "https://push.example.com/push"},
+                data={"url": "https://push.example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -88,16 +87,15 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         return event_id
 
     def test_send_push_single_worker(self):
-        """Test that registration works when using a pusher worker.
-        """
+        """Test that registration works when using a pusher worker."""
         http_client_mock = Mock(spec_set=["post_json_get_json"])
-        http_client_mock.post_json_get_json.side_effect = lambda *_, **__: defer.succeed(
-            {}
+        http_client_mock.post_json_get_json.side_effect = (
+            lambda *_, **__: defer.succeed({})
         )
 
         self.make_worker_hs(
             "synapse.app.pusher",
-            {"start_pushers": True},
+            {"start_pushers": False},
             proxied_blacklisted_http_client=http_client_mock,
         )
 
@@ -109,7 +107,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         http_client_mock.post_json_get_json.assert_called_once()
         self.assertEqual(
             http_client_mock.post_json_get_json.call_args[0][0],
-            "https://push.example.com/push",
+            "https://push.example.com/_matrix/push/v1/notify",
         )
         self.assertEqual(
             event_id,
@@ -119,11 +117,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
     def test_send_push_multiple_workers(self):
-        """Test that registration works when using sharded pusher workers.
-        """
+        """Test that registration works when using sharded pusher workers."""
         http_client_mock1 = Mock(spec_set=["post_json_get_json"])
-        http_client_mock1.post_json_get_json.side_effect = lambda *_, **__: defer.succeed(
-            {}
+        http_client_mock1.post_json_get_json.side_effect = (
+            lambda *_, **__: defer.succeed({})
         )
 
         self.make_worker_hs(
@@ -137,8 +134,8 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
         http_client_mock2 = Mock(spec_set=["post_json_get_json"])
-        http_client_mock2.post_json_get_json.side_effect = lambda *_, **__: defer.succeed(
-            {}
+        http_client_mock2.post_json_get_json.side_effect = (
+            lambda *_, **__: defer.succeed({})
         )
 
         self.make_worker_hs(
@@ -161,7 +158,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         http_client_mock2.post_json_get_json.assert_not_called()
         self.assertEqual(
             http_client_mock1.post_json_get_json.call_args[0][0],
-            "https://push.example.com/push",
+            "https://push.example.com/_matrix/push/v1/notify",
         )
         self.assertEqual(
             event_id,
@@ -183,7 +180,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         http_client_mock2.post_json_get_json.assert_called_once()
         self.assertEqual(
             http_client_mock2.post_json_get_json.call_args[0][0],
-            "https://push.example.com/push",
+            "https://push.example.com/_matrix/push/v1/notify",
         )
         self.assertEqual(
             event_id,

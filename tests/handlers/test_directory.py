@@ -133,7 +133,9 @@ class TestCreateAlias(unittest.HomeserverTestCase):
         """A user can create an alias for a room they're in."""
         self.get_success(
             self.handler.create_association(
-                create_requester(self.test_user), self.room_alias, self.room_id,
+                create_requester(self.test_user),
+                self.room_alias,
+                self.room_id,
             )
         )
 
@@ -145,7 +147,9 @@ class TestCreateAlias(unittest.HomeserverTestCase):
 
         self.get_failure(
             self.handler.create_association(
-                create_requester(self.test_user), self.room_alias, other_room_id,
+                create_requester(self.test_user),
+                self.room_alias,
+                other_room_id,
             ),
             synapse.api.errors.SynapseError,
         )
@@ -158,7 +162,9 @@ class TestCreateAlias(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.create_association(
-                create_requester(self.admin_user), self.room_alias, other_room_id,
+                create_requester(self.admin_user),
+                self.room_alias,
+                other_room_id,
             )
         )
 
@@ -277,8 +283,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
 
 
 class CanonicalAliasTestCase(unittest.HomeserverTestCase):
-    """Test modifications of the canonical alias when delete aliases.
-    """
+    """Test modifications of the canonical alias when delete aliases."""
 
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -319,7 +324,10 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
     def _set_canonical_alias(self, content):
         """Configure the canonical alias state on the room."""
         self.helper.send_state(
-            self.room_id, "m.room.canonical_alias", content, tok=self.admin_user_tok,
+            self.room_id,
+            "m.room.canonical_alias",
+            content,
+            tok=self.admin_user_tok,
         )
 
     def _get_canonical_alias(self):
@@ -407,7 +415,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
     def test_denied(self):
         room_id = self.helper.create_room_as(self.user_id)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             b"directory/room/%23test%3Atest",
             ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
@@ -417,7 +425,7 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
     def test_allowed(self):
         room_id = self.helper.create_room_as(self.user_id)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             b"directory/room/%23unofficial_test%3Atest",
             ('{"room_id":"%s"}' % (room_id,)).encode("ascii"),
@@ -433,7 +441,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         room_id = self.helper.create_room_as(self.user_id)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
         self.assertEquals(200, channel.code, channel.result)
@@ -448,7 +456,7 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         self.directory_handler.enable_room_list_search = True
 
         # Room list is enabled so we should get some results
-        request, channel = self.make_request("GET", b"publicRooms")
+        channel = self.make_request("GET", b"publicRooms")
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) > 0)
 
@@ -456,13 +464,13 @@ class TestRoomListSearchDisabled(unittest.HomeserverTestCase):
         self.directory_handler.enable_room_list_search = False
 
         # Room list disabled so we should get no results
-        request, channel = self.make_request("GET", b"publicRooms")
+        channel = self.make_request("GET", b"publicRooms")
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["chunk"]) == 0)
 
         # Room list disabled so we shouldn't be allowed to publish rooms
         room_id = self.helper.create_room_as(self.user_id)
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", b"directory/list/room/%s" % (room_id.encode("ascii"),), b"{}"
         )
         self.assertEquals(403, channel.code, channel.result)

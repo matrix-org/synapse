@@ -80,6 +80,32 @@ class DeviceStoreTestCase(tests.unittest.TestCase):
         )
 
     @defer.inlineCallbacks
+    def test_count_devices_by_users(self):
+        yield defer.ensureDeferred(
+            self.store.store_device("user_id", "device1", "display_name 1")
+        )
+        yield defer.ensureDeferred(
+            self.store.store_device("user_id", "device2", "display_name 2")
+        )
+        yield defer.ensureDeferred(
+            self.store.store_device("user_id2", "device3", "display_name 3")
+        )
+
+        res = yield defer.ensureDeferred(self.store.count_devices_by_users())
+        self.assertEqual(0, res)
+
+        res = yield defer.ensureDeferred(self.store.count_devices_by_users(["unknown"]))
+        self.assertEqual(0, res)
+
+        res = yield defer.ensureDeferred(self.store.count_devices_by_users(["user_id"]))
+        self.assertEqual(2, res)
+
+        res = yield defer.ensureDeferred(
+            self.store.count_devices_by_users(["user_id", "user_id2"])
+        )
+        self.assertEqual(3, res)
+
+    @defer.inlineCallbacks
     def test_get_device_updates_by_remote(self):
         device_ids = ["device_id1", "device_id2"]
 

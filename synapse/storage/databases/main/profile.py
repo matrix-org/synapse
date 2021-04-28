@@ -145,7 +145,7 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profile_avatar_url(
-        self, user_localpart: str, new_avatar_url: str, batchnum: int
+        self, user_localpart: str, new_avatar_url: Optional[str], batchnum: int
     ) -> None:
         # Invalidate the read cache for this user
         self.get_profile_avatar_url.invalidate((user_localpart,))
@@ -159,7 +159,11 @@ class ProfileWorkerStore(SQLBaseStore):
         )
 
     async def set_profiles_active(
-        self, users: List[UserID], active: bool, hide: bool, batchnum: int,
+        self,
+        users: List[UserID],
+        active: bool,
+        hide: bool,
+        batchnum: int,
     ) -> None:
         """Given a set of users, set active and hidden flags on them.
 
@@ -240,8 +244,7 @@ class ProfileWorkerStore(SQLBaseStore):
             )
 
     async def is_subscribed_remote_profile_for_user(self, user_id):
-        """Check whether we are interested in a remote user's profile.
-        """
+        """Check whether we are interested in a remote user's profile."""
         res = await self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"user_id": user_id},
@@ -267,8 +270,7 @@ class ProfileWorkerStore(SQLBaseStore):
     async def get_remote_profile_cache_entries_that_expire(
         self, last_checked: int
     ) -> List[Dict[str, str]]:
-        """Get all users who haven't been checked since `last_checked`
-        """
+        """Get all users who haven't been checked since `last_checked`"""
 
         def _get_remote_profile_cache_entries_that_expire_txn(txn):
             sql = """

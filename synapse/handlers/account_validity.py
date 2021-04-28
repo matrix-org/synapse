@@ -30,7 +30,7 @@ from synapse.types import UserID
 from synapse.util import stringutils
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

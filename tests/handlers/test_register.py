@@ -18,7 +18,6 @@ from mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
-from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha.register import (
     _map_email_to_displayname,
     register_servlets,
@@ -527,6 +526,37 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(requester.shadow_banned)
 
+    def test_spam_checker_receives_sso_type(self):
+        """Test rejecting registration based on SSO type"""
+
+        class BanBadIdPUser:
+            def check_registration_for_spam(
+                self, email_threepid, username, request_info, auth_provider_id=None
+            ):
+                # Reject any user coming from CAS and whose username contains profanity
+                if auth_provider_id == "cas" and "flimflob" in username:
+                    return RegistrationBehaviour.DENY
+                return RegistrationBehaviour.ALLOW
+
+        # Configure a spam checker that denies a certain user on a specific IdP
+        spam_checker = self.hs.get_spam_checker()
+        spam_checker.spam_checkers = [BanBadIdPUser()]
+
+        f = self.get_failure(
+            self.handler.register_user(localpart="bobflimflob", auth_provider_id="cas"),
+            SynapseError,
+        )
+        exception = f.value
+
+        # We return 429 from the spam checker for denied registrations
+        self.assertIsInstance(exception, SynapseError)
+        self.assertEqual(exception.code, 429)
+
+        # Check the same username can register using SAML
+        self.get_success(
+            self.handler.register_user(localpart="bobflimflob", auth_provider_id="saml")
+        )
+
     def test_email_to_displayname_mapping(self):
         """Test that custom emails are mapped to new user displaynames correctly"""
         self._check_mapping(
@@ -580,7 +610,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         # Mock Synapse's http json post method to check for the internal bind call
         post_json_get_json = Mock(return_value=make_awaitable(None))
-        self.hs.get_simple_http_client().post_json_get_json = post_json_get_json
+        self.hs.get_identity_handler().http_client.post_json_get_json = (
+            post_json_get_json
+        )
 
         # Retrieve a UIA session ID
         channel = self.uia_register(
@@ -617,11 +649,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     def uia_register(self, expected_response: int, body: dict) -> FakeChannel:
         """Make a register request."""
-        request, channel = self.make_request(
-            "POST", "register", body
-        )  # type: SynapseRequest, FakeChannel
+        channel = self.make_request("POST", "register", body)
 
-        self.assertEqual(request.code, expected_response)
+        self.assertEqual(channel.code, expected_response)
         return channel
 
     async def get_or_create_user(

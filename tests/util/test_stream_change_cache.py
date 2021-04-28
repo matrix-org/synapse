@@ -70,7 +70,8 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         self.assertTrue("user@foo.com" not in cache._entity_to_key)
 
         self.assertEqual(
-            cache.get_all_entities_changed(2), ["bar@baz.net", "user@elsewhere.org"],
+            cache.get_all_entities_changed(2),
+            ["bar@baz.net", "user@elsewhere.org"],
         )
         self.assertIsNone(cache.get_all_entities_changed(1))
 
@@ -80,7 +81,8 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
             {"bar@baz.net", "user@elsewhere.org"}, set(cache._entity_to_key)
         )
         self.assertEqual(
-            cache.get_all_entities_changed(2), ["user@elsewhere.org", "bar@baz.net"],
+            cache.get_all_entities_changed(2),
+            ["user@elsewhere.org", "bar@baz.net"],
         )
         self.assertIsNone(cache.get_all_entities_changed(1))
 
@@ -222,7 +224,8 @@ class StreamChangeCacheTests(unittest.HomeserverTestCase):
         # Query a subset of the entries mid-way through the stream. We should
         # only get back the subset.
         self.assertEqual(
-            cache.get_entities_changed(["bar@baz.net"], stream_pos=2), {"bar@baz.net"},
+            cache.get_entities_changed(["bar@baz.net"], stream_pos=2),
+            {"bar@baz.net"},
         )
 
     def test_max_pos(self):

@@ -27,6 +27,11 @@ MAX_ALIAS_LENGTH = 255
 # the maximum length for a user id is 255 characters
 MAX_USERID_LENGTH = 255
 
+# The maximum length for a group id is 255 characters
+MAX_GROUPID_LENGTH = 255
+MAX_GROUP_CATEGORYID_LENGTH = 255
+MAX_GROUP_ROLEID_LENGTH = 255
+
 
 class Membership:
 
@@ -46,6 +51,7 @@ class PresenceState:
     OFFLINE = "offline"
     UNAVAILABLE = "unavailable"
     ONLINE = "online"
+    BUSY = "org.matrix.msc3026.busy"
 
 
 class JoinRules:
@@ -93,7 +99,15 @@ class EventTypes:
 
     Retention = "m.room.retention"
 
+    Dummy = "org.matrix.dummy_event"
+
+    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
+    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+
+
+class EduTypes:
     Presence = "m.presence"
+    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:
@@ -126,8 +140,7 @@ class UserTypes:
 
 
 class RelationTypes:
-    """The types of relations known to this server.
-    """
+    """The types of relations known to this server."""
 
     ANNOTATION = "m.annotation"
     REPLACE = "m.replace"
@@ -151,6 +164,9 @@ class EventContentFields:
     # cf https://github.com/matrix-org/matrix-doc/pull/2228
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
 
+    # cf https://github.com/matrix-org/matrix-doc/pull/1772
+    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
+
 
 class RoomEncryptionAlgorithms:
     MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
@@ -160,3 +176,10 @@ class RoomEncryptionAlgorithms:
 class AccountDataTypes:
     DIRECT = "m.direct"
     IGNORED_USER_LIST = "m.ignored_user_list"
+
+
+class HistoryVisibility:
+    INVITED = "invited"
+    JOINED = "joined"
+    SHARED = "shared"
+    WORLD_READABLE = "world_readable"

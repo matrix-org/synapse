@@ -46,16 +46,16 @@ class AdditionalResourceTests(HomeserverTestCase):
         handler = _AsyncTestCustomEndpoint({}, None).handle_request
         resource = AdditionalResource(self.hs, handler)
 
-        request, channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
+        channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_async"})
 
     def test_sync(self):
         handler = _SyncTestCustomEndpoint({}, None).handle_request
         resource = AdditionalResource(self.hs, handler)
 
-        request, channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
+        channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_sync"})

@@ -51,11 +51,11 @@ class RoomDisposition:
 class RoomVersion:
     """An object which describes the unique attributes of a room version."""
 
-    identifier = attr.ib()  # str; the identifier for this version
-    disposition = attr.ib()  # str; one of the RoomDispositions
-    event_format = attr.ib()  # int; one of the EventFormatVersions
-    state_res = attr.ib()  # int; one of the StateResolutionVersions
-    enforce_key_validity = attr.ib()  # bool
+    identifier = attr.ib(type=str)  # the identifier for this version
+    disposition = attr.ib(type=str)  # one of the RoomDispositions
+    event_format = attr.ib(type=int)  # one of the EventFormatVersions
+    state_res = attr.ib(type=int)  # one of the StateResolutionVersions
+    enforce_key_validity = attr.ib(type=bool)
 
     # Before MSC2432, m.room.aliases had special auth rules and redaction rules
     special_case_aliases_auth = attr.ib(type=bool)
@@ -64,9 +64,11 @@ class RoomVersion:
     # * Floats
     # * NaN, Infinity, -Infinity
     strict_canonicaljson = attr.ib(type=bool)
-    # bool: MSC2209: Check 'notifications' key while verifying
+    # MSC2209: Check 'notifications' key while verifying
     # m.room.power_levels auth rules.
     limit_notifications_power_levels = attr.ib(type=bool)
+    # MSC2174/MSC2176: Apply updated redaction rules algorithm.
+    msc2176_redaction_rules = attr.ib(type=bool)
     # MSC2174/MSC2176: Apply updated redaction rules algorithm.
     msc2176_redaction_rules = attr.ib(type=bool)
     # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
@@ -183,5 +185,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V5,
         RoomVersions.V6,
         RoomVersions.V7,
+        RoomVersions.MSC2176,
     )
 }  # type: Dict[str, RoomVersion]

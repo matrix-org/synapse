@@ -22,7 +22,6 @@ from synapse.rest.client.v1 import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
 from tests import unittest
-from tests.server import make_request
 
 
 class DomainRuleCheckerTestCase(unittest.TestCase):
@@ -285,8 +284,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         )
 
     def test_cannot_3pid_invite(self):
-        """Test that unbound 3pid invites get rejected.
-        """
+        """Test that unbound 3pid invites get rejected."""
         channel = self._create_room(self.admin_access_token)
         assert channel.result["code"] == b"200", channel.result
 
@@ -311,7 +309,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
             expect_code=403,
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "rooms/%s/invite" % (room_id),
             {"address": "foo@bar.com", "medium": "email", "id_server": "localhost"},
@@ -322,9 +320,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
     def _create_room(self, token, content={}):
         path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
-        request, channel = make_request(
-            self.hs.get_reactor(),
-            self.site,
+        channel = self.make_request(
             "POST",
             path,
             content=json.dumps(content).encode("utf8"),

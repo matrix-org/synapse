@@ -81,7 +81,9 @@ class RoomAccessRules(object):
     """
 
     def __init__(
-        self, config: Dict, module_api: ModuleApi,
+        self,
+        config: Dict,
+        module_api: ModuleApi,
     ):
         self.id_server = config["id_server"]
         self.module_api = module_api
@@ -111,7 +113,10 @@ class RoomAccessRules(object):
         return config
 
     async def on_create_room(
-        self, requester: Requester, config: Dict, is_requester_admin: bool,
+        self,
+        requester: Requester,
+        config: Dict,
+        is_requester_admin: bool,
     ) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.on_create_room.
 
@@ -259,7 +264,10 @@ class RoomAccessRules(object):
         }
 
     async def check_threepid_can_be_invited(
-        self, medium: str, address: str, state_events: StateMap[EventBase],
+        self,
+        medium: str,
+        address: str,
+        state_events: StateMap[EventBase],
     ) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.check_threepid_can_be_invited.
 
@@ -309,7 +317,9 @@ class RoomAccessRules(object):
         return True
 
     async def check_event_allowed(
-        self, event: EventBase, state_events: StateMap[EventBase],
+        self,
+        event: EventBase,
+        state_events: StateMap[EventBase],
     ) -> bool:
         """Implements synapse.events.ThirdPartyEventRules.check_event_allowed.
 
@@ -434,7 +444,10 @@ class RoomAccessRules(object):
         )
 
     async def _on_membership_or_invite(
-        self, event: EventBase, rule: str, state_events: StateMap[EventBase],
+        self,
+        event: EventBase,
+        rule: str,
+        state_events: StateMap[EventBase],
     ) -> bool:
         """Applies the correct rule for incoming m.room.member and
         m.room.third_party_invite events.
@@ -659,7 +672,9 @@ class RoomAccessRules(object):
         return True
 
     def _on_membership_or_invite_direct(
-        self, event: EventBase, state_events: StateMap[EventBase],
+        self,
+        event: EventBase,
+        state_events: StateMap[EventBase],
     ) -> bool:
         """Implements the checks and behaviour specified for the "direct" rule.
 

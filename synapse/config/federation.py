@@ -12,12 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 from typing import Optional
 
-from netaddr import IPSet
-
-from synapse.config._base import Config, ConfigError
+from synapse.config._base import Config
 from synapse.config._util import validate_config
 
 
@@ -36,31 +33,6 @@ class FederationConfig(Config):
             for domain in federation_domain_whitelist:
                 self.federation_domain_whitelist[domain] = True
 
-        ip_range_blacklist = config.get("ip_range_blacklist", [])
-
-        # Attempt to create an IPSet from the given ranges
-        try:
-            self.ip_range_blacklist = IPSet(ip_range_blacklist)
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_blacklist: %s" % e)
-        # Always blacklist 0.0.0.0, ::
-        self.ip_range_blacklist.update(["0.0.0.0", "::"])
-
-        # The federation_ip_range_blacklist is used for backwards-compatibility
-        # and only applies to federation and identity servers. If it is not given,
-        # default to ip_range_blacklist.
-        federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", ip_range_blacklist
-        )
-        try:
-            self.federation_ip_range_blacklist = IPSet(federation_ip_range_blacklist)
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist: %s" % e
-            )
-        # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
-
         federation_metrics_domains = config.get("federation_metrics_domains") or []
         validate_config(
             _METRICS_FOR_DOMAINS_SCHEMA,
@@ -68,6 +40,10 @@ class FederationConfig(Config):
             ("federation_metrics_domains",),
         )
         self.federation_metrics_domains = set(federation_metrics_domains)
+
+        self.allow_profile_lookup_over_federation = config.get(
+            "allow_profile_lookup_over_federation", True
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -84,29 +60,6 @@ class FederationConfig(Config):
         #  - nyc.example.com
         #  - syd.example.com
 
-        # Prevent outgoing requests from being sent to the following blacklisted IP address
-        # CIDR ranges. If this option is not specified, or specified with an empty list,
-        # no IP range blacklist will be enforced.
-        #
-        # The blacklist applies to the outbound requests for federation, identity servers,
-        # push servers, and for checking key validitity for third-party invite events.
-        #
-        # (0.0.0.0 and :: are always blacklisted, whether or not they are explicitly
-        # listed here, since they correspond to unroutable addresses.)
-        #
-        # This option replaces federation_ip_range_blacklist in Synapse v1.24.0.
-        #
-        ip_range_blacklist:
-          - '127.0.0.0/8'
-          - '10.0.0.0/8'
-          - '172.16.0.0/12'
-          - '192.168.0.0/16'
-          - '100.64.0.0/10'
-          - '169.254.0.0/16'
-          - '::1/128'
-          - 'fe80::/64'
-          - 'fc00::/7'
-
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
         # and outbound federation, though be aware that any delay can be due to problems
@@ -117,6 +70,12 @@ class FederationConfig(Config):
         #federation_metrics_domains:
         #  - matrix.org
         #  - example.com
+
+        # Uncomment to disable profile lookup over federation. By default, the
+        # Federation API allows other homeservers to obtain profile data of any user
+        # on this homeserver. Defaults to 'true'.
+        #
+        #allow_profile_lookup_over_federation: false
         """
 
 

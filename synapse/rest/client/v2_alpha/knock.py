@@ -25,6 +25,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_list_from_args,
 )
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
 from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.types import JsonDict, RoomAlias, RoomID
@@ -53,7 +54,10 @@ class KnockRoomAliasServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_POST(
-        self, request: Request, room_identifier: str, txn_id: Optional[str] = None,
+        self,
+        request: SynapseRequest,
+        room_identifier: str,
+        txn_id: Optional[str] = None,
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
 
@@ -65,7 +69,7 @@ class KnockRoomAliasServlet(RestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
-                remote_room_hosts = parse_list_from_args(request.args, "server_name")
+                remote_room_hosts = parse_list_from_args(request.args, "server_name")  # type: ignore
             except KeyError:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):

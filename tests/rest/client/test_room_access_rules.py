@@ -86,7 +86,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["send_invite"])
         mock_federation_client.send_invite.side_effect = send_invite
 
-        mock_http_client = Mock(spec=["get_json", "post_json_get_json"],)
+        mock_http_client = Mock(
+            spec=["get_json", "post_json_get_json"],
+        )
         # Mocking the response for /info on the IS API.
         mock_http_client.get_json.side_effect = get_json
         # Mocking the response for /store-invite on the IS API.
@@ -154,8 +156,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.create_room(rule=AccessRules.DIRECT, expected_code=400)
 
     def test_create_room_direct_invalid_rule(self):
-        """Tests that creating a direct room with an invalid rule will fail.
-        """
+        """Tests that creating a direct room with an invalid rule will fail."""
         self.create_room(direct=True, rule=AccessRules.RESTRICTED, expected_code=400)
 
     def test_create_room_default_power_level_rules(self):
@@ -234,7 +235,9 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         """
         # Creates a room with the default power levels
         room_id = self.create_room(
-            direct=True, rule=AccessRules.DIRECT, expected_code=200,
+            direct=True,
+            rule=AccessRules.DIRECT,
+            expected_code=200,
         )
 
         # Attempt to drop invite and state_default power levels after the fact
@@ -273,7 +276,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         )
 
         # List preset_room_id in the public room list
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/directory/list/room/%s" % (preset_room_id,),
             {"visibility": "public"},
@@ -282,7 +285,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
         # List init_state_room_id in the public room list
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/directory/list/room/%s" % (init_state_room_id,),
             {"visibility": "public"},
@@ -361,14 +364,14 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % self.restricted_room
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 200, channel.result)
 
         # We are allowed to remove the room from the public room list
         url = "/_matrix/client/r0/directory/list/room/%s" % self.restricted_room
         data = {"visibility": "private"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 200, channel.result)
 
     def test_direct(self):
@@ -470,7 +473,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % self.direct_rooms[0]
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 403, channel.result)
 
     def test_unrestricted(self):
@@ -549,7 +552,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % self.unrestricted_room
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 403, channel.result)
 
     def test_change_rules(self):
@@ -607,7 +610,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         url = "/_matrix/client/r0/directory/list/room/%s" % test_room_id
         data = {"visibility": "public"}
 
-        request, channel = self.make_request("PUT", url, data, access_token=self.tok)
+        channel = self.make_request("PUT", url, data, access_token=self.tok)
         self.assertEqual(channel.code, 200, channel.result)
 
         # Attempt to switch the room to "unrestricted"
@@ -854,22 +857,30 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         """
 
         def freeze_room_with_id_and_power_levels(
-            room_id: str, custom_power_levels_content: Optional[JsonDict] = None,
+            room_id: str,
+            custom_power_levels_content: Optional[JsonDict] = None,
         ):
             # Invite a user to the room, they join with PL 0
             self.helper.invite(
-                room=room_id, src=self.user_id, targ=self.invitee_id, tok=self.tok,
+                room=room_id,
+                src=self.user_id,
+                targ=self.invitee_id,
+                tok=self.tok,
             )
 
             # Invitee joins the room
             self.helper.join(
-                room=room_id, user=self.invitee_id, tok=self.invitee_tok,
+                room=room_id,
+                user=self.invitee_id,
+                tok=self.invitee_tok,
             )
 
             if not custom_power_levels_content:
                 # Retrieve the room's current power levels event content
                 power_levels = self.helper.get_state(
-                    room_id=room_id, event_type="m.room.power_levels", tok=self.tok,
+                    room_id=room_id,
+                    event_type="m.room.power_levels",
+                    tok=self.tok,
                 )
             else:
                 power_levels = custom_power_levels_content
@@ -884,12 +895,16 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
             # Ensure that the invitee leaving the room does not change the power levels
             self.helper.leave(
-                room=room_id, user=self.invitee_id, tok=self.invitee_tok,
+                room=room_id,
+                user=self.invitee_id,
+                tok=self.invitee_tok,
             )
 
             # Retrieve the new power levels of the room
             new_power_levels = self.helper.get_state(
-                room_id=room_id, event_type="m.room.power_levels", tok=self.tok,
+                room_id=room_id,
+                event_type="m.room.power_levels",
+                tok=self.tok,
             )
 
             # Ensure they have not changed
@@ -897,22 +912,31 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
             # Invite the user back again
             self.helper.invite(
-                room=room_id, src=self.user_id, targ=self.invitee_id, tok=self.tok,
+                room=room_id,
+                src=self.user_id,
+                targ=self.invitee_id,
+                tok=self.tok,
             )
 
             # Invitee joins the room
             self.helper.join(
-                room=room_id, user=self.invitee_id, tok=self.invitee_tok,
+                room=room_id,
+                user=self.invitee_id,
+                tok=self.invitee_tok,
             )
 
             # Now the admin leaves the room
             self.helper.leave(
-                room=room_id, user=self.user_id, tok=self.tok,
+                room=room_id,
+                user=self.user_id,
+                tok=self.tok,
             )
 
             # Check the power levels again
             new_power_levels = self.helper.get_state(
-                room_id=room_id, event_type="m.room.power_levels", tok=self.invitee_tok,
+                room_id=room_id,
+                event_type="m.room.power_levels",
+                tok=self.invitee_tok,
             )
 
             # Ensure that the new power levels prevent anyone but admins from sending
@@ -1001,8 +1025,11 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         if power_levels_content_override:
             content["power_levels_content_override"] = power_levels_content_override
 
-        request, channel = self.make_request(
-            "POST", "/_matrix/client/r0/createRoom", content, access_token=self.tok,
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/createRoom",
+            content,
+            access_token=self.tok,
         )
 
         self.assertEqual(channel.code, expected_code, channel.result)
@@ -1011,7 +1038,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             return channel.json_body["room_id"]
 
     def current_rule_in_room(self, room_id):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
             access_token=self.tok,
@@ -1022,7 +1049,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
     def change_rule_in_room(self, room_id, new_rule, expected_code=200):
         data = {"rule": new_rule}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, ACCESS_RULES_TYPE),
             json.dumps(data),
@@ -1033,7 +1060,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
 
     def change_join_rule_in_room(self, room_id, new_join_rule, expected_code=200):
         data = {"join_rule": new_join_rule}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/%s" % (room_id, EventTypes.JoinRules),
             json.dumps(data),
@@ -1045,7 +1072,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
     def send_threepid_invite(self, address, room_id, expected_code=200):
         params = {"id_server": "testis", "medium": "email", "address": address}
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/%s/invite" % room_id,
             json.dumps(params),
@@ -1062,9 +1089,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
             state_key,
         )
 
-        request, channel = self.make_request(
-            "PUT", path, json.dumps(body), access_token=tok
-        )
+        channel = self.make_request("PUT", path, json.dumps(body), access_token=tok)
 
         self.assertEqual(channel.code, expect_code, channel.result)
 

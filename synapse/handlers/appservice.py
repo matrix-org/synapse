@@ -38,7 +38,7 @@ from synapse.types import Collection, JsonDict, RoomAlias, RoomStreamToken, User
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +290,9 @@ class ApplicationServicesHandler:
             if not interested:
                 continue
             presence_events, _ = await presence_source.get_new_events(
-                user=user, service=service, from_key=from_key,
+                user=user,
+                service=service,
+                from_key=from_key,
             )
             time_now = self.clock.time_msec()
             events.extend(

@@ -14,9 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from mock import Mock
-
 from canonicaljson import json
 
 from twisted.internet import defer
@@ -30,12 +27,10 @@ from tests.utils import create_room
 
 
 class RedactionTestCase(unittest.HomeserverTestCase):
-    def make_homeserver(self, reactor, clock):
-        config = self.default_config()
+    def default_config(self):
+        config = super().default_config()
         config["redaction_retention_period"] = "30d"
-        return self.setup_test_homeserver(
-            resource_for_federation=Mock(), federation_http_client=None, config=config
-        )
+        return config
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
@@ -304,8 +299,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
     def test_redact_censor(self):
-        """Test that a redacted event gets censored in the DB after a month
-        """
+        """Test that a redacted event gets censored in the DB after a month"""
 
         self.get_success(
             self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
@@ -375,8 +369,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.assert_dict({"content": {}}, json.loads(event_json))
 
     def test_redact_redaction(self):
-        """Tests that we can redact a redaction and can fetch it again.
-        """
+        """Tests that we can redact a redaction and can fetch it again."""
 
         self.get_success(
             self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)
@@ -409,8 +402,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         )
 
     def test_store_redacted_redaction(self):
-        """Tests that we can store a redacted redaction.
-        """
+        """Tests that we can store a redacted redaction."""
 
         self.get_success(
             self.inject_room_member(self.room1, self.u_alice, Membership.JOIN)

@@ -21,7 +21,9 @@ from typing import Dict, Iterable, Optional, Set
 
 from typing_extensions import ContextManager
 
-from twisted.internet import address, reactor
+from twisted.internet import address
+from twisted.web.resource import IResource
+from twisted.web.server import Request
 
 import synapse
 import synapse.events
@@ -34,6 +36,7 @@ from synapse.api.urls import (
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
+from synapse.app._base import register_start
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
@@ -89,45 +92,47 @@ from synapse.replication.tcp.streams import (
     ToDeviceStream,
 )
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events
+from synapse.rest.client.v1 import events, login, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
-from synapse.rest.client.v1.login import LoginRestServlet
 from synapse.rest.client.v1.profile import (
     ProfileAvatarURLRestServlet,
     ProfileDisplaynameRestServlet,
     ProfileRestServlet,
 )
 from synapse.rest.client.v1.push_rule import PushRuleRestServlet
-from synapse.rest.client.v1.room import (
-    JoinedRoomMemberListRestServlet,
-    JoinRoomAliasServlet,
-    PublicRoomListRestServlet,
-    RoomEventContextServlet,
-    RoomInitialSyncRestServlet,
-    RoomMemberListRestServlet,
-    RoomMembershipRestServlet,
-    RoomMessageListRestServlet,
-    RoomSendEventRestServlet,
-    RoomStateEventRestServlet,
-    RoomStateRestServlet,
-    RoomTypingRestServlet,
-)
 from synapse.rest.client.v1.voip import VoipRestServlet
-from synapse.rest.client.v2_alpha import groups, sync, user_directory
+from synapse.rest.client.v2_alpha import (
+    account_data,
+    groups,
+    read_marker,
+    receipts,
+    room_keys,
+    sync,
+    tags,
+    user_directory,
+)
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
 from synapse.rest.client.v2_alpha.account_data import (
     AccountDataServlet,
     RoomAccountDataServlet,
 )
-from synapse.rest.client.v2_alpha.keys import KeyChangesServlet, KeyQueryServlet
+from synapse.rest.client.v2_alpha.devices import DevicesRestServlet
+from synapse.rest.client.v2_alpha.keys import (
+    KeyChangesServlet,
+    KeyQueryServlet,
+    OneTimeKeyServlet,
+)
 from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+from synapse.rest.client.v2_alpha.sendtodevice import SendToDeviceRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.server import HomeServer, cache_in_self
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
+from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
@@ -142,7 +147,6 @@ from synapse.storage.databases.main.user_directory import UserDirectoryStore
 from synapse.types import ReadReceipt
 from synapse.util.async_helpers import Linearizer
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.manhole import manhole
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.generic_worker")
@@ -186,7 +190,7 @@ class KeyUploadServlet(RestServlet):
         self.http_client = hs.get_simple_http_client()
         self.main_uri = hs.config.worker_main_http_uri
 
-    async def on_POST(self, request, device_id):
+    async def on_POST(self, request: Request, device_id: Optional[str]):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
@@ -219,10 +223,12 @@ class KeyUploadServlet(RestServlet):
                 header: request.requestHeaders.getRawHeaders(header, [])
                 for header in (b"Authorization", b"User-Agent")
             }
-            # Add the previous hop the the X-Forwarded-For header.
+            # Add the previous hop to the X-Forwarded-For header.
             x_forwarded_for = request.requestHeaders.getRawHeaders(
                 b"X-Forwarded-For", []
             )
+            # we use request.client here, since we want the previous hop, not the
+            # original client (as returned by request.getClientAddress()).
             if isinstance(request.client, (address.IPv4Address, address.IPv6Address)):
                 previous_host = request.client.host.encode("ascii")
                 # If the header exists, add to the comma-separated list of the first
@@ -234,6 +240,14 @@ class KeyUploadServlet(RestServlet):
                 else:
                     x_forwarded_for = [previous_host]
             headers[b"X-Forwarded-For"] = x_forwarded_for
+
+            # Replicate the original X-Forwarded-Proto header. Note that
+            # XForwardedForRequest overrides isSecure() to give us the original protocol
+            # used by the client, as opposed to the protocol used by our upstream proxy
+            # - which is what we want here.
+            headers[b"X-Forwarded-Proto"] = [
+                b"https" if request.isSecure() else b"http"
+            ]
 
             try:
                 result = await self.http_client.post_json_get_json(
@@ -286,6 +300,8 @@ class GenericWorkerPresence(BasePresenceHandler):
         self._send_stop_syncing_loop = self.clock.looping_call(
             self.send_stop_syncing, UPDATE_SYNCING_USERS_MS
         )
+
+        self._busy_presence_enabled = hs.config.experimental.msc3026_enabled
 
         hs.get_reactor().addSystemEventTrigger(
             "before",
@@ -417,16 +433,19 @@ class GenericWorkerPresence(BasePresenceHandler):
         ]
 
     async def set_state(self, target_user, state, ignore_status_msg=False):
-        """Set the presence state of the user.
-        """
+        """Set the presence state of the user."""
         presence = state["presence"]
 
         valid_presence = (
             PresenceState.ONLINE,
             PresenceState.UNAVAILABLE,
             PresenceState.OFFLINE,
+            PresenceState.BUSY,
         )
-        if presence not in valid_presence:
+
+        if presence not in valid_presence or (
+            presence == PresenceState.BUSY and not self._busy_presence_enabled
+        ):
             raise SynapseError(400, "Invalid presence state")
 
         user_id = target_user.to_string()
@@ -459,6 +478,7 @@ class GenericWorkerSlavedStore(
     UserDirectoryStore,
     StatsStore,
     UIAuthWorkerStore,
+    EndToEndRoomKeyStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedReceiptsStore,
@@ -503,7 +523,7 @@ class GenericWorkerServer(HomeServer):
             site_tag = port
 
         # We always include a health resource.
-        resources = {"/health": HealthResource()}
+        resources = {"/health": HealthResource()}  # type: Dict[str, IResource]
 
         for res in listener_config.http_options.resources:
             for name in res.names:
@@ -512,36 +532,36 @@ class GenericWorkerServer(HomeServer):
                 elif name == "client":
                     resource = JsonResource(self, canonical_json=False)
 
-                    PublicRoomListRestServlet(self).register(resource)
-                    RoomMemberListRestServlet(self).register(resource)
-                    JoinedRoomMemberListRestServlet(self).register(resource)
-                    RoomStateRestServlet(self).register(resource)
-                    RoomEventContextServlet(self).register(resource)
-                    RoomMessageListRestServlet(self).register(resource)
                     RegisterRestServlet(self).register(resource)
-                    LoginRestServlet(self).register(resource)
+                    login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
+                    DevicesRestServlet(self).register(resource)
                     KeyQueryServlet(self).register(resource)
+                    OneTimeKeyServlet(self).register(resource)
                     KeyChangesServlet(self).register(resource)
                     VoipRestServlet(self).register(resource)
                     PushRuleRestServlet(self).register(resource)
                     VersionsRestServlet(self).register(resource)
-                    RoomSendEventRestServlet(self).register(resource)
-                    RoomMembershipRestServlet(self).register(resource)
-                    RoomStateEventRestServlet(self).register(resource)
-                    JoinRoomAliasServlet(self).register(resource)
+
                     ProfileAvatarURLRestServlet(self).register(resource)
                     ProfileDisplaynameRestServlet(self).register(resource)
                     ProfileRestServlet(self).register(resource)
                     KeyUploadServlet(self).register(resource)
                     AccountDataServlet(self).register(resource)
                     RoomAccountDataServlet(self).register(resource)
-                    RoomTypingRestServlet(self).register(resource)
 
                     sync.register_servlets(self, resource)
                     events.register_servlets(self, resource)
+                    room.register_servlets(self, resource, True)
+                    room.register_deprecated_servlets(self, resource)
                     InitialSyncRestServlet(self).register(resource)
-                    RoomInitialSyncRestServlet(self).register(resource)
+                    room_keys.register_servlets(self, resource)
+                    tags.register_servlets(self, resource)
+                    account_data.register_servlets(self, resource)
+                    receipts.register_servlets(self, resource)
+                    read_marker.register_servlets(self, resource)
+
+                    SendToDeviceRestServlet(self).register(resource)
 
                     user_directory.register_servlets(self, resource)
 
@@ -553,6 +573,8 @@ class GenericWorkerServer(HomeServer):
                     groups.register_servlets(self, resource)
 
                     resources.update({CLIENT_API_PREFIX: resource})
+
+                    resources.update(build_synapse_client_resource_tree(self))
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
@@ -617,12 +639,8 @@ class GenericWorkerServer(HomeServer):
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
-                _base.listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                _base.listen_manhole(
+                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
                 )
             elif listener.type == "metrics":
                 if not self.get_config().enable_metrics:
@@ -638,9 +656,6 @@ class GenericWorkerServer(HomeServer):
                 logger.warning("Unsupported listener type: %s", listener.type)
 
         self.get_tcp_replication().start_replication(self)
-
-    async def remove_pusher(self, app_id, push_key, user_id):
-        self.get_tcp_replication().send_remove_pusher(app_id, push_key, user_id)
 
     @cache_in_self
     def get_replication_data_handler(self):
@@ -771,13 +786,6 @@ class FederationSenderHandler:
         self.federation_position = None
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
-
-    def on_start(self):
-        # There may be some events that are persisted but haven't been sent,
-        # so send them now.
-        self.federation_sender.notify_new_events(
-            self.store.get_room_max_stream_ordering()
-        )
 
     def wake_destination(self, server: str):
         self.federation_sender.wake_destination(server)
@@ -916,22 +924,6 @@ def start(config_options):
         # For other worker types we force this to off.
         config.appservice.notify_appservices = False
 
-    if config.worker_app == "synapse.app.pusher":
-        if config.server.start_pushers:
-            sys.stderr.write(
-                "\nThe pushers must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``start_pushers: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.server.start_pushers = True
-    else:
-        # For other worker types we force this to off.
-        config.server.start_pushers = False
-
     if config.worker_app == "synapse.app.user_dir":
         if config.server.update_user_directory:
             sys.stderr.write(
@@ -947,22 +939,6 @@ def start(config_options):
     else:
         # For other worker types we force this to off.
         config.server.update_user_directory = False
-
-    if config.worker_app == "synapse.app.federation_sender":
-        if config.worker.send_federation:
-            sys.stderr.write(
-                "\nThe send_federation must be disabled in the main synapse process"
-                "\nbefore they can be run in a separate worker."
-                "\nPlease add ``send_federation: false`` to the main config"
-                "\n"
-            )
-            sys.exit(1)
-
-        # Force the pushers to start since they will be disabled in the main config
-        config.worker.send_federation = True
-    else:
-        # For other worker types we force this to off.
-        config.worker.send_federation = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -980,9 +956,7 @@ def start(config_options):
     # streams. Will no-op if no streams can be written to by this worker.
     hs.get_replication_streamer()
 
-    reactor.addSystemEventTrigger(
-        "before", "startup", _base.start, hs, config.worker_listeners
-    )
+    register_start(_base.start, hs, config.worker_listeners)
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

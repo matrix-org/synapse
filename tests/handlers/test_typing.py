@@ -15,18 +15,20 @@
 
 
 import json
+from typing import Dict
 
 from mock import ANY, Mock, call
 
 from twisted.internet import defer
+from twisted.web.resource import Resource
 
 from synapse.api.errors import AuthError
+from synapse.federation.transport.server import TransportLayerServer
 from synapse.types import UserID, create_requester
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
-from tests.utils import register_federation_servlets
 
 # Some local users to test with
 U_APPLE = UserID.from_string("@apple:test")
@@ -53,8 +55,6 @@ def _make_edu_transaction_json(edu_type, content):
 
 
 class TypingNotificationsTestCase(unittest.HomeserverTestCase):
-    servlets = [register_federation_servlets]
-
     def make_homeserver(self, reactor, clock):
         # we mock out the keyring so as to skip the authentication check on the
         # federation API call.
@@ -76,6 +76,11 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         )
 
         return hs
+
+    def create_resource_dict(self) -> Dict[str, Resource]:
+        d = super().create_resource_dict()
+        d["/_matrix/federation"] = TransportLayerServer(self.hs)
+        return d
 
     def prepare(self, reactor, clock, hs):
         mock_notifier = hs.get_notifier()
@@ -138,14 +143,14 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.datastore.get_current_state_deltas = Mock(return_value=(0, None))
 
         self.datastore.get_to_device_stream_token = lambda: 0
-        self.datastore.get_new_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
-            ([], 0)
+        self.datastore.get_new_device_msgs_for_remote = (
+            lambda *args, **kargs: make_awaitable(([], 0))
         )
-        self.datastore.delete_device_msgs_for_remote = lambda *args, **kargs: make_awaitable(
-            None
+        self.datastore.delete_device_msgs_for_remote = (
+            lambda *args, **kargs: make_awaitable(None)
         )
-        self.datastore.set_received_txn_response = lambda *args, **kwargs: make_awaitable(
-            None
+        self.datastore.set_received_txn_response = (
+            lambda *args, **kwargs: make_awaitable(None)
         )
 
     def test_started_typing_local(self):
@@ -215,7 +220,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 0)
 
-        (request, channel) = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/federation/v1/send/1000000",
             _make_edu_transaction_json(
