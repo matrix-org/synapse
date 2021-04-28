@@ -117,7 +117,7 @@ class SpaceSummaryHandler:
 
             if is_in_room:
                 rooms, events = await self._summarize_local_room(
-                    requester, room_id, suggested_only, max_children
+                    requester, None, room_id, suggested_only, max_children
                 )
             else:
                 rooms, events = await self._summarize_remote_room(
@@ -167,6 +167,7 @@ class SpaceSummaryHandler:
 
     async def federation_space_summary(
         self,
+        origin: str,
         room_id: str,
         suggested_only: bool,
         max_rooms_per_space: Optional[int],
@@ -176,6 +177,8 @@ class SpaceSummaryHandler:
         Implementation of the space summary Federation API
 
         Args:
+            origin: The server requesting the spaces summary.
+
             room_id: room id to start the summary at
 
             suggested_only: whether we should only return children with the "suggested"
@@ -211,7 +214,7 @@ class SpaceSummaryHandler:
             logger.debug("Processing room %s", room_id)
 
             rooms, events = await self._summarize_local_room(
-                None, room_id, suggested_only, max_rooms_per_space
+                None, origin, room_id, suggested_only, max_rooms_per_space
             )
 
             processed_rooms.add(room_id)
@@ -227,6 +230,7 @@ class SpaceSummaryHandler:
     async def _summarize_local_room(
         self,
         requester: Optional[str],
+        origin: Optional[str],
         room_id: str,
         suggested_only: bool,
         max_children: Optional[int],
@@ -238,6 +242,9 @@ class SpaceSummaryHandler:
             requester:
                 The user requesting the summary, if it is a local request. None
                 if this is a federation request.
+            origin:
+                The server requesting the summary, if it is a federation request.
+                None if this is a local request.
             room_id: The room ID to summarize.
             suggested_only: True if only suggested children should be returned.
                 Otherwise, all children are returned.
@@ -252,7 +259,7 @@ class SpaceSummaryHandler:
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
         """
-        if not await self._is_room_accessible(room_id, requester):
+        if not await self._is_room_accessible(room_id, requester, origin):
             return (), ()
 
         room_entry = await self._build_room_entry(room_id)
@@ -337,7 +344,9 @@ class SpaceSummaryHandler:
             or ev.event_type == EventTypes.SpaceChild
         )
 
-    async def _is_room_accessible(self, room_id: str, requester: Optional[str]) -> bool:
+    async def _is_room_accessible(
+        self, room_id: str, requester: Optional[str], origin: Optional[str]
+    ) -> bool:
         """
         Calculate whether the room should be shown in the spaces summary.
 
@@ -345,6 +354,7 @@ class SpaceSummaryHandler:
 
         * The requester is joined or invited to the room.
         * The requester can join without an invite (per MSC3083).
+        * The origin server has any user that is joined or invited to the room.
         * The history visibility is set to world readable.
 
         Args:
@@ -352,6 +362,9 @@ class SpaceSummaryHandler:
             requester:
                 The user requesting the summary, if it is a local request. None
                 if this is a federation request.
+            origin:
+                The server requesting the summary, if it is a federation request.
+                None if this is a local request.
 
         Returns:
              True if the room should be included in the spaces summary.
@@ -375,6 +388,10 @@ class SpaceSummaryHandler:
                 state_ids, room_version, requester
             ):
                 return True
+
+        # If this is a request over federation, check if the host is in the room.
+        elif origin and await self._auth.check_host_in_room(room_id, origin):
+            return True
 
         # otherwise, check if the room is peekable
         hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""), None)
