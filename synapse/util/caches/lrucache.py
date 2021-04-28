@@ -73,7 +73,7 @@ class _Node:
 
         # Set of callbacks to run when the node gets deleted. We store as a list
         # rather than a set to keep memory usage down (and since we expect few
-        # entries per node the performance of checking for duplication in a list
+        # entries per node, the performance of checking for duplication in a list
         # vs using a set is negligible).
         #
         # Note that we store this as an optional list to keep the memory
@@ -96,7 +96,7 @@ class _Node:
                 self.callbacks.append(callback)
 
     def run_and_clear_callbacks(self) -> None:
-        """Run all callbacks and clear the stored set of callbacks. Used when
+        """Run all callbacks and clear the stored list of callbacks. Used when
         the node is being deleted.
         """
 
