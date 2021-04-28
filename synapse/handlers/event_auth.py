@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Collection, Tuple
 
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.room_versions import RoomVersion
@@ -28,6 +28,56 @@ class EventAuthHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
+
+    async def get_allowed_spaces(
+        self, state_ids: StateMap[str], room_version: RoomVersion
+    ) -> Tuple[bool, Collection[str]]:
+        """
+        Generate a list of spaces allow access to a room.
+
+        Args:
+            state_ids: The state of the room as it currently is.
+            room_version: The room version of the room being joined.
+
+        Returns:
+            A tuple:
+                True if spaces give access to the room.
+                A collection of spaces (if any) which provide membership to the room.
+        """
+        # This only applies to room versions which support the new join rule.
+        if not room_version.msc3083_join_rules:
+            return False, ()
+
+        # If there's no join rule, then it defaults to invite (so this doesn't apply).
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
+        if not join_rules_event_id:
+            return False, ()
+
+        # If the join rule is not restricted, this doesn't apply.
+        join_rules_event = await self._store.get_event(join_rules_event_id)
+        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
+            return False, ()
+
+        # If allowed is of the wrong form, then only allow invited users.
+        allowed_spaces = join_rules_event.content.get("allow", [])
+        if not isinstance(allowed_spaces, list):
+            return True, ()
+
+        # Pull out the room IDs, invalid data gets filtered.
+        result = []
+        for space in allowed_spaces:
+            if not isinstance(space, dict):
+                continue
+
+            space_id = space.get("space")
+            if not isinstance(space_id, str):
+                continue
+
+            # The user was joined to one of the spaces specified, they can join
+            # this room!
+            result.append(space_id)
+
+        return True, result
 
     async def can_join_without_invite(
         self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
@@ -46,39 +96,20 @@ class EventAuthHandler:
         Returns:
             True if the user can join the room, false otherwise.
         """
-        # This only applies to room versions which support the new join rule.
-        if not room_version.msc3083_join_rules:
+        # Get whether spaces allow access to the room and the allowed spaces.
+        allow_via_spaces, allowed_spaces = await self.get_allowed_spaces(
+            state_ids, room_version
+        )
+        # Access via spaces doesn't apply to this room.
+        if not allow_via_spaces:
             return True
-
-        # If there's no join rule, then it defaults to invite (so this doesn't apply).
-        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
-        if not join_rules_event_id:
-            return True
-
-        # If the join rule is not restricted, this doesn't apply.
-        join_rules_event = await self._store.get_event(join_rules_event_id)
-        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
-            return True
-
-        # If allowed is of the wrong form, then only allow invited users.
-        allowed_spaces = join_rules_event.content.get("allow", [])
-        if not isinstance(allowed_spaces, list):
-            return False
 
         # Get the list of joined rooms and see if there's an overlap.
         joined_rooms = await self._store.get_rooms_for_user(user_id)
 
-        # Pull out the other room IDs, invalid data gets filtered.
-        for space in allowed_spaces:
-            if not isinstance(space, dict):
-                continue
-
-            space_id = space.get("space")
-            if not isinstance(space_id, str):
-                continue
-
-            # The user was joined to one of the spaces specified, they can join
-            # this room!
+        # If the user was joined to one of the spaces specified, they can join
+        # this room!
+        for space_id in allowed_spaces:
             if space_id in joined_rooms:
                 return True
 

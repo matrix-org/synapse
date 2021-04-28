@@ -120,12 +120,30 @@ class SpaceSummaryHandler:
                     requester, None, room_id, suggested_only, max_children
                 )
             else:
-                rooms, events = await self._summarize_remote_room(
+                fed_rooms, fed_events = await self._summarize_remote_room(
                     queue_entry,
                     suggested_only,
                     max_children,
                     exclude_rooms=processed_rooms,
                 )
+
+                # The results over federation might include rooms that the we,
+                # as the requesting server, are allowed to see, but the requesting
+                # user is not permitted see. Handle that filtering.
+                room_ids = set()
+                rooms = []
+                events = []
+                for room in fed_rooms:
+                    fed_room_id = room.get("room_id")
+                    if fed_room_id and await self._is_room_accessible(
+                        fed_room_id, requester, None
+                    ):
+                        rooms.append(room)
+                        room_ids.add(fed_room_id)
+
+                for event in fed_events:
+                    if event.get("room_id") in room_ids:
+                        events.append(event)
 
             logger.debug(
                 "Query of %s returned rooms %s, events %s",
@@ -370,6 +388,7 @@ class SpaceSummaryHandler:
              True if the room should be included in the spaces summary.
         """
         state_ids = await self._store.get_current_state_ids(room_id)
+        room_version = await self._store.get_room_version(room_id)
 
         # if we have an authenticated requesting user, first check if they are able to view
         # stripped state in the room.
@@ -383,15 +402,30 @@ class SpaceSummaryHandler:
                     return True
 
             # Otherwise, if they should be allowed access via membership in a space.
-            room_version = await self._store.get_room_version(room_id)
             if await self._event_auth_handler.can_join_without_invite(
                 state_ids, room_version, requester
             ):
                 return True
 
-        # If this is a request over federation, check if the host is in the room.
-        elif origin and await self._auth.check_host_in_room(room_id, origin):
-            return True
+        # If this is a request over federation, check if the host is in the room or
+        # is in one of the spaces specified via the join rules.
+        elif origin:
+            if await self._auth.check_host_in_room(room_id, origin):
+                return True
+
+            # Alternately, if the host has a user in any of the spaces specified
+            # for access, then the host can see this room (and should do filtering
+            # if the requester cannot see it).
+            (
+                allow_via_spaces,
+                allowed_spaces,
+            ) = await self._event_auth_handler.get_allowed_spaces(
+                state_ids, room_version
+            )
+            if allow_via_spaces:
+                for space_id in allowed_spaces:
+                    if await self._auth.check_host_in_room(space_id, origin):
+                        return True
 
         # otherwise, check if the room is peekable
         hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""), None)
