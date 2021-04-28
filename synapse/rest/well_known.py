@@ -42,7 +42,7 @@ class WellKnownBuilder:
         # Point to BigBlueButton widget for calls
         result.update({
             "io.element.call_behaviour": {
-                "widget_build_url": "http://localhost:9999/bigbluebutton-widget.json",
+                "widget_build_url": "http://localhost:8184/api/v1/dimension/bigbluebutton/widget",
             }
         })
 
