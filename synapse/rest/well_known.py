@@ -39,6 +39,13 @@ class WellKnownBuilder:
 
         result = {"m.homeserver": {"base_url": self._config.public_baseurl}}
 
+        # Point to BigBlueButton widget for calls
+        result.update({
+            "io.element.call_behaviour": {
+                "widget_build_url": "http://localhost:9999/bigbluebutton-widget.json",
+            }
+        })
+
         if self._config.default_identity_server:
             result["m.identity_server"] = {
                 "base_url": self._config.default_identity_server
