@@ -14,7 +14,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Dict, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
@@ -295,33 +295,37 @@ class TransactionStore(TransactionWorkerStore):
                 },
             )
 
-    async def bulk_store_destination_rooms_entries(
-        self, room_and_destination_to_ordering: Dict[Tuple[str, str], int]
-    ):
+    async def store_destination_rooms_entries(
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        stream_ordering: int,
+    ) -> None:
         """
-        Updates or creates `destination_rooms` entries for a number of events.
+        Updates or creates `destination_rooms` entries in batch for a single event.
 
         Args:
-            room_and_destination_to_ordering: A mapping of (room, destination) -> stream_id
+            destinations: list of destinations
+            room_id: the room_id of the event
+            stream_ordering: the stream_ordering of the event
         """
 
         await self.db_pool.simple_upsert_many(
             table="destinations",
             key_names=("destination",),
-            key_values={(d,) for _, d in room_and_destination_to_ordering.keys()},
+            key_values=[(d,) for d in destinations],
             value_names=[],
             value_values=[],
             desc="store_destination_rooms_entries_dests",
         )
 
+        rows = [(destination, room_id) for destination in destinations]
         await self.db_pool.simple_upsert_many(
             table="destination_rooms",
-            key_names=("room_id", "destination"),
-            key_values=list(room_and_destination_to_ordering.keys()),
+            key_names=("destination", "room_id"),
+            key_values=rows,
             value_names=["stream_ordering"],
-            value_values=[
-                (stream_id,) for stream_id in room_and_destination_to_ordering.values()
-            ],
+            value_values=[(stream_ordering,)] * len(rows),
             desc="store_destination_rooms_entries_rooms",
         )
 
