@@ -1452,7 +1452,7 @@ class FederationHandler(BaseHandler):
         # room stuff after join currently doesn't work on workers.
         assert self.config.worker.worker_app is None
 
-        logger.debug("Joining %s to %s", joinee, room_id)
+        logger.info("Joining %s to %s", joinee, room_id)
 
         origin, event, room_version_obj = await self._make_and_verify_event(
             target_hosts,
@@ -1462,6 +1462,8 @@ class FederationHandler(BaseHandler):
             content,
             params={"ver": KNOWN_ROOM_VERSIONS},
         )
+
+        logger.info("make_join done from %s", origin)
 
         # This shouldn't happen, because the RoomMemberHandler has a
         # linearizer lock which only allows one operation per user per room
@@ -1482,9 +1484,12 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
+            logger.info("Sending join")
             ret = await self.federation_client.send_join(
                 host_list, event, room_version_obj
             )
+
+            logger.info("send join done")
 
             origin = ret["origin"]
             state = ret["state"]
@@ -1510,9 +1515,13 @@ class FederationHandler(BaseHandler):
                 room_version=room_version_obj,
             )
 
+            logger.info("Persisting auth true")
+
             max_stream_id = await self._persist_auth_tree(
                 origin, room_id, auth_chain, state, event, room_version_obj
             )
+
+            logger.info("Persisted auth true")
 
             # We wait here until this instance has seen the events come down
             # replication (if we're using replication) as the below uses caches.
@@ -2166,6 +2175,8 @@ class FederationHandler(BaseHandler):
             ctx = await self.state_handler.compute_event_context(e)
             events_to_context[e.event_id] = ctx
 
+        logger.info("Computed contexts")
+
         event_map = {
             e.event_id: e for e in itertools.chain(auth_events, state, [event])
         }
@@ -2207,6 +2218,8 @@ class FederationHandler(BaseHandler):
             else:
                 logger.info("Failed to find auth event %r", e_id)
 
+        logger.info("Got missing events")
+
         for e in itertools.chain(auth_events, state, [event]):
             auth_for_e = {
                 (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
@@ -2231,6 +2244,8 @@ class FederationHandler(BaseHandler):
                     raise
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
+        logger.info("Authed events")
+
         await self.persist_events_and_notify(
             room_id,
             [
@@ -2239,9 +2254,13 @@ class FederationHandler(BaseHandler):
             ],
         )
 
+        logger.info("Persisted events")
+
         new_event_context = await self.state_handler.compute_event_context(
             event, old_state=state
         )
+
+        logger.info("Computed context")
 
         return await self.persist_events_and_notify(
             room_id, [(event, new_event_context)]

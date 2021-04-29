@@ -669,15 +669,21 @@ class FederationClient(FederationBase):
 
             logger.debug("Got content: %s", content)
 
+            logger.info("send_join content: %d", len(content))
+
             state = [
                 event_from_pdu_json(p, room_version, outlier=True)
                 for p in content.get("state", [])
             ]
 
+            logger.info("Parsed auth chain: %d", len(state))
+
             auth_chain = [
                 event_from_pdu_json(p, room_version, outlier=True)
                 for p in content.get("auth_chain", [])
             ]
+
+            logger.info("Parsed auth chain: %d", len(auth_chain))
 
             pdus = {p.event_id: p for p in itertools.chain(state, auth_chain)}
 
@@ -711,6 +717,8 @@ class FederationClient(FederationBase):
                 room_version=room_version,
             )
 
+            logger.info("_check_sigs_and_hash_and_fetch done")
+
             valid_pdus_map = {p.event_id: p for p in valid_pdus}
 
             # NB: We *need* to copy to ensure that we don't have multiple
@@ -743,6 +751,8 @@ class FederationClient(FederationBase):
                     "Unexpected create event(s) in auth chain: %s"
                     % (auth_chain_create_events,)
                 )
+
+            logger.info("Returning from send_join")
 
             return {
                 "state": signed_state,
