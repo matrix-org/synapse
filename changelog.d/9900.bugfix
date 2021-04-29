@@ -1,1 +1,0 @@
-Fix tight loop handling presence replication when using workers. Introduced in v1.33.0rc1.
