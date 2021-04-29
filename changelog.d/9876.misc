@@ -1,1 +1,0 @@
-Add type hints to `synapse.api.auth` and `synapse.api.auth_blocking` modules.
