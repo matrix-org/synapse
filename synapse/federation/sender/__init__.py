@@ -13,10 +13,23 @@
 # limitations under the License.
 
 import abc
+import itertools
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple, Collection
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 from prometheus_client import Counter
+
+from twisted.internet import defer
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
@@ -24,6 +37,7 @@ from synapse.events import EventBase
 from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,
@@ -352,7 +366,29 @@ class FederationSender(AbstractFederationSender):
                             if dests
                         ]
 
-                events_and_dests = await get_federatable_events_and_destinations(events)
+                events_by_room: Dict[str, List[EventBase]] = {}
+                for event in events:
+                    events_by_room.setdefault(event.room_id, []).append(event)
+
+                # concurrently process room events, to allow parallelization through db queries
+                nested_events_and_dests: List[
+                    List[Tuple[EventBase, Collection[str]]]
+                ] = await make_deferred_yieldable(
+                    defer.gatherResults(
+                        [
+                            run_in_background(
+                                get_federatable_events_and_destinations, evs
+                            )
+                            for evs in events_by_room.values()
+                        ],
+                        consumeErrors=True,
+                    )
+                )
+
+                # flatten list
+                events_and_dests = list(
+                    itertools.chain.from_iterable(nested_events_and_dests)
+                )
 
                 # Send corresponding events to each destination queue
                 await self._distribute_events(events_and_dests)
@@ -373,7 +409,7 @@ class FederationSender(AbstractFederationSender):
                     events_processed_counter.inc(len(events))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
-                        len({event.room_id for event in events})
+                        len(events_by_room)
                     )
 
                 event_processing_loop_counter.labels("federation_sender").inc()
