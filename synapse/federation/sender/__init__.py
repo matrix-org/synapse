@@ -14,7 +14,7 @@
 
 import abc
 import logging
-from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple, Collection
 
 from prometheus_client import Counter
 
