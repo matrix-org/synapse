@@ -572,6 +572,7 @@ class ServerConfig(Config):
             _warn_if_webclient_configured(self.listeners)
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
+        self.gc_seconds = read_gc_thresholds(config.get("gc_min_seconds_between", None))
 
         @attr.s
         class LimitRemoteRoomsConfig:
@@ -916,6 +917,14 @@ class ServerConfig(Config):
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
         #gc_thresholds: [700, 10, 10]
+
+        # The minimum time in seconds between each GC for a generation, regardless of
+        # the GC thresholds. This ensures that we don't do GC too frequently.
+        #
+        # A value of `[1, 10, 30]` indicates that a second must pass between consecutive
+        # generation 0 GCs, etc.
+        #
+        # gc_min_seconds_between: [1, 10, 30]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is 100. -1 means no upper limit.
