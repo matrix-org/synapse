@@ -686,8 +686,6 @@ class FederationClient(FederationBase):
             for i, p in enumerate(ijson.items(content, "state.item")):
                 state.append(event_from_pdu_json(p, room_version, outlier=True))
                 if i % 1000 == 999:
-                    r = get_thread_resource_usage()
-                    logger.info("Memory during state: %s", r.ru_maxrss)
                     await self._clock.sleep(0)
 
             r = get_thread_resource_usage()
@@ -700,8 +698,6 @@ class FederationClient(FederationBase):
             for i, p in enumerate(ijson.items(content, "auth_chain.item")):
                 auth_chain.append(event_from_pdu_json(p, room_version, outlier=True))
                 if i % 1000 == 999:
-                    r = get_thread_resource_usage()
-                    logger.info("Memory during auth chain: %s", r.ru_maxrss)
                     await self._clock.sleep(0)
 
             r = get_thread_resource_usage()
@@ -735,6 +731,7 @@ class FederationClient(FederationBase):
             valid_pdus = []
 
             for chunk in batch_iter(itertools.chain(state, auth_chain), 1000):
+                logger.info("Handling next _check_sigs_and_hash_and_fetch chunk")
                 new_valid_pdus = await self._check_sigs_and_hash_and_fetch(
                     destination,
                     chunk,
