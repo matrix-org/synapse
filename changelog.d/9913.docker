@@ -1,1 +1,1 @@
-Added startup_delay to docker healthcheck to reduce waiting time for coming online, contributed by @Maquis196
+Added startup_delay to docker healthcheck to reduce waiting time for coming online, contributed by @Maquis196.
