@@ -673,7 +673,7 @@ class FederationClient(FederationBase):
         async def send_request(destination) -> Dict[str, Any]:
             content = await self._do_send_join(destination, pdu)
 
-            logger.info("Got content: %s", content.getvalue())
+            # logger.debug("Got content: %s", content.getvalue())
 
             # logger.info("send_join content: %d", len(content))
 
