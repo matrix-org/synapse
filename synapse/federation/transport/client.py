@@ -244,7 +244,10 @@ class TransportLayerClient:
         path = _create_v1_path("/send_join/%s/%s", room_id, event_id)
 
         response = await self.client.put_json(
-            destination=destination, path=path, data=content
+            destination=destination,
+            path=path,
+            data=content,
+            return_string_io=True,
         )
 
         return response
@@ -254,7 +257,10 @@ class TransportLayerClient:
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
 
         response = await self.client.put_json(
-            destination=destination, path=path, data=content
+            destination=destination,
+            path=path,
+            data=content,
+            return_string_io=True,
         )
 
         return response
