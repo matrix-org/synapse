@@ -207,9 +207,10 @@ You will need version >2.1 for this to work.
 ```
 healthcheck:
   test: ["CMD", "curl", "-fSs", "http://localhost:8008/health"]
-  interval: 1m
-  timeout: 10s
+  interval: 15s
+  timeout: 5s
   retries: 3
+  start_period: 5s
 ```
 
 ## Using jemalloc
