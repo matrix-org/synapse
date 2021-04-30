@@ -154,6 +154,7 @@ async def _handle_json_response(
     request: MatrixFederationRequest,
     response: IResponse,
     start_ms: int,
+    return_string_io=False,
 ) -> JsonDict:
     """
     Reads the JSON body of a response, with a timeout
@@ -175,12 +176,12 @@ async def _handle_json_response(
         d = read_body_with_max_size(response, BinaryIOWrapper(buf), MAX_RESPONSE_SIZE)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
-        def parse(_len: int):
-            return json_decoder.decode(buf.getvalue())
+        await make_deferred_yieldable(d)
 
-        d.addCallback(parse)
-
-        body = await make_deferred_yieldable(d)
+        if return_string_io:
+            body = buf
+        else:
+            body = json_decoder.decode(buf.getvalue())
     except BodyExceededMaxSize as e:
         # The response was too big.
         logger.warning(
@@ -684,6 +685,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
+        return_string_io=False,
     ) -> Union[JsonDict, list]:
         """Sends the specified json data using PUT
 
@@ -758,7 +760,12 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms
+            self.reactor,
+            _sec_timeout,
+            request,
+            response,
+            start_ms,
+            return_string_io=return_string_io,
         )
 
         return body

@@ -33,6 +33,7 @@ from typing import (
 )
 
 import attr
+import ijson
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -669,18 +670,20 @@ class FederationClient(FederationBase):
 
             logger.debug("Got content: %s", content)
 
-            logger.info("send_join content: %d", len(content))
+            # logger.info("send_join content: %d", len(content))
 
+            content.seek(0)
             state = [
                 event_from_pdu_json(p, room_version, outlier=True)
-                for p in content.get("state", [])
+                for p in ijson.items(content, "state.item")
             ]
 
             logger.info("Parsed auth chain: %d", len(state))
+            content.seek(0)
 
             auth_chain = [
                 event_from_pdu_json(p, room_version, outlier=True)
-                for p in content.get("auth_chain", [])
+                for p in ijson.items(content, "auth_chain.item")
             ]
 
             logger.info("Parsed auth chain: %d", len(auth_chain))
@@ -778,6 +781,8 @@ class FederationClient(FederationBase):
             # and raise.
             if not self._is_unknown_endpoint(e):
                 raise
+
+        raise NotImplementedError()
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
 
