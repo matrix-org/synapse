@@ -34,6 +34,7 @@ from typing import (
 
 import attr
 import ijson
+from synapse.logging.context import get_thread_resource_usage
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -668,23 +669,39 @@ class FederationClient(FederationBase):
         async def send_request(destination) -> Dict[str, Any]:
             content = await self._do_send_join(destination, pdu)
 
-            logger.debug("Got content: %s", content)
+            logger.info("Got content: %s", content.getvalue())
 
             # logger.info("send_join content: %d", len(content))
 
             content.seek(0)
-            state = [
-                event_from_pdu_json(p, room_version, outlier=True)
-                for p in ijson.items(content, "state.item")
-            ]
 
-            logger.info("Parsed auth chain: %d", len(state))
+            r = get_thread_resource_usage()
+            logger.info("Memory before state: %s", r.ru_maxrss)
+
+            state = []
+            for i, p in enumerate(ijson.items(content, "state.item")):
+                state.append(event_from_pdu_json(p, room_version, outlier=True))
+                if i % 1000 == 999:
+                    r = get_thread_resource_usage()
+                    logger.info("Memory during state: %s", r.ru_maxrss)
+                    await self._clock.sleep(0)
+
+            r = get_thread_resource_usage()
+            logger.info("Memory after state: %s", r.ru_maxrss)
+
+            logger.info("Parsed state: %d", len(state))
             content.seek(0)
 
-            auth_chain = [
-                event_from_pdu_json(p, room_version, outlier=True)
-                for p in ijson.items(content, "auth_chain.item")
-            ]
+            auth_chain = []
+            for i, p in enumerate(ijson.items(content, "auth_chain.item")):
+                auth_chain.append(event_from_pdu_json(p, room_version, outlier=True))
+                if i % 1000 == 999:
+                    r = get_thread_resource_usage()
+                    logger.info("Memory during auth chain: %s", r.ru_maxrss)
+                    await self._clock.sleep(0)
+
+            r = get_thread_resource_usage()
+            logger.info("Memory after: %s", r.ru_maxrss)
 
             logger.info("Parsed auth chain: %d", len(auth_chain))
 
