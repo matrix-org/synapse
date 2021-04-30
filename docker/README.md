@@ -192,9 +192,9 @@ whilst running the above `docker run` commands.
    --no-healthcheck
 ```
 
-## Disabling the healthcheck in docker-compose
+## Disabling the healthcheck in docker-compose file
 
-If you wish to disable the healthcheck via docker-compose append your stanza with the follow.
+If you wish to disable the healthcheck via docker-compose append your stanza with the following.
 
 ```
   healthcheck:
@@ -212,7 +212,7 @@ If you wish to point the healthcheck at a different port with docker command, ad
 ## Setting the healthcheck in docker-compose file
 
 You can add the following to set a custom healthcheck in a docker compose file.
-You will need version >2.1 for this to work. 
+You will need docker-compose version >2.1 for this to work. 
 
 ```
 healthcheck:
@@ -222,7 +222,6 @@ healthcheck:
   retries: 3
   start_period: 5s
 ```
-
 
 ## Using jemalloc
 
