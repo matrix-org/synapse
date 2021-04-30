@@ -110,6 +110,8 @@ class EventTypes:
 
     Dummy = "org.matrix.dummy_event"
 
+    SpaceChild = "m.space.child"
+    SpaceParent = "m.space.parent"
     MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
     MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
