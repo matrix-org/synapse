@@ -235,15 +235,10 @@ class SyncRestServlet(RestServlet):
         response["next_batch"] = await sync_result.next_batch.to_string(self.store)
         response.update(
             {
-                "account_data": {"events": sync_result.account_data},
-                "to_device": {"events": sync_result.to_device},
                 "device_lists": {
                     "changed": list(sync_result.device_lists.changed),
                     "left": list(sync_result.device_lists.left),
                 },
-                "presence": SyncRestServlet.encode_presence(
-                    sync_result.presence, time_now
-                ),
                 "rooms": {"join": joined, "invite": invited, "leave": archived},
                 "groups": {
                     "join": sync_result.groups.join,
@@ -254,6 +249,16 @@ class SyncRestServlet(RestServlet):
                 "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
             }
         )
+
+        if sync_result.account_data:
+            response["account_data"] = {"events": sync_result.account_data}
+        if sync_result.presence:
+            response["presence"] = SyncRestServlet.encode_presence(
+                sync_result.presence, time_now
+            )
+
+        if sync_result.to_device:
+            response["to_device"] = {"events": sync_result.to_device}
 
         return response
 
