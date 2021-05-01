@@ -239,11 +239,6 @@ class SyncRestServlet(RestServlet):
                     "changed": list(sync_result.device_lists.changed),
                     "left": list(sync_result.device_lists.left),
                 },
-                "groups": {
-                    "join": sync_result.groups.join,
-                    "invite": sync_result.groups.invite,
-                    "leave": sync_result.groups.leave,
-                },
                 "device_one_time_keys_count": sync_result.device_one_time_keys_count,
                 "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
             }
@@ -265,6 +260,13 @@ class SyncRestServlet(RestServlet):
             response["rooms"]["invite"] = invited
         if archived:
             response["rooms"]["leave"] = archived
+
+        if sync_result.groups.join:
+            response["groups"]["join"] = sync_result.groups.join
+        if sync_result.groups.invite:
+            response["groups"]["invite"] = sync_result.groups.invite
+        if sync_result.groups.leave:
+            response["groups"]["leave"] = sync_result.groups.leave
 
         return response
 
