@@ -458,6 +458,29 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
 
+class WhoamiTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        account.register_servlets,
+        register.register_servlets,
+    ]
+
+    def test_GET_whoami(self):
+        device_id = "wouldgohere"
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test", device_id=device_id)
+
+        whoami = self.whoami(tok)
+        self.assertObjectHasAttributes({"user_id": user_id, "device_id": device_id}, whoami)
+
+    def whoami(self, tok):
+        channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
+        self.assertEqual(channel.code, 200)
+        return channel.json_body
+
+
 class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
     servlets = [

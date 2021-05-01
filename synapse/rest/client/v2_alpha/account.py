@@ -884,7 +884,10 @@ class WhoamiRestServlet(RestServlet):
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request)
 
-        return 200, {"user_id": requester.user.to_string()}
+        return 200, {
+            "user_id": requester.user.to_string(),
+            "device_id": requester.device_id,
+        }
 
 
 def register_servlets(hs, http_server):
