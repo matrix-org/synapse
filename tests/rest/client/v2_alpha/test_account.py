@@ -473,7 +473,9 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "test", device_id=device_id)
 
         whoami = self.whoami(tok)
-        self.assertObjectHasAttributes({"user_id": user_id, "device_id": device_id}, whoami)
+        self.assertObjectHasAttributes(
+            {"user_id": user_id, "device_id": device_id}, whoami
+        )
 
     def whoami(self, tok):
         channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
