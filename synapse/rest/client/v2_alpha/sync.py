@@ -235,10 +235,6 @@ class SyncRestServlet(RestServlet):
         response["next_batch"] = await sync_result.next_batch.to_string(self.store)
         response.update(
             {
-                "device_lists": {
-                    "changed": list(sync_result.device_lists.changed),
-                    "left": list(sync_result.device_lists.left),
-                },
                 "device_one_time_keys_count": sync_result.device_one_time_keys_count,
                 "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
             }
@@ -253,6 +249,11 @@ class SyncRestServlet(RestServlet):
 
         if sync_result.to_device:
             response["to_device"] = {"events": sync_result.to_device}
+
+        if sync_result.device_lists.changed:
+            response["device_lists"]["changed"] = list(sync_result.device_lists.changed)
+        if sync_result.device_lists.left:
+            response["device_lists"]["left"] = list(sync_result.device_lists.left)
 
         if joined:
             response["rooms"]["join"] = joined
