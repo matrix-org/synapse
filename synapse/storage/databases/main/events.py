@@ -1975,19 +1975,22 @@ class PersistEventsStore:
         For the given event, update the event edges table and forward and
         backward extremities tables.
         """
+        asdf = [
+            {
+                "event_id": ev.event_id,
+                "prev_event_id": e_id,
+                "room_id": ev.room_id,
+                "is_state": False,
+            }
+            for ev in events
+            for e_id in ev.prev_event_ids()
+        ]
+
+        logger.info("inserting event_edges=%s", asdf)
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_edges",
-            values=[
-                {
-                    "event_id": ev.event_id,
-                    "prev_event_id": e_id,
-                    "room_id": ev.room_id,
-                    "is_state": False,
-                }
-                for ev in events
-                for e_id in ev.prev_event_ids()
-            ],
+            values=asdf,
         )
 
         self._update_backward_extremeties(txn, events)

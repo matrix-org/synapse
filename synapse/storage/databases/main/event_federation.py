@@ -915,7 +915,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return sorted(events, key=lambda e: -e.depth)
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
-        logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
+        logger.info("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
 
         event_results = set()
 
@@ -956,11 +956,35 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
+            logger.info("_get_backfill_events query: %s", event_id)
             txn.execute(query, (event_id, False, limit - len(event_results)))
 
             for row in txn:
+                logger.info("_get_backfill_events query row: %s", row)
                 if row[1] not in event_results:
                     queue.put((-row[0], row[1]))
+
+            # From each event, go forwards through sucesors to find chains of historical backfilled floating outliers
+            successorQueue = PriorityQueue()
+            successorQueue.put(event_id)
+            while not successorQueue.empty() and len(event_results) < limit:
+                try:
+                    event_id = successorQueue.get_nowait()
+                except Empty:
+                    break
+
+                successor_event_ids = self.get_successor_events_txn(txn, [event_id])
+                logger.info(
+                    "_get_backfill_events successor_event_ids: %s", successor_event_ids
+                )
+                for successor_event_id in successor_event_ids:
+                    # Skip any branches we have already gone down
+                    if successor_event_id in event_results:
+                        continue
+
+                    event_results.add(successor_event_id)
+
+                    successorQueue.put(successor_event_id)
 
         return event_results
 
@@ -1006,6 +1030,24 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # reverse it so that the events are approximately chronological.
         event_results.reverse()
         return event_results
+
+    def get_successor_events_txn(self, txn, event_ids: Iterable[str]) -> List[str]:
+        """Fetch all events that have the given events as a prev event
+
+        Args:
+            txn: Transaction object
+            event_ids: The events to use as the previous events.
+        """
+        rows = self.db_pool.simple_select_many_txn(
+            txn,
+            table="event_edges",
+            column="prev_event_id",
+            iterable=event_ids,
+            retcols=("event_id",),
+            keyvalues={},
+        )
+
+        return [row["event_id"] for row in rows]
 
     async def get_successor_events(self, event_ids: Iterable[str]) -> List[str]:
         """Fetch all events that have the given events as a prev event

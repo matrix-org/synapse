@@ -158,7 +158,7 @@ class EventBuilder:
         # it has a larger `depth` but before the successor event because the `stream_ordering`
         # is negative before the successor event.
         if inherit_depth:
-            sucessor_event_ids = await self._store.get_successor_events(
+            successor_event_ids = await self._store.get_successor_events(
                 [most_recent_prev_event_id]
             )
 
@@ -166,13 +166,13 @@ class EventBuilder:
             # historical messages and we can just inherit from the previous historical
             # event which we can already assume has the correct depth where we want
             # to insert into.
-            if not sucessor_event_ids:
+            if not successor_event_ids:
                 depth = most_recent_prev_event_depth
             else:
                 (
                     _,
                     oldest_successor_depth,
-                ) = await self._store.get_min_depth_of(sucessor_event_ids)
+                ) = await self._store.get_min_depth_of(successor_event_ids)
 
                 depth = oldest_successor_depth
         # Otherwise, progress the depth as normal

@@ -923,6 +923,7 @@ class FederationHandler(BaseHandler):
         events = await self.federation_client.backfill(
             dest, room_id, limit=limit, extremities=extremities
         )
+        logger.info("backfill response returned %d events", len(events))
 
         if not events:
             return []
@@ -1949,9 +1950,17 @@ class FederationHandler(BaseHandler):
         # Synapse asks for 100 events per backfill request. Do not allow more.
         limit = min(limit, 100)
 
+        logger.info(
+            "handlers.on_backfill_request pdu_list %d %s", len(pdu_list), pdu_list
+        )
+
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
 
+        logger.info("handlers.on_backfill_request %d", len(events))
+
         events = await filter_events_for_server(self.storage, origin, events)
+
+        logger.info("handlers.on_backfill_request after filter %d", len(events))
 
         return events
 
