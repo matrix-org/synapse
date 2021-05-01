@@ -397,7 +397,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
 
         # Check that this access token has been invalidated.
-        channel = self.make_request("GET", "account/whoami")
+        channel = self.make_request("GET", "account/whoami", access_token=tok)
         self.assertEqual(channel.code, 401)
 
     def test_pending_invites(self):
