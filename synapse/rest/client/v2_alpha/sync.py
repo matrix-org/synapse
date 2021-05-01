@@ -233,12 +233,6 @@ class SyncRestServlet(RestServlet):
 
         response: dict = defaultdict(dict)
         response["next_batch"] = await sync_result.next_batch.to_string(self.store)
-        response.update(
-            {
-                "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-                "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
-            }
-        )
 
         if sync_result.account_data:
             response["account_data"] = {"events": sync_result.account_data}
@@ -254,6 +248,15 @@ class SyncRestServlet(RestServlet):
             response["device_lists"]["changed"] = list(sync_result.device_lists.changed)
         if sync_result.device_lists.left:
             response["device_lists"]["left"] = list(sync_result.device_lists.left)
+
+        if sync_result.device_one_time_keys_count:
+            response[
+                "device_one_time_keys_count"
+            ] = sync_result.device_one_time_keys_count
+        if sync_result.device_unused_fallback_key_types:
+            response[
+                "org.matrix.msc2732.device_unused_fallback_key_types"
+            ] = sync_result.device_unused_fallback_key_types
 
         if joined:
             response["rooms"]["join"] = joined
