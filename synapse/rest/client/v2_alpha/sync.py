@@ -239,7 +239,6 @@ class SyncRestServlet(RestServlet):
                     "changed": list(sync_result.device_lists.changed),
                     "left": list(sync_result.device_lists.left),
                 },
-                "rooms": {"join": joined, "invite": invited, "leave": archived},
                 "groups": {
                     "join": sync_result.groups.join,
                     "invite": sync_result.groups.invite,
@@ -259,6 +258,13 @@ class SyncRestServlet(RestServlet):
 
         if sync_result.to_device:
             response["to_device"] = {"events": sync_result.to_device}
+
+        if joined:
+            response["rooms"]["join"] = joined
+        if invited:
+            response["rooms"]["invite"] = invited
+        if archived:
+            response["rooms"]["leave"] = archived
 
         return response
 
