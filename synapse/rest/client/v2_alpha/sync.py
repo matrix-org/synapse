@@ -14,6 +14,7 @@
 
 import itertools
 import logging
+from collections import defaultdict
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import PresenceState
@@ -229,24 +230,32 @@ class SyncRestServlet(RestServlet):
         )
 
         logger.debug("building sync response dict")
-        return {
-            "account_data": {"events": sync_result.account_data},
-            "to_device": {"events": sync_result.to_device},
-            "device_lists": {
-                "changed": list(sync_result.device_lists.changed),
-                "left": list(sync_result.device_lists.left),
-            },
-            "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
-            "rooms": {"join": joined, "invite": invited, "leave": archived},
-            "groups": {
-                "join": sync_result.groups.join,
-                "invite": sync_result.groups.invite,
-                "leave": sync_result.groups.leave,
-            },
-            "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-            "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
-            "next_batch": await sync_result.next_batch.to_string(self.store),
-        }
+
+        response: dict = defaultdict(dict)
+        response["next_batch"] = await sync_result.next_batch.to_string(self.store)
+        response.update(
+            {
+                "account_data": {"events": sync_result.account_data},
+                "to_device": {"events": sync_result.to_device},
+                "device_lists": {
+                    "changed": list(sync_result.device_lists.changed),
+                    "left": list(sync_result.device_lists.left),
+                },
+                "presence": SyncRestServlet.encode_presence(
+                    sync_result.presence, time_now
+                ),
+                "rooms": {"join": joined, "invite": invited, "leave": archived},
+                "groups": {
+                    "join": sync_result.groups.join,
+                    "invite": sync_result.groups.invite,
+                    "leave": sync_result.groups.leave,
+                },
+                "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+                "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
+            }
+        )
+
+        return response
 
     @staticmethod
     def encode_presence(events, time_now):
