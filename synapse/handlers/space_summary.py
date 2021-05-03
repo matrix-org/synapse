@@ -138,15 +138,25 @@ class SpaceSummaryHandler:
 
                 # The results over federation might include rooms that the we,
                 # as the requesting server, are allowed to see, but the requesting
-                # user is not permitted see. Handle that filtering.
+                # user is not permitted see.
+                #
+                # A room may be visible if it is world readable, or if it is accessible
+                # to the specific user.
                 room_ids = set()
                 rooms = []  # type: List[JsonDict]
                 events = []
                 for room in fed_rooms:
+                    # Pull whether it is world readable from the returned information
+                    # since we may not have the state of this room.
+                    include_room = room.get("world_readable") is True
                     fed_room_id = room.get("room_id")
-                    if fed_room_id and await self._is_room_accessible(
-                        fed_room_id, requester, None
-                    ):
+
+                    if not include_room and fed_room_id:
+                        include_room = await self._is_room_accessible(
+                            fed_room_id, requester, None
+                        )
+
+                    if include_room:
                         rooms_result.append(room)
                         room_ids.add(fed_room_id)
 
@@ -397,6 +407,12 @@ class SpaceSummaryHandler:
              True if the room should be included in the spaces summary.
         """
         state_ids = await self._store.get_current_state_ids(room_id)
+
+        # If there's no state for the room, it isn't known.
+        if not state_ids:
+            logger.info("room %s is unknown, omitting from summary", room_id)
+            return False
+
         room_version = await self._store.get_room_version(room_id)
 
         # if we have an authenticated requesting user, first check if they are able to view
