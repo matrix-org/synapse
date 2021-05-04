@@ -924,7 +924,7 @@ class ServerConfig(Config):
         # A value of `[1, 10, 30]` indicates that a second must pass between consecutive
         # generation 0 GCs, etc.
         #
-        # gc_min_seconds_between: [1, 10, 30]
+        #gc_min_seconds_between: [1, 10, 30]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is 100. -1 means no upper limit.
