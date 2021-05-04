@@ -1022,6 +1022,9 @@ class EventCreationHandler:
         if not self._external_cache.is_enabled():
             return
 
+        # If external cache is enabled we should always have this.
+        assert self._external_cache_joined_hosts_updates
+
         # We actually store two mappings, event ID -> prev state group,
         # state group -> joined hosts, which is much more space efficient
         # than event ID -> joined hosts.
@@ -1037,9 +1040,8 @@ class EventCreationHandler:
         )
 
         if state_entry.state_group:
-            if self._external_cache_joined_hosts_updates:
-                if state_entry.state_group in self._external_cache_joined_hosts_updates:
-                    return
+            if state_entry.state_group in self._external_cache_joined_hosts_updates:
+                return
 
             joined_hosts = await self.store.get_joined_hosts(event.room_id, state_entry)
 
@@ -1058,8 +1060,7 @@ class EventCreationHandler:
                 expiry_ms=60 * 60 * 1000,
             )
 
-            if self._external_cache_joined_hosts_updates:
-                self._external_cache_joined_hosts_updates[context.prev_group] = None
+            self._external_cache_joined_hosts_updates[state_entry.state_group] = None
 
     async def _validate_canonical_alias(
         self, directory_handler, room_alias_str: str, expected_room_id: str
