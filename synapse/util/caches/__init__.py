@@ -105,8 +105,13 @@ class CacheMetric:
                 cache_total.labels(self._cache_name).set(self.hits + self.misses)
                 if getattr(self._cache, "max_size", None):
                     cache_max_size.labels(self._cache_name).set(self._cache.max_size)
-                if self.memory_usage is not None:
-                    cache_memory_usage.labels(self._cache_name).set(self.memory_usage)
+
+                if TRACK_MEMORY_USAGE:
+                    # self.memory_usage can be None if nothing has been inserted
+                    # into the cache yet.
+                    cache_memory_usage.labels(self._cache_name).set(
+                        self.memory_usage or 0
+                    )
             if self._collect_callback:
                 self._collect_callback()
         except Exception as e:
