@@ -18,6 +18,7 @@ import hashlib
 import hmac
 import inspect
 import logging
+import secrets
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
 from unittest.mock import Mock, patch
@@ -247,6 +248,8 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
+            max_request_body_size=1234,
+            reactor=self.reactor,
         )
 
         from tests.rest.client.v1.utils import RestHelper
@@ -624,7 +627,6 @@ class HomeserverTestCase(TestCase):
             str: The new event's ID.
         """
         event_creator = self.hs.get_event_creation_handler()
-        secrets = self.hs.get_secrets()
         requester = create_requester(user)
 
         event, context = self.get_success(
