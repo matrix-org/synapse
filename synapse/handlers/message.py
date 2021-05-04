@@ -1023,7 +1023,7 @@ class EventCreationHandler:
             return
 
         # If external cache is enabled we should always have this.
-        assert self._external_cache_joined_hosts_updates
+        assert self._external_cache_joined_hosts_updates is not None
 
         # We actually store two mappings, event ID -> prev state group,
         # state group -> joined hosts, which is much more space efficient
