@@ -36,6 +36,7 @@ from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
+from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util.async_helpers import Linearizer
 from synapse.util.daemonize import daemonize_process
@@ -115,6 +116,7 @@ def start_reactor(
 
     def run():
         logger.info("Running")
+        setup_jemalloc_stats()
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
