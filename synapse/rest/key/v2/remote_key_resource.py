@@ -215,7 +215,7 @@ class RemoteKey(DirectServeJsonResource):
         # ensure the result is sent).
         if cache_misses and query_remote_on_cache_miss:
             await yieldable_gather_results(
-                self.fetcher.get_keys,
+                lambda t: self.fetcher.get_keys(*t),
                 (
                     (server_name, list(keys), 0)
                     for server_name, keys in cache_misses.items()
