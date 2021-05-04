@@ -134,17 +134,12 @@ class _Queue:
         d = defer.Deferred()
         self._next_values.append((value, d))
 
-        if self._is_processing:
-            return await d
+        if not self._is_processing:
+            run_as_background_process(self._name, self._unsafe_process)
 
-        run_as_background_process(self._name, self._unsafe_process)
-
-        return await d
+        return await make_deferred_yieldable(d)
 
     async def _unsafe_process(self):
-        # We purposefully defer to the next loop.
-        await self._clock.sleep(0)
-
         try:
             if self._is_processing:
                 return
@@ -152,6 +147,9 @@ class _Queue:
             self._is_processing = True
 
             while self._next_values:
+                # We purposefully defer to the next loop.
+                await self._clock.sleep(0)
+
                 next_values = self._next_values
                 self._next_values = []
 
