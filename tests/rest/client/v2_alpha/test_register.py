@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -14,7 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import datetime
 import json
 import os
@@ -22,7 +20,7 @@ import os
 import pkg_resources
 
 import synapse.rest.admin
-from synapse.api.constants import LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, logout
@@ -59,7 +57,9 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         )
 
         self.hs.get_datastore().services_cache.append(appservice)
-        request_data = json.dumps({"username": "as_user_kermit"})
+        request_data = json.dumps(
+            {"username": "as_user_kermit", "type": APP_SERVICE_REGISTRATION_TYPE}
+        )
 
         channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
@@ -69,9 +69,31 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         det_data = {"user_id": user_id, "home_server": self.hs.hostname}
         self.assertDictContainsSubset(det_data, channel.json_body)
 
+    def test_POST_appservice_registration_no_type(self):
+        as_token = "i_am_an_app_service"
+
+        appservice = ApplicationService(
+            as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+
+        self.hs.get_datastore().services_cache.append(appservice)
+        request_data = json.dumps({"username": "as_user_kermit"})
+
+        channel = self.make_request(
+            b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
+        )
+
+        self.assertEquals(channel.result["code"], b"400", channel.result)
+
     def test_POST_appservice_registration_invalid(self):
         self.appservice = None  # no application service exists
-        request_data = json.dumps({"username": "kermit"})
+        request_data = json.dumps(
+            {"username": "kermit", "type": APP_SERVICE_REGISTRATION_TYPE}
+        )
         channel = self.make_request(
             b"POST", self.url + b"?access_token=i_am_an_app_service", request_data
         )
@@ -288,6 +310,57 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertIsNotNone(channel.json_body.get("sid"))
 
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_reject_invalid_email(self):
+        """Check that bad emails are rejected"""
+
+        # Test for email with multiple @
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": "email@@email", "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        # Check error to ensure that we're not erroring due to a bug in the test.
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
+        # Test for email with no @
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": "email", "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
+        # Test for super long email
+        email = "a@" + "a" * 1000
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": email, "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
 
@@ -470,8 +543,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         (user_id, tok) = self.create_user()
 
-        # Move 6 days forward. This should trigger a renewal email to be sent.
-        self.reactor.advance(datetime.timedelta(days=6).total_seconds())
+        # Move 5 days forward. This should trigger a renewal email to be sent.
+        self.reactor.advance(datetime.timedelta(days=5).total_seconds())
         self.assertEqual(len(self.email_attempts), 1)
 
         # Retrieving the URL from the email is too much pain for now, so we
@@ -482,14 +555,32 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         # Check that we're getting HTML back.
-        content_type = None
-        for header in channel.result.get("headers", []):
-            if header[0] == b"Content-Type":
-                content_type = header[1]
-        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+        content_type = channel.headers.getRawHeaders(b"Content-Type")
+        self.assertEqual(content_type, [b"text/html; charset=utf-8"], channel.result)
 
         # Check that the HTML we're getting is the one we expect on a successful renewal.
-        expected_html = self.hs.config.account_validity.account_renewed_html_content
+        expiration_ts = self.get_success(self.store.get_expiration_ts_for_user(user_id))
+        expected_html = self.hs.config.account_validity.account_validity_account_renewed_template.render(
+            expiration_ts=expiration_ts
+        )
+        self.assertEqual(
+            channel.result["body"], expected_html.encode("utf8"), channel.result
+        )
+
+        # Move 1 day forward. Try to renew with the same token again.
+        url = "/_matrix/client/unstable/account_validity/renew?token=%s" % renewal_token
+        channel = self.make_request(b"GET", url)
+        self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        # Check that we're getting HTML back.
+        content_type = channel.headers.getRawHeaders(b"Content-Type")
+        self.assertEqual(content_type, [b"text/html; charset=utf-8"], channel.result)
+
+        # Check that the HTML we're getting is the one we expect when reusing a
+        # token. The account expiration date should not have changed.
+        expected_html = self.hs.config.account_validity.account_validity_account_previously_renewed_template.render(
+            expiration_ts=expiration_ts
+        )
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result
         )
@@ -509,15 +600,14 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"404", channel.result)
 
         # Check that we're getting HTML back.
-        content_type = None
-        for header in channel.result.get("headers", []):
-            if header[0] == b"Content-Type":
-                content_type = header[1]
-        self.assertEqual(content_type, b"text/html; charset=utf-8", channel.result)
+        content_type = channel.headers.getRawHeaders(b"Content-Type")
+        self.assertEqual(content_type, [b"text/html; charset=utf-8"], channel.result)
 
         # Check that the HTML we're getting is the one we expect when using an
         # invalid/unknown token.
-        expected_html = self.hs.config.account_validity.invalid_token_html_content
+        expected_html = (
+            self.hs.config.account_validity.account_validity_invalid_token_template.render()
+        )
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result
         )
@@ -625,7 +715,12 @@ class AccountValidityBackgroundJobTestCase(unittest.HomeserverTestCase):
         config["account_validity"] = {"enabled": False}
 
         self.hs = self.setup_test_homeserver(config=config)
-        self.hs.config.account_validity.period = self.validity_period
+
+        # We need to set these directly, instead of in the homeserver config dict above.
+        # This is due to account validity-related config options not being read by
+        # Synapse when account_validity.enabled is False.
+        self.hs.get_datastore()._account_validity_period = self.validity_period
+        self.hs.get_datastore()._account_validity_startup_job_max_delta = self.max_delta
 
         self.store = self.hs.get_datastore()
 

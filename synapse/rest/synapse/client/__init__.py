@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,6 +57,7 @@ def build_synapse_client_resource_tree(hs: "HomeServer") -> Mapping[str, Resourc
         resources["/_synapse/client/saml2"] = res
 
         # This is also mounted under '/_matrix' for backwards-compatibility.
+        # To be removed in Synapse v1.32.0.
         resources["/_matrix/saml2"] = res
 
     return resources

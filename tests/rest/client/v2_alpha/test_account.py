@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -75,8 +74,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.submit_token_resource = PasswordResetSubmitTokenResource(hs)
 
     def test_basic_password_reset(self):
-        """Test basic password reset flow
-        """
+        """Test basic password reset flow"""
         old_password = "monkey"
         new_password = "kangeroo"
 
@@ -114,8 +112,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
     @override_config({"rc_3pid_validation": {"burst_count": 3}})
     def test_ratelimit_by_email(self):
-        """Test that we ratelimit /requestToken for the same email.
-        """
+        """Test that we ratelimit /requestToken for the same email."""
         old_password = "monkey"
         new_password = "kangeroo"
 
@@ -203,8 +200,7 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         self.attempt_wrong_password_login("kermit", old_password)
 
     def test_cant_reset_password_without_clicking_link(self):
-        """Test that we do actually need to click the link in the email
-        """
+        """Test that we do actually need to click the link in the email"""
         old_password = "monkey"
         new_password = "kangeroo"
 
@@ -299,7 +295,9 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
 
         if channel.code != 200:
             raise HttpResponseException(
-                channel.code, channel.result["reason"], channel.result["body"],
+                channel.code,
+                channel.result["reason"],
+                channel.result["body"],
             )
 
         return channel.json_body["sid"]
@@ -566,8 +564,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
     @override_config({"rc_3pid_validation": {"burst_count": 3}})
     def test_ratelimit_by_ip(self):
-        """Tests that adding emails is ratelimited by IP
-        """
+        """Tests that adding emails is ratelimited by IP"""
 
         # We expect to be able to set three emails before getting ratelimited.
         self.get_success(self._add_email("foo1@test.bar", "foo1@test.bar"))
@@ -580,8 +577,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(cm.exception.code, 429)
 
     def test_add_email_if_disabled(self):
-        """Test adding email to profile when doing so is disallowed
-        """
+        """Test adding email to profile when doing so is disallowed"""
         self.hs.config.enable_3pid_changes = False
 
         client_secret = "foobar"
@@ -611,15 +607,16 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+            "GET",
+            self.url_3pid,
+            access_token=self.user_id_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email(self):
-        """Test deleting an email from profile
-        """
+        """Test deleting an email from profile"""
         # Add a threepid
         self.get_success(
             self.store.user_add_threepid(
@@ -641,15 +638,16 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+            "GET",
+            self.url_3pid,
+            access_token=self.user_id_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertFalse(channel.json_body["threepids"])
 
     def test_delete_email_if_disabled(self):
-        """Test deleting an email from profile when disallowed
-        """
+        """Test deleting an email from profile when disallowed"""
         self.hs.config.enable_3pid_changes = False
 
         # Add a threepid
@@ -675,7 +673,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+            "GET",
+            self.url_3pid,
+            access_token=self.user_id_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -683,8 +683,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(self.email, channel.json_body["threepids"][0]["address"])
 
     def test_cant_add_email_without_clicking_link(self):
-        """Test that we do actually need to click the link in the email
-        """
+        """Test that we do actually need to click the link in the email"""
         client_secret = "foobar"
         session_id = self._request_token(self.email, client_secret)
 
@@ -710,7 +709,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+            "GET",
+            self.url_3pid,
+            access_token=self.user_id_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -743,7 +744,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+            "GET",
+            self.url_3pid,
+            access_token=self.user_id_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -788,7 +791,10 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Ensure not providing a next_link parameter still works
         self._request_token(
-            "something@example.com", "some_secret", next_link=None, expect_code=200,
+            "something@example.com",
+            "some_secret",
+            next_link=None,
+            expect_code=200,
         )
 
         self._request_token(
@@ -846,17 +852,27 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         if next_link:
             body["next_link"] = next_link
 
-        channel = self.make_request("POST", b"account/3pid/email/requestToken", body,)
+        channel = self.make_request(
+            "POST",
+            b"account/3pid/email/requestToken",
+            body,
+        )
 
         if channel.code != expect_code:
             raise HttpResponseException(
-                channel.code, channel.result["reason"], channel.result["body"],
+                channel.code,
+                channel.result["reason"],
+                channel.result["body"],
             )
 
         return channel.json_body.get("sid")
 
     def _request_token_invalid_email(
-        self, email, expected_errcode, expected_error, client_secret="foobar",
+        self,
+        email,
+        expected_errcode,
+        expected_error,
+        client_secret="foobar",
     ):
         channel = self.make_request(
             "POST",
@@ -895,8 +911,7 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         return match.group(0)
 
     def _add_email(self, request_email, expected_email):
-        """Test adding an email to profile
-        """
+        """Test adding an email to profile"""
         previous_email_attempts = len(self.email_attempts)
 
         client_secret = "foobar"
@@ -926,7 +941,9 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
         # Get user
         channel = self.make_request(
-            "GET", self.url_3pid, access_token=self.user_id_tok,
+            "GET",
+            self.url_3pid,
+            access_token=self.user_id_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])

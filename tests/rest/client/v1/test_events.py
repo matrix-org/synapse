@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.rest.client.v1 import events, login, room
@@ -150,6 +149,8 @@ class GetEventsTestCase(unittest.HomeserverTestCase):
         event_id = resp["event_id"]
 
         channel = self.make_request(
-            "GET", "/events/" + event_id, access_token=self.token,
+            "GET",
+            "/events/" + event_id,
+            access_token=self.token,
         )
         self.assertEquals(channel.code, 200, msg=channel.result)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -30,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class RoomUpgradeRestServlet(RestServlet):
-    """Handler for room uprade requests.
+    """Handler for room upgrade requests.
 
     Handles requests of the form:
 

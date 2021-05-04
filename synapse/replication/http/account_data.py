@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -175,7 +174,11 @@ class ReplicationRemoveTagRestServlet(ReplicationEndpoint):
         return {}
 
     async def _handle_request(self, request, user_id, room_id, tag):
-        max_stream_id = await self.handler.remove_tag_from_room(user_id, room_id, tag,)
+        max_stream_id = await self.handler.remove_tag_from_room(
+            user_id,
+            room_id,
+            tag,
+        )
 
         return 200, {"max_stream_id": max_stream_id}
 

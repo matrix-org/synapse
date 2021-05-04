@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -27,6 +26,7 @@ import yaml
 from netaddr import AddrFormatError, IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
@@ -52,7 +52,12 @@ def _6to4(network: IPNetwork) -> IPNetwork:
     hex_network = hex(network.first)[2:]
     hex_network = ("0" * (8 - len(hex_network))) + hex_network
     return IPNetwork(
-        "2002:%s:%s::/%d" % (hex_network[:4], hex_network[4:], 16 + network.prefixlen,)
+        "2002:%s:%s::/%d"
+        % (
+            hex_network[:4],
+            hex_network[4:],
+            16 + network.prefixlen,
+        )
     )
 
 
@@ -230,14 +235,27 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
-        self.public_baseurl = config.get("public_baseurl") or "https://%s/" % (
-            self.server_name,
-        )
-        if self.public_baseurl[-1] != "/":
-            self.public_baseurl += "/"
+
+        self.public_baseurl = config.get("public_baseurl")
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
 
         # Whether to enable user presence.
-        self.use_presence = config.get("use_presence", True)
+        presence_config = config.get("presence") or {}
+        self.use_presence = presence_config.get("enabled")
+        if self.use_presence is None:
+            self.use_presence = config.get("use_presence", True)
+
+        # Custom presence router module
+        self.presence_router_module_class = None
+        self.presence_router_config = None
+        presence_router_config = presence_config.get("presence_router")
+        if presence_router_config:
+            (
+                self.presence_router_module_class,
+                self.presence_router_config,
+            ) = load_module(presence_router_config, ("presence", "presence_router"))
 
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker
@@ -258,7 +276,14 @@ class ServerConfig(Config):
         # Whether to require sharing a room with a user to retrieve their
         # profile data
         self.limit_profile_requests_to_users_who_share_rooms = config.get(
-            "limit_profile_requests_to_users_who_share_rooms", False,
+            "limit_profile_requests_to_users_who_share_rooms",
+            False,
+        )
+
+        # Whether to retrieve and display profile data for a user when they
+        # are invited to a room
+        self.include_profile_data_on_invite = config.get(
+            "include_profile_data_on_invite", True
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -385,8 +410,6 @@ class ServerConfig(Config):
             ["0.0.0.0", "::"],
             config_path=("federation_ip_range_blacklist",),
         )
-
-        self.start_pushers = config.get("start_pushers", True)
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before
@@ -615,7 +638,9 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    port=manhole,
+                    bind_addresses=["127.0.0.1"],
+                    type="manhole",
                 )
             )
 
@@ -651,7 +676,8 @@ class ServerConfig(Config):
         # and letting the client know which email address is bound to an account and
         # which one isn't.
         self.request_token_inhibit_3pid_errors = config.get(
-            "request_token_inhibit_3pid_errors", False,
+            "request_token_inhibit_3pid_errors",
+            False,
         )
 
         # List of users trialing the new experimental default push rules. This setting is
@@ -813,10 +839,6 @@ class ServerConfig(Config):
         # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
         # 'listeners' below).
         #
-        # If this is left unset, it defaults to 'https://<server_name>/'. (Note that
-        # that will not work unless you configure Synapse or a reverse-proxy to listen
-        # on port 443.)
-        #
         #public_baseurl: https://example.com/
 
         # Set the soft limit on the number of file descriptors synapse can use
@@ -825,15 +847,33 @@ class ServerConfig(Config):
         #
         #soft_file_limit: 0
 
-        # Set to false to disable presence tracking on this homeserver.
+        # Presence tracking allows users to see the state (e.g online/offline)
+        # of other local and remote users.
         #
-        #use_presence: false
+        presence:
+          # Uncomment to disable presence tracking on this homeserver. This option
+          # replaces the previous top-level 'use_presence' option.
+          #
+          #enabled: false
+
+          # Presence routers are third-party modules that can specify additional logic
+          # to where presence updates from users are routed.
+          #
+          presence_router:
+            # The custom module's class. Uncomment to use a custom presence router module.
+            #
+            #module: "my_custom_router.PresenceRouter"
+
+            # Configuration options of the custom module. Refer to your module's
+            # documentation for available options.
+            #
+            #config:
+            #  example_option: 'something'
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
         # 'false'. Note that profile data is also available via the federation
-        # API, so this setting is of limited value if federation is enabled on
-        # the server.
+        # API, unless allow_profile_lookup_over_federation is set to false.
         #
         #require_auth_for_profile_requests: true
 
@@ -843,6 +883,14 @@ class ServerConfig(Config):
         # requesting server. Defaults to 'false'.
         #
         #limit_profile_requests_to_users_who_share_rooms: true
+
+        # Uncomment to prevent a user's profile data from being retrieved and
+        # displayed in a room until they have joined it. By default, a user's
+        # profile data is included in an invite event, regardless of the values
+        # of the above two settings, and whether or not the users share a server.
+        # Defaults to 'true'.
+        #
+        #include_profile_data_on_invite: false
 
         # If set to 'true', removes the need for authentication to access the server's
         # public rooms directory through the client API, meaning that anyone can

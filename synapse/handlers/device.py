@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -15,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
@@ -29,7 +28,6 @@ from synapse.api.errors import (
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import (
-    Collection,
     JsonDict,
     StreamToken,
     UserID,
@@ -45,7 +43,7 @@ from synapse.util.retryutils import NotRetryingDestination
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +84,7 @@ class DeviceWorkerHandler(BaseHandler):
 
     @trace
     async def get_device(self, user_id: str, device_id: str) -> JsonDict:
-        """ Retrieve the given device
+        """Retrieve the given device
 
         Args:
             user_id: The user to get the device from
@@ -157,8 +155,7 @@ class DeviceWorkerHandler(BaseHandler):
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
             if room_id not in room_ids:
-                for key, event_id in current_state_ids.items():
-                    etype, state_key = key
+                for etype, state_key in current_state_ids.keys():
                     if etype != EventTypes.Member:
                         continue
                     possibly_left.add(state_key)
@@ -166,7 +163,7 @@ class DeviceWorkerHandler(BaseHandler):
 
             # Fetch the current state at the time.
             try:
-                event_ids = await self.store.get_forward_extremeties_for_room(
+                event_ids = await self.store.get_forward_extremities_for_room_at_stream_ordering(
                     room_id, stream_ordering=stream_ordering
                 )
             except errors.StoreError:
@@ -180,8 +177,7 @@ class DeviceWorkerHandler(BaseHandler):
                 log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
-                for key, event_id in current_state_ids.items():
-                    etype, state_key = key
+                for etype, state_key in current_state_ids.keys():
                     if etype != EventTypes.Member:
                         continue
                     possibly_changed.add(state_key)
@@ -199,8 +195,7 @@ class DeviceWorkerHandler(BaseHandler):
             for state_dict in prev_state_ids.values():
                 member_event = state_dict.get((EventTypes.Member, user_id), None)
                 if not member_event or member_event != current_member_id:
-                    for key, event_id in current_state_ids.items():
-                        etype, state_key = key
+                    for etype, state_key in current_state_ids.keys():
                         if etype != EventTypes.Member:
                             continue
                         possibly_changed.add(state_key)
@@ -341,7 +336,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
     @trace
     async def delete_device(self, user_id: str, device_id: str) -> None:
-        """ Delete the given device
+        """Delete the given device
 
         Args:
             user_id: The user to delete the device from.
@@ -386,7 +381,7 @@ class DeviceHandler(DeviceWorkerHandler):
         await self.delete_devices(user_id, device_ids)
 
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
-        """ Delete several devices
+        """Delete several devices
 
         Args:
             user_id: The user to delete devices from.
@@ -417,7 +412,7 @@ class DeviceHandler(DeviceWorkerHandler):
         await self.notify_device_update(user_id, device_ids)
 
     async def update_device(self, user_id: str, device_id: str, content: dict) -> None:
-        """ Update the given device
+        """Update the given device
 
         Args:
             user_id: The user to update devices of.
@@ -534,7 +529,9 @@ class DeviceHandler(DeviceWorkerHandler):
             device id of the dehydrated device
         """
         device_id = await self.check_device_registered(
-            user_id, None, initial_device_display_name,
+            user_id,
+            None,
+            initial_device_display_name,
         )
         old_device_id = await self.store.store_dehydrated_device(
             user_id, device_id, device_data
@@ -629,7 +626,7 @@ class DeviceListUpdater:
             max_len=10000,
             expiry_ms=30 * 60 * 1000,
             iterable=True,
-        )
+        )  # type: ExpiringCache[str, Set[str]]
 
         # Attempt to resync out of sync device lists every 30s.
         self._resync_retry_in_progress = False
@@ -713,7 +710,7 @@ class DeviceListUpdater:
                 # This can happen since we batch updates
                 return
 
-            for device_id, stream_id, prev_ids, content in pending_updates:
+            for device_id, stream_id, prev_ids, _ in pending_updates:
                 logger.debug(
                     "Handling update %r/%r, ID: %r, prev: %r ",
                     user_id,
@@ -739,7 +736,7 @@ class DeviceListUpdater:
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
-                for device_id, stream_id, prev_ids, content in pending_updates:
+                for device_id, stream_id, _, content in pending_updates:
                     await self.store.update_remote_device_list_cache_entry(
                         user_id, device_id, content, stream_id
                     )
@@ -758,7 +755,7 @@ class DeviceListUpdater:
         """Given a list of updates for a user figure out if we need to do a full
         resync, or whether we have enough data that we can just apply the delta.
         """
-        seen_updates = self._seen_updates.get(user_id, set())
+        seen_updates = self._seen_updates.get(user_id, set())  # type: Set[str]
 
         extremity = await self.store.get_device_list_last_stream_id_for_remote(user_id)
 
@@ -803,7 +800,8 @@ class DeviceListUpdater:
                 try:
                     # Try to resync the current user's devices list.
                     result = await self.user_device_resync(
-                        user_id=user_id, mark_failed_as_stale=False,
+                        user_id=user_id,
+                        mark_failed_as_stale=False,
                     )
 
                     # user_device_resync only returns a result if it managed to
@@ -813,14 +811,17 @@ class DeviceListUpdater:
                     # self.store.update_remote_device_list_cache).
                     if result:
                         logger.debug(
-                            "Successfully resynced the device list for %s", user_id,
+                            "Successfully resynced the device list for %s",
+                            user_id,
                         )
                 except Exception as e:
                     # If there was an issue resyncing this user, e.g. if the remote
                     # server sent a malformed result, just log the error instead of
                     # aborting all the subsequent resyncs.
                     logger.debug(
-                        "Could not resync the device list for %s: %s", user_id, e,
+                        "Could not resync the device list for %s: %s",
+                        user_id,
+                        e,
                     )
         finally:
             # Allow future calls to retry resyncinc out of sync device lists.
@@ -855,7 +856,9 @@ class DeviceListUpdater:
             return None
         except (RequestSendFailed, HttpResponseException) as e:
             logger.warning(
-                "Failed to handle device list update for %s: %s", user_id, e,
+                "Failed to handle device list update for %s: %s",
+                user_id,
+                e,
             )
 
             if mark_failed_as_stale:
@@ -899,6 +902,7 @@ class DeviceListUpdater:
         master_key = result.get("master_key")
         self_signing_key = result.get("self_signing_key")
 
+        ignore_devices = False
         # If the remote server has more than ~1000 devices for this user
         # we assume that something is going horribly wrong (e.g. a bot
         # that logs in and creates a new device every time it tries to
@@ -917,6 +921,16 @@ class DeviceListUpdater:
                 len(devices),
             )
             devices = []
+            ignore_devices = True
+        else:
+            cached_devices = await self.store.get_cached_devices_for_user(user_id)
+            if cached_devices == {d["device_id"]: d for d in devices}:
+                logging.info(
+                    "Skipping device list resync for %s, as our cache matches already",
+                    user_id,
+                )
+                devices = []
+                ignore_devices = True
 
         for device in devices:
             logger.debug(
@@ -926,16 +940,25 @@ class DeviceListUpdater:
                 stream_id,
             )
 
-        await self.store.update_remote_device_list_cache(user_id, devices, stream_id)
+        if not ignore_devices:
+            await self.store.update_remote_device_list_cache(
+                user_id, devices, stream_id
+            )
+        # mark the cache as valid, whether or not we actually processed any device
+        # list updates.
+        await self.store.mark_remote_user_device_cache_as_valid(user_id)
         device_ids = [device["device_id"] for device in devices]
 
         # Handle cross-signing keys.
         cross_signing_device_ids = await self.process_cross_signing_key_update(
-            user_id, master_key, self_signing_key,
+            user_id,
+            master_key,
+            self_signing_key,
         )
         device_ids = device_ids + cross_signing_device_ids
 
-        await self.device_handler.notify_device_update(user_id, device_ids)
+        if device_ids:
+            await self.device_handler.notify_device_update(user_id, device_ids)
 
         # We clobber the seen updates since we've re-synced from a given
         # point.
@@ -963,14 +986,17 @@ class DeviceListUpdater:
         """
         device_ids = []
 
-        if master_key:
+        current_keys_map = await self.store.get_e2e_cross_signing_keys_bulk([user_id])
+        current_keys = current_keys_map.get(user_id) or {}
+
+        if master_key and master_key != current_keys.get("master"):
             await self.store.set_e2e_cross_signing_key(user_id, "master", master_key)
             _, verify_key = get_verify_key_from_cross_signing_key(master_key)
             # verify_key is a VerifyKey from signedjson, which uses
             # .version to denote the portion of the key ID after the
             # algorithm and colon, which is the device ID
             device_ids.append(verify_key.version)
-        if self_signing_key:
+        if self_signing_key and self_signing_key != current_keys.get("self_signing"):
             await self.store.set_e2e_cross_signing_key(
                 user_id, "self_signing", self_signing_key
             )

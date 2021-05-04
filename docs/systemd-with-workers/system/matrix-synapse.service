@@ -3,6 +3,7 @@ Description=Synapse master
 
 # This service should be restarted when the synapse target is restarted.
 PartOf=matrix-synapse.target
+ReloadPropagatedFrom=matrix-synapse.target
 
 [Service]
 Type=notify

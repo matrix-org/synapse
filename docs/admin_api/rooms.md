@@ -10,6 +10,7 @@
   * [Undoing room shutdowns](#undoing-room-shutdowns)
 - [Make Room Admin API](#make-room-admin-api)
 - [Forward Extremities Admin API](#forward-extremities-admin-api)
+- [Event Context API](#event-context-api)
 
 # List Room API
 
@@ -426,7 +427,7 @@ the new room. Users on other servers will be unaffected.
 The API is:
 
 ```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
+DELETE /_synapse/admin/v1/rooms/<room_id>
 ```
 
 with a body of:
@@ -527,6 +528,15 @@ You will have to manually handle, if you so choose, the following:
 * Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
 * Removal of the Content Violation room if desired.
 
+## Deprecated endpoint
+
+The previous deprecated API will be removed in a future release, it was:
+
+```
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+It behaves the same way than the current endpoint except the path and the method.
 
 # Make Room Admin API
 
@@ -592,5 +602,123 @@ that were deleted.
 ```json
 {
   "deleted": 1
+}
+```
+
+# Event Context API
+
+This API lets a client find the context of an event. This is designed primarily to investigate abuse reports.
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/context/<event_id>
+```
+
+This API mimmicks [GET /_matrix/client/r0/rooms/{roomId}/context/{eventId}](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-rooms-roomid-context-eventid). Please refer to the link for all details on parameters and reseponse.
+
+Example response:
+
+```json
+{
+  "end": "t29-57_2_0_2",
+  "events_after": [
+    {
+      "content": {
+        "body": "This is an example text message",
+        "msgtype": "m.text",
+        "format": "org.matrix.custom.html",
+        "formatted_body": "<b>This is an example text message</b>"
+      },
+      "type": "m.room.message",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      }
+    }
+  ],
+  "event": {
+    "content": {
+      "body": "filename.jpg",
+      "info": {
+        "h": 398,
+        "w": 394,
+        "mimetype": "image/jpeg",
+        "size": 31037
+      },
+      "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+      "msgtype": "m.image"
+    },
+    "type": "m.room.message",
+    "event_id": "$f3h4d129462ha:example.com",
+    "room_id": "!636q39766251:example.com",
+    "sender": "@example:example.org",
+    "origin_server_ts": 1432735824653,
+    "unsigned": {
+      "age": 1234
+    }
+  },
+  "events_before": [
+    {
+      "content": {
+        "body": "something-important.doc",
+        "filename": "something-important.doc",
+        "info": {
+          "mimetype": "application/msword",
+          "size": 46144
+        },
+        "msgtype": "m.file",
+        "url": "mxc://example.org/FHyPlCeYUSFFxlgbQYZmoEoe"
+      },
+      "type": "m.room.message",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      }
+    }
+  ],
+  "start": "t27-54_2_0_2",
+  "state": [
+    {
+      "content": {
+        "creator": "@example:example.org",
+        "room_version": "1",
+        "m.federate": true,
+        "predecessor": {
+          "event_id": "$something:example.org",
+          "room_id": "!oldroom:example.org"
+        }
+      },
+      "type": "m.room.create",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      },
+      "state_key": ""
+    },
+    {
+      "content": {
+        "membership": "join",
+        "avatar_url": "mxc://example.org/SEsfnsuifSDFSSEF",
+        "displayname": "Alice Margatroid"
+      },
+      "type": "m.room.member",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      },
+      "state_key": "@alice:example.org"
+    }
+  ]
 }
 ```

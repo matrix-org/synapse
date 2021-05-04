@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -76,9 +75,6 @@ def _is_valid_3pe_result(r, field):
     fields = r["fields"]
     if not isinstance(fields, dict):
         return False
-    for k in fields.keys():
-        if not isinstance(fields[k], str):
-            return False
 
     return True
 
@@ -93,7 +89,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         self.clock = hs.get_clock()
 
         self.protocol_meta_cache = ResponseCache(
-            hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
+            hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )  # type: ResponseCache[Tuple[str, str]]
 
     async def query_user(self, service, user_id):
@@ -230,7 +226,9 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         try:
             await self.put_json(
-                uri=uri, json_body=body, args={"access_token": service.hs_token},
+                uri=uri,
+                json_body=body,
+                args={"access_token": service.hs_token},
             )
             sent_transactions_counter.labels(service.id).inc()
             sent_events_counter.labels(service.id).inc(len(events))

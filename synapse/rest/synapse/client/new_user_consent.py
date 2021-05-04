@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
 from synapse.handlers.sso import get_username_mapping_session_cookie_from_request
@@ -60,6 +59,15 @@ class NewUserConsentResource(DirectServeHtmlResource):
         except SynapseError as e:
             logger.warning("Error fetching session: %s", e)
             self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
+            return
+
+        # It should be impossible to get here without having first been through
+        # the pick-a-username step, which ensures chosen_localpart gets set.
+        if not session.chosen_localpart:
+            logger.warning("Session has no user name selected")
+            self._sso_handler.render_error(
+                request, "no_user", "No user name has been selected.", code=400
+            )
             return
 
         user_id = UserID(session.chosen_localpart, self._server_name)

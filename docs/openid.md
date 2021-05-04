@@ -226,7 +226,7 @@ Synapse config:
 oidc_providers:
   - idp_id: github
     idp_name: Github
-    idp_brand: "org.matrix.github"  # optional: styling hint for clients
+    idp_brand: "github"  # optional: styling hint for clients
     discover: false
     issuer: "https://github.com/"
     client_id: "your-client-id" # TO BE FILLED
@@ -252,7 +252,7 @@ oidc_providers:
    oidc_providers:
      - idp_id: google
        idp_name: Google
-       idp_brand: "org.matrix.google"  # optional: styling hint for clients
+       idp_brand: "google"  # optional: styling hint for clients
        issuer: "https://accounts.google.com/"
        client_id: "your-client-id" # TO BE FILLED
        client_secret: "your-client-secret" # TO BE FILLED
@@ -299,7 +299,7 @@ Synapse config:
 oidc_providers:
   - idp_id: gitlab
     idp_name: Gitlab
-    idp_brand: "org.matrix.gitlab"  # optional: styling hint for clients
+    idp_brand: "gitlab"  # optional: styling hint for clients
     issuer: "https://gitlab.com/"
     client_id: "your-client-id" # TO BE FILLED
     client_secret: "your-client-secret" # TO BE FILLED
@@ -334,7 +334,7 @@ Synapse config:
 ```yaml
   - idp_id: facebook
     idp_name: Facebook
-    idp_brand: "org.matrix.facebook"  # optional: styling hint for clients
+    idp_brand: "facebook"  # optional: styling hint for clients
     discover: false
     issuer: "https://facebook.com"
     client_id: "your-client-id" # TO BE FILLED
@@ -365,7 +365,7 @@ login mechanism needs an attribute to uniquely identify users, and that endpoint
 does not return a `sub` property, an alternative `subject_claim` has to be set.
 
 1. Create a new application.
-2. Add this Callback URL: `[synapse public baseurl]/_synapse/oidc/callback`
+2. Add this Callback URL: `[synapse public baseurl]/_synapse/client/oidc/callback`
 
 Synapse config:
 
@@ -386,5 +386,63 @@ oidc_providers:
       config:
         subject_claim: "id"
         localpart_template: "{{ user.login }}"
-        display_name_template: "{{ user.full_name }}" 
+        display_name_template: "{{ user.full_name }}"
+```
+
+### XWiki
+
+Install [OpenID Connect Provider](https://extensions.xwiki.org/xwiki/bin/view/Extension/OpenID%20Connect/OpenID%20Connect%20Provider/) extension in your [XWiki](https://www.xwiki.org) instance.
+
+Synapse config:
+
+```yaml
+oidc_providers:
+  - idp_id: xwiki
+    idp_name: "XWiki"
+    issuer: "https://myxwikihost/xwiki/oidc/"
+    client_id: "your-client-id" # TO BE FILLED
+    client_auth_method: none
+    scopes: ["openid", "profile"]
+    user_profile_method: "userinfo_endpoint"
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.preferred_username }}"
+        display_name_template: "{{ user.name }}"
+```
+
+## Apple
+
+Configuring "Sign in with Apple" (SiWA) requires an Apple Developer account.
+
+You will need to create a new "Services ID" for SiWA, and create and download a
+private key with "SiWA" enabled.
+
+As well as the private key file, you will need:
+ * Client ID: the "identifier" you gave the "Services ID"
+ * Team ID: a 10-character ID associated with your developer account.
+ * Key ID: the 10-character identifier for the key.
+
+https://help.apple.com/developer-account/?lang=en#/dev77c875b7e has more
+documentation on setting up SiWA.
+
+The synapse config will look like this:
+
+```yaml
+  - idp_id: apple
+    idp_name: Apple
+    issuer: "https://appleid.apple.com"
+    client_id: "your-client-id" # Set to the "identifier" for your "ServicesID"
+    client_auth_method: "client_secret_post"
+    client_secret_jwt_key:
+      key_file: "/path/to/AuthKey_KEYIDCODE.p8"  # point to your key file
+      jwt_header:
+        alg: ES256
+        kid: "KEYIDCODE"   # Set to the 10-char Key ID
+      jwt_payload:
+        iss: TEAMIDCODE    # Set to the 10-char Team ID
+    scopes: ["name", "email", "openid"]
+    authorization_endpoint: https://appleid.apple.com/auth/authorize?response_mode=form_post
+    user_mapping_provider:
+      config:
+        email_template: "{{ user.email }}"
 ```

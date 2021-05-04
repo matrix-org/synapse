@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -21,7 +20,7 @@ from synapse.api.errors import HttpResponseException, RequestSendFailed, Synapse
 from synapse.types import GroupID, JsonDict, get_domain_from_id
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -146,8 +145,7 @@ class GroupsLocalWorkerHandler:
     async def get_users_in_group(
         self, group_id: str, requester_user_id: str
     ) -> JsonDict:
-        """Get users in a group
-        """
+        """Get users in a group"""
         if self.is_mine_id(group_id):
             return await self.groups_server_handler.get_users_in_group(
                 group_id, requester_user_id
@@ -283,8 +281,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def create_group(
         self, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
-        """Create a group
-        """
+        """Create a group"""
 
         logger.info("Asking to create group with ID: %r", group_id)
 
@@ -314,8 +311,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def join_group(
         self, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
-        """Request to join a group
-        """
+        """Request to join a group"""
         if self.is_mine_id(group_id):
             await self.groups_server_handler.join_group(group_id, user_id, content)
             local_attestation = None
@@ -361,8 +357,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def accept_invite(
         self, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
-        """Accept an invite to a group
-        """
+        """Accept an invite to a group"""
         if self.is_mine_id(group_id):
             await self.groups_server_handler.accept_invite(group_id, user_id, content)
             local_attestation = None
@@ -408,8 +403,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def invite(
         self, group_id: str, user_id: str, requester_user_id: str, config: JsonDict
     ) -> JsonDict:
-        """Invite a user to a group
-        """
+        """Invite a user to a group"""
         content = {"requester_user_id": requester_user_id, "config": config}
         if self.is_mine_id(group_id):
             res = await self.groups_server_handler.invite_to_group(
@@ -434,8 +428,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def on_invite(
         self, group_id: str, user_id: str, content: JsonDict
     ) -> JsonDict:
-        """One of our users were invited to a group
-        """
+        """One of our users were invited to a group"""
         # TODO: Support auto join and rejection
 
         if not self.is_mine_id(user_id):
@@ -466,8 +459,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def remove_user_from_group(
         self, group_id: str, user_id: str, requester_user_id: str, content: JsonDict
     ) -> JsonDict:
-        """Remove a user from a group
-        """
+        """Remove a user from a group"""
         if user_id == requester_user_id:
             token = await self.store.register_user_group_membership(
                 group_id, user_id, membership="leave"
@@ -501,8 +493,7 @@ class GroupsLocalHandler(GroupsLocalWorkerHandler):
     async def user_removed_from_group(
         self, group_id: str, user_id: str, content: JsonDict
     ) -> None:
-        """One of our users was removed/kicked from a group
-        """
+        """One of our users was removed/kicked from a group"""
         # TODO: Check if user in group
         token = await self.store.register_user_group_membership(
             group_id, user_id, membership="leave"

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,10 +14,9 @@
 
 import time
 import urllib.parse
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
+from unittest.mock import Mock
 from urllib.parse import urlencode
-
-from mock import Mock
 
 import pymacaroons
 
@@ -47,8 +45,14 @@ except ImportError:
     HAS_JWT = False
 
 
-# public_base_url used in some tests
-BASE_URL = "https://synapse/"
+# synapse server name: used to populate public_baseurl in some tests
+SYNAPSE_SERVER_PUBLIC_HOSTNAME = "synapse"
+
+# public_baseurl for some tests. It uses an http:// scheme because
+# FakeChannel.isSecure() returns False, so synapse will see the requested uri as
+# http://..., so using http in the public_baseurl stops Synapse trying to redirect to
+# https://....
+BASE_URL = "http://%s/" % (SYNAPSE_SERVER_PUBLIC_HOSTNAME,)
 
 # CAS server used in some tests
 CAS_SERVER = "https://fake.test"
@@ -431,14 +435,16 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "/_matrix/client/r0/login")
         self.assertEqual(channel.code, 200, channel.result)
 
-        expected_flows = [
-            {"type": "m.login.cas"},
-            {"type": "m.login.sso"},
-            {"type": "m.login.token"},
-            {"type": "m.login.password"},
-        ] + ADDITIONAL_LOGIN_FLOWS
+        expected_flow_types = [
+            "m.login.cas",
+            "m.login.sso",
+            "m.login.token",
+            "m.login.password",
+        ] + [f["type"] for f in ADDITIONAL_LOGIN_FLOWS]
 
-        self.assertCountEqual(channel.json_body["flows"], expected_flows)
+        self.assertCountEqual(
+            [f["type"] for f in channel.json_body["flows"]], expected_flow_types
+        )
 
     @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_get_msc2858_login_flows(self):
@@ -480,11 +486,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
     def test_multi_sso_redirect(self):
         """/login/sso/redirect should redirect to an identity picker"""
         # first hit the redirect url, which should redirect to our idp picker
-        channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/login/sso/redirect?redirectUrl="
-            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL),
-        )
+        channel = self._make_sso_redirect_request(False, None)
         self.assertEqual(channel.code, 302, channel.result)
         uri = channel.headers.getRawHeaders("Location")[0]
 
@@ -520,7 +522,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             shorthand=False,
         )
         self.assertEqual(channel.code, 302, channel.result)
-        cas_uri = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        cas_uri = location_headers[0]
         cas_uri_path, cas_uri_query = cas_uri.split("?", 1)
 
         # it should redirect us to the login page of the cas server
@@ -543,7 +547,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             + "&idp=saml",
         )
         self.assertEqual(channel.code, 302, channel.result)
-        saml_uri = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        saml_uri = location_headers[0]
         saml_uri_path, saml_uri_query = saml_uri.split("?", 1)
 
         # it should redirect us to the login page of the SAML server
@@ -565,17 +571,21 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             + "&idp=oidc",
         )
         self.assertEqual(channel.code, 302, channel.result)
-        oidc_uri = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        oidc_uri = location_headers[0]
         oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
 
         # it should redirect us to the auth page of the OIDC server
         self.assertEqual(oidc_uri_path, TEST_OIDC_AUTH_ENDPOINT)
 
         # ... and should have set a cookie including the redirect url
-        cookies = dict(
-            h.split(";")[0].split("=", maxsplit=1)
-            for h in channel.headers.getRawHeaders("Set-Cookie")
-        )
+        cookie_headers = channel.headers.getRawHeaders("Set-Cookie")
+        assert cookie_headers
+        cookies = {}  # type: Dict[str, str]
+        for h in cookie_headers:
+            key, value = h.split(";")[0].split("=", maxsplit=1)
+            cookies[key] = value
 
         oidc_session_cookie = cookies["oidc_session"]
         macaroon = pymacaroons.Macaroon.deserialize(oidc_session_cookie)
@@ -588,9 +598,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
         # that should serve a confirmation page
         self.assertEqual(channel.code, 200, channel.result)
-        self.assertTrue(
-            channel.headers.getRawHeaders("Content-Type")[-1].startswith("text/html")
-        )
+        content_type_headers = channel.headers.getRawHeaders("Content-Type")
+        assert content_type_headers
+        self.assertTrue(content_type_headers[-1].startswith("text/html"))
         p = TestHtmlParser()
         p.feed(channel.text_body)
         p.close()
@@ -611,7 +621,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         # matrix access token, mxid, and device id.
         login_token = params[2][1]
         chan = self.make_request(
-            "POST", "/login", content={"type": "m.login.token", "token": login_token},
+            "POST",
+            "/login",
+            content={"type": "m.login.token", "token": login_token},
         )
         self.assertEqual(chan.code, 200, chan.result)
         self.assertEqual(chan.json_body["user_id"], "@user1:test")
@@ -619,46 +631,67 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
     def test_multi_sso_redirect_to_unknown(self):
         """An unknown IdP should cause a 400"""
         channel = self.make_request(
-            "GET", "/_synapse/client/pick_idp?redirectUrl=http://x&idp=xyz",
-        )
-        self.assertEqual(channel.code, 400, channel.result)
-
-    def test_client_idp_redirect_msc2858_disabled(self):
-        """If the client tries to pick an IdP but MSC2858 is disabled, return a 400"""
-        channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/org.matrix.msc2858/login/sso/redirect/oidc?redirectUrl="
-            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL),
+            "/_synapse/client/pick_idp?redirectUrl=http://x&idp=xyz",
         )
         self.assertEqual(channel.code, 400, channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
 
-    @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_client_idp_redirect_to_unknown(self):
         """If the client tries to pick an unknown IdP, return a 404"""
-        channel = self.make_request(
-            "GET",
-            "/_matrix/client/unstable/org.matrix.msc2858/login/sso/redirect/xxx?redirectUrl="
-            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL),
-        )
+        channel = self._make_sso_redirect_request(False, "xxx")
         self.assertEqual(channel.code, 404, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_FOUND")
 
-    @override_config({"experimental_features": {"msc2858_enabled": True}})
     def test_client_idp_redirect_to_oidc(self):
         """If the client pick a known IdP, redirect to it"""
-        channel = self.make_request(
-            "GET",
-            "/_matrix/client/unstable/org.matrix.msc2858/login/sso/redirect/oidc?redirectUrl="
-            + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL),
-        )
-
+        channel = self._make_sso_redirect_request(False, "oidc")
         self.assertEqual(channel.code, 302, channel.result)
         oidc_uri = channel.headers.getRawHeaders("Location")[0]
         oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
 
         # it should redirect us to the auth page of the OIDC server
         self.assertEqual(oidc_uri_path, TEST_OIDC_AUTH_ENDPOINT)
+
+    @override_config({"experimental_features": {"msc2858_enabled": True}})
+    def test_client_msc2858_redirect_to_oidc(self):
+        """Test the unstable API"""
+        channel = self._make_sso_redirect_request(True, "oidc")
+        self.assertEqual(channel.code, 302, channel.result)
+        oidc_uri = channel.headers.getRawHeaders("Location")[0]
+        oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
+
+        # it should redirect us to the auth page of the OIDC server
+        self.assertEqual(oidc_uri_path, TEST_OIDC_AUTH_ENDPOINT)
+
+    def test_client_idp_redirect_msc2858_disabled(self):
+        """If the client tries to use the MSC2858 endpoint but MSC2858 is disabled, return a 400"""
+        channel = self._make_sso_redirect_request(True, "oidc")
+        self.assertEqual(channel.code, 400, channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
+
+    def _make_sso_redirect_request(
+        self, unstable_endpoint: bool = False, idp_prov: Optional[str] = None
+    ):
+        """Send a request to /_matrix/client/r0/login/sso/redirect
+
+        ... or the unstable equivalent
+
+        ... possibly specifying an IDP provider
+        """
+        endpoint = (
+            "/_matrix/client/unstable/org.matrix.msc2858/login/sso/redirect"
+            if unstable_endpoint
+            else "/_matrix/client/r0/login/sso/redirect"
+        )
+        if idp_prov is not None:
+            endpoint += "/" + idp_prov
+        endpoint += "?redirectUrl=" + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL)
+
+        return self.make_request(
+            "GET",
+            endpoint,
+            custom_headers=[("Host", SYNAPSE_SERVER_PUBLIC_HOSTNAME)],
+        )
 
     @staticmethod
     def _get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
@@ -680,10 +713,12 @@ class CASTestCase(unittest.HomeserverTestCase):
         self.redirect_path = "_synapse/client/login/sso/redirect/confirm"
 
         config = self.default_config()
+        config["public_baseurl"] = (
+            config.get("public_baseurl") or "https://matrix.goodserver.com:8448"
+        )
         config["cas_config"] = {
             "enabled": True,
             "server_url": CAS_SERVER,
-            "service_url": "https://matrix.goodserver.com:8448",
         }
 
         cas_user_id = "username"
@@ -717,7 +752,8 @@ class CASTestCase(unittest.HomeserverTestCase):
         mocked_http_client.get_raw.side_effect = get_raw
 
         self.hs = self.setup_test_homeserver(
-            config=config, proxied_http_client=mocked_http_client,
+            config=config,
+            proxied_http_client=mocked_http_client,
         )
 
         return self.hs
@@ -787,6 +823,7 @@ class CASTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 302)
         location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
         self.assertEqual(location_headers[0][: len(redirect_url)], redirect_url)
 
     @override_config({"sso": {"client_whitelist": ["https://legit-site.com/"]}})
@@ -1229,7 +1266,9 @@ class UsernamePickerTestCase(HomeserverTestCase):
 
         # that should redirect to the username picker
         self.assertEqual(channel.code, 302, channel.result)
-        picker_url = channel.headers.getRawHeaders("Location")[0]
+        location_headers = channel.headers.getRawHeaders("Location")
+        assert location_headers
+        picker_url = location_headers[0]
         self.assertEqual(picker_url, "/_synapse/client/pick_username/account_details")
 
         # ... with a username_mapping_session cookie
@@ -1242,7 +1281,9 @@ class UsernamePickerTestCase(HomeserverTestCase):
         # looks ok.
         username_mapping_sessions = self.hs.get_sso_handler()._username_mapping_sessions
         self.assertIn(
-            session_id, username_mapping_sessions, "session id not found in map",
+            session_id,
+            username_mapping_sessions,
+            "session id not found in map",
         )
         session = username_mapping_sessions[session_id]
         self.assertEqual(session.remote_user_id, "tester")
@@ -1270,6 +1311,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+        assert location_headers
 
         # send a request to the completion page, which should 302 to the client redirectUrl
         chan = self.make_request(
@@ -1279,6 +1321,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         )
         self.assertEqual(chan.code, 302, chan.result)
         location_headers = chan.headers.getRawHeaders("Location")
+        assert location_headers
 
         # ensure that the returned location matches the requested redirect URL
         path, query = location_headers[0].split("?", 1)
@@ -1297,7 +1340,9 @@ class UsernamePickerTestCase(HomeserverTestCase):
         # finally, submit the matrix login token to the login API, which gives us our
         # matrix access token, mxid, and device id.
         chan = self.make_request(
-            "POST", "/login", content={"type": "m.login.token", "token": login_token},
+            "POST",
+            "/login",
+            content={"type": "m.login.token", "token": login_token},
         )
         self.assertEqual(chan.code, 200, chan.result)
         self.assertEqual(chan.json_body["user_id"], "@bobby:test")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,9 @@
 """Contains functions for registering clients."""
 
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+
+from prometheus_client import Counter
 
 from synapse import types
 from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
@@ -36,9 +37,22 @@ from synapse.types import RoomAlias, UserID, create_requester
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+registration_counter = Counter(
+    "synapse_user_registrations_total",
+    "Number of new users registered (since restart)",
+    ["guest", "shadow_banned", "auth_provider"],
+)
+
+login_counter = Counter(
+    "synapse_user_logins_total",
+    "Number of user logins (since restart)",
+    ["guest", "auth_provider"],
+)
 
 
 class RegistrationHandler(BaseHandler):
@@ -62,11 +76,12 @@ class RegistrationHandler(BaseHandler):
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
                 hs
             )
-            self._post_registration_client = ReplicationPostRegisterActionsServlet.make_client(
-                hs
+            self._post_registration_client = (
+                ReplicationPostRegisterActionsServlet.make_client(hs)
             )
         else:
             self.device_handler = hs.get_device_handler()
+            self._register_device_client = self.register_device_inner
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.session_lifetime
@@ -153,9 +168,10 @@ class RegistrationHandler(BaseHandler):
         user_type: Optional[str] = None,
         default_display_name: Optional[str] = None,
         address: Optional[str] = None,
-        bind_emails: Iterable[str] = [],
+        bind_emails: Optional[Iterable[str]] = None,
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
+        auth_provider_id: Optional[str] = None,
     ) -> str:
         """Registers a new client on the server.
 
@@ -181,20 +197,27 @@ class RegistrationHandler(BaseHandler):
               admin api, otherwise False.
             user_agent_ips: Tuples of IP addresses and user-agents used
                 during the registration process.
+            auth_provider_id: The SSO IdP the user used, if any.
         Returns:
-            The registere user_id.
+            The registered user_id.
         Raises:
             SynapseError if there was a problem registering.
         """
-        self.check_registration_ratelimit(address)
+        bind_emails = bind_emails or []
+
+        await self.check_registration_ratelimit(address)
 
         result = await self.spam_checker.check_registration_for_spam(
-            threepid, localpart, user_agent_ips or [],
+            threepid,
+            localpart,
+            user_agent_ips or [],
+            auth_provider_id=auth_provider_id,
         )
 
         if result == RegistrationBehaviour.DENY:
             logger.info(
-                "Blocked registration of %r", localpart,
+                "Blocked registration of %r",
+                localpart,
             )
             # We return a 429 to make it not obvious that they've been
             # denied.
@@ -203,7 +226,8 @@ class RegistrationHandler(BaseHandler):
         shadow_banned = result == RegistrationBehaviour.SHADOW_BAN
         if shadow_banned:
             logger.info(
-                "Shadow banning registration of %r", localpart,
+                "Shadow banning registration of %r",
+                localpart,
             )
 
         # do not check_auth_blocking if the call is coming through the Admin API
@@ -275,6 +299,12 @@ class RegistrationHandler(BaseHandler):
                 except SynapseError:
                     # if user id is taken, just generate another
                     fail_count += 1
+
+        registration_counter.labels(
+            guest=make_guest,
+            shadow_banned=shadow_banned,
+            auth_provider=(auth_provider_id or ""),
+        ).inc()
 
         if not self.hs.config.user_consent_at_registration:
             if not self.hs.config.auto_join_rooms_for_guests and make_guest:
@@ -369,7 +399,9 @@ class RegistrationHandler(BaseHandler):
                     config["room_alias_name"] = room_alias.localpart
 
                     info, _ = await room_creation_handler.create_room(
-                        fake_requester, config=config, ratelimit=False,
+                        fake_requester,
+                        config=config,
+                        ratelimit=False,
                     )
 
                     # If the room does not require an invite, but another user
@@ -406,10 +438,10 @@ class RegistrationHandler(BaseHandler):
 
                 if RoomAlias.is_valid(r):
                     (
-                        room_id,
+                        room,
                         remote_room_hosts,
                     ) = await room_member_handler.lookup_room_alias(room_alias)
-                    room_id = room_id.to_string()
+                    room_id = room.to_string()
                 else:
                     raise SynapseError(
                         400, "%s was not legal room ID or room alias" % (r,)
@@ -552,7 +584,7 @@ class RegistrationHandler(BaseHandler):
                     errcode=Codes.EXCLUSIVE,
                 )
 
-    def check_registration_ratelimit(self, address: Optional[str]) -> None:
+    async def check_registration_ratelimit(self, address: Optional[str]) -> None:
         """A simple helper method to check whether the registration rate limit has been hit
         for a given IP address
 
@@ -566,7 +598,7 @@ class RegistrationHandler(BaseHandler):
         if not address:
             return
 
-        self.ratelimiter.ratelimit(address)
+        await self.ratelimiter.ratelimit(None, address)
 
     async def register_with_store(
         self,
@@ -632,6 +664,7 @@ class RegistrationHandler(BaseHandler):
         initial_display_name: Optional[str],
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
+        auth_provider_id: Optional[str] = None,
     ) -> Tuple[str, str]:
         """Register a device for a user and generate an access token.
 
@@ -642,21 +675,40 @@ class RegistrationHandler(BaseHandler):
             device_id: The device ID to check, or None to generate a new one.
             initial_display_name: An optional display name for the device.
             is_guest: Whether this is a guest account
-
+            auth_provider_id: The SSO IdP the user used, if any (just used for the
+                prometheus metrics).
         Returns:
             Tuple of device ID and access token
         """
+        res = await self._register_device_client(
+            user_id=user_id,
+            device_id=device_id,
+            initial_display_name=initial_display_name,
+            is_guest=is_guest,
+            is_appservice_ghost=is_appservice_ghost,
+        )
 
-        if self.hs.config.worker_app:
-            r = await self._register_device_client(
-                user_id=user_id,
-                device_id=device_id,
-                initial_display_name=initial_display_name,
-                is_guest=is_guest,
-                is_appservice_ghost=is_appservice_ghost,
-            )
-            return r["device_id"], r["access_token"]
+        login_counter.labels(
+            guest=is_guest,
+            auth_provider=(auth_provider_id or ""),
+        ).inc()
 
+        return res["device_id"], res["access_token"]
+
+    async def register_device_inner(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        initial_display_name: Optional[str],
+        is_guest: bool = False,
+        is_appservice_ghost: bool = False,
+    ) -> Dict[str, str]:
+        """Helper for register_device
+
+        Does the bits that need doing on the main process. Not for use outside this
+        class and RegisterDeviceReplicationServlet.
+        """
+        assert not self.hs.config.worker_app
         valid_until_ms = None
         if self.session_lifetime is not None:
             if is_guest:
@@ -681,7 +733,7 @@ class RegistrationHandler(BaseHandler):
                 is_appservice_ghost=is_appservice_ghost,
             )
 
-        return (registered_device_id, access_token)
+        return {"device_id": registered_device_id, "access_token": access_token}
 
     async def post_registration_actions(
         self, user_id: str, auth_result: dict, access_token: Optional[str]
@@ -753,7 +805,10 @@ class RegistrationHandler(BaseHandler):
             return
 
         await self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
+            user_id,
+            threepid["medium"],
+            threepid["address"],
+            threepid["validated_at"],
         )
 
         # And we add an email pusher for them by default, but only
@@ -805,5 +860,8 @@ class RegistrationHandler(BaseHandler):
             raise
 
         await self._auth_handler.add_threepid(
-            user_id, threepid["medium"], threepid["address"], threepid["validated_at"],
+            user_id,
+            threepid["medium"],
+            threepid["address"],
+            threepid["validated_at"],
         )

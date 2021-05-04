@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -91,7 +90,9 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"], Codes.PASSWORD_TOO_SHORT, channel.result,
+            channel.json_body["errcode"],
+            Codes.PASSWORD_TOO_SHORT,
+            channel.result,
         )
 
     def test_password_no_digit(self):
@@ -100,7 +101,9 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"], Codes.PASSWORD_NO_DIGIT, channel.result,
+            channel.json_body["errcode"],
+            Codes.PASSWORD_NO_DIGIT,
+            channel.result,
         )
 
     def test_password_no_symbol(self):
@@ -109,7 +112,9 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"], Codes.PASSWORD_NO_SYMBOL, channel.result,
+            channel.json_body["errcode"],
+            Codes.PASSWORD_NO_SYMBOL,
+            channel.result,
         )
 
     def test_password_no_uppercase(self):
@@ -118,7 +123,9 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"], Codes.PASSWORD_NO_UPPERCASE, channel.result,
+            channel.json_body["errcode"],
+            Codes.PASSWORD_NO_UPPERCASE,
+            channel.result,
         )
 
     def test_password_no_lowercase(self):
@@ -127,7 +134,9 @@ class PasswordPolicyTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 400, channel.result)
         self.assertEqual(
-            channel.json_body["errcode"], Codes.PASSWORD_NO_LOWERCASE, channel.result,
+            channel.json_body["errcode"],
+            Codes.PASSWORD_NO_LOWERCASE,
+            channel.result,
         )
 
     def test_password_compliant(self):

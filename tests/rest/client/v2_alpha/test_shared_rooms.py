@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Half-Shot
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -54,61 +53,62 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
         A room should show up in the shared list of rooms between two users
         if it is public.
         """
-        u1 = self.register_user("user1", "pass")
-        u1_token = self.login(u1, "pass")
-        u2 = self.register_user("user2", "pass")
-        u2_token = self.login(u2, "pass")
-
-        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
-        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room, user=u2, tok=u2_token)
-
-        channel = self._get_shared_rooms(u1_token, u2)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 1)
-        self.assertEquals(channel.json_body["joined"][0], room)
+        self._check_shared_rooms_with(room_one_is_public=True, room_two_is_public=True)
 
     def test_shared_room_list_private(self):
         """
         A room should show up in the shared list of rooms between two users
         if it is private.
         """
-        u1 = self.register_user("user1", "pass")
-        u1_token = self.login(u1, "pass")
-        u2 = self.register_user("user2", "pass")
-        u2_token = self.login(u2, "pass")
-
-        room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
-        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room, user=u2, tok=u2_token)
-
-        channel = self._get_shared_rooms(u1_token, u2)
-        self.assertEquals(200, channel.code, channel.result)
-        self.assertEquals(len(channel.json_body["joined"]), 1)
-        self.assertEquals(channel.json_body["joined"][0], room)
+        self._check_shared_rooms_with(
+            room_one_is_public=False, room_two_is_public=False
+        )
 
     def test_shared_room_list_mixed(self):
         """
         The shared room list between two users should contain both public and private
         rooms.
         """
+        self._check_shared_rooms_with(room_one_is_public=True, room_two_is_public=False)
+
+    def _check_shared_rooms_with(
+        self, room_one_is_public: bool, room_two_is_public: bool
+    ):
+        """Checks that shared public or private rooms between two users appear in
+        their shared room lists
+        """
         u1 = self.register_user("user1", "pass")
         u1_token = self.login(u1, "pass")
         u2 = self.register_user("user2", "pass")
         u2_token = self.login(u2, "pass")
 
-        room_public = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
-        room_private = self.helper.create_room_as(u2, is_public=False, tok=u2_token)
-        self.helper.invite(room_public, src=u1, targ=u2, tok=u1_token)
-        self.helper.invite(room_private, src=u2, targ=u1, tok=u2_token)
-        self.helper.join(room_public, user=u2, tok=u2_token)
-        self.helper.join(room_private, user=u1, tok=u1_token)
+        # Create a room. user1 invites user2, who joins
+        room_id_one = self.helper.create_room_as(
+            u1, is_public=room_one_is_public, tok=u1_token
+        )
+        self.helper.invite(room_id_one, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room_id_one, user=u2, tok=u2_token)
 
+        # Check shared rooms from user1's perspective.
+        # We should see the one room in common
+        channel = self._get_shared_rooms(u1_token, u2)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertEquals(len(channel.json_body["joined"]), 1)
+        self.assertEquals(channel.json_body["joined"][0], room_id_one)
+
+        # Create another room and invite user2 to it
+        room_id_two = self.helper.create_room_as(
+            u1, is_public=room_two_is_public, tok=u1_token
+        )
+        self.helper.invite(room_id_two, src=u1, targ=u2, tok=u1_token)
+        self.helper.join(room_id_two, user=u2, tok=u2_token)
+
+        # Check shared rooms again. We should now see both rooms.
         channel = self._get_shared_rooms(u1_token, u2)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 2)
-        self.assertTrue(room_public in channel.json_body["joined"])
-        self.assertTrue(room_private in channel.json_body["joined"])
+        for room_id_id in channel.json_body["joined"]:
+            self.assertIn(room_id_id, [room_id_one, room_id_two])
 
     def test_shared_room_list_after_leave(self):
         """
@@ -132,6 +132,12 @@ class UserSharedRoomsTest(unittest.HomeserverTestCase):
 
         self.helper.leave(room, user=u1, tok=u1_token)
 
+        # Check user1's view of shared rooms with user2
+        channel = self._get_shared_rooms(u1_token, u2)
+        self.assertEquals(200, channel.code, channel.result)
+        self.assertEquals(len(channel.json_body["joined"]), 0)
+
+        # Check user2's view of shared rooms with user1
         channel = self._get_shared_rooms(u2_token, u1)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEquals(len(channel.json_body["joined"]), 0)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018, 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -66,18 +65,37 @@ TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
 class UserSortOrder(Enum):
     """
     Enum to define the sorting method used when returning users
-    with get_users_media_usage_paginate
+    with get_users_paginate in __init__.py
+    and get_users_media_usage_paginate in stats.py
 
-    MEDIA_LENGTH = ordered by size of uploaded media. Smallest to largest.
-    MEDIA_COUNT = ordered by number of uploaded media. Smallest to largest.
+    When moves this to __init__.py gets `builtins.ImportError` with
+    `most likely due to a circular import`
+
+    MEDIA_LENGTH = ordered by size of uploaded media.
+    MEDIA_COUNT = ordered by number of uploaded media.
     USER_ID = ordered alphabetically by `user_id`.
+    NAME = ordered alphabetically by `user_id`. This is for compatibility reasons,
+    as the user_id is returned in the name field in the response in list users admin API.
     DISPLAYNAME = ordered alphabetically by `displayname`
+    GUEST = ordered by `is_guest`
+    ADMIN = ordered by `admin`
+    DEACTIVATED = ordered by `deactivated`
+    USER_TYPE = ordered alphabetically by `user_type`
+    AVATAR_URL = ordered alphabetically by `avatar_url`
+    SHADOW_BANNED = ordered by `shadow_banned`
     """
 
     MEDIA_LENGTH = "media_length"
     MEDIA_COUNT = "media_count"
     USER_ID = "user_id"
+    NAME = "name"
     DISPLAYNAME = "displayname"
+    GUEST = "is_guest"
+    ADMIN = "admin"
+    DEACTIVATED = "deactivated"
+    USER_TYPE = "user_type"
+    AVATAR_URL = "avatar_url"
+    SHADOW_BANNED = "shadow_banned"
 
 
 class StatsStore(StateDeltasStore):
@@ -1001,7 +1019,9 @@ class StatsStore(StateDeltasStore):
                 ORDER BY {order_by_column} {order}
                 LIMIT ? OFFSET ?
             """.format(
-                sql_base=sql_base, order_by_column=order_by_column, order=order,
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
             )
 
             args += [limit, start]

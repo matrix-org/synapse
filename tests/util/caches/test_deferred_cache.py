@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -232,7 +231,10 @@ class DeferredCacheTestCase(TestCase):
 
     def test_eviction_iterable(self):
         cache = DeferredCache(
-            "test", max_entries=3, apply_cache_factor_from_config=False, iterable=True,
+            "test",
+            max_entries=3,
+            apply_cache_factor_from_config=False,
+            iterable=True,
         )
 
         cache.prefill(1, ["one", "two"])

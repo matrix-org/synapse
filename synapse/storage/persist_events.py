@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -18,7 +17,7 @@
 import itertools
 import logging
 from collections import deque, namedtuple
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter, Histogram
 
@@ -33,7 +32,6 @@ from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
-    Collection,
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,
@@ -411,8 +409,8 @@ class EventsPersistenceStorage:
                         )
 
                     for room_id, ev_ctx_rm in events_by_room.items():
-                        latest_event_ids = await self.main_store.get_latest_event_ids_in_room(
-                            room_id
+                        latest_event_ids = (
+                            await self.main_store.get_latest_event_ids_in_room(room_id)
                         )
                         new_latest_event_ids = await self._calculate_new_extremities(
                             room_id, ev_ctx_rm, latest_event_ids
@@ -889,7 +887,8 @@ class EventsPersistenceStorage:
                 continue
 
             logger.debug(
-                "Not dropping as too new and not in new_senders: %s", new_senders,
+                "Not dropping as too new and not in new_senders: %s",
+                new_senders,
             )
 
             return new_latest_event_ids
@@ -1004,7 +1003,10 @@ class EventsPersistenceStorage:
 
         remote_event_ids = [
             event_id
-            for (typ, state_key,), event_id in current_state.items()
+            for (
+                typ,
+                state_key,
+            ), event_id in current_state.items()
             if typ == EventTypes.Member and not self.is_mine_id(state_key)
         ]
         rows = await self.main_store.get_membership_from_event_ids(remote_event_ids)

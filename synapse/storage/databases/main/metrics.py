@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -111,7 +110,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     async def count_daily_sent_e2ee_messages(self):
         def _count_messages(txn):
             # This is good enough as if you have silly characters in your own
-            # hostname then thats your own fault.
+            # hostname then that's your own fault.
             like_clause = "%:" + self.hs.hostname
 
             sql = """
@@ -167,7 +166,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
     async def count_daily_sent_messages(self):
         def _count_messages(txn):
             # This is good enough as if you have silly characters in your own
-            # hostname then thats your own fault.
+            # hostname then that's your own fault.
             like_clause = "%:" + self.hs.hostname
 
             sql = """

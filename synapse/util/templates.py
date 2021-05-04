@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +16,7 @@
 
 import time
 import urllib.parse
-from typing import TYPE_CHECKING, Callable, Iterable, Union
+from typing import TYPE_CHECKING, Callable, Iterable, Optional, Union
 
 import jinja2
 
@@ -74,14 +73,23 @@ def build_jinja_env(
     return env
 
 
-def _create_mxc_to_http_filter(public_baseurl: str) -> Callable:
+def _create_mxc_to_http_filter(
+    public_baseurl: Optional[str],
+) -> Callable[[str, int, int, str], str]:
     """Create and return a jinja2 filter that converts MXC urls to HTTP
 
     Args:
         public_baseurl: The public, accessible base URL of the homeserver
     """
 
-    def mxc_to_http_filter(value, width, height, resize_method="crop"):
+    def mxc_to_http_filter(
+        value: str, width: int, height: int, resize_method: str = "crop"
+    ) -> str:
+        if not public_baseurl:
+            raise RuntimeError(
+                "public_baseurl must be set in the homeserver config to convert MXC URLs to HTTP URLs."
+            )
+
         if value[0:6] != "mxc://":
             return ""
 

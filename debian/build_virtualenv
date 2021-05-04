@@ -50,18 +50,27 @@ PACKAGE_BUILD_DIR="debian/matrix-synapse-py3"
 VIRTUALENV_DIR="${PACKAGE_BUILD_DIR}${DH_VIRTUALENV_INSTALL_ROOT}/matrix-synapse"
 TARGET_PYTHON="${VIRTUALENV_DIR}/bin/python"
 
-# we copy the tests to a temporary directory so that we can put them on the
-# PYTHONPATH without putting the uninstalled synapse on the pythonpath.
-tmpdir=`mktemp -d`
-trap "rm -r $tmpdir" EXIT
+case "$DEB_BUILD_OPTIONS" in
+    *nocheck*)
+        # Skip running tests if "nocheck" present in $DEB_BUILD_OPTIONS
+        ;;
 
-cp -r tests "$tmpdir"
+    *)
+        # Copy tests to a temporary directory so that we can put them on the
+        # PYTHONPATH without putting the uninstalled synapse on the pythonpath.
+        tmpdir=`mktemp -d`
+        trap "rm -r $tmpdir" EXIT
 
-PYTHONPATH="$tmpdir" \
-    "${TARGET_PYTHON}" -B -m twisted.trial --reporter=text -j2 tests
+        cp -r tests "$tmpdir"
+
+        PYTHONPATH="$tmpdir" \
+            "${TARGET_PYTHON}" -m twisted.trial --reporter=text -j2 tests
+
+        ;;
+esac
 
 # build the config file
-"${TARGET_PYTHON}" -B "${VIRTUALENV_DIR}/bin/generate_config" \
+"${TARGET_PYTHON}" "${VIRTUALENV_DIR}/bin/generate_config" \
         --config-dir="/etc/matrix-synapse" \
         --data-dir="/var/lib/matrix-synapse" |
     perl -pe '
@@ -87,7 +96,7 @@ PYTHONPATH="$tmpdir" \
 ' > "${PACKAGE_BUILD_DIR}/etc/matrix-synapse/homeserver.yaml"
 
 # build the log config file
-"${TARGET_PYTHON}" -B "${VIRTUALENV_DIR}/bin/generate_log_config" \
+"${TARGET_PYTHON}" "${VIRTUALENV_DIR}/bin/generate_log_config" \
         --output-file="${PACKAGE_BUILD_DIR}/etc/matrix-synapse/log.yaml"
 
 # add a dependency on the right version of python to substvars.

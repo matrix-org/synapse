@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -260,7 +259,9 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         # Create a new login for the user and dehydrated the device
         device_id, access_token = self.get_success(
             self.registration.register_device(
-                user_id=user_id, device_id=None, initial_display_name="new device",
+                user_id=user_id,
+                device_id=None,
+                initial_display_name="new device",
             )
         )
 

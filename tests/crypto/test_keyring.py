@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import time
+from unittest.mock import Mock
 
-from mock import Mock
-
+import attr
 import canonicaljson
 import signedjson.key
 import signedjson.sign
@@ -68,6 +67,11 @@ class MockPerspectiveServer:
         signedjson.sign.sign_json(res, self.server_name, self.key)
 
 
+@attr.s(slots=True)
+class FakeRequest:
+    id = attr.ib()
+
+
 @logcontext_clean
 class KeyringTestCase(unittest.HomeserverTestCase):
     def check_context(self, val, expected):
@@ -89,7 +93,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         first_lookup_deferred = Deferred()
 
         async def first_lookup_fetch(keys_to_fetch):
-            self.assertEquals(current_context().request, "context_11")
+            self.assertEquals(current_context().request.id, "context_11")
             self.assertEqual(keys_to_fetch, {"server10": {get_key_id(key1): 0}})
 
             await make_deferred_yieldable(first_lookup_deferred)
@@ -102,9 +106,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         mock_fetcher.get_keys.side_effect = first_lookup_fetch
 
         async def first_lookup():
-            with LoggingContext("context_11") as context_11:
-                context_11.request = "context_11"
-
+            with LoggingContext("context_11", request=FakeRequest("context_11")):
                 res_deferreds = kr.verify_json_objects_for_server(
                     [("server10", json1, 0, "test10"), ("server11", {}, 0, "test11")]
                 )
@@ -130,7 +132,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # should block rather than start a second call
 
         async def second_lookup_fetch(keys_to_fetch):
-            self.assertEquals(current_context().request, "context_12")
+            self.assertEquals(current_context().request.id, "context_12")
             return {
                 "server10": {
                     get_key_id(key1): FetchKeyResult(get_verify_key(key1), 100)
@@ -142,9 +144,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         second_lookup_state = [0]
 
         async def second_lookup():
-            with LoggingContext("context_12") as context_12:
-                context_12.request = "context_12"
-
+            with LoggingContext("context_12", request=FakeRequest("context_12")):
                 res_deferreds_2 = kr.verify_json_objects_for_server(
                     [("server10", json1, 0, "test")]
                 )
@@ -400,7 +400,10 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         )
 
     def build_perspectives_response(
-        self, server_name: str, signing_key: SigningKey, valid_until_ts: int,
+        self,
+        server_name: str,
+        signing_key: SigningKey,
+        valid_until_ts: int,
     ) -> dict:
         """
         Build a valid perspectives server response to a request for the given key
@@ -455,7 +458,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
         VALID_UNTIL_TS = 200 * 1000
 
         response = self.build_perspectives_response(
-            SERVER_NAME, testkey, VALID_UNTIL_TS,
+            SERVER_NAME,
+            testkey,
+            VALID_UNTIL_TS,
         )
 
         self.expect_outgoing_key_query(SERVER_NAME, "key1", response)
@@ -584,10 +589,7 @@ def get_key_id(key):
 
 @defer.inlineCallbacks
 def run_in_context(f, *args, **kwargs):
-    with LoggingContext("testctx") as ctx:
-        # we set the "request" prop to make it easier to follow what's going on in the
-        # logs.
-        ctx.request = "testctx"
+    with LoggingContext("testctx"):
         rv = yield f(*args, **kwargs)
     return rv
 

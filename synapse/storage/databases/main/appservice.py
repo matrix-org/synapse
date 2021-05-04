@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -32,7 +31,7 @@ from synapse.types import JsonDict
 from synapse.util import json_encoder
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +72,7 @@ class ApplicationServiceWorkerStore(SQLBaseStore):
         return self.services_cache
 
     def get_if_app_services_interested_in_user(self, user_id: str) -> bool:
-        """Check if the user is one associated with an app service (exclusively)
-        """
+        """Check if the user is one associated with an app service (exclusively)"""
         if self.exclusive_user_regex:
             return bool(self.exclusive_user_regex.match(user_id))
         else:

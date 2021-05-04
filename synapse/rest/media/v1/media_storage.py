@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,8 +84,7 @@ class MediaStorage:
         return fname
 
     async def write_to_file(self, source: IO, output: IO):
-        """Asynchronously write the `source` to `output`.
-        """
+        """Asynchronously write the `source` to `output`."""
         await defer_to_thread(self.reactor, _write_file_synchronously, source, output)
 
     @contextlib.contextmanager
@@ -245,7 +243,7 @@ class MediaStorage:
                     await consumer.wait()
                 return local_path
 
-        raise Exception("file could not be found")
+        raise NotFoundError()
 
     def _file_info_to_path(self, file_info: FileInfo) -> str:
         """Converts file_info into a relative path.
@@ -342,8 +340,7 @@ class ReadableFileWrapper:
     path = attr.ib(type=str)
 
     async def write_chunks_to(self, callback: Callable[[bytes], None]):
-        """Reads the file in chunks and calls the callback with each chunk.
-        """
+        """Reads the file in chunks and calls the callback with each chunk."""
 
         with open(self.path, "rb") as file:
             while True:

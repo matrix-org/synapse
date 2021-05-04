@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -29,7 +28,7 @@ from urllib import parse as urlparse
 import attr
 
 from twisted.internet.error import DNSLookupError
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -39,6 +38,7 @@ from synapse.http.server import (
     respond_with_json_bytes,
 )
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
@@ -53,12 +53,15 @@ from ._base import FileInfo
 if TYPE_CHECKING:
     from lxml import etree
 
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
-_charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
+_charset_match = re.compile(br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9-]+)"?', flags=re.I)
+_xml_encoding_match = re.compile(
+    br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9-]+)"', flags=re.I
+)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 OG_TAG_NAME_MAXLEN = 50
@@ -146,8 +149,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             treq_args={"browser_like_redirects": True},
             ip_whitelist=hs.config.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
@@ -172,7 +174,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             clock=self.clock,
             # don't spider URLs more often than once an hour
             expiry_ms=ONE_HOUR,
-        )
+        )  # type: ExpiringCache[str, ObservableDeferred]
 
         if self._worker_run_media_background_jobs:
             self._cleaner_loop = self.clock.looping_call(
@@ -183,7 +185,9 @@ class PreviewUrlResource(DirectServeJsonResource):
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 
-    async def _async_render_GET(self, request: Request) -> None:
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
@@ -300,24 +304,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info["filename"], "rb") as file:
                 body = file.read()
 
-            encoding = None
-
-            # Let's try and figure out if it has an encoding set in a meta tag.
-            # Limit it to the first 1kb, since it ought to be in the meta tags
-            # at the top.
-            match = _charset_match.search(body[:1000])
-
-            # If we find a match, it should take precedence over the
-            # Content-Type header, so set it here.
-            if match:
-                encoding = match.group(1).decode("ascii")
-
-            # If we don't find a match, we'll look at the HTTP Content-Type, and
-            # if that doesn't exist, we'll fall back to UTF-8.
-            if not encoding:
-                content_match = _content_type_match.match(media_info["media_type"])
-                encoding = content_match.group(1) if content_match else "utf-8"
-
+            encoding = get_html_media_encoding(body, media_info["media_type"])
             og = decode_and_calc_og(body, media_info["uri"], encoding)
 
             # pre-cache the image for posterity
@@ -594,8 +581,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         )
 
     async def _expire_url_cache_data(self) -> None:
-        """Clean up expired url cache content, media and thumbnails.
-        """
+        """Clean up expired url cache content, media and thumbnails."""
         # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs
@@ -689,6 +675,48 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.debug("No media removed from url cache")
 
 
+def get_html_media_encoding(body: bytes, content_type: str) -> str:
+    """
+    Get the encoding of the body based on the (presumably) HTML body or media_type.
+
+    The precedence used for finding a character encoding is:
+
+    1. meta tag with a charset declared.
+    2. The XML document's character encoding attribute.
+    3. The Content-Type header.
+    4. Fallback to UTF-8.
+
+    Args:
+        body: The HTML document, as bytes.
+        content_type: The Content-Type header.
+
+    Returns:
+        The character encoding of the body, as a string.
+    """
+    # Limit searches to the first 1kb, since it ought to be at the top.
+    body_start = body[:1024]
+
+    # Let's try and figure out if it has an encoding set in a meta tag.
+    match = _charset_match.search(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    # If we didn't find a match, see if it an XML document with an encoding.
+    match = _xml_encoding_match.match(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # If we don't find a match, we'll look at the HTTP Content-Type, and
+    # if that doesn't exist, we'll fall back to UTF-8.
+    content_match = _content_type_match.match(content_type)
+    if content_match:
+        return content_match.group(1)
+
+    return "utf-8"
+
+
 def decode_and_calc_og(
     body: bytes, media_uri: str, request_encoding: Optional[str] = None
 ) -> Dict[str, Optional[str]]:
@@ -725,6 +753,11 @@ def decode_and_calc_og(
     def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:
         # Attempt to parse the body. If this fails, log and return no metadata.
         tree = etree.fromstring(body_attempt, parser)
+
+        # The data was successfully parsed, but no tree was found.
+        if tree is None:
+            return {}
+
         return _calc_og(tree, media_uri)
 
     # Attempt to parse the body. If this fails, log and return no metadata.

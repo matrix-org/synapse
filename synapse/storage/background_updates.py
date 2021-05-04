@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +22,7 @@ from synapse.util import json_encoder
 from . import engines
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
     from synapse.storage.database import DatabasePool, LoggingTransaction
 
 logger = logging.getLogger(__name__)
@@ -77,7 +76,7 @@ class BackgroundUpdatePerformance:
 
 
 class BackgroundUpdater:
-    """ Background updates are updates to the database that run in the
+    """Background updates are updates to the database that run in the
     background. Each update processes a batch of data at once. We attempt to
     limit the impact of each update by monitoring how long each batch takes to
     process and autotuning the batch size.
@@ -158,8 +157,7 @@ class BackgroundUpdater:
         return False
 
     async def has_completed_background_update(self, update_name: str) -> bool:
-        """Check if the given background update has finished running.
-        """
+        """Check if the given background update has finished running."""
         if self._all_done:
             return True
 
@@ -198,7 +196,8 @@ class BackgroundUpdater:
 
         if not self._current_background_update:
             all_pending_updates = await self.db_pool.runInteraction(
-                "background_updates", get_background_updates_txn,
+                "background_updates",
+                get_background_updates_txn,
             )
             if not all_pending_updates:
                 # no work left to do

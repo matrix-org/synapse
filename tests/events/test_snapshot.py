@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,7 +42,10 @@ class TestEventContext(unittest.HomeserverTestCase):
 
         event, context = self.get_success(
             create_event(
-                self.hs, room_id=self.room_id, type="m.test", sender=self.user_id,
+                self.hs,
+                room_id=self.room_id,
+                type="m.test",
+                sender=self.user_id,
             )
         )
 

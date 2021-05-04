@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the 'License');
@@ -39,12 +38,12 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
             last_event = None
 
             # Make a real event chain
-            for i in range(event_count):
+            for _ in range(event_count):
                 ev = self.create_and_send_event(room_id, user, False, last_event)
                 last_event = [ev]
 
             # Sprinkle in some extremities
-            for i in range(extrems):
+            for _ in range(extrems):
                 ev = self.create_and_send_event(room_id, user, False, last_event)
 
         # Let it run for a while, then pull out the statistics from the

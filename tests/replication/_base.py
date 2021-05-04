@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,26 +14,21 @@
 import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-import attr
-
-from twisted.internet.interfaces import IConsumer, IPullProducer, IReactorTime
 from twisted.internet.protocol import Protocol
-from twisted.internet.task import LoopingCall
-from twisted.web.http import HTTPChannel
 from twisted.web.resource import Resource
 
-from synapse.app.generic_worker import (
-    GenericWorkerReplicationHandler,
-    GenericWorkerServer,
-)
+from synapse.app.generic_worker import GenericWorkerServer
 from synapse.http.server import JsonResource
 from synapse.http.site import SynapseRequest, SynapseSite
 from synapse.replication.http import ReplicationRestResource
+from synapse.replication.tcp.client import ReplicationDataHandler
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.protocol import ClientReplicationStreamProtocol
-from synapse.replication.tcp.resource import ReplicationStreamProtocolFactory
+from synapse.replication.tcp.resource import (
+    ReplicationStreamProtocolFactory,
+    ServerReplicationStreamProtocol,
+)
 from synapse.server import HomeServer
-from synapse.util import Clock
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -42,7 +36,7 @@ from tests.server import FakeTransport
 try:
     import hiredis
 except ImportError:
-    hiredis = None
+    hiredis = None  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +53,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # build a replication server
         server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
-        self.server = server_factory.buildProtocol(None)
+        self.server = server_factory.buildProtocol(
+            None
+        )  # type: ServerReplicationStreamProtocol
 
         # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -79,7 +75,11 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
 
         repl_handler = ReplicationCommandHandler(self.worker_hs)
         self.client = ClientReplicationStreamProtocol(
-            self.worker_hs, "client", "test", clock, repl_handler,
+            self.worker_hs,
+            "client",
+            "test",
+            clock,
+            repl_handler,
         )
 
         self._client_transport = None
@@ -148,12 +148,20 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # Set up client side protocol
         client_protocol = client_factory.buildProtocol(None)
 
-        request_factory = OneShotRequestFactory()
-
         # Set up the server side protocol
-        channel = _PushHTTPChannel(self.reactor)
+        channel = self.site.buildProtocol(None)
+
+        # hook into the channel's request factory so that we can keep a record
+        # of the requests
+        requests: List[SynapseRequest] = []
+        real_request_factory = channel.requestFactory
+
+        def request_factory(*args, **kwargs):
+            request = real_request_factory(*args, **kwargs)
+            requests.append(request)
+            return request
+
         channel.requestFactory = request_factory
-        channel.site = self.site
 
         # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
@@ -175,7 +183,10 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         server_to_client_transport.loseConnection()
         client_to_server_transport.loseConnection()
 
-        return request_factory.request
+        # there should have been exactly one request
+        self.assertEqual(len(requests), 1)
+
+        return requests[0]
 
     def assert_request_is_get_repl_stream_updates(
         self, request: SynapseRequest, stream_name: str
@@ -184,8 +195,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         fetching updates for given stream.
         """
 
+        path = request.path  # type: bytes  # type: ignore
         self.assertRegex(
-            request.path,
+            path,
             br"^/_synapse/replication/get_repl_stream_updates/%s/[^/]+$"
             % (stream_name.encode("ascii"),),
         )
@@ -228,7 +240,9 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         if self.hs.config.redis.redis_enabled:
             # Handle attempts to connect to fake redis server.
             self.reactor.add_tcp_client_callback(
-                "localhost", 6379, self.connect_any_redis_attempts,
+                b"localhost",
+                6379,
+                self.connect_any_redis_attempts,
             )
 
             self.hs.get_tcp_replication().start_replication(self.hs)
@@ -246,8 +260,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         )
 
     def create_test_resource(self):
-        """Overrides `HomeserverTestCase.create_test_resource`.
-        """
+        """Overrides `HomeserverTestCase.create_test_resource`."""
         # We override this so that it automatically registers all the HTTP
         # replication servlets, without having to explicitly do that in all
         # subclassses.
@@ -260,7 +273,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         return resource
 
     def make_worker_hs(
-        self, worker_app: str, extra_config: dict = {}, **kwargs
+        self, worker_app: str, extra_config: Optional[dict] = None, **kwargs
     ) -> HomeServer:
         """Make a new worker HS instance, correctly connecting replcation
         stream to the master HS.
@@ -277,7 +290,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
         config = self._get_worker_hs_config()
         config["worker_app"] = worker_app
-        config.update(extra_config)
+        config.update(extra_config or {})
 
         worker_hs = self.setup_test_homeserver(
             homeserver_to_use=GenericWorkerServer,
@@ -296,7 +309,10 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             if instance_loc.host not in self.reactor.lookups:
                 raise Exception(
                     "Host does not have an IP for instance_map[%r].host = %r"
-                    % (instance_name, instance_loc.host,)
+                    % (
+                        instance_name,
+                        instance_loc.host,
+                    )
                 )
 
             self.reactor.add_tcp_client_callback(
@@ -315,7 +331,11 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         if not worker_hs.config.redis_enabled:
             repl_handler = ReplicationCommandHandler(worker_hs)
             client = ClientReplicationStreamProtocol(
-                worker_hs, "client", "test", self.clock, repl_handler,
+                worker_hs,
+                "client",
+                "test",
+                self.clock,
+                repl_handler,
             )
             server = self.server_factory.buildProtocol(None)
 
@@ -339,6 +359,8 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             config=worker_hs.config.server.listeners[0],
             resource=resource,
             server_version_string="1",
+            max_request_body_size=4096,
+            reactor=self.reactor,
         )
 
         if worker_hs.config.redis.redis_enabled:
@@ -375,12 +397,8 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         # Set up client side protocol
         client_protocol = client_factory.buildProtocol(None)
 
-        request_factory = OneShotRequestFactory()
-
         # Set up the server side protocol
-        channel = _PushHTTPChannel(self.reactor)
-        channel.requestFactory = request_factory
-        channel.site = self._hs_to_site[hs]
+        channel = self._hs_to_site[hs].buildProtocol(None)
 
         # Connect client to server and vice versa.
         client_to_server_transport = FakeTransport(
@@ -406,7 +424,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         clients = self.reactor.tcpClients
         while clients:
             (host, port, client_factory, _timeout, _bindAddress) = clients.pop(0)
-            self.assertEqual(host, "localhost")
+            self.assertEqual(host, b"localhost")
             self.assertEqual(port, 6379)
 
             client_protocol = client_factory.buildProtocol(None)
@@ -423,7 +441,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             server_protocol.makeConnection(server_to_client_transport)
 
 
-class TestReplicationDataHandler(GenericWorkerReplicationHandler):
+class TestReplicationDataHandler(ReplicationDataHandler):
     """Drop-in for ReplicationDataHandler which just collects RDATA rows"""
 
     def __init__(self, hs: HomeServer):
@@ -438,146 +456,22 @@ class TestReplicationDataHandler(GenericWorkerReplicationHandler):
             self.received_rdata_rows.append((stream_name, token, r))
 
 
-@attr.s()
-class OneShotRequestFactory:
-    """A simple request factory that generates a single `SynapseRequest` and
-    stores it for future use. Can only be used once.
-    """
-
-    request = attr.ib(default=None)
-
-    def __call__(self, *args, **kwargs):
-        assert self.request is None
-
-        self.request = SynapseRequest(*args, **kwargs)
-        return self.request
-
-
-class _PushHTTPChannel(HTTPChannel):
-    """A HTTPChannel that wraps pull producers to push producers.
-
-    This is a hack to get around the fact that HTTPChannel transparently wraps a
-    pull producer (which is what Synapse uses to reply to requests) with
-    `_PullToPush` to convert it to a push producer. Unfortunately `_PullToPush`
-    uses the standard reactor rather than letting us use our test reactor, which
-    makes it very hard to test.
-    """
-
-    def __init__(self, reactor: IReactorTime):
-        super().__init__()
-        self.reactor = reactor
-
-        self._pull_to_push_producer = None  # type: Optional[_PullToPushProducer]
-
-    def registerProducer(self, producer, streaming):
-        # Convert pull producers to push producer.
-        if not streaming:
-            self._pull_to_push_producer = _PullToPushProducer(
-                self.reactor, producer, self
-            )
-            producer = self._pull_to_push_producer
-
-        super().registerProducer(producer, True)
-
-    def unregisterProducer(self):
-        if self._pull_to_push_producer:
-            # We need to manually stop the _PullToPushProducer.
-            self._pull_to_push_producer.stop()
-
-    def checkPersistence(self, request, version):
-        """Check whether the connection can be re-used
-        """
-        # We hijack this to always say no for ease of wiring stuff up in
-        # `handle_http_replication_attempt`.
-        request.responseHeaders.setRawHeaders(b"connection", [b"close"])
-        return False
-
-
-class _PullToPushProducer:
-    """A push producer that wraps a pull producer.
-    """
-
-    def __init__(
-        self, reactor: IReactorTime, producer: IPullProducer, consumer: IConsumer
-    ):
-        self._clock = Clock(reactor)
-        self._producer = producer
-        self._consumer = consumer
-
-        # While running we use a looping call with a zero delay to call
-        # resumeProducing on given producer.
-        self._looping_call = None  # type: Optional[LoopingCall]
-
-        # We start writing next reactor tick.
-        self._start_loop()
-
-    def _start_loop(self):
-        """Start the looping call to
-        """
-
-        if not self._looping_call:
-            # Start a looping call which runs every tick.
-            self._looping_call = self._clock.looping_call(self._run_once, 0)
-
-    def stop(self):
-        """Stops calling resumeProducing.
-        """
-        if self._looping_call:
-            self._looping_call.stop()
-            self._looping_call = None
-
-    def pauseProducing(self):
-        """Implements IPushProducer
-        """
-        self.stop()
-
-    def resumeProducing(self):
-        """Implements IPushProducer
-        """
-        self._start_loop()
-
-    def stopProducing(self):
-        """Implements IPushProducer
-        """
-        self.stop()
-        self._producer.stopProducing()
-
-    def _run_once(self):
-        """Calls resumeProducing on producer once.
-        """
-
-        try:
-            self._producer.resumeProducing()
-        except Exception:
-            logger.exception("Failed to call resumeProducing")
-            try:
-                self._consumer.unregisterProducer()
-            except Exception:
-                pass
-
-            self.stopProducing()
-
-
 class FakeRedisPubSubServer:
-    """A fake Redis server for pub/sub.
-    """
+    """A fake Redis server for pub/sub."""
 
     def __init__(self):
         self._subscribers = set()
 
     def add_subscriber(self, conn):
-        """A connection has called SUBSCRIBE
-        """
+        """A connection has called SUBSCRIBE"""
         self._subscribers.add(conn)
 
     def remove_subscriber(self, conn):
-        """A connection has called UNSUBSCRIBE
-        """
+        """A connection has called UNSUBSCRIBE"""
         self._subscribers.discard(conn)
 
     def publish(self, conn, channel, msg) -> int:
-        """A connection want to publish a message to subscribers.
-        """
+        """A connection want to publish a message to subscribers."""
         for sub in self._subscribers:
             sub.send(["message", channel, msg])
 
@@ -588,8 +482,9 @@ class FakeRedisPubSubServer:
 
 
 class FakeRedisPubSubProtocol(Protocol):
-    """A connection from a client talking to the fake Redis server.
-    """
+    """A connection from a client talking to the fake Redis server."""
+
+    transport = None  # type: Optional[FakeTransport]
 
     def __init__(self, server: FakeRedisPubSubServer):
         self._server = server
@@ -613,8 +508,7 @@ class FakeRedisPubSubProtocol(Protocol):
             self.handle_command(msg[0], *msg[1:])
 
     def handle_command(self, command, *args):
-        """Received a Redis command from the client.
-        """
+        """Received a Redis command from the client."""
 
         # We currently only support pub/sub.
         if command == b"PUBLISH":
@@ -635,8 +529,9 @@ class FakeRedisPubSubProtocol(Protocol):
             raise Exception("Unknown command")
 
     def send(self, msg):
-        """Send a message back to the client.
-        """
+        """Send a message back to the client."""
+        assert self.transport is not None
+
         raw = self.encode(msg).encode("utf-8")
 
         self.transport.write(raw)

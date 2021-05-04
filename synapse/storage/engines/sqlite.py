@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +28,10 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         super().__init__(database_module, database_config)
 
         database = database_config.get("args", {}).get("database")
-        self._is_in_memory = database in (None, ":memory:",)
+        self._is_in_memory = database in (
+            None,
+            ":memory:",
+        )
 
         if platform.python_implementation() == "PyPy":
             # pypy's sqlite3 module doesn't handle bytearrays, convert them
@@ -54,24 +56,18 @@ class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
         return self.module.sqlite_version_info >= (3, 24, 0)
 
     @property
-    def supports_tuple_comparison(self):
-        """
-        Do we support comparing tuples, i.e. `(a, b) > (c, d)`? This requires
-        SQLite 3.15+.
-        """
-        return self.module.sqlite_version_info >= (3, 15, 0)
-
-    @property
     def supports_using_any_list(self):
-        """Do we support using `a = ANY(?)` and passing a list
-        """
+        """Do we support using `a = ANY(?)` and passing a list"""
         return False
 
     def check_database(self, db_conn, allow_outdated_version: bool = False):
         if not allow_outdated_version:
             version = self.module.sqlite_version_info
-            if version < (3, 11, 0):
-                raise RuntimeError("Synapse requires sqlite 3.11 or above.")
+            # Synapse is untested against older SQLite versions, and we don't want
+            # to let users upgrade to a version of Synapse with broken support for their
+            # sqlite version, because it risks leaving them with a half-upgraded db.
+            if version < (3, 22, 0):
+                raise RuntimeError("Synapse requires sqlite 3.22 or above.")
 
     def check_new_database(self, txn):
         """Gets called when setting up a brand new database. This allows us to

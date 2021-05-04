@@ -74,10 +74,6 @@ pid_file: DATADIR/homeserver.pid
 # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
 # 'listeners' below).
 #
-# If this is left unset, it defaults to 'https://<server_name>/'. (Note that
-# that will not work unless you configure Synapse or a reverse-proxy to listen
-# on port 443.)
-#
 #public_baseurl: https://example.com/
 
 # Set the soft limit on the number of file descriptors synapse can use
@@ -86,15 +82,33 @@ pid_file: DATADIR/homeserver.pid
 #
 #soft_file_limit: 0
 
-# Set to false to disable presence tracking on this homeserver.
+# Presence tracking allows users to see the state (e.g online/offline)
+# of other local and remote users.
 #
-#use_presence: false
+presence:
+  # Uncomment to disable presence tracking on this homeserver. This option
+  # replaces the previous top-level 'use_presence' option.
+  #
+  #enabled: false
+
+  # Presence routers are third-party modules that can specify additional logic
+  # to where presence updates from users are routed.
+  #
+  presence_router:
+    # The custom module's class. Uncomment to use a custom presence router module.
+    #
+    #module: "my_custom_router.PresenceRouter"
+
+    # Configuration options of the custom module. Refer to your module's
+    # documentation for available options.
+    #
+    #config:
+    #  example_option: 'something'
 
 # Whether to require authentication to retrieve profile data (avatars,
 # display names) of other users through the client API. Defaults to
 # 'false'. Note that profile data is also available via the federation
-# API, so this setting is of limited value if federation is enabled on
-# the server.
+# API, unless allow_profile_lookup_over_federation is set to false.
 #
 #require_auth_for_profile_requests: true
 
@@ -104,6 +118,14 @@ pid_file: DATADIR/homeserver.pid
 # requesting server. Defaults to 'false'.
 #
 #limit_profile_requests_to_users_who_share_rooms: true
+
+# Uncomment to prevent a user's profile data from being retrieved and
+# displayed in a room until they have joined it. By default, a user's
+# profile data is included in an invite event, regardless of the values
+# of the above two settings, and whether or not the users share a server.
+# Defaults to 'true'.
+#
+#include_profile_data_on_invite: false
 
 # If set to 'true', removes the need for authentication to access the server's
 # public rooms directory through the client API, meaning that anyone can
@@ -703,6 +725,12 @@ acme:
 #  - matrix.org
 #  - example.com
 
+# Uncomment to disable profile lookup over federation. By default, the
+# Federation API allows other homeservers to obtain profile data of any user
+# on this homeserver. Defaults to 'true'.
+#
+#allow_profile_lookup_over_federation: false
+
 
 ## Caching ##
 
@@ -860,10 +888,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_joins:
 #  local:
 #    per_second: 0.1
-#    burst_count: 3
+#    burst_count: 10
 #  remote:
 #    per_second: 0.01
-#    burst_count: 3
+#    burst_count: 10
 #
 #rc_3pid_validation:
 #  per_second: 0.003
@@ -1147,70 +1175,6 @@ url_preview_accept_language:
 #
 #enable_registration: false
 
-# Optional account validity configuration. This allows for accounts to be denied
-# any request after a given period.
-#
-# Once this feature is enabled, Synapse will look for registered users without an
-# expiration date at startup and will add one to every account it found using the
-# current settings at that time.
-# This means that, if a validity period is set, and Synapse is restarted (it will
-# then derive an expiration date from the current validity period), and some time
-# after that the validity period changes and Synapse is restarted, the users'
-# expiration dates won't be updated unless their account is manually renewed. This
-# date will be randomly selected within a range [now + period - d ; now + period],
-# where d is equal to 10% of the validity period.
-#
-account_validity:
-  # The account validity feature is disabled by default. Uncomment the
-  # following line to enable it.
-  #
-  #enabled: true
-
-  # The period after which an account is valid after its registration. When
-  # renewing the account, its validity period will be extended by this amount
-  # of time. This parameter is required when using the account validity
-  # feature.
-  #
-  #period: 6w
-
-  # The amount of time before an account's expiry date at which Synapse will
-  # send an email to the account's email address with a renewal link. By
-  # default, no such emails are sent.
-  #
-  # If you enable this setting, you will also need to fill out the 'email'
-  # configuration section. You should also check that 'public_baseurl' is set
-  # correctly.
-  #
-  #renew_at: 1w
-
-  # The subject of the email sent out with the renewal link. '%(app)s' can be
-  # used as a placeholder for the 'app_name' parameter from the 'email'
-  # section.
-  #
-  # Note that the placeholder must be written '%(app)s', including the
-  # trailing 's'.
-  #
-  # If this is not set, a default value is used.
-  #
-  #renew_email_subject: "Renew your %(app)s account"
-
-  # Directory in which Synapse will try to find templates for the HTML files to
-  # serve to the user when trying to renew an account. If not set, default
-  # templates from within the Synapse package will be used.
-  #
-  #template_dir: "res/templates"
-
-  # File within 'template_dir' giving the HTML to be displayed to the user after
-  # they successfully renewed their account. If not set, default text is used.
-  #
-  #account_renewed_html_path: "account_renewed.html"
-
-  # File within 'template_dir' giving the HTML to be displayed when the user
-  # tries to renew an account with an invalid renewal token. If not set,
-  # default text is used.
-  #
-  #invalid_token_html_path: "invalid_token.html"
-
 # Time that a user's session remains valid for, after they log in.
 #
 # Note that this is not currently compatible with guest logins.
@@ -1238,9 +1202,9 @@ account_validity:
 #
 #allowed_local_3pids:
 #  - medium: email
-#    pattern: '.*@matrix\.org'
+#    pattern: '^[^@]+@matrix\.org$'
 #  - medium: email
-#    pattern: '.*@vector\.im'
+#    pattern: '^[^@]+@vector\.im$'
 #  - medium: msisdn
 #    pattern: '\+44'
 
@@ -1270,7 +1234,8 @@ account_validity:
 # The identity server which we suggest that clients should use when users log
 # in on this server.
 #
-# (By default, no suggestion is made, so it is left up to the client.)
+# (By default, no suggestion is made, so it is left up to the client.
+# This setting is ignored unless public_baseurl is also set.)
 #
 #default_identity_server: https://matrix.org
 
@@ -1294,6 +1259,8 @@ account_validity:
 # Servers handling the these requests must answer the `/requestToken` endpoints defined
 # by the Matrix Identity Service API specification:
 # https://matrix.org/docs/spec/identity_service/latest
+#
+# If a delegate is specified, the config option public_baseurl must also be filled out.
 #
 account_threepid_delegates:
     #email: https://example.com     # Delegate email sending to example.com
@@ -1402,6 +1369,91 @@ account_threepid_delegates:
 #auto_join_rooms_for_guests: false
 
 
+## Account Validity ##
+
+# Optional account validity configuration. This allows for accounts to be denied
+# any request after a given period.
+#
+# Once this feature is enabled, Synapse will look for registered users without an
+# expiration date at startup and will add one to every account it found using the
+# current settings at that time.
+# This means that, if a validity period is set, and Synapse is restarted (it will
+# then derive an expiration date from the current validity period), and some time
+# after that the validity period changes and Synapse is restarted, the users'
+# expiration dates won't be updated unless their account is manually renewed. This
+# date will be randomly selected within a range [now + period - d ; now + period],
+# where d is equal to 10% of the validity period.
+#
+account_validity:
+  # The account validity feature is disabled by default. Uncomment the
+  # following line to enable it.
+  #
+  #enabled: true
+
+  # The period after which an account is valid after its registration. When
+  # renewing the account, its validity period will be extended by this amount
+  # of time. This parameter is required when using the account validity
+  # feature.
+  #
+  #period: 6w
+
+  # The amount of time before an account's expiry date at which Synapse will
+  # send an email to the account's email address with a renewal link. By
+  # default, no such emails are sent.
+  #
+  # If you enable this setting, you will also need to fill out the 'email' and
+  # 'public_baseurl' configuration sections.
+  #
+  #renew_at: 1w
+
+  # The subject of the email sent out with the renewal link. '%(app)s' can be
+  # used as a placeholder for the 'app_name' parameter from the 'email'
+  # section.
+  #
+  # Note that the placeholder must be written '%(app)s', including the
+  # trailing 's'.
+  #
+  # If this is not set, a default value is used.
+  #
+  #renew_email_subject: "Renew your %(app)s account"
+
+  # Directory in which Synapse will try to find templates for the HTML files to
+  # serve to the user when trying to renew an account. If not set, default
+  # templates from within the Synapse package will be used.
+  #
+  # The currently available templates are:
+  #
+  # * account_renewed.html: Displayed to the user after they have successfully
+  #       renewed their account.
+  #
+  # * account_previously_renewed.html: Displayed to the user if they attempt to
+  #       renew their account with a token that is valid, but that has already
+  #       been used. In this case the account is not renewed again.
+  #
+  # * invalid_token.html: Displayed to the user when they try to renew an account
+  #       with an unknown or invalid renewal token.
+  #
+  # See https://github.com/matrix-org/synapse/tree/master/synapse/res/templates for
+  # default template contents.
+  #
+  # The file name of some of these templates can be configured below for legacy
+  # reasons.
+  #
+  #template_dir: "res/templates"
+
+  # A custom file name for the 'account_renewed.html' template.
+  #
+  # If not set, the file is assumed to be named "account_renewed.html".
+  #
+  #account_renewed_html_path: "account_renewed.html"
+
+  # A custom file name for the 'invalid_token.html' template.
+  #
+  # If not set, the file is assumed to be named "invalid_token.html".
+  #
+  #invalid_token_html_path: "invalid_token.html"
+
+
 ## Metrics ###
 
 # Enable collection and rendering of performance metrics
@@ -1440,14 +1492,31 @@ metrics_flags:
 
 ## API Configuration ##
 
-# A list of event types that will be included in the room_invite_state
+# Controls for the state that is shared with users who receive an invite
+# to a room
 #
-#room_invite_state_types:
-#  - "m.room.join_rules"
-#  - "m.room.canonical_alias"
-#  - "m.room.avatar"
-#  - "m.room.encryption"
-#  - "m.room.name"
+room_prejoin_state:
+   # By default, the following state event types are shared with users who
+   # receive invites to the room:
+   #
+   # - m.room.join_rules
+   # - m.room.canonical_alias
+   # - m.room.avatar
+   # - m.room.encryption
+   # - m.room.name
+   #
+   # Uncomment the following to disable these defaults (so that only the event
+   # types listed in 'additional_event_types' are shared). Defaults to 'false'.
+   #
+   #disable_default_event_types: true
+
+   # Additional state event types to share with users when they are invited
+   # to a room.
+   #
+   # By default, this list is empty (so only the default event types are shared).
+   #
+   #additional_event_types:
+   #  - org.example.custom.event.type
 
 
 # A list of application service config files to use
@@ -1747,6 +1816,9 @@ saml2_config:
 #       Note that, if this is changed, users authenticating via that provider
 #       will no longer be recognised as the same user!
 #
+#       (Use "oidc" here if you are migrating from an old "oidc_config"
+#       configuration.)
+#
 #   idp_name: A user-facing name for this identity provider, which is used to
 #       offer the user a choice of login mechanisms.
 #
@@ -1768,7 +1840,26 @@ saml2_config:
 #
 #   client_id: Required. oauth2 client id to use.
 #
-#   client_secret: Required. oauth2 client secret to use.
+#   client_secret: oauth2 client secret to use. May be omitted if
+#        client_secret_jwt_key is given, or if client_auth_method is 'none'.
+#
+#   client_secret_jwt_key: Alternative to client_secret: details of a key used
+#      to create a JSON Web Token to be used as an OAuth2 client secret. If
+#      given, must be a dictionary with the following properties:
+#
+#          key: a pem-encoded signing key. Must be a suitable key for the
+#              algorithm specified. Required unless 'key_file' is given.
+#
+#          key_file: the path to file containing a pem-encoded signing key file.
+#              Required unless 'key' is given.
+#
+#          jwt_header: a dictionary giving properties to include in the JWT
+#              header. Must include the key 'alg', giving the algorithm used to
+#              sign the JWT, such as "ES256", using the JWA identifiers in
+#              RFC7518.
+#
+#          jwt_payload: an optional dictionary giving properties to include in
+#              the JWT payload. Normally this should include an 'iss' key.
 #
 #   client_auth_method: auth method to use when exchanging the token. Valid
 #       values are 'client_secret_basic' (default), 'client_secret_post' and
@@ -1809,7 +1900,7 @@ saml2_config:
 #       sub-properties:
 #
 #       module: The class name of a custom mapping module. Default is
-#           'synapse.handlers.oidc_handler.JinjaOidcMappingProvider'.
+#           'synapse.handlers.oidc.JinjaOidcMappingProvider'.
 #           See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
 #           for information on implementing a custom mapping provider.
 #
@@ -1843,6 +1934,24 @@ saml2_config:
 #           which is set to the claims returned by the UserInfo Endpoint and/or
 #           in the ID Token.
 #
+#   It is possible to configure Synapse to only allow logins if certain attributes
+#   match particular values in the OIDC userinfo. The requirements can be listed under
+#   `attribute_requirements` as shown below. All of the listed attributes must
+#   match for the login to be permitted. Additional attributes can be added to
+#   userinfo by expanding the `scopes` section of the OIDC config to retrieve
+#   additional information from the OIDC provider.
+#
+#   If the OIDC claim is a list, then the attribute must match any value in the list.
+#   Otherwise, it must exactly match the value of the claim. Using the example
+#   below, the `family_name` claim MUST be "Stephensson", but the `groups`
+#   claim MUST contain "admin".
+#
+#   attribute_requirements:
+#     - attribute: family_name
+#       value: "Stephensson"
+#     - attribute: groups
+#       value: "admin"
+#
 # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
 # for information on how to configure these options.
 #
@@ -1875,34 +1984,9 @@ oidc_providers:
   #      localpart_template: "{{ user.login }}"
   #      display_name_template: "{{ user.name }}"
   #      email_template: "{{ user.email }}"
-
-  # For use with Keycloak
-  #
-  #- idp_id: keycloak
-  #  idp_name: Keycloak
-  #  issuer: "https://127.0.0.1:8443/auth/realms/my_realm_name"
-  #  client_id: "synapse"
-  #  client_secret: "copy secret generated in Keycloak UI"
-  #  scopes: ["openid", "profile"]
-
-  # For use with Github
-  #
-  #- idp_id: github
-  #  idp_name: Github
-  #  idp_brand: org.matrix.github
-  #  discover: false
-  #  issuer: "https://github.com/"
-  #  client_id: "your-client-id" # TO BE FILLED
-  #  client_secret: "your-client-secret" # TO BE FILLED
-  #  authorization_endpoint: "https://github.com/login/oauth/authorize"
-  #  token_endpoint: "https://github.com/login/oauth/access_token"
-  #  userinfo_endpoint: "https://api.github.com/user"
-  #  scopes: ["read:user"]
-  #  user_mapping_provider:
-  #    config:
-  #      subject_claim: "id"
-  #      localpart_template: "{{ user.login }}"
-  #      display_name_template: "{{ user.name }}"
+  #  attribute_requirements:
+  #    - attribute: userGroup
+  #      value: "synapseUsers"
 
 
 # Enable Central Authentication Service (CAS) for registration and login.
@@ -1948,9 +2032,9 @@ sso:
     # phishing attacks from evil.site. To avoid this, include a slash after the
     # hostname: "https://my.client/".
     #
-    # The login fallback page (used by clients that don't natively support the
-    # required login flows) is automatically whitelisted in addition to any URLs
-    # in this list.
+    # If public_baseurl is set, then the login fallback page (used by clients
+    # that don't natively support the required login flows) is whitelisted in
+    # addition to any URLs in this list.
     #
     # By default, this list is empty.
     #
@@ -2230,11 +2314,11 @@ password_config:
       #require_uppercase: true
 
 ui_auth:
-    # The number of milliseconds to allow a user-interactive authentication
-    # session to be active.
+    # The amount of time to allow a user-interactive authentication session
+    # to be active.
     #
     # This defaults to 0, meaning the user is queried for their credentials
-    # before every action, but this can be overridden to alow a single
+    # before every action, but this can be overridden to allow a single
     # validation to be re-used.  This weakens the protections afforded by
     # the user-interactive authentication process, by allowing for multiple
     # (and potentially different) operations to use the same validation session.
@@ -2242,7 +2326,7 @@ ui_auth:
     # Uncomment below to allow for credential validation to last for 15
     # seconds.
     #
-    #session_timeout: 15000
+    #session_timeout: "15s"
 
 
 # Configuration for sending emails from Synapse.
@@ -2532,19 +2616,35 @@ spam_checker:
 
 # User Directory configuration
 #
-# 'enabled' defines whether users can search the user directory. If
-# false then empty responses are returned to all queries. Defaults to
-# true.
-#
-# 'search_all_users' defines whether to search all users visible to your HS
-# when searching the user directory, rather than limiting to users visible
-# in public rooms.  Defaults to false.  If you set it True, you'll have to
-# rebuild the user_directory search indexes, see
-# https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
-#
-#user_directory:
-#  enabled: true
-#  search_all_users: false
+user_directory:
+    # Defines whether users can search the user directory. If false then
+    # empty responses are returned to all queries. Defaults to true.
+    #
+    # Uncomment to disable the user directory.
+    #
+    #enabled: false
+
+    # Defines whether to search all users visible to your HS when searching
+    # the user directory, rather than limiting to users visible in public
+    # rooms. Defaults to false.
+    #
+    # If you set it true, you'll have to rebuild the user_directory search
+    # indexes, see:
+    # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
+    #
+    # Uncomment to return search results containing all known users, even if that
+    # user does not share a room with the requester.
+    #
+    #search_all_users: true
+
+    # Defines whether to prefer local users in search query results.
+    # If True, local users are more likely to appear above remote users
+    # when searching the user directory. Defaults to false.
+    #
+    # Uncomment to prefer local over remote users in user directory search
+    # results.
+    #
+    #prefer_local_users: true
 
 
 # User Consent configuration
@@ -2599,19 +2699,20 @@ spam_checker:
 
 
 
-# Local statistics collection. Used in populating the room directory.
+# Settings for local room and user statistics collection. See
+# docs/room_and_user_statistics.md.
 #
-# 'bucket_size' controls how large each statistics timeslice is. It can
-# be defined in a human readable short form -- e.g. "1d", "1y".
-#
-# 'retention' controls how long historical statistics will be kept for.
-# It can be defined in a human readable short form -- e.g. "1d", "1y".
-#
-#
-#stats:
-#   enabled: true
-#   bucket_size: 1d
-#   retention: 1y
+stats:
+  # Uncomment the following to disable room and user statistics. Note that doing
+  # so may cause certain features (such as the room directory) not to work
+  # correctly.
+  #
+  #enabled: false
+
+  # The size of each timeslice in the room_stats_historical and
+  # user_stats_historical tables, as a time period. Defaults to "1d".
+  #
+  #bucket_size: 1h
 
 
 # Server Notices room configuration

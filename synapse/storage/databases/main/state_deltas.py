@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -64,7 +63,7 @@ class StateDeltasStore(SQLBaseStore):
         def get_current_state_deltas_txn(txn):
             # First we calculate the max stream id that will give us less than
             # N results.
-            # We arbitarily limit to 100 stream_id entries to ensure we don't
+            # We arbitrarily limit to 100 stream_id entries to ensure we don't
             # select toooo many.
             sql = """
                 SELECT stream_id, count(*)
@@ -81,7 +80,7 @@ class StateDeltasStore(SQLBaseStore):
             for stream_id, count in txn:
                 total += count
                 if total > 100:
-                    # We arbitarily limit to 100 entries to ensure we don't
+                    # We arbitrarily limit to 100 entries to ensure we don't
                     # select toooo many.
                     logger.debug(
                         "Clipping current_state_delta_stream rows to stream_id %i",

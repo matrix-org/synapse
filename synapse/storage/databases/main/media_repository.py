@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -13,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from enum import Enum
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from synapse.storage._base import SQLBaseStore
@@ -21,6 +21,25 @@ from synapse.storage.database import DatabasePool
 BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD = (
     "media_repository_drop_index_wo_method"
 )
+BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2 = (
+    "media_repository_drop_index_wo_method_2"
+)
+
+
+class MediaSortOrder(Enum):
+    """
+    Enum to define the sorting method used when returning media with
+    get_local_media_by_user_paginate
+    """
+
+    MEDIA_ID = "media_id"
+    UPLOAD_NAME = "upload_name"
+    CREATED_TS = "created_ts"
+    LAST_ACCESS_TS = "last_access_ts"
+    MEDIA_LENGTH = "media_length"
+    MEDIA_TYPE = "media_type"
+    QUARANTINED_BY = "quarantined_by"
+    SAFE_FROM_QUARANTINE = "safe_from_quarantine"
 
 
 class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
@@ -68,23 +87,35 @@ class MediaRepositoryBackgroundUpdateStore(SQLBaseStore):
             unique=True,
         )
 
+        # the original impl of _drop_media_index_without_method was broken (see
+        # https://github.com/matrix-org/synapse/issues/8649), so we replace the original
+        # impl with a no-op and run the fixed migration as
+        # media_repository_drop_index_wo_method_2.
+        self.db_pool.updates.register_noop_background_update(
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
+        )
         self.db_pool.updates.register_background_update_handler(
-            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD,
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2,
             self._drop_media_index_without_method,
         )
 
     async def _drop_media_index_without_method(self, progress, batch_size):
+        """background update handler which removes the old constraints.
+
+        Note that this is only run on postgres.
+        """
+
         def f(txn):
             txn.execute(
                 "ALTER TABLE local_media_repository_thumbnails DROP CONSTRAINT IF EXISTS local_media_repository_thumbn_media_id_thumbnail_width_thum_key"
             )
             txn.execute(
-                "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_repository_thumbn_media_id_thumbnail_width_thum_key"
+                "ALTER TABLE remote_media_cache_thumbnails DROP CONSTRAINT IF EXISTS remote_media_cache_thumbnails_media_origin_media_id_thumbna_key"
             )
 
         await self.db_pool.runInteraction("drop_media_indices_without_method", f)
         await self.db_pool.updates._end_background_update(
-            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD
+            BG_UPDATE_REMOVE_MEDIA_REPO_INDEX_WITHOUT_METHOD_2
         )
         return 1
 
@@ -118,7 +149,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_local_media_by_user_paginate(
-        self, start: int, limit: int, user_id: str
+        self,
+        start: int,
+        limit: int,
+        user_id: str,
+        order_by: str = MediaSortOrder.CREATED_TS.value,
+        direction: str = "f",
     ) -> Tuple[List[Dict[str, Any]], int]:
         """Get a paginated list of metadata for a local piece of media
         which an user_id has uploaded
@@ -127,12 +163,22 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
             start: offset in the list
             limit: maximum amount of media_ids to retrieve
             user_id: fully-qualified user id
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
         Returns:
             A paginated list of all metadata of user's media,
             plus the total count of all the user's media
         """
 
         def get_local_media_by_user_paginate_txn(txn):
+
+            # Set ordering
+            order_by_column = MediaSortOrder(order_by).value
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
 
             args = [user_id]
             sql = """
@@ -155,9 +201,12 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
                     "safe_from_quarantine"
                 FROM local_media_repository
                 WHERE user_id = ?
-                ORDER BY created_ts DESC, media_id DESC
+                ORDER BY {order_by_column} {order}, media_id ASC
                 LIMIT ? OFFSET ?
-            """
+            """.format(
+                order_by_column=order_by_column,
+                order=order,
+            )
 
             args += [limit, start]
             txn.execute(sql, args)
@@ -169,7 +218,10 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_local_media_before(
-        self, before_ts: int, size_gt: int, keep_profiles: bool,
+        self,
+        before_ts: int,
+        size_gt: int,
+        keep_profiles: bool,
     ) -> List[str]:
 
         # to find files that have never been accessed (last_access_ts IS NULL)
@@ -341,16 +393,16 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        await self.db_pool.simple_insert(
-            "local_media_repository_thumbnails",
-            {
+        await self.db_pool.simple_upsert(
+            table="local_media_repository_thumbnails",
+            keyvalues={
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
                 "thumbnail_height": thumbnail_height,
                 "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
-                "thumbnail_length": thumbnail_length,
             },
+            values={"thumbnail_length": thumbnail_length},
             desc="store_local_thumbnail",
         )
 
@@ -454,10 +506,14 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         )
 
     async def get_remote_media_thumbnail(
-        self, origin: str, media_id: str, t_width: int, t_height: int, t_type: str,
+        self,
+        origin: str,
+        media_id: str,
+        t_width: int,
+        t_height: int,
+        t_type: str,
     ) -> Optional[Dict[str, Any]]:
-        """Fetch the thumbnail info of given width, height and type.
-        """
+        """Fetch the thumbnail info of given width, height and type."""
 
         return await self.db_pool.simple_select_one(
             table="remote_media_cache_thumbnails",
@@ -491,18 +547,18 @@ class MediaRepositoryStore(MediaRepositoryBackgroundUpdateStore):
         thumbnail_method,
         thumbnail_length,
     ):
-        await self.db_pool.simple_insert(
-            "remote_media_cache_thumbnails",
-            {
+        await self.db_pool.simple_upsert(
+            table="remote_media_cache_thumbnails",
+            keyvalues={
                 "media_origin": origin,
                 "media_id": media_id,
                 "thumbnail_width": thumbnail_width,
                 "thumbnail_height": thumbnail_height,
                 "thumbnail_method": thumbnail_method,
                 "thumbnail_type": thumbnail_type,
-                "thumbnail_length": thumbnail_length,
-                "filesystem_id": filesystem_id,
             },
+            values={"thumbnail_length": thumbnail_length},
+            insertion_values={"filesystem_id": filesystem_id},
             desc="store_remote_media_thumbnail",
         )
 

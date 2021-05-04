@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +31,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True, frozen=True)
 class _CalculateChainCover:
-    """Return value for _calculate_chain_cover_txn.
-    """
+    """Return value for _calculate_chain_cover_txn."""
 
     # The last room_id/depth/stream processed.
     room_id = attr.ib(type=str)
@@ -127,11 +125,18 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "rejected_events_metadata", self._rejected_events_metadata,
+            "rejected_events_metadata",
+            self._rejected_events_metadata,
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "chain_cover", self._chain_cover_index,
+            "chain_cover",
+            self._chain_cover_index,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            "purged_chain_cover",
+            self._purged_chain_cover_index,
         )
 
     async def _background_reindex_fields_sender(self, progress, batch_size):
@@ -462,8 +467,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         return num_handled
 
     async def _redactions_received_ts(self, progress, batch_size):
-        """Handles filling out the `received_ts` column in redactions.
-        """
+        """Handles filling out the `received_ts` column in redactions."""
         last_event_id = progress.get("last_event_id", "")
 
         def _redactions_received_ts_txn(txn):
@@ -518,8 +522,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         return count
 
     async def _event_fix_redactions_bytes(self, progress, batch_size):
-        """Undoes hex encoded censored redacted event JSON.
-        """
+        """Undoes hex encoded censored redacted event JSON."""
 
         def _event_fix_redactions_bytes_txn(txn):
             # This update is quite fast due to new index.
@@ -642,7 +645,13 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 LIMIT ?
             """
 
-            txn.execute(sql, (last_event_id, batch_size,))
+            txn.execute(
+                sql,
+                (
+                    last_event_id,
+                    batch_size,
+                ),
+            )
 
             return [(row[0], row[1], db_to_json(row[2]), row[3], row[4]) for row in txn]  # type: ignore
 
@@ -691,7 +700,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 )
 
             if not has_event_auth:
-                for auth_id in event.auth_event_ids():
+                # Old, dodgy, events may have duplicate auth events, which we
+                # need to deduplicate as we have a unique constraint.
+                for auth_id in set(event.auth_event_ids()):
                     auth_events.append(
                         {
                             "room_id": event.room_id,
@@ -826,7 +837,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         # We want to do a `(topological_ordering, stream_ordering) > (?,?)`
         # comparison, but that is not supported on older SQLite versions
         tuple_clause, tuple_args = make_tuple_comparison_clause(
-            self.database_engine,
             [
                 ("events.room_id", last_room_id),
                 ("topological_ordering", last_depth),
@@ -910,7 +920,12 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         # Annoyingly we need to gut wrench into the persit event store so that
         # we can reuse the function to calculate the chain cover for rooms.
         PersistEventsStore._add_chain_cover_index(
-            txn, self.db_pool, event_to_room_id, event_to_types, event_to_auth_chain,
+            txn,
+            self.db_pool,
+            self.event_chain_id_gen,
+            event_to_room_id,
+            event_to_types,
+            event_to_auth_chain,
         )
 
         return _CalculateChainCover(
@@ -920,3 +935,77 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             processed_count=count,
             finished_room_map=finished_rooms,
         )
+
+    async def _purged_chain_cover_index(self, progress: dict, batch_size: int) -> int:
+        """
+        A background updates that iterates over the chain cover and deletes the
+        chain cover for events that have been purged.
+
+        This may be due to fully purging a room or via setting a retention policy.
+        """
+        current_event_id = progress.get("current_event_id", "")
+
+        def purged_chain_cover_txn(txn) -> int:
+            # The event ID from events will be null if the chain ID / sequence
+            # number points to a purged event.
+            sql = """
+                SELECT event_id, chain_id, sequence_number, e.event_id IS NOT NULL
+                FROM event_auth_chains
+                LEFT JOIN events AS e USING (event_id)
+                WHERE event_id > ? ORDER BY event_auth_chains.event_id ASC LIMIT ?
+            """
+            txn.execute(sql, (current_event_id, batch_size))
+
+            rows = txn.fetchall()
+            if not rows:
+                return 0
+
+            # The event IDs and chain IDs / sequence numbers where the event has
+            # been purged.
+            unreferenced_event_ids = []
+            unreferenced_chain_id_tuples = []
+            event_id = ""
+            for event_id, chain_id, sequence_number, has_event in rows:
+                if not has_event:
+                    unreferenced_event_ids.append((event_id,))
+                    unreferenced_chain_id_tuples.append((chain_id, sequence_number))
+
+            # Delete the unreferenced auth chains from event_auth_chain_links and
+            # event_auth_chains.
+            txn.executemany(
+                """
+                DELETE FROM event_auth_chains WHERE event_id = ?
+                """,
+                unreferenced_event_ids,
+            )
+            # We should also delete matching target_*, but there is no index on
+            # target_chain_id. Hopefully any purged events are due to a room
+            # being fully purged and they will be removed from the origin_*
+            # searches.
+            txn.executemany(
+                """
+                DELETE FROM event_auth_chain_links WHERE
+                origin_chain_id = ? AND origin_sequence_number = ?
+                """,
+                unreferenced_chain_id_tuples,
+            )
+
+            progress = {
+                "current_event_id": event_id,
+            }
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn, "purged_chain_cover", progress
+            )
+
+            return len(rows)
+
+        result = await self.db_pool.runInteraction(
+            "_purged_chain_cover_index",
+            purged_chain_cover_txn,
+        )
+
+        if not result:
+            await self.db_pool.updates._end_background_update("purged_chain_cover")
+
+        return result

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017, 2018 New Vector Ltd
 #
@@ -57,7 +56,7 @@ from synapse.util.metrics import Measure
 from synapse.util.retryutils import NotRetryingDestination
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -502,7 +501,7 @@ class StoreKeyFetcher(KeyFetcher):
 class BaseV2KeyFetcher(KeyFetcher):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.config = hs.get_config()
+        self.config = hs.config
 
     async def process_v2_response(
         self, from_server: str, response_json: JsonDict, time_added_ms: int

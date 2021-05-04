@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
@@ -96,18 +96,48 @@ for port in 8080 8081 8082; do
     # Check script parameters
     if [ $# -eq 1 ]; then
         if [ $1 = "--no-rate-limit" ]; then
-            # messages rate limit
-            echo 'rc_messages_per_second: 1000' >> $DIR/etc/$port.config
-            echo 'rc_message_burst_count: 1000' >> $DIR/etc/$port.config
 
-            # registration rate limit
-            printf 'rc_registration:\n  per_second: 1000\n  burst_count: 1000\n' >> $DIR/etc/$port.config
-
-            # login rate limit
-            echo 'rc_login:' >> $DIR/etc/$port.config
-            printf '  address:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
-            printf '  account:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
-            printf '  failed_attempts:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
+            # Disable any rate limiting
+            ratelimiting=$(cat <<-RC
+			rc_message:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_registration:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_login:
+			  address:
+			    per_second: 1000
+			    burst_count: 1000
+			  account:
+			    per_second: 1000
+			    burst_count: 1000
+			  failed_attempts:
+			    per_second: 1000
+			    burst_count: 1000
+			rc_admin_redaction:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_joins:
+			  local:
+			    per_second: 1000
+			    burst_count: 1000
+			  remote:
+			    per_second: 1000
+			    burst_count: 1000
+			rc_3pid_validation:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_invites:
+			  per_room:
+			    per_second: 1000
+			    burst_count: 1000
+			  per_user:
+			    per_second: 1000
+			    burst_count: 1000
+			RC
+			)
+            echo "${ratelimiting}" >> $DIR/etc/$port.config
         fi
     fi
 

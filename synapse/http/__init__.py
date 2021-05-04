@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -14,8 +13,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import re
+from typing import Union
 
-from twisted.internet import task
+from twisted.internet import address, task
 from twisted.web.client import FileBodyProducer
 from twisted.web.iweb import IRequest
 
@@ -53,9 +53,42 @@ class QuieterFileBodyProducer(FileBodyProducer):
             pass
 
 
+def get_request_uri(request: IRequest) -> bytes:
+    """Return the full URI that was requested by the client"""
+    return b"%s://%s%s" % (
+        b"https" if request.isSecure() else b"http",
+        _get_requested_host(request),
+        # despite its name, "request.uri" is only the path and query-string.
+        request.uri,
+    )
+
+
+def _get_requested_host(request: IRequest) -> bytes:
+    hostname = request.getHeader(b"host")
+    if hostname:
+        return hostname
+
+    # no Host header, use the address/port that the request arrived on
+    host = request.getHost()  # type: Union[address.IPv4Address, address.IPv6Address]
+
+    hostname = host.host.encode("ascii")
+
+    if request.isSecure() and host.port == 443:
+        # default port for https
+        return hostname
+
+    if not request.isSecure() and host.port == 80:
+        # default port for http
+        return hostname
+
+    return b"%s:%i" % (
+        hostname,
+        host.port,
+    )
+
+
 def get_request_user_agent(request: IRequest, default: str = "") -> str:
-    """Return the last User-Agent header, or the given default.
-    """
+    """Return the last User-Agent header, or the given default."""
     # There could be raw utf-8 bytes in the User-Agent header.
 
     # N.B. if you don't do this, the logger explodes cryptically

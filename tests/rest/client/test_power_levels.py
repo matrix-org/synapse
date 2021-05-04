@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -73,7 +72,9 @@ class PowerLevelsTestCase(HomeserverTestCase):
 
         # Mod the mod
         room_power_levels = self.helper.get_state(
-            self.room_id, "m.room.power_levels", tok=self.admin_access_token,
+            self.room_id,
+            "m.room.power_levels",
+            tok=self.admin_access_token,
         )
 
         # Update existing power levels with mod at PL50

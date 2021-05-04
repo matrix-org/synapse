@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -98,7 +97,7 @@ class DefaultDictProperty(DictProperty):
 
 
 class _EventInternalMetadata:
-    __slots__ = ["_dict", "stream_ordering"]
+    __slots__ = ["_dict", "stream_ordering", "outlier"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
@@ -108,7 +107,10 @@ class _EventInternalMetadata:
         # the stream ordering of this event. None, until it has been persisted.
         self.stream_ordering = None  # type: Optional[int]
 
-    outlier = DictProperty("outlier")  # type: bool
+        # whether this event is an outlier (ie, whether we have the state at that point
+        # in the DAG)
+        self.outlier = False
+
     out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
     send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: str
     recheck_redaction = DictProperty("recheck_redaction")  # type: bool
@@ -129,7 +131,7 @@ class _EventInternalMetadata:
         return dict(self._dict)
 
     def is_outlier(self) -> bool:
-        return self._dict.get("outlier", False)
+        return self.outlier
 
     def is_out_of_band_membership(self) -> bool:
         """Whether this is an out of band membership, like an invite or an invite
@@ -327,9 +329,11 @@ class FrozenEvent(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
+
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -383,9 +387,11 @@ class FrozenEventV2(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
+
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -504,9 +510,11 @@ def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
 def make_event_from_dict(
     event_dict: JsonDict,
     room_version: RoomVersion = RoomVersions.V1,
-    internal_metadata_dict: JsonDict = {},
+    internal_metadata_dict: Optional[JsonDict] = None,
     rejected_reason: Optional[str] = None,
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""
     event_type = _event_type_from_format_version(room_version.event_format)
-    return event_type(event_dict, room_version, internal_metadata_dict, rejected_reason)
+    return event_type(
+        event_dict, room_version, internal_metadata_dict or {}, rejected_reason
+    )

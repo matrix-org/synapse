@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -56,7 +55,9 @@ class MetricsConfig(Config):
             try:
                 check_requirements("sentry")
             except DependencyException as e:
-                raise ConfigError(e.message)
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
             self.sentry_dsn = config["sentry"].get("dsn")
             if not self.sentry_dsn:

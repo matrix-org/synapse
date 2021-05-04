@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 - 2018 New Vector Ltd
 #
@@ -197,7 +196,8 @@ class PaginationHandler:
             stream_ordering = await self.store.find_first_stream_ordering_after_ts(ts)
 
             r = await self.store.get_room_event_before_stream_ordering(
-                room_id, stream_ordering,
+                room_id,
+                stream_ordering,
             )
             if not r:
                 logger.warning(
@@ -223,7 +223,12 @@ class PaginationHandler:
             # the background so that it's not blocking any other operation apart from
             # other purges in the same room.
             run_as_background_process(
-                "_purge_history", self._purge_history, purge_id, room_id, token, True,
+                "_purge_history",
+                self._purge_history,
+                purge_id,
+                room_id,
+                token,
+                True,
             )
 
     def start_purge_history(
@@ -279,7 +284,7 @@ class PaginationHandler:
         except Exception:
             f = Failure()
             logger.error(
-                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())
+                "[purge] failed", exc_info=(f.type, f.value, f.getTracebackObject())  # type: ignore
             )
             self._purges_by_id[purge_id].status = PurgeStatus.STATUS_FAILED
         finally:
@@ -389,7 +394,9 @@ class PaginationHandler:
                         )
 
                 await self.hs.get_federation_handler().maybe_backfill(
-                    room_id, curr_topo, limit=pagin_config.limit,
+                    room_id,
+                    curr_topo,
+                    limit=pagin_config.limit,
                 )
 
             to_room_key = None

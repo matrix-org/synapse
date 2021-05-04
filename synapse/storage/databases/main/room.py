@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -193,8 +192,7 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     async def get_room_count(self) -> int:
-        """Retrieve the total number of rooms.
-        """
+        """Retrieve the total number of rooms."""
 
         def f(txn):
             sql = "SELECT count(*)  FROM rooms"
@@ -517,17 +515,16 @@ class RoomWorkerStore(SQLBaseStore):
             return rooms, room_count[0]
 
         return await self.db_pool.runInteraction(
-            "get_rooms_paginate", _get_rooms_paginate_txn,
+            "get_rooms_paginate",
+            _get_rooms_paginate_txn,
         )
 
     @cached(max_entries=10000)
-    async def get_ratelimit_for_user(self, user_id):
-        """Check if there are any overrides for ratelimiting for the given
-        user
+    async def get_ratelimit_for_user(self, user_id: str) -> Optional[RatelimitOverride]:
+        """Check if there are any overrides for ratelimiting for the given user
 
         Args:
-            user_id (str)
-
+            user_id: user ID of the user
         Returns:
             RatelimitOverride if there is an override, else None. If the contents
             of RatelimitOverride are None or 0 then ratelimitng has been
@@ -548,6 +545,62 @@ class RoomWorkerStore(SQLBaseStore):
             )
         else:
             return None
+
+    async def set_ratelimit_for_user(
+        self, user_id: str, messages_per_second: int, burst_count: int
+    ) -> None:
+        """Sets whether a user is set an overridden ratelimit.
+        Args:
+            user_id: user ID of the user
+            messages_per_second: The number of actions that can be performed in a second.
+            burst_count: How many actions that can be performed before being limited.
+        """
+
+        def set_ratelimit_txn(txn):
+            self.db_pool.simple_upsert_txn(
+                txn,
+                table="ratelimit_override",
+                keyvalues={"user_id": user_id},
+                values={
+                    "messages_per_second": messages_per_second,
+                    "burst_count": burst_count,
+                },
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_ratelimit_for_user, (user_id,)
+            )
+
+        await self.db_pool.runInteraction("set_ratelimit", set_ratelimit_txn)
+
+    async def delete_ratelimit_for_user(self, user_id: str) -> None:
+        """Delete an overridden ratelimit for a user.
+        Args:
+            user_id: user ID of the user
+        """
+
+        def delete_ratelimit_txn(txn):
+            row = self.db_pool.simple_select_one_txn(
+                txn,
+                table="ratelimit_override",
+                keyvalues={"user_id": user_id},
+                retcols=["user_id"],
+                allow_none=True,
+            )
+
+            if not row:
+                return
+
+            # They are there, delete them.
+            self.db_pool.simple_delete_one_txn(
+                txn, "ratelimit_override", keyvalues={"user_id": user_id}
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_ratelimit_for_user, (user_id,)
+            )
+
+        await self.db_pool.runInteraction("delete_ratelimit", delete_ratelimit_txn)
 
     @cached()
     async def get_retention_policy_for_room(self, room_id):
@@ -578,7 +631,8 @@ class RoomWorkerStore(SQLBaseStore):
             return self.db_pool.cursor_to_dict(txn)
 
         ret = await self.db_pool.runInteraction(
-            "get_retention_policy_for_room", get_retention_policy_for_room_txn,
+            "get_retention_policy_for_room",
+            get_retention_policy_for_room_txn,
         )
 
         # If we don't know this room ID, ret will be None, in this case return the default
@@ -707,7 +761,10 @@ class RoomWorkerStore(SQLBaseStore):
         return local_media_mxcs, remote_media_mxcs
 
     async def quarantine_media_by_id(
-        self, server_name: str, media_id: str, quarantined_by: str,
+        self,
+        server_name: str,
+        media_id: str,
+        quarantined_by: str,
     ) -> int:
         """quarantines a single local or remote media id
 
@@ -961,7 +1018,8 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         self.config = hs.config
 
         self.db_pool.updates.register_background_update_handler(
-            "insert_room_retention", self._background_insert_retention,
+            "insert_room_retention",
+            self._background_insert_retention,
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -1033,7 +1091,8 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 return False
 
         end = await self.db_pool.runInteraction(
-            "insert_room_retention", _background_insert_retention_txn,
+            "insert_room_retention",
+            _background_insert_retention_txn,
         )
 
         if end:
@@ -1044,7 +1103,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
     async def _background_add_rooms_room_version_column(
         self, progress: dict, batch_size: int
     ):
-        """Background update to go and add room version inforamtion to `rooms`
+        """Background update to go and add room version information to `rooms`
         table from `current_state_events` table.
         """
 
@@ -1588,7 +1647,8 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 LIMIT ?
                 OFFSET ?
             """.format(
-                where_clause=where_clause, order=order,
+                where_clause=where_clause,
+                order=order,
             )
 
             args += [limit, start]
