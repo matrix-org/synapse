@@ -16,7 +16,7 @@
 import abc
 import logging
 import urllib
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Tuple
 
 import attr
 from signedjson.key import (
@@ -41,11 +41,9 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config.key import TrustedKeyServer
-from synapse.logging.context import (
-    PreserveLoggingContext,
-    make_deferred_yieldable,
-    run_in_background,
-)
+from synapse.events import EventBase
+from synapse.events.utils import prune_event_dict
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict
@@ -72,8 +70,6 @@ class VerifyJsonRequest:
         minimum_valid_until_ts: time at which we require the signing key to
             be valid. (0 implies we don't care)
 
-        request_name: The name of the request.
-
         key_ids: The set of key_ids to that could be used to verify the JSON object
 
         key_ready (Deferred[str, str, nacl.signing.VerifyKey]):
@@ -86,13 +82,32 @@ class VerifyJsonRequest:
     """
 
     server_name = attr.ib(type=str)
-    json_object = attr.ib(type=JsonDict)
+    json_object_callback = attr.ib(type=Callable[[], JsonDict])
     minimum_valid_until_ts = attr.ib(type=int)
-    request_name = attr.ib(type=str)
-    key_ids = attr.ib(init=False, type=List[str])
+    key_ids = attr.ib(type=List[str])
 
-    def __attrs_post_init__(self):
-        self.key_ids = signature_ids(self.json_object, self.server_name)
+    @staticmethod
+    def from_json_object(
+        server_name: str, minimum_valid_until_ms: int, json_object: JsonDict
+    ):
+        key_ids = signature_ids(json_object, server_name)
+        return VerifyJsonRequest(
+            server_name, lambda: json_object, minimum_valid_until_ms, key_ids
+        )
+
+    @staticmethod
+    def from_event(
+        server_name: str,
+        minimum_valid_until_ms: int,
+        event: EventBase,
+    ):
+        key_ids = list(event.signatures.get(server_name, []))
+        return VerifyJsonRequest(
+            server_name,
+            lambda: prune_event_dict(event.room_version, event.get_pdu_json()),
+            minimum_valid_until_ms,
+            key_ids,
+        )
 
 
 class KeyLookupError(ValueError):
@@ -178,8 +193,10 @@ class Keyring:
         validity_time: int,
         request_name: str,
     ) -> defer.Deferred:
-        request = VerifyJsonRequest(
-            server_name, json_object, validity_time, request_name
+        request = VerifyJsonRequest.from_json_object(
+            server_name,
+            validity_time,
+            json_object,
         )
         return defer.ensureDeferred(self._verify_object(request))
 
@@ -189,12 +206,30 @@ class Keyring:
         return [
             defer.ensureDeferred(
                 self._verify_object(
-                    VerifyJsonRequest(
-                        server_name, json_object, validity_time, request_name
+                    VerifyJsonRequest.from_json_object(
+                        server_name,
+                        validity_time,
+                        json_object,
                     )
                 )
             )
             for server_name, json_object, validity_time, request_name in server_and_json
+        ]
+
+    def verify_events_for_server(
+        self, server_and_json: Iterable[Tuple[str, EventBase, int]]
+    ) -> List[defer.Deferred]:
+        return [
+            defer.ensureDeferred(
+                self._verify_object(
+                    VerifyJsonRequest.from_event(
+                        server_name,
+                        validity_time,
+                        event,
+                    )
+                )
+            )
+            for server_name, event, validity_time in server_and_json
         ]
 
     async def _verify_object(self, verify_request: VerifyJsonRequest):
@@ -239,8 +274,9 @@ class Keyring:
             for key_id in verify_request.key_ids:
                 verify_key = found_keys[key_id].verify_key
                 try:
+                    json_object = verify_request.json_object_callback()
                     verify_signed_json(
-                        verify_request.json_object,
+                        json_object,
                         verify_request.server_name,
                         verify_key,
                     )
