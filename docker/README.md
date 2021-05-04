@@ -194,7 +194,7 @@ whilst running the above `docker run` commands.
 
 ## Disabling the healthcheck in docker-compose file
 
-If you wish to disable the healthcheck via docker-compose append your stanza with the following.
+If you wish to disable the healthcheck via docker-compose, append the following to your service configuration.
 
 ```
   healthcheck:
