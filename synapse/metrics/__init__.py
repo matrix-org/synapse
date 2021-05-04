@@ -754,8 +754,8 @@ def _setup_jemalloc_stats():
 
 try:
     _setup_jemalloc_stats()
-except Exception:
-    logger.info("Failed to setup collector to record jemalloc stats.")
+except Exception as e:
+    logger.info("Failed to setup collector to record jemalloc stats: %s", e)
 
 try:
     # Ensure the reactor has all the attributes we expect
