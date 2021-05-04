@@ -537,7 +537,7 @@ REGISTRY.register(ReactorLastSeenMetric())
 
 # The minimum time in seconds between GCs for each generation, regardless of the current GC
 # thresholds and counts.
-MIN_TIME_BETWEEN_GCS = [1, 10, 30]
+MIN_TIME_BETWEEN_GCS = (1, 10, 30)
 
 # The time (in seconds since the epoch) of the last time we did a GC for each generation.
 _last_gc = [0, 0, 0]

@@ -572,7 +572,7 @@ class ServerConfig(Config):
             _warn_if_webclient_configured(self.listeners)
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
-        self.gc_seconds = read_gc_thresholds(config.get("gc_min_seconds_between", None))
+        self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
 
         @attr.s
         class LimitRemoteRoomsConfig:
@@ -921,10 +921,10 @@ class ServerConfig(Config):
         # The minimum time in seconds between each GC for a generation, regardless of
         # the GC thresholds. This ensures that we don't do GC too frequently.
         #
-        # A value of `[1, 10, 30]` indicates that a second must pass between consecutive
+        # A value of `[1s, 10s, 30s]` indicates that a second must pass between consecutive
         # generation 0 GCs, etc.
         #
-        #gc_min_seconds_between: [1, 10, 30]
+        #gc_min_interval: [0.5s, 30s, 1m]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is 100. -1 means no upper limit.
@@ -1313,6 +1313,23 @@ class ServerConfig(Config):
             type=int,
             help="Turn on the twisted telnet manhole service on the given port.",
         )
+
+    def read_gc_intervals(self, durations):
+        """Reads the three durations for the GC min interval option."""
+        if durations is None:
+            return None
+        try:
+            if len(durations) != 3:
+                raise ValueError()
+            return (
+                self.parse_duration(durations[0]),
+                self.parse_duration(durations[1]),
+                self.parse_duration(durations[2]),
+            )
+        except Exception:
+            raise ConfigError(
+                "Value of `gc_min_interval` must be a list of three durations if set"
+            )
 
 
 def is_threepid_reserved(reserved_threepids, threepid):
