@@ -37,7 +37,7 @@ get_counter = Counter(
 
 response_timer = Histogram(
     "synapse_external_cache_response_time_seconds",
-    "sec",
+    "Time taken to get a response from Redis for a request",
     labelnames=["method"],
     buckets=(
         0.001,
