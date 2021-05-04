@@ -615,8 +615,8 @@ def _setup_jemalloc_stats():
     regex = re.compile(r"/\S+/libjemalloc.*$")
 
     jemalloc_path = None
-    with open(f"/proc/{pid}/maps") as f:
-        for line in f.readlines():
+    with open("/proc/self/maps") as f:
+        for line in f:
             match = regex.search(line.strip())
             if match:
                 jemalloc_path = match.group()
@@ -709,7 +709,7 @@ def _setup_jemalloc_stats():
             _jemalloc_refresh_stats()
 
             g = GaugeMetricFamily(
-                "jemalloc_stats_app_memory",
+                "jemalloc_stats_app_memory_bytes",
                 "The stats reported by jemalloc",
                 labels=["type"],
             )
