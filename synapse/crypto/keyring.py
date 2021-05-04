@@ -203,12 +203,13 @@ class Keyring:
     ) -> List[defer.Deferred]:
         return [
             defer.ensureDeferred(
-                self._verify_object(
+                run_in_background(
+                    self._verify_object,
                     VerifyJsonRequest.from_json_object(
                         server_name,
                         validity_time,
                         json_object,
-                    )
+                    ),
                 )
             )
             for server_name, json_object, validity_time, request_name in server_and_json
