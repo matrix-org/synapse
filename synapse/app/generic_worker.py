@@ -452,7 +452,7 @@ def start(config_options):
         config.server.update_user_directory = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
-    synapse.util.caches.lrucache.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
+    synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     hs = GenericWorkerServer(
         config.server_name,

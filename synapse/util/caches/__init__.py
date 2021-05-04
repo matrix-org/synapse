@@ -38,8 +38,8 @@ cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
 cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
 cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
 cache_memory_usage = Gauge(
-    "synapse_util_caches_cache_memory_usage",
-    "Estimated size in bytes of the caches",
+    "synapse_util_caches_cache_size_bytes",
+    "Estimated memory usage of the caches",
     ["name"],
 )
 
