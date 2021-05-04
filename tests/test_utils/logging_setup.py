@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +16,7 @@ import os
 
 import twisted.logger
 
-from synapse.util.logcontext import LoggingContextFilter
+from synapse.logging.context import LoggingContextFilter
 
 
 class ToTwistedHandler(logging.Handler):
@@ -28,9 +27,8 @@ class ToTwistedHandler(logging.Handler):
     def emit(self, record):
         log_entry = self.format(record)
         log_level = record.levelname.lower().replace("warning", "warn")
-        self.tx_log.emit(
-            twisted.logger.LogLevel.levelWithName(log_level),
-            log_entry.replace("{", r"(").replace("}", r")"),
+        self.tx_log.emit(  # type: ignore
+            twisted.logger.LogLevel.levelWithName(log_level), "{entry}", entry=log_entry
         )
 
 
@@ -49,7 +47,7 @@ def setup_logging():
     handler = ToTwistedHandler()
     formatter = logging.Formatter(log_format)
     handler.setFormatter(formatter)
-    handler.addFilter(LoggingContextFilter(request=""))
+    handler.addFilter(LoggingContextFilter())
     root_logger.addHandler(handler)
 
     log_level = os.environ.get("SYNAPSE_TEST_LOG_LEVEL", "ERROR")

@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2016 OpenMarket Ltd
+# Copyright 2016-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,80 +12,89 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
-import tests.unittest
-import tests.utils
+from tests.unittest import HomeserverTestCase
 
 
-class EndToEndKeyStoreTestCase(tests.unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield tests.utils.setup_test_homeserver(self.addCleanup)
+class EndToEndKeyStoreTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
     def test_key_without_device_name(self):
         now = 1470174257070
         json = {"key": "value"}
 
-        yield self.store.store_device("user", "device", None)
+        self.get_success(self.store.store_device("user", "device", None))
 
-        yield self.store.set_e2e_device_keys("user", "device", now, json)
+        self.get_success(self.store.set_e2e_device_keys("user", "device", now, json))
 
-        res = yield self.store.get_e2e_device_keys((("user", "device"),))
+        res = self.get_success(
+            self.store.get_e2e_device_keys_for_cs_api((("user", "device"),))
+        )
         self.assertIn("user", res)
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
-        self.assertDictContainsSubset({"keys": json, "device_display_name": None}, dev)
+        self.assertDictContainsSubset(json, dev)
 
-    @defer.inlineCallbacks
     def test_reupload_key(self):
         now = 1470174257070
         json = {"key": "value"}
 
-        yield self.store.store_device("user", "device", None)
+        self.get_success(self.store.store_device("user", "device", None))
 
-        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        changed = self.get_success(
+            self.store.set_e2e_device_keys("user", "device", now, json)
+        )
         self.assertTrue(changed)
 
         # If we try to upload the same key then we should be told nothing
         # changed
-        changed = yield self.store.set_e2e_device_keys("user", "device", now, json)
+        changed = self.get_success(
+            self.store.set_e2e_device_keys("user", "device", now, json)
+        )
         self.assertFalse(changed)
 
-    @defer.inlineCallbacks
     def test_get_key_with_device_name(self):
         now = 1470174257070
         json = {"key": "value"}
 
-        yield self.store.set_e2e_device_keys("user", "device", now, json)
-        yield self.store.store_device("user", "device", "display_name")
+        self.get_success(self.store.set_e2e_device_keys("user", "device", now, json))
+        self.get_success(self.store.store_device("user", "device", "display_name"))
 
-        res = yield self.store.get_e2e_device_keys((("user", "device"),))
+        res = self.get_success(
+            self.store.get_e2e_device_keys_for_cs_api((("user", "device"),))
+        )
         self.assertIn("user", res)
         self.assertIn("device", res["user"])
         dev = res["user"]["device"]
         self.assertDictContainsSubset(
-            {"keys": json, "device_display_name": "display_name"}, dev
+            {"key": "value", "unsigned": {"device_display_name": "display_name"}}, dev
         )
 
-    @defer.inlineCallbacks
     def test_multiple_devices(self):
         now = 1470174257070
 
-        yield self.store.store_device("user1", "device1", None)
-        yield self.store.store_device("user1", "device2", None)
-        yield self.store.store_device("user2", "device1", None)
-        yield self.store.store_device("user2", "device2", None)
+        self.get_success(self.store.store_device("user1", "device1", None))
+        self.get_success(self.store.store_device("user1", "device2", None))
+        self.get_success(self.store.store_device("user2", "device1", None))
+        self.get_success(self.store.store_device("user2", "device2", None))
 
-        yield self.store.set_e2e_device_keys("user1", "device1", now, "json11")
-        yield self.store.set_e2e_device_keys("user1", "device2", now, "json12")
-        yield self.store.set_e2e_device_keys("user2", "device1", now, "json21")
-        yield self.store.set_e2e_device_keys("user2", "device2", now, "json22")
+        self.get_success(
+            self.store.set_e2e_device_keys("user1", "device1", now, {"key": "json11"})
+        )
+        self.get_success(
+            self.store.set_e2e_device_keys("user1", "device2", now, {"key": "json12"})
+        )
+        self.get_success(
+            self.store.set_e2e_device_keys("user2", "device1", now, {"key": "json21"})
+        )
+        self.get_success(
+            self.store.set_e2e_device_keys("user2", "device2", now, {"key": "json22"})
+        )
 
-        res = yield self.store.get_e2e_device_keys(
-            (("user1", "device1"), ("user2", "device2"))
+        res = self.get_success(
+            self.store.get_e2e_device_keys_for_cs_api(
+                (("user1", "device1"), ("user2", "device2"))
+            )
         )
         self.assertIn("user1", res)
         self.assertIn("device1", res["user1"])

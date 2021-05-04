@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>Authentication successful</title>
+        <meta name="viewport" content="width=device-width, user-scalable=no">
+        <style type="text/css">
+            {% include "sso.css" without context %}
+        </style>
+        <script>
+            if (window.onAuthDone) {
+                window.onAuthDone();
+            } else if (window.opener && window.opener.postMessage) {
+                window.opener.postMessage("authDone", "*");
+            }
+        </script>
+    </head>
+    <body>
+        <header>
+            <h1>Thank you</h1>
+            <p>
+                Now we know it’s you, you can close this window and return to the
+                application.
+            </p>
+        </header>
+        {% include "sso_footer.html" without context %}
+    </body>
+</html>

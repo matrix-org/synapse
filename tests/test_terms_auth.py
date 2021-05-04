@@ -13,9 +13,7 @@
 # limitations under the License.
 
 import json
-
-import six
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
 
@@ -28,6 +26,21 @@ from tests import unittest
 class TermsTestCase(unittest.HomeserverTestCase):
     servlets = [register_servlets]
 
+    def default_config(self):
+        config = super().default_config()
+        config.update(
+            {
+                "public_baseurl": "https://example.org/",
+                "user_consent": {
+                    "version": "1.0",
+                    "policy_name": "My Cool Privacy Policy",
+                    "template_dir": "/",
+                    "require_at_registration": True,
+                },
+            }
+        )
+        return config
+
     def prepare(self, reactor, clock, hs):
         self.clock = MemoryReactorClock()
         self.hs_clock = Clock(self.clock)
@@ -35,25 +48,16 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.registration_handler = Mock()
         self.auth_handler = Mock()
         self.device_handler = Mock()
-        hs.config.enable_registration = True
-        hs.config.registrations_require_3pid = []
-        hs.config.auto_join_rooms = []
-        hs.config.enable_registration_captcha = False
 
     def test_ui_auth(self):
-        self.hs.config.user_consent_at_registration = True
-        self.hs.config.user_consent_policy_name = "My Cool Privacy Policy"
-        self.hs.config.public_baseurl = "https://example.org/"
-        self.hs.config.user_consent_version = "1.0"
-
         # Do a UI auth request
-        request, channel = self.make_request(b"POST", self.url, b"{}")
-        self.render(request)
+        request_data = json.dumps({"username": "kermit", "password": "monkey"})
+        channel = self.make_request(b"POST", self.url, request_data)
 
         self.assertEquals(channel.result["code"], b"401", channel.result)
 
         self.assertTrue(channel.json_body is not None)
-        self.assertIsInstance(channel.json_body["session"], six.text_type)
+        self.assertIsInstance(channel.json_body["session"], str)
 
         self.assertIsInstance(channel.json_body["flows"], list)
         for flow in channel.json_body["flows"]:
@@ -91,8 +95,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
 
         self.registration_handler.check_username = Mock(return_value=True)
 
-        request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
+        channel = self.make_request(b"POST", self.url, request_data)
 
         # We don't bother checking that the response is correct - we'll leave that to
         # other tests. We just want to make sure we're on the right path.
@@ -109,8 +112,7 @@ class TermsTestCase(unittest.HomeserverTestCase):
                 },
             }
         )
-        request, channel = self.make_request(b"POST", self.url, request_data)
-        self.render(request)
+        channel = self.make_request(b"POST", self.url, request_data)
 
         # We're interested in getting a response that looks like a successful
         # registration, not so much that the details are exactly what we want.
@@ -118,6 +120,6 @@ class TermsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
         self.assertTrue(channel.json_body is not None)
-        self.assertIsInstance(channel.json_body["user_id"], six.text_type)
-        self.assertIsInstance(channel.json_body["access_token"], six.text_type)
-        self.assertIsInstance(channel.json_body["device_id"], six.text_type)
+        self.assertIsInstance(channel.json_body["user_id"], str)
+        self.assertIsInstance(channel.json_body["access_token"], str)
+        self.assertIsInstance(channel.json_body["device_id"], str)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,6 @@
 # limitations under the License.
 
 import logging
-
-from twisted.internet import defer
 
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -34,11 +31,13 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
     PATH_ARGS = ("user_id",)
 
     def __init__(self, hs):
-        super(RegisterDeviceReplicationServlet, self).__init__(hs)
+        super().__init__(hs)
         self.registration_handler = hs.get_registration_handler()
 
     @staticmethod
-    def _serialize_payload(user_id, device_id, initial_display_name, is_guest):
+    async def _serialize_payload(
+        user_id, device_id, initial_display_name, is_guest, is_appservice_ghost
+    ):
         """
         Args:
             device_id (str|None): Device ID to use, if None a new one is
@@ -50,21 +49,26 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             "device_id": device_id,
             "initial_display_name": initial_display_name,
             "is_guest": is_guest,
+            "is_appservice_ghost": is_appservice_ghost,
         }
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, user_id):
+    async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
         device_id = content["device_id"]
         initial_display_name = content["initial_display_name"]
         is_guest = content["is_guest"]
+        is_appservice_ghost = content["is_appservice_ghost"]
 
-        device_id, access_token = yield self.registration_handler.register_device(
-            user_id, device_id, initial_display_name, is_guest
+        res = await self.registration_handler.register_device_inner(
+            user_id,
+            device_id,
+            initial_display_name,
+            is_guest,
+            is_appservice_ghost=is_appservice_ghost,
         )
 
-        defer.returnValue((200, {"device_id": device_id, "access_token": access_token}))
+        return 200, res
 
 
 def register_servlets(hs, http_server):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage import KeyStore
+from synapse.storage.databases.main.keys import KeyStore
 
 # KeyStore isn't really safe to use from a worker, but for now we do so and hope that
 # the races it creates aren't too bad.

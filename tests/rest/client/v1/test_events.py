@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock, NonCallableMock
+from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.rest.client.v1 import events, login, room
@@ -40,17 +39,13 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         config["enable_registration"] = True
         config["auto_join_rooms"] = []
 
-        hs = self.setup_test_homeserver(
-            config=config, ratelimiter=NonCallableMock(spec_set=["can_do_action"])
-        )
-        self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
+        hs = self.setup_test_homeserver(config=config)
 
-        hs.get_handlers().federation_handler = Mock()
+        hs.get_federation_handler = Mock()
 
         return hs
 
-    def prepare(self, hs, reactor, clock):
+    def prepare(self, reactor, clock, hs):
 
         # register an account
         self.user_id = self.register_user("sid1", "pass")
@@ -67,17 +62,15 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         # implementation is now part of the r0 implementation, the newer
         # behaviour is used instead to be consistent with the r0 spec.
         # see issue #2602
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/events?access_token=%s" % ("invalid" + self.token,)
         )
-        self.render(request)
         self.assertEquals(channel.code, 401, msg=channel.result)
 
         # valid token, expect content
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, msg=channel.result)
         self.assertTrue("chunk" in channel.json_body)
         self.assertTrue("start" in channel.json_body)
@@ -93,10 +86,9 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
         )
 
         # valid token, expect content
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/events?access_token=%s&timeout=0" % (self.token,)
         )
-        self.render(request)
         self.assertEquals(channel.code, 200, msg=channel.result)
 
         # We may get a presence event for ourselves down
@@ -134,3 +126,31 @@ class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
 
         # someone else set topic, expect 6 (join,send,topic,join,send,topic)
         pass
+
+
+class GetEventsTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        events.register_servlets,
+        room.register_servlets,
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+    ]
+
+    def prepare(self, hs, reactor, clock):
+
+        # register an account
+        self.user_id = self.register_user("sid1", "pass")
+        self.token = self.login(self.user_id, "pass")
+
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.token)
+
+    def test_get_event_via_events(self):
+        resp = self.helper.send(self.room_id, tok=self.token)
+        event_id = resp["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/events/" + event_id,
+            access_token=self.token,
+        )
+        self.assertEquals(channel.code, 200, msg=channel.result)

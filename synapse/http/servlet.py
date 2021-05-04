@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,9 +16,8 @@
 
 import logging
 
-from canonicaljson import json
-
 from synapse.api.errors import Codes, SynapseError
+from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +94,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             return {b"true": True, b"false": False}[args[name][0]]
         except Exception:
             message = (
-                "Boolean query parameter %r must be one of" " ['true', 'false']"
+                "Boolean query parameter %r must be one of ['true', 'false']"
             ) % (name,)
             raise SynapseError(400, message)
     else:
@@ -165,7 +163,12 @@ def parse_string_from_args(
         value = args[name][0]
 
         if encoding:
-            value = value.decode(encoding)
+            try:
+                value = value.decode(encoding)
+            except ValueError:
+                raise SynapseError(
+                    400, "Query parameter %r must be %s" % (name, encoding)
+                )
 
         if allowed_values is not None and value not in allowed_values:
             message = "Query parameter %r must be one of [%s]" % (
@@ -209,18 +212,10 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     if not content_bytes and allow_empty_body:
         return None
 
-    # Decode to Unicode so that simplejson will return Unicode strings on
-    # Python 2
     try:
-        content_unicode = content_bytes.decode("utf8")
-    except UnicodeDecodeError:
-        logger.warn("Unable to decode UTF-8")
-        raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
-
-    try:
-        content = json.loads(content_unicode)
+        content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warn("Unable to parse JSON: %s", e)
+        logger.warning("Unable to parse JSON: %s", e)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     return content
@@ -260,9 +255,9 @@ def assert_params_in_dict(body, required):
         raise SynapseError(400, "Missing params: %r" % absent, Codes.MISSING_PARAM)
 
 
-class RestServlet(object):
+class RestServlet:
 
-    """ A Synapse REST Servlet.
+    """A Synapse REST Servlet.
 
     An implementing class can either provide its own custom 'register' method,
     or use the automatic pattern handling provided by the base class.
@@ -276,7 +271,6 @@ class RestServlet(object):
       on_PUT
       on_POST
       on_DELETE
-      on_OPTIONS
 
     Automatically handles turning CodeMessageExceptions thrown by these methods
     into the appropriate HTTP response.
@@ -287,10 +281,13 @@ class RestServlet(object):
         if hasattr(self, "PATTERNS"):
             patterns = self.PATTERNS
 
-            for method in ("GET", "PUT", "POST", "OPTIONS", "DELETE"):
+            for method in ("GET", "PUT", "POST", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
+                    servlet_classname = self.__class__.__name__
                     method_handler = getattr(self, "on_%s" % (method,))
-                    http_server.register_paths(method, patterns, method_handler)
+                    http_server.register_paths(
+                        method, patterns, method_handler, servlet_classname
+                    )
 
         else:
             raise NotImplementedError("RestServlet must register something.")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +14,6 @@
 
 
 import logging
-
-from twisted.internet import defer
 
 from synapse.api.errors import AuthError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -62,15 +59,14 @@ class IdTokenServlet(RestServlet):
     EXPIRES_MS = 3600 * 1000
 
     def __init__(self, hs):
-        super(IdTokenServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.server_name = hs.config.server_name
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request, user_id):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot request tokens for other users.")
 
@@ -81,18 +77,16 @@ class IdTokenServlet(RestServlet):
         token = random_string(24)
         ts_valid_until_ms = self.clock.time_msec() + self.EXPIRES_MS
 
-        yield self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
+        await self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
 
-        defer.returnValue(
-            (
-                200,
-                {
-                    "access_token": token,
-                    "token_type": "Bearer",
-                    "matrix_server_name": self.server_name,
-                    "expires_in": self.EXPIRES_MS / 1000,
-                },
-            )
+        return (
+            200,
+            {
+                "access_token": token,
+                "token_type": "Bearer",
+                "matrix_server_name": self.server_name,
+                "expires_in": self.EXPIRES_MS / 1000,
+            },
         )
 
 

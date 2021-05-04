@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +16,9 @@
 import nacl.signing
 from unpaddedbase64 import decode_base64
 
+from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import add_hashes_and_signatures
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 from tests import unittest
 
@@ -49,9 +49,11 @@ class EventSigningTestCase(unittest.TestCase):
             "unsigned": {"age_ts": 1000000},
         }
 
-        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(
+            RoomVersions.V1, event_dict, HOSTNAME, self.signing_key
+        )
 
-        event = FrozenEvent(event_dict)
+        event = make_event_from_dict(event_dict)
 
         self.assertTrue(hasattr(event, "hashes"))
         self.assertIn("sha256", event.hashes)
@@ -81,9 +83,11 @@ class EventSigningTestCase(unittest.TestCase):
             "unsigned": {"age_ts": 1000000},
         }
 
-        add_hashes_and_signatures(event_dict, HOSTNAME, self.signing_key)
+        add_hashes_and_signatures(
+            RoomVersions.V1, event_dict, HOSTNAME, self.signing_key
+        )
 
-        event = FrozenEvent(event_dict)
+        event = make_event_from_dict(event_dict)
 
         self.assertTrue(hasattr(event, "hashes"))
         self.assertIn("sha256", event.hashes)

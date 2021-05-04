@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
+# Copyright 2019 - 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,19 +13,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import logging
+import time
 import unicodedata
+import urllib.parse
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Mapping,
+    Optional,
+    Tuple,
+    Union,
+)
 
 import attr
 import bcrypt
 import pymacaroons
-from canonicaljson import json
 
-from twisted.internet import defer
-from twisted.web.client import PartialDownloadError
+from twisted.web.server import Request
 
-import synapse.util.stringutils as stringutils
 from synapse.api.constants import LoginType
 from synapse.api.errors import (
     AuthError,
@@ -34,79 +45,261 @@ from synapse.api.errors import (
     LoginError,
     StoreError,
     SynapseError,
+    UserDeactivatedError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.handlers._base import BaseHandler
+from synapse.handlers.ui_auth import (
+    INTERACTIVE_AUTH_CHECKERS,
+    UIAuthSessionDataConstants,
+)
+from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
+from synapse.http import get_request_user_agent
+from synapse.http.server import finish_request, respond_with_html
+from synapse.http.site import SynapseRequest
+from synapse.logging.context import defer_to_thread
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.module_api import ModuleApi
-from synapse.types import UserID
-from synapse.util import logcontext
-from synapse.util.caches.expiringcache import ExpiringCache
+from synapse.storage.roommember import ProfileInfo
+from synapse.types import JsonDict, Requester, UserID
+from synapse.util import stringutils as stringutils
+from synapse.util.async_helpers import maybe_awaitable
+from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
+from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.threepids import canonicalise_email
 
-from ._base import BaseHandler
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+
+def convert_client_dict_legacy_fields_to_identifier(
+    submission: JsonDict,
+) -> Dict[str, str]:
+    """
+    Convert a legacy-formatted login submission to an identifier dict.
+
+    Legacy login submissions (used in both login and user-interactive authentication)
+    provide user-identifying information at the top-level instead.
+
+    These are now deprecated and replaced with identifiers:
+    https://matrix.org/docs/spec/client_server/r0.6.1#identifier-types
+
+    Args:
+        submission: The client dict to convert
+
+    Returns:
+        The matching identifier dict
+
+    Raises:
+        SynapseError: If the format of the client dict is invalid
+    """
+    identifier = submission.get("identifier", {})
+
+    # Generate an m.id.user identifier if "user" parameter is present
+    user = submission.get("user")
+    if user:
+        identifier = {"type": "m.id.user", "user": user}
+
+    # Generate an m.id.thirdparty identifier if "medium" and "address" parameters are present
+    medium = submission.get("medium")
+    address = submission.get("address")
+    if medium and address:
+        identifier = {
+            "type": "m.id.thirdparty",
+            "medium": medium,
+            "address": address,
+        }
+
+    # We've converted valid, legacy login submissions to an identifier. If the
+    # submission still doesn't have an identifier, it's invalid
+    if not identifier:
+        raise SynapseError(400, "Invalid login submission", Codes.INVALID_PARAM)
+
+    # Ensure the identifier has a type
+    if "type" not in identifier:
+        raise SynapseError(
+            400,
+            "'identifier' dict has no key 'type'",
+            errcode=Codes.MISSING_PARAM,
+        )
+
+    return identifier
+
+
+def login_id_phone_to_thirdparty(identifier: JsonDict) -> Dict[str, str]:
+    """
+    Convert a phone login identifier type to a generic threepid identifier.
+
+    Args:
+        identifier: Login identifier dict of type 'm.id.phone'
+
+    Returns:
+        An equivalent m.id.thirdparty identifier dict
+    """
+    if "country" not in identifier or (
+        # The specification requires a "phone" field, while Synapse used to require a "number"
+        # field. Accept both for backwards compatibility.
+        "phone" not in identifier
+        and "number" not in identifier
+    ):
+        raise SynapseError(
+            400, "Invalid phone-type identifier", errcode=Codes.INVALID_PARAM
+        )
+
+    # Accept both "phone" and "number" as valid keys in m.id.phone
+    phone_number = identifier.get("phone", identifier["number"])
+
+    # Convert user-provided phone number to a consistent representation
+    msisdn = phone_number_to_msisdn(identifier["country"], phone_number)
+
+    return {
+        "type": "m.id.thirdparty",
+        "medium": "msisdn",
+        "address": msisdn,
+    }
+
+
+@attr.s(slots=True)
+class SsoLoginExtraAttributes:
+    """Data we track about SAML2 sessions"""
+
+    # time the session was created, in milliseconds
+    creation_time = attr.ib(type=int)
+    extra_attributes = attr.ib(type=JsonDict)
+
+
+@attr.s(slots=True, frozen=True)
+class LoginTokenAttributes:
+    """Data we store in a short-term login token"""
+
+    user_id = attr.ib(type=str)
+
+    # the SSO Identity Provider that the user authenticated with, to get this token
+    auth_provider_id = attr.ib(type=str)
 
 
 class AuthHandler(BaseHandler):
     SESSION_EXPIRE_MS = 48 * 60 * 60 * 1000
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer):
-        """
-        super(AuthHandler, self).__init__(hs)
-        self.checkers = {
-            LoginType.RECAPTCHA: self._check_recaptcha,
-            LoginType.EMAIL_IDENTITY: self._check_email_identity,
-            LoginType.MSISDN: self._check_msisdn,
-            LoginType.DUMMY: self._check_dummy_auth,
-            LoginType.TERMS: self._check_terms_auth,
-        }
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+
+        self.checkers = {}  # type: Dict[str, UserInteractiveAuthChecker]
+        for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
+            inst = auth_checker_class(hs)
+            if inst.is_enabled():
+                self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
+
         self.bcrypt_rounds = hs.config.bcrypt_rounds
 
-        # This is not a cache per se, but a store of all current sessions that
-        # expire after N hours
-        self.sessions = ExpiringCache(
-            cache_name="register_sessions",
-            clock=hs.get_clock(),
-            expiry_ms=self.SESSION_EXPIRE_MS,
-            reset_expiry_on_get=True,
-        )
-
+        # we can't use hs.get_module_api() here, because to do so will create an
+        # import loop.
+        #
+        # TODO: refactor this class to separate the lower-level stuff that
+        #   ModuleApi can use from the higher-level stuff that uses ModuleApi, as
+        #   better way to break the loop
         account_handler = ModuleApi(hs, self)
+
         self.password_providers = [
-            module(config=config, account_handler=account_handler)
+            PasswordProvider.load(module, config, account_handler)
             for module, config in hs.config.password_providers
         ]
 
-        logger.info("Extra password_providers: %r", self.password_providers)
+        logger.info("Extra password_providers: %s", self.password_providers)
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
         self._password_enabled = hs.config.password_enabled
+        self._password_localdb_enabled = hs.config.password_localdb_enabled
 
-        # we keep this as a list despite the O(N^2) implication so that we can
-        # keep PASSWORD first and avoid confusing clients which pick the first
-        # type in the list. (NB that the spec doesn't require us to do so and
-        # clients which favour types that they don't understand over those that
-        # they do are technically broken)
-        login_types = []
-        if self._password_enabled:
-            login_types.append(LoginType.PASSWORD)
+        # start out by assuming PASSWORD is enabled; we will remove it later if not.
+        login_types = set()
+        if self._password_localdb_enabled:
+            login_types.add(LoginType.PASSWORD)
+
         for provider in self.password_providers:
-            if hasattr(provider, "get_supported_login_types"):
-                for t in provider.get_supported_login_types().keys():
-                    if t not in login_types:
-                        login_types.append(t)
-        self._supported_login_types = login_types
+            login_types.update(provider.get_supported_login_types().keys())
 
-        self._account_ratelimiter = Ratelimiter()
-        self._failed_attempts_ratelimiter = Ratelimiter()
+        if not self._password_enabled:
+            login_types.discard(LoginType.PASSWORD)
+
+        # Some clients just pick the first type in the list. In this case, we want
+        # them to use PASSWORD (rather than token or whatever), so we want to make sure
+        # that comes first, where it's present.
+        self._supported_login_types = []
+        if LoginType.PASSWORD in login_types:
+            self._supported_login_types.append(LoginType.PASSWORD)
+            login_types.remove(LoginType.PASSWORD)
+        self._supported_login_types.extend(login_types)
+
+        # Ratelimiter for failed auth during UIA. Uses same ratelimit config
+        # as per `rc_login.failed_attempts`.
+        self._failed_uia_attempts_ratelimiter = Ratelimiter(
+            store=self.store,
+            clock=self.clock,
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+        )
+
+        # The number of seconds to keep a UI auth session active.
+        self._ui_auth_session_timeout = hs.config.ui_auth_session_timeout
+
+        # Ratelimitier for failed /login attempts
+        self._failed_login_attempts_ratelimiter = Ratelimiter(
+            store=self.store,
+            clock=hs.get_clock(),
+            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+        )
 
         self._clock = self.hs.get_clock()
 
-    @defer.inlineCallbacks
-    def validate_user_via_ui_auth(self, requester, request_body, clientip):
+        # Expire old UI auth sessions after a period of time.
+        if hs.config.run_background_tasks:
+            self._clock.looping_call(
+                run_as_background_process,
+                5 * 60 * 1000,
+                "expire_old_sessions",
+                self._expire_old_sessions,
+            )
+
+        # Load the SSO HTML templates.
+
+        # The following template is shown to the user during a client login via SSO,
+        # after the SSO completes and before redirecting them back to their client.
+        # It notifies the user they are about to give access to their matrix account
+        # to the client.
+        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+
+        # The following template is shown during user interactive authentication
+        # in the fallback auth scenario. It notifies the user that they are
+        # authenticating for an operation to occur on their account.
+        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+
+        # The following template is shown during the SSO authentication process if
+        # the account is deactivated.
+        self._sso_account_deactivated_template = (
+            hs.config.sso_account_deactivated_template
+        )
+
+        self._server_name = hs.config.server_name
+
+        # cast to tuple for use with str.startswith
+        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
+
+        # A mapping of user ID to extra attributes to include in the login
+        # response.
+        self._extra_attributes = {}  # type: Dict[str, SsoLoginExtraAttributes]
+
+    async def validate_user_via_ui_auth(
+        self,
+        requester: Requester,
+        request: SynapseRequest,
+        request_body: Dict[str, Any],
+        description: str,
+    ) -> Tuple[dict, Optional[str]]:
         """
         Checks that the user is who they claim to be, via a UI auth.
 
@@ -115,15 +308,24 @@ class AuthHandler(BaseHandler):
         that it isn't stolen by re-authenticating them.
 
         Args:
-            requester (Requester): The user, as given by the access token
+            requester: The user, as given by the access token
 
-            request_body (dict): The body of the request sent by the client
+            request: The request sent by the client.
 
-            clientip (str): The IP address of the client.
+            request_body: The body of the request sent by the client
+
+            description: A human readable string to be displayed to the user that
+                         describes the operation happening on their account.
 
         Returns:
-            defer.Deferred[dict]: the parameters for this request (which may
+            A tuple of (params, session_id).
+
+                'params' contains the parameters for this request (which may
                 have been given only in a previous call).
+
+                'session_id' is the ID of this session, either passed in by the
+                client or assigned by this call. This is None if UI auth was
+                skipped (by re-using a previous validation).
 
         Raises:
             InteractiveAuthIncompleteError if the client has not yet completed
@@ -131,39 +333,121 @@ class AuthHandler(BaseHandler):
 
             AuthError if the client has completed a login flow, and it gives
                 a different user to `requester`
+
+            LimitExceededError if the ratelimiter's failed request count for this
+                user is too high to proceed
+
         """
+        if not requester.access_token_id:
+            raise ValueError("Cannot validate a user without an access token")
+        if self._ui_auth_session_timeout:
+            last_validated = await self.store.get_access_token_last_validated(
+                requester.access_token_id
+            )
+            if self.clock.time_msec() - last_validated < self._ui_auth_session_timeout:
+                # Return the input parameters, minus the auth key, which matches
+                # the logic in check_ui_auth.
+                request_body.pop("auth", None)
+                return request_body, None
+
+        requester_user_id = requester.user.to_string()
+
+        # Check if we should be ratelimited due to too many previous failed attempts
+        await self._failed_uia_attempts_ratelimiter.ratelimit(requester, update=False)
 
         # build a list of supported flows
-        flows = [[login_type] for login_type in self._supported_login_types]
+        supported_ui_auth_types = await self._get_available_ui_auth_types(
+            requester.user
+        )
+        flows = [[login_type] for login_type in supported_ui_auth_types]
 
-        result, params, _ = yield self.check_auth(flows, request_body, clientip)
+        def get_new_session_data() -> JsonDict:
+            return {UIAuthSessionDataConstants.REQUEST_USER_ID: requester_user_id}
+
+        try:
+            result, params, session_id = await self.check_ui_auth(
+                flows,
+                request,
+                request_body,
+                description,
+                get_new_session_data,
+            )
+        except LoginError:
+            # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
+            await self._failed_uia_attempts_ratelimiter.can_do_action(
+                requester,
+            )
+            raise
 
         # find the completed login type
-        for login_type in self._supported_login_types:
+        for login_type in supported_ui_auth_types:
             if login_type not in result:
                 continue
 
-            user_id = result[login_type]
+            validated_user_id = result[login_type]
             break
         else:
             # this can't happen
             raise Exception("check_auth returned True but no successful login type")
 
         # check that the UI auth matched the access token
-        if user_id != requester.user.to_string():
+        if validated_user_id != requester_user_id:
             raise AuthError(403, "Invalid auth")
 
-        defer.returnValue(params)
+        # Note that the access token has been validated.
+        await self.store.update_access_token_last_validated(requester.access_token_id)
 
-    @defer.inlineCallbacks
-    def check_auth(self, flows, clientdict, clientip, password_servlet=False):
+        return params, session_id
+
+    async def _get_available_ui_auth_types(self, user: UserID) -> Iterable[str]:
+        """Get a list of the authentication types this user can use"""
+
+        ui_auth_types = set()
+
+        # if the HS supports password auth, and the user has a non-null password, we
+        # support password auth
+        if self._password_localdb_enabled and self._password_enabled:
+            lookupres = await self._find_user_id_and_pwd_hash(user.to_string())
+            if lookupres:
+                _, password_hash = lookupres
+                if password_hash:
+                    ui_auth_types.add(LoginType.PASSWORD)
+
+        # also allow auth from password providers
+        for provider in self.password_providers:
+            for t in provider.get_supported_login_types().keys():
+                if t == LoginType.PASSWORD and not self._password_enabled:
+                    continue
+                ui_auth_types.add(t)
+
+        # if sso is enabled, allow the user to log in via SSO iff they have a mapping
+        # from sso to mxid.
+        if await self.hs.get_sso_handler().get_identity_providers_for_user(
+            user.to_string()
+        ):
+            ui_auth_types.add(LoginType.SSO)
+
+        return ui_auth_types
+
+    def get_enabled_auth_types(self):
+        """Return the enabled user-interactive authentication types
+
+        Returns the UI-Auth types which are supported by the homeserver's current
+        config.
+        """
+        return self.checkers.keys()
+
+    async def check_ui_auth(
+        self,
+        flows: List[List[str]],
+        request: SynapseRequest,
+        clientdict: Dict[str, Any],
+        description: str,
+        get_new_session_data: Optional[Callable[[], JsonDict]] = None,
+    ) -> Tuple[dict, dict, str]:
         """
         Takes a dictionary sent by the client in the login / registration
         protocol and handles the User-Interactive Auth flow.
-
-        As a side effect, this function fills in the 'creds' key on the user's
-        session with a map, which maps each auth-type (str) to the relevant
-        identity authenticated by that auth-type (mostly str, but for captcha, bool).
 
         If no auth flows have been completed successfully, raises an
         InteractiveAuthIncompleteError. To handle this, you can use
@@ -171,28 +455,27 @@ class AuthHandler(BaseHandler):
         decorator.
 
         Args:
-            flows (list): A list of login flows. Each flow is an ordered list of
-                          strings representing auth-types. At least one full
-                          flow must be completed in order for auth to be successful.
+            flows: A list of login flows. Each flow is an ordered list of
+                   strings representing auth-types. At least one full
+                   flow must be completed in order for auth to be successful.
+
+            request: The request sent by the client.
 
             clientdict: The dictionary from the client root level, not the
                         'auth' key: this method prompts for auth if none is sent.
 
-            clientip (str): The IP address of the client.
+            description: A human readable string to be displayed to the user that
+                         describes the operation happening on their account.
 
-            password_servlet (bool): Whether the request originated from
-                PasswordRestServlet.
-                XXX: This is a temporary hack to distinguish between checking
-                for threepid validations locally (in the case of password
-                resets) and using the identity server (in the case of binding
-                a 3PID during registration). Once we start using the
-                homeserver for both tasks, this distinction will no longer be
-                necessary.
+            get_new_session_data:
+                an optional callback which will be called when starting a new session.
+                it should return data to be stored as part of the session.
 
+                The keys of the returned data should be entries in
+                UIAuthSessionDataConstants.
 
         Returns:
-            defer.Deferred[dict, dict, str]: a deferred tuple of
-                (creds, params, session_id).
+            A tuple of (creds, params, session_id).
 
                 'creds' contains the authenticated credentials of each stage.
 
@@ -207,66 +490,112 @@ class AuthHandler(BaseHandler):
                 all the stages in any of the permitted flows.
         """
 
-        authdict = None
-        sid = None
-        if clientdict and "auth" in clientdict:
-            authdict = clientdict["auth"]
-            del clientdict["auth"]
-            if "session" in authdict:
-                sid = authdict["session"]
-        session = self._get_session_info(sid)
+        sid = None  # type: Optional[str]
+        authdict = clientdict.pop("auth", {})
+        if "session" in authdict:
+            sid = authdict["session"]
 
-        if len(clientdict) > 0:
+        # Convert the URI and method to strings.
+        uri = request.uri.decode("utf-8")  # type: ignore
+        method = request.method.decode("utf-8")
+
+        # If there's no session ID, create a new session.
+        if not sid:
+            new_session_data = get_new_session_data() if get_new_session_data else {}
+
+            session = await self.store.create_ui_auth_session(
+                clientdict, uri, method, description
+            )
+
+            for k, v in new_session_data.items():
+                await self.set_session_data(session.session_id, k, v)
+
+        else:
+            try:
+                session = await self.store.get_ui_auth_session(sid)
+            except StoreError:
+                raise SynapseError(400, "Unknown session ID: %s" % (sid,))
+
+            # If the client provides parameters, update what is persisted,
+            # otherwise use whatever was last provided.
+            #
             # This was designed to allow the client to omit the parameters
             # and just supply the session in subsequent calls so it split
             # auth between devices by just sharing the session, (eg. so you
             # could continue registration from your phone having clicked the
             # email auth link on there). It's probably too open to abuse
             # because it lets unauthenticated clients store arbitrary objects
-            # on a home server.
-            # Revisit: Assumimg the REST APIs do sensible validation, the data
-            # isn't arbintrary.
-            session["clientdict"] = clientdict
-            self._save_session(session)
-        elif "clientdict" in session:
-            clientdict = session["clientdict"]
+            # on a homeserver.
+            #
+            # Revisit: Assuming the REST APIs do sensible validation, the data
+            # isn't arbitrary.
+            #
+            # Note that the registration endpoint explicitly removes the
+            # "initial_device_display_name" parameter if it is provided
+            # without a "password" parameter. See the changes to
+            # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
+            # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
+            if not clientdict:
+                clientdict = session.clientdict
+
+            # Ensure that the queried operation does not vary between stages of
+            # the UI authentication session. This is done by generating a stable
+            # comparator and storing it during the initial query. Subsequent
+            # queries ensure that this comparator has not changed.
+            #
+            # The comparator is based on the requested URI and HTTP method. The
+            # client dict (minus the auth dict) should also be checked, but some
+            # clients are not spec compliant, just warn for now if the client
+            # dict changes.
+            if (session.uri, session.method) != (uri, method):
+                raise SynapseError(
+                    403,
+                    "Requested operation has changed during the UI authentication session.",
+                )
+
+            if session.clientdict != clientdict:
+                logger.warning(
+                    "Requested operation has changed during the UI "
+                    "authentication session. A future version of Synapse "
+                    "will remove this capability."
+                )
+
+            # For backwards compatibility, changes to the client dict are
+            # persisted as clients modify them throughout their user interactive
+            # authentication flow.
+            await self.store.set_ui_auth_clientdict(sid, clientdict)
+
+        user_agent = get_request_user_agent(request)
+        clientip = request.getClientIP()
+
+        await self.store.add_user_agent_ip_to_ui_auth_session(
+            session.session_id, user_agent, clientip
+        )
 
         if not authdict:
             raise InteractiveAuthIncompleteError(
-                self._auth_dict_for_flows(flows, session)
+                session.session_id, self._auth_dict_for_flows(flows, session.session_id)
             )
 
-        if "creds" not in session:
-            session["creds"] = {}
-        creds = session["creds"]
-
         # check auth type currently being presented
-        errordict = {}
+        errordict = {}  # type: Dict[str, Any]
         if "type" in authdict:
-            login_type = authdict["type"]
+            login_type = authdict["type"]  # type: str
             try:
-                result = yield self._check_auth_dict(
-                    authdict, clientip, password_servlet=password_servlet
-                )
+                result = await self._check_auth_dict(authdict, clientip)
                 if result:
-                    creds[login_type] = result
-                    self._save_session(session)
+                    await self.store.mark_ui_auth_stage_complete(
+                        session.session_id, login_type, result
+                    )
             except LoginError as e:
-                if login_type == LoginType.EMAIL_IDENTITY:
-                    # riot used to have a bug where it would request a new
-                    # validation token (thus sending a new email) each time it
-                    # got a 401 with a 'flows' field.
-                    # (https://github.com/vector-im/vector-web/issues/2447).
-                    #
-                    # Grandfather in the old behaviour for now to avoid
-                    # breaking old riot deployments.
-                    raise
-
                 # this step failed. Merge the error dict into the response
                 # so that the client can have another go.
                 errordict = e.error_dict()
 
+        creds = await self.store.get_completed_ui_auth_stages(session.session_id)
         for f in flows:
+            # If all the required credentials have been supplied, the user has
+            # successfully completed the UI auth process!
             if len(set(f) - set(creds)) == 0:
                 # it's very useful to know what args are stored, but this can
                 # include the password in the case of registering, so only log
@@ -278,15 +607,17 @@ class AuthHandler(BaseHandler):
                     creds,
                     list(clientdict),
                 )
-                defer.returnValue((creds, clientdict, session["id"]))
 
-        ret = self._auth_dict_for_flows(flows, session)
+                return creds, clientdict, session.session_id
+
+        ret = self._auth_dict_for_flows(flows, session.session_id)
         ret["completed"] = list(creds)
         ret.update(errordict)
-        raise InteractiveAuthIncompleteError(ret)
+        raise InteractiveAuthIncompleteError(session.session_id, ret)
 
-    @defer.inlineCallbacks
-    def add_oob_auth(self, stagetype, authdict, clientip):
+    async def add_oob_auth(
+        self, stagetype: str, authdict: Dict[str, Any], clientip: str
+    ) -> bool:
         """
         Adds the result of out-of-band authentication into an existing auth
         session. Currently used for adding the result of fallback auth.
@@ -296,19 +627,15 @@ class AuthHandler(BaseHandler):
         if "session" not in authdict:
             raise LoginError(400, "", Codes.MISSING_PARAM)
 
-        sess = self._get_session_info(authdict["session"])
-        if "creds" not in sess:
-            sess["creds"] = {}
-        creds = sess["creds"]
-
-        result = yield self.checkers[stagetype](authdict, clientip)
+        result = await self.checkers[stagetype].check_auth(authdict, clientip)
         if result:
-            creds[stagetype] = result
-            self._save_session(sess)
-            defer.returnValue(True)
-        defer.returnValue(False)
+            await self.store.mark_ui_auth_stage_complete(
+                authdict["session"], stagetype, result
+            )
+            return True
+        return False
 
-    def get_session_id(self, clientdict):
+    def get_session_id(self, clientdict: Dict[str, Any]) -> Optional[str]:
         """
         Gets the session ID for a client given the client dictionary
 
@@ -316,7 +643,7 @@ class AuthHandler(BaseHandler):
             clientdict: The dictionary sent by the client in the request
 
         Returns:
-            str|None: The string session ID the client sent. If the client did
+            The string session ID the client sent. If the client did
                 not send a session ID, returns None.
         """
         sid = None
@@ -326,43 +653,59 @@ class AuthHandler(BaseHandler):
                 sid = authdict["session"]
         return sid
 
-    def set_session_data(self, session_id, key, value):
+    async def set_session_data(self, session_id: str, key: str, value: Any) -> None:
         """
         Store a key-value pair into the sessions data associated with this
         request. This data is stored server-side and cannot be modified by
         the client.
 
         Args:
-            session_id (string): The ID of this session as returned from check_auth
-            key (string): The key to store the data under
-            value (any): The data to store
+            session_id: The ID of this session as returned from check_auth
+            key: The key to store the data under. An entry from
+                UIAuthSessionDataConstants.
+            value: The data to store
         """
-        sess = self._get_session_info(session_id)
-        sess.setdefault("serverdict", {})[key] = value
-        self._save_session(sess)
+        try:
+            await self.store.set_ui_auth_session_data(session_id, key, value)
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-    def get_session_data(self, session_id, key, default=None):
+    async def get_session_data(
+        self, session_id: str, key: str, default: Optional[Any] = None
+    ) -> Any:
         """
         Retrieve data stored with set_session_data
 
         Args:
-            session_id (string): The ID of this session as returned from check_auth
-            key (string): The key to store the data under
-            default (any): Value to return if the key has not been set
+            session_id: The ID of this session as returned from check_auth
+            key: The key the data was stored under. An entry from
+                UIAuthSessionDataConstants.
+            default: Value to return if the key has not been set
         """
-        sess = self._get_session_info(session_id)
-        return sess.setdefault("serverdict", {}).get(key, default)
+        try:
+            return await self.store.get_ui_auth_session_data(session_id, key, default)
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-    @defer.inlineCallbacks
-    def _check_auth_dict(self, authdict, clientip, password_servlet=False):
+    async def _expire_old_sessions(self):
+        """
+        Invalidate any user interactive authentication sessions that have expired.
+        """
+        now = self._clock.time_msec()
+        expiration_time = now - self.SESSION_EXPIRE_MS
+        await self.store.delete_old_ui_auth_sessions(expiration_time)
+
+    async def _check_auth_dict(
+        self, authdict: Dict[str, Any], clientip: str
+    ) -> Union[Dict[str, Any], str]:
         """Attempt to validate the auth dict provided by a client
 
         Args:
-            authdict (object): auth dict provided by the client
-            clientip (str): IP address of the client
+            authdict: auth dict provided by the client
+            clientip: IP address of the client
 
         Returns:
-            Deferred: result of the stage verification.
+            Result of the stage verification.
 
         Raises:
             StoreError if there was a problem accessing the database
@@ -372,140 +715,17 @@ class AuthHandler(BaseHandler):
         login_type = authdict["type"]
         checker = self.checkers.get(login_type)
         if checker is not None:
-            # XXX: Temporary workaround for having Synapse handle password resets
-            # See AuthHandler.check_auth for further details
-            res = yield checker(
-                authdict, clientip=clientip, password_servlet=password_servlet
-            )
-            defer.returnValue(res)
+            res = await checker.check_auth(authdict, clientip=clientip)
+            return res
 
-        # build a v1-login-style dict out of the authdict and fall back to the
-        # v1 code
-        user_id = authdict.get("user")
+        # fall back to the v1 login flow
+        canonical_id, _ = await self.validate_login(authdict)
+        return canonical_id
 
-        if user_id is None:
-            raise SynapseError(400, "", Codes.MISSING_PARAM)
-
-        (canonical_id, callback) = yield self.validate_login(user_id, authdict)
-        defer.returnValue(canonical_id)
-
-    @defer.inlineCallbacks
-    def _check_recaptcha(self, authdict, clientip, **kwargs):
-        try:
-            user_response = authdict["response"]
-        except KeyError:
-            # Client tried to provide captcha but didn't give the parameter:
-            # bad request.
-            raise LoginError(
-                400, "Captcha response is required", errcode=Codes.CAPTCHA_NEEDED
-            )
-
-        logger.info(
-            "Submitting recaptcha response %s with remoteip %s", user_response, clientip
-        )
-
-        # TODO: get this from the homeserver rather than creating a new one for
-        # each request
-        try:
-            client = self.hs.get_simple_http_client()
-            resp_body = yield client.post_urlencoded_get_json(
-                self.hs.config.recaptcha_siteverify_api,
-                args={
-                    "secret": self.hs.config.recaptcha_private_key,
-                    "response": user_response,
-                    "remoteip": clientip,
-                },
-            )
-        except PartialDownloadError as pde:
-            # Twisted is silly
-            data = pde.response
-            resp_body = json.loads(data)
-
-        if "success" in resp_body:
-            # Note that we do NOT check the hostname here: we explicitly
-            # intend the CAPTCHA to be presented by whatever client the
-            # user is using, we just care that they have completed a CAPTCHA.
-            logger.info(
-                "%s reCAPTCHA from hostname %s",
-                "Successful" if resp_body["success"] else "Failed",
-                resp_body.get("hostname"),
-            )
-            if resp_body["success"]:
-                defer.returnValue(True)
-        raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
-
-    def _check_email_identity(self, authdict, **kwargs):
-        return self._check_threepid("email", authdict, **kwargs)
-
-    def _check_msisdn(self, authdict, **kwargs):
-        return self._check_threepid("msisdn", authdict)
-
-    def _check_dummy_auth(self, authdict, **kwargs):
-        return defer.succeed(True)
-
-    def _check_terms_auth(self, authdict, **kwargs):
-        return defer.succeed(True)
-
-    @defer.inlineCallbacks
-    def _check_threepid(self, medium, authdict, password_servlet=False, **kwargs):
-        if "threepid_creds" not in authdict:
-            raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
-
-        threepid_creds = authdict["threepid_creds"]
-
-        identity_handler = self.hs.get_handlers().identity_handler
-
-        logger.info("Getting validated threepid. threepidcreds: %r", (threepid_creds,))
-        if (
-            not password_servlet
-            or self.hs.config.email_password_reset_behaviour == "remote"
-        ):
-            threepid = yield identity_handler.threepid_from_creds(threepid_creds)
-        elif self.hs.config.email_password_reset_behaviour == "local":
-            row = yield self.store.get_threepid_validation_session(
-                medium,
-                threepid_creds["client_secret"],
-                sid=threepid_creds["sid"],
-                validated=True,
-            )
-
-            threepid = (
-                {
-                    "medium": row["medium"],
-                    "address": row["address"],
-                    "validated_at": row["validated_at"],
-                }
-                if row
-                else None
-            )
-
-            if row:
-                # Valid threepid returned, delete from the db
-                yield self.store.delete_threepid_session(threepid_creds["sid"])
-        else:
-            raise SynapseError(
-                400, "Password resets are not enabled on this homeserver"
-            )
-
-        if not threepid:
-            raise LoginError(401, "", errcode=Codes.UNAUTHORIZED)
-
-        if threepid["medium"] != medium:
-            raise LoginError(
-                401,
-                "Expecting threepid of type '%s', got '%s'"
-                % (medium, threepid["medium"]),
-                errcode=Codes.UNAUTHORIZED,
-            )
-
-        threepid["threepid_creds"] = authdict["threepid_creds"]
-
-        defer.returnValue(threepid)
-
-    def _get_params_recaptcha(self):
+    def _get_params_recaptcha(self) -> dict:
         return {"public_key": self.hs.config.recaptcha_public_key}
 
-    def _get_params_terms(self):
+    def _get_params_terms(self) -> dict:
         return {
             "policies": {
                 "privacy_policy": {
@@ -522,7 +742,11 @@ class AuthHandler(BaseHandler):
             }
         }
 
-    def _auth_dict_for_flows(self, flows, session):
+    def _auth_dict_for_flows(
+        self,
+        flows: List[List[str]],
+        session_id: str,
+    ) -> Dict[str, Any]:
         public_flows = []
         for f in flows:
             public_flows.append(f)
@@ -532,7 +756,7 @@ class AuthHandler(BaseHandler):
             LoginType.TERMS: self._get_params_terms,
         }
 
-        params = {}
+        params = {}  # type: Dict[str, Any]
 
         for f in public_flows:
             for stage in f:
@@ -540,48 +764,69 @@ class AuthHandler(BaseHandler):
                     params[stage] = get_params[stage]()
 
         return {
-            "session": session["id"],
+            "session": session_id,
             "flows": [{"stages": f} for f in public_flows],
             "params": params,
         }
 
-    def _get_session_info(self, session_id):
-        if session_id not in self.sessions:
-            session_id = None
-
-        if not session_id:
-            # create a new session
-            while session_id is None or session_id in self.sessions:
-                session_id = stringutils.random_string(24)
-            self.sessions[session_id] = {"id": session_id}
-
-        return self.sessions[session_id]
-
-    @defer.inlineCallbacks
-    def get_access_token_for_user_id(self, user_id, device_id=None):
+    async def get_access_token_for_user_id(
+        self,
+        user_id: str,
+        device_id: Optional[str],
+        valid_until_ms: Optional[int],
+        puppets_user_id: Optional[str] = None,
+        is_appservice_ghost: bool = False,
+    ) -> str:
         """
         Creates a new access token for the user with the given user ID.
 
         The user is assumed to have been authenticated by some other
-        machanism (e.g. CAS), and the user_id converted to the canonical case.
+        mechanism (e.g. CAS), and the user_id converted to the canonical case.
 
         The device will be recorded in the table if it is not there already.
 
         Args:
-            user_id (str): canonical User ID
-            device_id (str|None): the device ID to associate with the tokens.
+            user_id: canonical User ID
+            device_id: the device ID to associate with the tokens.
                None to leave the tokens unassociated with a device (deprecated:
                we should always have a device ID)
+            valid_until_ms: when the token is valid until. None for
+                no expiry.
+            is_appservice_ghost: Whether the user is an application ghost user
         Returns:
               The access token for the user's session.
         Raises:
             StoreError if there was a problem storing the token.
         """
-        logger.info("Logging in user %s on device %s", user_id, device_id)
-        access_token = self.generate_access_token()
-        yield self.store.add_access_token_to_user(user_id, access_token, device_id)
+        fmt_expiry = ""
+        if valid_until_ms is not None:
+            fmt_expiry = time.strftime(
+                " until %Y-%m-%d %H:%M:%S", time.localtime(valid_until_ms / 1000.0)
+            )
 
-        yield self.auth.check_auth_blocking(user_id)
+        if puppets_user_id:
+            logger.info(
+                "Logging in user %s as %s%s", user_id, puppets_user_id, fmt_expiry
+            )
+        else:
+            logger.info(
+                "Logging in user %s on device %s%s", user_id, device_id, fmt_expiry
+            )
+
+        if (
+            not is_appservice_ghost
+            or self.hs.config.appservice.track_appservice_user_ips
+        ):
+            await self.auth.check_auth_blocking(user_id)
+
+        access_token = self.generate_access_token()
+        await self.store.add_access_token_to_user(
+            user_id=user_id,
+            token=access_token,
+            device_id=device_id,
+            valid_until_ms=valid_until_ms,
+            puppets_user_id=puppets_user_id,
+        )
 
         # the device *should* have been registered before we got here; however,
         # it's possible we raced against a DELETE operation. The thing we
@@ -589,51 +834,45 @@ class AuthHandler(BaseHandler):
         # device, so we double-check it here.
         if device_id is not None:
             try:
-                yield self.store.get_device(user_id, device_id)
+                await self.store.get_device(user_id, device_id)
             except StoreError:
-                yield self.store.delete_access_token(access_token)
+                await self.store.delete_access_token(access_token)
                 raise StoreError(400, "Login raced against device deletion")
 
-        defer.returnValue(access_token)
+        return access_token
 
-    @defer.inlineCallbacks
-    def check_user_exists(self, user_id):
+    async def check_user_exists(self, user_id: str) -> Optional[str]:
         """
         Checks to see if a user with the given id exists. Will check case
         insensitively, but return None if there are multiple inexact matches.
 
         Args:
-            (unicode|bytes) user_id: complete @user:id
+            user_id: complete @user:id
 
         Returns:
-            defer.Deferred: (unicode) canonical_user_id, or None if zero or
-            multiple matches
-
-        Raises:
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
+            The canonical_user_id, or None if zero or multiple matches
         """
-        self.ratelimit_login_per_account(user_id)
-        res = yield self._find_user_id_and_pwd_hash(user_id)
+        res = await self._find_user_id_and_pwd_hash(user_id)
         if res is not None:
-            defer.returnValue(res[0])
-        defer.returnValue(None)
+            return res[0]
+        return None
 
-    @defer.inlineCallbacks
-    def _find_user_id_and_pwd_hash(self, user_id):
+    async def _find_user_id_and_pwd_hash(
+        self, user_id: str
+    ) -> Optional[Tuple[str, str]]:
         """Checks to see if a user with the given id exists. Will check case
         insensitively, but will return None if there are multiple inexact
         matches.
 
         Returns:
-            tuple: A 2-tuple of `(canonical_user_id, password_hash)`
-            None: if there is not exactly one match
+            A 2-tuple of `(canonical_user_id, password_hash)` or `None`
+            if there is not exactly one match
         """
-        user_infos = yield self.store.get_users_by_id_case_insensitive(user_id)
+        user_infos = await self.store.get_users_by_id_case_insensitive(user_id)
 
         result = None
         if not user_infos:
-            logger.warn("Attempted to login as %s but they do not exist", user_id)
+            logger.warning("Attempted to login as %s but they do not exist", user_id)
         elif len(user_infos) == 1:
             # a single match (possibly not exact)
             result = user_infos.popitem()
@@ -642,15 +881,28 @@ class AuthHandler(BaseHandler):
             result = (user_id, user_infos[user_id])
         else:
             # multiple matches, none of them exact
-            logger.warn(
+            logger.warning(
                 "Attempted to login as %s but it matches more than one user "
                 "inexactly: %r",
                 user_id,
                 user_infos.keys(),
             )
-        defer.returnValue(result)
+        return result
 
-    def get_supported_login_types(self):
+    def can_change_password(self) -> bool:
+        """Get whether users on this server are allowed to change or set a password.
+
+        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+
+        Note that any account (even SSO accounts) are allowed to add passwords if the above
+        is true.
+
+        Returns:
+            Whether users on this server are allowed to change or set a password
+        """
+        return self._password_enabled and self._password_localdb_enabled
+
+    def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
 
         By default this is just 'm.login.password' (unless password_enabled is
@@ -658,65 +910,188 @@ class AuthHandler(BaseHandler):
         other login types.
 
         Returns:
-            Iterable[str]: login types
+            login types
         """
         return self._supported_login_types
 
-    @defer.inlineCallbacks
-    def validate_login(self, username, login_submission):
+    async def validate_login(
+        self,
+        login_submission: Dict[str, Any],
+        ratelimit: bool = False,
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
-        Also used by the user-interactive auth flow to validate
-        m.login.password auth types.
+        Also used by the user-interactive auth flow to validate auth types which don't
+        have an explicit UIA handler, including m.password.auth.
 
         Args:
-            username (str): username supplied by the user
-            login_submission (dict): the whole of the login submission
+            login_submission: the whole of the login submission
                 (including 'type' and other relevant fields)
+            ratelimit: whether to apply the failed_login_attempt ratelimiter
         Returns:
-            Deferred[str, func]: canonical user id, and optional callback
+            A tuple of the canonical user id, and optional callback
                 to be called once the access token and device id are issued
         Raises:
             StoreError if there was a problem accessing the database
             SynapseError if there was a problem with the request
             LoginError if there was an authentication problem.
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
         """
+        login_type = login_submission.get("type")
+        if not isinstance(login_type, str):
+            raise SynapseError(400, "Bad parameter: type", Codes.INVALID_PARAM)
+
+        # ideally, we wouldn't be checking the identifier unless we know we have a login
+        # method which uses it (https://github.com/matrix-org/synapse/issues/8836)
+        #
+        # But the auth providers' check_auth interface requires a username, so in
+        # practice we can only support login methods which we can map to a username
+        # anyway.
+
+        # special case to check for "password" for the check_password interface
+        # for the auth providers
+        password = login_submission.get("password")
+        if login_type == LoginType.PASSWORD:
+            if not self._password_enabled:
+                raise SynapseError(400, "Password login has been disabled.")
+            if not isinstance(password, str):
+                raise SynapseError(400, "Bad parameter: password", Codes.INVALID_PARAM)
+
+        # map old-school login fields into new-school "identifier" fields.
+        identifier_dict = convert_client_dict_legacy_fields_to_identifier(
+            login_submission
+        )
+
+        # convert phone type identifiers to generic threepids
+        if identifier_dict["type"] == "m.id.phone":
+            identifier_dict = login_id_phone_to_thirdparty(identifier_dict)
+
+        # convert threepid identifiers to user IDs
+        if identifier_dict["type"] == "m.id.thirdparty":
+            address = identifier_dict.get("address")
+            medium = identifier_dict.get("medium")
+
+            if medium is None or address is None:
+                raise SynapseError(400, "Invalid thirdparty identifier")
+
+            # For emails, canonicalise the address.
+            # We store all email addresses canonicalised in the DB.
+            # (See add_threepid in synapse/handlers/auth.py)
+            if medium == "email":
+                try:
+                    address = canonicalise_email(address)
+                except ValueError as e:
+                    raise SynapseError(400, str(e))
+
+            # We also apply account rate limiting using the 3PID as a key, as
+            # otherwise using 3PID bypasses the ratelimiting based on user ID.
+            if ratelimit:
+                await self._failed_login_attempts_ratelimiter.ratelimit(
+                    None, (medium, address), update=False
+                )
+
+            # Check for login providers that support 3pid login types
+            if login_type == LoginType.PASSWORD:
+                # we've already checked that there is a (valid) password field
+                assert isinstance(password, str)
+                (
+                    canonical_user_id,
+                    callback_3pid,
+                ) = await self.check_password_provider_3pid(medium, address, password)
+                if canonical_user_id:
+                    # Authentication through password provider and 3pid succeeded
+                    return canonical_user_id, callback_3pid
+
+            # No password providers were able to handle this 3pid
+            # Check local store
+            user_id = await self.hs.get_datastore().get_user_id_by_threepid(
+                medium, address
+            )
+            if not user_id:
+                logger.warning(
+                    "unknown 3pid identifier medium %s, address %r", medium, address
+                )
+                # We mark that we've failed to log in here, as
+                # `check_password_provider_3pid` might have returned `None` due
+                # to an incorrect password, rather than the account not
+                # existing.
+                #
+                # If it returned None but the 3PID was bound then we won't hit
+                # this code path, which is fine as then the per-user ratelimit
+                # will kick in below.
+                if ratelimit:
+                    await self._failed_login_attempts_ratelimiter.can_do_action(
+                        None, (medium, address)
+                    )
+                raise LoginError(403, "", errcode=Codes.FORBIDDEN)
+
+            identifier_dict = {"type": "m.id.user", "user": user_id}
+
+        # by this point, the identifier should be an m.id.user: if it's anything
+        # else, we haven't understood it.
+        if identifier_dict["type"] != "m.id.user":
+            raise SynapseError(400, "Unknown login identifier type")
+
+        username = identifier_dict.get("user")
+        if not username:
+            raise SynapseError(400, "User identifier is missing 'user' key")
 
         if username.startswith("@"):
             qualified_user_id = username
         else:
             qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
-        self.ratelimit_login_per_account(qualified_user_id)
+        # Check if we've hit the failed ratelimit (but don't update it)
+        if ratelimit:
+            await self._failed_login_attempts_ratelimiter.ratelimit(
+                None, qualified_user_id.lower(), update=False
+            )
+
+        try:
+            return await self._validate_userid_login(username, login_submission)
+        except LoginError:
+            # The user has failed to log in, so we need to update the rate
+            # limiter. Using `can_do_action` avoids us raising a ratelimit
+            # exception and masking the LoginError. The actual ratelimiting
+            # should have happened above.
+            if ratelimit:
+                await self._failed_login_attempts_ratelimiter.can_do_action(
+                    None, qualified_user_id.lower()
+                )
+            raise
+
+    async def _validate_userid_login(
+        self,
+        username: str,
+        login_submission: Dict[str, Any],
+    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
+        """Helper for validate_login
+
+        Handles login, once we've mapped 3pids onto userids
+
+        Args:
+            username: the username, from the identifier dict
+            login_submission: the whole of the login submission
+                (including 'type' and other relevant fields)
+        Returns:
+            A tuple of the canonical user id, and optional callback
+                to be called once the access token and device id are issued
+        Raises:
+            StoreError if there was a problem accessing the database
+            SynapseError if there was a problem with the request
+            LoginError if there was an authentication problem.
+        """
+        if username.startswith("@"):
+            qualified_user_id = username
+        else:
+            qualified_user_id = UserID(username, self.hs.hostname).to_string()
 
         login_type = login_submission.get("type")
+        # we already checked that we have a valid login type
+        assert isinstance(login_type, str)
+
         known_login_type = False
 
-        # special case to check for "password" for the check_password interface
-        # for the auth providers
-        password = login_submission.get("password")
-
-        if login_type == LoginType.PASSWORD:
-            if not self._password_enabled:
-                raise SynapseError(400, "Password login has been disabled.")
-            if not password:
-                raise SynapseError(400, "Missing parameter: password")
-
         for provider in self.password_providers:
-            if hasattr(provider, "check_password") and login_type == LoginType.PASSWORD:
-                known_login_type = True
-                is_valid = yield provider.check_password(qualified_user_id, password)
-                if is_valid:
-                    defer.returnValue((qualified_user_id, None))
-
-            if not hasattr(provider, "get_supported_login_types") or not hasattr(
-                provider, "check_auth"
-            ):
-                # this password provider doesn't understand custom login types
-                continue
-
             supported_login_types = provider.get_supported_login_types()
             if login_type not in supported_login_types:
                 # this password provider doesn't understand this login type
@@ -739,183 +1114,167 @@ class AuthHandler(BaseHandler):
                     % (login_type, missing_fields),
                 )
 
-            result = yield provider.check_auth(username, login_type, login_dict)
+            result = await provider.check_auth(username, login_type, login_dict)
             if result:
-                if isinstance(result, str):
-                    result = (result, None)
-                defer.returnValue(result)
+                return result
 
-        if login_type == LoginType.PASSWORD and self.hs.config.password_localdb_enabled:
+        if login_type == LoginType.PASSWORD and self._password_localdb_enabled:
             known_login_type = True
 
-            canonical_user_id = yield self._check_local_password(
+            # we've already checked that there is a (valid) password field
+            password = login_submission["password"]
+            assert isinstance(password, str)
+
+            canonical_user_id = await self._check_local_password(
                 qualified_user_id, password
             )
 
             if canonical_user_id:
-                defer.returnValue((canonical_user_id, None))
+                return canonical_user_id, None
 
         if not known_login_type:
             raise SynapseError(400, "Unknown login type %s" % login_type)
-
-        # unknown username or invalid password.
-        self._failed_attempts_ratelimiter.ratelimit(
-            qualified_user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-            update=True,
-        )
 
         # We raise a 403 here, but note that if we're doing user-interactive
         # login, it turns all LoginErrors into a 401 anyway.
         raise LoginError(403, "Invalid password", errcode=Codes.FORBIDDEN)
 
-    @defer.inlineCallbacks
-    def check_password_provider_3pid(self, medium, address, password):
+    async def check_password_provider_3pid(
+        self, medium: str, address: str, password: str
+    ) -> Tuple[Optional[str], Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
         """Check if a password provider is able to validate a thirdparty login
 
         Args:
-            medium (str): The medium of the 3pid (ex. email).
-            address (str): The address of the 3pid (ex. jdoe@example.com).
-            password (str): The password of the user.
+            medium: The medium of the 3pid (ex. email).
+            address: The address of the 3pid (ex. jdoe@example.com).
+            password: The password of the user.
 
         Returns:
-            Deferred[(str|None, func|None)]: A tuple of `(user_id,
-            callback)`. If authentication is successful, `user_id` is a `str`
-            containing the authenticated, canonical user ID. `callback` is
+            A tuple of `(user_id, callback)`. If authentication is successful,
+            `user_id`is the authenticated, canonical user ID. `callback` is
             then either a function to be later run after the server has
             completed login/registration, or `None`. If authentication was
             unsuccessful, `user_id` and `callback` are both `None`.
         """
         for provider in self.password_providers:
-            if hasattr(provider, "check_3pid_auth"):
-                # This function is able to return a deferred that either
-                # resolves None, meaning authentication failure, or upon
-                # success, to a str (which is the user_id) or a tuple of
-                # (user_id, callback_func), where callback_func should be run
-                # after we've finished everything else
-                result = yield provider.check_3pid_auth(medium, address, password)
-                if result:
-                    # Check if the return value is a str or a tuple
-                    if isinstance(result, str):
-                        # If it's a str, set callback function to None
-                        result = (result, None)
-                    defer.returnValue(result)
+            result = await provider.check_3pid_auth(medium, address, password)
+            if result:
+                return result
 
-        defer.returnValue((None, None))
+        return None, None
 
-    @defer.inlineCallbacks
-    def _check_local_password(self, user_id, password):
+    async def _check_local_password(self, user_id: str, password: str) -> Optional[str]:
         """Authenticate a user against the local password database.
 
         user_id is checked case insensitively, but will return None if there are
         multiple inexact matches.
 
         Args:
-            user_id (unicode): complete @user:id
-            password (unicode): the provided password
+            user_id: complete @user:id
+            password: the provided password
         Returns:
-            Deferred[unicode] the canonical_user_id, or Deferred[None] if
-                unknown user/bad password
-
-        Raises:
-            LimitExceededError if the ratelimiter's login requests count for this
-                user is too high too proceed.
+            The canonical_user_id, or None if unknown user/bad password
         """
-        lookupres = yield self._find_user_id_and_pwd_hash(user_id)
+        lookupres = await self._find_user_id_and_pwd_hash(user_id)
         if not lookupres:
-            defer.returnValue(None)
+            return None
         (user_id, password_hash) = lookupres
-        result = yield self.validate_hash(password, password_hash)
+
+        # If the password hash is None, the account has likely been deactivated
+        if not password_hash:
+            deactivated = await self.store.get_user_deactivated_status(user_id)
+            if deactivated:
+                raise UserDeactivatedError("This account has been deactivated")
+
+        result = await self.validate_hash(password, password_hash)
         if not result:
-            logger.warn("Failed password login for user %s", user_id)
-            defer.returnValue(None)
-        defer.returnValue(user_id)
+            logger.warning("Failed password login for user %s", user_id)
+            return None
+        return user_id
 
     def generate_access_token(self):
         """Generates an opaque string, for use as an access token"""
         return stringutils.random_string(20)
 
-    @defer.inlineCallbacks
-    def validate_short_term_login_token_and_get_user_id(self, login_token):
-        auth_api = self.hs.get_auth()
-        user_id = None
+    async def validate_short_term_login_token(
+        self, login_token: str
+    ) -> LoginTokenAttributes:
         try:
-            macaroon = pymacaroons.Macaroon.deserialize(login_token)
-            user_id = auth_api.get_user_id_from_macaroon(macaroon)
-            auth_api.validate_macaroon(macaroon, "login", True, user_id)
+            res = self.macaroon_gen.verify_short_term_login_token(login_token)
         except Exception:
             raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
-        self.ratelimit_login_per_account(user_id)
-        yield self.auth.check_auth_blocking(user_id)
-        defer.returnValue(user_id)
 
-    @defer.inlineCallbacks
-    def delete_access_token(self, access_token):
+        await self.auth.check_auth_blocking(res.user_id)
+        return res
+
+    async def delete_access_token(self, access_token: str):
         """Invalidate a single access token
 
         Args:
-            access_token (str): access token to be deleted
+            access_token: access token to be deleted
 
-        Returns:
-            Deferred
         """
-        user_info = yield self.auth.get_user_by_access_token(access_token)
-        yield self.store.delete_access_token(access_token)
+        user_info = await self.auth.get_user_by_access_token(access_token)
+        await self.store.delete_access_token(access_token)
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
-            if hasattr(provider, "on_logged_out"):
-                yield provider.on_logged_out(
-                    user_id=str(user_info["user"]),
-                    device_id=user_info["device_id"],
-                    access_token=access_token,
-                )
-
-        # delete pushers associated with this access token
-        if user_info["token_id"] is not None:
-            yield self.hs.get_pusherpool().remove_pushers_by_access_token(
-                str(user_info["user"]), (user_info["token_id"],)
+            await provider.on_logged_out(
+                user_id=user_info.user_id,
+                device_id=user_info.device_id,
+                access_token=access_token,
             )
 
-    @defer.inlineCallbacks
-    def delete_access_tokens_for_user(
-        self, user_id, except_token_id=None, device_id=None
+        # delete pushers associated with this access token
+        if user_info.token_id is not None:
+            await self.hs.get_pusherpool().remove_pushers_by_access_token(
+                user_info.user_id, (user_info.token_id,)
+            )
+
+    async def delete_access_tokens_for_user(
+        self,
+        user_id: str,
+        except_token_id: Optional[int] = None,
+        device_id: Optional[str] = None,
     ):
         """Invalidate access tokens belonging to a user
 
         Args:
-            user_id (str):  ID of user the tokens belong to
-            except_token_id (str|None): access_token ID which should *not* be
-                deleted
-            device_id (str|None):  ID of device the tokens are associated with.
+            user_id:  ID of user the tokens belong to
+            except_token_id: access_token ID which should *not* be deleted
+            device_id:  ID of device the tokens are associated with.
                 If None, tokens associated with any device (or no device) will
                 be deleted
-        Returns:
-            Deferred
         """
-        tokens_and_devices = yield self.store.user_delete_access_tokens(
+        tokens_and_devices = await self.store.user_delete_access_tokens(
             user_id, except_token_id=except_token_id, device_id=device_id
         )
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
-            if hasattr(provider, "on_logged_out"):
-                for token, token_id, device_id in tokens_and_devices:
-                    yield provider.on_logged_out(
-                        user_id=user_id, device_id=device_id, access_token=token
-                    )
+            for token, _, device_id in tokens_and_devices:
+                await provider.on_logged_out(
+                    user_id=user_id, device_id=device_id, access_token=token
+                )
 
         # delete pushers associated with the access tokens
-        yield self.hs.get_pusherpool().remove_pushers_by_access_token(
+        await self.hs.get_pusherpool().remove_pushers_by_access_token(
             user_id, (token_id for _, token_id, _ in tokens_and_devices)
         )
 
-    @defer.inlineCallbacks
-    def add_threepid(self, user_id, medium, address, validated_at):
+    async def add_threepid(
+        self, user_id: str, medium: str, address: str, validated_at: int
+    ):
+        # check if medium has a valid value
+        if medium not in ["email", "msisdn"]:
+            raise SynapseError(
+                code=400,
+                msg=("'%s' is not a valid value for 'medium'" % (medium,)),
+                errcode=Codes.INVALID_PARAM,
+            )
+
         # 'Canonicalise' email addresses down to lower case.
-        # We've now moving towards the Home Server being the entity that
+        # We've now moving towards the homeserver being the entity that
         # is responsible for validating threepids used for resetting passwords
         # on accounts, so in future Synapse will gain knowledge of specific
         # types (mediums) of threepid. For now, we still use the existing
@@ -924,58 +1283,52 @@ class AuthHandler(BaseHandler):
         # for the presence of an email address during password reset was
         # case sensitive).
         if medium == "email":
-            address = address.lower()
+            address = canonicalise_email(address)
 
-        yield self.store.user_add_threepid(
+        await self.store.user_add_threepid(
             user_id, medium, address, validated_at, self.hs.get_clock().time_msec()
         )
 
-    @defer.inlineCallbacks
-    def delete_threepid(self, user_id, medium, address, id_server=None):
+    async def delete_threepid(
+        self, user_id: str, medium: str, address: str, id_server: Optional[str] = None
+    ) -> bool:
         """Attempts to unbind the 3pid on the identity servers and deletes it
         from the local database.
 
         Args:
-            user_id (str)
-            medium (str)
-            address (str)
-            id_server (str|None): Use the given identity server when unbinding
+            user_id: ID of user to remove the 3pid from.
+            medium: The medium of the 3pid being removed: "email" or "msisdn".
+            address: The 3pid address to remove.
+            id_server: Use the given identity server when unbinding
                 any threepids. If None then will attempt to unbind using the
                 identity server specified when binding (if known).
 
-
         Returns:
-            Deferred[bool]: Returns True if successfully unbound the 3pid on
+            Returns True if successfully unbound the 3pid on
             the identity server, False if identity server doesn't support the
             unbind API.
         """
 
         # 'Canonicalise' email addresses as per above
         if medium == "email":
-            address = address.lower()
+            address = canonicalise_email(address)
 
-        identity_handler = self.hs.get_handlers().identity_handler
-        result = yield identity_handler.try_unbind_threepid(
+        identity_handler = self.hs.get_identity_handler()
+        result = await identity_handler.try_unbind_threepid(
             user_id, {"medium": medium, "address": address, "id_server": id_server}
         )
 
-        yield self.store.user_delete_threepid(user_id, medium, address)
-        defer.returnValue(result)
+        await self.store.user_delete_threepid(user_id, medium, address)
+        return result
 
-    def _save_session(self, session):
-        # TODO: Persistent storage
-        logger.debug("Saving session %s", session)
-        session["last_used"] = self.hs.get_clock().time_msec()
-        self.sessions[session["id"]] = session
-
-    def hash(self, password):
+    async def hash(self, password: str) -> str:
         """Computes a secure hash of password.
 
         Args:
-            password (unicode): Password to hash.
+            password: Password to hash.
 
         Returns:
-            Deferred(unicode): Hashed password.
+            Hashed password.
         """
 
         def _do_hash():
@@ -987,72 +1340,256 @@ class AuthHandler(BaseHandler):
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
-        return logcontext.defer_to_thread(self.hs.get_reactor(), _do_hash)
+        return await defer_to_thread(self.hs.get_reactor(), _do_hash)
 
-    def validate_hash(self, password, stored_hash):
+    async def validate_hash(
+        self, password: str, stored_hash: Union[bytes, str]
+    ) -> bool:
         """Validates that self.hash(password) == stored_hash.
 
         Args:
-            password (unicode): Password to hash.
-            stored_hash (bytes): Expected hash value.
+            password: Password to hash.
+            stored_hash: Expected hash value.
 
         Returns:
-            Deferred(bool): Whether self.hash(password) == stored_hash.
+            Whether self.hash(password) == stored_hash.
         """
 
-        def _do_validate_hash():
+        def _do_validate_hash(checked_hash: bytes):
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
                 pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
-                stored_hash,
+                checked_hash,
             )
 
         if stored_hash:
             if not isinstance(stored_hash, bytes):
                 stored_hash = stored_hash.encode("ascii")
 
-            return logcontext.defer_to_thread(self.hs.get_reactor(), _do_validate_hash)
+            return await defer_to_thread(
+                self.hs.get_reactor(), _do_validate_hash, stored_hash
+            )
         else:
-            return defer.succeed(False)
+            return False
 
-    def ratelimit_login_per_account(self, user_id):
-        """Checks whether the process must be stopped because of ratelimiting.
-
-        Checks against two ratelimiters: the generic one for login attempts per
-        account and the one specific to failed attempts.
+    async def start_sso_ui_auth(self, request: SynapseRequest, session_id: str) -> str:
+        """
+        Get the HTML for the SSO redirect confirmation page.
 
         Args:
-            user_id (unicode): complete @user:id
+            request: The incoming HTTP request
+            session_id: The user interactive authentication session ID.
 
-        Raises:
-            LimitExceededError if one of the ratelimiters' login requests count
-                for this user is too high too proceed.
+        Returns:
+            The HTML to render.
         """
-        self._failed_attempts_ratelimiter.ratelimit(
-            user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
-            update=False,
+        try:
+            session = await self.store.get_ui_auth_session(session_id)
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
+
+        user_id_to_verify = await self.get_session_data(
+            session_id, UIAuthSessionDataConstants.REQUEST_USER_ID
+        )  # type: str
+
+        idps = await self.hs.get_sso_handler().get_identity_providers_for_user(
+            user_id_to_verify
         )
 
-        self._account_ratelimiter.ratelimit(
-            user_id.lower(),
-            time_now_s=self._clock.time(),
-            rate_hz=self.hs.config.rc_login_account.per_second,
-            burst_count=self.hs.config.rc_login_account.burst_count,
-            update=True,
+        if not idps:
+            # we checked that the user had some remote identities before offering an SSO
+            # flow, so either it's been deleted or the client has requested SSO despite
+            # it not being offered.
+            raise SynapseError(400, "User has no SSO identities")
+
+        # for now, just pick one
+        idp_id, sso_auth_provider = next(iter(idps.items()))
+        if len(idps) > 0:
+            logger.warning(
+                "User %r has previously logged in with multiple SSO IdPs; arbitrarily "
+                "picking %r",
+                user_id_to_verify,
+                idp_id,
+            )
+
+        redirect_url = await sso_auth_provider.handle_redirect_request(
+            request, None, session_id
         )
 
+        return self._sso_auth_confirm_template.render(
+            description=session.description,
+            redirect_url=redirect_url,
+            idp=sso_auth_provider,
+        )
 
-@attr.s
-class MacaroonGenerator(object):
+    async def complete_sso_login(
+        self,
+        registered_user_id: str,
+        auth_provider_id: str,
+        request: Request,
+        client_redirect_url: str,
+        extra_attributes: Optional[JsonDict] = None,
+        new_user: bool = False,
+    ):
+        """Having figured out a mxid for this user, complete the HTTP request
+
+        Args:
+            registered_user_id: The registered user ID to complete SSO login for.
+            auth_provider_id: The id of the SSO Identity provider that was used for
+                login. This will be stored in the login token for future tracking in
+                prometheus metrics.
+            request: The request to complete.
+            client_redirect_url: The URL to which to redirect the user at the end of the
+                process.
+            extra_attributes: Extra attributes which will be passed to the client
+                during successful login. Must be JSON serializable.
+            new_user: True if we should use wording appropriate to a user who has just
+                registered.
+        """
+        # If the account has been deactivated, do not proceed with the login
+        # flow.
+        deactivated = await self.store.get_user_deactivated_status(registered_user_id)
+        if deactivated:
+            respond_with_html(request, 403, self._sso_account_deactivated_template)
+            return
+
+        profile = await self.store.get_profileinfo(
+            UserID.from_string(registered_user_id).localpart
+        )
+
+        self._complete_sso_login(
+            registered_user_id,
+            auth_provider_id,
+            request,
+            client_redirect_url,
+            extra_attributes,
+            new_user=new_user,
+            user_profile_data=profile,
+        )
+
+    def _complete_sso_login(
+        self,
+        registered_user_id: str,
+        auth_provider_id: str,
+        request: Request,
+        client_redirect_url: str,
+        extra_attributes: Optional[JsonDict] = None,
+        new_user: bool = False,
+        user_profile_data: Optional[ProfileInfo] = None,
+    ):
+        """
+        The synchronous portion of complete_sso_login.
+
+        This exists purely for backwards compatibility of synapse.module_api.ModuleApi.
+        """
+
+        if user_profile_data is None:
+            user_profile_data = ProfileInfo(None, None)
+
+        # Store any extra attributes which will be passed in the login response.
+        # Note that this is per-user so it may overwrite a previous value, this
+        # is considered OK since the newest SSO attributes should be most valid.
+        if extra_attributes:
+            self._extra_attributes[registered_user_id] = SsoLoginExtraAttributes(
+                self._clock.time_msec(),
+                extra_attributes,
+            )
+
+        # Create a login token
+        login_token = self.macaroon_gen.generate_short_term_login_token(
+            registered_user_id, auth_provider_id=auth_provider_id
+        )
+
+        # Append the login token to the original redirect URL (i.e. with its query
+        # parameters kept intact) to build the URL to which the template needs to
+        # redirect the users once they have clicked on the confirmation link.
+        redirect_url = self.add_query_param_to_url(
+            client_redirect_url, "loginToken", login_token
+        )
+
+        # if the client is whitelisted, we can redirect straight to it
+        if client_redirect_url.startswith(self._whitelisted_sso_clients):
+            request.redirect(redirect_url)
+            finish_request(request)
+            return
+
+        # Otherwise, serve the redirect confirmation page.
+
+        # Remove the query parameters from the redirect URL to get a shorter version of
+        # it. This is only to display a human-readable URL in the template, but not the
+        # URL we redirect users to.
+        url_parts = urllib.parse.urlsplit(client_redirect_url)
+
+        if url_parts.scheme == "https":
+            # for an https uri, just show the netloc (ie, the hostname. Specifically,
+            # the bit between "//" and "/"; this includes any potential
+            # "username:password@" prefix.)
+            display_url = url_parts.netloc
+        else:
+            # for other uris, strip the query-params (including the login token) and
+            # fragment.
+            display_url = urllib.parse.urlunsplit(
+                (url_parts.scheme, url_parts.netloc, url_parts.path, "", "")
+            )
+
+        html = self._sso_redirect_confirm_template.render(
+            display_url=display_url,
+            redirect_url=redirect_url,
+            server_name=self._server_name,
+            new_user=new_user,
+            user_id=registered_user_id,
+            user_profile=user_profile_data,
+        )
+        respond_with_html(request, 200, html)
+
+    async def _sso_login_callback(self, login_result: JsonDict) -> None:
+        """
+        A login callback which might add additional attributes to the login response.
+
+        Args:
+            login_result: The data to be sent to the client. Includes the user
+                ID and access token.
+        """
+        # Expire attributes before processing. Note that there shouldn't be any
+        # valid logins that still have extra attributes.
+        self._expire_sso_extra_attributes()
+
+        extra_attributes = self._extra_attributes.get(login_result["user_id"])
+        if extra_attributes:
+            login_result.update(extra_attributes.extra_attributes)
+
+    def _expire_sso_extra_attributes(self) -> None:
+        """
+        Iterate through the mapping of user IDs to extra attributes and remove any that are no longer valid.
+        """
+        # TODO This should match the amount of time the macaroon is valid for.
+        LOGIN_TOKEN_EXPIRATION_TIME = 2 * 60 * 1000
+        expire_before = self._clock.time_msec() - LOGIN_TOKEN_EXPIRATION_TIME
+        to_expire = set()
+        for user_id, data in self._extra_attributes.items():
+            if data.creation_time < expire_before:
+                to_expire.add(user_id)
+        for user_id in to_expire:
+            logger.debug("Expiring extra attributes for user %s", user_id)
+            del self._extra_attributes[user_id]
+
+    @staticmethod
+    def add_query_param_to_url(url: str, param_name: str, param: Any):
+        url_parts = list(urllib.parse.urlparse(url))
+        query = urllib.parse.parse_qsl(url_parts[4], keep_blank_values=True)
+        query.append((param_name, param))
+        url_parts[4] = urllib.parse.urlencode(query)
+        return urllib.parse.urlunparse(url_parts)
+
+
+@attr.s(slots=True)
+class MacaroonGenerator:
 
     hs = attr.ib()
 
-    def generate_guest_access_token(self, user_id):
+    def generate_guest_access_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
         # Include a nonce, to make sure that each login gets a different
@@ -1063,29 +1600,55 @@ class MacaroonGenerator(object):
         macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
 
-    def generate_short_term_login_token(self, user_id, duration_in_ms=(2 * 60 * 1000)):
-        """
-
-        Args:
-            user_id (unicode):
-            duration_in_ms (int):
-
-        Returns:
-            unicode
-        """
+    def generate_short_term_login_token(
+        self,
+        user_id: str,
+        auth_provider_id: str,
+        duration_in_ms: int = (2 * 60 * 1000),
+    ) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = login")
         now = self.hs.get_clock().time_msec()
         expiry = now + duration_in_ms
         macaroon.add_first_party_caveat("time < %d" % (expiry,))
+        macaroon.add_first_party_caveat("auth_provider_id = %s" % (auth_provider_id,))
         return macaroon.serialize()
 
-    def generate_delete_pusher_token(self, user_id):
+    def verify_short_term_login_token(self, token: str) -> LoginTokenAttributes:
+        """Verify a short-term-login macaroon
+
+        Checks that the given token is a valid, unexpired short-term-login token
+        minted by this server.
+
+        Args:
+            token: the login token to verify
+
+        Returns:
+            the user_id that this token is valid for
+
+        Raises:
+            MacaroonVerificationFailedException if the verification failed
+        """
+        macaroon = pymacaroons.Macaroon.deserialize(token)
+        user_id = get_value_from_macaroon(macaroon, "user_id")
+        auth_provider_id = get_value_from_macaroon(macaroon, "auth_provider_id")
+
+        v = pymacaroons.Verifier()
+        v.satisfy_exact("gen = 1")
+        v.satisfy_exact("type = login")
+        v.satisfy_general(lambda c: c.startswith("user_id = "))
+        v.satisfy_general(lambda c: c.startswith("auth_provider_id = "))
+        satisfy_expiry(v, self.hs.get_clock().time_msec)
+        v.verify(macaroon, self.hs.config.key.macaroon_secret_key)
+
+        return LoginTokenAttributes(user_id=user_id, auth_provider_id=auth_provider_id)
+
+    def generate_delete_pusher_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = delete_pusher")
         return macaroon.serialize()
 
-    def _generate_base_macaroon(self, user_id):
+    def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
             location=self.hs.config.server_name,
             identifier="key",
@@ -1094,3 +1657,131 @@ class MacaroonGenerator(object):
         macaroon.add_first_party_caveat("gen = 1")
         macaroon.add_first_party_caveat("user_id = %s" % (user_id,))
         return macaroon
+
+
+class PasswordProvider:
+    """Wrapper for a password auth provider module
+
+    This class abstracts out all of the backwards-compatibility hacks for
+    password providers, to provide a consistent interface.
+    """
+
+    @classmethod
+    def load(cls, module, config, module_api: ModuleApi) -> "PasswordProvider":
+        try:
+            pp = module(config=config, account_handler=module_api)
+        except Exception as e:
+            logger.error("Error while initializing %r: %s", module, e)
+            raise
+        return cls(pp, module_api)
+
+    def __init__(self, pp, module_api: ModuleApi):
+        self._pp = pp
+        self._module_api = module_api
+
+        self._supported_login_types = {}
+
+        # grandfather in check_password support
+        if hasattr(self._pp, "check_password"):
+            self._supported_login_types[LoginType.PASSWORD] = ("password",)
+
+        g = getattr(self._pp, "get_supported_login_types", None)
+        if g:
+            self._supported_login_types.update(g())
+
+    def __str__(self):
+        return str(self._pp)
+
+    def get_supported_login_types(self) -> Mapping[str, Iterable[str]]:
+        """Get the login types supported by this password provider
+
+        Returns a map from a login type identifier (such as m.login.password) to an
+        iterable giving the fields which must be provided by the user in the submission
+        to the /login API.
+
+        This wrapper adds m.login.password to the list if the underlying password
+        provider supports the check_password() api.
+        """
+        return self._supported_login_types
+
+    async def check_auth(
+        self, username: str, login_type: str, login_dict: JsonDict
+    ) -> Optional[Tuple[str, Optional[Callable]]]:
+        """Check if the user has presented valid login credentials
+
+        This wrapper also calls check_password() if the underlying password provider
+        supports the check_password() api and the login type is m.login.password.
+
+        Args:
+            username: user id presented by the client. Either an MXID or an unqualified
+                username.
+
+            login_type: the login type being attempted - one of the types returned by
+                get_supported_login_types()
+
+            login_dict: the dictionary of login secrets passed by the client.
+
+        Returns: (user_id, callback) where `user_id` is the fully-qualified mxid of the
+            user, and `callback` is an optional callback which will be called with the
+            result from the /login call (including access_token, device_id, etc.)
+        """
+        # first grandfather in a call to check_password
+        if login_type == LoginType.PASSWORD:
+            g = getattr(self._pp, "check_password", None)
+            if g:
+                qualified_user_id = self._module_api.get_qualified_user_id(username)
+                is_valid = await self._pp.check_password(
+                    qualified_user_id, login_dict["password"]
+                )
+                if is_valid:
+                    return qualified_user_id, None
+
+        g = getattr(self._pp, "check_auth", None)
+        if not g:
+            return None
+        result = await g(username, login_type, login_dict)
+
+        # Check if the return value is a str or a tuple
+        if isinstance(result, str):
+            # If it's a str, set callback function to None
+            return result, None
+
+        return result
+
+    async def check_3pid_auth(
+        self, medium: str, address: str, password: str
+    ) -> Optional[Tuple[str, Optional[Callable]]]:
+        g = getattr(self._pp, "check_3pid_auth", None)
+        if not g:
+            return None
+
+        # This function is able to return a deferred that either
+        # resolves None, meaning authentication failure, or upon
+        # success, to a str (which is the user_id) or a tuple of
+        # (user_id, callback_func), where callback_func should be run
+        # after we've finished everything else
+        result = await g(medium, address, password)
+
+        # Check if the return value is a str or a tuple
+        if isinstance(result, str):
+            # If it's a str, set callback function to None
+            return result, None
+
+        return result
+
+    async def on_logged_out(
+        self, user_id: str, device_id: Optional[str], access_token: str
+    ) -> None:
+        g = getattr(self._pp, "on_logged_out", None)
+        if not g:
+            return
+
+        # This might return an awaitable, if it does block the log out
+        # until it completes.
+        await maybe_awaitable(
+            g(
+                user_id=user_id,
+                device_id=device_id,
+                access_token=access_token,
+            )
+        )

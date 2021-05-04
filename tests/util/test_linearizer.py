@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -14,12 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from six.moves import range
-
 from twisted.internet import defer, reactor
 from twisted.internet.defer import CancelledError
 
-from synapse.util import Clock, logcontext
+from synapse.logging.context import LoggingContext, current_context
+from synapse.util import Clock
 from synapse.util.async_helpers import Linearizer
 
 from tests import unittest
@@ -44,6 +42,38 @@ class LinearizerTestCase(unittest.TestCase):
         with (yield d2):
             pass
 
+    @defer.inlineCallbacks
+    def test_linearizer_is_queued(self):
+        linearizer = Linearizer()
+
+        key = object()
+
+        d1 = linearizer.queue(key)
+        cm1 = yield d1
+
+        # Since d1 gets called immediately, "is_queued" should return false.
+        self.assertFalse(linearizer.is_queued(key))
+
+        d2 = linearizer.queue(key)
+        self.assertFalse(d2.called)
+
+        # Now d2 is queued up behind successful completion of cm1
+        self.assertTrue(linearizer.is_queued(key))
+
+        with cm1:
+            self.assertFalse(d2.called)
+
+            # cm1 still not done, so d2 still queued.
+            self.assertTrue(linearizer.is_queued(key))
+
+        # And now d2 is called and nothing is in the queue again
+        self.assertFalse(linearizer.is_queued(key))
+
+        with (yield d2):
+            self.assertFalse(linearizer.is_queued(key))
+
+        self.assertFalse(linearizer.is_queued(key))
+
     def test_lots_of_queued_things(self):
         # we have one slow thing, and lots of fast things queued up behind it.
         # it should *not* explode the stack.
@@ -51,13 +81,13 @@ class LinearizerTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def func(i, sleep=False):
-            with logcontext.LoggingContext("func(%s)" % i) as lc:
+            with LoggingContext("func(%s)" % i) as lc:
                 with (yield linearizer.queue("")):
-                    self.assertEqual(logcontext.LoggingContext.current_context(), lc)
+                    self.assertEqual(current_context(), lc)
                     if sleep:
                         yield Clock(reactor).sleep(0)
 
-                self.assertEqual(logcontext.LoggingContext.current_context(), lc)
+                self.assertEqual(current_context(), lc)
 
         func(0, sleep=True)
         for i in range(1, 100):

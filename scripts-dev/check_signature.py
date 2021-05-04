@@ -2,9 +2,9 @@ import argparse
 import json
 import logging
 import sys
-import urllib2
 
 import dns.resolver
+import urllib2
 from signedjson.key import decode_verify_key_bytes, write_signing_keys
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64

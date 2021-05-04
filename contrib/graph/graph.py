@@ -1,4 +1,10 @@
-from __future__ import print_function
+import argparse
+import cgi
+import datetime
+import json
+
+import pydot
+import urllib2
 
 # Copyright 2014-2016 OpenMarket Ltd
 #
@@ -15,15 +21,6 @@ from __future__ import print_function
 # limitations under the License.
 
 
-import sqlite3
-import pydot
-import cgi
-import json
-import datetime
-import argparse
-import urllib2
-
-
 def make_name(pdu_id, origin):
     return "%s@%s" % (pdu_id, origin)
 
@@ -33,7 +30,7 @@ def make_graph(pdus, room, filename_prefix):
     node_map = {}
 
     origins = set()
-    colors = set(("red", "green", "blue", "yellow", "purple"))
+    colors = {"red", "green", "blue", "yellow", "purple"}
 
     for pdu in pdus:
         origins.add(pdu.get("origin"))
@@ -49,7 +46,7 @@ def make_graph(pdus, room, filename_prefix):
         try:
             c = colors.pop()
             color_map[o] = c
-        except:
+        except Exception:
             print("Run out of colours!")
             color_map[o] = "black"
 

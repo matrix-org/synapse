@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +31,6 @@ To use, pipe the above into::
     PYTHON_PATH=. ./scripts/move_remote_media_to_new_store.py <source repo> <dest repo>
 """
 
-from __future__ import print_function
-
 import argparse
 import logging
 import os
@@ -53,7 +50,7 @@ def main(src_repo, dest_repo):
         parts = line.split("|")
         if len(parts) != 2:
             print("Unable to parse input line %s" % line, file=sys.stderr)
-            exit(1)
+            sys.exit(1)
 
         move_media(parts[0], parts[1], src_paths, dest_paths)
 
@@ -72,7 +69,7 @@ def move_media(origin_server, file_id, src_paths, dest_paths):
     # check that the original exists
     original_file = src_paths.remote_media_filepath(origin_server, file_id)
     if not os.path.exists(original_file):
-        logger.warn(
+        logger.warning(
             "Original for %s/%s (%s) does not exist",
             origin_server,
             file_id,

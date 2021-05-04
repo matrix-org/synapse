@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +15,13 @@
 
 import logging
 
-from twisted.internet import defer
-
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    InvalidClientCredentialsError,
+    NotFoundError,
+    SynapseError,
+)
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.types import RoomAlias
@@ -36,22 +39,19 @@ class ClientDirectoryServer(RestServlet):
     PATTERNS = client_patterns("/directory/room/(?P<room_alias>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(ClientDirectoryServer, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
+        self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_alias):
+    async def on_GET(self, request, room_alias):
         room_alias = RoomAlias.from_string(room_alias)
 
-        dir_handler = self.handlers.directory_handler
-        res = yield dir_handler.get_association(room_alias)
+        res = await self.directory_handler.get_association(room_alias)
 
-        defer.returnValue((200, res))
+        return 200, res
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, room_alias):
+    async def on_PUT(self, request, room_alias):
         room_alias = RoomAlias.from_string(room_alias)
 
         content = parse_json_object_from_request(request)
@@ -71,91 +71,85 @@ class ClientDirectoryServer(RestServlet):
 
         # TODO(erikj): Check types.
 
-        room = yield self.store.get_room(room_id)
+        room = await self.store.get_room(room_id)
         if room is None:
             raise SynapseError(400, "Room does not exist")
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
 
-        yield self.handlers.directory_handler.create_association(
+        await self.directory_handler.create_association(
             requester, room_alias, room_id, servers
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, room_alias):
-        dir_handler = self.handlers.directory_handler
-
+    async def on_DELETE(self, request, room_alias):
         try:
-            service = yield self.auth.get_appservice_by_req(request)
+            service = self.auth.get_appservice_by_req(request)
             room_alias = RoomAlias.from_string(room_alias)
-            yield dir_handler.delete_appservice_association(service, room_alias)
+            await self.directory_handler.delete_appservice_association(
+                service, room_alias
+            )
             logger.info(
                 "Application service at %s deleted alias %s",
                 service.url,
                 room_alias.to_string(),
             )
-            defer.returnValue((200, {}))
-        except AuthError:
+            return 200, {}
+        except InvalidClientCredentialsError:
             # fallback to default user behaviour if they aren't an AS
             pass
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         user = requester.user
 
         room_alias = RoomAlias.from_string(room_alias)
 
-        yield dir_handler.delete_association(requester, room_alias)
+        await self.directory_handler.delete_association(requester, room_alias)
 
         logger.info(
             "User %s deleted alias %s", user.to_string(), room_alias.to_string()
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class ClientDirectoryListServer(RestServlet):
     PATTERNS = client_patterns("/directory/list/room/(?P<room_id>[^/]*)$", v1=True)
 
     def __init__(self, hs):
-        super(ClientDirectoryListServer, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
+        self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
-        room = yield self.store.get_room(room_id)
+    async def on_GET(self, request, room_id):
+        room = await self.store.get_room(room_id)
         if room is None:
             raise NotFoundError("Unknown room")
 
-        defer.returnValue(
-            (200, {"visibility": "public" if room["is_public"] else "private"})
-        )
+        return 200, {"visibility": "public" if room["is_public"] else "private"}
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
 
-        yield self.handlers.directory_handler.edit_published_room_list(
+        await self.directory_handler.edit_published_room_list(
             requester, room_id, visibility
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_DELETE(self, request, room_id):
+        requester = await self.auth.get_user_by_req(request)
 
-        yield self.handlers.directory_handler.edit_published_room_list(
+        await self.directory_handler.edit_published_room_list(
             requester, room_id, "private"
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class ClientAppserviceDirectoryListServer(RestServlet):
@@ -164,9 +158,9 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     )
 
     def __init__(self, hs):
-        super(ClientAppserviceDirectoryListServer, self).__init__()
+        super().__init__()
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
+        self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
     def on_PUT(self, request, network_id, room_id):
@@ -177,16 +171,15 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     def on_DELETE(self, request, network_id, room_id):
         return self._edit(request, network_id, room_id, "private")
 
-    @defer.inlineCallbacks
-    def _edit(self, request, network_id, room_id, visibility):
-        requester = yield self.auth.get_user_by_req(request)
+    async def _edit(self, request, network_id, room_id, visibility):
+        requester = await self.auth.get_user_by_req(request)
         if not requester.app_service:
             raise AuthError(
                 403, "Only appservices can edit the appservice published room list"
             )
 
-        yield self.handlers.directory_handler.edit_published_appservice_room_list(
+        await self.directory_handler.edit_published_appservice_room_list(
             requester.app_service.id, network_id, room_id, visibility
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}

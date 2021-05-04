@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,88 +17,116 @@ import email.utils
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
-from twisted.internet import defer
-
-from synapse.api.errors import StoreError
+from synapse.api.errors import StoreError, SynapseError
+from synapse.logging.context import make_deferred_yieldable
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.types import UserID
 from synapse.util import stringutils
-from synapse.util.logcontext import make_deferred_yieldable
 
-try:
-    from synapse.push.mailer import load_jinja2_templates
-except ImportError:
-    load_jinja2_templates = None
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class AccountValidityHandler(object):
-    def __init__(self, hs):
+class AccountValidityHandler:
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
+        self.config = hs.config
         self.store = self.hs.get_datastore()
         self.sendmail = self.hs.get_sendmail()
         self.clock = self.hs.get_clock()
 
-        self._account_validity = self.hs.config.account_validity
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
+        self._account_validity_renew_by_email_enabled = (
+            hs.config.account_validity.account_validity_renew_by_email_enabled
+        )
 
-        if self._account_validity.renew_by_email_enabled and load_jinja2_templates:
+        self._account_validity_period = None
+        if self._account_validity_enabled:
+            self._account_validity_period = (
+                hs.config.account_validity.account_validity_period
+            )
+
+        if (
+            self._account_validity_enabled
+            and self._account_validity_renew_by_email_enabled
+        ):
             # Don't do email-specific configuration if renewal by email is disabled.
+            self._template_html = (
+                hs.config.account_validity.account_validity_template_html
+            )
+            self._template_text = (
+                hs.config.account_validity.account_validity_template_text
+            )
+            account_validity_renew_email_subject = (
+                hs.config.account_validity.account_validity_renew_email_subject
+            )
+
             try:
-                app_name = self.hs.config.email_app_name
+                app_name = hs.config.email_app_name
 
-                self._subject = self._account_validity.renew_email_subject % {
-                    "app": app_name
-                }
+                self._subject = account_validity_renew_email_subject % {"app": app_name}
 
-                self._from_string = self.hs.config.email_notif_from % {"app": app_name}
+                self._from_string = hs.config.email_notif_from % {"app": app_name}
             except Exception:
                 # If substitution failed, fall back to the bare strings.
-                self._subject = self._account_validity.renew_email_subject
-                self._from_string = self.hs.config.email_notif_from
+                self._subject = account_validity_renew_email_subject
+                self._from_string = hs.config.email_notif_from
 
             self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
-            self._template_html, self._template_text = load_jinja2_templates(
-                config=self.hs.config,
-                template_html_name=self.hs.config.email_expiry_template_html,
-                template_text_name=self.hs.config.email_expiry_template_text,
-            )
-
             # Check the renewal emails to send and send them every 30min.
-            self.clock.looping_call(self.send_renewal_emails, 30 * 60 * 1000)
+            if hs.config.run_background_tasks:
+                self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
-    @defer.inlineCallbacks
-    def send_renewal_emails(self):
+    @wrap_as_background_process("send_renewals")
+    async def _send_renewal_emails(self) -> None:
         """Gets the list of users whose account is expiring in the amount of time
         configured in the ``renew_at`` parameter from the ``account_validity``
         configuration, and sends renewal emails to all of these users as long as they
         have an email 3PID attached to their account.
         """
-        expiring_users = yield self.store.get_users_expiring_soon()
+        expiring_users = await self.store.get_users_expiring_soon()
 
         if expiring_users:
             for user in expiring_users:
-                yield self._send_renewal_email(
+                await self._send_renewal_email(
                     user_id=user["user_id"], expiration_ts=user["expiration_ts_ms"]
                 )
 
-    @defer.inlineCallbacks
-    def send_renewal_email_to_user(self, user_id):
-        expiration_ts = yield self.store.get_expiration_ts_for_user(user_id)
-        yield self._send_renewal_email(user_id, expiration_ts)
+    async def send_renewal_email_to_user(self, user_id: str) -> None:
+        """
+        Send a renewal email for a specific user.
 
-    @defer.inlineCallbacks
-    def _send_renewal_email(self, user_id, expiration_ts):
+        Args:
+            user_id: The user ID to send a renewal email for.
+
+        Raises:
+            SynapseError if the user is not set to renew.
+        """
+        expiration_ts = await self.store.get_expiration_ts_for_user(user_id)
+
+        # If this user isn't set to be expired, raise an error.
+        if expiration_ts is None:
+            raise SynapseError(400, "User has no expiration time: %s" % (user_id,))
+
+        await self._send_renewal_email(user_id, expiration_ts)
+
+    async def _send_renewal_email(self, user_id: str, expiration_ts: int) -> None:
         """Sends out a renewal email to every email address attached to the given user
         with a unique link allowing them to renew their account.
 
         Args:
-            user_id (str): ID of the user to send email(s) to.
-            expiration_ts (int): Timestamp in milliseconds for the expiration date of
+            user_id: ID of the user to send email(s) to.
+            expiration_ts: Timestamp in milliseconds for the expiration date of
                 this user's account (used in the email templates).
         """
-        addresses = yield self._get_email_addresses_for_user(user_id)
+        addresses = await self._get_email_addresses_for_user(user_id)
 
         # Stop right here if the user doesn't have at least one email address.
         # In this case, they will have to ask their server admin to renew their
@@ -111,7 +138,7 @@ class AccountValidityHandler(object):
             return
 
         try:
-            user_display_name = yield self.store.get_profile_displayname(
+            user_display_name = await self.store.get_profile_displayname(
                 UserID.from_string(user_id).localpart
             )
             if user_display_name is None:
@@ -119,7 +146,7 @@ class AccountValidityHandler(object):
         except StoreError:
             user_display_name = user_id
 
-        renewal_token = yield self._get_renewal_token(user_id)
+        renewal_token = await self._get_renewal_token(user_id)
         url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
             self.hs.config.public_baseurl,
             renewal_token,
@@ -151,7 +178,7 @@ class AccountValidityHandler(object):
 
             logger.info("Sending renewal email to %s", address)
 
-            yield make_deferred_yieldable(
+            await make_deferred_yieldable(
                 self.sendmail(
                     self.hs.config.email_smtp_host,
                     self._raw_from,
@@ -166,37 +193,35 @@ class AccountValidityHandler(object):
                 )
             )
 
-        yield self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
+        await self.store.set_renewal_mail_status(user_id=user_id, email_sent=True)
 
-    @defer.inlineCallbacks
-    def _get_email_addresses_for_user(self, user_id):
+    async def _get_email_addresses_for_user(self, user_id: str) -> List[str]:
         """Retrieve the list of email addresses attached to a user's account.
 
         Args:
-            user_id (str): ID of the user to lookup email addresses for.
+            user_id: ID of the user to lookup email addresses for.
 
         Returns:
-            defer.Deferred[list[str]]: Email addresses for this account.
+            Email addresses for this account.
         """
-        threepids = yield self.store.user_get_threepids(user_id)
+        threepids = await self.store.user_get_threepids(user_id)
 
         addresses = []
         for threepid in threepids:
             if threepid["medium"] == "email":
                 addresses.append(threepid["address"])
 
-        defer.returnValue(addresses)
+        return addresses
 
-    @defer.inlineCallbacks
-    def _get_renewal_token(self, user_id):
+    async def _get_renewal_token(self, user_id: str) -> str:
         """Generates a 32-byte long random string that will be inserted into the
         user's renewal email's unique link, then saves it into the database.
 
         Args:
-            user_id (str): ID of the user to generate a string for.
+            user_id: ID of the user to generate a string for.
 
         Returns:
-            defer.Deferred[str]: The generated string.
+            The generated string.
 
         Raises:
             StoreError(500): Couldn't generate a unique string after 5 attempts.
@@ -205,45 +230,93 @@ class AccountValidityHandler(object):
         while attempts < 5:
             try:
                 renewal_token = stringutils.random_string(32)
-                yield self.store.set_renewal_token_for_user(user_id, renewal_token)
-                defer.returnValue(renewal_token)
+                await self.store.set_renewal_token_for_user(user_id, renewal_token)
+                return renewal_token
             except StoreError:
                 attempts += 1
         raise StoreError(500, "Couldn't generate a unique string as refresh string.")
 
-    @defer.inlineCallbacks
-    def renew_account(self, renewal_token):
+    async def renew_account(self, renewal_token: str) -> Tuple[bool, bool, int]:
         """Renews the account attached to a given renewal token by pushing back the
         expiration date by the current validity period in the server's configuration.
 
-        Args:
-            renewal_token (str): Token sent with the renewal request.
-        """
-        user_id = yield self.store.get_user_from_renewal_token(renewal_token)
-        logger.debug("Renewing an account for user %s", user_id)
-        yield self.renew_account_for_user(user_id)
+        If it turns out that the token is valid but has already been used, then the
+        token is considered stale. A token is stale if the 'token_used_ts_ms' db column
+        is non-null.
 
-    @defer.inlineCallbacks
-    def renew_account_for_user(self, user_id, expiration_ts=None, email_sent=False):
+        Args:
+            renewal_token: Token sent with the renewal request.
+        Returns:
+            A tuple containing:
+              * A bool representing whether the token is valid and unused.
+              * A bool which is `True` if the token is valid, but stale.
+              * An int representing the user's expiry timestamp as milliseconds since the
+                epoch, or 0 if the token was invalid.
+        """
+        try:
+            (
+                user_id,
+                current_expiration_ts,
+                token_used_ts,
+            ) = await self.store.get_user_from_renewal_token(renewal_token)
+        except StoreError:
+            return False, False, 0
+
+        # Check whether this token has already been used.
+        if token_used_ts:
+            logger.info(
+                "User '%s' attempted to use previously used token '%s' to renew account",
+                user_id,
+                renewal_token,
+            )
+            return False, True, current_expiration_ts
+
+        logger.debug("Renewing an account for user %s", user_id)
+
+        # Renew the account. Pass the renewal_token here so that it is not cleared.
+        # We want to keep the token around in case the user attempts to renew their
+        # account with the same token twice (clicking the email link twice).
+        #
+        # In that case, the token will be accepted, but the account's expiration ts
+        # will remain unchanged.
+        new_expiration_ts = await self.renew_account_for_user(
+            user_id, renewal_token=renewal_token
+        )
+
+        return True, False, new_expiration_ts
+
+    async def renew_account_for_user(
+        self,
+        user_id: str,
+        expiration_ts: Optional[int] = None,
+        email_sent: bool = False,
+        renewal_token: Optional[str] = None,
+    ) -> int:
         """Renews the account attached to a given user by pushing back the
         expiration date by the current validity period in the server's
         configuration.
 
         Args:
-            renewal_token (str): Token sent with the renewal request.
-            expiration_ts (int): New expiration date. Defaults to now + validity period.
-            email_sent (bool): Whether an email has been sent for this validity period.
-                Defaults to False.
+            user_id: The ID of the user to renew.
+            expiration_ts: New expiration date. Defaults to now + validity period.
+            email_sent: Whether an email has been sent for this validity period.
+            renewal_token: Token sent with the renewal request. The user's token
+                will be cleared if this is None.
 
         Returns:
-            defer.Deferred[int]: New expiration date for this account, as a timestamp
-                in milliseconds since epoch.
+            New expiration date for this account, as a timestamp in
+            milliseconds since epoch.
         """
+        now = self.clock.time_msec()
         if expiration_ts is None:
-            expiration_ts = self.clock.time_msec() + self._account_validity.period
+            expiration_ts = now + self._account_validity_period
 
-        yield self.store.set_account_validity_for_user(
-            user_id=user_id, expiration_ts=expiration_ts, email_sent=email_sent
+        await self.store.set_account_validity_for_user(
+            user_id=user_id,
+            expiration_ts=expiration_ts,
+            email_sent=email_sent,
+            renewal_token=renewal_token,
+            token_used_ts=now,
         )
 
-        defer.returnValue(expiration_ts)
+        return expiration_ts

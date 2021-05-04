@@ -13,12 +13,13 @@
 # limitations under the License.
 
 
-import sqlite3
-import pydot
-import cgi
-import json
-import datetime
 import argparse
+import cgi
+import datetime
+import json
+import sqlite3
+
+import pydot
 
 from synapse.events import FrozenEvent
 from synapse.util.frozenutils import unfreeze
@@ -36,7 +37,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
     args = [room_id]
 
     if limit:
-        sql += " ORDER BY topological_ordering DESC, stream_ordering DESC " "LIMIT ?"
+        sql += " ORDER BY topological_ordering DESC, stream_ordering DESC LIMIT ?"
 
         args.append(limit)
 
@@ -53,7 +54,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
 
     for event in events:
         c = conn.execute(
-            "SELECT state_group FROM event_to_state_groups " "WHERE event_id = ?",
+            "SELECT state_group FROM event_to_state_groups WHERE event_id = ?",
             (event.event_id,),
         )
 
@@ -98,7 +99,7 @@ def make_graph(db_name, room_id, file_prefix, limit):
         for prev_id, _ in event.prev_events:
             try:
                 end_node = node_map[prev_id]
-            except:
+            except Exception:
                 end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
 
                 node_map[prev_id] = end_node

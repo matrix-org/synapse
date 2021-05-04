@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,33 +14,29 @@
 
 import logging
 import random
+from typing import TYPE_CHECKING, Iterable, List, Optional
 
-from twisted.internet import defer
-
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import AuthError, SynapseError
 from synapse.events import EventBase
-from synapse.types import UserID
-from synapse.util.logutils import log_function
+from synapse.handlers.presence import format_user_presence_state
+from synapse.logging.utils import log_function
+from synapse.streams.config import PaginationConfig
+from synapse.types import JsonDict, UserID
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 logger = logging.getLogger(__name__)
 
 
 class EventStreamHandler(BaseHandler):
-    def __init__(self, hs):
-        super(EventStreamHandler, self).__init__(hs)
-
-        # Count of active streams per user
-        self._streams_per_user = {}
-        # Grace timers per user to delay the "stopped" signal
-        self._stop_timer_per_user = {}
-
-        self.distributor = hs.get_distributor()
-        self.distributor.declare("started_user_eventstream")
-        self.distributor.declare("stopped_user_eventstream")
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
 
         self.clock = hs.get_clock()
 
@@ -50,36 +45,31 @@ class EventStreamHandler(BaseHandler):
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
 
-    @defer.inlineCallbacks
     @log_function
-    def get_stream(
+    async def get_stream(
         self,
-        auth_user_id,
-        pagin_config,
-        timeout=0,
-        as_client_event=True,
-        affect_presence=True,
-        only_keys=None,
-        room_id=None,
-        is_guest=False,
-    ):
-        """Fetches the events stream for a given user.
-
-        If `only_keys` is not None, events from keys will be sent down.
-        """
+        auth_user_id: str,
+        pagin_config: PaginationConfig,
+        timeout: int = 0,
+        as_client_event: bool = True,
+        affect_presence: bool = True,
+        room_id: Optional[str] = None,
+        is_guest: bool = False,
+    ) -> JsonDict:
+        """Fetches the events stream for a given user."""
 
         if room_id:
-            blocked = yield self.store.is_room_blocked(room_id)
+            blocked = await self.store.is_room_blocked(room_id)
             if blocked:
                 raise SynapseError(403, "This room has been blocked on this server")
 
         # send any outstanding server notices to the user.
-        yield self._server_notices_sender.on_user_syncing(auth_user_id)
+        await self._server_notices_sender.on_user_syncing(auth_user_id)
 
         auth_user = UserID.from_string(auth_user_id)
         presence_handler = self.hs.get_presence_handler()
 
-        context = yield presence_handler.user_syncing(
+        context = await presence_handler.user_syncing(
             auth_user_id, affect_presence=affect_presence
         )
         with context:
@@ -91,18 +81,19 @@ class EventStreamHandler(BaseHandler):
                 # thundering herds on restart.
                 timeout = random.randint(int(timeout * 0.9), int(timeout * 1.1))
 
-            events, tokens = yield self.notifier.get_events_for(
+            events, tokens = await self.notifier.get_events_for(
                 auth_user,
                 pagin_config,
                 timeout,
-                only_keys=only_keys,
                 is_guest=is_guest,
                 explicit_room_id=room_id,
             )
 
+            time_now = self.clock.time_msec()
+
             # When the user joins a new room, or another user joins a currently
             # joined room, we need to send down presence for those users.
-            to_add = []
+            to_add = []  # type: List[JsonDict]
             for event in events:
                 if not isinstance(event, EventBase):
                     continue
@@ -112,23 +103,24 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = yield self.state.get_current_users_in_room(
+                        users = await self.state.get_current_users_in_room(
                             event.room_id
-                        )
-                        states = yield presence_handler.get_states(users, as_event=True)
-                        to_add.extend(states)
+                        )  # type: Iterable[str]
                     else:
+                        users = [event.state_key]
 
-                        ev = yield presence_handler.get_state(
-                            UserID.from_string(event.state_key), as_event=True
-                        )
-                        to_add.append(ev)
+                    states = await presence_handler.get_states(users)
+                    to_add.extend(
+                        {
+                            "type": EduTypes.Presence,
+                            "content": format_user_presence_state(state, time_now),
+                        }
+                        for state in states
+                    )
 
             events.extend(to_add)
 
-            time_now = self.clock.time_msec()
-
-            chunks = yield self._event_serializer.serialize_events(
+            chunks = await self._event_serializer.serialize_events(
                 events,
                 time_now,
                 as_client_event=as_client_event,
@@ -139,44 +131,48 @@ class EventStreamHandler(BaseHandler):
 
             chunk = {
                 "chunk": chunks,
-                "start": tokens[0].to_string(),
-                "end": tokens[1].to_string(),
+                "start": await tokens[0].to_string(self.store),
+                "end": await tokens[1].to_string(self.store),
             }
 
-            defer.returnValue(chunk)
+            return chunk
 
 
 class EventHandler(BaseHandler):
-    @defer.inlineCallbacks
-    def get_event(self, user, room_id, event_id):
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.storage = hs.get_storage()
+
+    async def get_event(
+        self, user: UserID, room_id: Optional[str], event_id: str
+    ) -> Optional[EventBase]:
         """Retrieve a single specified event.
 
         Args:
-            user (synapse.types.UserID): The user requesting the event
-            room_id (str|None): The expected room id. We'll return None if the
+            user: The user requesting the event
+            room_id: The expected room id. We'll return None if the
                 event's room does not match.
-            event_id (str): The event ID to obtain.
+            event_id: The event ID to obtain.
         Returns:
-            dict: An event, or None if there is no event matching this ID.
+            An event, or None if there is no event matching this ID.
         Raises:
             SynapseError if there was a problem retrieving this event, or
             AuthError if the user does not have the rights to inspect this
             event.
         """
-        event = yield self.store.get_event(event_id, check_room_id=room_id)
+        event = await self.store.get_event(event_id, check_room_id=room_id)
 
         if not event:
-            defer.returnValue(None)
-            return
+            return None
 
-        users = yield self.store.get_users_in_room(event.room_id)
+        users = await self.store.get_users_in_room(event.room_id)
         is_peeking = user.to_string() not in users
 
-        filtered = yield filter_events_for_client(
-            self.store, user.to_string(), [event], is_peeking=is_peeking
+        filtered = await filter_events_for_client(
+            self.storage, user.to_string(), [event], is_peeking=is_peeking
         )
 
         if not filtered:
             raise AuthError(403, "You don't have permission to access that event.")
 
-        defer.returnValue(event)
+        return event

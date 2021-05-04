@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +14,8 @@
 
 
 import threading
-
-from mock import NonCallableMock
-from six import StringIO
+from io import StringIO
+from unittest.mock import NonCallableMock
 
 from twisted.internet import defer, reactor
 
@@ -112,7 +110,7 @@ class FileConsumerTests(unittest.TestCase):
         self.assertTrue(string_file.closed)
 
 
-class DummyPullProducer(object):
+class DummyPullProducer:
     def __init__(self):
         self.consumer = None
         self.deferred = defer.Deferred()
@@ -134,7 +132,7 @@ class DummyPullProducer(object):
         return d
 
 
-class BlockingStringWrite(object):
+class BlockingStringWrite:
     def __init__(self):
         self.buffer = ""
         self.closed = False

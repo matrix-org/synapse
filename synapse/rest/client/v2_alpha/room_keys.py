@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,6 @@
 # limitations under the License.
 
 import logging
-
-from twisted.internet import defer
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import (
@@ -39,12 +36,11 @@ class RoomKeysServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, room_id, session_id):
+    async def on_PUT(self, request, room_id, session_id):
         """
         Uploads one or more encrypted E2E room keys for backup purposes.
         room_id: the ID of the room the keys are for (optional)
@@ -123,7 +119,7 @@ class RoomKeysServlet(RestServlet):
             }
         }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         body = parse_json_object_from_request(request)
         version = parse_string(request, "version")
@@ -134,11 +130,10 @@ class RoomKeysServlet(RestServlet):
         if room_id:
             body = {"rooms": {room_id: body}}
 
-        yield self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
-        defer.returnValue((200, {}))
+        ret = await self.e2e_room_keys_handler.upload_room_keys(user_id, version, body)
+        return 200, ret
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id, session_id):
+    async def on_GET(self, request, room_id, session_id):
         """
         Retrieves one or more encrypted E2E room keys for backup purposes.
         Symmetric with the PUT version of the API.
@@ -190,11 +185,11 @@ class RoomKeysServlet(RestServlet):
             }
         }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
-        version = parse_string(request, "version")
+        version = parse_string(request, "version", required=True)
 
-        room_keys = yield self.e2e_room_keys_handler.get_room_keys(
+        room_keys = await self.e2e_room_keys_handler.get_room_keys(
             user_id, version, room_id, session_id
         )
 
@@ -218,10 +213,9 @@ class RoomKeysServlet(RestServlet):
             else:
                 room_keys = room_keys["rooms"][room_id]
 
-        defer.returnValue((200, room_keys))
+        return 200, room_keys
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, room_id, session_id):
+    async def on_DELETE(self, request, room_id, session_id):
         """
         Deletes one or more encrypted E2E room keys for a user for backup purposes.
 
@@ -235,14 +229,14 @@ class RoomKeysServlet(RestServlet):
         the version must already have been created via the /change_secret API.
         """
 
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         version = parse_string(request, "version")
 
-        yield self.e2e_room_keys_handler.delete_room_keys(
+        ret = await self.e2e_room_keys_handler.delete_room_keys(
             user_id, version, room_id, session_id
         )
-        defer.returnValue((200, {}))
+        return 200, ret
 
 
 class RoomKeysNewVersionServlet(RestServlet):
@@ -253,12 +247,11 @@ class RoomKeysNewVersionServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysNewVersionServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         """
         Create a new backup version for this user's room_keys with the given
         info.  The version is allocated by the server and returned to the user
@@ -288,12 +281,12 @@ class RoomKeysNewVersionServlet(RestServlet):
             "version": 12345
         }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
 
-        new_version = yield self.e2e_room_keys_handler.create_version(user_id, info)
-        defer.returnValue((200, {"version": new_version}))
+        new_version = await self.e2e_room_keys_handler.create_version(user_id, info)
+        return 200, {"version": new_version}
 
     # we deliberately don't have a PUT /version, as these things really should
     # be immutable to avoid people footgunning
@@ -307,12 +300,11 @@ class RoomKeysVersionServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(RoomKeysVersionServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.e2e_room_keys_handler = hs.get_e2e_room_keys_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, version):
+    async def on_GET(self, request, version):
         """
         Retrieve the version information about a given version of the user's
         room_keys backup.  If the version part is missing, returns info about the
@@ -330,18 +322,17 @@ class RoomKeysVersionServlet(RestServlet):
             "auth_data": "dGhpcyBzaG91bGQgYWN0dWFsbHkgYmUgZW5jcnlwdGVkIGpzb24K"
         }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
         try:
-            info = yield self.e2e_room_keys_handler.get_version_info(user_id, version)
+            info = await self.e2e_room_keys_handler.get_version_info(user_id, version)
         except SynapseError as e:
             if e.code == 404:
                 raise SynapseError(404, "No backup found", Codes.NOT_FOUND)
-        defer.returnValue((200, info))
+        return 200, info
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, version):
+    async def on_DELETE(self, request, version):
         """
         Delete the information about a given version of the user's
         room_keys backup.  If the version part is missing, deletes the most
@@ -354,14 +345,13 @@ class RoomKeysVersionServlet(RestServlet):
         if version is None:
             raise SynapseError(400, "No version specified to delete", Codes.NOT_FOUND)
 
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
-        yield self.e2e_room_keys_handler.delete_version(user_id, version)
-        defer.returnValue((200, {}))
+        await self.e2e_room_keys_handler.delete_version(user_id, version)
+        return 200, {}
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, version):
+    async def on_PUT(self, request, version):
         """
         Update the information about a given version of the user's room_keys backup.
 
@@ -375,14 +365,14 @@ class RoomKeysVersionServlet(RestServlet):
                     "ed25519:something": "hijklmnop"
                 }
             },
-            "version": "42"
+            "version": "12345"
         }
 
         HTTP/1.1 200 OK
         Content-Type: application/json
         {}
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
         info = parse_json_object_from_request(request)
 
@@ -391,8 +381,8 @@ class RoomKeysVersionServlet(RestServlet):
                 400, "No version specified to update", Codes.MISSING_PARAM
             )
 
-        yield self.e2e_room_keys_handler.update_version(user_id, version, info)
-        defer.returnValue((200, {}))
+        await self.e2e_room_keys_handler.update_version(user_id, version, info)
+        return 200, {}
 
 
 def register_servlets(hs, http_server):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
+from unittest.mock import Mock
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed
@@ -35,9 +36,9 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         self.hs = yield setup_test_homeserver(self.addCleanup)
         self.event_creation_handler = self.hs.get_event_creation_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
-        self.store = self.hs.get_datastore()
+        self.storage = self.hs.get_storage()
 
-        yield create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM")
+        yield defer.ensureDeferred(create_room(self.hs, TEST_ROOM_ID, "@someone:ROOM"))
 
     @defer.inlineCallbacks
     def test_filtering(self):
@@ -50,7 +51,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         #
 
         # before we do that, we persist some other events to act as state.
-        self.inject_visibility("@admin:hs", "joined")
+        yield self.inject_visibility("@admin:hs", "joined")
         for i in range(0, 10):
             yield self.inject_room_member("@resident%i:hs" % i)
 
@@ -61,8 +62,8 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             evt = yield self.inject_room_member(user, extra_content={"a": "b"})
             events_to_filter.append(evt)
 
-        filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter
+        filtered = yield defer.ensureDeferred(
+            filter_events_for_server(self.storage, "test_server", events_to_filter)
         )
 
         # the result should be 5 redacted events, and 5 unredacted events.
@@ -74,7 +75,6 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             self.assertEqual(events_to_filter[i].event_id, filtered[i].event_id)
             self.assertEqual(filtered[i].content["a"], "b")
 
-    @tests.unittest.DEBUG
     @defer.inlineCallbacks
     def test_erased_user(self):
         # 4 message events, from erased and unerased users, with a membership
@@ -97,11 +97,13 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         events_to_filter.append(evt)
 
         # the erasey user gets erased
-        yield self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+        yield defer.ensureDeferred(
+            self.hs.get_datastore().mark_user_erased("@erased:local_hs")
+        )
 
         # ... and the filtering happens.
-        filtered = yield filter_events_for_server(
-            self.store, "test_server", events_to_filter
+        filtered = yield defer.ensureDeferred(
+            filter_events_for_server(self.storage, "test_server", events_to_filter)
         )
 
         for i in range(0, len(events_to_filter)):
@@ -135,16 +137,20 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
-        yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
+        return event
 
     @defer.inlineCallbacks
-    def inject_room_member(self, user_id, membership="join", extra_content={}):
+    def inject_room_member(
+        self, user_id, membership="join", extra_content: Optional[dict] = None
+    ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {
@@ -156,12 +162,14 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
+        return event
 
     @defer.inlineCallbacks
     def inject_message(self, user_id, content=None):
@@ -177,12 +185,14 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
             },
         )
 
-        event, context = yield self.event_creation_handler.create_new_client_event(
-            builder
+        event, context = yield defer.ensureDeferred(
+            self.event_creation_handler.create_new_client_event(builder)
         )
 
-        yield self.hs.get_datastore().persist_event(event, context)
-        defer.returnValue(event)
+        yield defer.ensureDeferred(
+            self.storage.persistence.persist_event(event, context)
+        )
+        return event
 
     @defer.inlineCallbacks
     def test_large_room(self):
@@ -258,8 +268,13 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
 
         logger.info("Starting filtering")
         start = time.time()
-        filtered = yield filter_events_for_server(
-            test_store, "test_server", events_to_filter
+
+        storage = Mock()
+        storage.main = test_store
+        storage.state = test_store
+
+        filtered = yield defer.ensureDeferred(
+            filter_events_for_server(test_store, "test_server", events_to_filter)
         )
         logger.info("Filtering took %f seconds", time.time() - start)
 
@@ -280,7 +295,7 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
     test_large_room.skip = "Disabled by default because it's slow"
 
 
-class _TestStore(object):
+class _TestStore:
     """Implements a few methods of the DataStore, so that we can test
     filter_events_for_server
 

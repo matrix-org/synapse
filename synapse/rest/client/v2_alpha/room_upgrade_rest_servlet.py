@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,15 +14,14 @@
 
 import logging
 
-from twisted.internet import defer
-
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import Codes, ShadowBanError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
 )
+from synapse.util import stringutils
 
 from ._base import client_patterns
 
@@ -31,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class RoomUpgradeRestServlet(RestServlet):
-    """Handler for room uprade requests.
+    """Handler for room upgrade requests.
 
     Handles requests of the form:
 
@@ -54,33 +52,36 @@ class RoomUpgradeRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomUpgradeRestServlet, self).__init__()
+        super().__init__()
         self._hs = hs
         self._room_creation_handler = hs.get_room_creation_handler()
         self._auth = hs.get_auth()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, room_id):
-        requester = yield self._auth.get_user_by_req(request)
+    async def on_POST(self, request, room_id):
+        requester = await self._auth.get_user_by_req(request)
 
         content = parse_json_object_from_request(request)
         assert_params_in_dict(content, ("new_version",))
-        new_version = content["new_version"]
 
-        if new_version not in KNOWN_ROOM_VERSIONS:
+        new_version = KNOWN_ROOM_VERSIONS.get(content["new_version"])
+        if new_version is None:
             raise SynapseError(
                 400,
                 "Your homeserver does not support this room version",
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
-        new_room_id = yield self._room_creation_handler.upgrade_room(
-            requester, room_id, new_version
-        )
+        try:
+            new_room_id = await self._room_creation_handler.upgrade_room(
+                requester, room_id, new_version
+            )
+        except ShadowBanError:
+            # Generate a random room ID.
+            new_room_id = stringutils.random_string(18)
 
         ret = {"replacement_room": new_room_id}
 
-        defer.returnValue((200, ret))
+        return 200, ret
 
 
 def register_servlets(hs, http_server):

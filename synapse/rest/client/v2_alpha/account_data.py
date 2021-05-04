@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,6 @@
 # limitations under the License.
 
 import logging
-
-from twisted.internet import defer
 
 from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -36,41 +33,35 @@ class AccountDataServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(AccountDataServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.notifier = hs.get_notifier()
+        self.handler = hs.get_account_data_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         body = parse_json_object_from_request(request)
 
-        max_id = yield self.store.add_account_data_for_user(
-            user_id, account_data_type, body
-        )
+        await self.handler.add_account_data_for_user(user_id, account_data_type, body)
 
-        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
+        return 200, {}
 
-        defer.returnValue((200, {}))
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = yield self.store.get_global_account_data_by_type_for_user(
+        event = await self.store.get_global_account_data_by_type_for_user(
             account_data_type, user_id
         )
 
         if event is None:
             raise NotFoundError("Account data not found")
 
-        defer.returnValue((200, event))
+        return 200, event
 
 
 class RoomAccountDataServlet(RestServlet):
@@ -86,14 +77,13 @@ class RoomAccountDataServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(RoomAccountDataServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
-        self.notifier = hs.get_notifier()
+        self.handler = hs.get_account_data_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_PUT(self, request, user_id, room_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
@@ -106,28 +96,25 @@ class RoomAccountDataServlet(RestServlet):
                 " Use /rooms/!roomId:server.name/read_markers",
             )
 
-        max_id = yield self.store.add_account_data_to_room(
+        await self.handler.add_account_data_to_room(
             user_id, room_id, account_data_type, body
         )
 
-        self.notifier.on_new_event("account_data_key", max_id, users=[user_id])
+        return 200, {}
 
-        defer.returnValue((200, {}))
-
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id, room_id, account_data_type):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, user_id, room_id, account_data_type):
+        requester = await self.auth.get_user_by_req(request)
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
-        event = yield self.store.get_account_data_for_room_and_type(
+        event = await self.store.get_account_data_for_room_and_type(
             user_id, room_id, account_data_type
         )
 
         if event is None:
             raise NotFoundError("Room account data not found")
 
-        defer.returnValue((200, event))
+        return 200, event
 
 
 def register_servlets(hs, http_server):

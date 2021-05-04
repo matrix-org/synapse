@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,16 +13,21 @@
 # limitations under the License.
 
 import itertools
-
-from six.moves import zip
+from typing import List
 
 import attr
+
+from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.event_auth import auth_types_for_event
-from synapse.events import FrozenEvent
-from synapse.state.v2 import lexicographical_topological_sort, resolve_events_with_store
+from synapse.events import make_event_from_dict
+from synapse.state.v2 import (
+    _get_auth_chain_difference,
+    lexicographical_topological_sort,
+    resolve_events_with_store,
+)
 from synapse.types import EventID
 
 from tests import unittest
@@ -43,7 +47,12 @@ MEMBERSHIP_CONTENT_BAN = {"membership": Membership.BAN}
 ORIGIN_SERVER_TS = 0
 
 
-class FakeEvent(object):
+class FakeClock:
+    def sleep(self, msec):
+        return defer.succeed(None)
+
+
+class FakeEvent:
     """A fake event we use as a convenience.
 
     NOTE: Again as a convenience we use "node_ids" rather than event_ids to
@@ -58,6 +67,7 @@ class FakeEvent(object):
         self.type = type
         self.state_key = state_key
         self.content = content
+        self.room_id = ROOM_ID
 
     def to_event(self, auth_events, prev_events):
         """Given the auth_events and prev_events, convert to a Frozen Event
@@ -77,7 +87,7 @@ class FakeEvent(object):
         event_dict = {
             "auth_events": [(a, {}) for a in auth_events],
             "prev_events": [(p, {}) for p in prev_events],
-            "event_id": self.node_id,
+            "event_id": self.event_id,
             "sender": self.sender,
             "type": self.type,
             "content": self.content,
@@ -88,7 +98,7 @@ class FakeEvent(object):
         if self.state_key is not None:
             event_dict["state_key"] = self.state_key
 
-        return FrozenEvent(event_dict)
+        return make_event_from_dict(event_dict)
 
 
 # All graphs start with this set of events
@@ -370,6 +380,60 @@ class StateTestCase(unittest.TestCase):
 
         self.do_check(events, edges, expected_state_ids)
 
+    def test_mainline_sort(self):
+        """Tests that the mainline ordering works correctly."""
+
+        events = [
+            FakeEvent(
+                id="T1", sender=ALICE, type=EventTypes.Topic, state_key="", content={}
+            ),
+            FakeEvent(
+                id="PA1",
+                sender=ALICE,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={"users": {ALICE: 100, BOB: 50}},
+            ),
+            FakeEvent(
+                id="T2", sender=ALICE, type=EventTypes.Topic, state_key="", content={}
+            ),
+            FakeEvent(
+                id="PA2",
+                sender=ALICE,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={
+                    "users": {ALICE: 100, BOB: 50},
+                    "events": {EventTypes.PowerLevels: 100},
+                },
+            ),
+            FakeEvent(
+                id="PB",
+                sender=BOB,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={"users": {ALICE: 100, BOB: 50}},
+            ),
+            FakeEvent(
+                id="T3", sender=BOB, type=EventTypes.Topic, state_key="", content={}
+            ),
+            FakeEvent(
+                id="T4", sender=ALICE, type=EventTypes.Topic, state_key="", content={}
+            ),
+        ]
+
+        edges = [
+            ["END", "T3", "PA2", "T2", "PA1", "T1", "START"],
+            ["END", "T4", "PB", "PA1"],
+        ]
+
+        # We expect T3 to be picked as the other topics are pointing at older
+        # power levels. Note that without mainline ordering we'd pick T4 due to
+        # it being sent *after* T3.
+        expected_state_ids = ["T3", "PA2"]
+
+        self.do_check(events, edges, expected_state_ids)
+
     def do_check(self, events, edges, expected_state_ids):
         """Take a list of events and edges and calculate the state of the
         graph at END, and asserts it matches `expected_state_ids`
@@ -418,13 +482,15 @@ class StateTestCase(unittest.TestCase):
                 state_before = dict(state_at_event[prev_events[0]])
             else:
                 state_d = resolve_events_with_store(
+                    FakeClock(),
+                    ROOM_ID,
                     RoomVersions.V2.identifier,
                     [state_at_event[n] for n in prev_events],
                     event_map=event_map,
                     state_res_store=TestStateResolutionStore(event_map),
                 )
 
-                state_before = self.successResultOf(state_d)
+                state_before = self.successResultOf(defer.ensureDeferred(state_d))
 
             state_after = dict(state_before)
             if fake_event.state_key is not None:
@@ -565,15 +631,193 @@ class SimpleParamStateTestCase(unittest.TestCase):
         # Test that we correctly handle passing `None` as the event_map
 
         state_d = resolve_events_with_store(
+            FakeClock(),
+            ROOM_ID,
             RoomVersions.V2.identifier,
             [self.state_at_bob, self.state_at_charlie],
             event_map=None,
             state_res_store=TestStateResolutionStore(self.event_map),
         )
 
-        state = self.successResultOf(state_d)
+        state = self.successResultOf(defer.ensureDeferred(state_d))
 
         self.assert_dict(self.expected_combined_state, state)
+
+
+class AuthChainDifferenceTestCase(unittest.TestCase):
+    """We test that `_get_auth_chain_difference` correctly handles unpersisted
+    events.
+    """
+
+    def test_simple(self):
+        # Test getting the auth difference for a simple chain with a single
+        # unpersisted event:
+        #
+        #  Unpersisted | Persisted
+        #              |
+        #           C -|-> B -> A
+
+        a = FakeEvent(
+            id="A",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([], [])
+
+        b = FakeEvent(
+            id="B",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([a.event_id], [])
+
+        c = FakeEvent(
+            id="C",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([b.event_id], [])
+
+        persisted_events = {a.event_id: a, b.event_id: b}
+        unpersited_events = {c.event_id: c}
+
+        state_sets = [{"a": a.event_id, "b": b.event_id}, {"c": c.event_id}]
+
+        store = TestStateResolutionStore(persisted_events)
+
+        diff_d = _get_auth_chain_difference(
+            ROOM_ID, state_sets, unpersited_events, store
+        )
+        difference = self.successResultOf(defer.ensureDeferred(diff_d))
+
+        self.assertEqual(difference, {c.event_id})
+
+    def test_multiple_unpersisted_chain(self):
+        # Test getting the auth difference for a simple chain with multiple
+        # unpersisted events:
+        #
+        #  Unpersisted | Persisted
+        #              |
+        #      D -> C -|-> B -> A
+
+        a = FakeEvent(
+            id="A",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([], [])
+
+        b = FakeEvent(
+            id="B",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([a.event_id], [])
+
+        c = FakeEvent(
+            id="C",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([b.event_id], [])
+
+        d = FakeEvent(
+            id="D",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([c.event_id], [])
+
+        persisted_events = {a.event_id: a, b.event_id: b}
+        unpersited_events = {c.event_id: c, d.event_id: d}
+
+        state_sets = [
+            {"a": a.event_id, "b": b.event_id},
+            {"c": c.event_id, "d": d.event_id},
+        ]
+
+        store = TestStateResolutionStore(persisted_events)
+
+        diff_d = _get_auth_chain_difference(
+            ROOM_ID, state_sets, unpersited_events, store
+        )
+        difference = self.successResultOf(defer.ensureDeferred(diff_d))
+
+        self.assertEqual(difference, {d.event_id, c.event_id})
+
+    def test_unpersisted_events_different_sets(self):
+        # Test getting the auth difference for with multiple unpersisted events
+        # in different branches:
+        #
+        #  Unpersisted | Persisted
+        #              |
+        #     D --> C -|-> B -> A
+        #     E ----^ -|---^
+        #              |
+
+        a = FakeEvent(
+            id="A",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([], [])
+
+        b = FakeEvent(
+            id="B",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([a.event_id], [])
+
+        c = FakeEvent(
+            id="C",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([b.event_id], [])
+
+        d = FakeEvent(
+            id="D",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([c.event_id], [])
+
+        e = FakeEvent(
+            id="E",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
+        ).to_event([c.event_id, b.event_id], [])
+
+        persisted_events = {a.event_id: a, b.event_id: b}
+        unpersited_events = {c.event_id: c, d.event_id: d, e.event_id: e}
+
+        state_sets = [
+            {"a": a.event_id, "b": b.event_id, "e": e.event_id},
+            {"c": c.event_id, "d": d.event_id},
+        ]
+
+        store = TestStateResolutionStore(persisted_events)
+
+        diff_d = _get_auth_chain_difference(
+            ROOM_ID, state_sets, unpersited_events, store
+        )
+        difference = self.successResultOf(defer.ensureDeferred(diff_d))
+
+        self.assertEqual(difference, {d.event_id, e.event_id})
 
 
 def pairwise(iterable):
@@ -584,7 +828,7 @@ def pairwise(iterable):
 
 
 @attr.s
-class TestStateResolutionStore(object):
+class TestStateResolutionStore:
     event_map = attr.ib()
 
     def get_events(self, event_ids, allow_rejected=False):
@@ -598,9 +842,11 @@ class TestStateResolutionStore(object):
             Deferred[dict[str, FrozenEvent]]: Dict from event_id to event.
         """
 
-        return {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
+        return defer.succeed(
+            {eid: self.event_map[eid] for eid in event_ids if eid in self.event_map}
+        )
 
-    def get_auth_chain(self, event_ids):
+    def _get_auth_chain(self, event_ids: List[str]) -> List[str]:
         """Gets the full auth chain for a set of events (including rejected
         events).
 
@@ -612,11 +858,10 @@ class TestStateResolutionStore(object):
                presence of rejected events
 
         Args:
-            event_ids (list): The event IDs of the events to fetch the auth
+            event_ids: The event IDs of the events to fetch the auth
                 chain for. Must be state events.
-
         Returns:
-            Deferred[list[str]]: List of event IDs of the auth chain.
+            List of event IDs of the auth chain.
         """
 
         # Simple DFS for auth chain
@@ -634,3 +879,9 @@ class TestStateResolutionStore(object):
                 stack.append(aid)
 
         return list(result)
+
+    def get_auth_chain_difference(self, room_id, auth_sets):
+        chains = [frozenset(self._get_auth_chain(a)) for a in auth_sets]
+
+        common = set(chains[0]).intersection(*chains[1:])
+        return defer.succeed(set(chains[0]).union(*chains[1:]) - common)

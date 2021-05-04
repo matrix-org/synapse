@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -16,9 +15,9 @@
 
 from twisted.trial import util
 
-import tests.patch_inline_callbacks
+from synapse.util.patch_inline_callbacks import do_patch
 
 # attempt to do the patch before we load any synapse code
-tests.patch_inline_callbacks.do_patch()
+do_patch()
 
 util.DEFAULT_TIMEOUT_DURATION = 20

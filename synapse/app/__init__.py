@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,14 +16,14 @@ import sys
 
 from synapse import python_dependencies  # noqa: E402
 
-sys.dont_write_bytecode = True
-
 logger = logging.getLogger(__name__)
 
 try:
     python_dependencies.check_requirements()
 except python_dependencies.DependencyException as e:
-    sys.stderr.writelines(e.message)
+    sys.stderr.writelines(
+        e.message  # noqa: B306, DependencyException.message is a property
+    )
     sys.exit(1)
 
 
@@ -44,6 +43,8 @@ def check_bind_error(e, address, bind_addresses):
         bind_addresses (list): Addresses on which the service listens.
     """
     if address == "0.0.0.0" and "::" in bind_addresses:
-        logger.warn("Failed to listen on 0.0.0.0, continuing because listening on [::]")
+        logger.warning(
+            "Failed to listen on 0.0.0.0, continuing because listening on [::]"
+        )
     else:
         raise e

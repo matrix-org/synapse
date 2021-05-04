@@ -15,11 +15,7 @@ services:
     restart: unless-stopped
     # See the readme for a full documentation of the environment settings
     environment:
-      - SYNAPSE_SERVER_NAME=my.matrix.host
-      - SYNAPSE_REPORT_STATS=no
-      - SYNAPSE_ENABLE_REGISTRATION=yes
-      - SYNAPSE_LOG_LEVEL=INFO
-      - POSTGRES_PASSWORD=changeme
+      - SYNAPSE_CONFIG_PATH=/data/homeserver.yaml
     volumes:
       # You may either store all the files in a local folder
       - ./files:/data
@@ -35,16 +31,33 @@ services:
       - 8448:8448/tcp
     # ... or use a reverse proxy, here is an example for traefik:
     labels:
+      # The following lines are valid for Traefik version 1.x:
       - traefik.enable=true
       - traefik.frontend.rule=Host:my.matrix.Host
       - traefik.port=8008
+      # Alternatively, for Traefik version 2.0:
+      - traefik.enable=true
+      - traefik.http.routers.http-synapse.entryPoints=http
+      - traefik.http.routers.http-synapse.rule=Host(`my.matrix.host`)
+      - traefik.http.middlewares.https_redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.https_redirect.redirectscheme.permanent=true
+      - traefik.http.routers.http-synapse.middlewares=https_redirect
+      - traefik.http.routers.https-synapse.entryPoints=https
+      - traefik.http.routers.https-synapse.rule=Host(`my.matrix.host`)
+      - traefik.http.routers.https-synapse.service=synapse
+      - traefik.http.routers.https-synapse.tls=true
+      - traefik.http.services.synapse.loadbalancer.server.port=8008
+      - traefik.http.routers.https-synapse.tls.certResolver=le-ssl
 
   db:
-    image: docker.io/postgres:10-alpine
+    image: docker.io/postgres:12-alpine
     # Change that password, of course!
     environment:
       - POSTGRES_USER=synapse
       - POSTGRES_PASSWORD=changeme
+      # ensure the database gets created correctly
+      # https://github.com/matrix-org/synapse/blob/master/docs/postgres.md#set-up-database
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
       # You may store the database tables in a local folder..
       - ./schemas:/var/lib/postgresql/data

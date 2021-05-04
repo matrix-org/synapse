@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +15,7 @@ from synapse.config._base import ConfigError
 
 if __name__ == "__main__":
     import sys
+
     from synapse.config.homeserver import HomeServerConfig
 
     action = sys.argv[1]

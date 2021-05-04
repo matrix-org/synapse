@@ -12,18 +12,26 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict, Optional
+
 from ._base import Config
 
 
-class RateLimitConfig(object):
-    def __init__(self, config, defaults={"per_second": 0.17, "burst_count": 3.0}):
+class RateLimitConfig:
+    def __init__(
+        self,
+        config: Dict[str, float],
+        defaults: Optional[Dict[str, float]] = None,
+    ):
+        defaults = defaults or {"per_second": 0.17, "burst_count": 3.0}
+
         self.per_second = config.get("per_second", defaults["per_second"])
-        self.burst_count = config.get("burst_count", defaults["burst_count"])
+        self.burst_count = int(config.get("burst_count", defaults["burst_count"]))
 
 
-class FederationRateLimitConfig(object):
+class FederationRateLimitConfig:
     _items_and_default = {
-        "window_size": 10000,
+        "window_size": 1000,
         "sleep_limit": 10,
         "sleep_delay": 500,
         "reject_limit": 50,
@@ -36,6 +44,8 @@ class FederationRateLimitConfig(object):
 
 
 class RatelimitConfig(Config):
+    section = "ratelimiting"
+
     def read_config(self, config, **kwargs):
 
         # Load the new-style messages config if it exists. Otherwise fall back
@@ -54,7 +64,7 @@ class RatelimitConfig(Config):
 
         # Load the new-style federation config, if it exists. Otherwise, fall
         # back to the old method.
-        if "federation_rc" in config:
+        if "rc_federation" in config:
             self.rc_federation = FederationRateLimitConfig(**config["rc_federation"])
         else:
             self.rc_federation = FederationRateLimitConfig(
@@ -80,6 +90,44 @@ class RatelimitConfig(Config):
             "federation_rr_transactions_per_room_per_second", 50
         )
 
+        rc_admin_redaction = config.get("rc_admin_redaction")
+        self.rc_admin_redaction = None
+        if rc_admin_redaction:
+            self.rc_admin_redaction = RateLimitConfig(rc_admin_redaction)
+
+        self.rc_joins_local = RateLimitConfig(
+            config.get("rc_joins", {}).get("local", {}),
+            defaults={"per_second": 0.1, "burst_count": 10},
+        )
+        self.rc_joins_remote = RateLimitConfig(
+            config.get("rc_joins", {}).get("remote", {}),
+            defaults={"per_second": 0.01, "burst_count": 10},
+        )
+
+        # Ratelimit cross-user key requests:
+        # * For local requests this is keyed by the sending device.
+        # * For requests received over federation this is keyed by the origin.
+        #
+        # Note that this isn't exposed in the configuration as it is obscure.
+        self.rc_key_requests = RateLimitConfig(
+            config.get("rc_key_requests", {}),
+            defaults={"per_second": 20, "burst_count": 100},
+        )
+
+        self.rc_3pid_validation = RateLimitConfig(
+            config.get("rc_3pid_validation") or {},
+            defaults={"per_second": 0.003, "burst_count": 5},
+        )
+
+        self.rc_invites_per_room = RateLimitConfig(
+            config.get("rc_invites", {}).get("per_room", {}),
+            defaults={"per_second": 0.3, "burst_count": 10},
+        )
+        self.rc_invites_per_user = RateLimitConfig(
+            config.get("rc_invites", {}).get("per_user", {}),
+            defaults={"per_second": 0.003, "burst_count": 5},
+        )
+
     def generate_config_section(self, **kwargs):
         return """\
         ## Ratelimiting ##
@@ -102,6 +150,16 @@ class RatelimitConfig(Config):
         #   - one for login that ratelimits login requests based on the account the
         #     client is attempting to log into, based on the amount of failed login
         #     attempts for this account.
+        #   - one for ratelimiting redactions by room admins. If this is not explicitly
+        #     set then it uses the same ratelimiting as per rc_message. This is useful
+        #     to allow room admins to deal with abuse quickly.
+        #   - two for ratelimiting number of rooms a user can join, "local" for when
+        #     users are joining rooms the server is already in (this is cheap) vs
+        #     "remote" for when users are trying to join rooms not on the server (which
+        #     can be more expensive)
+        #   - one for ratelimiting how often a user or IP can attempt to validate a 3PID.
+        #   - two for ratelimiting how often invites can be sent in a room or to a
+        #     specific user.
         #
         # The defaults are as shown below.
         #
@@ -123,7 +181,30 @@ class RatelimitConfig(Config):
         #  failed_attempts:
         #    per_second: 0.17
         #    burst_count: 3
-
+        #
+        #rc_admin_redaction:
+        #  per_second: 1
+        #  burst_count: 50
+        #
+        #rc_joins:
+        #  local:
+        #    per_second: 0.1
+        #    burst_count: 10
+        #  remote:
+        #    per_second: 0.01
+        #    burst_count: 10
+        #
+        #rc_3pid_validation:
+        #  per_second: 0.003
+        #  burst_count: 5
+        #
+        #rc_invites:
+        #  per_room:
+        #    per_second: 0.3
+        #    burst_count: 10
+        #  per_user:
+        #    per_second: 0.003
+        #    burst_count: 5
 
         # Ratelimiting settings for incoming federation
         #

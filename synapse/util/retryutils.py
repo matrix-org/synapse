@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,12 +14,19 @@
 import logging
 import random
 
-from twisted.internet import defer
-
-import synapse.util.logcontext
+import synapse.logging.context
 from synapse.api.errors import CodeMessageException
 
 logger = logging.getLogger(__name__)
+
+# the initial backoff, after the first transaction fails
+MIN_RETRY_INTERVAL = 10 * 60 * 1000
+
+# how much we multiply the backoff by after each subsequent fail
+RETRY_MULTIPLIER = 5
+
+# a cap on the backoff. (Essentially none)
+MAX_RETRY_INTERVAL = 2 ** 62
 
 
 class NotRetryingDestination(Exception):
@@ -38,15 +44,14 @@ class NotRetryingDestination(Exception):
         """
 
         msg = "Not retrying server %s." % (destination,)
-        super(NotRetryingDestination, self).__init__(msg)
+        super().__init__(msg)
 
         self.retry_last_ts = retry_last_ts
         self.retry_interval = retry_interval
         self.destination = destination
 
 
-@defer.inlineCallbacks
-def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs):
+async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs):
     """For a given destination check if we have previously failed to
     send a request there and are waiting before retrying the destination.
     If we are not ready to retry the destination, this will raise a
@@ -64,18 +69,20 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
     Example usage:
 
         try:
-            limiter = yield get_retry_limiter(destination, clock, store)
+            limiter = await get_retry_limiter(destination, clock, store)
             with limiter:
-                response = yield do_request()
+                response = await do_request()
         except NotRetryingDestination:
             # We aren't ready to retry that destination.
             raise
     """
+    failure_ts = None
     retry_last_ts, retry_interval = (0, 0)
 
-    retry_timings = yield store.get_destination_retry_timings(destination)
+    retry_timings = await store.get_destination_retry_timings(destination)
 
     if retry_timings:
+        failure_ts = retry_timings["failure_ts"]
         retry_last_ts, retry_interval = (
             retry_timings["retry_last_ts"],
             retry_timings["retry_interval"],
@@ -95,28 +102,25 @@ def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs)
     # maximum backoff even though it might only have been down briefly
     backoff_on_failure = not ignore_backoff
 
-    defer.returnValue(
-        RetryDestinationLimiter(
-            destination,
-            clock,
-            store,
-            retry_interval,
-            backoff_on_failure=backoff_on_failure,
-            **kwargs
-        )
+    return RetryDestinationLimiter(
+        destination,
+        clock,
+        store,
+        failure_ts,
+        retry_interval,
+        backoff_on_failure=backoff_on_failure,
+        **kwargs,
     )
 
 
-class RetryDestinationLimiter(object):
+class RetryDestinationLimiter:
     def __init__(
         self,
         destination,
         clock,
         store,
+        failure_ts,
         retry_interval,
-        min_retry_interval=10 * 60 * 1000,
-        max_retry_interval=24 * 60 * 60 * 1000,
-        multiplier_retry_interval=5,
         backoff_on_404=False,
         backoff_on_failure=True,
     ):
@@ -129,15 +133,11 @@ class RetryDestinationLimiter(object):
             destination (str)
             clock (Clock)
             store (DataStore)
+            failure_ts (int|None): when this destination started failing (in ms since
+                the epoch), or zero if the last request was successful
             retry_interval (int): The next retry interval taken from the
                 database in milliseconds, or zero if the last request was
                 successful.
-            min_retry_interval (int): The minimum retry interval to use after
-                a failed request, in milliseconds.
-            max_retry_interval (int): The maximum retry interval to use after
-                a failed request, in milliseconds.
-            multiplier_retry_interval (int): The multiplier to use to increase
-                the retry interval after a failed request.
             backoff_on_404 (bool): Back off if we get a 404
 
             backoff_on_failure (bool): set to False if we should not increase the
@@ -147,10 +147,8 @@ class RetryDestinationLimiter(object):
         self.store = store
         self.destination = destination
 
+        self.failure_ts = failure_ts
         self.retry_interval = retry_interval
-        self.min_retry_interval = min_retry_interval
-        self.max_retry_interval = max_retry_interval
-        self.multiplier_retry_interval = multiplier_retry_interval
         self.backoff_on_404 = backoff_on_404
         self.backoff_on_failure = backoff_on_failure
 
@@ -172,7 +170,7 @@ class RetryDestinationLimiter(object):
             # has been decommissioned.
             # If we get a 401, then we should probably back off since they
             # won't accept our requests for at least a while.
-            # 429 is us being aggresively rate limited, so lets rate limit
+            # 429 is us being aggressively rate limited, so lets rate limit
             # ourselves.
             if exc_val.code == 404 and self.backoff_on_404:
                 valid_err_code = False
@@ -191,6 +189,7 @@ class RetryDestinationLimiter(object):
             logger.debug(
                 "Connection to %s was successful; clearing backoff", self.destination
             )
+            self.failure_ts = None
             retry_last_ts = 0
             self.retry_interval = 0
         elif not self.backoff_on_failure:
@@ -198,13 +197,14 @@ class RetryDestinationLimiter(object):
         else:
             # We couldn't connect.
             if self.retry_interval:
-                self.retry_interval *= self.multiplier_retry_interval
-                self.retry_interval *= int(random.uniform(0.8, 1.4))
+                self.retry_interval = int(
+                    self.retry_interval * RETRY_MULTIPLIER * random.uniform(0.8, 1.4)
+                )
 
-                if self.retry_interval >= self.max_retry_interval:
-                    self.retry_interval = self.max_retry_interval
+                if self.retry_interval >= MAX_RETRY_INTERVAL:
+                    self.retry_interval = MAX_RETRY_INTERVAL
             else:
-                self.retry_interval = self.min_retry_interval
+                self.retry_interval = MIN_RETRY_INTERVAL
 
             logger.info(
                 "Connection to %s was unsuccessful (%s(%s)); backoff now %i",
@@ -215,14 +215,19 @@ class RetryDestinationLimiter(object):
             )
             retry_last_ts = int(self.clock.time_msec())
 
-        @defer.inlineCallbacks
-        def store_retry_timings():
+            if self.failure_ts is None:
+                self.failure_ts = retry_last_ts
+
+        async def store_retry_timings():
             try:
-                yield self.store.set_destination_retry_timings(
-                    self.destination, retry_last_ts, self.retry_interval
+                await self.store.set_destination_retry_timings(
+                    self.destination,
+                    self.failure_ts,
+                    retry_last_ts,
+                    self.retry_interval,
                 )
             except Exception:
                 logger.exception("Failed to store destination_retry_timings")
 
         # we deliberately do this in the background.
-        synapse.util.logcontext.run_in_background(store_retry_timings)
+        synapse.logging.context.run_in_background(store_retry_timings)

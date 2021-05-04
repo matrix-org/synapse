@@ -1,1 +1,0 @@
-Fix a bug where deactivated users could receive renewal emails if the account validity feature is on.

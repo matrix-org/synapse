@@ -1,5 +1,7 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2017 Vector Creations Ltd
+# Copyright 2018-2019 New Vector Ltd
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +15,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
 import jsonschema
 
-from twisted.internet import defer
-
+from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filter
-from synapse.events import FrozenEvent
+from synapse.events import make_event_from_dict
 
 from tests import unittest
-from tests.utils import DeferredMockCallable, MockHttpResource, setup_test_homeserver
 
 user_localpart = "test_user"
 
@@ -34,26 +32,12 @@ def MockEvent(**kwargs):
         kwargs["event_id"] = "fake_event_id"
     if "type" not in kwargs:
         kwargs["type"] = "fake_type"
-    return FrozenEvent(kwargs)
+    return make_event_from_dict(kwargs)
 
 
-class FilteringTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.mock_federation_resource = MockHttpResource()
-
-        self.mock_http_client = Mock(spec=[])
-        self.mock_http_client.put_json = DeferredMockCallable()
-
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
-            handlers=None,
-            http_client=self.mock_http_client,
-            keyring=Mock(),
-        )
-
+class FilteringTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         self.filtering = hs.get_filtering()
-
         self.datastore = hs.get_datastore()
 
     def test_errors_on_invalid_filters(self):
@@ -95,6 +79,8 @@ class FilteringTestCase(unittest.TestCase):
                         "types": ["m.room.message"],
                         "not_rooms": ["!726s6s6q:example.com"],
                         "not_senders": ["@spam:example.com"],
+                        "org.matrix.labels": ["#fun"],
+                        "org.matrix.not_labels": ["#work"],
                     },
                     "ephemeral": {
                         "types": ["m.receipt", "m.typing"],
@@ -320,28 +306,72 @@ class FilteringTestCase(unittest.TestCase):
         )
         self.assertFalse(Filter(definition).check(event))
 
-    @defer.inlineCallbacks
+    def test_filter_labels(self):
+        definition = {"org.matrix.labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#fun"]},
+        )
+
+        self.assertTrue(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#notfun"]},
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+    def test_filter_not_labels(self):
+        definition = {"org.matrix.not_labels": ["#fun"]}
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#fun"]},
+        )
+
+        self.assertFalse(Filter(definition).check(event))
+
+        event = MockEvent(
+            sender="@foo:bar",
+            type="m.room.message",
+            room_id="!secretbase:unknown",
+            content={EventContentFields.LABELS: ["#notfun"]},
+        )
+
+        self.assertTrue(Filter(definition).check(event))
+
     def test_filter_presence_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
-        filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart, user_filter=user_filter_json
+        filter_id = self.get_success(
+            self.datastore.add_user_filter(
+                user_localpart=user_localpart, user_filter=user_filter_json
+            )
         )
         event = MockEvent(sender="@foo:bar", type="m.profile")
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        user_filter = self.get_success(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_presence(events=events)
         self.assertEquals(events, results)
 
-    @defer.inlineCallbacks
     def test_filter_presence_no_match(self):
         user_filter_json = {"presence": {"types": ["m.*"]}}
 
-        filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart + "2", user_filter=user_filter_json
+        filter_id = self.get_success(
+            self.datastore.add_user_filter(
+                user_localpart=user_localpart + "2", user_filter=user_filter_json
+            )
         )
         event = MockEvent(
             event_id="$asdasd:localhost",
@@ -350,42 +380,50 @@ class FilteringTestCase(unittest.TestCase):
         )
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart + "2", filter_id=filter_id
+        user_filter = self.get_success(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart + "2", filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_presence(events=events)
         self.assertEquals([], results)
 
-    @defer.inlineCallbacks
     def test_filter_room_state_match(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
-        filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart, user_filter=user_filter_json
+        filter_id = self.get_success(
+            self.datastore.add_user_filter(
+                user_localpart=user_localpart, user_filter=user_filter_json
+            )
         )
         event = MockEvent(sender="@foo:bar", type="m.room.topic", room_id="!foo:bar")
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        user_filter = self.get_success(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_room_state(events=events)
         self.assertEquals(events, results)
 
-    @defer.inlineCallbacks
     def test_filter_room_state_no_match(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
-        filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart, user_filter=user_filter_json
+        filter_id = self.get_success(
+            self.datastore.add_user_filter(
+                user_localpart=user_localpart, user_filter=user_filter_json
+            )
         )
         event = MockEvent(
             sender="@foo:bar", type="org.matrix.custom.event", room_id="!foo:bar"
         )
         events = [event]
 
-        user_filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        user_filter = self.get_success(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         results = user_filter.filter_room_state(events)
@@ -407,34 +445,40 @@ class FilteringTestCase(unittest.TestCase):
 
         self.assertEquals(filtered_room_ids, ["!allowed:example.com"])
 
-    @defer.inlineCallbacks
     def test_add_filter(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
 
-        filter_id = yield self.filtering.add_user_filter(
-            user_localpart=user_localpart, user_filter=user_filter_json
+        filter_id = self.get_success(
+            self.filtering.add_user_filter(
+                user_localpart=user_localpart, user_filter=user_filter_json
+            )
         )
 
         self.assertEquals(filter_id, 0)
         self.assertEquals(
             user_filter_json,
             (
-                yield self.datastore.get_user_filter(
-                    user_localpart=user_localpart, filter_id=0
+                self.get_success(
+                    self.datastore.get_user_filter(
+                        user_localpart=user_localpart, filter_id=0
+                    )
                 )
             ),
         )
 
-    @defer.inlineCallbacks
     def test_get_filter(self):
         user_filter_json = {"room": {"state": {"types": ["m.*"]}}}
 
-        filter_id = yield self.datastore.add_user_filter(
-            user_localpart=user_localpart, user_filter=user_filter_json
+        filter_id = self.get_success(
+            self.datastore.add_user_filter(
+                user_localpart=user_localpart, user_filter=user_filter_json
+            )
         )
 
-        filter = yield self.filtering.get_user_filter(
-            user_localpart=user_localpart, filter_id=filter_id
+        filter = self.get_success(
+            self.filtering.get_user_filter(
+                user_localpart=user_localpart, filter_id=filter_id
+            )
         )
 
         self.assertEquals(filter.get_filter_json(), user_filter_json)

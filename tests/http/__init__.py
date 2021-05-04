@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +19,23 @@ from zope.interface import implementer
 from OpenSSL import SSL
 from OpenSSL.SSL import Connection
 from twisted.internet.interfaces import IOpenSSLServerConnectionCreator
+from twisted.internet.ssl import Certificate, trustRootFromCertificates
+from twisted.web.client import BrowserLikePolicyForHTTPS  # noqa: F401
+from twisted.web.iweb import IPolicyForHTTPS  # noqa: F401
+
+
+def get_test_https_policy():
+    """Get a test IPolicyForHTTPS which trusts the test CA cert
+
+    Returns:
+        IPolicyForHTTPS
+    """
+    ca_file = get_test_ca_cert_file()
+    with open(ca_file) as stream:
+        content = stream.read()
+    cert = Certificate.loadPEM(content)
+    trust_root = trustRootFromCertificates([cert])
+    return BrowserLikePolicyForHTTPS(trustRoot=trust_root)
 
 
 def get_test_ca_cert_file():
@@ -116,7 +132,7 @@ def create_test_cert_file(sanlist):
 
 
 @implementer(IOpenSSLServerConnectionCreator)
-class TestServerTLSConnectionFactory(object):
+class TestServerTLSConnectionFactory:
     """An SSL connection creator which returns connections which present a certificate
     signed by our test CA."""
 
@@ -128,7 +144,7 @@ class TestServerTLSConnectionFactory(object):
         self._cert_file = create_test_cert_file(sanlist)
 
     def serverConnectionForTLS(self, tlsProtocol):
-        ctx = SSL.Context(SSL.TLSv1_METHOD)
+        ctx = SSL.Context(SSL.SSLv23_METHOD)
         ctx.use_certificate_file(self._cert_file)
         ctx.use_privatekey_file(get_test_key_file())
         return Connection(ctx, None)

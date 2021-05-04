@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,133 +12,163 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING, List
 
-from twisted.internet import defer
+from prometheus_client import Gauge
 
 from synapse.api.errors import HttpResponseException
+from synapse.events import EventBase
 from synapse.federation.persistence import TransactionActions
-from synapse.federation.units import Transaction
+from synapse.federation.units import Edu, Transaction
+from synapse.logging.opentracing import (
+    extract_text_map,
+    set_tag,
+    start_active_span_follows_from,
+    tags,
+    whitelisted_homeserver,
+)
+from synapse.util import json_decoder
 from synapse.util.metrics import measure_func
+
+if TYPE_CHECKING:
+    import synapse.server
 
 logger = logging.getLogger(__name__)
 
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_sent_pdu_time",
+    "The timestamp of the last PDU which was successfully sent to the given domain",
+    labelnames=("server_name",),
+)
 
-class TransactionManager(object):
+
+class TransactionManager:
     """Helper class which handles building and sending transactions
 
     shared between PerDestinationQueue objects
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "synapse.server.HomeServer"):
         self._server_name = hs.hostname
         self.clock = hs.get_clock()  # nb must be called this for @measure_func
         self._store = hs.get_datastore()
         self._transaction_actions = TransactionActions(self._store)
         self._transport_layer = hs.get_federation_transport_client()
 
+        self._federation_metrics_domains = (
+            hs.config.federation.federation_metrics_domains
+        )
+
         # HACK to get unique tx id
         self._next_txn_id = int(self.clock.time_msec())
 
     @measure_func("_send_new_transaction")
-    @defer.inlineCallbacks
-    def send_new_transaction(self, destination, pending_pdus, pending_edus):
+    async def send_new_transaction(
+        self,
+        destination: str,
+        pdus: List[EventBase],
+        edus: List[Edu],
+    ) -> None:
+        """
+        Args:
+            destination: The destination to send to (e.g. 'example.org')
+            pdus: In-order list of PDUs to send
+            edus: List of EDUs to send
+        """
 
-        # Sort based on the order field
-        pending_pdus.sort(key=lambda t: t[1])
-        pdus = [x[0] for x in pending_pdus]
-        edus = pending_edus
+        # Make a transaction-sending opentracing span. This span follows on from
+        # all the edus in that transaction. This needs to be done since there is
+        # no active span here, so if the edus were not received by the remote the
+        # span would have no causality and it would be forgotten.
 
-        success = True
+        span_contexts = []
+        keep_destination = whitelisted_homeserver(destination)
 
-        logger.debug("TX [%s] _attempt_new_transaction", destination)
+        for edu in edus:
+            context = edu.get_context()
+            if context:
+                span_contexts.append(extract_text_map(json_decoder.decode(context)))
+            if keep_destination:
+                edu.strip_context()
 
-        txn_id = str(self._next_txn_id)
+        with start_active_span_follows_from("send_transaction", span_contexts):
+            logger.debug("TX [%s] _attempt_new_transaction", destination)
 
-        logger.debug(
-            "TX [%s] {%s} Attempting new transaction" " (pdus: %d, edus: %d)",
-            destination,
-            txn_id,
-            len(pdus),
-            len(edus),
-        )
+            txn_id = str(self._next_txn_id)
 
-        logger.debug("TX [%s] Persisting transaction...", destination)
-
-        transaction = Transaction.create_new(
-            origin_server_ts=int(self.clock.time_msec()),
-            transaction_id=txn_id,
-            origin=self._server_name,
-            destination=destination,
-            pdus=pdus,
-            edus=edus,
-        )
-
-        self._next_txn_id += 1
-
-        yield self._transaction_actions.prepare_to_send(transaction)
-
-        logger.debug("TX [%s] Persisted transaction", destination)
-        logger.info(
-            "TX [%s] {%s} Sending transaction [%s]," " (PDUs: %d, EDUs: %d)",
-            destination,
-            txn_id,
-            transaction.transaction_id,
-            len(pdus),
-            len(edus),
-        )
-
-        # Actually send the transaction
-
-        # FIXME (erikj): This is a bit of a hack to make the Pdu age
-        # keys work
-        def json_data_cb():
-            data = transaction.get_dict()
-            now = int(self.clock.time_msec())
-            if "pdus" in data:
-                for p in data["pdus"]:
-                    if "age_ts" in p:
-                        unsigned = p.setdefault("unsigned", {})
-                        unsigned["age"] = now - int(p["age_ts"])
-                        del p["age_ts"]
-            return data
-
-        try:
-            response = yield self._transport_layer.send_transaction(
-                transaction, json_data_cb
+            logger.debug(
+                "TX [%s] {%s} Attempting new transaction (pdus: %d, edus: %d)",
+                destination,
+                txn_id,
+                len(pdus),
+                len(edus),
             )
-            code = 200
-        except HttpResponseException as e:
-            code = e.code
-            response = e.response
 
-            if e.code in (401, 404, 429) or 500 <= e.code:
+            transaction = Transaction.create_new(
+                origin_server_ts=int(self.clock.time_msec()),
+                transaction_id=txn_id,
+                origin=self._server_name,
+                destination=destination,
+                pdus=pdus,
+                edus=edus,
+            )
+
+            self._next_txn_id += 1
+
+            logger.info(
+                "TX [%s] {%s} Sending transaction [%s], (PDUs: %d, EDUs: %d)",
+                destination,
+                txn_id,
+                transaction.transaction_id,
+                len(pdus),
+                len(edus),
+            )
+
+            # Actually send the transaction
+
+            # FIXME (erikj): This is a bit of a hack to make the Pdu age
+            # keys work
+            # FIXME (richardv): I also believe it no longer works. We (now?) store
+            #  "age_ts" in "unsigned" rather than at the top level. See
+            #  https://github.com/matrix-org/synapse/issues/8429.
+            def json_data_cb():
+                data = transaction.get_dict()
+                now = int(self.clock.time_msec())
+                if "pdus" in data:
+                    for p in data["pdus"]:
+                        if "age_ts" in p:
+                            unsigned = p.setdefault("unsigned", {})
+                            unsigned["age"] = now - int(p["age_ts"])
+                            del p["age_ts"]
+                return data
+
+            try:
+                response = await self._transport_layer.send_transaction(
+                    transaction, json_data_cb
+                )
+            except HttpResponseException as e:
+                code = e.code
+                response = e.response
+
+                set_tag(tags.ERROR, True)
+
                 logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
-                raise e
+                raise
 
-        logger.info("TX [%s] {%s} got %d response", destination, txn_id, code)
+            logger.info("TX [%s] {%s} got 200 response", destination, txn_id)
 
-        yield self._transaction_actions.delivered(transaction, code, response)
-
-        logger.debug("TX [%s] {%s} Marked as delivered", destination, txn_id)
-
-        if code == 200:
             for e_id, r in response.get("pdus", {}).items():
                 if "error" in r:
-                    logger.warn(
+                    logger.warning(
                         "TX [%s] {%s} Remote returned error for %s: %s",
                         destination,
                         txn_id,
                         e_id,
                         r,
                     )
-        else:
-            for p in pdus:
-                logger.warn(
-                    "TX [%s] {%s} Failed to send event %s",
-                    destination,
-                    txn_id,
-                    p.event_id,
-                )
-            success = False
 
-        defer.returnValue(success)
+            if pdus and destination in self._federation_metrics_domains:
+                last_pdu = pdus[-1]
+                last_pdu_ts_metric.labels(server_name=destination).set(
+                    last_pdu.origin_server_ts / 1000
+                )

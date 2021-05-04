@@ -1,0 +1,19 @@
+{# html fragment to be included in SSO pages, to show the user's profile #}
+
+<div class="profile{% if user_profile.avatar_url %} with-avatar{% endif %}">
+    {% if user_profile.avatar_url %}
+    <img src="{{ user_profile.avatar_url | mxc_to_http(64, 64) }}" class="avatar" />
+    {% endif %}
+    {# users that signed up with SSO will have a display_name of some sort;
+       however that is not the case for users who signed up via other
+       methods, so we need to handle that.
+    #}
+    {% if user_profile.display_name %}
+        <div class="display-name">{{ user_profile.display_name }}</div>
+    {% else %}
+        {# split the userid on ':', take the part before the first ':',
+           and then remove the leading '@'. #}
+        <div class="display-name">{{ user_id.split(":")[0][1:] }}</div>
+    {% endif %}
+    <div class="user-id">{{ user_id }}</div>
+</div>

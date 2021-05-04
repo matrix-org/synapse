@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014, 2015 matrix.org
+# Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,9 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
 import os
 from collections import namedtuple
+from typing import Dict, List
 
+from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
+from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
@@ -33,17 +36,6 @@ THUMBNAIL_SIZE_YAML = """\
         #    method: %(method)s
 """
 
-MISSING_NETADDR = "Missing netaddr library. This is required for URL preview API."
-
-MISSING_LXML = """Missing lxml library. This is required for URL preview API.
-
-    Install by running:
-        pip install lxml
-
-    Requires libxslt1-dev system package.
-    """
-
-
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
 )
@@ -59,7 +51,7 @@ MediaStorageProviderConfig = namedtuple(
 
 
 def parse_thumbnail_requirements(thumbnail_sizes):
-    """ Takes a list of dictionaries with "width", "height", and "method" keys
+    """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 
@@ -70,7 +62,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         Dictionary mapping from media type string to list of
         ThumbnailRequirement tuples.
     """
-    requirements = {}
+    requirements = {}  # type: Dict[str, List]
     for size in thumbnail_sizes:
         width = size["width"]
         height = size["height"]
@@ -78,6 +70,8 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/jpg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
     return {
@@ -86,8 +80,28 @@ def parse_thumbnail_requirements(thumbnail_sizes):
 
 
 class ContentRepositoryConfig(Config):
+    section = "media"
+
     def read_config(self, config, **kwargs):
-        self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
+
+        # Only enable the media repo if either the media repo is enabled or the
+        # current worker app is the media repo.
+        if (
+            self.enable_media_repo is False
+            and config.get("worker_app") != "synapse.app.media_repository"
+        ):
+            self.can_load_media_repo = False
+            return
+        else:
+            self.can_load_media_repo = True
+
+        # Whether this instance should be the one to run the background jobs to
+        # e.g clean up old URL previews.
+        self.media_instance_running_background_jobs = config.get(
+            "media_instance_running_background_jobs",
+        )
+
+        self.max_upload_size = self.parse_size(config.get("max_upload_size", "50M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
@@ -127,9 +141,9 @@ class ContentRepositoryConfig(Config):
         #
         # We don't create the storage providers here as not all workers need
         # them to be started.
-        self.media_storage_providers = []
+        self.media_storage_providers = []  # type: List[tuple]
 
-        for provider_config in storage_providers:
+        for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to
             # expose FileStorageProviderBackend
             if provider_config["module"] == "file_system":
@@ -138,7 +152,9 @@ class ContentRepositoryConfig(Config):
                     ".FileStorageProviderBackend"
                 )
 
-            provider_class, parsed_config = load_module(provider_config)
+            provider_class, parsed_config = load_module(
+                provider_config, ("media_storage_providers", "<item %i>" % i)
+            )
 
             wrapper_config = MediaStorageProviderConfig(
                 provider_config.get("store_local", False),
@@ -150,7 +166,6 @@ class ContentRepositoryConfig(Config):
                 (provider_class, parsed_config, wrapper_config)
             )
 
-        self.uploads_path = self.ensure_directory(config.get("uploads_path", "uploads"))
         self.dynamic_thumbnails = config.get("dynamic_thumbnails", False)
         self.thumbnail_requirements = parse_thumbnail_requirements(
             config.get("thumbnail_sizes", DEFAULT_THUMBNAIL_SIZES)
@@ -158,16 +173,12 @@ class ContentRepositoryConfig(Config):
         self.url_preview_enabled = config.get("url_preview_enabled", False)
         if self.url_preview_enabled:
             try:
-                import lxml
+                check_requirements("url_preview")
 
-                lxml  # To stop unused lint.
-            except ImportError:
-                raise ConfigError(MISSING_LXML)
-
-            try:
-                from netaddr import IPSet
-            except ImportError:
-                raise ConfigError(MISSING_NETADDR)
+            except DependencyException as e:
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
@@ -176,23 +187,27 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            self.url_preview_ip_range_blacklist = IPSet(
-                config["url_preview_ip_range_blacklist"]
-            )
-
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist.update(["0.0.0.0", "::"])
+            self.url_preview_ip_range_blacklist = generate_ip_set(
+                config["url_preview_ip_range_blacklist"],
+                ["0.0.0.0", "::"],
+                config_path=("url_preview_ip_range_blacklist",),
+            )
 
-            self.url_preview_ip_range_whitelist = IPSet(
-                config.get("url_preview_ip_range_whitelist", ())
+            self.url_preview_ip_range_whitelist = generate_ip_set(
+                config.get("url_preview_ip_range_whitelist", ()),
+                config_path=("url_preview_ip_range_whitelist",),
             )
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
 
+            self.url_preview_accept_language = config.get(
+                "url_preview_accept_language"
+            ) or ["en"]
+
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
-        uploads_path = os.path.join(data_dir_path, "uploads")
 
         formatted_thumbnail_sizes = "".join(
             THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES
@@ -200,8 +215,19 @@ class ContentRepositoryConfig(Config):
         # strip final NL
         formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
 
+        ip_range_blacklist = "\n".join(
+            "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
+        )
+
         return (
             r"""
+        ## Media Store ##
+
+        # Enable the media store service in the Synapse master. Uncomment the
+        # following if you are using a separate media store worker.
+        #
+        #enable_media_repo: false
+
         # Directory where uploaded images and attachments are stored.
         #
         media_store_path: "%(media_store)s"
@@ -211,23 +237,18 @@ class ContentRepositoryConfig(Config):
         #
         #media_storage_providers:
         #  - module: file_system
-        #    # Whether to write new local files.
+        #    # Whether to store newly uploaded local files
         #    store_local: false
-        #    # Whether to write new remote media
+        #    # Whether to store newly downloaded remote files
         #    store_remote: false
-        #    # Whether to block upload requests waiting for write to this
-        #    # provider to complete
+        #    # Whether to wait for successful storage for local uploads
         #    store_synchronous: false
         #    config:
         #       directory: /mnt/some/other/directory
 
-        # Directory where in-progress uploads are stored.
-        #
-        uploads_path: "%(uploads_path)s"
-
         # The largest allowed upload size in bytes
         #
-        #max_upload_size: 10M
+        #max_upload_size: 50M
 
         # Maximum number of pixels that will be thumbnailed
         #
@@ -268,15 +289,7 @@ class ContentRepositoryConfig(Config):
         # you uncomment the following list as a starting point.
         #
         #url_preview_ip_range_blacklist:
-        #  - '127.0.0.0/8'
-        #  - '10.0.0.0/8'
-        #  - '172.16.0.0/12'
-        #  - '192.168.0.0/16'
-        #  - '100.64.0.0/10'
-        #  - '169.254.0.0/16'
-        #  - '::1/128'
-        #  - 'fe80::/64'
-        #  - 'fc00::/7'
+%(ip_range_blacklist)s
 
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.
@@ -324,6 +337,31 @@ class ContentRepositoryConfig(Config):
         # The largest allowed URL preview spidering size in bytes
         #
         #max_spider_size: 10M
+
+        # A list of values for the Accept-Language HTTP header used when
+        # downloading webpages during URL preview generation. This allows
+        # Synapse to specify the preferred languages that URL previews should
+        # be in when communicating with remote servers.
+        #
+        # Each value is a IETF language tag; a 2-3 letter identifier for a
+        # language, optionally followed by subtags separated by '-', specifying
+        # a country or region variant.
+        #
+        # Multiple values can be provided, and a weight can be added to each by
+        # using quality value syntax (;q=). '*' translates to any language.
+        #
+        # Defaults to "en".
+        #
+        # Example:
+        #
+        # url_preview_accept_language:
+        #   - en-UK
+        #   - en-US;q=0.9
+        #   - fr;q=0.8
+        #   - *;q=0.7
+        #
+        url_preview_accept_language:
+        #   - en
         """
             % locals()
         )

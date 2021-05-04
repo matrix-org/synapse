@@ -1,5 +1,3 @@
-from __future__ import print_function
-
 import sqlite3
 import sys
 
@@ -15,7 +13,7 @@ from synapse.storage.pdu import PduStore
 from synapse.storage.signatures import SignatureStore
 
 
-class Store(object):
+class Store:
     _get_pdu_tuples = PduStore.__dict__["_get_pdu_tuples"]
     _get_pdu_content_hashes_txn = SignatureStore.__dict__["_get_pdu_content_hashes_txn"]
     _get_prev_pdu_hashes_txn = SignatureStore.__dict__["_get_prev_pdu_hashes_txn"]
@@ -27,7 +25,7 @@ class Store(object):
         "_store_pdu_reference_hash_txn"
     ]
     _store_prev_pdu_hash_txn = SignatureStore.__dict__["_store_prev_pdu_hash_txn"]
-    _simple_insert_txn = SQLBaseStore.__dict__["_simple_insert_txn"]
+    simple_insert_txn = SQLBaseStore.__dict__["simple_insert_txn"]
 
 
 store = Store()

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -14,15 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
-
-from twisted.internet import defer
+from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
 from synapse.rest.client.v1 import login
 
 from tests import unittest
+from tests.server import make_request
+from tests.test_utils import make_awaitable
+from tests.unittest import override_config
 
 
 class ClientIpStoreTestCase(unittest.HomeserverTestCase):
@@ -37,9 +37,19 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(12345678)
 
         user_id = "@user:id"
+        device_id = "MY_DEVICE"
+
+        # Insert a user IP
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
         self.get_success(
             self.store.insert_client_ip(
-                user_id, "access_token", "ip", "user_agent", "device_id"
+                user_id, "access_token", "ip", "user_agent", device_id
             )
         )
 
@@ -47,15 +57,14 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.reactor.advance(10)
 
         result = self.get_success(
-            self.store.get_last_client_ip_by_device(user_id, "device_id")
+            self.store.get_last_client_ip_by_device(user_id, device_id)
         )
 
-        r = result[(user_id, "device_id")]
+        r = result[(user_id, device_id)]
         self.assertDictContainsSubset(
             {
                 "user_id": user_id,
-                "device_id": "device_id",
-                "access_token": "access_token",
+                "device_id": device_id,
                 "ip": "ip",
                 "user_agent": "user_agent",
                 "last_seen": 12345678000,
@@ -82,7 +91,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.pump(0)
 
         result = self.get_success(
-            self.store._simple_select_list(
+            self.store.db_pool.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -113,7 +122,7 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         self.pump(0)
 
         result = self.get_success(
-            self.store._simple_select_list(
+            self.store.db_pool.simple_select_list(
                 table="user_ips",
                 keyvalues={"user_id": user_id},
                 retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
@@ -134,9 +143,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    @override_config({"limit_usage_by_mau": False, "max_mau_value": 50})
     def test_disabled_monthly_active_user(self):
-        self.hs.config.limit_usage_by_mau = False
-        self.hs.config.max_mau_value = 50
         user_id = "@user:server"
         self.get_success(
             self.store.insert_client_ip(
@@ -146,14 +154,13 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
 
+    @override_config({"limit_usage_by_mau": True, "max_mau_value": 50})
     def test_adding_monthly_active_user_when_full(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 50
         lots_of_users = 100
         user_id = "@user:server"
 
         self.store.get_monthly_active_count = Mock(
-            return_value=defer.succeed(lots_of_users)
+            return_value=make_awaitable(lots_of_users)
         )
         self.get_success(
             self.store.insert_client_ip(
@@ -163,9 +170,8 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
 
+    @override_config({"limit_usage_by_mau": True, "max_mau_value": 50})
     def test_adding_monthly_active_user_when_space(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 50
         user_id = "@user:server"
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
@@ -181,13 +187,10 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertTrue(active)
 
+    @override_config({"limit_usage_by_mau": True, "max_mau_value": 50})
     def test_updating_monthly_active_user_when_space(self):
-        self.hs.config.limit_usage_by_mau = True
-        self.hs.config.max_mau_value = 50
         user_id = "@user:server"
-        self.get_success(
-            self.store.register(user_id=user_id, token="123", password_hash=None)
-        )
+        self.get_success(self.store.register_user(user_id=user_id, password_hash=None))
 
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertFalse(active)
@@ -202,12 +205,191 @@ class ClientIpStoreTestCase(unittest.HomeserverTestCase):
         )
         active = self.get_success(self.store.user_last_seen_monthly_active(user_id))
         self.assertTrue(active)
+
+    def test_devices_last_seen_bg_update(self):
+        # First make sure we have completed all updates.
+        while not self.get_success(
+            self.store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+            )
+
+        user_id = "@user:id"
+        device_id = "MY_DEVICE"
+
+        # Insert a user IP
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", device_id
+            )
+        )
+        # Force persisting to disk
+        self.reactor.advance(200)
+
+        # But clear the associated entry in devices table
+        self.get_success(
+            self.store.db_pool.simple_update(
+                table="devices",
+                keyvalues={"user_id": user_id, "device_id": device_id},
+                updatevalues={"last_seen": None, "ip": None, "user_agent": None},
+                desc="test_devices_last_seen_bg_update",
+            )
+        )
+
+        # We should now get nulls when querying
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, device_id)
+        )
+
+        r = result[(user_id, device_id)]
+        self.assertDictContainsSubset(
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "ip": None,
+                "user_agent": None,
+                "last_seen": None,
+            },
+            r,
+        )
+
+        # Register the background update to run again.
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                table="background_updates",
+                values={
+                    "update_name": "devices_last_seen",
+                    "progress_json": "{}",
+                    "depends_on": None,
+                },
+            )
+        )
+
+        # ... and tell the DataStore that it hasn't finished all updates yet
+        self.store.db_pool.updates._all_done = False
+
+        # Now let's actually drive the updates to completion
+        while not self.get_success(
+            self.store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+            )
+
+        # We should now get the correct result again
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, device_id)
+        )
+
+        r = result[(user_id, device_id)]
+        self.assertDictContainsSubset(
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "ip": "ip",
+                "user_agent": "user_agent",
+                "last_seen": 0,
+            },
+            r,
+        )
+
+    def test_old_user_ips_pruned(self):
+        # First make sure we have completed all updates.
+        while not self.get_success(
+            self.store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+            )
+
+        user_id = "@user:id"
+        device_id = "MY_DEVICE"
+
+        # Insert a user IP
+        self.get_success(
+            self.store.store_device(
+                user_id,
+                device_id,
+                "display name",
+            )
+        )
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip", "user_agent", device_id
+            )
+        )
+
+        # Force persisting to disk
+        self.reactor.advance(200)
+
+        # We should see that in the DB
+        result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": user_id},
+                retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
+
+        self.assertEqual(
+            result,
+            [
+                {
+                    "access_token": "access_token",
+                    "ip": "ip",
+                    "user_agent": "user_agent",
+                    "device_id": device_id,
+                    "last_seen": 0,
+                }
+            ],
+        )
+
+        # Now advance by a couple of months
+        self.reactor.advance(60 * 24 * 60 * 60)
+
+        # We should get no results.
+        result = self.get_success(
+            self.store.db_pool.simple_select_list(
+                table="user_ips",
+                keyvalues={"user_id": user_id},
+                retcols=["access_token", "ip", "user_agent", "device_id", "last_seen"],
+                desc="get_user_ip_and_agents",
+            )
+        )
+
+        self.assertEqual(result, [])
+
+        # But we should still get the correct values for the device
+        result = self.get_success(
+            self.store.get_last_client_ip_by_device(user_id, device_id)
+        )
+
+        r = result[(user_id, device_id)]
+        self.assertDictContainsSubset(
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                "ip": "ip",
+                "user_agent": "user_agent",
+                "last_seen": 0,
+            },
+            r,
+        )
 
 
 class ClientIpAuthTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        synapse.rest.admin.register_servlets,
         login.register_servlets,
     ]
 
@@ -244,18 +426,18 @@ class ClientIpAuthTestCase(unittest.HomeserverTestCase):
         # Advance to a known time
         self.reactor.advance(123456 - self.reactor.seconds())
 
-        request, channel = self.make_request(
-            "GET",
-            "/_matrix/client/r0/admin/users/" + self.user_id,
-            access_token=access_token,
-            **make_request_args
-        )
-        request.requestHeaders.addRawHeader(b"User-Agent", b"Mozzila pizza")
+        headers1 = {b"User-Agent": b"Mozzila pizza"}
+        headers1.update(headers)
 
-        # Add the optional headers
-        for h, v in headers.items():
-            request.requestHeaders.addRawHeader(h, v)
-        self.render(request)
+        make_request(
+            self.reactor,
+            self.site,
+            "GET",
+            "/_synapse/admin/v2/users/" + self.user_id,
+            access_token=access_token,
+            custom_headers=headers1.items(),
+            **make_request_args,
+        )
 
         # Advance so the save loop occurs
         self.reactor.advance(100)

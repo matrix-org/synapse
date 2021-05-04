@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,46 +13,62 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Optional
 
-from twisted.internet import defer
-
+import synapse.state
+import synapse.storage
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.errors import LimitExceededError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class BaseHandler(object):
+class BaseHandler:
     """
     Common base class for the event handlers.
 
-    Attributes:
-        store (synapse.storage.DataStore):
-        state_handler (synapse.state.StateHandler):
+    Deprecated: new code should not use this. Instead, Handler classes should define the
+    fields they actually need. The utility methods should either be factored out to
+    standalone helper functions, or to different Handler classes.
     """
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer):
-        """
-        self.store = hs.get_datastore()
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
-        self.state_handler = hs.get_state_handler()
+        self.state_handler = hs.get_state_handler()  # type: synapse.state.StateHandler
         self.distributor = hs.get_distributor()
-        self.ratelimiter = hs.get_ratelimiter()
         self.clock = hs.get_clock()
         self.hs = hs
+
+        # The rate_hz and burst_count are overridden on a per-user basis
+        self.request_ratelimiter = Ratelimiter(
+            store=self.store, clock=self.clock, rate_hz=0, burst_count=0
+        )
+        self._rc_message = self.hs.config.rc_message
+
+        # Check whether ratelimiting room admin message redaction is enabled
+        # by the presence of rate limits in the config
+        if self.hs.config.rc_admin_redaction:
+            self.admin_redaction_ratelimiter = Ratelimiter(
+                store=self.store,
+                clock=self.clock,
+                rate_hz=self.hs.config.rc_admin_redaction.per_second,
+                burst_count=self.hs.config.rc_admin_redaction.burst_count,
+            )  # type: Optional[Ratelimiter]
+        else:
+            self.admin_redaction_ratelimiter = None
 
         self.server_name = hs.hostname
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    @defer.inlineCallbacks
-    def ratelimit(self, requester, update=True):
+    async def ratelimit(self, requester, update=True, is_admin_redaction=False):
         """Ratelimits requests.
 
         Args:
@@ -62,11 +77,13 @@ class BaseHandler(object):
                 Set to False when doing multiple checks for one request (e.g.
                 to check up front if we would reject the request), and set to
                 True for the last call for a given request.
+            is_admin_redaction (bool): Whether this is a room admin/moderator
+                redacting an event. If so then we may apply different
+                ratelimits depending on config.
 
         Raises:
             LimitExceededError if the request should be ratelimited
         """
-        time_now = self.clock.time()
         user_id = requester.user.to_string()
 
         # The AS user itself is never rate limited.
@@ -74,61 +91,55 @@ class BaseHandler(object):
         if app_service is not None:
             return  # do not ratelimit app service senders
 
-        # Disable rate limiting of users belonging to any AS that is configured
-        # not to be rate limited in its registration file (rate_limited: true|false).
-        if requester.app_service and not requester.app_service.is_rate_limited():
-            return
+        messages_per_second = self._rc_message.per_second
+        burst_count = self._rc_message.burst_count
 
         # Check if there is a per user override in the DB.
-        override = yield self.store.get_ratelimit_for_user(user_id)
+        override = await self.store.get_ratelimit_for_user(user_id)
         if override:
-            # If overriden with a null Hz then ratelimiting has been entirely
+            # If overridden with a null Hz then ratelimiting has been entirely
             # disabled for the user
             if not override.messages_per_second:
                 return
 
             messages_per_second = override.messages_per_second
             burst_count = override.burst_count
-        else:
-            messages_per_second = self.hs.config.rc_message.per_second
-            burst_count = self.hs.config.rc_message.burst_count
 
-        allowed, time_allowed = self.ratelimiter.can_do_action(
-            user_id,
-            time_now,
-            rate_hz=messages_per_second,
-            burst_count=burst_count,
-            update=update,
-        )
-        if not allowed:
-            raise LimitExceededError(
-                retry_after_ms=int(1000 * (time_allowed - time_now))
+        if is_admin_redaction and self.admin_redaction_ratelimiter:
+            # If we have separate config for admin redactions, use a separate
+            # ratelimiter as to not have user_ids clash
+            await self.admin_redaction_ratelimiter.ratelimit(requester, update=update)
+        else:
+            # Override rate and burst count per-user
+            await self.request_ratelimiter.ratelimit(
+                requester,
+                rate_hz=messages_per_second,
+                burst_count=burst_count,
+                update=update,
             )
 
-    @defer.inlineCallbacks
-    def maybe_kick_guest_users(self, event, context=None):
+    async def maybe_kick_guest_users(self, event, context=None):
         # Technically this function invalidates current_state by changing it.
         # Hopefully this isn't that important to the caller.
         if event.type == EventTypes.GuestAccess:
             guest_access = event.content.get("guest_access", "forbidden")
             if guest_access != "can_join":
                 if context:
-                    current_state_ids = yield context.get_current_state_ids(self.store)
-                    current_state = yield self.store.get_events(
+                    current_state_ids = await context.get_current_state_ids()
+                    current_state_dict = await self.store.get_events(
                         list(current_state_ids.values())
                     )
+                    current_state = list(current_state_dict.values())
                 else:
-                    current_state = yield self.state_handler.get_current_state(
+                    current_state_map = await self.state_handler.get_current_state(
                         event.room_id
                     )
-
-                current_state = list(current_state.values())
+                    current_state = list(current_state_map.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
-                yield self.kick_guest_users(current_state)
+                await self.kick_guest_users(current_state)
 
-    @defer.inlineCallbacks
-    def kick_guest_users(self, current_state):
+    async def kick_guest_users(self, current_state):
         for member_event in current_state:
             try:
                 if member_event.type != EventTypes.Member:
@@ -157,9 +168,11 @@ class BaseHandler(object):
                 # and having homeservers have their own users leave keeps more
                 # of that decision-making and control local to the guest-having
                 # homeserver.
-                requester = synapse.types.create_requester(target_user, is_guest=True)
+                requester = synapse.types.create_requester(
+                    target_user, is_guest=True, authenticated_entity=self.server_name
+                )
                 handler = self.hs.get_room_member_handler()
-                yield handler.update_membership(
+                await handler.update_membership(
                     requester,
                     target_user,
                     member_event.room_id,

@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,21 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from twisted.internet import defer
-
 from synapse.api.constants import EventTypes
+from synapse.api.room_versions import RoomVersions
 from synapse.types import RoomAlias, RoomID, UserID
 
-from tests import unittest
-from tests.utils import setup_test_homeserver
+from tests.unittest import HomeserverTestCase
 
 
-class RoomStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
-
+class RoomStoreTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         # We can't test RoomStore on its own without the DirectoryStore, for
         # management of the 'room_aliases' table
         self.store = hs.get_datastore()
@@ -36,13 +29,15 @@ class RoomStoreTestCase(unittest.TestCase):
         self.alias = RoomAlias.from_string("#a-room-name:test")
         self.u_creator = UserID.from_string("@creator:test")
 
-        yield self.store.store_room(
-            self.room.to_string(),
-            room_creator_user_id=self.u_creator.to_string(),
-            is_public=True,
+        self.get_success(
+            self.store.store_room(
+                self.room.to_string(),
+                room_creator_user_id=self.u_creator.to_string(),
+                is_public=True,
+                room_version=RoomVersions.V1,
+            )
         )
 
-    @defer.inlineCallbacks
     def test_get_room(self):
         self.assertDictContainsSubset(
             {
@@ -50,41 +45,64 @@ class RoomStoreTestCase(unittest.TestCase):
                 "creator": self.u_creator.to_string(),
                 "is_public": True,
             },
-            (yield self.store.get_room(self.room.to_string())),
+            (self.get_success(self.store.get_room(self.room.to_string()))),
+        )
+
+    def test_get_room_unknown_room(self):
+        self.assertIsNone((self.get_success(self.store.get_room("!uknown:test"))))
+
+    def test_get_room_with_stats(self):
+        self.assertDictContainsSubset(
+            {
+                "room_id": self.room.to_string(),
+                "creator": self.u_creator.to_string(),
+                "public": True,
+            },
+            (self.get_success(self.store.get_room_with_stats(self.room.to_string()))),
+        )
+
+    def test_get_room_with_stats_unknown_room(self):
+        self.assertIsNone(
+            (self.get_success(self.store.get_room_with_stats("!uknown:test"))),
         )
 
 
-class RoomEventsStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = setup_test_homeserver(self.addCleanup)
-
+class RoomEventsStoreTestCase(HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
         # Room events need the full datastore, for persist_event() and
         # get_room_state()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.event_factory = hs.get_event_factory()
 
         self.room = RoomID.from_string("!abcde:test")
 
-        yield self.store.store_room(
-            self.room.to_string(), room_creator_user_id="@creator:text", is_public=True
+        self.get_success(
+            self.store.store_room(
+                self.room.to_string(),
+                room_creator_user_id="@creator:text",
+                is_public=True,
+                room_version=RoomVersions.V1,
+            )
         )
 
-    @defer.inlineCallbacks
     def inject_room_event(self, **kwargs):
-        yield self.store.persist_event(
-            self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
+        self.get_success(
+            self.storage.persistence.persist_event(
+                self.event_factory.create_event(room_id=self.room.to_string(), **kwargs)
+            )
         )
 
-    @defer.inlineCallbacks
     def STALE_test_room_name(self):
         name = "A-Room-Name"
 
-        yield self.inject_room_event(
+        self.inject_room_event(
             etype=EventTypes.Name, name=name, content={"name": name}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = self.get_success(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(
@@ -92,15 +110,16 @@ class RoomEventsStoreTestCase(unittest.TestCase):
             state[0],
         )
 
-    @defer.inlineCallbacks
     def STALE_test_room_topic(self):
         topic = "A place for things"
 
-        yield self.inject_room_event(
+        self.inject_room_event(
             etype=EventTypes.Topic, topic=topic, content={"topic": topic}, depth=1
         )
 
-        state = yield self.store.get_current_state(room_id=self.room.to_string())
+        state = self.get_success(
+            self.store.get_current_state(room_id=self.room.to_string())
+        )
 
         self.assertEquals(1, len(state))
         self.assertObjectHasAttributes(

@@ -11,62 +11,72 @@
 #    docker build -f docker/Dockerfile --build-arg PYTHON_VERSION=3.6 .
 #
 
-ARG PYTHON_VERSION=3.7
+ARG PYTHON_VERSION=3.8
 
 ###
 ### Stage 0: builder
 ###
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.8 as builder
+FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
 # install the OS build deps
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libffi-dev \
+    libjpeg-dev \
+    libpq-dev \
+    libssl-dev \
+    libwebp-dev \
+    libxml++2.6-dev \
+    libxslt1-dev \
+    openssl \
+    rustc \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-RUN apk add \
-        build-base \
-        libffi-dev \
-        libjpeg-turbo-dev \
-        libressl-dev \
-        libxslt-dev \
-        linux-headers \
-        postgresql-dev \
-        zlib-dev
-
-# build things which have slow build steps, before we copy synapse, so that
-# the layer can be cached.
-#
-# (we really just care about caching a wheel here, as the "pip install" below
-# will install them again.)
-
-RUN pip install --prefix="/install" --no-warn-script-location \
-        cryptography \
-        msgpack-python \
-        pillow \
-        pynacl
-
-# now install synapse and all of the python deps to /install.
-
-COPY synapse /synapse/synapse/
+# Copy just what we need to pip install
 COPY scripts /synapse/scripts/
 COPY MANIFEST.in README.rst setup.py synctl /synapse/
+COPY synapse/__init__.py /synapse/synapse/__init__.py
+COPY synapse/python_dependencies.py /synapse/synapse/python_dependencies.py
 
+# To speed up rebuilds, install all of the dependencies before we copy over
+# the whole synapse project so that we this layer in the Docker cache can be
+# used while you develop on the source
+#
+# This is aiming at installing the `install_requires` and `extras_require` from `setup.py`
 RUN pip install --prefix="/install" --no-warn-script-location \
-        /synapse[all]
+    /synapse[all]
+
+# Copy over the rest of the project
+COPY synapse /synapse/synapse/
+
+# Install the synapse package itself and all of its children packages.
+#
+# This is aiming at installing only the `packages=find_packages(...)` from `setup.py
+RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
 
 ###
 ### Stage 1: runtime
 ###
 
-FROM docker.io/python:${PYTHON_VERSION}-alpine3.8
+FROM docker.io/python:${PYTHON_VERSION}-slim
 
-# xmlsec is required for saml support
-RUN apk add --no-cache --virtual .runtime_deps \
-        libffi \
-        libjpeg-turbo \
-        libressl \
-        libxslt \
-        libpq \
-        zlib \
-        su-exec \
-        xmlsec
+LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
+LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'
+LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git'
+LABEL org.opencontainers.image.licenses='Apache-2.0'
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    gosu \
+    libjpeg62-turbo \
+    libpq5 \
+    libwebp6 \
+    xmlsec1 \
+    libjemalloc2 \
+    libssl-dev \
+    openssl \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
@@ -77,3 +87,6 @@ VOLUME ["/data"]
 EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]
+
+HEALTHCHECK --interval=1m --timeout=5s \
+    CMD curl -fSs http://localhost:8008/health || exit 1

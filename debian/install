@@ -1,2 +1,1 @@
-debian/log.yaml etc/matrix-synapse
 debian/manage_debconf.pl /opt/venvs/matrix-synapse/lib/

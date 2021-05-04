@@ -94,7 +94,7 @@ class SynapseManhole(ColoredManhole):
     """Overrides connectionMade to create our own ManholeInterpreter"""
 
     def connectionMade(self):
-        super(SynapseManhole, self).connectionMade()
+        super().connectionMade()
 
         # replace the manhole interpreter with our own impl
         self.interpreter = SynapseManholeInterpreter(self, self.namespace)

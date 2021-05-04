@@ -1,7 +1,5 @@
 #! /usr/bin/python
 
-from __future__ import print_function
-
 import argparse
 import ast
 import os
@@ -13,7 +11,7 @@ import yaml
 
 class DefinitionVisitor(ast.NodeVisitor):
     def __init__(self):
-        super(DefinitionVisitor, self).__init__()
+        super().__init__()
         self.functions = {}
         self.classes = {}
         self.names = {}
@@ -142,7 +140,7 @@ if __name__ == "__main__":
 
     definitions = {}
     for directory in args.directories:
-        for root, dirs, files in os.walk(directory):
+        for root, _, files in os.walk(directory):
             for filename in files:
                 if filename.endswith(".py"):
                     filepath = os.path.join(root, filename)

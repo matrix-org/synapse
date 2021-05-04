@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,20 +14,37 @@
 
 import logging
 from collections import namedtuple
+from typing import (
+    Awaitable,
+    Callable,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
+import attr
 from prometheus_client import Counter
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+import synapse.server
+from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
+from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging.context import PreserveLoggingContext
+from synapse.logging.opentracing import log_kv, start_active_span
+from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
-from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.types import StreamToken
+from synapse.streams.config import PaginationConfig
+from synapse.types import PersistedEventPosition, RoomStreamToken, StreamToken, UserID
 from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
-from synapse.util.logcontext import PreserveLoggingContext
-from synapse.util.logutils import log_function
 from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
 
@@ -40,19 +56,21 @@ users_woken_by_stream_counter = Counter(
     "synapse_notifier_users_woken_by_stream", "", ["stream"]
 )
 
+T = TypeVar("T")
+
 
 # TODO(paul): Should be shared somewhere
-def count(func, l):
-    """Return the number of items in l for which func returns true."""
+def count(func: Callable[[T], bool], it: Iterable[T]) -> int:
+    """Return the number of items in it for which func returns true."""
     n = 0
-    for x in l:
+    for x in it:
         if func(x):
             n += 1
     return n
 
 
-class _NotificationListener(object):
-    """ This represents a single client connection to the events stream.
+class _NotificationListener:
+    """This represents a single client connection to the events stream.
     The events stream handler will have yielded to the deferred, so to
     notify the handler it is sufficient to resolve the deferred.
     """
@@ -63,7 +81,7 @@ class _NotificationListener(object):
         self.deferred = deferred
 
 
-class _NotifierUserStream(object):
+class _NotifierUserStream:
     """This represents a user connected to the event stream.
     It tracks the most recent stream token for that user.
     At a given point a user may have a number of streams listening for
@@ -73,13 +91,19 @@ class _NotifierUserStream(object):
     so that it can remove itself from the indexes in the Notifier class.
     """
 
-    def __init__(self, user_id, rooms, current_token, time_now_ms):
+    def __init__(
+        self,
+        user_id: str,
+        rooms: Collection[str],
+        current_token: StreamToken,
+        time_now_ms: int,
+    ):
         self.user_id = user_id
         self.rooms = set(rooms)
         self.current_token = current_token
 
         # The last token for which we should wake up any streams that have a
-        # token that comes before it. This gets updated everytime we get poked.
+        # token that comes before it. This gets updated every time we get poked.
         # We start it at the current token since if we get any streams
         # that have a token from before we have no idea whether they should be
         # woken up or not, so lets just wake them up.
@@ -89,18 +113,32 @@ class _NotifierUserStream(object):
         with PreserveLoggingContext():
             self.notify_deferred = ObservableDeferred(defer.Deferred())
 
-    def notify(self, stream_key, stream_id, time_now_ms):
+    def notify(
+        self,
+        stream_key: str,
+        stream_id: Union[int, RoomStreamToken],
+        time_now_ms: int,
+    ):
         """Notify any listeners for this user of a new event from an
         event source.
         Args:
-            stream_key(str): The stream the event came from.
-            stream_id(str): The new id for the stream the event came from.
-            time_now_ms(int): The current time in milliseconds.
+            stream_key: The stream the event came from.
+            stream_id: The new id for the stream the event came from.
+            time_now_ms: The current time in milliseconds.
         """
         self.current_token = self.current_token.copy_and_advance(stream_key, stream_id)
         self.last_notified_token = self.current_token
         self.last_notified_ms = time_now_ms
         noify_deferred = self.notify_deferred
+
+        log_kv(
+            {
+                "notify": self.user_id,
+                "stream": stream_key,
+                "stream_id": stream_id,
+                "listeners": self.count_listeners(),
+            }
+        )
 
         users_woken_by_stream_counter.labels(stream_key).inc()
 
@@ -108,8 +146,8 @@ class _NotifierUserStream(object):
             self.notify_deferred = ObservableDeferred(defer.Deferred())
             noify_deferred.callback(self.current_token)
 
-    def remove(self, notifier):
-        """ Remove this listener from all the indexes in the Notifier
+    def remove(self, notifier: "Notifier"):
+        """Remove this listener from all the indexes in the Notifier
         it knows about.
         """
 
@@ -119,10 +157,10 @@ class _NotifierUserStream(object):
 
         notifier.user_to_user_stream.pop(self.user_id)
 
-    def count_listeners(self):
+    def count_listeners(self) -> int:
         return len(self.notify_deferred.observers())
 
-    def new_listener(self, token):
+    def new_listener(self, token: StreamToken) -> _NotificationListener:
         """Returns a deferred that is resolved when there is a new token
         greater than the given token.
 
@@ -132,21 +170,30 @@ class _NotifierUserStream(object):
         """
         # Immediately wake up stream if something has already since happened
         # since their last token.
-        if self.last_notified_token.is_after(token):
+        if self.last_notified_token != token:
             return _NotificationListener(defer.succeed(self.current_token))
         else:
             return _NotificationListener(self.notify_deferred.observe())
 
 
 class EventStreamResult(namedtuple("EventStreamResult", ("events", "tokens"))):
-    def __nonzero__(self):
+    def __bool__(self):
         return bool(self.events)
 
-    __bool__ = __nonzero__  # python3
+
+@attr.s(slots=True, frozen=True)
+class _PendingRoomEventEntry:
+    event_pos = attr.ib(type=PersistedEventPosition)
+    extra_users = attr.ib(type=Collection[UserID])
+
+    room_id = attr.ib(type=str)
+    type = attr.ib(type=str)
+    state_key = attr.ib(type=Optional[str])
+    membership = attr.ib(type=Optional[str])
 
 
-class Notifier(object):
-    """ This class is responsible for notifying any listeners when there are
+class Notifier:
+    """This class is responsible for notifying any listeners when there are
     new events available for it.
 
     Primarily used from the /events stream.
@@ -154,24 +201,30 @@ class Notifier(object):
 
     UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
 
-    def __init__(self, hs):
-        self.user_to_user_stream = {}
-        self.room_to_user_streams = {}
+    def __init__(self, hs: "synapse.server.HomeServer"):
+        self.user_to_user_stream = {}  # type: Dict[str, _NotifierUserStream]
+        self.room_to_user_streams = {}  # type: Dict[str, Set[_NotifierUserStream]]
 
         self.hs = hs
+        self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
-        self.pending_new_room_events = []
+        self.pending_new_room_events = []  # type: List[_PendingRoomEventEntry]
 
-        self.replication_callbacks = []
+        # Called when there are new things to stream over replication
+        self.replication_callbacks = []  # type: List[Callable[[], None]]
+
+        # Called when remote servers have come back online after having been
+        # down.
+        self.remote_server_up_callbacks = []  # type: List[Callable[[str], None]]
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
+        self._pusher_pool = hs.get_pusherpool()
 
+        self.federation_sender = None
         if hs.should_send_federation():
             self.federation_sender = hs.get_federation_sender()
-        else:
-            self.federation_sender = None
 
         self.state_handler = hs.get_state_handler()
 
@@ -183,12 +236,12 @@ class Notifier(object):
         # when rendering the metrics page, which is likely once per minute at
         # most when scraping it.
         def count_listeners():
-            all_user_streams = set()
+            all_user_streams = set()  # type: Set[_NotifierUserStream]
 
-            for x in list(self.room_to_user_streams.values()):
-                all_user_streams |= x
-            for x in list(self.user_to_user_stream.values()):
-                all_user_streams.add(x)
+            for streams in list(self.room_to_user_streams.values()):
+                all_user_streams |= streams
+            for stream in list(self.user_to_user_stream.values()):
+                all_user_streams.add(stream)
 
             return sum(stream.count_listeners() for stream in all_user_streams)
 
@@ -204,7 +257,7 @@ class Notifier(object):
             "synapse_notifier_users", "", [], lambda: len(self.user_to_user_stream)
         )
 
-    def add_replication_callback(self, cb):
+    def add_replication_callback(self, cb: Callable[[], None]):
         """Add a callback that will be called when some new data is available.
         Callback is not given any arguments. It should *not* return a Deferred - if
         it needs to do any asynchronous work, a background thread should be started and
@@ -213,9 +266,34 @@ class Notifier(object):
         self.replication_callbacks.append(cb)
 
     def on_new_room_event(
-        self, event, room_stream_id, max_room_stream_id, extra_users=[]
+        self,
+        event: EventBase,
+        event_pos: PersistedEventPosition,
+        max_room_stream_token: RoomStreamToken,
+        extra_users: Optional[Collection[UserID]] = None,
     ):
-        """ Used by handlers to inform the notifier something has happened
+        """Unwraps event and calls `on_new_room_event_args`."""
+        self.on_new_room_event_args(
+            event_pos=event_pos,
+            room_id=event.room_id,
+            event_type=event.type,
+            state_key=event.get("state_key"),
+            membership=event.content.get("membership"),
+            max_room_stream_token=max_room_stream_token,
+            extra_users=extra_users or [],
+        )
+
+    def on_new_room_event_args(
+        self,
+        room_id: str,
+        event_type: str,
+        state_key: Optional[str],
+        membership: Optional[str],
+        event_pos: PersistedEventPosition,
+        max_room_stream_token: RoomStreamToken,
+        extra_users: Optional[Collection[UserID]] = None,
+    ):
+        """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
 
         This triggers the notifier to wake up any listeners that are
@@ -226,95 +304,165 @@ class Notifier(object):
         until all previous events have been persisted before notifying
         the client streams.
         """
-        self.pending_new_room_events.append((room_stream_id, event, extra_users))
-        self._notify_pending_new_room_events(max_room_stream_id)
+        self.pending_new_room_events.append(
+            _PendingRoomEventEntry(
+                event_pos=event_pos,
+                extra_users=extra_users or [],
+                room_id=room_id,
+                type=event_type,
+                state_key=state_key,
+                membership=membership,
+            )
+        )
+        self._notify_pending_new_room_events(max_room_stream_token)
 
         self.notify_replication()
 
-    def _notify_pending_new_room_events(self, max_room_stream_id):
+    def _notify_pending_new_room_events(self, max_room_stream_token: RoomStreamToken):
         """Notify for the room events that were queued waiting for a previous
         event to be persisted.
         Args:
-            max_room_stream_id(int): The highest stream_id below which all
+            max_room_stream_token: The highest stream_id below which all
                 events have been persisted.
         """
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
-        for room_stream_id, event, extra_users in pending:
-            if room_stream_id > max_room_stream_id:
-                self.pending_new_room_events.append(
-                    (room_stream_id, event, extra_users)
-                )
-            else:
-                self._on_new_room_event(event, room_stream_id, extra_users)
 
-    def _on_new_room_event(self, event, room_stream_id, extra_users=[]):
-        """Notify any user streams that are interested in this room event"""
+        users = set()  # type: Set[UserID]
+        rooms = set()  # type: Set[str]
+
+        for entry in pending:
+            if entry.event_pos.persisted_after(max_room_stream_token):
+                self.pending_new_room_events.append(entry)
+            else:
+                if (
+                    entry.type == EventTypes.Member
+                    and entry.membership == Membership.JOIN
+                    and entry.state_key
+                ):
+                    self._user_joined_room(entry.state_key, entry.room_id)
+
+                users.update(entry.extra_users)
+                rooms.add(entry.room_id)
+
+        if users or rooms:
+            self.on_new_event(
+                "room_key",
+                max_room_stream_token,
+                users=users,
+                rooms=rooms,
+            )
+            self._on_updated_room_token(max_room_stream_token)
+
+    def _on_updated_room_token(self, max_room_stream_token: RoomStreamToken):
+        """Poke services that might care that the room position has been
+        updated.
+        """
+
         # poke any interested application service.
-        run_as_background_process(
-            "notify_app_services", self._notify_app_services, room_stream_id
-        )
+        self._notify_app_services(max_room_stream_token)
+        self._notify_pusher_pool(max_room_stream_token)
 
         if self.federation_sender:
-            self.federation_sender.notify_new_events(room_stream_id)
+            self.federation_sender.notify_new_events(max_room_stream_token)
 
-        if event.type == EventTypes.Member and event.membership == Membership.JOIN:
-            self._user_joined_room(event.state_key, event.room_id)
-
-        self.on_new_event(
-            "room_key", room_stream_id, users=extra_users, rooms=[event.room_id]
-        )
-
-    @defer.inlineCallbacks
-    def _notify_app_services(self, room_stream_id):
+    def _notify_app_services(self, max_room_stream_token: RoomStreamToken):
         try:
-            yield self.appservice_handler.notify_interested_services(room_stream_id)
+            self.appservice_handler.notify_interested_services(max_room_stream_token)
         except Exception:
             logger.exception("Error notifying application services of event")
 
-    def on_new_event(self, stream_key, new_token, users=[], rooms=[]):
-        """ Used to inform listeners that something has happened event wise.
+    def _notify_app_services_ephemeral(
+        self,
+        stream_key: str,
+        new_token: Union[int, RoomStreamToken],
+        users: Optional[Collection[Union[str, UserID]]] = None,
+    ):
+        try:
+            stream_token = None
+            if isinstance(new_token, int):
+                stream_token = new_token
+            self.appservice_handler.notify_interested_services_ephemeral(
+                stream_key, stream_token, users or []
+            )
+        except Exception:
+            logger.exception("Error notifying application services of event")
+
+    def _notify_pusher_pool(self, max_room_stream_token: RoomStreamToken):
+        try:
+            self._pusher_pool.on_new_notifications(max_room_stream_token)
+        except Exception:
+            logger.exception("Error pusher pool of event")
+
+    def on_new_event(
+        self,
+        stream_key: str,
+        new_token: Union[int, RoomStreamToken],
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[Collection[str]] = None,
+    ):
+        """Used to inform listeners that something has happened event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
-        with PreserveLoggingContext():
-            with Measure(self.clock, "on_new_event"):
-                user_streams = set()
+        users = users or []
+        rooms = rooms or []
 
-                for user in users:
-                    user_stream = self.user_to_user_stream.get(str(user))
-                    if user_stream is not None:
-                        user_streams.add(user_stream)
+        with Measure(self.clock, "on_new_event"):
+            user_streams = set()
 
-                for room in rooms:
-                    user_streams |= self.room_to_user_streams.get(room, set())
+            log_kv(
+                {
+                    "waking_up_explicit_users": len(users),
+                    "waking_up_explicit_rooms": len(rooms),
+                }
+            )
 
-                time_now_ms = self.clock.time_msec()
-                for user_stream in user_streams:
-                    try:
-                        user_stream.notify(stream_key, new_token, time_now_ms)
-                    except Exception:
-                        logger.exception("Failed to notify listener")
+            for user in users:
+                user_stream = self.user_to_user_stream.get(str(user))
+                if user_stream is not None:
+                    user_streams.add(user_stream)
 
-                self.notify_replication()
+            for room in rooms:
+                user_streams |= self.room_to_user_streams.get(room, set())
 
-    def on_new_replication_data(self):
-        """Used to inform replication listeners that something has happend
+            time_now_ms = self.clock.time_msec()
+            for user_stream in user_streams:
+                try:
+                    user_stream.notify(stream_key, new_token, time_now_ms)
+                except Exception:
+                    logger.exception("Failed to notify listener")
+
+            self.notify_replication()
+
+            # Notify appservices
+            self._notify_app_services_ephemeral(
+                stream_key,
+                new_token,
+                users,
+            )
+
+    def on_new_replication_data(self) -> None:
+        """Used to inform replication listeners that something has happened
         without waking up any of the normal user event streams"""
         self.notify_replication()
 
-    @defer.inlineCallbacks
-    def wait_for_events(
-        self, user_id, timeout, callback, room_ids=None, from_token=StreamToken.START
-    ):
+    async def wait_for_events(
+        self,
+        user_id: str,
+        timeout: int,
+        callback: Callable[[StreamToken, StreamToken], Awaitable[T]],
+        room_ids=None,
+        from_token=StreamToken.START,
+    ) -> T:
         """Wait until the callback returns a non empty response or the
         timeout fires.
         """
         user_stream = self.user_to_user_stream.get(user_id)
         if user_stream is None:
-            current_token = yield self.event_sources.get_current_token()
+            current_token = self.event_sources.get_current_token()
             if room_ids is None:
-                room_ids = yield self.store.get_rooms_for_user(user_id)
+                room_ids = await self.store.get_rooms_for_user(user_id)
             user_stream = _NotifierUserStream(
                 user_id=user_id,
                 rooms=room_ids,
@@ -342,12 +490,34 @@ class Notifier(object):
                         (end_time - now) / 1000.0,
                         self.hs.get_reactor(),
                     )
-                    with PreserveLoggingContext():
-                        yield listener.deferred
+
+                    with start_active_span("wait_for_events.deferred"):
+                        log_kv(
+                            {
+                                "wait_for_events": "sleep",
+                                "token": prev_token,
+                            }
+                        )
+
+                        with PreserveLoggingContext():
+                            await listener.deferred
+
+                        log_kv(
+                            {
+                                "wait_for_events": "woken",
+                                "token": user_stream.current_token,
+                            }
+                        )
 
                     current_token = user_stream.current_token
 
-                    result = yield callback(prev_token, current_token)
+                    result = await callback(prev_token, current_token)
+                    log_kv(
+                        {
+                            "wait_for_events": "result",
+                            "result": bool(result),
+                        }
+                    )
                     if result:
                         break
 
@@ -355,54 +525,54 @@ class Notifier(object):
                     # has happened between the old prev_token and the current_token
                     prev_token = current_token
                 except defer.TimeoutError:
+                    log_kv({"wait_for_events": "timeout"})
                     break
                 except defer.CancelledError:
+                    log_kv({"wait_for_events": "cancelled"})
                     break
 
         if result is None:
             # This happened if there was no timeout or if the timeout had
             # already expired.
             current_token = user_stream.current_token
-            result = yield callback(prev_token, current_token)
+            result = await callback(prev_token, current_token)
 
-        defer.returnValue(result)
+        return result
 
-    @defer.inlineCallbacks
-    def get_events_for(
+    async def get_events_for(
         self,
-        user,
-        pagination_config,
-        timeout,
-        only_keys=None,
-        is_guest=False,
-        explicit_room_id=None,
-    ):
-        """ For the given user and rooms, return any new events for them. If
+        user: UserID,
+        pagination_config: PaginationConfig,
+        timeout: int,
+        is_guest: bool = False,
+        explicit_room_id: Optional[str] = None,
+    ) -> EventStreamResult:
+        """For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
         new events to happen before returning.
-
-        If `only_keys` is not None, events from keys will be sent down.
 
         If explicit_room_id is not set, the user's joined rooms will be polled
         for events.
         If explicit_room_id is set, that room will be polled for events only if
         it is world readable or the user has joined the room.
         """
-        from_token = pagination_config.from_token
-        if not from_token:
-            from_token = yield self.event_sources.get_current_token()
+        if pagination_config.from_token:
+            from_token = pagination_config.from_token
+        else:
+            from_token = self.event_sources.get_current_token()
 
         limit = pagination_config.limit
 
-        room_ids, is_joined = yield self._get_room_ids(user, explicit_room_id)
+        room_ids, is_joined = await self._get_room_ids(user, explicit_room_id)
         is_peeking = not is_joined
 
-        @defer.inlineCallbacks
-        def check_for_updates(before_token, after_token):
-            if not after_token.is_after(before_token):
-                defer.returnValue(EventStreamResult([], (from_token, from_token)))
+        async def check_for_updates(
+            before_token: StreamToken, after_token: StreamToken
+        ) -> EventStreamResult:
+            if after_token == before_token:
+                return EventStreamResult([], (from_token, from_token))
 
-            events = []
+            events = []  # type: List[EventBase]
             end_token = from_token
 
             for name, source in self.event_sources.sources.items():
@@ -411,10 +581,8 @@ class Notifier(object):
                 after_id = getattr(after_token, keyname)
                 if before_id == after_id:
                     continue
-                if only_keys and name not in only_keys:
-                    continue
 
-                new_events, new_key = yield source.get_new_events(
+                new_events, new_key = await source.get_new_events(
                     user=user,
                     from_key=getattr(from_token, keyname),
                     limit=limit,
@@ -424,8 +592,11 @@ class Notifier(object):
                 )
 
                 if name == "room":
-                    new_events = yield filter_events_for_client(
-                        self.store, user.to_string(), new_events, is_peeking=is_peeking
+                    new_events = await filter_events_for_client(
+                        self.storage,
+                        user.to_string(),
+                        new_events,
+                        is_peeking=is_peeking,
                     )
                 elif name == "presence":
                     now = self.clock.time_msec()
@@ -440,7 +611,7 @@ class Notifier(object):
                 events.extend(new_events)
                 end_token = end_token.copy_and_replace(keyname, new_key)
 
-            defer.returnValue(EventStreamResult(events, (from_token, end_token)))
+            return EventStreamResult(events, (from_token, end_token))
 
         user_id_for_stream = user.to_string()
         if is_peeking:
@@ -457,7 +628,7 @@ class Notifier(object):
                 user_id_for_stream,
             )
 
-        result = yield self.wait_for_events(
+        result = await self.wait_for_events(
             user_id_for_stream,
             timeout,
             check_for_updates,
@@ -465,31 +636,33 @@ class Notifier(object):
             from_token=from_token,
         )
 
-        defer.returnValue(result)
+        return result
 
-    @defer.inlineCallbacks
-    def _get_room_ids(self, user, explicit_room_id):
-        joined_room_ids = yield self.store.get_rooms_for_user(user.to_string())
+    async def _get_room_ids(
+        self, user: UserID, explicit_room_id: Optional[str]
+    ) -> Tuple[Collection[str], bool]:
+        joined_room_ids = await self.store.get_rooms_for_user(user.to_string())
         if explicit_room_id:
             if explicit_room_id in joined_room_ids:
-                defer.returnValue(([explicit_room_id], True))
-            if (yield self._is_world_readable(explicit_room_id)):
-                defer.returnValue(([explicit_room_id], False))
+                return [explicit_room_id], True
+            if await self._is_world_readable(explicit_room_id):
+                return [explicit_room_id], False
             raise AuthError(403, "Non-joined access not allowed")
-        defer.returnValue((joined_room_ids, True))
+        return joined_room_ids, True
 
-    @defer.inlineCallbacks
-    def _is_world_readable(self, room_id):
-        state = yield self.state_handler.get_current_state(
+    async def _is_world_readable(self, room_id: str) -> bool:
+        state = await self.state_handler.get_current_state(
             room_id, EventTypes.RoomHistoryVisibility, ""
         )
         if state and "history_visibility" in state.content:
-            defer.returnValue(state.content["history_visibility"] == "world_readable")
+            return (
+                state.content["history_visibility"] == HistoryVisibility.WORLD_READABLE
+            )
         else:
-            defer.returnValue(False)
+            return False
 
     @log_function
-    def remove_expired_streams(self):
+    def remove_expired_streams(self) -> None:
         time_now_ms = self.clock.time_msec()
         expired_streams = []
         expire_before_ts = time_now_ms - self.UNUSED_STREAM_EXPIRY_MS
@@ -503,21 +676,29 @@ class Notifier(object):
             expired_stream.remove(self)
 
     @log_function
-    def _register_with_keys(self, user_stream):
+    def _register_with_keys(self, user_stream: _NotifierUserStream):
         self.user_to_user_stream[user_stream.user_id] = user_stream
 
         for room in user_stream.rooms:
             s = self.room_to_user_streams.setdefault(room, set())
             s.add(user_stream)
 
-    def _user_joined_room(self, user_id, room_id):
+    def _user_joined_room(self, user_id: str, room_id: str):
         new_user_stream = self.user_to_user_stream.get(user_id)
         if new_user_stream is not None:
             room_streams = self.room_to_user_streams.setdefault(room_id, set())
             room_streams.add(new_user_stream)
             new_user_stream.rooms.add(room_id)
 
-    def notify_replication(self):
+    def notify_replication(self) -> None:
         """Notify the any replication listeners that there's a new event"""
         for cb in self.replication_callbacks:
             cb()
+
+    def notify_remote_server_up(self, server: str):
+        """Notify any replication that a remote server has come back up"""
+        # We call federation_sender directly rather than registering as a
+        # callback as a) we already have a reference to it and b) it introduces
+        # circular dependencies.
+        if self.federation_sender:
+            self.federation_sender.wake_destination(server)

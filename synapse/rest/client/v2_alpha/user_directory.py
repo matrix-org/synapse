@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,6 @@
 # limitations under the License.
 
 import logging
-
-from twisted.internet import defer
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -33,13 +30,12 @@ class UserDirectorySearchRestServlet(RestServlet):
         Args:
             hs (synapse.server.HomeServer): server
         """
-        super(UserDirectorySearchRestServlet, self).__init__()
+        super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
+    async def on_POST(self, request):
         """Searches for users in directory
 
         Returns:
@@ -56,11 +52,11 @@ class UserDirectorySearchRestServlet(RestServlet):
                     ]
                 }
         """
-        requester = yield self.auth.get_user_by_req(request, allow_guest=False)
+        requester = await self.auth.get_user_by_req(request, allow_guest=False)
         user_id = requester.user.to_string()
 
         if not self.hs.config.user_directory_search_enabled:
-            defer.returnValue((200, {"limited": False, "results": []}))
+            return 200, {"limited": False, "results": []}
 
         body = parse_json_object_from_request(request)
 
@@ -72,11 +68,11 @@ class UserDirectorySearchRestServlet(RestServlet):
         except Exception:
             raise SynapseError(400, "`search_term` is required field")
 
-        results = yield self.user_directory_handler.search_users(
+        results = await self.user_directory_handler.search_users(
             user_id, search_term, limit
         )
 
-        defer.returnValue((200, results))
+        return 200, results
 
 
 def register_servlets(hs, http_server):

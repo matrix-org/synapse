@@ -3,6 +3,7 @@
 import codecs
 import glob
 import os
+import platform
 import subprocess
 import sys
 
@@ -41,8 +42,8 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
         config_dir (str): where to put generated config files
         config_path (str): where to put the main config file
         environ (dict): environment dictionary
-        ownership (str): "<user>:<group>" string which will be used to set
-            ownership of the generated configs
+        ownership (str|None): "<user>:<group>" string which will be used to set
+            ownership of the generated configs. If None, ownership will not change.
     """
     for v in ("SYNAPSE_SERVER_NAME", "SYNAPSE_REPORT_STATS"):
         if v not in environ:
@@ -105,24 +106,24 @@ def generate_config_from_template(config_dir, config_path, environ, ownership):
     log("Generating log config file " + log_config_file)
     convert("/conf/log.config", log_config_file, environ)
 
-    subprocess.check_output(["chown", "-R", ownership, "/data"])
-
     # Hopefully we already have a signing key, but generate one if not.
-    subprocess.check_output(
-        [
-            "su-exec",
-            ownership,
-            "python",
-            "-m",
-            "synapse.app.homeserver",
-            "--config-path",
-            config_path,
-            # tell synapse to put generated keys in /data rather than /compiled
-            "--keys-directory",
-            config_dir,
-            "--generate-keys",
-        ]
-    )
+    args = [
+        "python",
+        "-m",
+        "synapse.app.homeserver",
+        "--config-path",
+        config_path,
+        # tell synapse to put generated keys in /data rather than /compiled
+        "--keys-directory",
+        config_dir,
+        "--generate-keys",
+    ]
+
+    if ownership is not None:
+        subprocess.check_output(["chown", "-R", ownership, "/data"])
+        args = ["gosu", ownership] + args
+
+    subprocess.check_output(args)
 
 
 def run_generate_config(environ, ownership):
@@ -130,7 +131,7 @@ def run_generate_config(environ, ownership):
 
     Args:
         environ (dict): env var dict
-        ownership (str): "userid:groupid" arg for chmod
+        ownership (str|None): "userid:groupid" arg for chmod. If None, ownership will not change.
 
     Never returns.
     """
@@ -148,9 +149,6 @@ def run_generate_config(environ, ownership):
     if not os.path.exists(log_config_file):
         log("Creating log config %s" % (log_config_file,))
         convert("/conf/log.config", log_config_file, environ)
-
-    # make sure that synapse has perms to write to the data dir.
-    subprocess.check_output(["chown", ownership, data_dir])
 
     args = [
         "python",
@@ -170,12 +168,29 @@ def run_generate_config(environ, ownership):
         "--open-private-ports",
     ]
     # log("running %s" % (args, ))
-    os.execv("/usr/local/bin/python", args)
+
+    if ownership is not None:
+        # make sure that synapse has perms to write to the data dir.
+        subprocess.check_output(["chown", ownership, data_dir])
+
+        args = ["gosu", ownership] + args
+        os.execv("/usr/sbin/gosu", args)
+    else:
+        os.execv("/usr/local/bin/python", args)
 
 
 def main(args, environ):
-    mode = args[1] if len(args) > 1 else None
-    ownership = "{}:{}".format(environ.get("UID", 991), environ.get("GID", 991))
+    mode = args[1] if len(args) > 1 else "run"
+    desired_uid = int(environ.get("UID", "991"))
+    desired_gid = int(environ.get("GID", "991"))
+    synapse_worker = environ.get("SYNAPSE_WORKER", "synapse.app.homeserver")
+    if (desired_uid == os.getuid()) and (desired_gid == os.getgid()):
+        ownership = None
+    else:
+        ownership = "{}:{}".format(desired_uid, desired_gid)
+
+    if ownership is None:
+        log("Will not perform chmod/gosu as UserID already matches request")
 
     # In generate mode, generate a configuration and missing keys, then exit
     if mode == "generate":
@@ -191,32 +206,41 @@ def main(args, environ):
             config_dir, config_path, environ, ownership
         )
 
-    if mode is not None:
+    if mode != "run":
         error("Unknown execution mode '%s'" % (mode,))
 
-    if "SYNAPSE_SERVER_NAME" in environ:
-        # backwards-compatibility generate-a-config-on-the-fly mode
-        if "SYNAPSE_CONFIG_PATH" in environ:
-            error(
-                "SYNAPSE_SERVER_NAME and SYNAPSE_CONFIG_PATH are mutually exclusive "
-                "except in `generate` or `migrate_config` mode."
-            )
+    args = args[2:]
 
-        config_path = "/compiled/homeserver.yaml"
-        log(
-            "Generating config file '%s' on-the-fly from environment variables.\n"
-            "Note that this mode is deprecated. You can migrate to a static config\n"
-            "file by running with 'migrate_config'. See the README for more details."
-            % (config_path,)
-        )
+    if "-m" not in args:
+        args = ["-m", synapse_worker] + args
 
-        generate_config_from_template("/compiled", config_path, environ, ownership)
+    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
+
+    if os.path.isfile(jemallocpath):
+        environ["LD_PRELOAD"] = jemallocpath
     else:
+        log("Could not find %s, will not use" % (jemallocpath,))
+
+    # if there are no config files passed to synapse, try adding the default file
+    if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
         config_path = environ.get(
             "SYNAPSE_CONFIG_PATH", config_dir + "/homeserver.yaml"
         )
+
         if not os.path.exists(config_path):
+            if "SYNAPSE_SERVER_NAME" in environ:
+                error(
+                    """\
+Config file '%s' does not exist.
+
+The synapse docker image no longer supports generating a config file on-the-fly
+based on environment variables. You can migrate to a static config file by
+running with 'migrate_config'. See the README for more details.
+"""
+                    % (config_path,)
+                )
+
             error(
                 "Config file '%s' does not exist. You should either create a new "
                 "config file by running with the `generate` argument (and then edit "
@@ -225,18 +249,16 @@ def main(args, environ):
                 % (config_path,)
             )
 
-    log("Starting synapse with config file " + config_path)
+        args += ["--config-path", config_path]
 
-    args = [
-        "su-exec",
-        ownership,
-        "python",
-        "-m",
-        "synapse.app.homeserver",
-        "--config-path",
-        config_path,
-    ]
-    os.execv("/sbin/su-exec", args)
+    log("Starting synapse with args " + " ".join(args))
+
+    args = ["python"] + args
+    if ownership is not None:
+        args = ["gosu", ownership] + args
+        os.execve("/usr/sbin/gosu", args, environ)
+    else:
+        os.execve("/usr/local/bin/python", args, environ)
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,23 +11,41 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import platform
 import struct
 import threading
+import typing
 
-from synapse.storage.prepare_database import prepare_database
+from synapse.storage.engines import BaseDatabaseEngine
+from synapse.storage.types import Connection
+
+if typing.TYPE_CHECKING:
+    import sqlite3  # noqa: F401
 
 
-class Sqlite3Engine(object):
-    single_threaded = True
-
+class Sqlite3Engine(BaseDatabaseEngine["sqlite3.Connection"]):
     def __init__(self, database_module, database_config):
-        self.module = database_module
+        super().__init__(database_module, database_config)
+
+        database = database_config.get("args", {}).get("database")
+        self._is_in_memory = database in (
+            None,
+            ":memory:",
+        )
+
+        if platform.python_implementation() == "PyPy":
+            # pypy's sqlite3 module doesn't handle bytearrays, convert them
+            # back to bytes.
+            database_module.register_adapter(bytearray, lambda array: bytes(array))
 
         # The current max state_group, or None if we haven't looked
         # in the DB yet.
         self._current_state_group_id = None
         self._current_state_group_id_lock = threading.Lock()
+
+    @property
+    def single_threaded(self) -> bool:
+        return True
 
     @property
     def can_native_upsert(self):
@@ -38,15 +55,41 @@ class Sqlite3Engine(object):
         """
         return self.module.sqlite_version_info >= (3, 24, 0)
 
-    def check_database(self, txn):
-        pass
+    @property
+    def supports_using_any_list(self):
+        """Do we support using `a = ANY(?)` and passing a list"""
+        return False
+
+    def check_database(self, db_conn, allow_outdated_version: bool = False):
+        if not allow_outdated_version:
+            version = self.module.sqlite_version_info
+            # Synapse is untested against older SQLite versions, and we don't want
+            # to let users upgrade to a version of Synapse with broken support for their
+            # sqlite version, because it risks leaving them with a half-upgraded db.
+            if version < (3, 22, 0):
+                raise RuntimeError("Synapse requires sqlite 3.22 or above.")
+
+    def check_new_database(self, txn):
+        """Gets called when setting up a brand new database. This allows us to
+        apply stricter checks on new databases versus existing database.
+        """
 
     def convert_param_style(self, sql):
         return sql
 
     def on_new_connection(self, db_conn):
-        prepare_database(db_conn, self, config=None)
+        # We need to import here to avoid an import loop.
+        from synapse.storage.prepare_database import prepare_database
+
+        if self._is_in_memory:
+            # In memory databases need to be rebuilt each time. Ideally we'd
+            # reuse the same connection as we do when starting up, but that
+            # would involve using adbapi before we have started the reactor.
+            prepare_database(db_conn, self, config=None)
+
         db_conn.create_function("rank", 1, _rank)
+        db_conn.execute("PRAGMA foreign_keys = ON;")
+        db_conn.commit()
 
     def is_deadlock(self, error):
         return False
@@ -57,19 +100,6 @@ class Sqlite3Engine(object):
     def lock_table(self, txn, table):
         return
 
-    def get_next_state_group_id(self, txn):
-        """Returns an int that can be used as a new state_group ID
-        """
-        # We do application locking here since if we're using sqlite then
-        # we are a single process synapse.
-        with self._current_state_group_id_lock:
-            if self._current_state_group_id is None:
-                txn.execute("SELECT COALESCE(max(id), 0) FROM state_groups")
-                self._current_state_group_id = txn.fetchone()[0]
-
-            self._current_state_group_id += 1
-            return self._current_state_group_id
-
     @property
     def server_version(self):
         """Gets a string giving the server version. For example: '3.22.0'
@@ -78,6 +108,14 @@ class Sqlite3Engine(object):
             string
         """
         return "%i.%i.%i" % self.module.sqlite_version_info
+
+    def in_transaction(self, conn: Connection) -> bool:
+        return conn.in_transaction  # type: ignore
+
+    def attempt_to_set_autocommit(self, conn: Connection, autocommit: bool):
+        # Twisted doesn't let us set attributes on the connections, so we can't
+        # set the connection to autocommit mode.
+        pass
 
 
 # Following functions taken from: https://github.com/coleifer/peewee

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +16,8 @@ from ._base import Config
 
 
 class GroupsConfig(Config):
+    section = "groups"
+
     def read_config(self, config, **kwargs):
         self.enable_group_creation = config.get("enable_group_creation", False)
         self.group_creation_prefix = config.get("group_creation_prefix", "")
@@ -30,5 +31,5 @@ class GroupsConfig(Config):
         # If enabled, non server admins can only create groups with local parts
         # starting with this prefix
         #
-        #group_creation_prefix: "unofficial/"
+        #group_creation_prefix: "unofficial_"
         """

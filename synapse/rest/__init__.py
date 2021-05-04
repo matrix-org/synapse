@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -13,8 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import synapse.rest.admin
 from synapse.http.server import JsonResource
+from synapse.rest import admin
 from synapse.rest.client import versions
 from synapse.rest.client.v1 import (
     directory,
@@ -41,6 +40,7 @@ from synapse.rest.client.v2_alpha import (
     keys,
     notifications,
     openid,
+    password_policy,
     read_marker,
     receipts,
     register,
@@ -49,6 +49,7 @@ from synapse.rest.client.v2_alpha import (
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
+    shared_rooms,
     sync,
     tags,
     thirdparty,
@@ -73,7 +74,7 @@ class ClientRestResource(JsonResource):
 
     @staticmethod
     def register_servlets(client_resource, hs):
-        versions.register_servlets(client_resource)
+        versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
         initial_sync.register_servlets(hs, client_resource)
@@ -118,8 +119,10 @@ class ClientRestResource(JsonResource):
         capabilities.register_servlets(hs, client_resource)
         account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
+        password_policy.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
-        synapse.rest.admin.register_servlets_for_client_rest_resource(
-            hs, client_resource
-        )
+        admin.register_servlets_for_client_rest_resource(hs, client_resource)
+
+        # unstable
+        shared_rooms.register_servlets(hs, client_resource)

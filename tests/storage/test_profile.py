@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,44 +12,73 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from twisted.internet import defer
-
-from synapse.storage.profile import ProfileStore
 from synapse.types import UserID
 
 from tests import unittest
-from tests.utils import setup_test_homeserver
 
 
-class ProfileStoreTestCase(unittest.TestCase):
-    @defer.inlineCallbacks
-    def setUp(self):
-        hs = yield setup_test_homeserver(self.addCleanup)
-
-        self.store = ProfileStore(hs.get_db_conn(), hs)
+class ProfileStoreTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
 
         self.u_frank = UserID.from_string("@frank:test")
 
-    @defer.inlineCallbacks
     def test_displayname(self):
-        yield self.store.create_profile(self.u_frank.localpart)
+        self.get_success(self.store.create_profile(self.u_frank.localpart))
 
-        yield self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
-
-        self.assertEquals(
-            "Frank", (yield self.store.get_profile_displayname(self.u_frank.localpart))
+        self.get_success(
+            self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
         )
 
-    @defer.inlineCallbacks
-    def test_avatar_url(self):
-        yield self.store.create_profile(self.u_frank.localpart)
+        self.assertEquals(
+            "Frank",
+            (
+                self.get_success(
+                    self.store.get_profile_displayname(self.u_frank.localpart)
+                )
+            ),
+        )
 
-        yield self.store.set_profile_avatar_url(
-            self.u_frank.localpart, "http://my.site/here"
+        # test set to None
+        self.get_success(
+            self.store.set_profile_displayname(self.u_frank.localpart, None)
+        )
+
+        self.assertIsNone(
+            (
+                self.get_success(
+                    self.store.get_profile_displayname(self.u_frank.localpart)
+                )
+            )
+        )
+
+    def test_avatar_url(self):
+        self.get_success(self.store.create_profile(self.u_frank.localpart))
+
+        self.get_success(
+            self.store.set_profile_avatar_url(
+                self.u_frank.localpart, "http://my.site/here"
+            )
         )
 
         self.assertEquals(
             "http://my.site/here",
-            (yield self.store.get_profile_avatar_url(self.u_frank.localpart)),
+            (
+                self.get_success(
+                    self.store.get_profile_avatar_url(self.u_frank.localpart)
+                )
+            ),
+        )
+
+        # test set to None
+        self.get_success(
+            self.store.set_profile_avatar_url(self.u_frank.localpart, None)
+        )
+
+        self.assertIsNone(
+            (
+                self.get_success(
+                    self.store.get_profile_avatar_url(self.u_frank.localpart)
+                )
+            )
         )

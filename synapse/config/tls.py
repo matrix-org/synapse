@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,8 +17,7 @@ import os
 import warnings
 from datetime import datetime
 from hashlib import sha256
-
-import six
+from typing import List, Optional
 
 from unpaddedbase64 import encode_base64
 
@@ -31,9 +29,22 @@ from synapse.util import glob_to_regex
 
 logger = logging.getLogger(__name__)
 
+ACME_SUPPORT_ENABLED_WARN = """\
+This server uses Synapse's built-in ACME support. Note that ACME v1 has been
+deprecated by Let's Encrypt, and that Synapse doesn't currently support ACME v2,
+which means that this feature will not work with Synapse installs set up after
+November 2019, and that it may stop working on June 2020 for installs set up
+before that date.
+
+For more info and alternative solutions, see
+https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
+--------------------------------------------------------------------------------"""
+
 
 class TlsConfig(Config):
-    def read_config(self, config, config_dir_path, **kwargs):
+    section = "tls"
+
+    def read_config(self, config: dict, config_dir_path: str, **kwargs):
 
         acme_config = config.get("acme", None)
         if acme_config is None:
@@ -41,8 +52,11 @@ class TlsConfig(Config):
 
         self.acme_enabled = acme_config.get("enabled", False)
 
+        if self.acme_enabled:
+            logger.warning(ACME_SUPPORT_ENABLED_WARN)
+
         # hyperlink complains on py2 if this is not a Unicode
-        self.acme_url = six.text_type(
+        self.acme_url = str(
             acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
         )
         self.acme_port = acme_config.get("port", 80)
@@ -57,7 +71,7 @@ class TlsConfig(Config):
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
 
-        if self.has_tls_listener():
+        if self.root.server.has_tls_listener():
             if not self.tls_certificate_file:
                 raise ConfigError(
                     "tls_certificate_path must be specified if TLS-enabled listeners are "
@@ -106,12 +120,21 @@ class TlsConfig(Config):
         fed_whitelist_entries = config.get(
             "federation_certificate_verification_whitelist", []
         )
+        if fed_whitelist_entries is None:
+            fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []
+        self.federation_certificate_verification_whitelist = []  # type: List[str]
         for entry in fed_whitelist_entries:
+            try:
+                entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
+            except UnicodeEncodeError:
+                raise ConfigError(
+                    "IDNA domain names are not allowed in the "
+                    "federation_certificate_verification_whitelist: %s" % (entry,)
+                )
+
             # Convert globs to regex
-            entry_regex = glob_to_regex(entry)
             self.federation_certificate_verification_whitelist.append(entry_regex)
 
         # List of custom certificate authorities for federation traffic validation
@@ -153,8 +176,8 @@ class TlsConfig(Config):
             "use_insecure_ssl_client_just_for_testing_do_not_use"
         )
 
-        self.tls_certificate = None
-        self.tls_private_key = None
+        self.tls_certificate = None  # type: Optional[crypto.X509]
+        self.tls_private_key = None  # type: Optional[crypto.PKey]
 
     def is_disk_cert_valid(self, allow_self_signed=True):
         """
@@ -202,12 +225,12 @@ class TlsConfig(Config):
         days_remaining = (expires_on - now).days
         return days_remaining
 
-    def read_certificate_from_disk(self, require_cert_and_key):
+    def read_certificate_from_disk(self, require_cert_and_key: bool):
         """
         Read the certificates and private key from disk.
 
         Args:
-            require_cert_and_key (bool): set to True to throw an error if the certificate
+            require_cert_and_key: set to True to throw an error if the certificate
                 and key file are not given
         """
         if require_cert_and_key:
@@ -234,17 +257,43 @@ class TlsConfig(Config):
                 crypto.FILETYPE_ASN1, self.tls_certificate
             )
             sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-            sha256_fingerprints = set(f["sha256"] for f in self.tls_fingerprints)
+            sha256_fingerprints = {f["sha256"] for f in self.tls_fingerprints}
             if sha256_fingerprint not in sha256_fingerprints:
                 self.tls_fingerprints.append({"sha256": sha256_fingerprint})
 
     def generate_config_section(
-        self, config_dir_path, server_name, data_dir_path, **kwargs
+        self,
+        config_dir_path,
+        server_name,
+        data_dir_path,
+        tls_certificate_path,
+        tls_private_key_path,
+        acme_domain,
+        **kwargs,
     ):
+        """If the acme_domain is specified acme will be enabled.
+        If the TLS paths are not specified the default will be certs in the
+        config directory"""
+
         base_key_name = os.path.join(config_dir_path, server_name)
 
-        tls_certificate_path = base_key_name + ".tls.crt"
-        tls_private_key_path = base_key_name + ".tls.key"
+        if bool(tls_certificate_path) != bool(tls_private_key_path):
+            raise ConfigError(
+                "Please specify both a cert path and a key path or neither."
+            )
+
+        tls_enabled = (
+            "" if tls_certificate_path and tls_private_key_path or acme_domain else "#"
+        )
+
+        if not tls_certificate_path:
+            tls_certificate_path = base_key_name + ".tls.crt"
+        if not tls_private_key_path:
+            tls_private_key_path = base_key_name + ".tls.key"
+
+        acme_enabled = bool(acme_domain)
+        acme_domain = "matrix.example.com"
+
         default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
 
         # this is to avoid the max line length. Sorrynotsorry
@@ -252,6 +301,9 @@ class TlsConfig(Config):
             "ProxyPass /.well-known/acme-challenge "
             "http://localhost:8009/.well-known/acme-challenge"
         )
+
+        # flake8 doesn't recognise that variables are used in the below string
+        _ = tls_enabled, proxypassline, acme_enabled, default_acme_account_file
 
         return (
             """\
@@ -269,11 +321,11 @@ class TlsConfig(Config):
         # instance, if using certbot, use `fullchain.pem` as your certificate,
         # not `cert.pem`).
         #
-        #tls_certificate_path: "%(tls_certificate_path)s"
+        %(tls_enabled)stls_certificate_path: "%(tls_certificate_path)s"
 
         # PEM-encoded private key for TLS
         #
-        #tls_private_key_path: "%(tls_private_key_path)s"
+        %(tls_enabled)stls_private_key_path: "%(tls_private_key_path)s"
 
         # Whether to verify TLS server certificates for outbound federation requests.
         #
@@ -321,6 +373,11 @@ class TlsConfig(Config):
         # ACME support: This will configure Synapse to request a valid TLS certificate
         # for your configured `server_name` via Let's Encrypt.
         #
+        # Note that ACME v1 is now deprecated, and Synapse currently doesn't support
+        # ACME v2. This means that this feature currently won't work with installs set
+        # up after November 2019. For more info, and alternative solutions, see
+        # https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
+        #
         # Note that provisioning a certificate in this way requires port 80 to be
         # routed to Synapse so that it can complete the http-01 ACME challenge.
         # By default, if you enable ACME support, Synapse will attempt to listen on
@@ -340,10 +397,10 @@ class TlsConfig(Config):
         #    permission to listen on port 80.
         #
         acme:
-            # ACME support is disabled by default. Uncomment the following line
-            # (and tls_certificate_path and tls_private_key_path above) to enable it.
+            # ACME support is disabled by default. Set this to `true` and uncomment
+            # tls_certificate_path and tls_private_key_path above to enable it.
             #
-            #enabled: true
+            enabled: %(acme_enabled)s
 
             # Endpoint to use to request certificates. If you only want to test,
             # use Let's Encrypt's staging url:
@@ -354,17 +411,17 @@ class TlsConfig(Config):
             # Port number to listen on for the HTTP-01 challenge. Change this if
             # you are forwarding connections through Apache/Nginx/etc.
             #
-            #port: 80
+            port: 80
 
             # Local addresses to listen on for incoming connections.
             # Again, you may want to change this if you are forwarding connections
             # through Apache/Nginx/etc.
             #
-            #bind_addresses: ['::', '0.0.0.0']
+            bind_addresses: ['::', '0.0.0.0']
 
             # How many days remaining on a certificate before it is renewed.
             #
-            #reprovision_threshold: 30
+            reprovision_threshold: 30
 
             # The domain that the certificate should be for. Normally this
             # should be the same as your Matrix domain (i.e., 'server_name'), but,
@@ -378,7 +435,7 @@ class TlsConfig(Config):
             #
             # If not set, defaults to your 'server_name'.
             #
-            #domain: matrix.example.com
+            domain: %(acme_domain)s
 
             # file to use for the account key. This will be generated if it doesn't
             # exist.
@@ -413,18 +470,21 @@ class TlsConfig(Config):
         # or by checking matrix.org/federationtester/api/report?server_name=$host
         #
         #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
-
         """
-            % locals()
+            # Lowercase the string representation of boolean values
+            % {
+                x[0]: str(x[1]).lower() if isinstance(x[1], bool) else x[1]
+                for x in locals().items()
+            }
         )
 
-    def read_tls_certificate(self):
+    def read_tls_certificate(self) -> crypto.X509:
         """Reads the TLS certificate from the configured file, and returns it
 
         Also checks if it is self-signed, and warns if so
 
         Returns:
-            OpenSSL.crypto.X509: the certificate
+            The certificate
         """
         cert_path = self.tls_certificate_file
         logger.info("Loading TLS certificate from %s", cert_path)
@@ -443,11 +503,11 @@ class TlsConfig(Config):
 
         return cert
 
-    def read_tls_private_key(self):
+    def read_tls_private_key(self) -> crypto.PKey:
         """Reads the TLS private key from the configured file, and returns it
 
         Returns:
-            OpenSSL.crypto.PKey: the private key
+            The private key
         """
         private_key_path = self.tls_private_key_file
         logger.info("Loading TLS key from %s", private_key_path)

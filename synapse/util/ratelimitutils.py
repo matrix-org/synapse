@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,7 +19,7 @@ import logging
 from twisted.internet import defer
 
 from synapse.api.errors import LimitExceededError
-from synapse.util.logcontext import (
+from synapse.logging.context import (
     PreserveLoggingContext,
     make_deferred_yieldable,
     run_in_background,
@@ -29,19 +28,21 @@ from synapse.util.logcontext import (
 logger = logging.getLogger(__name__)
 
 
-class FederationRateLimiter(object):
+class FederationRateLimiter:
     def __init__(self, clock, config):
         """
         Args:
             clock (Clock)
             config (FederationRateLimitConfig)
         """
-        self.clock = clock
-        self._config = config
-        self.ratelimiters = {}
+
+        def new_limiter():
+            return _PerHostRatelimiter(clock=clock, config=config)
+
+        self.ratelimiters = collections.defaultdict(new_limiter)
 
     def ratelimit(self, host):
-        """Used to ratelimit an incoming request from given host
+        """Used to ratelimit an incoming request from a given host
 
         Example usage:
 
@@ -53,14 +54,12 @@ class FederationRateLimiter(object):
             host (str): Origin of incoming request.
 
         Returns:
-            _PerHostRatelimiter
+            context manager which returns a deferred.
         """
-        return self.ratelimiters.setdefault(
-            host, _PerHostRatelimiter(clock=self.clock, config=self._config)
-        ).ratelimit()
+        return self.ratelimiters[host].ratelimit()
 
 
-class _PerHostRatelimiter(object):
+class _PerHostRatelimiter:
     def __init__(self, clock, config):
         """
         Args:
@@ -122,7 +121,7 @@ class _PerHostRatelimiter(object):
         self.request_times.append(time_now)
 
         def queue_request():
-            if len(self.current_processing) > self.concurrent_requests:
+            if len(self.current_processing) >= self.concurrent_requests:
                 queue_defer = defer.Deferred()
                 self.ready_request_queue[request_id] = queue_defer
                 logger.info(

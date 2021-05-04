@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import logging
-
-from six import string_types
-from six.moves.urllib import parse as urlparse
+from typing import Dict
+from urllib import parse as urlparse
 
 import yaml
 from netaddr import IPSet
@@ -29,6 +28,8 @@ logger = logging.getLogger(__name__)
 
 
 class AppServiceConfig(Config):
+    section = "appservice"
+
     def read_config(self, config, **kwargs):
         self.app_service_config_files = config.get("app_service_config_files", [])
         self.notify_appservices = config.get("notify_appservices", True)
@@ -45,7 +46,7 @@ class AppServiceConfig(Config):
         # Uncomment to enable tracking of application service IP addresses. Implicitly
         # enables MAU tracking for application service users.
         #
-        #track_appservice_user_ips: True
+        #track_appservice_user_ips: true
         """
 
 
@@ -56,8 +57,8 @@ def load_appservices(hostname, config_files):
         return []
 
     # Dicts of value -> filename
-    seen_as_tokens = {}
-    seen_ids = {}
+    seen_as_tokens = {}  # type: Dict[str, str]
+    seen_ids = {}  # type: Dict[str, str]
 
     appservices = []
 
@@ -95,17 +96,14 @@ def load_appservices(hostname, config_files):
 def _load_appservice(hostname, as_info, config_filename):
     required_string_fields = ["id", "as_token", "hs_token", "sender_localpart"]
     for field in required_string_fields:
-        if not isinstance(as_info.get(field), string_types):
+        if not isinstance(as_info.get(field), str):
             raise KeyError(
                 "Required string field: '%s' (%s)" % (field, config_filename)
             )
 
     # 'url' must either be a string or explicitly null, not missing
     # to avoid accidentally turning off push for ASes.
-    if (
-        not isinstance(as_info.get("url"), string_types)
-        and as_info.get("url", "") is not None
-    ):
+    if not isinstance(as_info.get("url"), str) and as_info.get("url", "") is not None:
         raise KeyError(
             "Required string field or explicit null: 'url' (%s)" % (config_filename,)
         )
@@ -131,11 +129,11 @@ def _load_appservice(hostname, as_info, config_filename):
             for regex_obj in as_info["namespaces"][ns]:
                 if not isinstance(regex_obj, dict):
                     raise ValueError(
-                        "Expected namespace entry in %s to be an object," " but got %s",
+                        "Expected namespace entry in %s to be an object, but got %s",
                         ns,
                         regex_obj,
                     )
-                if not isinstance(regex_obj.get("regex"), string_types):
+                if not isinstance(regex_obj.get("regex"), str):
                     raise ValueError("Missing/bad type 'regex' key in %s", regex_obj)
                 if not isinstance(regex_obj.get("exclusive"), bool):
                     raise ValueError(
@@ -162,6 +160,8 @@ def _load_appservice(hostname, as_info, config_filename):
     if as_info.get("ip_range_whitelist"):
         ip_range_whitelist = IPSet(as_info.get("ip_range_whitelist"))
 
+    supports_ephemeral = as_info.get("de.sorunome.msc2409.push_ephemeral", False)
+
     return ApplicationService(
         token=as_info["as_token"],
         hostname=hostname,
@@ -170,6 +170,7 @@ def _load_appservice(hostname, as_info, config_filename):
         hs_token=as_info["hs_token"],
         sender=user_id,
         id=as_info["id"],
+        supports_ephemeral=supports_ephemeral,
         protocols=protocols,
         rate_limited=rate_limited,
         ip_range_whitelist=ip_range_whitelist,

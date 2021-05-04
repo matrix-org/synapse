@@ -1,19 +1,26 @@
 import twisted.python.failure
 from twisted.internet import defer, reactor
 
-from synapse.util import Clock, logcontext
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import (
+    SENTINEL_CONTEXT,
+    LoggingContext,
+    PreserveLoggingContext,
+    current_context,
+    make_deferred_yieldable,
+    nested_logging_context,
+    run_in_background,
+)
+from synapse.util import Clock
 
 from .. import unittest
 
 
 class LoggingContextTestCase(unittest.TestCase):
     def _check_test_key(self, value):
-        self.assertEquals(LoggingContext.current_context().request, value)
+        self.assertEquals(current_context().name, value)
 
     def test_with_context(self):
-        with LoggingContext() as context_one:
-            context_one.request = "test"
+        with LoggingContext("test"):
             self._check_test_key("test")
 
     @defer.inlineCallbacks
@@ -22,41 +29,30 @@ class LoggingContextTestCase(unittest.TestCase):
 
         @defer.inlineCallbacks
         def competing_callback():
-            with LoggingContext() as competing_context:
-                competing_context.request = "competing"
+            with LoggingContext("competing"):
                 yield clock.sleep(0)
                 self._check_test_key("competing")
 
         reactor.callLater(0, competing_callback)
 
-        with LoggingContext() as context_one:
-            context_one.request = "one"
+        with LoggingContext("one"):
             yield clock.sleep(0)
             self._check_test_key("one")
 
     def _test_run_in_background(self, function):
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
         callback_completed = [False]
 
-        def test():
-            context_one.request = "one"
-            d = function()
+        with LoggingContext("one"):
+            # fire off function, but don't wait on it.
+            d2 = run_in_background(function)
 
             def cb(res):
-                self._check_test_key("one")
                 callback_completed[0] = True
                 return res
 
-            d.addCallback(cb)
-
-            return d
-
-        with LoggingContext() as context_one:
-            context_one.request = "one"
-
-            # fire off function, but don't wait on it.
-            logcontext.run_in_background(test)
+            d2.addCallback(cb)
 
             self._check_test_key("one")
 
@@ -72,7 +68,7 @@ class LoggingContextTestCase(unittest.TestCase):
             # make sure that the context was reset before it got thrown back
             # into the reactor
             try:
-                self.assertIs(LoggingContext.current_context(), sentinel_context)
+                self.assertIs(current_context(), sentinel_context)
                 d2.callback(None)
             except BaseException:
                 d2.errback(twisted.python.failure.Failure())
@@ -92,7 +88,7 @@ class LoggingContextTestCase(unittest.TestCase):
     def test_run_in_background_with_non_blocking_fn(self):
         @defer.inlineCallbacks
         def nonblocking_function():
-            with logcontext.PreserveLoggingContext():
+            with PreserveLoggingContext():
                 yield defer.succeed(None)
 
         return self._test_run_in_background(nonblocking_function)
@@ -101,27 +97,41 @@ class LoggingContextTestCase(unittest.TestCase):
         # a function which returns a deferred which looks like it has been
         # called, but is actually paused
         def testfunc():
-            return logcontext.make_deferred_yieldable(_chained_deferred_function())
+            return make_deferred_yieldable(_chained_deferred_function())
+
+        return self._test_run_in_background(testfunc)
+
+    def test_run_in_background_with_coroutine(self):
+        async def testfunc():
+            self._check_test_key("one")
+            d = Clock(reactor).sleep(0)
+            self.assertIs(current_context(), SENTINEL_CONTEXT)
+            await d
+            self._check_test_key("one")
+
+        return self._test_run_in_background(testfunc)
+
+    def test_run_in_background_with_nonblocking_coroutine(self):
+        async def testfunc():
+            self._check_test_key("one")
 
         return self._test_run_in_background(testfunc)
 
     @defer.inlineCallbacks
     def test_make_deferred_yieldable(self):
-        # a function which retuns an incomplete deferred, but doesn't follow
+        # a function which returns an incomplete deferred, but doesn't follow
         # the synapse rules.
         def blocking_function():
             d = defer.Deferred()
             reactor.callLater(0, d.callback, None)
             return d
 
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
-        with LoggingContext() as context_one:
-            context_one.request = "one"
-
-            d1 = logcontext.make_deferred_yieldable(blocking_function())
+        with LoggingContext("one"):
+            d1 = make_deferred_yieldable(blocking_function())
             # make sure that the context was reset by make_deferred_yieldable
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assertIs(current_context(), sentinel_context)
 
             yield d1
 
@@ -130,14 +140,12 @@ class LoggingContextTestCase(unittest.TestCase):
 
     @defer.inlineCallbacks
     def test_make_deferred_yieldable_with_chained_deferreds(self):
-        sentinel_context = LoggingContext.current_context()
+        sentinel_context = current_context()
 
-        with LoggingContext() as context_one:
-            context_one.request = "one"
-
-            d1 = logcontext.make_deferred_yieldable(_chained_deferred_function())
+        with LoggingContext("one"):
+            d1 = make_deferred_yieldable(_chained_deferred_function())
             # make sure that the context was reset by make_deferred_yieldable
-            self.assertIs(LoggingContext.current_context(), sentinel_context)
+            self.assertIs(current_context(), sentinel_context)
 
             yield d1
 
@@ -149,10 +157,8 @@ class LoggingContextTestCase(unittest.TestCase):
         """Check that make_deferred_yieldable does the right thing when its
         argument isn't actually a deferred"""
 
-        with LoggingContext() as context_one:
-            context_one.request = "one"
-
-            d1 = logcontext.make_deferred_yieldable("bum")
+        with LoggingContext("one"):
+            d1 = make_deferred_yieldable("bum")
             self._check_test_key("one")
 
             r = yield d1
@@ -160,9 +166,31 @@ class LoggingContextTestCase(unittest.TestCase):
             self._check_test_key("one")
 
     def test_nested_logging_context(self):
-        with LoggingContext(request="foo"):
-            nested_context = logcontext.nested_logging_context(suffix="bar")
-            self.assertEqual(nested_context.request, "foo-bar")
+        with LoggingContext("foo"):
+            nested_context = nested_logging_context(suffix="bar")
+            self.assertEqual(nested_context.name, "foo-bar")
+
+    @defer.inlineCallbacks
+    def test_make_deferred_yieldable_with_await(self):
+        # an async function which returns an incomplete coroutine, but doesn't
+        # follow the synapse rules.
+
+        async def blocking_function():
+            d = defer.Deferred()
+            reactor.callLater(0, d.callback, None)
+            await d
+
+        sentinel_context = current_context()
+
+        with LoggingContext("one"):
+            d1 = make_deferred_yieldable(blocking_function())
+            # make sure that the context was reset by make_deferred_yieldable
+            self.assertIs(current_context(), sentinel_context)
+
+            yield d1
+
+            # now it should be restored
+            self._check_test_key("one")
 
 
 # a function which returns a deferred which has been "called", but

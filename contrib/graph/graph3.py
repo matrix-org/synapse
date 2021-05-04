@@ -1,4 +1,12 @@
-from __future__ import print_function
+import argparse
+import cgi
+import datetime
+
+import pydot
+import simplejson as json
+
+from synapse.events import FrozenEvent
+from synapse.util.frozenutils import unfreeze
 
 # Copyright 2016 OpenMarket Ltd
 #
@@ -13,18 +21,6 @@ from __future__ import print_function
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
-import pydot
-import cgi
-import simplejson as json
-import datetime
-import argparse
-
-from synapse.events import FrozenEvent
-from synapse.util.frozenutils import unfreeze
-
-from six import string_types
 
 
 def make_graph(file_name, room_id, file_prefix, limit):
@@ -62,7 +58,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
         for key, value in unfreeze(event.get_dict()["content"]).items():
             if value is None:
                 value = "<null>"
-            elif isinstance(value, string_types):
+            elif isinstance(value, str):
                 pass
             else:
                 value = json.dumps(value)
@@ -108,7 +104,7 @@ def make_graph(file_name, room_id, file_prefix, limit):
         for prev_id, _ in event.prev_events:
             try:
                 end_node = node_map[prev_id]
-            except:
+            except Exception:
                 end_node = pydot.Node(name=prev_id, label="<<b>%s</b>>" % (prev_id,))
 
                 node_map[prev_id] = end_node

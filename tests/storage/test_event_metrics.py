@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the 'License');
@@ -13,10 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from prometheus_client.exposition import generate_latest
-
-from synapse.metrics import REGISTRY
-from synapse.types import Requester, UserID
+from synapse.metrics import REGISTRY, generate_latest
+from synapse.types import UserID, create_requester
 
 from tests.unittest import HomeserverTestCase
 
@@ -29,24 +26,24 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         room_creator = self.hs.get_room_creation_handler()
 
         user = UserID("alice", "test")
-        requester = Requester(user, None, False, None, None)
+        requester = create_requester(user)
 
         # Real events, forward extremities
         events = [(3, 2), (6, 2), (4, 6)]
 
         for event_count, extrems in events:
-            info = self.get_success(room_creator.create_room(requester, {}))
+            info, _ = self.get_success(room_creator.create_room(requester, {}))
             room_id = info["room_id"]
 
             last_event = None
 
             # Make a real event chain
-            for i in range(event_count):
+            for _ in range(event_count):
                 ev = self.create_and_send_event(room_id, user, False, last_event)
                 last_event = [ev]
 
             # Sprinkle in some extremities
-            for i in range(extrems):
+            for _ in range(extrems):
                 ev = self.create_and_send_event(room_id, user, False, last_event)
 
         # Let it run for a while, then pull out the statistics from the
@@ -54,31 +51,32 @@ class ExtremStatisticsTestCase(HomeserverTestCase):
         self.reactor.advance(60 * 60 * 1000)
         self.pump(1)
 
-        items = set(
+        items = list(
             filter(
                 lambda x: b"synapse_forward_extremities_" in x,
-                generate_latest(REGISTRY).split(b"\n"),
+                generate_latest(REGISTRY, emit_help=False).split(b"\n"),
             )
         )
 
-        expected = set(
-            [
-                b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
-                b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
-                b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
-                b'synapse_forward_extremities_bucket{le="5.0"} 2.0',
-                b'synapse_forward_extremities_bucket{le="7.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="10.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="15.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="20.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="50.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
-                b'synapse_forward_extremities_bucket{le="+Inf"} 3.0',
-                b"synapse_forward_extremities_count 3.0",
-                b"synapse_forward_extremities_sum 10.0",
-            ]
-        )
-
+        expected = [
+            b'synapse_forward_extremities_bucket{le="1.0"} 0.0',
+            b'synapse_forward_extremities_bucket{le="2.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="3.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="5.0"} 2.0',
+            b'synapse_forward_extremities_bucket{le="7.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="10.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="15.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="20.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="50.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="100.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="200.0"} 3.0',
+            b'synapse_forward_extremities_bucket{le="500.0"} 3.0',
+            # per https://docs.google.com/document/d/1KwV0mAXwwbvvifBvDKH_LU1YjyXE_wxCkHNoCGq1GX0/edit#heading=h.wghdjzzh72j9,
+            # "inf" is valid: "this includes variants such as inf"
+            b'synapse_forward_extremities_bucket{le="inf"} 3.0',
+            b"# TYPE synapse_forward_extremities_gcount gauge",
+            b"synapse_forward_extremities_gcount 3.0",
+            b"# TYPE synapse_forward_extremities_gsum gauge",
+            b"synapse_forward_extremities_gsum 10.0",
+        ]
         self.assertEqual(items, expected)

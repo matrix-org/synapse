@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
+# Copyright 2019 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,18 +14,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Callable,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
-import six
-from six import iteritems
-
-from canonicaljson import json
-from prometheus_client import Counter
+from prometheus_client import Counter, Gauge, Histogram
 
 from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -35,23 +44,32 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.crypto.event_signing import compute_event_signature
-from synapse.events import room_version_to_event_format
+from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
-from synapse.http.endpoint import parse_server_name
+from synapse.http.servlet import assert_params_in_dict
+from synapse.logging.context import (
+    make_deferred_yieldable,
+    nested_logging_context,
+    run_in_background,
+)
+from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
+from synapse.logging.utils import log_function
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
-from synapse.types import get_domain_from_id
-from synapse.util import glob_to_regex
+from synapse.types import JsonDict
+from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.logcontext import nested_logging_context
-from synapse.util.logutils import log_function
+from synapse.util.stringutils import parse_server_name
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 # when processing incoming transactions, we try to handle multiple rooms in
 # parallel, up to this limit.
@@ -67,16 +85,42 @@ received_queries_counter = Counter(
     "synapse_federation_server_received_queries", "", ["type"]
 )
 
+pdu_process_time = Histogram(
+    "synapse_federation_server_pdu_process_time",
+    "Time taken to process an event",
+)
+
+last_pdu_ts_metric = Gauge(
+    "synapse_federation_last_received_pdu_time",
+    "The timestamp of the last PDU which was successfully received from the given domain",
+    labelnames=("server_name",),
+)
+
 
 class FederationServer(FederationBase):
-    def __init__(self, hs):
-        super(FederationServer, self).__init__(hs)
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
 
         self.auth = hs.get_auth()
-        self.handler = hs.get_handlers().federation_handler
+        self.handler = hs.get_federation_handler()
+        self.state = hs.get_state_handler()
+
+        self.device_handler = hs.get_device_handler()
+
+        # Ensure the following handlers are loaded since they register callbacks
+        # with FederationHandlerRegistry.
+        hs.get_directory_handler()
 
         self._server_linearizer = Linearizer("fed_server")
-        self._transaction_linearizer = Linearizer("fed_txn_handler")
+
+        # origins that we are currently processing a transaction from.
+        # a dict from origin to txn id.
+        self._active_transactions = {}  # type: Dict[str, str]
+
+        # We cache results for transaction with the same ID
+        self._transaction_resp_cache = ResponseCache(
+            hs.get_clock(), "fed_txn_handler", timeout_ms=30000
+        )  # type: ResponseCache[Tuple[str, str]]
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -84,94 +128,172 @@ class FederationServer(FederationBase):
 
         # We cache responses to state queries, as they take a while and often
         # come in waves.
-        self._state_resp_cache = ResponseCache(hs, "state_resp", timeout_ms=30000)
+        self._state_resp_cache = ResponseCache(
+            hs.get_clock(), "state_resp", timeout_ms=30000
+        )  # type: ResponseCache[Tuple[str, str]]
+        self._state_ids_resp_cache = ResponseCache(
+            hs.get_clock(), "state_ids_resp", timeout_ms=30000
+        )  # type: ResponseCache[Tuple[str, str]]
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_backfill_request(self, origin, room_id, versions, limit):
-        with (yield self._server_linearizer.queue((origin, room_id))):
+        self._federation_metrics_domains = (
+            hs.config.federation.federation_metrics_domains
+        )
+
+    async def on_backfill_request(
+        self, origin: str, room_id: str, versions: List[str], limit: int
+    ) -> Tuple[int, Dict[str, Any]]:
+        with (await self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
-            yield self.check_server_matches_acl(origin_host, room_id)
+            await self.check_server_matches_acl(origin_host, room_id)
 
-            pdus = yield self.handler.on_backfill_request(
+            pdus = await self.handler.on_backfill_request(
                 origin, room_id, versions, limit
             )
 
             res = self._transaction_from_pdus(pdus).get_dict()
 
-        defer.returnValue((200, res))
+        return 200, res
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_incoming_transaction(self, origin, transaction_data):
+    async def on_incoming_transaction(
+        self, origin: str, transaction_data: JsonDict
+    ) -> Tuple[int, Dict[str, Any]]:
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
         request_time = self._clock.time_msec()
 
         transaction = Transaction(**transaction_data)
+        transaction_id = transaction.transaction_id  # type: ignore
 
-        if not transaction.transaction_id:
+        if not transaction_id:
             raise Exception("Transaction missing transaction_id")
 
-        logger.debug("[%s] Got transaction", transaction.transaction_id)
+        logger.debug("[%s] Got transaction", transaction_id)
 
-        # use a linearizer to ensure that we don't process the same transaction
-        # multiple times in parallel.
-        with (
-            yield self._transaction_linearizer.queue(
-                (origin, transaction.transaction_id)
-            )
+        # Reject malformed transactions early: reject if too many PDUs/EDUs
+        if len(transaction.pdus) > 50 or (  # type: ignore
+            hasattr(transaction, "edus") and len(transaction.edus) > 100  # type: ignore
         ):
-            result = yield self._handle_incoming_transaction(
+            logger.info("Transaction PDU or EDU count too large. Returning 400")
+            return 400, {}
+
+        # we only process one transaction from each origin at a time. We need to do
+        # this check here, rather than in _on_incoming_transaction_inner so that we
+        # don't cache the rejection in _transaction_resp_cache (so that if the txn
+        # arrives again later, we can process it).
+        current_transaction = self._active_transactions.get(origin)
+        if current_transaction and current_transaction != transaction_id:
+            logger.warning(
+                "Received another txn %s from %s while still processing %s",
+                transaction_id,
+                origin,
+                current_transaction,
+            )
+            return 429, {
+                "errcode": Codes.UNKNOWN,
+                "error": "Too many concurrent transactions",
+            }
+
+        # CRITICAL SECTION: we must now not await until we populate _active_transactions
+        # in _on_incoming_transaction_inner.
+
+        # We wrap in a ResponseCache so that we de-duplicate retried
+        # transactions.
+        return await self._transaction_resp_cache.wrap(
+            (origin, transaction_id),
+            self._on_incoming_transaction_inner,
+            origin,
+            transaction,
+            request_time,
+        )
+
+    async def _on_incoming_transaction_inner(
+        self, origin: str, transaction: Transaction, request_time: int
+    ) -> Tuple[int, Dict[str, Any]]:
+        # CRITICAL SECTION: the first thing we must do (before awaiting) is
+        # add an entry to _active_transactions.
+        assert origin not in self._active_transactions
+        self._active_transactions[origin] = transaction.transaction_id  # type: ignore
+
+        try:
+            result = await self._handle_incoming_transaction(
                 origin, transaction, request_time
             )
+            return result
+        finally:
+            del self._active_transactions[origin]
 
-        defer.returnValue(result)
-
-    @defer.inlineCallbacks
-    def _handle_incoming_transaction(self, origin, transaction, request_time):
-        """ Process an incoming transaction and return the HTTP response
+    async def _handle_incoming_transaction(
+        self, origin: str, transaction: Transaction, request_time: int
+    ) -> Tuple[int, Dict[str, Any]]:
+        """Process an incoming transaction and return the HTTP response
 
         Args:
-            origin (unicode): the server making the request
-            transaction (Transaction): incoming transaction
-            request_time (int): timestamp that the HTTP request arrived at
+            origin: the server making the request
+            transaction: incoming transaction
+            request_time: timestamp that the HTTP request arrived at
 
         Returns:
-            Deferred[(int, object)]: http response code and body
+            HTTP response code and body
         """
-        response = yield self.transaction_actions.have_responded(origin, transaction)
+        response = await self.transaction_actions.have_responded(origin, transaction)
 
         if response:
             logger.debug(
                 "[%s] We've already responded to this request",
-                transaction.transaction_id,
+                transaction.transaction_id,  # type: ignore
             )
-            defer.returnValue(response)
-            return
+            return response
 
-        logger.debug("[%s] Transaction is new", transaction.transaction_id)
+        logger.debug("[%s] Transaction is new", transaction.transaction_id)  # type: ignore
 
-        # Reject if PDU count > 50 and EDU count > 100
-        if len(transaction.pdus) > 50 or (
-            hasattr(transaction, "edus") and len(transaction.edus) > 100
-        ):
+        # We process PDUs and EDUs in parallel. This is important as we don't
+        # want to block things like to device messages from reaching clients
+        # behind the potentially expensive handling of PDUs.
+        pdu_results, _ = await make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(
+                        self._handle_pdus_in_txn, origin, transaction, request_time
+                    ),
+                    run_in_background(self._handle_edus_in_txn, origin, transaction),
+                ],
+                consumeErrors=True,
+            ).addErrback(unwrapFirstError)
+        )
 
-            logger.info("Transaction PDU or EDU count too large. Returning 400")
+        response = {"pdus": pdu_results}
 
-            response = {}
-            yield self.transaction_actions.set_response(
-                origin, transaction, 400, response
-            )
-            defer.returnValue((400, response))
+        logger.debug("Returning: %s", str(response))
 
-        received_pdus_counter.inc(len(transaction.pdus))
+        await self.transaction_actions.set_response(origin, transaction, 200, response)
+        return 200, response
+
+    async def _handle_pdus_in_txn(
+        self, origin: str, transaction: Transaction, request_time: int
+    ) -> Dict[str, dict]:
+        """Process the PDUs in a received transaction.
+
+        Args:
+            origin: the server making the request
+            transaction: incoming transaction
+            request_time: timestamp that the HTTP request arrived at
+
+        Returns:
+            A map from event ID of a processed PDU to any errors we should
+            report back to the sending server.
+        """
+
+        received_pdus_counter.inc(len(transaction.pdus))  # type: ignore
 
         origin_host, _ = parse_server_name(origin)
 
-        pdus_by_room = {}
+        pdus_by_room = {}  # type: Dict[str, List[EventBase]]
 
-        for p in transaction.pdus:
+        newest_pdu_ts = 0
+
+        for p in transaction.pdus:  # type: ignore
+            # FIXME (richardv): I don't think this works:
+            #  https://github.com/matrix-org/synapse/issues/8429
             if "unsigned" in p:
                 unsigned = p["unsigned"]
                 if "age" in unsigned:
@@ -196,25 +318,21 @@ class FederationServer(FederationBase):
                 continue
 
             try:
-                room_version = yield self.store.get_room_version(room_id)
+                room_version = await self.store.get_room_version(room_id)
             except NotFoundError:
                 logger.info("Ignoring PDU for unknown room_id: %s", room_id)
                 continue
-
-            try:
-                format_ver = room_version_to_event_format(room_version)
-            except UnsupportedRoomVersionError:
+            except UnsupportedRoomVersionError as e:
                 # this can happen if support for a given room version is withdrawn,
                 # so that we still get events for said room.
-                logger.info(
-                    "Ignoring PDU for room %s with unknown version %s",
-                    room_id,
-                    room_version,
-                )
+                logger.info("Ignoring PDU: %s", e)
                 continue
 
-            event = event_from_pdu_json(p, format_ver)
+            event = event_from_pdu_json(p, room_version)
             pdus_by_room.setdefault(room_id, []).append(event)
+
+            if event.origin_server_ts > newest_pdu_ts:
+                newest_pdu_ts = event.origin_server_ts
 
         pdu_results = {}
 
@@ -222,66 +340,79 @@ class FederationServer(FederationBase):
         # require callouts to other servers to fetch missing events), but
         # impose a limit to avoid going too crazy with ram/cpu.
 
-        @defer.inlineCallbacks
-        def process_pdus_for_room(room_id):
-            logger.debug("Processing PDUs for %s", room_id)
-            try:
-                yield self.check_server_matches_acl(origin_host, room_id)
-            except AuthError as e:
-                logger.warn("Ignoring PDUs for room %s from banned server", room_id)
-                for pdu in pdus_by_room[room_id]:
-                    event_id = pdu.event_id
-                    pdu_results[event_id] = e.error_dict()
-                return
+        async def process_pdus_for_room(room_id: str):
+            with nested_logging_context(room_id):
+                logger.debug("Processing PDUs for %s", room_id)
 
-            for pdu in pdus_by_room[room_id]:
-                event_id = pdu.event_id
+                try:
+                    await self.check_server_matches_acl(origin_host, room_id)
+                except AuthError as e:
+                    logger.warning(
+                        "Ignoring PDUs for room %s from banned server", room_id
+                    )
+                    for pdu in pdus_by_room[room_id]:
+                        event_id = pdu.event_id
+                        pdu_results[event_id] = e.error_dict()
+                    return
+
+                for pdu in pdus_by_room[room_id]:
+                    pdu_results[pdu.event_id] = await process_pdu(pdu)
+
+        async def process_pdu(pdu: EventBase) -> JsonDict:
+            event_id = pdu.event_id
+            with pdu_process_time.time():
                 with nested_logging_context(event_id):
                     try:
-                        yield self._handle_received_pdu(origin, pdu)
-                        pdu_results[event_id] = {}
+                        await self._handle_received_pdu(origin, pdu)
+                        return {}
                     except FederationError as e:
-                        logger.warn("Error handling PDU %s: %s", event_id, e)
-                        pdu_results[event_id] = {"error": str(e)}
+                        logger.warning("Error handling PDU %s: %s", event_id, e)
+                        return {"error": str(e)}
                     except Exception as e:
                         f = failure.Failure()
-                        pdu_results[event_id] = {"error": str(e)}
                         logger.error(
                             "Failed to handle PDU %s",
                             event_id,
-                            exc_info=(f.type, f.value, f.getTracebackObject()),
+                            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                         )
+                        return {"error": str(e)}
 
-        yield concurrently_execute(
+        await concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(), TRANSACTION_CONCURRENCY_LIMIT
         )
 
-        if hasattr(transaction, "edus"):
-            for edu in (Edu(**x) for x in transaction.edus):
-                yield self.received_edu(origin, edu.edu_type, edu.content)
+        if newest_pdu_ts and origin in self._federation_metrics_domains:
+            last_pdu_ts_metric.labels(server_name=origin).set(newest_pdu_ts / 1000)
 
-        response = {"pdus": pdu_results}
+        return pdu_results
 
-        logger.debug("Returning: %s", str(response))
+    async def _handle_edus_in_txn(self, origin: str, transaction: Transaction):
+        """Process the EDUs in a received transaction."""
 
-        yield self.transaction_actions.set_response(origin, transaction, 200, response)
-        defer.returnValue((200, response))
+        async def _process_edu(edu_dict):
+            received_edus_counter.inc()
 
-    @defer.inlineCallbacks
-    def received_edu(self, origin, edu_type, content):
-        received_edus_counter.inc()
-        yield self.registry.on_edu(edu_type, origin, content)
+            edu = Edu(
+                origin=origin,
+                destination=self.server_name,
+                edu_type=edu_dict["edu_type"],
+                content=edu_dict["content"],
+            )
+            await self.registry.on_edu(edu.edu_type, origin, edu.content)
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_context_state_request(self, origin, room_id, event_id):
-        if not event_id:
-            raise NotImplementedError("Specify an event")
+        await concurrently_execute(
+            _process_edu,
+            getattr(transaction, "edus", []),
+            TRANSACTION_CONCURRENCY_LIMIT,
+        )
 
+    async def on_room_state_request(
+        self, origin: str, room_id: str, event_id: str
+    ) -> Tuple[int, Dict[str, Any]]:
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, room_id)
+        await self.check_server_matches_acl(origin_host, room_id)
 
-        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        in_room = await self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
@@ -290,250 +421,214 @@ class FederationServer(FederationBase):
         # in the cache so we could return it without waiting for the linearizer
         # - but that's non-trivial to get right, and anyway somewhat defeats
         # the point of the linearizer.
-        with (yield self._server_linearizer.queue((origin, room_id))):
-            resp = yield self._state_resp_cache.wrap(
-                (room_id, event_id),
-                self._on_context_state_request_compute,
-                room_id,
-                event_id,
+        with (await self._server_linearizer.queue((origin, room_id))):
+            resp = dict(
+                await self._state_resp_cache.wrap(
+                    (room_id, event_id),
+                    self._on_context_state_request_compute,
+                    room_id,
+                    event_id,
+                )
             )
 
-        defer.returnValue((200, resp))
+        room_version = await self.store.get_room_version_id(room_id)
+        resp["room_version"] = room_version
 
-    @defer.inlineCallbacks
-    def on_state_ids_request(self, origin, room_id, event_id):
+        return 200, resp
+
+    async def on_state_ids_request(
+        self, origin: str, room_id: str, event_id: str
+    ) -> Tuple[int, Dict[str, Any]]:
         if not event_id:
             raise NotImplementedError("Specify an event")
 
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, room_id)
+        await self.check_server_matches_acl(origin_host, room_id)
 
-        in_room = yield self.auth.check_host_in_room(room_id, origin)
+        in_room = await self.auth.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
-        state_ids = yield self.handler.get_state_ids_for_pdu(room_id, event_id)
-        auth_chain_ids = yield self.store.get_auth_chain_ids(state_ids)
-
-        defer.returnValue(
-            (200, {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids})
+        resp = await self._state_ids_resp_cache.wrap(
+            (room_id, event_id),
+            self._on_state_ids_request_compute,
+            room_id,
+            event_id,
         )
 
-    @defer.inlineCallbacks
-    def _on_context_state_request_compute(self, room_id, event_id):
-        pdus = yield self.handler.get_state_for_pdu(room_id, event_id)
-        auth_chain = yield self.store.get_auth_chain([pdu.event_id for pdu in pdus])
+        return 200, resp
 
-        for event in auth_chain:
-            # We sign these again because there was a bug where we
-            # incorrectly signed things the first time round
-            if self.hs.is_mine_id(event.event_id):
-                event.signatures.update(
-                    compute_event_signature(
-                        event.get_pdu_json(),
-                        self.hs.hostname,
-                        self.hs.config.signing_key[0],
-                    )
-                )
+    async def _on_state_ids_request_compute(self, room_id, event_id):
+        state_ids = await self.handler.get_state_ids_for_pdu(room_id, event_id)
+        auth_chain_ids = await self.store.get_auth_chain_ids(room_id, state_ids)
+        return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
-        defer.returnValue(
-            {
-                "pdus": [pdu.get_pdu_json() for pdu in pdus],
-                "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
-            }
+    async def _on_context_state_request_compute(
+        self, room_id: str, event_id: str
+    ) -> Dict[str, list]:
+        if event_id:
+            pdus = await self.handler.get_state_for_pdu(
+                room_id, event_id
+            )  # type: Iterable[EventBase]
+        else:
+            pdus = (await self.state.get_current_state(room_id)).values()
+
+        auth_chain = await self.store.get_auth_chain(
+            room_id, [pdu.event_id for pdu in pdus]
         )
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_pdu_request(self, origin, event_id):
-        pdu = yield self.handler.get_persisted_pdu(origin, event_id)
+        return {
+            "pdus": [pdu.get_pdu_json() for pdu in pdus],
+            "auth_chain": [pdu.get_pdu_json() for pdu in auth_chain],
+        }
+
+    async def on_pdu_request(
+        self, origin: str, event_id: str
+    ) -> Tuple[int, Union[JsonDict, str]]:
+        pdu = await self.handler.get_persisted_pdu(origin, event_id)
 
         if pdu:
-            defer.returnValue((200, self._transaction_from_pdus([pdu]).get_dict()))
+            return 200, self._transaction_from_pdus([pdu]).get_dict()
         else:
-            defer.returnValue((404, ""))
+            return 404, ""
 
-    @defer.inlineCallbacks
-    def on_query_request(self, query_type, args):
+    async def on_query_request(
+        self, query_type: str, args: Dict[str, str]
+    ) -> Tuple[int, Dict[str, Any]]:
         received_queries_counter.labels(query_type).inc()
-        resp = yield self.registry.on_query(query_type, args)
-        defer.returnValue((200, resp))
+        resp = await self.registry.on_query(query_type, args)
+        return 200, resp
 
-    @defer.inlineCallbacks
-    def on_make_join_request(self, origin, room_id, user_id, supported_versions):
+    async def on_make_join_request(
+        self, origin: str, room_id: str, user_id: str, supported_versions: List[str]
+    ) -> Dict[str, Any]:
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, room_id)
+        await self.check_server_matches_acl(origin_host, room_id)
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
         if room_version not in supported_versions:
-            logger.warn("Room version %s not in %s", room_version, supported_versions)
+            logger.warning(
+                "Room version %s not in %s", room_version, supported_versions
+            )
             raise IncompatibleRoomVersionError(room_version=room_version)
 
-        pdu = yield self.handler.on_make_join_request(room_id, user_id)
+        pdu = await self.handler.on_make_join_request(origin, room_id, user_id)
         time_now = self._clock.time_msec()
-        defer.returnValue(
-            {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
-        )
+        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    @defer.inlineCallbacks
-    def on_invite_request(self, origin, content, room_version):
-        if room_version not in KNOWN_ROOM_VERSIONS:
+    async def on_invite_request(
+        self, origin: str, content: JsonDict, room_version_id: str
+    ) -> Dict[str, Any]:
+        room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
+        if not room_version:
             raise SynapseError(
                 400,
                 "Homeserver does not support this room version",
                 Codes.UNSUPPORTED_ROOM_VERSION,
             )
 
-        format_ver = room_version_to_event_format(room_version)
-
-        pdu = event_from_pdu_json(content, format_ver)
+        pdu = event_from_pdu_json(content, room_version)
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, pdu.room_id)
-        ret_pdu = yield self.handler.on_invite_request(origin, pdu)
+        await self.check_server_matches_acl(origin_host, pdu.room_id)
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        ret_pdu = await self.handler.on_invite_request(origin, pdu, room_version)
         time_now = self._clock.time_msec()
-        defer.returnValue({"event": ret_pdu.get_pdu_json(time_now)})
+        return {"event": ret_pdu.get_pdu_json(time_now)}
 
-    @defer.inlineCallbacks
-    def on_send_join_request(self, origin, content, room_id):
+    async def on_send_join_request(
+        self, origin: str, content: JsonDict
+    ) -> Dict[str, Any]:
         logger.debug("on_send_join_request: content: %s", content)
 
-        room_version = yield self.store.get_room_version(room_id)
-        format_ver = room_version_to_event_format(room_version)
-        pdu = event_from_pdu_json(content, format_ver)
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
+        pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, pdu.room_id)
+        await self.check_server_matches_acl(origin_host, pdu.room_id)
 
         logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
-        res_pdus = yield self.handler.on_send_join_request(origin, pdu)
-        time_now = self._clock.time_msec()
-        defer.returnValue(
-            (
-                200,
-                {
-                    "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-                    "auth_chain": [
-                        p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]
-                    ],
-                },
-            )
-        )
 
-    @defer.inlineCallbacks
-    def on_make_leave_request(self, origin, room_id, user_id):
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+        res_pdus = await self.handler.on_send_join_request(origin, pdu)
+        time_now = self._clock.time_msec()
+        return {
+            "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
+            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
+        }
+
+    async def on_make_leave_request(
+        self, origin: str, room_id: str, user_id: str
+    ) -> Dict[str, Any]:
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, room_id)
-        pdu = yield self.handler.on_make_leave_request(room_id, user_id)
+        await self.check_server_matches_acl(origin_host, room_id)
+        pdu = await self.handler.on_make_leave_request(origin, room_id, user_id)
 
-        room_version = yield self.store.get_room_version(room_id)
+        room_version = await self.store.get_room_version_id(room_id)
 
         time_now = self._clock.time_msec()
-        defer.returnValue(
-            {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
-        )
+        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    @defer.inlineCallbacks
-    def on_send_leave_request(self, origin, content, room_id):
+    async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
 
-        room_version = yield self.store.get_room_version(room_id)
-        format_ver = room_version_to_event_format(room_version)
-        pdu = event_from_pdu_json(content, format_ver)
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
+        pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
-        yield self.check_server_matches_acl(origin_host, pdu.room_id)
+        await self.check_server_matches_acl(origin_host, pdu.room_id)
 
         logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
-        yield self.handler.on_send_leave_request(origin, pdu)
-        defer.returnValue((200, {}))
 
-    @defer.inlineCallbacks
-    def on_event_auth(self, origin, room_id, event_id):
-        with (yield self._server_linearizer.queue((origin, room_id))):
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+        await self.handler.on_send_leave_request(origin, pdu)
+        return {}
+
+    async def on_event_auth(
+        self, origin: str, room_id: str, event_id: str
+    ) -> Tuple[int, Dict[str, Any]]:
+        with (await self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
-            yield self.check_server_matches_acl(origin_host, room_id)
+            await self.check_server_matches_acl(origin_host, room_id)
 
             time_now = self._clock.time_msec()
-            auth_pdus = yield self.handler.on_event_auth(event_id)
+            auth_pdus = await self.handler.on_event_auth(event_id)
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
-        defer.returnValue((200, res))
-
-    @defer.inlineCallbacks
-    def on_query_auth_request(self, origin, content, room_id, event_id):
-        """
-        Content is a dict with keys::
-            auth_chain (list): A list of events that give the auth chain.
-            missing (list): A list of event_ids indicating what the other
-              side (`origin`) think we're missing.
-            rejects (dict): A mapping from event_id to a 2-tuple of reason
-              string and a proof (or None) of why the event was rejected.
-              The keys of this dict give the list of events the `origin` has
-              rejected.
-
-        Args:
-            origin (str)
-            content (dict)
-            event_id (str)
-
-        Returns:
-            Deferred: Results in `dict` with the same format as `content`
-        """
-        with (yield self._server_linearizer.queue((origin, room_id))):
-            origin_host, _ = parse_server_name(origin)
-            yield self.check_server_matches_acl(origin_host, room_id)
-
-            room_version = yield self.store.get_room_version(room_id)
-            format_ver = room_version_to_event_format(room_version)
-
-            auth_chain = [
-                event_from_pdu_json(e, format_ver) for e in content["auth_chain"]
-            ]
-
-            signed_auth = yield self._check_sigs_and_hash_and_fetch(
-                origin, auth_chain, outlier=True, room_version=room_version
-            )
-
-            ret = yield self.handler.on_query_auth(
-                origin,
-                event_id,
-                room_id,
-                signed_auth,
-                content.get("rejects", []),
-                content.get("missing", []),
-            )
-
-            time_now = self._clock.time_msec()
-            send_content = {
-                "auth_chain": [e.get_pdu_json(time_now) for e in ret["auth_chain"]],
-                "rejects": ret.get("rejects", []),
-                "missing": ret.get("missing", []),
-            }
-
-        defer.returnValue((200, send_content))
+        return 200, res
 
     @log_function
-    def on_query_client_keys(self, origin, content):
-        return self.on_query_request("client_keys", content)
+    async def on_query_client_keys(
+        self, origin: str, content: Dict[str, str]
+    ) -> Tuple[int, Dict[str, Any]]:
+        return await self.on_query_request("client_keys", content)
 
-    def on_query_user_devices(self, origin, user_id):
-        return self.on_query_request("user_devices", user_id)
+    async def on_query_user_devices(
+        self, origin: str, user_id: str
+    ) -> Tuple[int, Dict[str, Any]]:
+        keys = await self.device_handler.on_federation_query_user_devices(user_id)
+        return 200, keys
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_claim_client_keys(self, origin, content):
+    @trace
+    async def on_claim_client_keys(
+        self, origin: str, content: JsonDict
+    ) -> Dict[str, Any]:
         query = []
         for user_id, device_keys in content.get("one_time_keys", {}).items():
             for device_id, algorithm in device_keys.items():
                 query.append((user_id, device_id, algorithm))
 
-        results = yield self.store.claim_e2e_one_time_keys(query)
+        log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
+        results = await self.store.claim_e2e_one_time_keys(query)
 
-        json_result = {}
+        json_result = {}  # type: Dict[str, Dict[str, dict]]
         for user_id, device_keys in results.items():
             for device_id, keys in device_keys.items():
-                for key_id, json_bytes in keys.items():
+                for key_id, json_str in keys.items():
                     json_result.setdefault(user_id, {})[device_id] = {
-                        key_id: json.loads(json_bytes)
+                        key_id: json_decoder.decode(json_str)
                     }
 
         logger.info(
@@ -541,25 +636,28 @@ class FederationServer(FederationBase):
             ",".join(
                 (
                     "%s for %s:%s" % (key_id, user_id, device_id)
-                    for user_id, user_keys in iteritems(json_result)
-                    for device_id, device_keys in iteritems(user_keys)
-                    for key_id, _ in iteritems(device_keys)
+                    for user_id, user_keys in json_result.items()
+                    for device_id, device_keys in user_keys.items()
+                    for key_id, _ in device_keys.items()
                 )
             ),
         )
 
-        defer.returnValue({"one_time_keys": json_result})
+        return {"one_time_keys": json_result}
 
-    @defer.inlineCallbacks
-    @log_function
-    def on_get_missing_events(
-        self, origin, room_id, earliest_events, latest_events, limit
-    ):
-        with (yield self._server_linearizer.queue((origin, room_id))):
+    async def on_get_missing_events(
+        self,
+        origin: str,
+        room_id: str,
+        earliest_events: List[str],
+        latest_events: List[str],
+        limit: int,
+    ) -> Dict[str, list]:
+        with (await self._server_linearizer.queue((origin, room_id))):
             origin_host, _ = parse_server_name(origin)
-            yield self.check_server_matches_acl(origin_host, room_id)
+            await self.check_server_matches_acl(origin_host, room_id)
 
-            logger.info(
+            logger.debug(
                 "on_get_missing_events: earliest_events: %r, latest_events: %r,"
                 " limit: %d",
                 earliest_events,
@@ -567,29 +665,27 @@ class FederationServer(FederationBase):
                 limit,
             )
 
-            missing_events = yield self.handler.on_get_missing_events(
+            missing_events = await self.handler.on_get_missing_events(
                 origin, room_id, earliest_events, latest_events, limit
             )
 
             if len(missing_events) < 5:
-                logger.info(
+                logger.debug(
                     "Returning %d events: %r", len(missing_events), missing_events
                 )
             else:
-                logger.info("Returning %d events", len(missing_events))
+                logger.debug("Returning %d events", len(missing_events))
 
             time_now = self._clock.time_msec()
 
-        defer.returnValue(
-            {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
-        )
+        return {"events": [ev.get_pdu_json(time_now) for ev in missing_events]}
 
     @log_function
-    def on_openid_userinfo(self, token):
+    async def on_openid_userinfo(self, token: str) -> Optional[str]:
         ts_now_ms = self._clock.time_msec()
-        return self.store.get_user_id_for_open_id_token(token, ts_now_ms)
+        return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
 
-    def _transaction_from_pdus(self, pdu_list):
+    def _transaction_from_pdus(self, pdu_list: List[EventBase]) -> Transaction:
         """Returns a new Transaction containing the given PDUs suitable for
         transmission.
         """
@@ -602,9 +698,8 @@ class FederationServer(FederationBase):
             destination=None,
         )
 
-    @defer.inlineCallbacks
-    def _handle_received_pdu(self, origin, pdu):
-        """ Process a PDU received in a federation /send/ transaction.
+    async def _handle_received_pdu(self, origin: str, pdu: EventBase) -> None:
+        """Process a PDU received in a federation /send/ transaction.
 
         If the event is invalid, then this method throws a FederationError.
         (The error will then be logged and sent back to the sender (which
@@ -624,100 +719,70 @@ class FederationServer(FederationBase):
         until we try to backfill across the discontinuity.
 
         Args:
-            origin (str): server which sent the pdu
-            pdu (FrozenEvent): received pdu
-
-        Returns (Deferred): completes with None
+            origin: server which sent the pdu
+            pdu: received pdu
 
         Raises: FederationError if the signatures / hash do not match, or
             if the event was unacceptable for any other reason (eg, too large,
             too many prev_events, couldn't find the prev_events)
         """
-        # check that it's actually being sent from a valid destination to
-        # workaround bug #1753 in 0.18.5 and 0.18.6
-        if origin != get_domain_from_id(pdu.sender):
-            # We continue to accept join events from any server; this is
-            # necessary for the federation join dance to work correctly.
-            # (When we join over federation, the "helper" server is
-            # responsible for sending out the join event, rather than the
-            # origin. See bug #1893. This is also true for some third party
-            # invites).
-            if not (
-                pdu.type == "m.room.member"
-                and pdu.content
-                and pdu.content.get("membership", None)
-                in (Membership.JOIN, Membership.INVITE)
-            ):
-                logger.info(
-                    "Discarding PDU %s from invalid origin %s", pdu.event_id, origin
-                )
-                return
-            else:
-                logger.info("Accepting join PDU %s from %s", pdu.event_id, origin)
 
         # We've already checked that we know the room version by this point
-        room_version = yield self.store.get_room_version(pdu.room_id)
+        room_version = await self.store.get_room_version(pdu.room_id)
 
         # Check signature.
         try:
-            pdu = yield self._check_sigs_and_hash(room_version, pdu)
+            pdu = await self._check_sigs_and_hash(room_version, pdu)
         except SynapseError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
 
-        yield self.handler.on_receive_pdu(origin, pdu, sent_to_us_directly=True)
+        await self.handler.on_receive_pdu(origin, pdu, sent_to_us_directly=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<ReplicationLayer(%s)>" % self.server_name
 
-    @defer.inlineCallbacks
-    def exchange_third_party_invite(
-        self, sender_user_id, target_user_id, room_id, signed
-    ):
-        ret = yield self.handler.exchange_third_party_invite(
+    async def exchange_third_party_invite(
+        self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict
+    ) -> None:
+        await self.handler.exchange_third_party_invite(
             sender_user_id, target_user_id, room_id, signed
         )
-        defer.returnValue(ret)
 
-    @defer.inlineCallbacks
-    def on_exchange_third_party_invite_request(self, origin, room_id, event_dict):
-        ret = yield self.handler.on_exchange_third_party_invite_request(
-            origin, room_id, event_dict
-        )
-        defer.returnValue(ret)
+    async def on_exchange_third_party_invite_request(self, event_dict: Dict) -> None:
+        await self.handler.on_exchange_third_party_invite_request(event_dict)
 
-    @defer.inlineCallbacks
-    def check_server_matches_acl(self, server_name, room_id):
+    async def check_server_matches_acl(self, server_name: str, room_id: str) -> None:
         """Check if the given server is allowed by the server ACLs in the room
 
         Args:
-            server_name (str): name of server, *without any port part*
-            room_id (str): ID of the room to check
+            server_name: name of server, *without any port part*
+            room_id: ID of the room to check
 
         Raises:
             AuthError if the server does not match the ACL
         """
-        state_ids = yield self.store.get_current_state_ids(room_id)
+        state_ids = await self.store.get_current_state_ids(room_id)
         acl_event_id = state_ids.get((EventTypes.ServerACL, ""))
 
         if not acl_event_id:
             return
 
-        acl_event = yield self.store.get_event(acl_event_id)
+        acl_event = await self.store.get_event(acl_event_id)
         if server_matches_acl_event(server_name, acl_event):
             return
 
         raise AuthError(code=403, msg="Server is banned from room")
 
 
-def server_matches_acl_event(server_name, acl_event):
+def server_matches_acl_event(server_name: str, acl_event: EventBase) -> bool:
     """Check if the given server is allowed by the ACL event
 
     Args:
-        server_name (str): name of server, without any port part
-        acl_event (EventBase): m.room.server_acl event
+        server_name: name of server, without any port part
+        acl_event: m.room.server_acl event
 
     Returns:
-        bool: True if this server is allowed by the ACLs
+        True if this server is allowed by the ACLs
     """
     logger.debug("Checking %s against acl %s", server_name, acl_event.content)
 
@@ -725,7 +790,7 @@ def server_matches_acl_event(server_name, acl_event):
     # server name is a literal IP
     allow_ip_literals = acl_event.content.get("allow_ip_literals", True)
     if not isinstance(allow_ip_literals, bool):
-        logger.warn("Ignorning non-bool allow_ip_literals flag")
+        logger.warning("Ignoring non-bool allow_ip_literals flag")
         allow_ip_literals = True
     if not allow_ip_literals:
         # check for ipv6 literals. These start with '['.
@@ -739,7 +804,7 @@ def server_matches_acl_event(server_name, acl_event):
     # next,  check the deny list
     deny = acl_event.content.get("deny", [])
     if not isinstance(deny, (list, tuple)):
-        logger.warn("Ignorning non-list deny ACL %s", deny)
+        logger.warning("Ignoring non-list deny ACL %s", deny)
         deny = []
     for e in deny:
         if _acl_entry_matches(server_name, e):
@@ -749,7 +814,7 @@ def server_matches_acl_event(server_name, acl_event):
     # then the allow list.
     allow = acl_event.content.get("allow", [])
     if not isinstance(allow, (list, tuple)):
-        logger.warn("Ignorning non-list allow ACL %s", allow)
+        logger.warning("Ignoring non-list allow ACL %s", allow)
         allow = []
     for e in allow:
         if _acl_entry_matches(server_name, e):
@@ -761,32 +826,62 @@ def server_matches_acl_event(server_name, acl_event):
     return False
 
 
-def _acl_entry_matches(server_name, acl_entry):
-    if not isinstance(acl_entry, six.string_types):
-        logger.warn(
+def _acl_entry_matches(server_name: str, acl_entry: Any) -> bool:
+    if not isinstance(acl_entry, str):
+        logger.warning(
             "Ignoring non-str ACL entry '%s' (is %s)", acl_entry, type(acl_entry)
         )
         return False
     regex = glob_to_regex(acl_entry)
-    return regex.match(server_name)
+    return bool(regex.match(server_name))
 
 
-class FederationHandlerRegistry(object):
+class FederationHandlerRegistry:
     """Allows classes to register themselves as handlers for a given EDU or
     query type for incoming federation traffic.
     """
 
-    def __init__(self):
-        self.edu_handlers = {}
-        self.query_handlers = {}
+    def __init__(self, hs: "HomeServer"):
+        self.config = hs.config
+        self.clock = hs.get_clock()
+        self._instance_name = hs.get_instance_name()
 
-    def register_edu_handler(self, edu_type, handler):
+        # These are safe to load in monolith mode, but will explode if we try
+        # and use them. However we have guards before we use them to ensure that
+        # we don't route to ourselves, and in monolith mode that will always be
+        # the case.
+        self._get_query_client = ReplicationGetQueryRestServlet.make_client(hs)
+        self._send_edu = ReplicationFederationSendEduRestServlet.make_client(hs)
+
+        self.edu_handlers = (
+            {}
+        )  # type: Dict[str, Callable[[str, dict], Awaitable[None]]]
+        self.query_handlers = (
+            {}
+        )  # type: Dict[str, Callable[[dict], Awaitable[JsonDict]]]
+
+        # Map from type to instance names that we should route EDU handling to.
+        # We randomly choose one instance from the list to route to for each new
+        # EDU received.
+        self._edu_type_to_instance = {}  # type: Dict[str, List[str]]
+
+        # A rate limiter for incoming room key requests per origin.
+        self._room_key_request_rate_limiter = Ratelimiter(
+            store=hs.get_datastore(),
+            clock=self.clock,
+            rate_hz=self.config.rc_key_requests.per_second,
+            burst_count=self.config.rc_key_requests.burst_count,
+        )
+
+    def register_edu_handler(
+        self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
+    ) -> None:
         """Sets the handler callable that will be used to handle an incoming
         federation EDU of the given type.
 
         Args:
-            edu_type (str): The type of the incoming EDU to register handler for
-            handler (Callable[[str, dict]]): A callable invoked on incoming EDU
+            edu_type: The type of the incoming EDU to register handler for
+            handler: A callable invoked on incoming EDU
                 of the given type. The arguments are the origin server name and
                 the EDU contents.
         """
@@ -797,14 +892,16 @@ class FederationHandlerRegistry(object):
 
         self.edu_handlers[edu_type] = handler
 
-    def register_query_handler(self, query_type, handler):
+    def register_query_handler(
+        self, query_type: str, handler: Callable[[dict], Awaitable[JsonDict]]
+    ) -> None:
         """Sets the handler callable that will be used to handle an incoming
         federation query of the given type.
 
         Args:
-            query_type (str): Category name of the query, which should match
+            query_type: Category name of the query, which should match
                 the string used by make_query.
-            handler (Callable[[dict], Deferred[dict]]): Invoked to handle
+            handler: Invoked to handle
                 incoming queries of this type. The return will be yielded
                 on and the result used as the response to the query request.
         """
@@ -815,65 +912,74 @@ class FederationHandlerRegistry(object):
 
         self.query_handlers[query_type] = handler
 
-    @defer.inlineCallbacks
-    def on_edu(self, edu_type, origin, content):
-        handler = self.edu_handlers.get(edu_type)
-        if not handler:
-            logger.warn("No handler registered for EDU type %s", edu_type)
+    def register_instance_for_edu(self, edu_type: str, instance_name: str) -> None:
+        """Register that the EDU handler is on a different instance than master."""
+        self._edu_type_to_instance[edu_type] = [instance_name]
 
-        try:
-            yield handler(origin, content)
-        except SynapseError as e:
-            logger.info("Failed to handle edu %r: %r", edu_type, e)
-        except Exception:
-            logger.exception("Failed to handle edu %r", edu_type)
+    def register_instances_for_edu(
+        self, edu_type: str, instance_names: List[str]
+    ) -> None:
+        """Register that the EDU handler is on multiple instances."""
+        self._edu_type_to_instance[edu_type] = instance_names
 
-    def on_query(self, query_type, args):
-        handler = self.query_handlers.get(query_type)
-        if not handler:
-            logger.warn("No handler registered for query type %s", query_type)
-            raise NotFoundError("No handler for Query type '%s'" % (query_type,))
-
-        return handler(args)
-
-
-class ReplicationFederationHandlerRegistry(FederationHandlerRegistry):
-    """A FederationHandlerRegistry for worker processes.
-
-    When receiving EDU or queries it will check if an appropriate handler has
-    been registered on the worker, if there isn't one then it calls off to the
-    master process.
-    """
-
-    def __init__(self, hs):
-        self.config = hs.config
-        self.http_client = hs.get_simple_http_client()
-        self.clock = hs.get_clock()
-
-        self._get_query_client = ReplicationGetQueryRestServlet.make_client(hs)
-        self._send_edu = ReplicationFederationSendEduRestServlet.make_client(hs)
-
-        super(ReplicationFederationHandlerRegistry, self).__init__()
-
-    def on_edu(self, edu_type, origin, content):
-        """Overrides FederationHandlerRegistry
-        """
-        if not self.config.use_presence and edu_type == "m.presence":
+    async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
+        if not self.config.use_presence and edu_type == EduTypes.Presence:
             return
 
+        # If the incoming room key requests from a particular origin are over
+        # the limit, drop them.
+        if (
+            edu_type == EduTypes.RoomKeyRequest
+            and not await self._room_key_request_rate_limiter.can_do_action(
+                None, origin
+            )
+        ):
+            return
+
+        # Check if we have a handler on this instance
         handler = self.edu_handlers.get(edu_type)
         if handler:
-            return super(ReplicationFederationHandlerRegistry, self).on_edu(
-                edu_type, origin, content
-            )
+            with start_active_span_from_edu(content, "handle_edu"):
+                try:
+                    await handler(origin, content)
+                except SynapseError as e:
+                    logger.info("Failed to handle edu %r: %r", edu_type, e)
+                except Exception:
+                    logger.exception("Failed to handle edu %r", edu_type)
+            return
 
-        return self._send_edu(edu_type=edu_type, origin=origin, content=content)
+        # Check if we can route it somewhere else that isn't us
+        instances = self._edu_type_to_instance.get(edu_type, ["master"])
+        if self._instance_name not in instances:
+            # Pick an instance randomly so that we don't overload one.
+            route_to = random.choice(instances)
 
-    def on_query(self, query_type, args):
-        """Overrides FederationHandlerRegistry
-        """
+            try:
+                await self._send_edu(
+                    instance_name=route_to,
+                    edu_type=edu_type,
+                    origin=origin,
+                    content=content,
+                )
+            except SynapseError as e:
+                logger.info("Failed to handle edu %r: %r", edu_type, e)
+            except Exception:
+                logger.exception("Failed to handle edu %r", edu_type)
+            return
+
+        # Oh well, let's just log and move on.
+        logger.warning("No handler registered for EDU type %s", edu_type)
+
+    async def on_query(self, query_type: str, args: dict) -> JsonDict:
         handler = self.query_handlers.get(query_type)
         if handler:
-            return handler(args)
+            return await handler(args)
 
-        return self._get_query_client(query_type=query_type, args=args)
+        # Check if we can route it somewhere else that isn't us
+        if self._instance_name == "master":
+            return await self._get_query_client(query_type=query_type, args=args)
+
+        # Uh oh, no handler! Let's raise an exception so the request returns an
+        # error.
+        logger.warning("No handler registered for query type %s", query_type)
+        raise NotFoundError("No handler for Query type '%s'" % (query_type,))

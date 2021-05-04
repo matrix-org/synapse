@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,27 +27,24 @@ Currently assumes the local address is localhost:<port>
 """
 
 
-from synapse.federation import ReplicationHandler
-
-from synapse.federation.units import Pdu
-
-from synapse.util import origin_from_ucid
-
-from synapse.app.homeserver import SynapseHomeServer
-
-# from synapse.util.logutils import log_function
-
-from twisted.internet import reactor, defer
-from twisted.python import log
-
 import argparse
+import curses.wrapper
 import json
 import logging
 import os
 import re
 
 import cursesio
-import curses.wrapper
+
+from twisted.internet import defer, reactor
+from twisted.python import log
+
+from synapse.app.homeserver import SynapseHomeServer
+from synapse.federation import ReplicationHandler
+from synapse.federation.units import Pdu
+from synapse.util import origin_from_ucid
+
+# from synapse.logging.utils import log_function
 
 
 logger = logging.getLogger("example")
@@ -58,8 +54,8 @@ def excpetion_errback(failure):
     logging.exception(failure)
 
 
-class InputOutput(object):
-    """ This is responsible for basic I/O so that a user can interact with
+class InputOutput:
+    """This is responsible for basic I/O so that a user can interact with
     the example app.
     """
 
@@ -71,20 +67,19 @@ class InputOutput(object):
         self.server = server
 
     def on_line(self, line):
-        """ This is where we process commands.
-        """
+        """This is where we process commands."""
 
         try:
-            m = re.match("^join (\S+)$", line)
+            m = re.match(r"^join (\S+)$", line)
             if m:
                 # The `sender` wants to join a room.
-                room_name, = m.groups()
+                (room_name,) = m.groups()
                 self.print_line("%s joining %s" % (self.user, room_name))
                 self.server.join_room(room_name, self.user, self.user)
                 # self.print_line("OK.")
                 return
 
-            m = re.match("^invite (\S+) (\S+)$", line)
+            m = re.match(r"^invite (\S+) (\S+)$", line)
             if m:
                 # `sender` wants to invite someone to a room
                 room_name, invitee = m.groups()
@@ -93,7 +88,7 @@ class InputOutput(object):
                 # self.print_line("OK.")
                 return
 
-            m = re.match("^send (\S+) (.*)$", line)
+            m = re.match(r"^send (\S+) (.*)$", line)
             if m:
                 # `sender` wants to message a room
                 room_name, body = m.groups()
@@ -102,10 +97,10 @@ class InputOutput(object):
                 # self.print_line("OK.")
                 return
 
-            m = re.match("^backfill (\S+)$", line)
+            m = re.match(r"^backfill (\S+)$", line)
             if m:
                 # we want to backfill a room
-                room_name, = m.groups()
+                (room_name,) = m.groups()
                 self.print_line("backfill %s" % room_name)
                 self.server.backfill(room_name)
                 return
@@ -135,8 +130,8 @@ class IOLoggerHandler(logging.Handler):
         self.io.print_log(msg)
 
 
-class Room(object):
-    """ Used to store (in memory) the current membership state of a room, and
+class Room:
+    """Used to store (in memory) the current membership state of a room, and
     which home servers we should send PDUs associated with the room to.
     """
 
@@ -151,8 +146,7 @@ class Room(object):
         self.have_got_metadata = False
 
     def add_participant(self, participant):
-        """ Someone has joined the room
-        """
+        """Someone has joined the room"""
         self.participants.add(participant)
         self.invited.discard(participant)
 
@@ -163,14 +157,13 @@ class Room(object):
             self.oldest_server = server
 
     def add_invited(self, invitee):
-        """ Someone has been invited to the room
-        """
+        """Someone has been invited to the room"""
         self.invited.add(invitee)
         self.servers.add(origin_from_ucid(invitee))
 
 
 class HomeServer(ReplicationHandler):
-    """ A very basic home server implentation that allows people to join a
+    """A very basic home server implentation that allows people to join a
     room and then invite other people.
     """
 
@@ -184,8 +177,7 @@ class HomeServer(ReplicationHandler):
         self.output = output
 
     def on_receive_pdu(self, pdu):
-        """ We just received a PDU
-        """
+        """We just received a PDU"""
         pdu_type = pdu.pdu_type
 
         if pdu_type == "sy.room.message":
@@ -201,34 +193,21 @@ class HomeServer(ReplicationHandler):
                 % (pdu.context, pdu.pdu_type, json.dumps(pdu.content))
             )
 
-    # def on_state_change(self, pdu):
-    ##self.output.print_line("#%s (state) %s *** %s" %
-    ##(pdu.context, pdu.state_key, pdu.pdu_type)
-    ##)
-
-    # if "joinee" in pdu.content:
-    # self._on_join(pdu.context, pdu.content["joinee"])
-    # elif "invitee" in pdu.content:
-    # self._on_invite(pdu.origin, pdu.context, pdu.content["invitee"])
-
     def _on_message(self, pdu):
-        """ We received a message
-        """
+        """We received a message"""
         self.output.print_line(
             "#%s %s %s" % (pdu.context, pdu.content["sender"], pdu.content["body"])
         )
 
     def _on_join(self, context, joinee):
-        """ Someone has joined a room, either a remote user or a local user
-        """
+        """Someone has joined a room, either a remote user or a local user"""
         room = self._get_or_create_room(context)
         room.add_participant(joinee)
 
         self.output.print_line("#%s %s %s" % (context, joinee, "*** JOINED"))
 
     def _on_invite(self, origin, context, invitee):
-        """ Someone has been invited
-        """
+        """Someone has been invited"""
         room = self._get_or_create_room(context)
         room.add_invited(invitee)
 
@@ -241,27 +220,27 @@ class HomeServer(ReplicationHandler):
 
     @defer.inlineCallbacks
     def send_message(self, room_name, sender, body):
-        """ Send a message to a room!
-        """
+        """Send a message to a room!"""
         destinations = yield self.get_servers_for_context(room_name)
 
         try:
-            yield self.replication_layer.send_pdu(
-                Pdu.create_new(
-                    context=room_name,
-                    pdu_type="sy.room.message",
-                    content={"sender": sender, "body": body},
-                    origin=self.server_name,
-                    destinations=destinations,
-                )
+            yield self.replication_layer.send_pdus(
+                [
+                    Pdu.create_new(
+                        context=room_name,
+                        pdu_type="sy.room.message",
+                        content={"sender": sender, "body": body},
+                        origin=self.server_name,
+                        destinations=destinations,
+                    )
+                ]
             )
         except Exception as e:
             logger.exception(e)
 
     @defer.inlineCallbacks
     def join_room(self, room_name, sender, joinee):
-        """ Join a room!
-        """
+        """Join a room!"""
         self._on_join(room_name, joinee)
 
         destinations = yield self.get_servers_for_context(room_name)
@@ -276,29 +255,30 @@ class HomeServer(ReplicationHandler):
                 origin=self.server_name,
                 destinations=destinations,
             )
-            yield self.replication_layer.send_pdu(pdu)
+            yield self.replication_layer.send_pdus([pdu])
         except Exception as e:
             logger.exception(e)
 
     @defer.inlineCallbacks
     def invite_to_room(self, room_name, sender, invitee):
-        """ Invite someone to a room!
-        """
+        """Invite someone to a room!"""
         self._on_invite(self.server_name, room_name, invitee)
 
         destinations = yield self.get_servers_for_context(room_name)
 
         try:
-            yield self.replication_layer.send_pdu(
-                Pdu.create_new(
-                    context=room_name,
-                    is_state=True,
-                    pdu_type="sy.room.member",
-                    state_key=invitee,
-                    content={"membership": "invite"},
-                    origin=self.server_name,
-                    destinations=destinations,
-                )
+            yield self.replication_layer.send_pdus(
+                [
+                    Pdu.create_new(
+                        context=room_name,
+                        is_state=True,
+                        pdu_type="sy.room.member",
+                        state_key=invitee,
+                        content={"membership": "invite"},
+                        origin=self.server_name,
+                        destinations=destinations,
+                    )
+                ]
             )
         except Exception as e:
             logger.exception(e)
@@ -314,7 +294,7 @@ class HomeServer(ReplicationHandler):
         return self.replication_layer.backfill(dest, room_name, limit)
 
     def _get_room_remote_servers(self, room_name):
-        return [i for i in self.joined_rooms.setdefault(room_name).servers]
+        return list(self.joined_rooms.setdefault(room_name).servers)
 
     def _get_or_create_room(self, room_name):
         return self.joined_rooms.setdefault(room_name, Room(room_name))
@@ -334,12 +314,12 @@ def main(stdscr):
     user = args.user
     server_name = origin_from_ucid(user)
 
-    ## Set up logging ##
+    # Set up logging
 
     root_logger = logging.getLogger()
 
     formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(lineno)d - " "%(levelname)s - %(message)s"
+        "%(asctime)s - %(name)s - %(lineno)d - %(levelname)s - %(message)s"
     )
     if not os.path.exists("logs"):
         os.makedirs("logs")
@@ -354,7 +334,7 @@ def main(stdscr):
     observer = log.PythonLoggingObserver()
     observer.start()
 
-    ## Set up synapse server
+    # Set up synapse server
 
     curses_stdio = cursesio.CursesStdIO(stdscr)
     input_output = InputOutput(curses_stdio, user)
@@ -368,16 +348,16 @@ def main(stdscr):
 
     input_output.set_home_server(hs)
 
-    ## Add input_output logger
+    # Add input_output logger
     io_logger = IOLoggerHandler(input_output)
     io_logger.setFormatter(formatter)
     root_logger.addHandler(io_logger)
 
-    ## Start! ##
+    # Start!
 
     try:
         port = int(server_name.split(":")[1])
-    except:
+    except Exception:
         port = 12345
 
     app_hs.get_http_server().start_listening(port)

@@ -8,7 +8,7 @@ formatters:
 
 filters:
     context:
-        (): synapse.util.logcontext.LoggingContextFilter
+        (): synapse.logging.context.LoggingContextFilter
         request: ""
 
 handlers:

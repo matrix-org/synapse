@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -15,75 +14,118 @@
 # limitations under the License.
 
 import logging
+from functools import wraps
+from typing import TYPE_CHECKING, Optional, Tuple
 
-from twisted.internet import defer
+from twisted.web.server import Request
 
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.types import GroupID
+from synapse.api.constants import (
+    MAX_GROUP_CATEGORYID_LENGTH,
+    MAX_GROUP_ROLEID_LENGTH,
+    MAX_GROUPID_LENGTH,
+)
+from synapse.api.errors import Codes, SynapseError
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.http.servlet import (
+    RestServlet,
+    assert_params_in_dict,
+    parse_json_object_from_request,
+)
+from synapse.http.site import SynapseRequest
+from synapse.types import GroupID, JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
-class GroupServlet(RestServlet):
-    """Get the group profile
+def _validate_group_id(f):
+    """Wrapper to validate the form of the group ID.
+
+    Can be applied to any on_FOO methods that accepts a group ID as a URL parameter.
     """
+
+    @wraps(f)
+    def wrapper(self, request: Request, group_id: str, *args, **kwargs):
+        if not GroupID.is_valid(group_id):
+            raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
+
+        return f(self, request, group_id, *args, **kwargs)
+
+    return wrapper
+
+
+class GroupServlet(RestServlet):
+    """Get the group profile"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/profile$")
 
-    def __init__(self, hs):
-        super(GroupServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        group_description = yield self.groups_handler.get_group_profile(
+        group_description = await self.groups_handler.get_group_profile(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, group_description))
+        return 200, group_description
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_POST(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        yield self.groups_handler.update_group_profile(
+        assert_params_in_dict(
+            content, ("name", "avatar_url", "short_description", "long_description")
+        )
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create group profiles."
+        await self.groups_handler.update_group_profile(
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class GroupSummaryServlet(RestServlet):
-    """Get the full group summary
-    """
+    """Get the full group summary"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/summary$")
 
-    def __init__(self, hs):
-        super(GroupSummaryServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        get_group_summary = yield self.groups_handler.get_group_summary(
+        get_group_summary = await self.groups_handler.get_group_summary(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, get_group_summary))
+        return 200, get_group_summary
 
 
 class GroupSummaryRoomsCatServlet(RestServlet):
@@ -100,19 +142,39 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         "/rooms/(?P<room_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        super(GroupSummaryRoomsCatServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, category_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self,
+        request: SynapseRequest,
+        group_id: str,
+        category_id: Optional[str],
+        room_id: str,
+    ):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if category_id == "":
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if category_id and len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_summary_room(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
+        resp = await self.groups_handler.update_group_summary_room(
             group_id,
             requester_user_id,
             room_id=room_id,
@@ -120,162 +182,213 @@ class GroupSummaryRoomsCatServlet(RestServlet):
             content=content,
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, category_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_DELETE(
+        self, request: SynapseRequest, group_id: str, category_id: str, room_id: str
+    ):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_summary_room(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group profiles."
+        resp = await self.groups_handler.delete_group_summary_room(
             group_id, requester_user_id, room_id=room_id, category_id=category_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupCategoryServlet(RestServlet):
-    """Get/add/update/delete a group category
-    """
+    """Get/add/update/delete a group category"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)$"
     )
 
-    def __init__(self, hs):
-        super(GroupCategoryServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id, category_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str, category_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_category(
+        category = await self.groups_handler.get_group_category(
             group_id, requester_user_id, category_id=category_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, category_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str, category_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not category_id:
+            raise SynapseError(400, "category_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_category(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
+        resp = await self.groups_handler.update_group_category(
             group_id, requester_user_id, category_id=category_id, content=content
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, category_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_DELETE(
+        self, request: SynapseRequest, group_id: str, category_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_category(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
+        resp = await self.groups_handler.delete_group_category(
             group_id, requester_user_id, category_id=category_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupCategoriesServlet(RestServlet):
-    """Get all group categories
-    """
+    """Get all group categories"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/categories/$")
 
-    def __init__(self, hs):
-        super(GroupCategoriesServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_categories(
+        category = await self.groups_handler.get_group_categories(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
 
 class GroupRoleServlet(RestServlet):
-    """Get/add/update/delete a group role
-    """
+    """Get/add/update/delete a group role"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)$")
 
-    def __init__(self, hs):
-        super(GroupRoleServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id, role_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str, role_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_role(
+        category = await self.groups_handler.get_group_role(
             group_id, requester_user_id, role_id=role_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, role_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str, role_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if not role_id:
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_role(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
+        resp = await self.groups_handler.update_group_role(
             group_id, requester_user_id, role_id=role_id, content=content
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, role_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_DELETE(
+        self, request: SynapseRequest, group_id: str, role_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_role(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group roles."
+        resp = await self.groups_handler.delete_group_role(
             group_id, requester_user_id, role_id=role_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupRolesServlet(RestServlet):
-    """Get all group roles
-    """
+    """Get all group roles"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/roles/$")
 
-    def __init__(self, hs):
-        super(GroupRolesServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        category = yield self.groups_handler.get_group_roles(
+        category = await self.groups_handler.get_group_roles(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, category))
+        return 200, category
 
 
 class GroupSummaryUsersRoleServlet(RestServlet):
@@ -292,19 +405,39 @@ class GroupSummaryUsersRoleServlet(RestServlet):
         "/users/(?P<user_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        super(GroupSummaryUsersRoleServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, role_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self,
+        request: SynapseRequest,
+        group_id: str,
+        role_id: Optional[str],
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
+        if role_id == "":
+            raise SynapseError(400, "role_id cannot be empty", Codes.INVALID_PARAM)
+
+        if role_id and len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         content = parse_json_object_from_request(request)
-        resp = yield self.groups_handler.update_group_summary_user(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
+        resp = await self.groups_handler.update_group_summary_user(
             group_id,
             requester_user_id,
             user_id=user_id,
@@ -312,133 +445,143 @@ class GroupSummaryUsersRoleServlet(RestServlet):
             content=content,
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, role_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_DELETE(
+        self, request: SynapseRequest, group_id: str, role_id: str, user_id: str
+    ):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        resp = yield self.groups_handler.delete_group_summary_user(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group summaries."
+        resp = await self.groups_handler.delete_group_summary_user(
             group_id, requester_user_id, user_id=user_id, role_id=role_id
         )
 
-        defer.returnValue((200, resp))
+        return 200, resp
 
 
 class GroupRoomServlet(RestServlet):
-    """Get all rooms in a group
-    """
+    """Get all rooms in a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/rooms$")
 
-    def __init__(self, hs):
-        super(GroupRoomServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_rooms_in_group(
+        result = await self.groups_handler.get_rooms_in_group(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupUsersServlet(RestServlet):
-    """Get all users in a group
-    """
+    """Get all users in a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/users$")
 
-    def __init__(self, hs):
-        super(GroupUsersServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_users_in_group(
+        result = await self.groups_handler.get_users_in_group(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupInvitedUsersServlet(RestServlet):
-    """Get users invited to a group
-    """
+    """Get users invited to a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/invited_users$")
 
-    def __init__(self, hs):
-        super(GroupInvitedUsersServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_GET(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_invited_users_in_group(
+        result = await self.groups_handler.get_invited_users_in_group(
             group_id, requester_user_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSettingJoinPolicyServlet(RestServlet):
-    """Set group join policy
-    """
+    """Set group join policy"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/settings/m.join_policy$")
 
-    def __init__(self, hs):
-        super(GroupSettingJoinPolicyServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
 
-        result = yield self.groups_handler.set_group_join_policy(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group join policy."
+        result = await self.groups_handler.set_group_join_policy(
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupCreateServlet(RestServlet):
-    """Create a group
-    """
+    """Create a group"""
 
     PATTERNS = client_patterns("/create_group$")
 
-    def __init__(self, hs):
-        super(GroupCreateServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
         self.server_name = hs.hostname
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         # TODO: Create group on remote server
@@ -446,305 +589,348 @@ class GroupCreateServlet(RestServlet):
         localpart = content.pop("localpart")
         group_id = GroupID(localpart, self.server_name).to_string()
 
-        result = yield self.groups_handler.create_group(
+        if not localpart:
+            raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
+
+        if len(group_id) > MAX_GROUPID_LENGTH:
+            raise SynapseError(
+                400,
+                "Group ID may not be longer than %s characters" % (MAX_GROUPID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot create groups."
+        result = await self.groups_handler.create_group(
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminRoomsServlet(RestServlet):
-    """Add a room to the group
-    """
+    """Add a room to the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        super(GroupAdminRoomsServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.add_room_to_group(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify rooms in a group."
+        result = await self.groups_handler.add_room_to_group(
             group_id, requester_user_id, room_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, group_id, room_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_DELETE(
+        self, request: SynapseRequest, group_id: str, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.remove_room_from_group(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
+        result = await self.groups_handler.remove_room_from_group(
             group_id, requester_user_id, room_id
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminRoomsConfigServlet(RestServlet):
-    """Update the config of a room in a group
-    """
+    """Update the config of a room in a group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/rooms/(?P<room_id>[^/]*)"
         "/config/(?P<config_key>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        super(GroupAdminRoomsConfigServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, room_id, config_key):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str, room_id: str, config_key: str
+    ):
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.update_room_in_group(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot modify group categories."
+        result = await self.groups_handler.update_room_in_group(
             group_id, requester_user_id, room_id, config_key, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminUsersInviteServlet(RestServlet):
-    """Invite a user to the group
-    """
+    """Invite a user to the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/invite/(?P<user_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        super(GroupAdminUsersInviteServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
         self.store = hs.get_datastore()
         self.is_mine_id = hs.is_mine_id
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id, user_id
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         config = content.get("config", {})
-        result = yield self.groups_handler.invite(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot invite users to a group."
+        result = await self.groups_handler.invite(
             group_id, user_id, requester_user_id, config
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupAdminUsersKickServlet(RestServlet):
-    """Kick a user from the group
-    """
+    """Kick a user from the group"""
 
     PATTERNS = client_patterns(
         "/groups/(?P<group_id>[^/]*)/admin/users/remove/(?P<user_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        super(GroupAdminUsersKickServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id, user_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id, user_id
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_user_from_group(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot kick users from a group."
+        result = await self.groups_handler.remove_user_from_group(
             group_id, user_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfLeaveServlet(RestServlet):
-    """Leave a joined group
-    """
+    """Leave a joined group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/leave$")
 
-    def __init__(self, hs):
-        super(GroupSelfLeaveServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.remove_user_from_group(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot leave a group for a users."
+        result = await self.groups_handler.remove_user_from_group(
             group_id, requester_user_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfJoinServlet(RestServlet):
-    """Attempt to join a group, or knock
-    """
+    """Attempt to join a group, or knock"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/join$")
 
-    def __init__(self, hs):
-        super(GroupSelfJoinServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.join_group(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot join a user to a group."
+        result = await self.groups_handler.join_group(
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfAcceptInviteServlet(RestServlet):
-    """Accept a group invite
-    """
+    """Accept a group invite"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/accept_invite$")
 
-    def __init__(self, hs):
-        super(GroupSelfAcceptInviteServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
-        result = yield self.groups_handler.accept_invite(
+        assert isinstance(
+            self.groups_handler, GroupsLocalHandler
+        ), "Workers cannot accept an invite to a group."
+        result = await self.groups_handler.accept_invite(
             group_id, requester_user_id, content
         )
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupSelfUpdatePublicityServlet(RestServlet):
-    """Update whether we publicise a users membership of a group
-    """
+    """Update whether we publicise a users membership of a group"""
 
     PATTERNS = client_patterns("/groups/(?P<group_id>[^/]*)/self/update_publicity$")
 
-    def __init__(self, hs):
-        super(GroupSelfUpdatePublicityServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, group_id):
-        requester = yield self.auth.get_user_by_req(request)
+    @_validate_group_id
+    async def on_PUT(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
         content = parse_json_object_from_request(request)
         publicise = content["publicise"]
-        yield self.store.update_group_publicity(group_id, requester_user_id, publicise)
+        await self.store.update_group_publicity(group_id, requester_user_id, publicise)
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
 
 class PublicisedGroupsForUserServlet(RestServlet):
-    """Get the list of groups a user is advertising
-    """
+    """Get the list of groups a user is advertising"""
 
     PATTERNS = client_patterns("/publicised_groups/(?P<user_id>[^/]*)$")
 
-    def __init__(self, hs):
-        super(PublicisedGroupsForUserServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, user_id):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
-        result = yield self.groups_handler.get_publicised_groups_for_user(user_id)
+        result = await self.groups_handler.get_publicised_groups_for_user(user_id)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class PublicisedGroupsForUsersServlet(RestServlet):
-    """Get the list of groups a user is advertising
-    """
+    """Get the list of groups a user is advertising"""
 
     PATTERNS = client_patterns("/publicised_groups$")
 
-    def __init__(self, hs):
-        super(PublicisedGroupsForUsersServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_POST(self, request):
-        yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
         user_ids = content["user_ids"]
 
-        result = yield self.groups_handler.bulk_get_publicised_groups(user_ids)
+        result = await self.groups_handler.bulk_get_publicised_groups(user_ids)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class GroupsForUserServlet(RestServlet):
-    """Get all groups the logged in user is joined to
-    """
+    """Get all groups the logged in user is joined to"""
 
     PATTERNS = client_patterns("/joined_groups$")
 
-    def __init__(self, hs):
-        super(GroupsForUserServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.groups_handler = hs.get_groups_local_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
         requester_user_id = requester.user.to_string()
 
-        result = yield self.groups_handler.get_joined_groups(requester_user_id)
+        result = await self.groups_handler.get_joined_groups(requester_user_id)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server):
     GroupServlet(hs).register(http_server)
     GroupSummaryServlet(hs).register(http_server)
     GroupInvitedUsersServlet(hs).register(http_server)

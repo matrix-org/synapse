@@ -2,10 +2,15 @@ Source: matrix-synapse-py3
 Section: contrib/python
 Priority: extra
 Maintainer: Synapse Packaging team <packages@matrix.org>
+# keep this list in sync with the build dependencies in docker/Dockerfile-dhvirtualenv.
+# TODO: Remove the dependency on dh-systemd after dropping support for Ubuntu xenial
+#       On all other supported releases, it's merely a transitional package which
+#       does nothing but depends on debhelper (> 9.20160709)
 Build-Depends:
- debhelper (>= 9),
- dh-systemd,
+ debhelper (>= 9.20160709) | dh-systemd,
  dh-virtualenv (>= 1.1),
+ libsystemd-dev,
+ libpq-dev,
  lsb-release,
  python3-dev,
  python3,
@@ -26,11 +31,13 @@ Pre-Depends: dpkg (>= 1.16.1)
 Depends:
  adduser,
  debconf,
- python3-distutils|libpython3-stdlib (<< 3.6),
  ${misc:Depends},
+ ${shlibs:Depends},
  ${synapse:pydepends},
 # some of our scripts use perl, but none of them are important,
 # so we put perl:Depends in Suggests rather than Depends.
+Recommends:
+ ${shlibs1:Recommends},
 Suggests:
  sqlite3,
  ${perl:Depends},

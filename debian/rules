@@ -3,15 +3,50 @@
 # Build Debian package using https://github.com/spotify/dh-virtualenv
 #
 
+# assume we only have one package
+PACKAGE_NAME:=`dh_listpackages`
+
 override_dh_systemd_enable:
 	dh_systemd_enable --name=matrix-synapse
 
 override_dh_installinit:
 	dh_installinit --name=matrix-synapse
 
+# we don't really want to strip the symbols from our object files.
 override_dh_strip:
 
+# dh_shlibdeps calls dpkg-shlibdeps, which finds all the binary files
+# (executables and shared libs) in the package, and looks for the shared
+# libraries that they depend on. It then adds a dependency on the package that
+# contains that library to the package.
+#
+# We make two modifications to that process...
+#
 override_dh_shlibdeps:
+        # Firstly, postgres is not a hard dependency for us, so we want to make
+        # the things that psycopg2 depends on (such as libpq) be
+        # recommendations rather than hard dependencies. We do so by
+        # running dpkg-shlibdeps manually on psycopg2's libs.
+        #
+	find debian/$(PACKAGE_NAME)/ -path '*/site-packages/psycopg2/*.so' | \
+	    xargs dpkg-shlibdeps -Tdebian/$(PACKAGE_NAME).substvars \
+	        -pshlibs1 -dRecommends
+
+        # secondly, we exclude PIL's libraries from the process. They are known
+        # to be self-contained, but they have interdependencies and
+        # dpkg-shlibdeps doesn't know how to resolve them.
+        #
+        # As of Pillow 7.1.0, these libraries are in
+        # site-packages/Pillow.libs. Previously, they were in
+        # site-packages/PIL/.libs.
+        #
+        # (we also need to exclude psycopg2, of course, since we've already
+        # dealt with that.)
+        #
+	dh_shlibdeps \
+	    -X site-packages/PIL/.libs \
+	    -X site-packages/Pillow.libs \
+	    -X site-packages/psycopg2
 
 override_dh_virtualenv:
 	./debian/build_virtualenv

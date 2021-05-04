@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +13,16 @@
 # limitations under the License.
 
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
 
-from .. import unittest
+from tests import unittest
+from tests.unittest import override_config
 
 
-class LruCacheTestCase(unittest.TestCase):
+class LruCacheTestCase(unittest.HomeserverTestCase):
     def test_get_set(self):
         cache = LruCache(1)
         cache["key"] = "value"
@@ -59,7 +59,7 @@ class LruCacheTestCase(unittest.TestCase):
         self.assertEquals(cache.pop("key"), None)
 
     def test_del_multi(self):
-        cache = LruCache(4, 2, cache_type=TreeCache)
+        cache = LruCache(4, keylen=2, cache_type=TreeCache)
         cache[("animal", "cat")] = "mew"
         cache[("animal", "dog")] = "woof"
         cache[("vehicles", "car")] = "vroom"
@@ -83,8 +83,13 @@ class LruCacheTestCase(unittest.TestCase):
         cache.clear()
         self.assertEquals(len(cache), 0)
 
+    @override_config({"caches": {"per_cache_factors": {"mycache": 10}}})
+    def test_special_size(self):
+        cache = LruCache(10, "mycache")
+        self.assertEqual(cache.max_size, 100)
 
-class LruCacheCallbacksTestCase(unittest.TestCase):
+
+class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
     def test_get(self):
         m = Mock()
         cache = LruCache(1)
@@ -160,7 +165,7 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         m2 = Mock()
         m3 = Mock()
         m4 = Mock()
-        cache = LruCache(4, 2, cache_type=TreeCache)
+        cache = LruCache(4, keylen=2, cache_type=TreeCache)
 
         cache.set(("a", "1"), "value", callbacks=[m1])
         cache.set(("a", "2"), "value", callbacks=[m2])
@@ -233,7 +238,7 @@ class LruCacheCallbacksTestCase(unittest.TestCase):
         self.assertEquals(m3.call_count, 1)
 
 
-class LruCacheSizedTestCase(unittest.TestCase):
+class LruCacheSizedTestCase(unittest.HomeserverTestCase):
     def test_evict(self):
         cache = LruCache(5, size_callback=len)
         cache["key1"] = [0]

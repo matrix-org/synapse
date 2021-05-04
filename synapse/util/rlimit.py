@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,4 +32,4 @@ def change_resource_limit(soft_file_no):
             resource.RLIMIT_CORE, (resource.RLIM_INFINITY, resource.RLIM_INFINITY)
         )
     except (ValueError, resource.error) as e:
-        logger.warn("Failed to set file or core limit: %s", e)
+        logger.warning("Failed to set file or core limit: %s", e)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from twisted.internet import defer
-
 from synapse.api.errors import (
     NotFoundError,
     StoreError,
@@ -26,7 +23,7 @@ from synapse.http.servlet import (
     parse_json_value_from_request,
     parse_string,
 )
-from synapse.push.baserules import BASE_RULE_IDS
+from synapse.push.baserules import BASE_RULE_IDS, NEW_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -40,24 +37,25 @@ class PushRuleRestServlet(RestServlet):
     )
 
     def __init__(self, hs):
-        super(PushRuleRestServlet, self).__init__()
+        super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
         self._is_worker = hs.config.worker_app is not None
 
-    @defer.inlineCallbacks
-    def on_PUT(self, request, path):
+        self._users_new_default_push_rules = hs.config.users_new_default_push_rules
+
+    async def on_PUT(self, request, path):
         if self._is_worker:
             raise Exception("Cannot handle PUT /push_rules on worker")
 
-        spec = _rule_spec_from_path([x for x in path.split("/")])
+        spec = _rule_spec_from_path(path.split("/"))
         try:
             priority_class = _priority_class_from_spec(spec)
         except InvalidRuleException as e:
             raise SynapseError(400, str(e))
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
 
         if "/" in spec["rule_id"] or "\\" in spec["rule_id"]:
             raise SynapseError(400, "rule_id may not contain slashes")
@@ -67,9 +65,9 @@ class PushRuleRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         if "attr" in spec:
-            yield self.set_rule_attr(user_id, spec, content)
+            await self.set_rule_attr(user_id, spec, content)
             self.notify_user(user_id)
-            defer.returnValue((200, {}))
+            return 200, {}
 
         if spec["rule_id"].startswith("."):
             # Rule ids starting with '.' are reserved for server default rules.
@@ -91,7 +89,7 @@ class PushRuleRestServlet(RestServlet):
             after = _namespaced_rule_id(spec, after)
 
         try:
-            yield self.store.add_push_rule(
+            await self.store.add_push_rule(
                 user_id=user_id,
                 rule_id=_namespaced_rule_id_from_spec(spec),
                 priority_class=priority_class,
@@ -106,43 +104,41 @@ class PushRuleRestServlet(RestServlet):
         except RuleNotFoundException as e:
             raise SynapseError(400, str(e))
 
-        defer.returnValue((200, {}))
+        return 200, {}
 
-    @defer.inlineCallbacks
-    def on_DELETE(self, request, path):
+    async def on_DELETE(self, request, path):
         if self._is_worker:
             raise Exception("Cannot handle DELETE /push_rules on worker")
 
-        spec = _rule_spec_from_path([x for x in path.split("/")])
+        spec = _rule_spec_from_path(path.split("/"))
 
-        requester = yield self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
 
         try:
-            yield self.store.delete_push_rule(user_id, namespaced_rule_id)
+            await self.store.delete_push_rule(user_id, namespaced_rule_id)
             self.notify_user(user_id)
-            defer.returnValue((200, {}))
+            return 200, {}
         except StoreError as e:
             if e.code == 404:
                 raise NotFoundError()
             else:
                 raise
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, path):
-        requester = yield self.auth.get_user_by_req(request)
+    async def on_GET(self, request, path):
+        requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
         # we build up the full structure and then decide which bits of it
         # to send which means doing unnecessary work sometimes but is
         # is probably not going to make a whole lot of difference
-        rules = yield self.store.get_push_rules_for_user(user_id)
+        rules = await self.store.get_push_rules_for_user(user_id)
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = [x for x in path.split("/")][1:]
+        path = path.split("/")[1:]
 
         if path == []:
             # we're a reference impl: pedantry is our job.
@@ -151,21 +147,30 @@ class PushRuleRestServlet(RestServlet):
             )
 
         if path[0] == "":
-            defer.returnValue((200, rules))
+            return 200, rules
         elif path[0] == "global":
             result = _filter_ruleset_with_path(rules["global"], path[1:])
-            defer.returnValue((200, result))
+            return 200, result
         else:
             raise UnrecognizedRequestError()
 
-    def on_OPTIONS(self, request, path):
-        return 200, {}
-
     def notify_user(self, user_id):
-        stream_id, _ = self.store.get_push_rules_stream_token()
+        stream_id = self.store.get_max_push_rules_stream_id()
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
-    def set_rule_attr(self, user_id, spec, val):
+    async def set_rule_attr(self, user_id, spec, val):
+        if spec["attr"] not in ("enabled", "actions"):
+            # for the sake of potential future expansion, shouldn't report
+            # 404 in the case of an unknown request so check it corresponds to
+            # a known attribute first.
+            raise UnrecognizedRequestError()
+
+        namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
+        rule_id = spec["rule_id"]
+        is_default_rule = rule_id.startswith(".")
+        if is_default_rule:
+            if namespaced_rule_id not in BASE_RULE_IDS:
+                raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
         if spec["attr"] == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
@@ -174,8 +179,9 @@ class PushRuleRestServlet(RestServlet):
                 # This should *actually* take a dict, but many clients pass
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
-            namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            return self.store.set_push_rule_enabled(user_id, namespaced_rule_id, val)
+            return await self.store.set_push_rule_enabled(
+                user_id, namespaced_rule_id, val, is_default_rule
+            )
         elif spec["attr"] == "actions":
             actions = val.get("actions")
             _check_actions(actions)
@@ -183,9 +189,14 @@ class PushRuleRestServlet(RestServlet):
             rule_id = spec["rule_id"]
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
-                if namespaced_rule_id not in BASE_RULE_IDS:
+                if user_id in self._users_new_default_push_rules:
+                    rule_ids = NEW_RULE_IDS
+                else:
+                    rule_ids = BASE_RULE_IDS
+
+                if namespaced_rule_id not in rule_ids:
                     raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
-            return self.store.set_push_rule_actions(
+            return await self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:

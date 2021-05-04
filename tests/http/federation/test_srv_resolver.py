@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -14,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -22,7 +21,7 @@ from twisted.internet.error import ConnectError
 from twisted.names import dns, error
 
 from synapse.http.federation.srv_resolver import SrvResolver
-from synapse.util.logcontext import LoggingContext
+from synapse.logging.context import LoggingContext, current_context
 
 from tests import unittest
 from tests.utils import MockClock
@@ -50,18 +49,12 @@ class SrvResolverTestCase(unittest.TestCase):
 
             with LoggingContext("one") as ctx:
                 resolve_d = resolver.resolve_service(service_name)
-
-                self.assertNoResult(resolve_d)
-
-                # should have reset to the sentinel context
-                self.assertIs(LoggingContext.current_context(), LoggingContext.sentinel)
-
-                result = yield resolve_d
+                result = yield defer.ensureDeferred(resolve_d)
 
                 # should have restored our context
-                self.assertIs(LoggingContext.current_context(), ctx)
+                self.assertIs(current_context(), ctx)
 
-                defer.returnValue(result)
+                return result
 
         test_d = do_lookup()
         self.assertNoResult(test_d)
@@ -83,13 +76,15 @@ class SrvResolverTestCase(unittest.TestCase):
 
         service_name = b"test_service.example.com"
 
-        entry = Mock(spec_set=["expires"])
+        entry = Mock(spec_set=["expires", "priority", "weight"])
         entry.expires = 0
+        entry.priority = 0
+        entry.weight = 0
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        servers = yield resolver.resolve_service(service_name)
+        servers = yield defer.ensureDeferred(resolver.resolve_service(service_name))
 
         dns_client_mock.lookupService.assert_called_once_with(service_name)
 
@@ -105,15 +100,17 @@ class SrvResolverTestCase(unittest.TestCase):
 
         service_name = b"test_service.example.com"
 
-        entry = Mock(spec_set=["expires"])
+        entry = Mock(spec_set=["expires", "priority", "weight"])
         entry.expires = 999999999
+        entry.priority = 0
+        entry.weight = 0
 
         cache = {service_name: [entry]}
         resolver = SrvResolver(
             dns_client=dns_client_mock, cache=cache, get_time=clock.time
         )
 
-        servers = yield resolver.resolve_service(service_name)
+        servers = yield defer.ensureDeferred(resolver.resolve_service(service_name))
 
         self.assertFalse(dns_client_mock.lookupService.called)
 
@@ -132,7 +129,7 @@ class SrvResolverTestCase(unittest.TestCase):
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
         with self.assertRaises(error.DNSServerError):
-            yield resolver.resolve_service(service_name)
+            yield defer.ensureDeferred(resolver.resolve_service(service_name))
 
     @defer.inlineCallbacks
     def test_name_error(self):
@@ -145,7 +142,7 @@ class SrvResolverTestCase(unittest.TestCase):
         cache = {}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        servers = yield resolver.resolve_service(service_name)
+        servers = yield defer.ensureDeferred(resolver.resolve_service(service_name))
 
         self.assertEquals(len(servers), 0)
         self.assertEquals(len(cache), 0)
@@ -162,8 +159,8 @@ class SrvResolverTestCase(unittest.TestCase):
         cache = {}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        resolve_d = resolver.resolve_service(service_name)
-        self.assertNoResult(resolve_d)
+        # Old versions of Twisted don't have an ensureDeferred in failureResultOf.
+        resolve_d = defer.ensureDeferred(resolver.resolve_service(service_name))
 
         # returning a single "." should make the lookup fail with a ConenctError
         lookup_deferred.callback(
@@ -188,8 +185,8 @@ class SrvResolverTestCase(unittest.TestCase):
         cache = {}
         resolver = SrvResolver(dns_client=dns_client_mock, cache=cache)
 
-        resolve_d = resolver.resolve_service(service_name)
-        self.assertNoResult(resolve_d)
+        # Old versions of Twisted don't have an ensureDeferred in successResultOf.
+        resolve_d = defer.ensureDeferred(resolver.resolve_service(service_name))
 
         lookup_deferred.callback(
             (

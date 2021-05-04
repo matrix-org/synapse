@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -19,8 +18,8 @@ import threading
 
 from prometheus_client.core import Counter, Histogram
 
+from synapse.logging.context import current_context
 from synapse.metrics import LaterGauge
-from synapse.util.logcontext import LoggingContext
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +108,7 @@ in_flight_requests_db_sched_duration = Counter(
 # The set of all in flight requests, set[RequestMetrics]
 _in_flight_requests = set()
 
-# Protects the _in_flight_requests set from concurrent accesss
+# Protects the _in_flight_requests set from concurrent access
 _in_flight_requests_lock = threading.Lock()
 
 
@@ -145,10 +144,10 @@ LaterGauge(
 )
 
 
-class RequestMetrics(object):
+class RequestMetrics:
     def start(self, time_sec, name, method):
         self.start = time_sec
-        self.start_context = LoggingContext.current_context()
+        self.start_context = current_context()
         self.name = name
         self.method = method
 
@@ -163,14 +162,14 @@ class RequestMetrics(object):
         with _in_flight_requests_lock:
             _in_flight_requests.discard(self)
 
-        context = LoggingContext.current_context()
+        context = current_context()
 
         tag = ""
         if context:
             tag = context.tag
 
             if context != self.start_context:
-                logger.warn(
+                logger.warning(
                     "Context have unexpectedly changed %r, %r",
                     context,
                     self.start_context,
@@ -213,8 +212,7 @@ class RequestMetrics(object):
         self.update_metrics()
 
     def update_metrics(self):
-        """Updates the in flight metrics with values from this request.
-        """
+        """Updates the in flight metrics with values from this request."""
         new_stats = self.start_context.get_resource_usage()
 
         diff = new_stats - self._request_stats

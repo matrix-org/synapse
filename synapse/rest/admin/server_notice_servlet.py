@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,20 +11,24 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
-
-from twisted.internet import defer
+from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_json_object_from_request,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin import assert_requester_is_admin
+from synapse.rest.admin._base import admin_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.types import UserID
+from synapse.types import JsonDict, UserID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class SendServerNoticeServlet(RestServlet):
@@ -47,26 +50,28 @@ class SendServerNoticeServlet(RestServlet):
     }
     """
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.txns = HttpTransactionCache(hs)
         self.snm = hs.get_server_notices_manager()
 
-    def register(self, json_resource):
-        PATTERN = "^/_synapse/admin/v1/send_server_notice"
-        json_resource.register_paths("POST", (re.compile(PATTERN + "$"),), self.on_POST)
+    def register(self, json_resource: HttpServer):
+        PATTERN = "/send_server_notice"
         json_resource.register_paths(
-            "PUT", (re.compile(PATTERN + "/(?P<txn_id>[^/]*)$"),), self.on_PUT
+            "POST", admin_patterns(PATTERN + "$"), self.on_POST, self.__class__.__name__
+        )
+        json_resource.register_paths(
+            "PUT",
+            admin_patterns(PATTERN + "/(?P<txn_id>[^/]*)$"),
+            self.on_PUT,
+            self.__class__.__name__,
         )
 
-    @defer.inlineCallbacks
-    def on_POST(self, request, txn_id=None):
-        yield assert_requester_is_admin(self.auth, request)
+    async def on_POST(
+        self, request: SynapseRequest, txn_id: Optional[str] = None
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ("user_id", "content"))
         event_type = body.get("type", EventTypes.Message)
@@ -80,16 +85,16 @@ class SendServerNoticeServlet(RestServlet):
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "Server notices can only be sent to local users")
 
-        event = yield self.snm.send_notice(
+        event = await self.snm.send_notice(
             user_id=body["user_id"],
             type=event_type,
             state_key=state_key,
             event_content=body["content"],
         )
 
-        defer.returnValue((200, {"event_id": event.event_id}))
+        return 200, {"event_id": event.event_id}
 
-    def on_PUT(self, request, txn_id):
+    def on_PUT(self, request: SynapseRequest, txn_id: str) -> Tuple[int, JsonDict]:
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, txn_id
         )

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from twisted.internet import defer
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.http.servlet import RestServlet
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -29,22 +32,16 @@ class CapabilitiesRestServlet(RestServlet):
 
     PATTERNS = client_patterns("/capabilities$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
-        super(CapabilitiesRestServlet, self).__init__()
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
         self.hs = hs
         self.config = hs.config
         self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
+        self.auth_handler = hs.get_auth_handler()
 
-    @defer.inlineCallbacks
-    def on_GET(self, request):
-        requester = yield self.auth.get_user_by_req(request, allow_guest=True)
-        user = yield self.store.get_user_by_id(requester.user.to_string())
-        change_password = bool(user["password_hash"])
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        await self.auth.get_user_by_req(request, allow_guest=True)
+        change_password = self.auth_handler.can_change_password()
 
         response = {
             "capabilities": {
@@ -58,8 +55,8 @@ class CapabilitiesRestServlet(RestServlet):
                 "m.change_password": {"enabled": change_password},
             }
         }
-        defer.returnValue((200, response))
+        return 200, response
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server):
     CapabilitiesRestServlet(hs).register(http_server)

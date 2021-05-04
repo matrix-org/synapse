@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -ex
+set -e
 
 if [[ "$BUILDKITE_BRANCH" =~ ^(develop|master|dinsic|shhs|release-.*)$ ]]; then
     echo "Not merging forward, as this is a release branch"
@@ -18,6 +18,8 @@ else
     GITBASE=$BUILDKITE_PULL_REQUEST_BASE_BRANCH
 fi
 
+echo "--- merge_base_branch $GITBASE"
+
 # Show what we are before
 git --no-pager show -s
 
@@ -27,7 +29,7 @@ git config --global user.name "A robot"
 
 # Fetch and merge. If it doesn't work, it will raise due to set -e.
 git fetch -u origin $GITBASE
-git merge --no-edit origin/$GITBASE
+git merge --no-edit --no-commit origin/$GITBASE
 
 # Show what we are after.
 git --no-pager show -s

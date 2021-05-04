@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
@@ -29,7 +29,9 @@ for port in 8080 8081 8082; do
 
     if ! grep -F "Customisation made by demo/start.sh" -q  $DIR/etc/$port.config; then
         printf '\n\n# Customisation made by demo/start.sh\n' >> $DIR/etc/$port.config
-        
+
+        echo "public_baseurl: http://localhost:$port/" >> $DIR/etc/$port.config
+
         echo 'enable_registration: true' >> $DIR/etc/$port.config
 
         # Warning, this heredoc depends on the interaction of tabs and spaces. Please don't
@@ -43,7 +45,7 @@ for port in 8080 8081 8082; do
 		    tls: true
 		    resources:
 		      - names: [client, federation]
-		
+
 		  - port: $port
 		    tls: false
 		    bind_addresses: ['::1', '127.0.0.1']
@@ -68,7 +70,7 @@ for port in 8080 8081 8082; do
 
         # Generate tls keys
         openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
-        
+
         # Ignore keys from the trusted keys server
         echo '# Ignore keys from the trusted keys server' >> $DIR/etc/$port.config
         echo 'trusted_key_servers:' >> $DIR/etc/$port.config
@@ -77,14 +79,13 @@ for port in 8080 8081 8082; do
 
         # Reduce the blacklist
         blacklist=$(cat <<-BLACK
-		# Set the blacklist so that it doesn't include 127.0.0.1
+		# Set the blacklist so that it doesn't include 127.0.0.1, ::1
 		federation_ip_range_blacklist:
 		  - '10.0.0.0/8'
 		  - '172.16.0.0/12'
 		  - '192.168.0.0/16'
 		  - '100.64.0.0/10'
 		  - '169.254.0.0/16'
-		  - '::1/128'
 		  - 'fe80::/64'
 		  - 'fc00::/7'
 		BLACK
@@ -95,18 +96,48 @@ for port in 8080 8081 8082; do
     # Check script parameters
     if [ $# -eq 1 ]; then
         if [ $1 = "--no-rate-limit" ]; then
-            # messages rate limit
-            echo 'rc_messages_per_second: 1000' >> $DIR/etc/$port.config
-            echo 'rc_message_burst_count: 1000' >> $DIR/etc/$port.config
 
-            # registration rate limit
-            printf 'rc_registration:\n  per_second: 1000\n  burst_count: 1000\n' >> $DIR/etc/$port.config
-
-            # login rate limit
-            echo 'rc_login:' >> $DIR/etc/$port.config
-            printf '  address:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
-            printf '  account:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
-            printf '  failed_attempts:\n    per_second: 1000\n    burst_count: 1000\n' >> $DIR/etc/$port.config
+            # Disable any rate limiting
+            ratelimiting=$(cat <<-RC
+			rc_message:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_registration:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_login:
+			  address:
+			    per_second: 1000
+			    burst_count: 1000
+			  account:
+			    per_second: 1000
+			    burst_count: 1000
+			  failed_attempts:
+			    per_second: 1000
+			    burst_count: 1000
+			rc_admin_redaction:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_joins:
+			  local:
+			    per_second: 1000
+			    burst_count: 1000
+			  remote:
+			    per_second: 1000
+			    burst_count: 1000
+			rc_3pid_validation:
+			  per_second: 1000
+			  burst_count: 1000
+			rc_invites:
+			  per_room:
+			    per_second: 1000
+			    burst_count: 1000
+			  per_user:
+			    per_second: 1000
+			    burst_count: 1000
+			RC
+			)
+            echo "${ratelimiting}" >> $DIR/etc/$port.config
         fi
     fi
 
@@ -120,7 +151,6 @@ for port in 8080 8081 8082; do
     python3 -m synapse.app.homeserver \
         --config-path "$DIR/etc/$port.config" \
         -D \
-        -vv \
 
     popd
 done

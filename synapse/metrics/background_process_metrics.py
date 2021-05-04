@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,14 +14,20 @@
 
 import logging
 import threading
+from functools import wraps
+from typing import TYPE_CHECKING, Dict, Optional, Set, Union
 
-import six
-
-from prometheus_client.core import REGISTRY, Counter, GaugeMetricFamily
+from prometheus_client.core import REGISTRY, Counter, Gauge
 
 from twisted.internet import defer
 
-from synapse.util.logcontext import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.opentracing import noop_context_manager, start_active_span
+from synapse.util.async_helpers import maybe_awaitable
+
+if TYPE_CHECKING:
+    import resource
+
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +36,12 @@ _background_process_start_count = Counter(
     "synapse_background_process_start_count",
     "Number of background processes started",
     ["name"],
+)
+
+_background_process_in_flight_count = Gauge(
+    "synapse_background_process_in_flight_count",
+    "Number of background processes in flight",
+    labelnames=["name"],
 )
 
 # we set registry=None in all of these to stop them getting registered with
@@ -78,19 +89,23 @@ _background_process_db_sched_duration = Counter(
 # map from description to a counter, so that we can name our logcontexts
 # incrementally. (It actually duplicates _background_process_start_count, but
 # it's much simpler to do so than to try to combine them.)
-_background_process_counts = dict()  # type: dict[str, int]
+_background_process_counts = {}  # type: Dict[str, int]
 
-# map from description to the currently running background processes.
+# Set of all running background processes that became active active since the
+# last time metrics were scraped (i.e. background processes that performed some
+# work since the last scrape.)
 #
-# it's kept as a dict of sets rather than a big set so that we can keep track
-# of process descriptions that no longer have any active processes.
-_background_processes = dict()  # type: dict[str, set[_BackgroundProcess]]
+# We do it like this to handle the case where we have a large number of
+# background processes stacking up behind a lock or linearizer, where we then
+# only need to iterate over and update metrics for the process that have
+# actually been active and can ignore the idle ones.
+_background_processes_active_since_last_scrape = set()  # type: Set[_BackgroundProcess]
 
-# A lock that covers the above dicts
+# A lock that covers the above set and dict
 _bg_metrics_lock = threading.Lock()
 
 
-class _Collector(object):
+class _Collector:
     """A custom metrics collector for the background process metrics.
 
     Ensures that all of the metrics are up-to-date with any in-flight processes
@@ -98,25 +113,16 @@ class _Collector(object):
     """
 
     def collect(self):
-        background_process_in_flight_count = GaugeMetricFamily(
-            "synapse_background_process_in_flight_count",
-            "Number of background processes in flight",
-            labels=["name"],
-        )
+        global _background_processes_active_since_last_scrape
 
-        # We copy the dict so that it doesn't change from underneath us.
-        # We also copy the process lists as that can also change
+        # We swap out the _background_processes set with an empty one so that
+        # we can safely iterate over the set without holding the lock.
         with _bg_metrics_lock:
-            _background_processes_copy = {
-                k: list(v) for k, v in six.iteritems(_background_processes)
-            }
+            _background_processes_copy = _background_processes_active_since_last_scrape
+            _background_processes_active_since_last_scrape = set()
 
-        for desc, processes in six.iteritems(_background_processes_copy):
-            background_process_in_flight_count.add_metric((desc,), len(processes))
-            for process in processes:
-                process.update_metrics()
-
-        yield background_process_in_flight_count
+        for process in _background_processes_copy:
+            process.update_metrics()
 
         # now we need to run collect() over each of the static Counters, and
         # yield each metric they return.
@@ -134,7 +140,7 @@ class _Collector(object):
 REGISTRY.register(_Collector())
 
 
-class _BackgroundProcess(object):
+class _BackgroundProcess:
     def __init__(self, desc, ctx):
         self.desc = desc
         self._context = ctx
@@ -160,7 +166,7 @@ class _BackgroundProcess(object):
         )
 
 
-def run_as_background_process(desc, func, *args, **kwargs):
+def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwargs):
     """Run the given function in its own logcontext, with resource metrics
 
     This should be used to wrap processes which are fired off to run in the
@@ -169,11 +175,14 @@ def run_as_background_process(desc, func, *args, **kwargs):
     It returns a Deferred which completes when the function completes, but it doesn't
     follow the synapse logcontext rules, which makes it appropriate for passing to
     clock.looping_call and friends (or for firing-and-forgetting in the middle of a
-    normal synapse inlineCallbacks function).
+    normal synapse async function).
 
     Args:
-        desc (str): a description for this background process type
-        func: a function, which may return a Deferred
+        desc: a description for this background process type
+        func: a function, which may return a Deferred or a coroutine
+        bg_start_span: Whether to start an opentracing span. Defaults to True.
+            Should only be disabled for processes that will not log to or tag
+            a span.
         args: positional args for func
         kwargs: keyword args for func
 
@@ -181,30 +190,95 @@ def run_as_background_process(desc, func, *args, **kwargs):
         follow the synapse logcontext rules.
     """
 
-    @defer.inlineCallbacks
-    def run():
+    async def run():
         with _bg_metrics_lock:
             count = _background_process_counts.get(desc, 0)
             _background_process_counts[desc] = count + 1
 
         _background_process_start_count.labels(desc).inc()
+        _background_process_in_flight_count.labels(desc).inc()
 
-        with LoggingContext(desc) as context:
-            context.request = "%s-%i" % (desc, count)
-            proc = _BackgroundProcess(desc, context)
-
-            with _bg_metrics_lock:
-                _background_processes.setdefault(desc, set()).add(proc)
-
+        with BackgroundProcessLoggingContext(desc, count) as context:
             try:
-                yield func(*args, **kwargs)
+                ctx = noop_context_manager()
+                if bg_start_span:
+                    ctx = start_active_span(desc, tags={"request_id": str(context)})
+                with ctx:
+                    return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
-                logger.exception("Background process '%s' threw an exception", desc)
+                logger.exception(
+                    "Background process '%s' threw an exception",
+                    desc,
+                )
             finally:
-                proc.update_metrics()
-
-                with _bg_metrics_lock:
-                    _background_processes[desc].remove(proc)
+                _background_process_in_flight_count.labels(desc).dec()
 
     with PreserveLoggingContext():
-        return run()
+        # Note that we return a Deferred here so that it can be used in a
+        # looping_call and other places that expect a Deferred.
+        return defer.ensureDeferred(run())
+
+
+def wrap_as_background_process(desc):
+    """Decorator that wraps a function that gets called as a background
+    process.
+
+    Equivalent of calling the function with `run_as_background_process`
+    """
+
+    def wrap_as_background_process_inner(func):
+        @wraps(func)
+        def wrap_as_background_process_inner_2(*args, **kwargs):
+            return run_as_background_process(desc, func, *args, **kwargs)
+
+        return wrap_as_background_process_inner_2
+
+    return wrap_as_background_process_inner
+
+
+class BackgroundProcessLoggingContext(LoggingContext):
+    """A logging context that tracks in flight metrics for background
+    processes.
+    """
+
+    __slots__ = ["_proc"]
+
+    def __init__(self, name: str, instance_id: Optional[Union[int, str]] = None):
+        """
+
+        Args:
+            name: The name of the background process. Each distinct `name` gets a
+                separate prometheus time series.
+
+            instance_id: an identifer to add to `name` to distinguish this instance of
+                the named background process in the logs. If this is `None`, one is
+                made up based on id(self).
+        """
+        if instance_id is None:
+            instance_id = id(self)
+        super().__init__("%s-%s" % (name, instance_id))
+        self._proc = _BackgroundProcess(name, self)
+
+    def start(self, rusage: "Optional[resource._RUsage]"):
+        """Log context has started running (again)."""
+
+        super().start(rusage)
+
+        # We've become active again so we make sure we're in the list of active
+        # procs. (Note that "start" here means we've become active, as opposed
+        # to starting for the first time.)
+        with _bg_metrics_lock:
+            _background_processes_active_since_last_scrape.add(self._proc)
+
+    def __exit__(self, type, value, traceback) -> None:
+        """Log context has finished."""
+
+        super().__exit__(type, value, traceback)
+
+        # The background process has finished. We explicitly remove and manually
+        # update the metrics here so that if nothing is scraping metrics the set
+        # doesn't infinitely grow.
+        with _bg_metrics_lock:
+            _background_processes_active_since_last_scrape.discard(self._proc)
+
+        self._proc.update_metrics()

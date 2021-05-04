@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,9 +14,8 @@
 
 import logging
 
-from twisted.internet import defer
-
-from synapse.events import event_type_from_format_version
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.events import make_event_from_dict
 from synapse.events.snapshot import EventContext
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.replication.http._base import ReplicationEndpoint
@@ -28,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
     """Handles events newly received from federation, including persisting and
-    notifying.
+    notifying. Returns the maximum stream ID of the persisted events.
 
     The API looks like:
 
@@ -37,56 +35,74 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         {
             "events": [{
                 "event": { .. serialized event .. },
+                "room_version": .., // "1", "2", "3", etc: the version of the room
+                                    // containing the event
+                "event_format_version": .., // 1,2,3 etc: the event format version
                 "internal_metadata": { .. serialized internal_metadata .. },
+                "outlier": true|false,
                 "rejected_reason": ..,   // The event.rejected_reason field
                 "context": { .. serialized event context .. },
             }],
             "backfilled": false
+        }
+
+        200 OK
+
+        {
+            "max_stream_id": 32443,
+        }
     """
 
     NAME = "fed_send_events"
     PATH_ARGS = ()
 
     def __init__(self, hs):
-        super(ReplicationFederationSendEventsRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.clock = hs.get_clock()
-        self.federation_handler = hs.get_handlers().federation_handler
+        self.federation_handler = hs.get_federation_handler()
 
     @staticmethod
-    @defer.inlineCallbacks
-    def _serialize_payload(store, event_and_contexts, backfilled):
+    async def _serialize_payload(store, room_id, event_and_contexts, backfilled):
         """
         Args:
             store
+            room_id (str)
             event_and_contexts (list[tuple[FrozenEvent, EventContext]])
             backfilled (bool): Whether or not the events are the result of
                 backfilling
         """
         event_payloads = []
         for event, context in event_and_contexts:
-            serialized_context = yield context.serialize(event, store)
+            serialized_context = await context.serialize(event, store)
 
             event_payloads.append(
                 {
                     "event": event.get_pdu_json(),
+                    "room_version": event.room_version.identifier,
                     "event_format_version": event.format_version,
                     "internal_metadata": event.internal_metadata.get_dict(),
+                    "outlier": event.internal_metadata.is_outlier(),
                     "rejected_reason": event.rejected_reason,
                     "context": serialized_context,
                 }
             )
 
-        payload = {"events": event_payloads, "backfilled": backfilled}
+        payload = {
+            "events": event_payloads,
+            "backfilled": backfilled,
+            "room_id": room_id,
+        }
 
-        defer.returnValue(payload)
+        return payload
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request):
+    async def _handle_request(self, request):
         with Measure(self.clock, "repl_fed_send_events_parse"):
             content = parse_json_object_from_request(request)
 
+            room_id = content["room_id"]
             backfilled = content["backfilled"]
 
             event_payloads = content["events"]
@@ -94,26 +110,28 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
             event_and_contexts = []
             for event_payload in event_payloads:
                 event_dict = event_payload["event"]
-                format_ver = event_payload["event_format_version"]
+                room_ver = KNOWN_ROOM_VERSIONS[event_payload["room_version"]]
                 internal_metadata = event_payload["internal_metadata"]
                 rejected_reason = event_payload["rejected_reason"]
 
-                EventType = event_type_from_format_version(format_ver)
-                event = EventType(event_dict, internal_metadata, rejected_reason)
+                event = make_event_from_dict(
+                    event_dict, room_ver, internal_metadata, rejected_reason
+                )
+                event.internal_metadata.outlier = event_payload["outlier"]
 
-                context = yield EventContext.deserialize(
-                    self.store, event_payload["context"]
+                context = EventContext.deserialize(
+                    self.storage, event_payload["context"]
                 )
 
                 event_and_contexts.append((event, context))
 
         logger.info("Got %d events from federation", len(event_and_contexts))
 
-        yield self.federation_handler.persist_events_and_notify(
-            event_and_contexts, backfilled
+        max_stream_id = await self.federation_handler.persist_events_and_notify(
+            room_id, event_and_contexts, backfilled
         )
 
-        defer.returnValue((200, {}))
+        return 200, {"max_stream_id": max_stream_id}
 
 
 class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
@@ -134,18 +152,17 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("edu_type",)
 
     def __init__(self, hs):
-        super(ReplicationFederationSendEduRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
     @staticmethod
-    def _serialize_payload(edu_type, origin, content):
+    async def _serialize_payload(edu_type, origin, content):
         return {"origin": origin, "content": content}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, edu_type):
+    async def _handle_request(self, request, edu_type):
         with Measure(self.clock, "repl_fed_send_edu_parse"):
             content = parse_json_object_from_request(request)
 
@@ -154,9 +171,9 @@ class ReplicationFederationSendEduRestServlet(ReplicationEndpoint):
 
         logger.info("Got %r edu from %s", edu_type, origin)
 
-        result = yield self.registry.on_edu(edu_type, origin, edu_content)
+        result = await self.registry.on_edu(edu_type, origin, edu_content)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class ReplicationGetQueryRestServlet(ReplicationEndpoint):
@@ -178,14 +195,14 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
     CACHE = False
 
     def __init__(self, hs):
-        super(ReplicationGetQueryRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
         self.registry = hs.get_federation_registry()
 
     @staticmethod
-    def _serialize_payload(query_type, args):
+    async def _serialize_payload(query_type, args):
         """
         Args:
             query_type (str)
@@ -193,18 +210,18 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
         """
         return {"args": args}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, query_type):
+    async def _handle_request(self, request, query_type):
         with Measure(self.clock, "repl_fed_query_parse"):
             content = parse_json_object_from_request(request)
 
             args = content["args"]
+            args["origin"] = content["origin"]
 
-        logger.info("Got %r query", query_type)
+        logger.info("Got %r query from %s", query_type, args["origin"])
 
-        result = yield self.registry.on_query(query_type, args)
+        result = await self.registry.on_query(query_type, args)
 
-        defer.returnValue((200, result))
+        return 200, result
 
 
 class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
@@ -213,7 +230,7 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
 
     Request format:
 
-        POST /_synapse/replication/fed_query/:fed_cleanup_room/:txn_id
+        POST /_synapse/replication/fed_cleanup_room/:room_id/:txn_id
 
         {}
     """
@@ -222,23 +239,54 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("room_id",)
 
     def __init__(self, hs):
-        super(ReplicationCleanRoomRestServlet, self).__init__(hs)
+        super().__init__(hs)
 
         self.store = hs.get_datastore()
 
     @staticmethod
-    def _serialize_payload(room_id, args):
+    async def _serialize_payload(room_id, args):
         """
         Args:
             room_id (str)
         """
         return {}
 
-    @defer.inlineCallbacks
-    def _handle_request(self, request, room_id):
-        yield self.store.clean_room_for_join(room_id)
+    async def _handle_request(self, request, room_id):
+        await self.store.clean_room_for_join(room_id)
 
-        defer.returnValue((200, {}))
+        return 200, {}
+
+
+class ReplicationStoreRoomOnOutlierMembershipRestServlet(ReplicationEndpoint):
+    """Called to clean up any data in DB for a given room, ready for the
+    server to join the room.
+
+    Request format:
+
+        POST /_synapse/replication/store_room_on_outlier_membership/:room_id/:txn_id
+
+        {
+            "room_version": "1",
+        }
+    """
+
+    NAME = "store_room_on_outlier_membership"
+    PATH_ARGS = ("room_id",)
+
+    def __init__(self, hs):
+        super().__init__(hs)
+
+        self.store = hs.get_datastore()
+
+    @staticmethod
+    async def _serialize_payload(room_id, room_version):
+        return {"room_version": room_version.identifier}
+
+    async def _handle_request(self, request, room_id):
+        content = parse_json_object_from_request(request)
+        room_version = KNOWN_ROOM_VERSIONS[content["room_version"]]
+        await self.store.maybe_store_room_on_outlier_membership(room_id, room_version)
+        return 200, {}
 
 
 def register_servlets(hs, http_server):
@@ -246,3 +294,4 @@ def register_servlets(hs, http_server):
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
     ReplicationGetQueryRestServlet(hs).register(http_server)
     ReplicationCleanRoomRestServlet(hs).register(http_server)
+    ReplicationStoreRoomOnOutlierMembershipRestServlet(hs).register(http_server)

@@ -2,7 +2,7 @@
 Description=Synapse Matrix homeserver
 
 [Service]
-Type=simple
+Type=notify
 User=matrix-synapse
 WorkingDirectory=/var/lib/matrix-synapse
 EnvironmentFile=/etc/default/matrix-synapse

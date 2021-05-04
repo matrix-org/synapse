@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -15,88 +14,132 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
-from six import iteritems, itervalues, string_types
+from canonicaljson import encode_canonical_json
 
-from canonicaljson import encode_canonical_json, json
+from twisted.internet.interfaces import IDelayedCall
 
-from twisted.internet import defer
-from twisted.internet.defer import succeed
-
-from synapse.api.constants import EventTypes, Membership, RelationTypes
+from synapse import event_auth
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    Membership,
+    RelationTypes,
+    UserTypes,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
     ConsentNotGivenError,
     NotFoundError,
+    ShadowBanError,
     SynapseError,
 )
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
+from synapse.events import EventBase
+from synapse.events.builder import EventBuilder
+from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
+from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
-from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
+from synapse.util import json_decoder, json_encoder
 from synapse.util.async_helpers import Linearizer
-from synapse.util.frozenutils import frozendict_json_encoder
-from synapse.util.logcontext import run_in_background
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
 
+if TYPE_CHECKING:
+    from synapse.events.third_party_rules import ThirdPartyEventRules
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
-class MessageHandler(object):
-    """Contains some read only APIs to get state about a room
-    """
+class MessageHandler:
+    """Contains some read only APIs to get state about a room"""
 
     def __init__(self, hs):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
+        self.state_store = self.storage.state
         self._event_serializer = hs.get_event_client_serializer()
+        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
-    @defer.inlineCallbacks
-    def get_room_data(
-        self, user_id=None, room_id=None, event_type=None, state_key="", is_guest=False
-    ):
-        """ Get data from a room.
+        # The scheduled call to self._expire_event. None if no call is currently
+        # scheduled.
+        self._scheduled_expiry = None  # type: Optional[IDelayedCall]
+
+        if not hs.config.worker_app:
+            run_as_background_process(
+                "_schedule_next_expiry", self._schedule_next_expiry
+            )
+
+    async def get_room_data(
+        self,
+        user_id: str,
+        room_id: str,
+        event_type: str,
+        state_key: str,
+    ) -> dict:
+        """Get data from a room.
 
         Args:
-            event : The room path event
+            user_id
+            room_id
+            event_type
+            state_key
         Returns:
             The path data content.
         Raises:
-            SynapseError if something went wrong.
+            SynapseError or AuthError if the user is not in the room
         """
-        membership, membership_event_id = yield self.auth.check_in_room_or_world_readable(
-            room_id, user_id
+        (
+            membership,
+            membership_event_id,
+        ) = await self.auth.check_user_in_room_or_world_readable(
+            room_id, user_id, allow_departed_users=True
         )
 
         if membership == Membership.JOIN:
-            data = yield self.state.get_current_state(room_id, event_type, state_key)
+            data = await self.state.get_current_state(room_id, event_type, state_key)
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
-            room_state = yield self.store.get_state_for_events(
+            room_state = await self.state_store.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
             )
             data = room_state[membership_event_id].get(key)
+        else:
+            # check_user_in_room_or_world_readable, if it doesn't raise an AuthError, should
+            # only ever return a Membership.JOIN/LEAVE object
+            #
+            # Safeguard in case it returned something else
+            logger.error(
+                "Attempted to retrieve data from a room for a user that has never been in it. "
+                "This should not have happened."
+            )
+            raise SynapseError(403, "User not in room", errcode=Codes.FORBIDDEN)
 
-        defer.returnValue(data)
+        return data
 
-    @defer.inlineCallbacks
-    def get_state_events(
+    async def get_state_events(
         self,
-        user_id,
-        room_id,
-        state_filter=StateFilter.all(),
-        at_token=None,
-        is_guest=False,
-    ):
+        user_id: str,
+        room_id: str,
+        state_filter: Optional[StateFilter] = None,
+        at_token: Optional[StreamToken] = None,
+        is_guest: bool = False,
+    ) -> List[dict]:
         """Retrieve all state events for a given room. If the user is
         joined to the room then return the current state. If the user has
         left the room return the state events from when they left. If an explicit
@@ -104,15 +147,14 @@ class MessageHandler(object):
         visible.
 
         Args:
-            user_id(str): The user requesting state events.
-            room_id(str): The room ID to get all state events from.
-            state_filter (StateFilter): The state filter used to fetch state
-                from the database.
-            at_token(StreamToken|None): the stream token of the at which we are requesting
+            user_id: The user requesting state events.
+            room_id: The room ID to get all state events from.
+            state_filter: The state filter used to fetch state from the database.
+            at_token: the stream token of the at which we are requesting
                 the stats. If the user is not allowed to view the state as of that
                 stream token, we raise a 403 SynapseError. If None, returns the current
                 state based on the current_state_events table.
-            is_guest(bool): whether this user is a guest
+            is_guest: whether this user is a guest
         Returns:
             A list of dicts representing state events. [{}, {}, {}]
         Raises:
@@ -121,25 +163,30 @@ class MessageHandler(object):
             AuthError (403) if the user doesn't have permission to view
             members of this room.
         """
+        state_filter = state_filter or StateFilter.all()
+
         if at_token:
             # FIXME this claims to get the state at a stream position, but
             # get_recent_events_for_room operates by topo ordering. This therefore
             # does not reliably give you the state at the given stream position.
             # (https://github.com/matrix-org/synapse/issues/3305)
-            last_events, _ = yield self.store.get_recent_events_for_room(
+            last_events, _ = await self.store.get_recent_events_for_room(
                 room_id, end_token=at_token.room_key, limit=1
             )
 
             if not last_events:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
 
-            visible_events = yield filter_events_for_client(
-                self.store, user_id, last_events
+            visible_events = await filter_events_for_client(
+                self.storage,
+                user_id,
+                last_events,
+                filter_send_to_client=False,
             )
 
             event = last_events[0]
             if visible_events:
-                room_state = yield self.store.get_state_for_events(
+                room_state = await self.state_store.get_state_for_events(
                     [event.event_id], state_filter=state_filter
                 )
                 room_state = room_state[event.event_id]
@@ -150,40 +197,42 @@ class MessageHandler(object):
                     % (user_id, room_id, at_token),
                 )
         else:
-            membership, membership_event_id = (
-                yield self.auth.check_in_room_or_world_readable(room_id, user_id)
+            (
+                membership,
+                membership_event_id,
+            ) = await self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
             )
 
             if membership == Membership.JOIN:
-                state_ids = yield self.store.get_filtered_current_state_ids(
+                state_ids = await self.store.get_filtered_current_state_ids(
                     room_id, state_filter=state_filter
                 )
-                room_state = yield self.store.get_events(state_ids.values())
+                room_state = await self.store.get_events(state_ids.values())
             elif membership == Membership.LEAVE:
-                room_state = yield self.store.get_state_for_events(
+                room_state = await self.state_store.get_state_for_events(
                     [membership_event_id], state_filter=state_filter
                 )
                 room_state = room_state[membership_event_id]
 
         now = self.clock.time_msec()
-        events = yield self._event_serializer.serialize_events(
+        events = await self._event_serializer.serialize_events(
             room_state.values(),
             now,
             # We don't bother bundling aggregations in when asked for state
             # events, as clients won't use them.
             bundle_aggregations=False,
         )
-        defer.returnValue(events)
+        return events
 
-    @defer.inlineCallbacks
-    def get_joined_members(self, requester, room_id):
+    async def get_joined_members(self, requester: Requester, room_id: str) -> dict:
         """Get all the joined members in the room and their profile information.
 
         If the user has left the room return the state events from when they left.
 
         Args:
-            requester(Requester): The user requesting state events.
-            room_id(str): The room ID to get all state events from.
+            requester: The user requesting state events.
+            room_id: The room ID to get all state events from.
         Returns:
             A dict of user_id to profile info
         """
@@ -191,15 +240,15 @@ class MessageHandler(object):
         if not requester.app_service:
             # We check AS auth after fetching the room membership, as it
             # requires us to pull out all joined members anyway.
-            membership, _ = yield self.auth.check_in_room_or_world_readable(
-                room_id, user_id
+            membership, _ = await self.auth.check_user_in_room_or_world_readable(
+                room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:
                 raise NotImplementedError(
                     "Getting joined members after leaving is not implemented"
                 )
 
-        users_with_profile = yield self.state.get_current_users_in_room(room_id)
+        users_with_profile = await self.state.get_current_users_in_room(room_id)
 
         # If this is an AS, double check that they are allowed to see the members.
         # This can either be because the AS user is in the room or because there
@@ -212,39 +261,143 @@ class MessageHandler(object):
                 # Loop fell through, AS has no interested users in room
                 raise AuthError(403, "Appservice not in room")
 
-        defer.returnValue(
-            {
-                user_id: {
-                    "avatar_url": profile.avatar_url,
-                    "display_name": profile.display_name,
-                }
-                for user_id, profile in iteritems(users_with_profile)
+        return {
+            user_id: {
+                "avatar_url": profile.avatar_url,
+                "display_name": profile.display_name,
             }
+            for user_id, profile in users_with_profile.items()
+        }
+
+    def maybe_schedule_expiry(self, event: EventBase):
+        """Schedule the expiry of an event if there's not already one scheduled,
+        or if the one running is for an event that will expire after the provided
+        timestamp.
+
+        This function needs to invalidate the event cache, which is only possible on
+        the master process, and therefore needs to be run on there.
+
+        Args:
+            event: The event to schedule the expiry of.
+        """
+
+        expiry_ts = event.content.get(EventContentFields.SELF_DESTRUCT_AFTER)
+        if not isinstance(expiry_ts, int) or event.is_state():
+            return
+
+        # _schedule_expiry_for_event won't actually schedule anything if there's already
+        # a task scheduled for a timestamp that's sooner than the provided one.
+        self._schedule_expiry_for_event(event.event_id, expiry_ts)
+
+    async def _schedule_next_expiry(self):
+        """Retrieve the ID and the expiry timestamp of the next event to be expired,
+        and schedule an expiry task for it.
+
+        If there's no event left to expire, set _expiry_scheduled to None so that a
+        future call to save_expiry_ts can schedule a new expiry task.
+        """
+        # Try to get the expiry timestamp of the next event to expire.
+        res = await self.store.get_next_event_to_expire()
+        if res:
+            event_id, expiry_ts = res
+            self._schedule_expiry_for_event(event_id, expiry_ts)
+
+    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int):
+        """Schedule an expiry task for the provided event if there's not already one
+        scheduled at a timestamp that's sooner than the provided one.
+
+        Args:
+            event_id: The ID of the event to expire.
+            expiry_ts: The timestamp at which to expire the event.
+        """
+        if self._scheduled_expiry:
+            # If the provided timestamp refers to a time before the scheduled time of the
+            # next expiry task, cancel that task and reschedule it for this timestamp.
+            next_scheduled_expiry_ts = self._scheduled_expiry.getTime() * 1000
+            if expiry_ts < next_scheduled_expiry_ts:
+                self._scheduled_expiry.cancel()
+            else:
+                return
+
+        # Figure out how many seconds we need to wait before expiring the event.
+        now_ms = self.clock.time_msec()
+        delay = (expiry_ts - now_ms) / 1000
+
+        # callLater doesn't support negative delays, so trim the delay to 0 if we're
+        # in that case.
+        if delay < 0:
+            delay = 0
+
+        logger.info("Scheduling expiry for event %s in %.3fs", event_id, delay)
+
+        self._scheduled_expiry = self.clock.call_later(
+            delay,
+            run_as_background_process,
+            "_expire_event",
+            self._expire_event,
+            event_id,
         )
 
+    async def _expire_event(self, event_id: str):
+        """Retrieve and expire an event that needs to be expired from the database.
 
-class EventCreationHandler(object):
-    def __init__(self, hs):
+        If the event doesn't exist in the database, log it and delete the expiry date
+        from the database (so that we don't try to expire it again).
+        """
+        assert self._ephemeral_events_enabled
+
+        self._scheduled_expiry = None
+
+        logger.info("Expiring event %s", event_id)
+
+        try:
+            # Expire the event if we know about it. This function also deletes the expiry
+            # date from the database in the same database transaction.
+            await self.store.expire_event(event_id)
+        except Exception as e:
+            logger.error("Could not expire event %s: %r", event_id, e)
+
+        # Schedule the expiry of the next event to expire.
+        await self._schedule_next_expiry()
+
+
+# The duration (in ms) after which rooms should be removed
+# `_rooms_to_exclude_from_dummy_event_insertion` (with the effect that we will try
+# to generate a dummy event for them once more)
+#
+_DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY = 7 * 24 * 60 * 60 * 1000
+
+
+class EventCreationHandler:
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.profile_handler = hs.get_profile_handler()
         self.event_builder_factory = hs.get_event_builder_factory()
         self.server_name = hs.hostname
-        self.ratelimiter = hs.get_ratelimiter()
         self.notifier = hs.get_notifier()
         self.config = hs.config
         self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self._events_shard_config = self.config.worker.events_shard_config
+        self._instance_name = hs.get_instance_name()
 
-        self.send_event_to_master = ReplicationSendEventRestServlet.make_client(hs)
+        self.room_invite_state_types = self.hs.config.api.room_prejoin_state
+
+        self.membership_types_to_include_profile_data_in = (
+            {Membership.JOIN, Membership.INVITE}
+            if self.hs.config.include_profile_data_on_invite
+            else {Membership.JOIN}
+        )
+
+        self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
         # This is only used to get at ratelimit function, and maybe_kick_guest_users
         self.base_handler = BaseHandler(hs)
-
-        self.pusher_pool = hs.get_pusherpool()
 
         # We arbitrarily limit concurrent event creation for a room to 5.
         # This is to stop us from diverging history *too* much.
@@ -253,7 +406,9 @@ class EventCreationHandler(object):
         self.action_generator = hs.get_action_generator()
 
         self.spam_checker = hs.get_spam_checker()
-        self.third_party_event_rules = hs.get_third_party_event_rules()
+        self.third_party_event_rules = (
+            self.hs.get_third_party_event_rules()
+        )  # type: ThirdPartyEventRules
 
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
@@ -265,8 +420,17 @@ class EventCreationHandler(object):
         if self._block_events_without_consent_error:
             self._consent_uri_builder = ConsentURIBuilder(self.config)
 
+        # Rooms which should be excluded from dummy insertion. (For instance,
+        # those without local users who can send events into the room).
+        #
+        # map from room id to time-of-last-attempt.
+        #
+        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: Dict[str, int]
+        # The number of forward extremeities before a dummy event is sent.
+        self._dummy_events_threshold = hs.config.dummy_events_threshold
+
         if (
-            not self.config.worker_app
+            self.config.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
@@ -277,16 +441,21 @@ class EventCreationHandler(object):
                 5 * 60 * 1000,
             )
 
-    @defer.inlineCallbacks
-    def create_event(
+        self._message_handler = hs.get_message_handler()
+
+        self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
+
+        self._external_cache = hs.get_external_cache()
+
+    async def create_event(
         self,
-        requester,
-        event_dict,
-        token_id=None,
-        txn_id=None,
-        prev_events_and_hashes=None,
-        require_consent=True,
-    ):
+        requester: Requester,
+        event_dict: dict,
+        txn_id: Optional[str] = None,
+        prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
+        require_consent: bool = True,
+    ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
 
@@ -297,32 +466,36 @@ class EventCreationHandler(object):
 
         Args:
             requester
-            event_dict (dict): An entire event
-            token_id (str)
-            txn_id (str)
-
-            prev_events_and_hashes (list[(str, dict[str, str], int)]|None):
+            event_dict: An entire event
+            txn_id
+            prev_event_ids:
                 the forward extremities to use as the prev_events for the
-                new event. For each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
+                new event.
 
                 If None, they will be requested from the database.
 
-            require_consent (bool): Whether to check if the requester has
-                consented to privacy policy.
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
+            require_consent: Whether to check if the requester has
+                consented to the privacy policy.
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
         Returns:
-            Tuple of created event (FrozenEvent), Context
+            Tuple of created event, Context
         """
-        yield self.auth.check_auth_blocking(requester.user.to_string())
+        await self.auth.check_auth_blocking(requester=requester)
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
             room_version = event_dict["content"]["room_version"]
         else:
             try:
-                room_version = yield self.store.get_room_version(event_dict["room_id"])
+                room_version = await self.store.get_room_version_id(
+                    event_dict["room_id"]
+                )
             except NotFoundError:
                 raise AuthError(403, "Unknown room")
 
@@ -334,35 +507,40 @@ class EventCreationHandler(object):
             membership = builder.content.get("membership", None)
             target = UserID.from_string(builder.state_key)
 
-            if membership in {Membership.JOIN, Membership.INVITE}:
+            if membership in self.membership_types_to_include_profile_data_in:
                 # If event doesn't include a display name, add one.
                 profile = self.profile_handler
                 content = builder.content
 
                 try:
                     if "displayname" not in content:
-                        content["displayname"] = yield profile.get_displayname(target)
+                        displayname = await profile.get_displayname(target)
+                        if displayname is not None:
+                            content["displayname"] = displayname
                     if "avatar_url" not in content:
-                        content["avatar_url"] = yield profile.get_avatar_url(target)
+                        avatar_url = await profile.get_avatar_url(target)
+                        if avatar_url is not None:
+                            content["avatar_url"] = avatar_url
                 except Exception as e:
                     logger.info(
                         "Failed to get profile information for %r: %s", target, e
                     )
 
-        is_exempt = yield self._is_exempt_from_privacy_policy(builder, requester)
+        is_exempt = await self._is_exempt_from_privacy_policy(builder, requester)
         if require_consent and not is_exempt:
-            yield self.assert_accepted_privacy_policy(requester)
+            await self.assert_accepted_privacy_policy(requester)
 
-        if token_id is not None:
-            builder.internal_metadata.token_id = token_id
+        if requester.access_token_id is not None:
+            builder.internal_metadata.token_id = requester.access_token_id
 
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
-        event, context = yield self.create_new_client_event(
+        event, context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
-            prev_events_and_hashes=prev_events_and_hashes,
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -377,9 +555,13 @@ class EventCreationHandler(object):
             # federation as well as those created locally. As of room v3, aliases events
             # can be created by users that are not in the room, therefore we have to
             # tolerate them in event_auth.check().
-            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_state_ids = await context.get_prev_state_ids()
             prev_event_id = prev_state_ids.get((EventTypes.Member, event.sender))
-            prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+            prev_event = (
+                await self.store.get_event(prev_event_id, allow_none=True)
+                if prev_event_id
+                else None
+            )
             if not prev_event or prev_event.membership != Membership.JOIN:
                 logger.warning(
                     (
@@ -395,41 +577,40 @@ class EventCreationHandler(object):
                     403, "You must be in the room to create an alias for it"
                 )
 
-        self.validator.validate_new(event)
+        self.validator.validate_new(event, self.config)
 
-        defer.returnValue((event, context))
+        return (event, context)
 
-    def _is_exempt_from_privacy_policy(self, builder, requester):
-        """"Determine if an event to be sent is exempt from having to consent
+    async def _is_exempt_from_privacy_policy(
+        self, builder: EventBuilder, requester: Requester
+    ) -> bool:
+        """ "Determine if an event to be sent is exempt from having to consent
         to the privacy policy
 
         Args:
-            builder (synapse.events.builder.EventBuilder): event being created
-            requester (Requster): user requesting this event
+            builder: event being created
+            requester: user requesting this event
 
         Returns:
-            Deferred[bool]: true if the event can be sent without the user
-                consenting
+            true if the event can be sent without the user consenting
         """
         # the only thing the user can do is join the server notices room.
         if builder.type == EventTypes.Member:
             membership = builder.content.get("membership", None)
             if membership == Membership.JOIN:
-                return self._is_server_notices_room(builder.room_id)
+                return await self._is_server_notices_room(builder.room_id)
             elif membership == Membership.LEAVE:
                 # the user is always allowed to leave (but not kick people)
                 return builder.state_key == requester.user.to_string()
-        return succeed(False)
+        return False
 
-    @defer.inlineCallbacks
-    def _is_server_notices_room(self, room_id):
+    async def _is_server_notices_room(self, room_id: str) -> bool:
         if self.config.server_notices_mxid is None:
-            defer.returnValue(False)
-        user_ids = yield self.store.get_users_in_room(room_id)
-        defer.returnValue(self.config.server_notices_mxid in user_ids)
+            return False
+        user_ids = await self.store.get_users_in_room(room_id)
+        return self.config.server_notices_mxid in user_ids
 
-    @defer.inlineCallbacks
-    def assert_accepted_privacy_policy(self, requester):
+    async def assert_accepted_privacy_policy(self, requester: Requester) -> None:
         """Check if a user has accepted the privacy policy
 
         Called when the given user is about to do something that requires
@@ -438,12 +619,10 @@ class EventCreationHandler(object):
         raised.
 
         Args:
-            requester (synapse.types.Requester):
-                The user making the request
+            requester: The user making the request
 
         Returns:
-            Deferred[None]: returns normally if the user has consented or is
-                exempt
+            Returns normally if the user has consented or is exempt
 
         Raises:
             ConsentNotGivenError: if the user has not given consent yet
@@ -455,7 +634,13 @@ class EventCreationHandler(object):
         if requester.app_service is not None:
             return
 
-        user_id = requester.user.to_string()
+        user_id = requester.authenticated_entity
+        if not user_id.startswith("@"):
+            # The authenticated entity might not be a user, e.g. if it's the
+            # server puppetting the user.
+            return
+
+        user = UserID.from_string(user_id)
 
         # exempt the system notices user
         if (
@@ -464,150 +649,206 @@ class EventCreationHandler(object):
         ):
             return
 
-        u = yield self.store.get_user_by_id(user_id)
+        u = await self.store.get_user_by_id(user_id)
         assert u is not None
+        if u["user_type"] in (UserTypes.SUPPORT, UserTypes.BOT):
+            # support and bot users are not required to consent
+            return
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
         if u["consent_version"] == self.config.user_consent_version:
             return
 
-        consent_uri = self._consent_uri_builder.build_user_consent_uri(
-            requester.user.localpart
-        )
+        consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)
         msg = self._block_events_without_consent_error % {"consent_uri": consent_uri}
         raise ConsentNotGivenError(msg=msg, consent_uri=consent_uri)
 
-    @defer.inlineCallbacks
-    def send_nonmember_event(self, requester, event, context, ratelimit=True):
-        """
-        Persists and notifies local clients and federation of an event.
-
-        Args:
-            event (FrozenEvent) the event to send.
-            context (Context) the context of the event.
-            ratelimit (bool): Whether to rate limit this send.
-            is_guest (bool): Whether the sender is a guest.
-        """
-        if event.type == EventTypes.Member:
-            raise SynapseError(
-                500, "Tried to send member event through non-member codepath"
-            )
-
-        user = UserID.from_string(event.sender)
-
-        assert self.hs.is_mine(user), "User must be our own: %s" % (user,)
-
-        if event.is_state():
-            prev_state = yield self.deduplicate_state_event(event, context)
-            if prev_state is not None:
-                logger.info(
-                    "Not bothering to persist state event %s duplicated by %s",
-                    event.event_id,
-                    prev_state.event_id,
-                )
-                defer.returnValue(prev_state)
-
-        yield self.handle_new_client_event(
-            requester=requester, event=event, context=context, ratelimit=ratelimit
-        )
-
-    @defer.inlineCallbacks
-    def deduplicate_state_event(self, event, context):
+    async def deduplicate_state_event(
+        self, event: EventBase, context: EventContext
+    ) -> Optional[EventBase]:
         """
         Checks whether event is in the latest resolved state in context.
 
-        If so, returns the version of the event in context.
-        Otherwise, returns None.
+        Args:
+            event: The event to check for duplication.
+            context: The event context.
+
+        Returns:
+            The previous version of the event is returned, if it is found in the
+            event context. Otherwise, None is returned.
         """
-        prev_state_ids = yield context.get_prev_state_ids(self.store)
+        prev_state_ids = await context.get_prev_state_ids()
         prev_event_id = prev_state_ids.get((event.type, event.state_key))
-        prev_event = yield self.store.get_event(prev_event_id, allow_none=True)
+        if not prev_event_id:
+            return None
+        prev_event = await self.store.get_event(prev_event_id, allow_none=True)
         if not prev_event:
-            return
+            return None
 
         if prev_event and event.user_id == prev_event.user_id:
             prev_content = encode_canonical_json(prev_event.content)
             next_content = encode_canonical_json(event.content)
             if prev_content == next_content:
-                defer.returnValue(prev_event)
-        return
+                return prev_event
+        return None
 
-    @defer.inlineCallbacks
-    def create_and_send_nonmember_event(
-        self, requester, event_dict, ratelimit=True, txn_id=None
-    ):
+    async def create_and_send_nonmember_event(
+        self,
+        requester: Requester,
+        event_dict: dict,
+        ratelimit: bool = True,
+        txn_id: Optional[str] = None,
+        ignore_shadow_ban: bool = False,
+    ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
 
-        See self.create_event and self.send_nonmember_event.
+        See self.create_event and self.handle_new_client_event.
+
+        Args:
+            requester: The requester sending the event.
+            event_dict: An entire event.
+            ratelimit: Whether to rate limit this send.
+            txn_id: The transaction ID.
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
+
+        Returns:
+            The event, and its stream ordering (if deduplication happened,
+            the previous, duplicate event).
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
+
+        if event_dict["type"] == EventTypes.Member:
+            raise SynapseError(
+                500, "Tried to send member event through non-member codepath"
+            )
+
+        if not ignore_shadow_ban and requester.shadow_banned:
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
 
         # We limit the number of concurrent event sends in a room so that we
         # don't fork the DAG too much. If we don't limit then we can end up in
         # a situation where event persistence can't keep up, causing
         # extremities to pile up, which in turn leads to state resolution
         # taking longer.
-        with (yield self.limiter.queue(event_dict["room_id"])):
-            event, context = yield self.create_event(
-                requester, event_dict, token_id=requester.access_token_id, txn_id=txn_id
+        with (await self.limiter.queue(event_dict["room_id"])):
+            if txn_id and requester.access_token_id:
+                existing_event_id = await self.store.get_event_id_from_transaction_id(
+                    event_dict["room_id"],
+                    requester.user.to_string(),
+                    requester.access_token_id,
+                    txn_id,
+                )
+                if existing_event_id:
+                    event = await self.store.get_event(existing_event_id)
+                    # we know it was persisted, so must have a stream ordering
+                    assert event.internal_metadata.stream_ordering
+                    return event, event.internal_metadata.stream_ordering
+
+            event, context = await self.create_event(
+                requester, event_dict, txn_id=txn_id
             )
 
-            spam_error = self.spam_checker.check_event_for_spam(event)
+            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+                event.sender,
+            )
+
+            spam_error = await self.spam_checker.check_event_for_spam(event)
             if spam_error:
-                if not isinstance(spam_error, string_types):
+                if not isinstance(spam_error, str):
                     spam_error = "Spam is not permitted here"
                 raise SynapseError(403, spam_error, Codes.FORBIDDEN)
 
-            yield self.send_nonmember_event(
-                requester, event, context, ratelimit=ratelimit
+            ev = await self.handle_new_client_event(
+                requester=requester,
+                event=event,
+                context=context,
+                ratelimit=ratelimit,
+                ignore_shadow_ban=ignore_shadow_ban,
             )
-        defer.returnValue(event)
+
+        # we know it was persisted, so must have a stream ordering
+        assert ev.internal_metadata.stream_ordering
+        return ev, ev.internal_metadata.stream_ordering
 
     @measure_func("create_new_client_event")
-    @defer.inlineCallbacks
-    def create_new_client_event(
-        self, builder, requester=None, prev_events_and_hashes=None
-    ):
+    async def create_new_client_event(
+        self,
+        builder: EventBuilder,
+        requester: Optional[Requester] = None,
+        prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
+    ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
         Args:
-            builder (EventBuilder):
-
-            requester (synapse.types.Requester|None):
-
-            prev_events_and_hashes (list[(str, dict[str, str], int)]|None):
+            builder:
+            requester:
+            prev_event_ids:
                 the forward extremities to use as the prev_events for the
-                new event. For each event, a tuple of (event_id, hashes, depth)
-                where *hashes* is a map from algorithm to hash.
+                new event.
 
                 If None, they will be requested from the database.
 
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
         Returns:
-            Deferred[(synapse.events.EventBase, synapse.events.snapshot.EventContext)]
+            Tuple of created event, context
         """
 
-        if prev_events_and_hashes is not None:
-            assert len(prev_events_and_hashes) <= 10, (
-                "Attempting to create an event with %i prev_events"
-                % (len(prev_events_and_hashes),)
+        if prev_event_ids is not None:
+            assert (
+                len(prev_event_ids) <= 10
+            ), "Attempting to create an event with %i prev_events" % (
+                len(prev_event_ids),
             )
         else:
-            prev_events_and_hashes = yield self.store.get_prev_events_for_room(
-                builder.room_id
-            )
+            prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
 
-        prev_events = [
-            (event_id, prev_hashes)
-            for event_id, prev_hashes, _ in prev_events_and_hashes
-        ]
+        # we now ought to have some prev_events (unless it's a create event).
+        #
+        # do a quick sanity check here, rather than waiting until we've created the
+        # event and then try to auth it (which fails with a somewhat confusing "No
+        # create event in auth events")
+        assert (
+            builder.type == EventTypes.Create or len(prev_event_ids) > 0
+        ), "Attempting to create an event with no prev_events"
 
-        event = yield builder.build(prev_event_ids=[p for p, _ in prev_events])
-        context = yield self.state.compute_event_context(event)
+        event = await builder.build(
+            prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
+        )
+        context = await self.state.compute_event_context(event)
         if requester:
             context.app_service = requester.app_service
 
-        self.validator.validate_new(event)
+        third_party_result = await self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not third_party_result:
+            logger.info(
+                "Event %s forbidden by third-party rules",
+                event,
+            )
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+        elif isinstance(third_party_result, dict):
+            # the third-party rules want to replace the event. We'll need to build a new
+            # event.
+            event, context = await self._rebuild_event_after_third_party_rules(
+                third_party_result, event
+            )
+
+        self.validator.validate_new(event, self.config)
 
         # If this event is an annotation then we check that that the sender
         # can't annotate the same way twice (e.g. stops users from liking an
@@ -617,7 +858,7 @@ class EventCreationHandler(object):
             relates_to = relation["event_id"]
             aggregation_key = relation["key"]
 
-            already_exists = yield self.store.has_user_annotated_event(
+            already_exists = await self.store.has_user_annotated_event(
                 relates_to, event.type, aggregation_key, event.sender
             )
             if already_exists:
@@ -625,26 +866,66 @@ class EventCreationHandler(object):
 
         logger.debug("Created event %s", event.event_id)
 
-        defer.returnValue((event, context))
+        return (event, context)
 
     @measure_func("handle_new_client_event")
-    @defer.inlineCallbacks
-    def handle_new_client_event(
-        self, requester, event, context, ratelimit=True, extra_users=[]
-    ):
-        """Processes a new event. This includes checking auth, persisting it,
+    async def handle_new_client_event(
+        self,
+        requester: Requester,
+        event: EventBase,
+        context: EventContext,
+        ratelimit: bool = True,
+        extra_users: Optional[List[UserID]] = None,
+        ignore_shadow_ban: bool = False,
+    ) -> EventBase:
+        """Processes a new event.
+
+        This includes deduplicating, checking auth, persisting,
         notifying users, sending to remote servers, etc.
 
         If called from a worker will hit out to the master process for final
         processing.
 
         Args:
-            requester (Requester)
-            event (FrozenEvent)
-            context (EventContext)
-            ratelimit (bool)
-            extra_users (list(UserID)): Any extra users to notify about event
+            requester
+            event
+            context
+            ratelimit
+            extra_users: Any extra users to notify about event
+
+            ignore_shadow_ban: True if shadow-banned users should be allowed to
+                send this event.
+
+        Return:
+            If the event was deduplicated, the previous, duplicate, event. Otherwise,
+            `event`.
+
+        Raises:
+            ShadowBanError if the requester has been shadow-banned.
         """
+        extra_users = extra_users or []
+
+        # we don't apply shadow-banning to membership events here. Invites are blocked
+        # higher up the stack, and we allow shadow-banned users to send join and leave
+        # events as normal.
+        if (
+            event.type != EventTypes.Member
+            and not ignore_shadow_ban
+            and requester.shadow_banned
+        ):
+            # We randomly sleep a bit just to annoy the requester.
+            await self.clock.sleep(random.randint(1, 10))
+            raise ShadowBanError()
+
+        if event.is_state():
+            prev_event = await self.deduplicate_state_event(event, context)
+            if prev_event is not None:
+                logger.info(
+                    "Not bothering to persist state event %s duplicated by %s",
+                    event.event_id,
+                    prev_event.event_id,
+                )
+                return prev_event
 
         if event.is_state() and (event.type, event.state_key) == (
             EventTypes.Create,
@@ -652,39 +933,38 @@ class EventCreationHandler(object):
         ):
             room_version = event.content.get("room_version", RoomVersions.V1.identifier)
         else:
-            room_version = yield self.store.get_room_version(event.room_id)
+            room_version = await self.store.get_room_version_id(event.room_id)
 
-        event_allowed = yield self.third_party_event_rules.check_event_allowed(
-            event, context
-        )
-        if not event_allowed:
-            raise SynapseError(
-                403, "This event is not allowed in this context", Codes.FORBIDDEN
-            )
-
-        try:
-            yield self.auth.check_from_context(room_version, event, context)
-        except AuthError as err:
-            logger.warn("Denying new event %r because %s", event, err)
-            raise err
+        if event.internal_metadata.is_out_of_band_membership():
+            # the only sort of out-of-band-membership events we expect to see here
+            # are invite rejections we have generated ourselves.
+            assert event.type == EventTypes.Member
+            assert event.content["membership"] == Membership.LEAVE
+        else:
+            try:
+                await self.auth.check_from_context(room_version, event, context)
+            except AuthError as err:
+                logger.warning("Denying new event %r because %s", event, err)
+                raise err
 
         # Ensure that we can round trip before trying to persist in db
         try:
-            dump = frozendict_json_encoder.encode(event.content)
-            json.loads(dump)
+            dump = json_encoder.encode(event.content)
+            json_decoder.decode(dump)
         except Exception:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 
-        yield self.action_generator.handle_push_actions_for_event(event, context)
+        await self.action_generator.handle_push_actions_for_event(event, context)
 
-        # reraise does not allow inlineCallbacks to preserve the stacktrace, so we
-        # hack around with a try/finally instead.
-        success = False
+        await self.cache_joined_hosts_for_event(event)
+
         try:
             # If we're a worker we need to hit out to the master.
-            if self.config.worker_app:
-                yield self.send_event_to_master(
+            writer_instance = self._events_shard_config.get_instance(event.room_id)
+            if writer_instance != self._instance_name:
+                result = await self.send_event(
+                    instance_name=writer_instance,
                     event_id=event.event_id,
                     store=self.store,
                     requester=requester,
@@ -693,80 +973,203 @@ class EventCreationHandler(object):
                     ratelimit=ratelimit,
                     extra_users=extra_users,
                 )
-                success = True
-                return
+                stream_id = result["stream_id"]
+                event_id = result["event_id"]
+                if event_id != event.event_id:
+                    # If we get a different event back then it means that its
+                    # been de-duplicated, so we replace the given event with the
+                    # one already persisted.
+                    event = await self.store.get_event(event_id)
+                else:
+                    # If we newly persisted the event then we need to update its
+                    # stream_ordering entry manually (as it was persisted on
+                    # another worker).
+                    event.internal_metadata.stream_ordering = stream_id
+                return event
 
-            yield self.persist_and_notify_client_event(
+            event = await self.persist_and_notify_client_event(
                 requester, event, context, ratelimit=ratelimit, extra_users=extra_users
             )
 
-            success = True
-        finally:
-            if not success:
-                # Ensure that we actually remove the entries in the push actions
-                # staging area, if we calculated them.
-                run_in_background(
-                    self.store.remove_push_actions_from_staging, event.event_id
-                )
+            return event
+        except Exception:
+            # Ensure that we actually remove the entries in the push actions
+            # staging area, if we calculated them.
+            await self.store.remove_push_actions_from_staging(event.event_id)
+            raise
 
-    @defer.inlineCallbacks
-    def persist_and_notify_client_event(
-        self, requester, event, context, ratelimit=True, extra_users=[]
-    ):
+    async def cache_joined_hosts_for_event(self, event: EventBase) -> None:
+        """Precalculate the joined hosts at the event, when using Redis, so that
+        external federation senders don't have to recalculate it themselves.
+        """
+
+        if not self._external_cache.is_enabled():
+            return
+
+        # We actually store two mappings, event ID -> prev state group,
+        # state group -> joined hosts, which is much more space efficient
+        # than event ID -> joined hosts.
+        #
+        # Note: We have to cache event ID -> prev state group, as we don't
+        # store that in the DB.
+        #
+        # Note: We always set the state group -> joined hosts cache, even if
+        # we already set it, so that the expiry time is reset.
+
+        state_entry = await self.state.resolve_state_groups_for_events(
+            event.room_id, event_ids=event.prev_event_ids()
+        )
+
+        if state_entry.state_group:
+            joined_hosts = await self.store.get_joined_hosts(event.room_id, state_entry)
+
+            await self._external_cache.set(
+                "event_to_prev_state_group",
+                event.event_id,
+                state_entry.state_group,
+                expiry_ms=60 * 60 * 1000,
+            )
+            await self._external_cache.set(
+                "get_joined_hosts",
+                str(state_entry.state_group),
+                list(joined_hosts),
+                expiry_ms=60 * 60 * 1000,
+            )
+
+    async def _validate_canonical_alias(
+        self, directory_handler, room_alias_str: str, expected_room_id: str
+    ) -> None:
+        """
+        Ensure that the given room alias points to the expected room ID.
+
+        Args:
+            directory_handler: The directory handler object.
+            room_alias_str: The room alias to check.
+            expected_room_id: The room ID that the alias should point to.
+        """
+        room_alias = RoomAlias.from_string(room_alias_str)
+        try:
+            mapping = await directory_handler.get_association(room_alias)
+        except SynapseError as e:
+            # Turn M_NOT_FOUND errors into M_BAD_ALIAS errors.
+            if e.errcode == Codes.NOT_FOUND:
+                raise SynapseError(
+                    400,
+                    "Room alias %s does not point to the room" % (room_alias_str,),
+                    Codes.BAD_ALIAS,
+                )
+            raise
+
+        if mapping["room_id"] != expected_room_id:
+            raise SynapseError(
+                400,
+                "Room alias %s does not point to the room" % (room_alias_str,),
+                Codes.BAD_ALIAS,
+            )
+
+    async def persist_and_notify_client_event(
+        self,
+        requester: Requester,
+        event: EventBase,
+        context: EventContext,
+        ratelimit: bool = True,
+        extra_users: Optional[List[UserID]] = None,
+    ) -> EventBase:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
 
-        This should only be run on master.
+        This should only be run on the instance in charge of persisting events.
+
+        Returns:
+            The persisted event. This may be different than the given event if
+            it was de-duplicated (e.g. because we had already persisted an
+            event with the same transaction ID.)
         """
-        assert not self.config.worker_app
+        extra_users = extra_users or []
+
+        assert self.storage.persistence is not None
+        assert self._events_shard_config.should_handle(
+            self._instance_name, event.room_id
+        )
 
         if ratelimit:
-            yield self.base_handler.ratelimit(requester)
+            # We check if this is a room admin redacting an event so that we
+            # can apply different ratelimiting. We do this by simply checking
+            # it's not a self-redaction (to avoid having to look up whether the
+            # user is actually admin or not).
+            is_admin_redaction = False
+            if event.type == EventTypes.Redaction:
+                original_event = await self.store.get_event(
+                    event.redacts,
+                    redact_behaviour=EventRedactBehaviour.AS_IS,
+                    get_prev_content=False,
+                    allow_rejected=False,
+                    allow_none=True,
+                )
 
-        yield self.base_handler.maybe_kick_guest_users(event, context)
+                is_admin_redaction = bool(
+                    original_event and event.sender != original_event.sender
+                )
+
+            await self.base_handler.ratelimit(
+                requester, is_admin_redaction=is_admin_redaction
+            )
+
+        await self.base_handler.maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
-            # Check the alias is acually valid (at this time at least)
-            room_alias_str = event.content.get("alias", None)
-            if room_alias_str:
-                room_alias = RoomAlias.from_string(room_alias_str)
-                directory_handler = self.hs.get_handlers().directory_handler
-                mapping = yield directory_handler.get_association(room_alias)
+            # Validate a newly added alias or newly added alt_aliases.
 
-                if mapping["room_id"] != event.room_id:
-                    raise SynapseError(
-                        400,
-                        "Room alias %s does not point to the room" % (room_alias_str,),
+            original_alias = None
+            original_alt_aliases = []  # type: List[str]
+
+            original_event_id = event.unsigned.get("replaces_state")
+            if original_event_id:
+                original_event = await self.store.get_event(original_event_id)
+
+                if original_event:
+                    original_alias = original_event.content.get("alias", None)
+                    original_alt_aliases = original_event.content.get("alt_aliases", [])
+
+            # Check the alias is currently valid (if it has changed).
+            room_alias_str = event.content.get("alias", None)
+            directory_handler = self.hs.get_directory_handler()
+            if room_alias_str and room_alias_str != original_alias:
+                await self._validate_canonical_alias(
+                    directory_handler, room_alias_str, event.room_id
+                )
+
+            # Check that alt_aliases is the proper form.
+            alt_aliases = event.content.get("alt_aliases", [])
+            if not isinstance(alt_aliases, (list, tuple)):
+                raise SynapseError(
+                    400, "The alt_aliases property must be a list.", Codes.INVALID_PARAM
+                )
+
+            # If the old version of alt_aliases is of an unknown form,
+            # completely replace it.
+            if not isinstance(original_alt_aliases, (list, tuple)):
+                original_alt_aliases = []
+
+            # Check that each alias is currently valid.
+            new_alt_aliases = set(alt_aliases) - set(original_alt_aliases)
+            if new_alt_aliases:
+                for alias_str in new_alt_aliases:
+                    await self._validate_canonical_alias(
+                        directory_handler, alias_str, event.room_id
                     )
 
-        federation_handler = self.hs.get_handlers().federation_handler
+        federation_handler = self.hs.get_federation_handler()
 
         if event.type == EventTypes.Member:
             if event.content["membership"] == Membership.INVITE:
-
-                def is_inviter_member_event(e):
-                    return e.type == EventTypes.Member and e.sender == event.sender
-
-                current_state_ids = yield context.get_current_state_ids(self.store)
-
-                state_to_include_ids = [
-                    e_id
-                    for k, e_id in iteritems(current_state_ids)
-                    if k[0] in self.hs.config.room_invite_state_types
-                    or k == (EventTypes.Member, event.sender)
-                ]
-
-                state_to_include = yield self.store.get_events(state_to_include_ids)
-
-                event.unsigned["invite_room_state"] = [
-                    {
-                        "type": e.type,
-                        "state_key": e.state_key,
-                        "content": e.content,
-                        "sender": e.sender,
-                    }
-                    for e in itervalues(state_to_include)
-                ]
+                event.unsigned[
+                    "invite_room_state"
+                ] = await self.store.get_stripped_room_state_from_event_context(
+                    context,
+                    self.room_invite_state_types,
+                    membership_user_id=event.sender,
+                )
 
                 invitee = UserID.from_string(event.state_key)
                 if not self.hs.is_mine(invitee):
@@ -774,52 +1177,80 @@ class EventCreationHandler(object):
                     # way? If we have been invited by a remote server, we need
                     # to get them to sign the event.
 
-                    returned_invite = yield federation_handler.send_invite(
+                    returned_invite = await federation_handler.send_invite(
                         invitee.domain, event
                     )
-
                     event.unsigned.pop("room_state", None)
 
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(returned_invite.signatures)
 
         if event.type == EventTypes.Redaction:
-            prev_state_ids = yield context.get_prev_state_ids(self.store)
-            auth_events_ids = yield self.auth.compute_auth_events(
+            original_event = await self.store.get_event(
+                event.redacts,
+                redact_behaviour=EventRedactBehaviour.AS_IS,
+                get_prev_content=False,
+                allow_rejected=False,
+                allow_none=True,
+            )
+
+            # we can make some additional checks now if we have the original event.
+            if original_event:
+                if original_event.type == EventTypes.Create:
+                    raise AuthError(403, "Redacting create events is not permitted")
+
+                if original_event.room_id != event.room_id:
+                    raise SynapseError(400, "Cannot redact event from a different room")
+
+                if original_event.type == EventTypes.ServerACL:
+                    raise AuthError(403, "Redacting server ACL events is not permitted")
+
+            prev_state_ids = await context.get_prev_state_ids()
+            auth_events_ids = self.auth.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
-            auth_events = yield self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events.values()}
-            room_version = yield self.store.get_room_version(event.room_id)
-            if self.auth.check_redaction(room_version, event, auth_events=auth_events):
-                original_event = yield self.store.get_event(
-                    event.redacts,
-                    check_redacted=False,
-                    get_prev_content=False,
-                    allow_rejected=False,
-                    allow_none=False,
-                )
+            auth_events_map = await self.store.get_events(auth_events_ids)
+            auth_events = {(e.type, e.state_key): e for e in auth_events_map.values()}
+
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+            if event_auth.check_redaction(
+                room_version_obj, event, auth_events=auth_events
+            ):
+                # this user doesn't have 'redact' rights, so we need to do some more
+                # checks on the original event. Let's start by checking the original
+                # event exists.
+                if not original_event:
+                    raise NotFoundError("Could not find event %s" % (event.redacts,))
+
                 if event.user_id != original_event.user_id:
                     raise AuthError(403, "You don't have permission to redact events")
 
-                # We've already checked.
+                # all the checks are done.
                 event.internal_metadata.recheck_redaction = False
 
         if event.type == EventTypes.Create:
-            prev_state_ids = yield context.get_prev_state_ids(self.store)
+            prev_state_ids = await context.get_prev_state_ids()
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        (event_stream_id, max_stream_id) = yield self.store.persist_event(
-            event, context=context
-        )
+        # Note that this returns the event that was persisted, which may not be
+        # the same as we passed in if it was deduplicated due transaction IDs.
+        (
+            event,
+            event_pos,
+            max_stream_token,
+        ) = await self.storage.persistence.persist_event(event, context=context)
 
-        yield self.pusher_pool.on_new_notifications(event_stream_id, max_stream_id)
+        if self._ephemeral_events_enabled:
+            # If there's an expiry timestamp on the event, schedule its expiry.
+            self._message_handler.maybe_schedule_expiry(event)
 
         def _notify():
             try:
                 self.notifier.on_new_room_event(
-                    event, event_stream_id, max_stream_id, extra_users=extra_users
+                    event, event_pos, max_stream_token, extra_users=extra_users
                 )
             except Exception:
                 logger.exception("Error notifying about new room event")
@@ -831,61 +1262,160 @@ class EventCreationHandler(object):
             # matters as sometimes presence code can take a while.
             run_in_background(self._bump_active_time, requester.user)
 
-    @defer.inlineCallbacks
-    def _bump_active_time(self, user):
+        return event
+
+    async def _bump_active_time(self, user: UserID) -> None:
         try:
             presence = self.hs.get_presence_handler()
-            yield presence.bump_presence_active_time(user)
+            await presence.bump_presence_active_time(user)
         except Exception:
             logger.exception("Error bumping presence active time")
 
-    @defer.inlineCallbacks
-    def _send_dummy_events_to_fill_extremities(self):
+    async def _send_dummy_events_to_fill_extremities(self):
         """Background task to send dummy events into rooms that have a large
         number of extremities
         """
-
-        room_ids = yield self.store.get_rooms_with_many_extremities(
-            min_count=10, limit=5
+        self._expire_rooms_to_exclude_from_dummy_event_insertion()
+        room_ids = await self.store.get_rooms_with_many_extremities(
+            min_count=self._dummy_events_threshold,
+            limit=5,
+            room_id_filter=self._rooms_to_exclude_from_dummy_event_insertion.keys(),
         )
 
         for room_id in room_ids:
-            # For each room we need to find a joined member we can use to send
-            # the dummy event with.
+            dummy_event_sent = await self._send_dummy_event_for_room(room_id)
 
-            prev_events_and_hashes = yield self.store.get_prev_events_for_room(room_id)
+            if not dummy_event_sent:
+                # Did not find a valid user in the room, so remove from future attempts
+                # Exclusion is time limited, so the room will be rechecked in the future
+                # dependent on _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
+                logger.info(
+                    "Failed to send dummy event into room %s. Will exclude it from "
+                    "future attempts until cache expires" % (room_id,)
+                )
+                now = self.clock.time_msec()
+                self._rooms_to_exclude_from_dummy_event_insertion[room_id] = now
 
-            latest_event_ids = (event_id for (event_id, _, _) in prev_events_and_hashes)
+    async def _send_dummy_event_for_room(self, room_id: str) -> bool:
+        """Attempt to send a dummy event for the given room.
 
-            members = yield self.state.get_current_users_in_room(
-                room_id, latest_event_ids=latest_event_ids
-            )
+        Args:
+            room_id: room to try to send an event from
 
-            user_id = None
-            for member in members:
-                if self.hs.is_mine_id(member):
-                    user_id = member
-                    break
+        Returns:
+            True if a dummy event was successfully sent. False if no user was able
+            to send an event.
+        """
 
-            if not user_id:
-                # We don't have a joined user.
-                # TODO: We should do something here to stop the room from
-                # appearing next time.
+        # For each room we need to find a joined member we can use to send
+        # the dummy event with.
+        latest_event_ids = await self.store.get_prev_events_for_room(room_id)
+        members = await self.state.get_current_users_in_room(
+            room_id, latest_event_ids=latest_event_ids
+        )
+        for user_id in members:
+            if not self.hs.is_mine_id(user_id):
                 continue
+            requester = create_requester(user_id, authenticated_entity=self.server_name)
+            try:
+                event, context = await self.create_event(
+                    requester,
+                    {
+                        "type": EventTypes.Dummy,
+                        "content": {},
+                        "room_id": room_id,
+                        "sender": user_id,
+                    },
+                    prev_event_ids=latest_event_ids,
+                )
 
-            requester = create_requester(user_id)
+                event.internal_metadata.proactively_send = False
 
-            event, context = yield self.create_event(
-                requester,
-                {
-                    "type": "org.matrix.dummy_event",
-                    "content": {},
-                    "room_id": room_id,
-                    "sender": user_id,
-                },
-                prev_events_and_hashes=prev_events_and_hashes,
+                # Since this is a dummy-event it is OK if it is sent by a
+                # shadow-banned user.
+                await self.handle_new_client_event(
+                    requester,
+                    event,
+                    context,
+                    ratelimit=False,
+                    ignore_shadow_ban=True,
+                )
+                return True
+            except AuthError:
+                logger.info(
+                    "Failed to send dummy event into room %s for user %s due to "
+                    "lack of power. Will try another user" % (room_id, user_id)
+                )
+        return False
+
+    def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
+        expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
+        to_expire = set()
+        for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():
+            if time < expire_before:
+                to_expire.add(room_id)
+        for room_id in to_expire:
+            logger.debug(
+                "Expiring room id %s from dummy event insertion exclusion cache",
+                room_id,
+            )
+            del self._rooms_to_exclude_from_dummy_event_insertion[room_id]
+
+    async def _rebuild_event_after_third_party_rules(
+        self, third_party_result: dict, original_event: EventBase
+    ) -> Tuple[EventBase, EventContext]:
+        # the third_party_event_rules want to replace the event.
+        # we do some basic checks, and then return the replacement event and context.
+
+        # Construct a new EventBuilder and validate it, which helps with the
+        # rest of these checks.
+        try:
+            builder = self.event_builder_factory.for_room_version(
+                original_event.room_version, third_party_result
+            )
+            self.validator.validate_builder(builder)
+        except SynapseError as e:
+            raise Exception(
+                "Third party rules module created an invalid event: " + e.msg,
             )
 
-            event.internal_metadata.proactively_send = False
+        immutable_fields = [
+            # changing the room is going to break things: we've already checked that the
+            # room exists, and are holding a concurrency limiter token for that room.
+            # Also, we might need to use a different room version.
+            "room_id",
+            # changing the type or state key might work, but we'd need to check that the
+            # calling functions aren't making assumptions about them.
+            "type",
+            "state_key",
+        ]
 
-            yield self.send_nonmember_event(requester, event, context, ratelimit=False)
+        for k in immutable_fields:
+            if getattr(builder, k, None) != original_event.get(k):
+                raise Exception(
+                    "Third party rules module created an invalid event: "
+                    "cannot change field " + k
+                )
+
+        # check that the new sender belongs to this HS
+        if not self.hs.is_mine_id(builder.sender):
+            raise Exception(
+                "Third party rules module created an invalid event: "
+                "invalid sender " + builder.sender
+            )
+
+        # copy over the original internal metadata
+        for k, v in original_event.internal_metadata.get_dict().items():
+            setattr(builder.internal_metadata, k, v)
+
+        # the event type hasn't changed, so there's no point in re-calculating the
+        # auth events.
+        event = await builder.build(
+            prev_event_ids=original_event.prev_event_ids(),
+            auth_event_ids=original_event.auth_event_ids(),
+        )
+
+        # we rebuild the event context, to be on the safe side. If nothing else,
+        # delta_ids might need an update.
+        context = await self.state.compute_event_context(event)
+        return event, context

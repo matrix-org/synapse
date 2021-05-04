@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
@@ -16,17 +15,27 @@
 
 import os
 
+import idna
+import yaml
+
 from OpenSSL import SSL
 
+from synapse.config._base import Config, RootConfig
 from synapse.config.tls import ConfigError, TlsConfig
-from synapse.crypto.context_factory import ClientTLSOptionsFactory
+from synapse.crypto.context_factory import FederationPolicyForHTTPS
 
 from tests.unittest import TestCase
 
 
-class TestConfig(TlsConfig):
+class FakeServer(Config):
+    section = "server"
+
     def has_tls_listener(self):
         return False
+
+
+class TestConfig(RootConfig):
+    config_classes = [FakeServer, TlsConfig]
 
 
 class TLSConfigTests(TestCase):
@@ -170,12 +179,13 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        cf = ClientTLSOptionsFactory(t)
+        cf = FederationPolicyForHTTPS(t)
+        options = _get_ssl_context_options(cf._verify_ssl_context)
 
         # The context has had NO_TLSv1_1 and NO_TLSv1_0 set, but not NO_TLSv1_2
-        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
-        self.assertNotEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertNotEqual(options & SSL.OP_NO_TLSv1, 0)
+        self.assertNotEqual(options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
 
     def test_tls_client_minimum_set_passed_through_1_0(self):
         """
@@ -185,9 +195,98 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
 
-        cf = ClientTLSOptionsFactory(t)
+        cf = FederationPolicyForHTTPS(t)
+        options = _get_ssl_context_options(cf._verify_ssl_context)
 
         # The context has not had any of the NO_TLS set.
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_1, 0)
-        self.assertEqual(cf._verify_ssl._options & SSL.OP_NO_TLSv1_2, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_1, 0)
+        self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
+
+    def test_acme_disabled_in_generated_config_no_acme_domain_provied(self):
+        """
+        Checks acme is disabled by default.
+        """
+        conf = TestConfig()
+        conf.read_config(
+            yaml.safe_load(
+                TestConfig().generate_config(
+                    "/config_dir_path",
+                    "my_super_secure_server",
+                    "/data_dir_path",
+                    tls_certificate_path="/tls_cert_path",
+                    tls_private_key_path="tls_private_key",
+                    acme_domain=None,  # This is the acme_domain
+                )
+            ),
+            "/config_dir_path",
+        )
+
+        self.assertFalse(conf.acme_enabled)
+
+    def test_acme_enabled_in_generated_config_domain_provided(self):
+        """
+        Checks acme is enabled if the acme_domain arg is set to some string.
+        """
+        conf = TestConfig()
+        conf.read_config(
+            yaml.safe_load(
+                TestConfig().generate_config(
+                    "/config_dir_path",
+                    "my_super_secure_server",
+                    "/data_dir_path",
+                    tls_certificate_path="/tls_cert_path",
+                    tls_private_key_path="tls_private_key",
+                    acme_domain="my_supe_secure_server",  # This is the acme_domain
+                )
+            ),
+            "/config_dir_path",
+        )
+
+        self.assertTrue(conf.acme_enabled)
+
+    def test_whitelist_idna_failure(self):
+        """
+        The federation certificate whitelist will not allow IDNA domain names.
+        """
+        config = {
+            "federation_certificate_verification_whitelist": [
+                "example.com",
+                "*.ドメイン.テスト",
+            ]
+        }
+        t = TestConfig()
+        e = self.assertRaises(
+            ConfigError, t.read_config, config, config_dir_path="", data_dir_path=""
+        )
+        self.assertIn("IDNA domain names", str(e))
+
+    def test_whitelist_idna_result(self):
+        """
+        The federation certificate whitelist will match on IDNA encoded names.
+        """
+        config = {
+            "federation_certificate_verification_whitelist": [
+                "example.com",
+                "*.xn--eckwd4c7c.xn--zckzah",
+            ]
+        }
+        t = TestConfig()
+        t.read_config(config, config_dir_path="", data_dir_path="")
+
+        cf = FederationPolicyForHTTPS(t)
+
+        # Not in the whitelist
+        opts = cf.get_options(b"notexample.com")
+        self.assertTrue(opts._verifier._verify_certs)
+
+        # Caught by the wildcard
+        opts = cf.get_options(idna.encode("テスト.ドメイン.テスト"))
+        self.assertFalse(opts._verifier._verify_certs)
+
+
+def _get_ssl_context_options(ssl_context: SSL.Context) -> int:
+    """get the options bits from an openssl context object"""
+    # the OpenSSL.SSL.Context wrapper doesn't expose get_options, so we have to
+    # use the low-level interface
+    return SSL._lib.SSL_CTX_get_options(ssl_context._context)

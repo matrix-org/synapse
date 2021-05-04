@@ -1,1 +1,0 @@
-Fix a bug where running synapse_port_db would cause the account validity feature to fail because it didn't set the type of the email_sent column to boolean.

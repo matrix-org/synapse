@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -17,23 +16,23 @@
 import logging
 import random
 import time
+from typing import List
 
 import attr
 
-from twisted.internet import defer
 from twisted.internet.error import ConnectError
 from twisted.names import client, dns
 from twisted.names.error import DNSNameError, DomainError
 
-from synapse.util.logcontext import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 
 SERVER_CACHE = {}
 
 
-@attr.s
-class Server(object):
+@attr.s(slots=True, frozen=True)
+class Server:
     """
     Our record of an individual server which can be tried to reach a destination.
 
@@ -53,37 +52,50 @@ class Server(object):
     expires = attr.ib(default=0)
 
 
-def pick_server_from_list(server_list):
-    """Randomly choose a server from the server list
-
-    Args:
-        server_list (list[Server]): list of candidate servers
-
-    Returns:
-        Tuple[bytes, int]: (host, port) pair for the chosen server
+def _sort_server_list(server_list):
+    """Given a list of SRV records sort them into priority order and shuffle
+    each priority with the given weight.
     """
-    if not server_list:
-        raise RuntimeError("pick_server_from_list called with empty list")
+    priority_map = {}
 
-    # TODO: currently we only use the lowest-priority servers. We should maintain a
-    # cache of servers known to be "down" and filter them out
+    for server in server_list:
+        priority_map.setdefault(server.priority, []).append(server)
 
-    min_priority = min(s.priority for s in server_list)
-    eligible_servers = list(s for s in server_list if s.priority == min_priority)
-    total_weight = sum(s.weight for s in eligible_servers)
-    target_weight = random.randint(0, total_weight)
+    results = []
+    for priority in sorted(priority_map):
+        servers = priority_map[priority]
 
-    for s in eligible_servers:
-        target_weight -= s.weight
+        # This algorithms roughly follows the algorithm described in RFC2782,
+        # changed to remove an off-by-one error.
+        #
+        # N.B. Weights can be zero, which means that they should be picked
+        # rarely.
 
-        if target_weight <= 0:
-            return s.host, s.port
+        total_weight = sum(s.weight for s in servers)
 
-    # this should be impossible.
-    raise RuntimeError("pick_server_from_list got to end of eligible server list.")
+        # Total weight can become zero if there are only zero weight servers
+        # left, which we handle by just shuffling and appending to the results.
+        while servers and total_weight:
+            target_weight = random.randint(1, total_weight)
+
+            for s in servers:
+                target_weight -= s.weight
+
+                if target_weight <= 0:
+                    break
+
+            results.append(s)
+            servers.remove(s)
+            total_weight -= s.weight
+
+        if servers:
+            random.shuffle(servers)
+            results.extend(servers)
+
+    return results
 
 
-class SrvResolver(object):
+class SrvResolver:
     """Interface to the dns client to do SRV lookups, with result caching.
 
     The default resolver in twisted.names doesn't do any caching (it has a CacheResolver,
@@ -100,16 +112,14 @@ class SrvResolver(object):
         self._cache = cache
         self._get_time = get_time
 
-    @defer.inlineCallbacks
-    def resolve_service(self, service_name):
+    async def resolve_service(self, service_name: bytes) -> List[Server]:
         """Look up a SRV record
 
         Args:
             service_name (bytes): record to look up
 
         Returns:
-            Deferred[list[Server]]:
-                a list of the SRV records, or an empty list if none found
+            a list of the SRV records, or an empty list if none found
         """
         now = int(self._get_time())
 
@@ -120,25 +130,25 @@ class SrvResolver(object):
         if cache_entry:
             if all(s.expires > now for s in cache_entry):
                 servers = list(cache_entry)
-                defer.returnValue(servers)
+                return _sort_server_list(servers)
 
         try:
-            answers, _, _ = yield make_deferred_yieldable(
+            answers, _, _ = await make_deferred_yieldable(
                 self._dns_client.lookupService(service_name)
             )
         except DNSNameError:
             # TODO: cache this. We can get the SOA out of the exception, and use
             # the negative-TTL value.
-            defer.returnValue([])
+            return []
         except DomainError as e:
             # We failed to resolve the name (other than a NameError)
             # Try something in the cache, else rereaise
             cache_entry = self._cache.get(service_name, None)
             if cache_entry:
-                logger.warn(
+                logger.warning(
                     "Failed to resolve %r, falling back to cache. %r", service_name, e
                 )
-                defer.returnValue(list(cache_entry))
+                return list(cache_entry)
             else:
                 raise e
 
@@ -169,4 +179,4 @@ class SrvResolver(object):
             )
 
         self._cache[service_name] = list(servers)
-        defer.returnValue(servers)
+        return _sort_server_list(servers)

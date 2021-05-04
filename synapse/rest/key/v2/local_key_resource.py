@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,7 +65,7 @@ class LocalKey(Resource):
 
     def __init__(self, hs):
         self.config = hs.config
-        self.clock = hs.clock
+        self.clock = hs.get_clock()
         self.update_response_body(self.clock.time_msec())
         Resource.__init__(self)
 

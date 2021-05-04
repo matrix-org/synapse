@@ -16,6 +16,8 @@ from ._base import Config
 
 
 class VoipConfig(Config):
+    section = "voip"
+
     def read_config(self, config, **kwargs):
         self.turn_uris = config.get("turn_uris", [])
         self.turn_shared_secret = config.get("turn_shared_secret")
@@ -54,5 +56,5 @@ class VoipConfig(Config):
         # connect to arbitrary endpoints without having first signed up for a
         # valid account (e.g. by passing a CAPTCHA).
         #
-        #turn_allow_guests: True
+        #turn_allow_guests: true
         """

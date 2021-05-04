@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,15 +16,15 @@
 to ensure idempotency when performing PUTs using the REST API."""
 import logging
 
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.util.async_helpers import ObservableDeferred
-from synapse.util.logcontext import make_deferred_yieldable, run_in_background
 
 logger = logging.getLogger(__name__)
 
 CLEANUP_PERIOD_MS = 1000 * 60 * 30  # 30 mins
 
 
-class HttpTransactionCache(object):
+class HttpTransactionCache:
     def __init__(self, hs):
         self.hs = hs
         self.auth = self.hs.get_auth()

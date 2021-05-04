@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,29 +17,53 @@ server protocol.
 """
 
 import logging
+from typing import Optional
 
+import attr
+
+from synapse.types import JsonDict
 from synapse.util.jsonobject import JsonEncodedObject
 
 logger = logging.getLogger(__name__)
 
 
+@attr.s(slots=True)
 class Edu(JsonEncodedObject):
-    """ An Edu represents a piece of data sent from one homeserver to another.
+    """An Edu represents a piece of data sent from one homeserver to another.
 
     In comparison to Pdus, Edus are not persisted for a long time on disk, are
     not meaningful beyond a given pair of homeservers, and don't have an
     internal ID or previous references graph.
     """
 
-    valid_keys = ["origin", "destination", "edu_type", "content"]
+    edu_type = attr.ib(type=str)
+    content = attr.ib(type=dict)
+    origin = attr.ib(type=str)
+    destination = attr.ib(type=str)
 
-    required_keys = ["edu_type"]
+    def get_dict(self) -> JsonDict:
+        return {
+            "edu_type": self.edu_type,
+            "content": self.content,
+        }
 
-    internal_keys = ["origin", "destination"]
+    def get_internal_dict(self) -> JsonDict:
+        return {
+            "edu_type": self.edu_type,
+            "content": self.content,
+            "origin": self.origin,
+            "destination": self.destination,
+        }
+
+    def get_context(self):
+        return getattr(self, "content", {}).get("org.matrix.opentracing_context", "{}")
+
+    def strip_context(self):
+        getattr(self, "content", {})["org.matrix.opentracing_context"] = "{}"
 
 
 class Transaction(JsonEncodedObject):
-    """ A transaction is a list of Pdus and Edus to be sent to a remote home
+    """A transaction is a list of Pdus and Edus to be sent to a remote home
     server with some extra metadata.
 
     Example transaction::
@@ -75,8 +98,8 @@ class Transaction(JsonEncodedObject):
         "pdus",
     ]
 
-    def __init__(self, transaction_id=None, pdus=[], **kwargs):
-        """ If we include a list of pdus then we decode then as PDU's
+    def __init__(self, transaction_id=None, pdus: Optional[list] = None, **kwargs):
+        """If we include a list of pdus then we decode then as PDU's
         automatically.
         """
 
@@ -84,13 +107,11 @@ class Transaction(JsonEncodedObject):
         if "edus" in kwargs and not kwargs["edus"]:
             del kwargs["edus"]
 
-        super(Transaction, self).__init__(
-            transaction_id=transaction_id, pdus=pdus, **kwargs
-        )
+        super().__init__(transaction_id=transaction_id, pdus=pdus or [], **kwargs)
 
     @staticmethod
     def create_new(pdus, **kwargs):
-        """ Used to create a new transaction. Will auto fill out
+        """Used to create a new transaction. Will auto fill out
         transaction_id and origin_server_ts keys.
         """
         if "origin_server_ts" not in kwargs:

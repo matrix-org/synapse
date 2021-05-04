@@ -40,7 +40,9 @@ listeners:
         compress: false
   {% endif %}
 
-  - port: 8008
+  # Allow configuring in case we want to reverse proxy 8008
+  # using another process in the same container
+  - port: {{ SYNAPSE_HTTP_PORT or 8008 }}
     tls: false
     bind_addresses: ['::']
     type: http
@@ -89,8 +91,7 @@ federation_rc_concurrent: 3
 ## Files ##
 
 media_store_path: "/data/media"
-uploads_path: "/data/uploads"
-max_upload_size: "{{ SYNAPSE_MAX_UPLOAD_SIZE or "10M" }}"
+max_upload_size: "{{ SYNAPSE_MAX_UPLOAD_SIZE or "50M" }}"
 max_image_pixels: "32M"
 dynamic_thumbnails: false
 
@@ -174,18 +175,10 @@ report_stats: False
 
 ## API Configuration ##
 
-room_invite_state_types:
-    - "m.room.join_rules"
-    - "m.room.canonical_alias"
-    - "m.room.avatar"
-    - "m.room.name"
-
 {% if SYNAPSE_APPSERVICES %}
 app_service_config_files:
 {% for appservice in SYNAPSE_APPSERVICES %}    - "{{ appservice }}"
 {% endfor %}
-{% else %}
-app_service_config_files: []
 {% endif %}
 
 macaroon_secret_key: "{{ SYNAPSE_MACAROON_SECRET_KEY }}"
@@ -198,31 +191,10 @@ old_signing_keys: {}
 key_refresh_interval: "1d" # 1 Day.
 
 # The trusted servers to download signing keys from.
-perspectives:
-  servers:
-    "matrix.org":
-      verify_keys:
-        "ed25519:auto":
-          key: "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
+trusted_key_servers:
+  - server_name: matrix.org
+    verify_keys:
+      "ed25519:auto": "Noi6WqcDj0QmPxCNQqgezwTlBKrfqehY1u2FyWP9uYw"
 
 password_config:
    enabled: true
-
-{% if SYNAPSE_SMTP_HOST %}
-email:
-   enable_notifs: false
-   smtp_host: "{{ SYNAPSE_SMTP_HOST }}"
-   smtp_port: {{ SYNAPSE_SMTP_PORT or "25" }}
-   smtp_user: "{{ SYNAPSE_SMTP_USER }}"
-   smtp_pass: "{{ SYNAPSE_SMTP_PASSWORD }}"
-   require_transport_security: False
-   notif_from: "{{ SYNAPSE_SMTP_FROM or "hostmaster@" + SYNAPSE_SERVER_NAME }}"
-   app_name: Matrix
-   # if template_dir is unset, uses the example templates that are part of
-   # the Synapse distribution.
-   #template_dir: res/templates
-   notif_template_html: notif_mail.html
-   notif_template_text: notif_mail.txt
-   notif_for_new_users: True
-   riot_base_url: "https://{{ SYNAPSE_SERVER_NAME }}"
-{% endif %}

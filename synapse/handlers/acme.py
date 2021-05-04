@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,26 +13,37 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 import twisted
 import twisted.internet.error
-from twisted.internet import defer
 from twisted.web import server, static
 from twisted.web.resource import Resource
 
 from synapse.app import check_bind_error
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
+ACME_REGISTER_FAIL_ERROR = """
+--------------------------------------------------------------------------------
+Failed to register with the ACME provider. This is likely happening because the installation
+is new, and ACME v1 has been deprecated by Let's Encrypt and disabled for
+new installations since November 2019.
+At the moment, Synapse doesn't support ACME v2. For more information and alternative
+solutions, please read https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
+--------------------------------------------------------------------------------"""
 
-class AcmeHandler(object):
-    def __init__(self, hs):
+
+class AcmeHandler:
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.reactor = hs.get_reactor()
         self._acme_domain = hs.config.acme_domain
 
-    @defer.inlineCallbacks
-    def start_listening(self):
+    async def start_listening(self) -> None:
         from synapse.handlers import acme_issuing_service
 
         # Configure logging for txacme, if you need to debug
@@ -62,7 +72,9 @@ class AcmeHandler(object):
                 "Listening for ACME requests on %s:%i", host, self.hs.config.acme_port
             )
             try:
-                self.reactor.listenTCP(self.hs.config.acme_port, srv, interface=host)
+                self.reactor.listenTCP(
+                    self.hs.config.acme_port, srv, backlog=50, interface=host
+                )
             except twisted.internet.error.CannotListenError as e:
                 check_bind_error(e, host, bind_addresses)
 
@@ -71,15 +83,19 @@ class AcmeHandler(object):
         # want it to control where we save the certificates, we have to reach in
         # and trigger the registration machinery ourselves.
         self._issuer._registered = False
-        yield self._issuer._ensure_registered()
 
-    @defer.inlineCallbacks
-    def provision_certificate(self):
+        try:
+            await self._issuer._ensure_registered()
+        except Exception:
+            logger.error(ACME_REGISTER_FAIL_ERROR)
+            raise
+
+    async def provision_certificate(self) -> None:
 
         logger.warning("Reprovisioning %s", self._acme_domain)
 
         try:
-            yield self._issuer.issue_cert(self._acme_domain)
+            await self._issuer.issue_cert(self._acme_domain)
         except Exception:
             logger.exception("Fail!")
             raise
@@ -99,5 +115,3 @@ class AcmeHandler(object):
         except Exception:
             logger.exception("Failed saving!")
             raise
-
-        defer.returnValue(True)

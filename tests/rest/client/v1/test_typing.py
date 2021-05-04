@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector
 #
@@ -16,9 +15,7 @@
 
 """Tests REST events for /rooms paths."""
 
-from mock import Mock, NonCallableMock
-
-from twisted.internet import defer
+from unittest.mock import Mock
 
 from synapse.rest.client.v1 import room
 from synapse.types import UserID
@@ -40,19 +37,15 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         hs = self.setup_test_homeserver(
             "red",
-            http_client=None,
+            federation_http_client=None,
             federation_client=Mock(),
-            ratelimiter=NonCallableMock(spec_set=["can_do_action"]),
         )
 
         self.event_source = hs.get_event_sources().sources["typing"]
 
-        self.ratelimiter = hs.get_ratelimiter()
-        self.ratelimiter.can_do_action.return_value = (True, 0)
+        hs.get_federation_handler = Mock()
 
-        hs.get_handlers().federation_handler = Mock()
-
-        def get_user_by_access_token(token=None, allow_guest=False):
+        async def get_user_by_access_token(token=None, allow_guest=False):
             return {
                 "user": UserID.from_string(self.auth_user_id),
                 "token_id": 1,
@@ -61,36 +54,10 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         hs.get_auth().get_user_by_access_token = get_user_by_access_token
 
-        def _insert_client_ip(*args, **kwargs):
-            return defer.succeed(None)
+        async def _insert_client_ip(*args, **kwargs):
+            return None
 
         hs.get_datastore().insert_client_ip = _insert_client_ip
-
-        def get_room_members(room_id):
-            if room_id == self.room_id:
-                return defer.succeed([self.user])
-            else:
-                return defer.succeed([])
-
-        @defer.inlineCallbacks
-        def fetch_room_distributions_into(
-            room_id, localusers=None, remotedomains=None, ignore_user=None
-        ):
-            members = yield get_room_members(room_id)
-            for member in members:
-                if ignore_user is not None and member == ignore_user:
-                    continue
-
-                if hs.is_mine(member):
-                    if localusers is not None:
-                        localusers.add(member)
-                else:
-                    if remotedomains is not None:
-                        remotedomains.add(member.domain)
-
-        hs.get_room_member_handler().fetch_room_distributions_into = (
-            fetch_room_distributions_into
-        )
 
         return hs
 
@@ -100,16 +67,17 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id, user="@jim:red")
 
     def test_set_typing(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
-        events = self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
+        events = self.get_success(
+            self.event_source.get_new_events(from_key=0, room_ids=[self.room_id])
+        )
         self.assertEquals(
             events[0],
             [
@@ -122,21 +90,19 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
         )
 
     def test_set_not_typing(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": false}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
     def test_typing_timeout(self):
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 1)
@@ -145,12 +111,11 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 2)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (self.room_id, self.user_id),
             b'{"typing": true, "timeout": 30000}',
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         self.assertEquals(self.event_source.get_current_key(), 3)

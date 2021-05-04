@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 #
@@ -20,30 +19,24 @@ import os
 import time
 import uuid
 import warnings
-from inspect import getcallargs
+from typing import Type
+from unittest.mock import Mock, patch
+from urllib import parse as urlparse
 
-from mock import Mock, patch
-from six.moves.urllib import parse as urlparse
-
-from twisted.internet import defer, reactor
+from twisted.internet import defer
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import CodeMessageException, cs_error
 from synapse.api.room_versions import RoomVersions
+from synapse.config.database import DatabaseConnectionConfig
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.server import DEFAULT_ROOM_VERSION
-from synapse.federation.transport import server as federation_server
-from synapse.http.server import HttpServer
+from synapse.logging.context import current_context, set_current_context
 from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import PostgresEngine, create_engine
-from synapse.storage.prepare_database import (
-    _get_or_create_schema_state,
-    _setup_new_database,
-    prepare_database,
-)
-from synapse.util.logcontext import LoggingContext
-from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.storage.prepare_database import prepare_database
 
 # set this to True to run the tests against postgres instead of sqlite.
 #
@@ -77,7 +70,10 @@ def setupdb():
         db_conn.autocommit = True
         cur = db_conn.cursor()
         cur.execute("DROP DATABASE IF EXISTS %s;" % (POSTGRES_BASE_DB,))
-        cur.execute("CREATE DATABASE %s;" % (POSTGRES_BASE_DB,))
+        cur.execute(
+            "CREATE DATABASE %s ENCODING 'UTF8' LC_COLLATE='C' LC_CTYPE='C' "
+            "template=template0;" % (POSTGRES_BASE_DB,)
+        )
         cur.close()
         db_conn.close()
 
@@ -88,11 +84,8 @@ def setupdb():
             host=POSTGRES_HOST,
             password=POSTGRES_PASSWORD,
         )
-        cur = db_conn.cursor()
-        _get_or_create_schema_state(cur, db_engine)
-        _setup_new_database(cur, db_engine)
-        db_conn.commit()
-        cur.close()
+        db_conn = LoggingDatabaseConnection(db_conn, db_engine, "tests")
+        prepare_database(db_conn, db_engine, None)
         db_conn.close()
 
         def _cleanup():
@@ -117,8 +110,8 @@ def default_config(name, parse=False):
     """
     config_dict = {
         "server_name": name,
+        "send_federation": False,
         "media_store_path": "media",
-        "uploads_path": "uploads",
         # the test signing key is just an arbitrary ed25519 key to keep the config
         # parser happy
         "signing_key": "ed25519 a_lPym qvioDNmfExFBRPgdTU+wtFYKq4JfwFRv7sYVgWvmgJg",
@@ -126,9 +119,7 @@ def default_config(name, parse=False):
         "enable_registration": True,
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
-        "expire_access_token": False,
         "trusted_third_party_id_servers": [],
-        "room_invite_state_types": [],
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
@@ -146,18 +137,11 @@ def default_config(name, parse=False):
         "limit_usage_by_mau": False,
         "hs_disabled": False,
         "hs_disabled_message": "",
-        "hs_disabled_limit_type": "",
         "max_mau_value": 50,
         "mau_trial_days": 0,
         "mau_stats_only": False,
         "mau_limits_reserved_threepids": [],
         "admin_contact": None,
-        "rc_federation": {
-            "reject_limit": 10,
-            "sleep_limit": 10,
-            "sleep_delay": 10,
-            "concurrent": 10,
-        },
         "rc_message": {"per_second": 10000, "burst_count": 10000},
         "rc_registration": {"per_second": 10000, "burst_count": 10000},
         "rc_login": {
@@ -165,6 +149,15 @@ def default_config(name, parse=False):
             "account": {"per_second": 10000, "burst_count": 10000},
             "failed_attempts": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_joins": {
+            "local": {"per_second": 10000, "burst_count": 10000},
+            "remote": {"per_second": 10000, "burst_count": 10000},
+        },
+        "rc_invites": {
+            "per_room": {"per_second": 10000, "burst_count": 10000},
+            "per_user": {"per_second": 10000, "burst_count": 10000},
+        },
+        "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
         "public_baseurl": None,
         "default_identity_server": None,
@@ -178,6 +171,8 @@ def default_config(name, parse=False):
         # disable user directory updates, because they get done in the
         # background, which upsets the test runner.
         "update_user_directory": False,
+        "caches": {"global_factor": 1},
+        "listeners": [{"port": 0, "type": "http"}],
     }
 
     if parse:
@@ -192,15 +187,13 @@ class TestHomeServer(HomeServer):
     DATASTORE_CLASS = DataStore
 
 
-@defer.inlineCallbacks
 def setup_test_homeserver(
     cleanup_func,
     name="test",
-    datastore=None,
     config=None,
     reactor=None,
-    homeserverToUse=TestHomeServer,
-    **kargs
+    homeserver_to_use: Type[HomeServer] = TestHomeServer,
+    **kwargs,
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -223,13 +216,13 @@ def setup_test_homeserver(
 
     config.ldap_enabled = False
 
-    if "clock" not in kargs:
-        kargs["clock"] = MockClock()
+    if "clock" not in kwargs:
+        kwargs["clock"] = MockClock()
 
     if USE_POSTGRES_FOR_TESTS:
         test_db = "synapse_test_%s" % uuid.uuid4().hex
 
-        config.database_config = {
+        database_config = {
             "name": "psycopg2",
             "args": {
                 "database": test_db,
@@ -241,16 +234,19 @@ def setup_test_homeserver(
             },
         }
     else:
-        config.database_config = {
+        database_config = {
             "name": "sqlite3",
             "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
-    db_engine = create_engine(config.database_config)
+    database = DatabaseConnectionConfig("master", database_config)
+    config.database.databases = [database]
+
+    db_engine = create_engine(database.config)
 
     # Create the database before we actually try and connect to it, based off
     # the template database we generate in setupdb()
-    if datastore is None and isinstance(db_engine, PostgresEngine):
+    if isinstance(db_engine, PostgresEngine):
         db_conn = db_engine.module.connect(
             database=POSTGRES_BASE_DB,
             user=POSTGRES_USER,
@@ -266,127 +262,87 @@ def setup_test_homeserver(
         cur.close()
         db_conn.close()
 
-    # we need to configure the connection pool to run the on_new_connection
-    # function, so that we can test code that uses custom sqlite functions
-    # (like rank).
-    config.database_config["args"]["cp_openfun"] = db_engine.on_new_connection
+    hs = homeserver_to_use(
+        name,
+        config=config,
+        version_string="Synapse/tests",
+        reactor=reactor,
+    )
 
-    if datastore is None:
-        hs = homeserverToUse(
-            name,
-            config=config,
-            db_config=config.database_config,
-            version_string="Synapse/tests",
-            database_engine=db_engine,
-            tls_server_context_factory=Mock(),
-            tls_client_options_factory=Mock(),
-            reactor=reactor,
-            **kargs
-        )
+    # Install @cache_in_self attributes
+    for key, val in kwargs.items():
+        setattr(hs, "_" + key, val)
 
-        # Prepare the DB on SQLite -- PostgreSQL is a copy of an already up to
-        # date db
-        if not isinstance(db_engine, PostgresEngine):
-            db_conn = hs.get_db_conn()
-            yield prepare_database(db_conn, db_engine, config)
-            db_conn.commit()
+    # Mock TLS
+    hs.tls_server_context_factory = Mock()
+    hs.tls_client_options_factory = Mock()
+
+    hs.setup()
+    if homeserver_to_use == TestHomeServer:
+        hs.setup_background_tasks()
+
+    if isinstance(db_engine, PostgresEngine):
+        database = hs.get_datastores().databases[0]
+
+        # We need to do cleanup on PostgreSQL
+        def cleanup():
+            import psycopg2
+
+            # Close all the db pools
+            database._db_pool.close()
+
+            dropped = False
+
+            # Drop the test database
+            db_conn = db_engine.module.connect(
+                database=POSTGRES_BASE_DB,
+                user=POSTGRES_USER,
+                host=POSTGRES_HOST,
+                password=POSTGRES_PASSWORD,
+            )
+            db_conn.autocommit = True
+            cur = db_conn.cursor()
+
+            # Try a few times to drop the DB. Some things may hold on to the
+            # database for a few more seconds due to flakiness, preventing
+            # us from dropping it when the test is over. If we can't drop
+            # it, warn and move on.
+            for _ in range(5):
+                try:
+                    cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
+                    db_conn.commit()
+                    dropped = True
+                except psycopg2.OperationalError as e:
+                    warnings.warn(
+                        "Couldn't drop old db: " + str(e), category=UserWarning
+                    )
+                    time.sleep(0.5)
+
+            cur.close()
             db_conn.close()
 
-        else:
-            # We need to do cleanup on PostgreSQL
-            def cleanup():
-                import psycopg2
+            if not dropped:
+                warnings.warn("Failed to drop old DB.", category=UserWarning)
 
-                # Close all the db pools
-                hs.get_db_pool().close()
-
-                dropped = False
-
-                # Drop the test database
-                db_conn = db_engine.module.connect(
-                    database=POSTGRES_BASE_DB,
-                    user=POSTGRES_USER,
-                    host=POSTGRES_HOST,
-                    password=POSTGRES_PASSWORD,
-                )
-                db_conn.autocommit = True
-                cur = db_conn.cursor()
-
-                # Try a few times to drop the DB. Some things may hold on to the
-                # database for a few more seconds due to flakiness, preventing
-                # us from dropping it when the test is over. If we can't drop
-                # it, warn and move on.
-                for x in range(5):
-                    try:
-                        cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
-                        db_conn.commit()
-                        dropped = True
-                    except psycopg2.OperationalError as e:
-                        warnings.warn(
-                            "Couldn't drop old db: " + str(e), category=UserWarning
-                        )
-                        time.sleep(0.5)
-
-                cur.close()
-                db_conn.close()
-
-                if not dropped:
-                    warnings.warn("Failed to drop old DB.", category=UserWarning)
-
-            if not LEAVE_DB:
-                # Register the cleanup hook
-                cleanup_func(cleanup)
-
-        hs.setup()
-        if homeserverToUse.__name__ == "TestHomeServer":
-            hs.setup_master()
-    else:
-        hs = homeserverToUse(
-            name,
-            db_pool=None,
-            datastore=datastore,
-            config=config,
-            version_string="Synapse/tests",
-            database_engine=db_engine,
-            tls_server_context_factory=Mock(),
-            tls_client_options_factory=Mock(),
-            reactor=reactor,
-            **kargs
-        )
+        if not LEAVE_DB:
+            # Register the cleanup hook
+            cleanup_func(cleanup)
 
     # bcrypt is far too slow to be doing in unit tests
     # Need to let the HS build an auth handler and then mess with it
     # because AuthHandler's constructor requires the HS, so we can't make one
     # beforehand and pass it in to the HS's constructor (chicken / egg)
-    hs.get_auth_handler().hash = lambda p: hashlib.md5(p.encode("utf8")).hexdigest()
-    hs.get_auth_handler().validate_hash = (
-        lambda p, h: hashlib.md5(p.encode("utf8")).hexdigest() == h
-    )
+    async def hash(p):
+        return hashlib.md5(p.encode("utf8")).hexdigest()
 
-    fed = kargs.get("resource_for_federation", None)
-    if fed:
-        register_federation_servlets(hs, fed)
+    hs.get_auth_handler().hash = hash
 
-    defer.returnValue(hs)
+    async def validate_hash(p, h):
+        return hashlib.md5(p.encode("utf8")).hexdigest() == h
 
+    hs.get_auth_handler().validate_hash = validate_hash
 
-def register_federation_servlets(hs, resource):
-    federation_server.register_servlets(
-        hs,
-        resource=resource,
-        authenticator=federation_server.Authenticator(hs),
-        ratelimiter=FederationRateLimiter(
-            hs.get_clock(), config=hs.config.rc_federation
-        ),
-    )
-
-
-def get_mock_call_args(pattern_func, mock_func):
-    """ Return the arguments the mock function was called with interpreted
-    by the pattern functions argument list.
-    """
-    invoked_args, invoked_kargs = mock_func.call_args
-    return getcallargs(pattern_func, *invoked_args, **invoked_kargs)
+    return hs
 
 
 def mock_getRawHeaders(headers=None):
@@ -399,7 +355,7 @@ def mock_getRawHeaders(headers=None):
 
 
 # This is a mock /resource/ not an entire server
-class MockHttpResource(HttpServer):
+class MockHttpResource:
     def __init__(self, prefix=""):
         self.callbacks = []  # 3-tuple of method/pattern/function
         self.prefix = prefix
@@ -412,7 +368,7 @@ class MockHttpResource(HttpServer):
     def trigger(
         self, http_method, path, content, mock_request, federation_auth_origin=None
     ):
-        """ Fire an HTTP event.
+        """Fire an HTTP event.
 
         Args:
             http_method : The HTTP method
@@ -470,19 +426,21 @@ class MockHttpResource(HttpServer):
                 try:
                     args = [urlparse.unquote(u) for u in matcher.groups()]
 
-                    (code, response) = yield func(mock_request, *args)
-                    defer.returnValue((code, response))
+                    (code, response) = yield defer.ensureDeferred(
+                        func(mock_request, *args)
+                    )
+                    return code, response
                 except CodeMessageException as e:
-                    defer.returnValue((e.code, cs_error(e.msg, code=e.errcode)))
+                    return (e.code, cs_error(e.msg, code=e.errcode))
 
         raise KeyError("No event can handle %s" % path)
 
-    def register_paths(self, method, path_patterns, callback):
+    def register_paths(self, method, path_patterns, callback, servlet_name):
         for path_pattern in path_patterns:
             self.callbacks.append((method, path_pattern, callback))
 
 
-class MockKey(object):
+class MockKey:
     alg = "mock_alg"
     version = "mock_version"
     signature = b"\x9a\x87$"
@@ -501,7 +459,7 @@ class MockKey(object):
         return b"<fake_encoded_key>"
 
 
-class MockClock(object):
+class MockClock:
     now = 1000
 
     def __init__(self):
@@ -517,10 +475,10 @@ class MockClock(object):
         return self.time() * 1000
 
     def call_later(self, delay, callback, *args, **kwargs):
-        current_context = LoggingContext.current_context()
+        ctx = current_context()
 
         def wrapped_callback():
-            LoggingContext.thread_local.current_context = current_context
+            set_current_context(ctx)
             callback(*args, **kwargs)
 
         t = [self.now + delay, wrapped_callback, False]
@@ -528,8 +486,8 @@ class MockClock(object):
 
         return t
 
-    def looping_call(self, function, interval):
-        self.loopers.append([function, interval / 1000.0, self.now])
+    def looping_call(self, function, interval, *args, **kwargs):
+        self.loopers.append([function, interval / 1000.0, self.now, args, kwargs])
 
     def cancel_call_later(self, timer, ignore_errs=False):
         if timer[2]:
@@ -559,9 +517,9 @@ class MockClock(object):
                 self.timers.append(t)
 
         for looped in self.loopers:
-            func, interval, last = looped
+            func, interval, last, args, kwargs = looped
             if last + interval < self.now:
-                func()
+                func(*args, **kwargs)
                 looped[2] = self.now
 
     def advance_time_msec(self, ms):
@@ -572,99 +530,20 @@ class MockClock(object):
         return d
 
 
-def _format_call(args, kwargs):
-    return ", ".join(
-        ["%r" % (a) for a in args] + ["%s=%r" % (k, v) for k, v in kwargs.items()]
-    )
+async def create_room(hs, room_id: str, creator_id: str):
+    """Creates and persist a creation event for the given room"""
 
-
-class DeferredMockCallable(object):
-    """A callable instance that stores a set of pending call expectations and
-    return values for them. It allows a unit test to assert that the given set
-    of function calls are eventually made, by awaiting on them to be called.
-    """
-
-    def __init__(self):
-        self.expectations = []
-        self.calls = []
-
-    def __call__(self, *args, **kwargs):
-        self.calls.append((args, kwargs))
-
-        if not self.expectations:
-            raise ValueError(
-                "%r has no pending calls to handle call(%s)"
-                % (self, _format_call(args, kwargs))
-            )
-
-        for (call, result, d) in self.expectations:
-            if args == call[1] and kwargs == call[2]:
-                d.callback(None)
-                return result
-
-        failure = AssertionError(
-            "Was not expecting call(%s)" % (_format_call(args, kwargs))
-        )
-
-        for _, _, d in self.expectations:
-            try:
-                d.errback(failure)
-            except Exception:
-                pass
-
-        raise failure
-
-    def expect_call_and_return(self, call, result):
-        self.expectations.append((call, result, defer.Deferred()))
-
-    @defer.inlineCallbacks
-    def await_calls(self, timeout=1000):
-        deferred = defer.DeferredList(
-            [d for _, _, d in self.expectations], fireOnOneErrback=True
-        )
-
-        timer = reactor.callLater(
-            timeout / 1000,
-            deferred.errback,
-            AssertionError(
-                "%d pending calls left: %s"
-                % (
-                    len([e for e in self.expectations if not e[2].called]),
-                    [e for e in self.expectations if not e[2].called],
-                )
-            ),
-        )
-
-        yield deferred
-
-        timer.cancel()
-
-        self.calls = []
-
-    def assert_had_no_calls(self):
-        if self.calls:
-            calls = self.calls
-            self.calls = []
-
-            raise AssertionError(
-                "Expected not to received any calls, got:\n"
-                + "\n".join(["call(%s)" % _format_call(c[0], c[1]) for c in calls])
-            )
-
-
-@defer.inlineCallbacks
-def create_room(hs, room_id, creator_id):
-    """Creates and persist a creation event for the given room
-
-    Args:
-        hs
-        room_id (str)
-        creator_id (str)
-    """
-
+    persistence_store = hs.get_storage().persistence
     store = hs.get_datastore()
     event_builder_factory = hs.get_event_builder_factory()
     event_creation_handler = hs.get_event_creation_handler()
+
+    await store.store_room(
+        room_id=room_id,
+        room_creator_user_id=creator_id,
+        is_public=False,
+        room_version=RoomVersions.V1,
+    )
 
     builder = event_builder_factory.for_room_version(
         RoomVersions.V1,
@@ -677,6 +556,6 @@ def create_room(hs, room_id, creator_id):
         },
     )
 
-    event, context = yield event_creation_handler.create_new_client_event(builder)
+    event, context = await event_creation_handler.create_new_client_event(builder)
 
-    yield store.persist_event(event, context)
+    await persistence_store.persist_event(event, context)

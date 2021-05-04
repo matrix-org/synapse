@@ -15,17 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import argparse
 import base64
 import json
 import sys
+from typing import Any, Optional
+from urllib import parse as urlparse
 
-from six.moves.urllib import parse as urlparse
-
-import nacl.signing
 import requests
+import signedjson.key
+import signedjson.types
 import srvlookup
 import yaml
 from requests.adapters import HTTPAdapter
@@ -45,18 +44,6 @@ def encode_base64(input_bytes):
     return output_string
 
 
-def decode_base64(input_string):
-    """Decode a base64 string to bytes inferring padding from the length of the
-    string."""
-
-    input_bytes = input_string.encode("ascii")
-    input_len = len(input_bytes)
-    padding = b"=" * (3 - ((input_len + 3) % 4))
-    output_len = 3 * ((input_len + 2) // 4) + (input_len + 2) % 4 - 2
-    output_bytes = base64.b64decode(input_bytes + padding)
-    return output_bytes[:output_len]
-
-
 def encode_canonical_json(value):
     return json.dumps(
         value,
@@ -70,7 +57,9 @@ def encode_canonical_json(value):
     ).encode("UTF-8")
 
 
-def sign_json(json_object, signing_key, signing_name):
+def sign_json(
+    json_object: Any, signing_key: signedjson.types.SigningKey, signing_name: str
+) -> Any:
     signatures = json_object.pop("signatures", {})
     unsigned = json_object.pop("unsigned", None)
 
@@ -87,43 +76,14 @@ def sign_json(json_object, signing_key, signing_name):
     return json_object
 
 
-NACL_ED25519 = "ed25519"
-
-
-def decode_signing_key_base64(algorithm, version, key_base64):
-    """Decode a base64 encoded signing key
-    Args:
-        algorithm (str): The algorithm the key is for (currently "ed25519").
-        version (str): Identifies this key out of the keys for this entity.
-        key_base64 (str): Base64 encoded bytes of the key.
-    Returns:
-        A SigningKey object.
-    """
-    if algorithm == NACL_ED25519:
-        key_bytes = decode_base64(key_base64)
-        key = nacl.signing.SigningKey(key_bytes)
-        key.version = version
-        key.alg = NACL_ED25519
-        return key
-    else:
-        raise ValueError("Unsupported algorithm %s" % (algorithm,))
-
-
-def read_signing_keys(stream):
-    """Reads a list of keys from a stream
-    Args:
-        stream : A stream to iterate for keys.
-    Returns:
-        list of SigningKey objects.
-    """
-    keys = []
-    for line in stream:
-        algorithm, version, key_base64 = line.split()
-        keys.append(decode_signing_key_base64(algorithm, version, key_base64))
-    return keys
-
-
-def request_json(method, origin_name, origin_key, destination, path, content):
+def request(
+    method: Optional[str],
+    origin_name: str,
+    origin_key: signedjson.types.SigningKey,
+    destination: str,
+    path: str,
+    content: Optional[str],
+) -> requests.Response:
     if method is None:
         if content is None:
             method = "GET"
@@ -160,11 +120,14 @@ def request_json(method, origin_name, origin_key, destination, path, content):
     if method == "POST":
         headers["Content-Type"] = "application/json"
 
-    result = s.request(
-        method=method, url=dest, headers=headers, verify=False, data=content
+    return s.request(
+        method=method,
+        url=dest,
+        headers=headers,
+        verify=False,
+        data=content,
+        stream=True,
     )
-    sys.stderr.write("Status Code: %d\n" % (result.status_code,))
-    return result.json()
 
 
 def main():
@@ -212,37 +175,53 @@ def main():
     parser.add_argument("--body", help="Data to send as the body of the HTTP request")
 
     parser.add_argument(
-        "path", help="request path. We will add '/_matrix/federation/v1/' to this."
+        "path", help="request path, including the '/_matrix/federation/...' prefix."
     )
 
     args = parser.parse_args()
 
-    if not args.server_name or not args.signing_key_path:
+    args.signing_key = None
+    if args.signing_key_path:
+        with open(args.signing_key_path) as f:
+            args.signing_key = f.readline()
+
+    if not args.server_name or not args.signing_key:
         read_args_from_config(args)
 
-    with open(args.signing_key_path) as f:
-        key = read_signing_keys(f)[0]
+    algorithm, version, key_base64 = args.signing_key.split()
+    key = signedjson.key.decode_signing_key_base64(algorithm, version, key_base64)
 
-    result = request_json(
+    result = request(
         args.method,
         args.server_name,
         key,
         args.destination,
-        "/_matrix/federation/v1/" + args.path,
+        args.path,
         content=args.body,
     )
 
-    json.dump(result, sys.stdout)
+    sys.stderr.write("Status Code: %d\n" % (result.status_code,))
+
+    for chunk in result.iter_content():
+        # we write raw utf8 to stdout.
+        sys.stdout.buffer.write(chunk)
+
     print("")
 
 
 def read_args_from_config(args):
     with open(args.config, "r") as fh:
         config = yaml.safe_load(fh)
+
         if not args.server_name:
             args.server_name = config["server_name"]
-        if not args.signing_key_path:
-            args.signing_key_path = config["signing_key_path"]
+
+        if not args.signing_key:
+            if "signing_key" in config:
+                args.signing_key = config["signing_key"]
+            else:
+                with open(config["signing_key_path"]) as f:
+                    args.signing_key = f.readline()
 
 
 class MatrixConnectionAdapter(HTTPAdapter):
@@ -305,7 +284,7 @@ class MatrixConnectionAdapter(HTTPAdapter):
         url = urlparse.urlunparse(
             ("https", netloc, parsed.path, parsed.params, parsed.query, parsed.fragment)
         )
-        return super(MatrixConnectionAdapter, self).get_connection(url, proxies)
+        return super().get_connection(url, proxies)
 
 
 if __name__ == "__main__":

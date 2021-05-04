@@ -1,15 +1,11 @@
 #!/usr/bin/env python
-from __future__ import print_function
-from argparse import ArgumentParser
+
 import json
-import requests
 import sys
 import urllib
+from argparse import ArgumentParser
 
-try:
-    raw_input
-except NameError:  # Python 3
-    raw_input = input
+import requests
 
 
 def _mkurl(template, kws):
@@ -56,7 +52,7 @@ def main(hs, room_id, access_token, user_id_prefix, why):
     print("The following user IDs will be kicked from %s" % room_name)
     for uid in kick_list:
         print(uid)
-    doit = raw_input("Continue? [Y]es\n")
+    doit = input("Continue? [Y]es\n")
     if len(doit) > 0 and doit.lower() == "y":
         print("Kicking members...")
         # encode them all

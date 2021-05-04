@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector
 #
@@ -14,16 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from __future__ import print_function
-
 import argparse
 import getpass
 import hashlib
 import hmac
 import logging
 import sys
-
-from six.moves import input
 
 import requests as _requests
 import yaml
@@ -41,7 +36,7 @@ def request_registration(
     exit=sys.exit,
 ):
 
-    url = "%s/_matrix/client/r0/admin/register" % (server_location,)
+    url = "%s/_synapse/admin/v1/register" % (server_location.rstrip("/"),)
 
     # Get the nonce
     r = requests.get(url, verify=False)
@@ -144,8 +139,8 @@ def main():
     logging.captureWarnings(True)
 
     parser = argparse.ArgumentParser(
-        description="Used to register new users with a given home server when"
-        " registration has been disabled. The home server must be"
+        description="Used to register new users with a given homeserver when"
+        " registration has been disabled. The homeserver must be"
         " configured with the 'registration_shared_secret' option"
         " set."
     )
@@ -202,7 +197,7 @@ def main():
         "server_url",
         default="https://localhost:8448",
         nargs="?",
-        help="URL to use to talk to the home server. Defaults to "
+        help="URL to use to talk to the homeserver. Defaults to "
         " 'https://localhost:8448'.",
     )
 
