@@ -1266,11 +1266,11 @@ class PresenceHandler(BasePresenceHandler):
 
         # Construct sets for all the local users and remote hosts that were
         # already in the room
-        prev_local_users = set()
+        prev_local_users = []
         prev_remote_hosts = set()
         for user_id in prev_users:
             if self.is_mine_id(user_id):
-                prev_local_users.add(user_id)
+                prev_local_users.append(user_id)
             else:
                 prev_remote_hosts.add(get_domain_from_id(user_id))
 
@@ -1278,11 +1278,11 @@ class PresenceHandler(BasePresenceHandler):
         # that were *not* already in the room. Care needs to be taken with the
         # calculating the remote hosts, as a host may have already been in the
         # room even if there is a newly joined user from that host.
-        newly_joined_local_users = set()
+        newly_joined_local_users = []
         newly_joined_remote_hosts = set()
         for user_id in newly_joined_users:
             if self.is_mine_id(user_id):
-                newly_joined_local_users.add(user_id)
+                newly_joined_local_users.append(user_id)
             else:
                 host = get_domain_from_id(user_id)
                 if host not in prev_remote_hosts:
