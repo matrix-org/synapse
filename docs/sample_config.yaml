@@ -158,6 +158,8 @@ presence:
 # A value of `[1s, 10s, 30s]` indicates that a second must pass between consecutive
 # generation 0 GCs, etc.
 #
+# Defaults to `[1s, 10s, 30s]`.
+#
 #gc_min_interval: [0.5s, 30s, 1m]
 
 # Set the limit on the returned events in the timeline in the get

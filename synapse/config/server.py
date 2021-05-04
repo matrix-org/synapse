@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 import yaml
@@ -924,6 +924,8 @@ class ServerConfig(Config):
         # A value of `[1s, 10s, 30s]` indicates that a second must pass between consecutive
         # generation 0 GCs, etc.
         #
+        # Defaults to `[1s, 10s, 30s]`.
+        #
         #gc_min_interval: [0.5s, 30s, 1m]
 
         # Set the limit on the returned events in the timeline in the get
@@ -1314,17 +1316,18 @@ class ServerConfig(Config):
             help="Turn on the twisted telnet manhole service on the given port.",
         )
 
-    def read_gc_intervals(self, durations):
-        """Reads the three durations for the GC min interval option."""
+    def read_gc_intervals(self, durations) -> Optional[Tuple[float, float, float]]:
+        """Reads the three durations for the GC min interval option, returning seconds."""
         if durations is None:
             return None
+
         try:
             if len(durations) != 3:
                 raise ValueError()
             return (
-                self.parse_duration(durations[0]),
-                self.parse_duration(durations[1]),
-                self.parse_duration(durations[2]),
+                self.parse_duration(durations[0]) / 1000,
+                self.parse_duration(durations[1]) / 1000,
+                self.parse_duration(durations[2]) / 1000,
             )
         except Exception:
             raise ConfigError(

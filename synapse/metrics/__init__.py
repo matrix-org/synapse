@@ -537,10 +537,10 @@ REGISTRY.register(ReactorLastSeenMetric())
 
 # The minimum time in seconds between GCs for each generation, regardless of the current GC
 # thresholds and counts.
-MIN_TIME_BETWEEN_GCS = (1, 10, 30)
+MIN_TIME_BETWEEN_GCS = (1.0, 10.0, 30.0)
 
 # The time (in seconds since the epoch) of the last time we did a GC for each generation.
-_last_gc = [0, 0, 0]
+_last_gc = [0.0, 0.0, 0.0]
 
 
 def runUntilCurrentTimer(reactor, func):
@@ -601,7 +601,7 @@ def runUntilCurrentTimer(reactor, func):
                 unreachable = gc.collect(i)
                 end = time.time()
 
-                _last_gc[i] = int(end)
+                _last_gc[i] = end
 
                 gc_time.labels(i).observe(end - start)
                 gc_unreachable.labels(i).set(unreachable)
