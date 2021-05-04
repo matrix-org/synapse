@@ -466,7 +466,9 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
     def test_invalid_user_id_length(self):
         invalid_user_id = "x" * 256
-        self.get_failure(self.handler.register(localpart=invalid_user_id), SynapseError)
+        self.get_failure(
+            self.handler.register_user(localpart=invalid_user_id), SynapseError
+        )
 
     def test_spam_checker_deny(self):
         """A spam checker can deny registration, which results in an error."""
@@ -560,8 +562,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
               one will be randomly generated.
         Returns:
             A tuple of (user_id, access_token).
-        Raises:
-            RegistrationError if there was a problem registering.
         """
         if localpart is None:
             raise SynapseError(400, "Request must include user id")
