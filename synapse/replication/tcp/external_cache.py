@@ -36,7 +36,7 @@ get_counter = Counter(
 )
 
 response_timer = Histogram(
-    "synapse_external_cache_response_time",
+    "synapse_external_cache_response_time_seconds",
     "sec",
     labelnames=["method"],
     buckets=(
