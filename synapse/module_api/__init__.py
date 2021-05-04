@@ -50,6 +50,7 @@ class ModuleApi:
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
+        self._state = hs.get_state_handler()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
@@ -399,11 +400,9 @@ class ModuleApi:
         Note that this method can only be run on the main or federation_sender worker
         processes.
         """
-        if not self._hs.should_send_federation():
-            raise Exception(
-                "send_local_online_presence_to can only be run "
-                "on processes that send federation",
-            )
+        # We pull out the presence handler here to break a cyclic
+        # dependency between the presence router and module API.
+        presence_handler = self._hs.get_presence_handler()
 
         local_users = set()
         remote_users = set()
@@ -412,6 +411,12 @@ class ModuleApi:
                 local_users.add(user)
             else:
                 remote_users.add(user)
+
+        if remote_users and not self._hs.should_send_federation():
+            raise Exception(
+                "send_local_online_presence_to can only be called with remote users "
+                "on processes that send federation",
+            )
 
         if local_users:
             # Force a presence initial_sync for these users next time they sync.
@@ -424,11 +429,9 @@ class ModuleApi:
                 UserID.from_string(user), from_key=None, include_offline=False
             )
 
-            # Send to remote destinations
-            await make_deferred_yieldable(
-                # We pull the federation sender here as we can only do so on workers
-                # that support sending presence
-                self._hs.get_federation_sender().send_presence(presence_events)
+            # Send to remote destinations.
+            await presence_handler.maybe_send_presence_to_interested_destinations(
+                presence_events
             )
 
 

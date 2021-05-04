@@ -137,7 +137,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
-        self.assertTrue(log["request"].startswith("name@"))
+        self.assertEqual(log["request"], "name")
 
     def test_with_request_context(self):
         """
@@ -164,7 +164,9 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         # Also set the requester to ensure the processing works.
         request.requester = "@foo:test"
 
-        with LoggingContext(parent_context=request.logcontext):
+        with LoggingContext(
+            request.get_request_id(), parent_context=request.logcontext
+        ):
             logger.info("Hello there, %s!", "wally")
 
         log = self.get_log_line()

@@ -140,7 +140,7 @@ if __name__ == "__main__":
 
     definitions = {}
     for directory in args.directories:
-        for root, dirs, files in os.walk(directory):
+        for root, _, files in os.walk(directory):
             for filename in files:
                 if filename.endswith(".py"):
                     filepath = os.path.join(root, filename)
