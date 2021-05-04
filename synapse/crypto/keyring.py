@@ -90,7 +90,6 @@ class VerifyJsonRequest:
     minimum_valid_until_ts = attr.ib(type=int)
     request_name = attr.ib(type=str)
     key_ids = attr.ib(init=False, type=List[str])
-    key_ready = attr.ib(default=attr.Factory(defer.Deferred), type=defer.Deferred)
 
     def __attrs_post_init__(self):
         self.key_ids = signature_ids(self.json_object, self.server_name)
@@ -696,37 +695,3 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
             keys.update(response_keys)
 
         return keys
-
-
-async def _handle_key_deferred(verify_request: VerifyJsonRequest) -> None:
-    """Waits for the key to become available, and then performs a verification
-
-    Args:
-        verify_request:
-
-    Raises:
-        SynapseError if there was a problem performing the verification
-    """
-    server_name = verify_request.server_name
-    with PreserveLoggingContext():
-        _, key_id, verify_key = await verify_request.key_ready
-
-    json_object = verify_request.json_object
-
-    try:
-        verify_signed_json(json_object, server_name, verify_key)
-    except SignatureVerifyException as e:
-        logger.debug(
-            "Error verifying signature for %s:%s:%s with key %s: %s",
-            server_name,
-            verify_key.alg,
-            verify_key.version,
-            encode_verify_key_base64(verify_key),
-            str(e),
-        )
-        raise SynapseError(
-            401,
-            "Invalid signature for server %s with key %s:%s: %s"
-            % (server_name, verify_key.alg, verify_key.version, str(e)),
-            Codes.UNAUTHORIZED,
-        )
