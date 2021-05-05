@@ -40,11 +40,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertTrue(
             {
                 "next_batch",
-                "rooms",
-                "presence",
-                "account_data",
-                "to_device",
-                "device_lists",
             }.issubset(set(channel.json_body.keys()))
         )
 
@@ -60,10 +55,6 @@ class FilterTestCase(unittest.HomeserverTestCase):
         self.assertTrue(
             {
                 "next_batch",
-                "rooms",
-                "account_data",
-                "to_device",
-                "device_lists",
             }.issubset(set(channel.json_body.keys()))
         )
 
