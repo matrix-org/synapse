@@ -12,15 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import ctypes
-import ctypes.util
 import functools
 import gc
 import itertools
 import logging
 import os
 import platform
-import re
 import threading
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Union
@@ -613,163 +610,6 @@ def runUntilCurrentTimer(reactor, func):
 
     return f
 
-
-def _setup_jemalloc_stats():
-    """Checks to see if jemalloc is loaded, and hooks up a collector to record
-    statistics exposed by jemalloc.
-    """
-
-    # Try to find the loaded jemalloc shared library, if any. We need to
-    # introspect into what is loaded, rather than loading whatever is on the
-    # path, as if we load a *different* jemalloc version things will seg fault.
-    pid = os.getpid()
-
-    # We're looking for a path at the end of the line that includes
-    # "libjemalloc".
-    regex = re.compile(r"/\S+/libjemalloc.*$")
-
-    jemalloc_path = None
-    with open(f"/proc/{pid}/maps") as f:
-        for line in f.readlines():
-            match = regex.search(line.strip())
-            if match:
-                jemalloc_path = match.group()
-
-    if not jemalloc_path:
-        # No loaded jemalloc was found.
-        return
-
-    jemalloc = ctypes.CDLL(jemalloc_path)
-
-    def _mallctl(
-        name: str, read: bool = True, write: Optional[int] = None
-    ) -> Optional[int]:
-        """Wrapper around `mallctl` for reading and writing integers to
-        jemalloc.
-
-        Args:
-            name: The name of the option to read from/write to.
-            read: Whether to try and read the value.
-            write: The value to write, if given.
-
-        Returns:
-            The value read if `read` is True, otherwise None.
-
-        Raises:
-            An exception if `mallctl` returns a non-zero error code.
-        """
-
-        input_var = None
-        input_var_ref = None
-        input_len_ref = None
-        if read:
-            input_var = ctypes.c_size_t(0)
-            input_len = ctypes.c_size_t(ctypes.sizeof(input_var))
-
-            input_var_ref = ctypes.byref(input_var)
-            input_len_ref = ctypes.byref(input_len)
-
-        write_var_ref = None
-        write_len = ctypes.c_size_t(0)
-        if write is not None:
-            write_var = ctypes.c_size_t(write)
-            write_len = ctypes.c_size_t(ctypes.sizeof(write_var))
-
-            write_var_ref = ctypes.byref(write_var)
-
-        # The interface is:
-        #
-        #   int mallctl(
-        #       const char *name,
-        #       void *oldp,
-        #       size_t *oldlenp,
-        #       void *newp,
-        #       size_t newlen
-        #   )
-        #
-        # Where oldp/oldlenp is a buffer where the old value will be written to
-        # (if not null), and newp/newlen is the buffer with the new value to set
-        # (if not null). Note that they're all references *except* newlen.
-        result = jemalloc.mallctl(
-            name.encode("ascii"),
-            input_var_ref,
-            input_len_ref,
-            write_var_ref,
-            write_len,
-        )
-
-        if result != 0:
-            raise Exception("Failed to call mallctl")
-
-        if input_var is None:
-            return None
-
-        return input_var.value
-
-    def _jemalloc_refresh_stats() -> None:
-        """Request that jemalloc updates its internal statistics. This needs to
-        be called before querying for stats, otherwise it will return stale
-        values.
-        """
-        try:
-            _mallctl("epoch", read=False, write=1)
-        except Exception:
-            pass
-
-    class JemallocCollector:
-        """Metrics for internal jemalloc stats."""
-
-        def collect(self):
-            _jemalloc_refresh_stats()
-
-            g = GaugeMetricFamily(
-                "jemalloc_stats_app_memory",
-                "The stats reported by jemalloc",
-                labels=["type"],
-            )
-
-            # Read the relevant global stats from jemalloc. Note that these may
-            # not be accurate if python is configured to use its internal small
-            # object allocator (which is on by default, disable by setting the
-            # env `PYTHONMALLOC=malloc`).
-            #
-            # See the jemalloc manpage for details about what each value means,
-            # roughly:
-            #   - allocated ─ Total number of bytes allocated by the app
-            #   - active ─ Total number of bytes in active pages allocated by
-            #     the application, this is bigger than `allocated`.
-            #   - resident ─ Maximum number of bytes in physically resident data
-            #     pages mapped by the allocator, comprising all pages dedicated
-            #     to allocator metadata, pages backing active allocations, and
-            #     unused dirty pages. This is bigger than `active`.
-            #   - mapped ─ Total number of bytes in active extents mapped by the
-            #     allocator.
-            #   - metadata ─ Total number of bytes dedicated to jemalloc
-            #     metadata.
-            for t in (
-                "allocated",
-                "active",
-                "resident",
-                "mapped",
-                "metadata",
-            ):
-                try:
-                    value = _mallctl(f"stats.{t}")
-                except Exception:
-                    # There was an error fetching the value, skip.
-                    continue
-
-                g.add_metric([t], value=value)
-
-            yield g
-
-    REGISTRY.register(JemallocCollector())
-
-
-try:
-    _setup_jemalloc_stats()
-except Exception:
-    logger.info("Failed to setup collector to record jemalloc stats.")
 
 try:
     # Ensure the reactor has all the attributes we expect
