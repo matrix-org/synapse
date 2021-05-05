@@ -18,8 +18,8 @@
 import logging
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
-import attr
 from prometheus_client import Counter
+from typing_extensions import TypedDict
 
 from synapse import types
 from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
@@ -56,13 +56,15 @@ login_counter = Counter(
     ["guest", "auth_provider"],
 )
 
-
-@attr.s(frozen=True, slots=True)
-class DeviceRegistrationResult:
-    device_id = attr.ib(type=str)
-    access_token = attr.ib(type=str)
-    valid_until_ms = attr.ib(type=Optional[int])
-    refresh_token = attr.ib(type=Optional[str])
+LoginDict = TypedDict(
+    "LoginDict",
+    {
+        "device_id": str,
+        "access_token": str,
+        "valid_until_ms": Optional[int],
+        "refresh_token": Optional[str],
+    },
+)
 
 
 class RegistrationHandler(BaseHandler):
@@ -708,10 +710,10 @@ class RegistrationHandler(BaseHandler):
         ).inc()
 
         return (
-            res.device_id,
-            res.access_token,
-            res.valid_until_ms,
-            res.refresh_token,
+            res["device_id"],
+            res["access_token"],
+            res["valid_until_ms"],
+            res["refresh_token"],
         )
 
     async def register_device_inner(
@@ -722,7 +724,7 @@ class RegistrationHandler(BaseHandler):
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
         should_issue_refresh_token: bool = False,
-    ) -> DeviceRegistrationResult:
+    ) -> LoginDict:
         """Helper for register_device
 
         Does the bits that need doing on the main process. Not for use outside this
@@ -767,12 +769,12 @@ class RegistrationHandler(BaseHandler):
                 refresh_token_id=refresh_token_id,
             )
 
-        return DeviceRegistrationResult(
-            device_id=registered_device_id,
-            access_token=access_token,
-            valid_until_ms=valid_until_ms,
-            refresh_token=refresh_token,
-        )
+        return {
+            "device_id": registered_device_id,
+            "access_token": access_token,
+            "valid_until_ms": valid_until_ms,
+            "refresh_token": refresh_token,
+        }
 
     async def post_registration_actions(
         self, user_id: str, auth_result: dict, access_token: Optional[str]
