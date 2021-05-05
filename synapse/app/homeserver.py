@@ -342,6 +342,9 @@ def setup(config_options):
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
+    if config.server.gc_seconds:
+        synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
+
     hs = SynapseHomeServer(
         config.server_name,
         config=config,

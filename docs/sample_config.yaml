@@ -152,6 +152,16 @@ presence:
 #
 #gc_thresholds: [700, 10, 10]
 
+# The minimum time in seconds between each GC for a generation, regardless of
+# the GC thresholds. This ensures that we don't do GC too frequently.
+#
+# A value of `[1s, 10s, 30s]` indicates that a second must pass between consecutive
+# generation 0 GCs, etc.
+#
+# Defaults to `[1s, 10s, 30s]`.
+#
+#gc_min_interval: [0.5s, 30s, 1m]
+
 # Set the limit on the returned events in the timeline in the get
 # and sync operations. The default value is 100. -1 means no upper limit.
 #
