@@ -17,7 +17,9 @@ import sys
 
 import psycopg2
 
-# Connect to postgres to create the base database.
+# a very simple replacment for `psql`, to make up for the lack of the postgres client
+# libraries in the synapse docker image.
+
 # We use "postgres" as a database because it's bound to exist and the "synapse" one
 # doesn't exist yet.
 db_conn = psycopg2.connect(
