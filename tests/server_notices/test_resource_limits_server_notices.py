@@ -306,8 +306,8 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
 
-        self.assertFalse(
-            "rooms" in channel.json_body, "Got invites without server notice"
+        self.assertNotIn(
+            "rooms", channel.json_body, "Got invites without server notice"
         )
 
     def test_invite_with_notice(self):

@@ -1,1 +1,1 @@
-Strip empty objects and list from the `/sync` response.
+Omit empty fields from the `/sync` response.  Contributed by @deepbluev7.
