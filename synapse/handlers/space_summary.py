@@ -332,7 +332,9 @@ class SpaceSummaryHandler:
         )
 
         # TODO: update once MSC1772 lands
-        room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
+        room_type = create_event.content.get(EventContentFields.ROOM_TYPE)
+        if not room_type:
+            room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
 
         entry = {
             "room_id": stats["room_id"],
