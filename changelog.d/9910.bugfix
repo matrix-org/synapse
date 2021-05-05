@@ -1,0 +1,1 @@
+Fix bug where user directory could get out of sync if room visibility and membership changed in quick succession.

@@ -1293,7 +1293,7 @@ class PresenceHandler(BasePresenceHandler):
 
             remote_host = get_domain_from_id(user_id)
 
-            users = await self.state.get_current_users_in_room(room_id)
+            users = await self.store.get_users_in_room(room_id)
             user_ids = list(filter(self.is_mine_id, users))
 
             states_d = await self.current_state_for_users(user_ids)
