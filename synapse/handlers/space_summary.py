@@ -344,7 +344,7 @@ class SpaceSummaryHandler:
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
-            "origin_server_ts": create_event.origin_server_ts,
+            "creation_ts": create_event.origin_server_ts,
             "room_type": room_type,
         }
 
