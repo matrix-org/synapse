@@ -15,9 +15,10 @@
 # limitations under the License.
 
 import abc
+import attr
 import os
 import zlib
-from typing import Dict, Optional, Tuple, Type
+from typing import Dict, Optional, Tuple, Type, Union
 
 from unpaddedbase64 import encode_base64
 
@@ -39,7 +40,7 @@ from synapse.util.stringutils import strtobool
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
 
 
-_PRESET_ZDICT = b""""auth_events":[],"prev_events":[],"type":"m.room.create","room_id":,"sender":,"content":"room_version":"creator":"depth":"prev_state":"state_key":""origin":"origin_server_ts":"hashes":{"sha256":"signatures":,"unsigned":{"age_ts":"""
+_PRESET_ZDICT = b"""{"auth_events":[],"prev_events":[],"type":"m.room.member",m.room.message"room_id":,"sender":,"content":{"msgtype":"m.text","body":""room_version":"creator":"depth":"prev_state":"state_key":""origin":"origin_server_ts":"hashes":{"sha256":"signatures":,"unsigned":{"age_ts":"ed25519"""
 
 
 def _encode_dict(d: JsonDict) -> bytes:
@@ -227,6 +228,28 @@ class _EventInternalMetadata:
         return self._dict.get("redacted", False)
 
 
+@attr.s(slots=True, auto_attribs=True)
+class _Signatures:
+    _signatures_bytes: bytes
+
+    @staticmethod
+    def from_dict(signature_dict: JsonDict) -> "_Signatures":
+        return _Signatures(_encode_dict(signature_dict))
+
+    def get_dict(self) -> JsonDict:
+        return _decode_dict(self._signatures_bytes)
+
+    def update(self, other: Union[JsonDict, "_Signatures"]):
+        if isinstance(other, _Signatures):
+            other_dict = _decode_dict(other)
+        else:
+            other_dict = other
+
+        signatures = self.get_dict()
+        signatures.update(other_dict)
+        self._signatures_bytes = _encode_dict(self._signatures_bytes)
+
+
 class EventBase(metaclass=abc.ABCMeta):
     __slots__ = [
         "room_version",
@@ -268,7 +291,7 @@ class EventBase(metaclass=abc.ABCMeta):
         assert room_version.event_format == self.format_version
 
         self.room_version = room_version
-        self.signatures = signatures
+        self.signatures = _Signatures.from_dict(signatures)
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
@@ -276,8 +299,6 @@ class EventBase(metaclass=abc.ABCMeta):
 
         self.auth_events = event_dict["auth_events"]
         self.depth = event_dict["depth"]
-        self.content = event_dict["content"]
-        self.hashes = event_dict["hashes"]
         self.origin = event_dict["origin"]
         self.origin_server_ts = event_dict["origin_server_ts"]
         self.prev_events = event_dict["prev_events"]
@@ -292,6 +313,14 @@ class EventBase(metaclass=abc.ABCMeta):
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
     @property
+    def content(self) -> JsonDict:
+        return self.get_dict()["content"]
+
+    @property
+    def hashes(self) -> JsonDict:
+        return self.get_dict()["hashes"]
+
+    @property
     def event_id(self) -> str:
         raise NotImplementedError()
 
@@ -304,7 +333,9 @@ class EventBase(metaclass=abc.ABCMeta):
 
     def get_dict(self) -> JsonDict:
         d = _decode_dict(self._encoded_dict)
-        d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
+        d.update(
+            {"signatures": self.signatures.get_dict(), "unsigned": dict(self.unsigned)}
+        )
 
         return d
 
