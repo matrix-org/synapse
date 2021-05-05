@@ -1,3 +1,12 @@
+Synapse 1.33.0 (2021-05-05)
+===========================
+
+Features
+--------
+
+- Build Debian packages for Ubuntu 21.04 (Hirsute Hippo). ([\#9909](https://github.com/matrix-org/synapse/issues/9909))
+
+
 Synapse 1.33.0rc2 (2021-04-29)
 ==============================
 
