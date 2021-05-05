@@ -73,9 +73,9 @@ class FederationBase:
               * throws a SynapseError if the signature check failed.
             The deferreds run their callbacks in the sentinel
         """
-        deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
-
         ctx = current_context()
+
+        deferreds = _check_sigs_on_pdus(self.keyring, room_version, pdus)
 
         @defer.inlineCallbacks
         def callback(_, pdu: EventBase):
