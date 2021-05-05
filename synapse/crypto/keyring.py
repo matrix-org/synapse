@@ -43,7 +43,11 @@ from synapse.api.errors import (
 from synapse.config.key import TrustedKeyServer
 from synapse.events import EventBase
 from synapse.events.utils import prune_event_dict
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    PreserveLoggingContext,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict
@@ -158,7 +162,8 @@ class _Queue:
                     results = await self.process_items(values)
 
                     for value, deferred in next_values:
-                        deferred.callback(results.get(value.server_name, {}))
+                        with PreserveLoggingContext():
+                            deferred.callback(results.get(value.server_name, {}))
 
                 except Exception as e:
                     for _, deferred in next_values:
