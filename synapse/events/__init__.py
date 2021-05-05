@@ -230,21 +230,22 @@ class EventBase(metaclass=abc.ABCMeta):
 
         self._dict = event_dict
 
-        self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
+        self.auth_events = event_dict["auth_events"]
+        self.depth = event_dict["depth"]
+        self.content = event_dict["content"]
+        self.hashes = event_dict["hashes"]
+        self.origin = event_dict["origin"]
+        self.origin_server_ts = event_dict["origin_server_ts"]
+        self.prev_events = event_dict["prev_events"]
+        self.redacts = event_dict.get("redacts")
+        self.room_id = event_dict["room_id"]
+        self.sender = event_dict["sender"]
+        self.type = event_dict["type"]
+        self.user_id = event_dict["sender"]
+        if "state_key" in event_dict:
+            self.state_key = event_dict["state_key"]
 
-    auth_events = DictProperty("auth_events")
-    depth = DictProperty("depth")
-    content = DictProperty("content")
-    hashes = DictProperty("hashes")
-    origin = DictProperty("origin")
-    origin_server_ts = DictProperty("origin_server_ts")
-    prev_events = DictProperty("prev_events")
-    redacts = DefaultDictProperty("redacts", None)
-    room_id = DictProperty("room_id")
-    sender = DictProperty("sender")
-    state_key = DictProperty("state_key")
-    type = DictProperty("type")
-    user_id = DictProperty("sender")
+        self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
     @property
     def event_id(self) -> str:

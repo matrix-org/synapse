@@ -1108,7 +1108,7 @@ class EventCreationHandler:
             # it's not a self-redaction (to avoid having to look up whether the
             # user is actually admin or not).
             is_admin_redaction = False
-            if event.type == EventTypes.Redaction:
+            if event.type == EventTypes.Redaction and event.redacts:
                 original_event = await self.store.get_event(
                     event.redacts,
                     redact_behaviour=EventRedactBehaviour.AS_IS,
@@ -1195,7 +1195,7 @@ class EventCreationHandler:
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(returned_invite.signatures)
 
-        if event.type == EventTypes.Redaction:
+        if event.type == EventTypes.Redaction and event.redacts:
             original_event = await self.store.get_event(
                 event.redacts,
                 redact_behaviour=EventRedactBehaviour.AS_IS,
