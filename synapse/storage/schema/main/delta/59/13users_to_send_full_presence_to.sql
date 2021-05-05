@@ -32,7 +32,3 @@ CREATE TABLE IF NOT EXISTS users_to_send_full_presence_to(
     FOREIGN KEY (user_id)
         REFERENCES users (name)
 );
-
--- For checking expired entries
-CREATE INDEX IF NOT EXISTS users_to_send_full_presence_to_added_ms
-    ON users_to_send_full_presence_to(added_ms);
