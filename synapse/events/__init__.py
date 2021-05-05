@@ -239,8 +239,8 @@ class _Signatures:
     def get_dict(self) -> JsonDict:
         return _decode_dict(self._signatures_bytes)
 
-    def get(self, server_name):
-        return self.get_dict().get(server_name)
+    def get(self, server_name, default=None):
+        return self.get_dict().get(server_name, default)
 
     def update(self, other: Union[JsonDict, "_Signatures"]):
         if isinstance(other, _Signatures):
