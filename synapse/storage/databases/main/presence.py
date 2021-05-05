@@ -210,60 +210,60 @@ class PresenceStore(SQLBaseStore):
 
         return {row["user_id"]: UserPresenceState(**row) for row in rows}
 
-    async def is_user_in_users_to_send_full_presence_to(self, user_id: str) -> bool:
-        """Check whether the given user is one we need to send full presence to.
+    async def should_user_receive_full_presence_with_token(
+        self,
+        user_id: str,
+        from_token: int,
+    ) -> bool:
+        """Check whether the given user should receive full presence using the stream token
+        they're updating from.
 
         Args:
             user_id: The ID of the user to check.
+            from_token: The stream token included in their /sync token.
 
         Returns:
             True if the user should have full presence sent to them, False otherwise.
         """
 
-        def _is_user_in_users_to_send_full_presence_to_txn(txn):
+        def _should_user_receive_full_presence_with_token_txn(txn):
             sql = """
                 SELECT 1 FROM users_to_send_full_presence_to
                 WHERE user_id = ?
+                AND presence_stream_id >= ?
             """
-            txn.execute(sql, (user_id,))
+            txn.execute(sql, (user_id, from_token))
             return bool(txn.fetchone())
 
         return await self.db_pool.runInteraction(
-            "is_user_in_users_to_send_full_presence_to",
-            _is_user_in_users_to_send_full_presence_to_txn,
+            "should_user_receive_full_presence_with_token",
+            _should_user_receive_full_presence_with_token_txn,
         )
 
     async def add_users_to_send_full_presence_to(self, user_ids: Iterable[str]):
         """Adds to the list of users who should receive a full snapshot of presence
         upon their next sync.
 
-        Entries are kept for at least USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS,
-        and are culled whenever this method is called.
-
         Args:
             user_ids: An iterable of user IDs.
         """
-        # Add user entries to the table
+
+        # Add user entries to the table, updating the presence_stream_id column if the user already
+        # exists in the table.
         await self.db_pool.simple_upsert_many(
             table="users_to_send_full_presence_to",
             key_names=("user_id",),
             key_values=[(user_id,) for user_id in user_ids],
-            value_names=(),
-            value_values=(),
+            value_names=("presence_stream_id",),
+            # We save the current presence stream ID token along with the user ID entry so
+            # that when a user /sync's, even if they syncing multiple times across separate
+            # devices at different times, each device will receive full presence once - when
+            # the presence stream ID in their sync token is less than the one in the table
+            # for their user ID.
+            value_values=(
+                (self._presence_id_gen.get_current_token(),) for _ in user_ids
+            ),
             desc="add_users_to_send_full_presence_to",
-        )
-
-    async def remove_user_from_users_to_send_full_presence_to(self, user_id: str):
-        """Removes a user from those to send full presence to. This should only be done
-        once we have sent full presence to them following a successful sync.
-
-        Args:
-            user_id: The ID of the user to remove from the table.
-        """
-        await self.db_pool.simple_delete(
-            table="users_to_send_full_presence_to",
-            keyvalues={"user_id": user_id},
-            desc="remove_user_from_users_to_send_full_presence_to",
         )
 
     async def get_presence_for_all_users(

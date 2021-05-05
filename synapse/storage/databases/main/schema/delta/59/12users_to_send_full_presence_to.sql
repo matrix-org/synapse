@@ -24,6 +24,11 @@
 CREATE TABLE IF NOT EXISTS users_to_send_full_presence_to(
     -- The user ID to send full presence to.
     user_id TEXT PRIMARY KEY,
+    -- A presence stream ID token - the current presence stream token when the row was last upserted.
+    -- If a user calls /sync and this token is part of the update they're to receive, we also include
+    -- full user presence in the response.
+    -- This allows multiple devices for a user to receive full presence whenever they next call /sync.
+    presence_stream_id BIGINT,
     FOREIGN KEY (user_id)
         REFERENCES users (name)
 );

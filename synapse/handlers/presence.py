@@ -1412,21 +1412,21 @@ class PresenceEventSource:
         user_id = user.to_string()
         stream_change_cache = self.store.presence_stream_cache
 
-        # Check if this user should receive all current, online user presence
-        user_in_users_to_send_full_presence_to = (
-            await self.store.is_user_in_users_to_send_full_presence_to(user_id)
-        )
-
         with Measure(self.clock, "presence.get_new_events"):
-            if user_in_users_to_send_full_presence_to:
-                # This user has been specified by a module to receive all current, online
-                # user presence. Removing from_key and setting include_offline to false
-                # will do effectively this.
-                from_key = None
-                include_offline = False
-
             if from_key is not None:
                 from_key = int(from_key)
+
+                # Check if this user should receive all current, online user presence. We only
+                # bother to do this if from_key is set, as otherwise the user will receive all
+                # user presence anyways.
+                if await self.store.should_user_receive_full_presence_with_token(
+                    user_id, from_key
+                ):
+                    # This user has been specified by a module to receive all current, online
+                    # user presence. Removing from_key and setting include_offline to false
+                    # will do effectively this.
+                    from_key = None
+                    include_offline = False
 
             max_token = self.store.get_current_presence_token()
             if from_key == max_token:
@@ -1460,12 +1460,6 @@ class PresenceEventSource:
                 presence_updates = await self._filter_all_presence_updates_for_user(
                     user_id, include_offline, from_key
                 )
-
-                # Remove the user from the list of users to receive all presence
-                if user_in_users_to_send_full_presence_to:
-                    await self.store.remove_user_from_users_to_send_full_presence_to(
-                        user_id
-                    )
 
                 return presence_updates, max_token
 
@@ -1515,10 +1509,6 @@ class PresenceEventSource:
                 interested_and_updated_users
             )
             presence_updates = list(users_to_state.values())
-
-        # Remove the user from the list of users to receive all presence
-        if user_in_users_to_send_full_presence_to:
-            await self.store.remove_user_from_users_to_send_full_presence_to(user_id)
 
         if not include_offline:
             # Filter out offline presence states
