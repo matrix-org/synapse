@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y \
     openssl \
     rustc \
     zlib1g-dev \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy just what we need to pip install
@@ -54,6 +55,11 @@ COPY synapse /synapse/synapse/
 #
 # This is aiming at installing only the `packages=find_packages(...)` from `setup.py
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
+
+# Install our local dev copy of signedjson
+COPY python-signedjson /python-signedjson/
+RUN cd /python-signedjson && pip install --prefix="/install" . && cd ..
+
 
 ###
 ### Stage 1: runtime
@@ -81,6 +87,10 @@ RUN apt-get update && apt-get install -y \
 COPY --from=builder /install /usr/local
 COPY ./docker/start.py /start.py
 COPY ./docker/conf /conf
+
+RUN python -c "import signedjson; print(signedjson.__file__)"
+RUN python -c "import signedjson; print(signedjson.__version__)"
+RUN cat $(python -c "import signedjson; print(signedjson.__file__)")
 
 VOLUME ["/data"]
 

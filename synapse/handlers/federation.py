@@ -2428,9 +2428,9 @@ class FederationHandler(BaseHandler):
             updated context
         """
         event_auth_events = set(event.auth_event_ids())
-        logger.info(
-            "event.event_id=%s event_auth_events=%s", event.event_id, event_auth_events
-        )
+        # logger.info(
+        #     "event.event_id=%s event_auth_events=%s", event.event_id, event_auth_events
+        # )
 
         # missing_auth is the set of the event's auth_events which we don't yet have
         # in auth_events.

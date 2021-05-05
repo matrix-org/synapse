@@ -359,11 +359,19 @@ class EventsWorkerStore(SQLBaseStore):
             set(event_ids), allow_rejected=allow_rejected
         )
 
+        # logger.info("get_events_as_list event_entry_map=%s", event_entry_map)
+
         events = []
         for event_id in event_ids:
             entry = event_entry_map.get(event_id, None)
             if not entry:
                 continue
+
+            # logger.info(
+            #     "get_events_as_list entry=%s sig=%s",
+            #     entry.event,
+            #     entry.event.signatures,
+            # )
 
             if not allow_rejected:
                 assert not entry.event.rejected_reason, (

@@ -602,7 +602,13 @@ class FederationServer(FederationBase):
 
             time_now = self._clock.time_msec()
             auth_pdus = await self.handler.on_event_auth(event_id)
+            logger.info("on_event_auth auth_pdus=%s", auth_pdus)
+            logger.info(
+                "on_event_auth signatures=%s", [a.signatures for a in auth_pdus]
+            )
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
+            logger.info("on_event_auth res=%s", res)
+
         return 200, res
 
     @log_function

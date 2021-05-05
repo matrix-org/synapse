@@ -33,7 +33,7 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
 fi
 
 # Build the base Synapse image from the local checkout
-docker build -t matrixdotorg/synapse -f docker/Dockerfile .
+docker build --progress=plain -t matrixdotorg/synapse -f docker/Dockerfile .
 # Build the Synapse monolith image from Complement, based on the above image we just built
 docker build -t complement-synapse -f "$COMPLEMENT_DIR/dockerfiles/Synapse.Dockerfile" "$COMPLEMENT_DIR/dockerfiles"
 

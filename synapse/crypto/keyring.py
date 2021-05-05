@@ -895,6 +895,13 @@ async def _handle_key_deferred(verify_request: VerifyJsonRequest) -> None:
 
     json_object = verify_request.json_object
 
+    logger.info(
+        "keyring _handle_key_deferred verify_request=%s, verify_key.version=%s, verify_key=%s, encode_verify_key_base64=%s",
+        verify_request,
+        verify_key.version,
+        verify_key,
+        encode_verify_key_base64(verify_key),
+    )
     try:
         verify_signed_json(json_object, server_name, verify_key)
     except SignatureVerifyException as e:
