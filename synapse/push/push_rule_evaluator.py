@@ -125,7 +125,7 @@ class PushRuleEvaluatorForEvent:
         self._power_levels = power_levels
 
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
-        self._value_cache = _flatten_dict(event)
+        self._value_cache = _flatten_dict(event.get_dict())
 
     def matches(
         self, condition: Dict[str, Any], user_id: str, display_name: str
@@ -271,7 +271,7 @@ def _re_word_boundary(r: str) -> str:
 
 
 def _flatten_dict(
-    d: Union[EventBase, dict],
+    d: dict,
     prefix: Optional[List[str]] = None,
     result: Optional[Dict[str, str]] = None,
 ) -> Dict[str, str]:

@@ -418,7 +418,9 @@ def get_send_level(
 def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
     power_levels_event = _get_power_level_event(auth_events)
 
-    send_level = get_send_level(event.type, event.get("state_key"), power_levels_event)
+    send_level = get_send_level(
+        event.type, getattr(event, "state_key", None), power_levels_event
+    )
     user_level = get_user_power_level(event.user_id, auth_events)
 
     if user_level < send_level:

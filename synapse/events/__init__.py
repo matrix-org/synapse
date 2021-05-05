@@ -263,12 +263,6 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return d
 
-    def get(self, key, default=None):
-        return self._dict.get(key, default)
-
-    def get_internal_metadata_dict(self):
-        return self.internal_metadata.get_dict()
-
     def get_pdu_json(self, time_now=None) -> JsonDict:
         pdu_json = self.get_dict()
 
@@ -284,18 +278,6 @@ class EventBase(metaclass=abc.ABCMeta):
 
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
-
-    def __getitem__(self, field):
-        return self._dict[field]
-
-    def __contains__(self, field):
-        return field in self._dict
-
-    def items(self):
-        return list(self._dict.items())
-
-    def keys(self):
-        return self._dict.keys()
 
     def prev_event_ids(self):
         """Returns the list of prev event IDs. The order matches the order
@@ -374,9 +356,9 @@ class FrozenEvent(EventBase):
 
     def __repr__(self):
         return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
-            self.get("event_id", None),
-            self.get("type", None),
-            self.get("state_key", None),
+            self.event_id,
+            self.type,
+            getattr(self, "state_key", None),
         )
 
 
@@ -461,8 +443,8 @@ class FrozenEventV2(EventBase):
         return "<%s event_id=%r, type=%r, state_key=%r>" % (
             self.__class__.__name__,
             self.event_id,
-            self.get("type", None),
-            self.get("state_key", None),
+            self.type,
+            self.state_key if self.is_state() else None,
         )
 
 

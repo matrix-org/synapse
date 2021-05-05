@@ -277,7 +277,7 @@ class Notifier:
             event_pos=event_pos,
             room_id=event.room_id,
             event_type=event.type,
-            state_key=event.get("state_key"),
+            state_key=getattr(event, "state_key", None),
             membership=event.content.get("membership"),
             max_room_stream_token=max_room_stream_token,
             extra_users=extra_users or [],

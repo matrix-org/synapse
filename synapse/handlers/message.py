@@ -1401,7 +1401,7 @@ class EventCreationHandler:
         ]
 
         for k in immutable_fields:
-            if getattr(builder, k, None) != original_event.get(k):
+            if getattr(builder, k, None) != getattr(original_event, k, None):
                 raise Exception(
                     "Third party rules module created an invalid event: "
                     "cannot change field " + k

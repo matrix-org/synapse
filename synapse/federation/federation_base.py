@@ -90,9 +90,7 @@ class FederationBase:
                     # received event was probably a redacted copy (but we then use our
                     # *actual* redacted copy to be on the safe side.)
                     redacted_event = prune_event(pdu)
-                    if set(redacted_event.keys()) == set(pdu.keys()) and set(
-                        redacted_event.content.keys()
-                    ) == set(pdu.content.keys()):
+                    if set(redacted_event.content.keys()) == set(pdu.content.keys()):
                         logger.info(
                             "Event %s seems to have been redacted; using our redacted "
                             "copy",
