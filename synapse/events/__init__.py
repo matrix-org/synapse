@@ -328,7 +328,7 @@ class EventBase(metaclass=abc.ABCMeta):
         self._encoded_dict = _encode_dict(event_dict)
 
         self.depth = event_dict["depth"]
-        self.origin = event_dict["origin"]
+        self.origin = event_dict.get("origin")
         self.origin_server_ts = event_dict["origin_server_ts"]
         self.redacts = event_dict.get("redacts")
         self.room_id = event_dict["room_id"]
