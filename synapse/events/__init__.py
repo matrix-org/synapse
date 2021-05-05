@@ -16,12 +16,14 @@
 
 import abc
 import os
+import zlib
 from typing import Dict, Optional, Tuple, Type
 
 from unpaddedbase64 import encode_base64
 
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict, RoomStreamToken
+from synapse.util import json_decoder, json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -35,6 +37,26 @@ from synapse.util.stringutils import strtobool
 # homeserver object itself.
 
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
+
+
+_PRESET_ZDICT = b""""auth_events":[],"prev_events":[],"type":"m.room.create","room_id":,"sender":,"content":"room_version":"creator":"depth":"prev_state":"state_key":""origin":"origin_server_ts":"hashes":{"sha256":"signatures":,"unsigned":{"age_ts":"""
+
+
+def _encode_dict(d: JsonDict) -> bytes:
+    json_bytes = json_encoder.encode(d).encode("utf-8")
+    c = zlib.compressobj(1, zdict=_PRESET_ZDICT)
+    result_bytes = c.compress(json_bytes)
+    result_bytes += c.flush()
+    return result_bytes
+
+
+def _decode_dict(b: bytes) -> JsonDict:
+    d = zlib.decompressobj(zdict=_PRESET_ZDICT)
+
+    result_bytes = d.decompress(b)
+    result_bytes += d.flush()
+
+    return json_decoder.decode(result_bytes.decode("utf-8"))
 
 
 class DictProperty:
@@ -211,11 +233,11 @@ class EventBase(metaclass=abc.ABCMeta):
         "signatures",
         "unsigned",
         "rejected_reason",
-        "_dict",
+        "_encoded_dict",
         "auth_events",
         "depth",
-        "content",
-        "hashes",
+        "_content",
+        "_hashes",
         "origin",
         "origin_server_ts",
         "prev_events",
@@ -250,7 +272,7 @@ class EventBase(metaclass=abc.ABCMeta):
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
-        self._dict = event_dict
+        self._encoded_dict = _encode_dict(event_dict)
 
         self.auth_events = event_dict["auth_events"]
         self.depth = event_dict["depth"]
@@ -281,7 +303,7 @@ class EventBase(metaclass=abc.ABCMeta):
         return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self) -> JsonDict:
-        d = dict(self._dict)
+        d = _decode_dict(self._encoded_dict)
         d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
 
         return d
@@ -324,7 +346,7 @@ class EventBase(metaclass=abc.ABCMeta):
         """'Freeze' the event dict, so it cannot be modified by accident"""
 
         # this will be a no-op if the event dict is already frozen.
-        self._dict = freeze(self._dict)
+        # self._dict = freeze(self._dict)
 
 
 class FrozenEvent(EventBase):
