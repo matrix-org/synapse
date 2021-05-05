@@ -32,7 +32,8 @@ from typing import (
 from typing_extensions import Literal
 
 from synapse.config import cache as cache_config
-from synapse.util.caches import TRACK_MEMORY_USAGE, CacheMetric, register_cache
+from synapse.util import caches
+from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache
 
 try:
@@ -111,7 +112,7 @@ class _Node:
         self.add_callbacks(callbacks)
 
         self.memory = 0
-        if TRACK_MEMORY_USAGE:
+        if caches.TRACK_MEMORY_USAGE:
             self.memory = (
                 _get_size_of(key)
                 + _get_size_of(value)
@@ -269,7 +270,7 @@ class LruCache(Generic[KT, VT]):
             if size_callback:
                 cached_cache_len[0] += size_callback(node.value)
 
-            if TRACK_MEMORY_USAGE and metrics:
+            if caches.TRACK_MEMORY_USAGE and metrics:
                 metrics.inc_memory_usage(node.memory)
 
         def move_node_to_front(node):
@@ -297,7 +298,7 @@ class LruCache(Generic[KT, VT]):
 
             node.run_and_clear_callbacks()
 
-            if TRACK_MEMORY_USAGE and metrics:
+            if caches.TRACK_MEMORY_USAGE and metrics:
                 metrics.dec_memory_usage(node.memory)
 
             return deleted_len
@@ -415,7 +416,7 @@ class LruCache(Generic[KT, VT]):
             if size_callback:
                 cached_cache_len[0] = 0
 
-            if TRACK_MEMORY_USAGE and metrics:
+            if caches.TRACK_MEMORY_USAGE and metrics:
                 metrics.clear_memory_usage()
 
         @synchronized
