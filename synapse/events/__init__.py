@@ -206,6 +206,28 @@ class _EventInternalMetadata:
 
 
 class EventBase(metaclass=abc.ABCMeta):
+    __slots__ = [
+        "room_version",
+        "signatures",
+        "unsigned",
+        "rejected_reason",
+        "_dict",
+        "auth_events",
+        "depth",
+        "content",
+        "hashes",
+        "origin",
+        "origin_server_ts",
+        "prev_events",
+        "redacts",
+        "room_id",
+        "sender",
+        "type",
+        "user_id",
+        "state_key",
+        "internal_metadata",
+    ]
+
     @property
     @abc.abstractmethod
     def format_version(self) -> int:
@@ -364,6 +386,8 @@ class FrozenEvent(EventBase):
 
 
 class FrozenEventV2(EventBase):
+    __slots__ = ["_event_id"]
+
     format_version = EventFormatVersions.V2  # All events of this type are V2
 
     def __init__(
@@ -451,6 +475,8 @@ class FrozenEventV2(EventBase):
 
 class FrozenEventV3(FrozenEventV2):
     """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
+
+    __slots__ = ["_event_id"]
 
     format_version = EventFormatVersions.V3  # All events of this type are V3
 
