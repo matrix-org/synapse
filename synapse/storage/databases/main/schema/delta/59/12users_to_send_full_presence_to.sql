@@ -22,10 +22,8 @@
 -- want to duplicate work across multiple sync workers.
 
 CREATE TABLE IF NOT EXISTS users_to_send_full_presence_to(
+    -- The user ID to send full presence to.
     user_id TEXT PRIMARY KEY,
-    added_ms BIGINT NOT NULL
+    FOREIGN KEY (user_id)
+        REFERENCES users (name)
 );
-
--- For checking expired entries
-CREATE INDEX IF NOT EXISTS users_to_send_full_presence_to_added_ms
-    ON users_to_send_full_presence_to(added_ms);

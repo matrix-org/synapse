@@ -23,14 +23,10 @@ from synapse.storage.types import Connection
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.stream_change_cache import StreamChangeCache
-from synapse.util.constants import HOUR_IN_MS
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
-
-# How long to keep entries in the users_to_send_full_presence_to db table
-USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS = 14 * 24 * HOUR_IN_MS
 
 
 class PresenceStore(SQLBaseStore):
@@ -247,31 +243,14 @@ class PresenceStore(SQLBaseStore):
         Args:
             user_ids: An iterable of user IDs.
         """
-        time_now = self.hs.get_clock().time_msec()
-
-        def _add_users_to_send_full_presence_to_txn(txn):
-            # Add user entries to the table (or update their added_ms if they already exist)
-            self.db_pool.simple_upsert_many_txn(
-                txn,
-                table="users_to_send_full_presence_to",
-                key_names=("user_id",),
-                key_values=((user_id,) for user_id in user_ids),
-                value_names=("added_ms",),
-                value_values=((time_now,) for _ in user_ids),
-            )
-
-            # Delete entries in the table that have expired
-            sql = """
-                DELETE FROM users_to_send_full_presence_to
-                WHERE added_ms < ?
-            """
-            txn.execute(
-                sql, (time_now - USERS_TO_SEND_FULL_PRESENCE_TO_ENTRY_LIFETIME_MS,)
-            )
-
-        await self.db_pool.runInteraction(
-            "add_users_to_send_full_presence_to",
-            _add_users_to_send_full_presence_to_txn,
+        # Add user entries to the table
+        await self.db_pool.simple_upsert_many(
+            table="users_to_send_full_presence_to",
+            key_names=("user_id",),
+            key_values=[(user_id,) for user_id in user_ids],
+            value_names=(),
+            value_values=(),
+            desc="add_users_to_send_full_presence_to",
         )
 
     async def remove_user_from_users_to_send_full_presence_to(self, user_id: str):
