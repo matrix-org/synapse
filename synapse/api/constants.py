@@ -176,7 +176,7 @@ class EventContentFields:
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
-    ROOM_TYPE = "m.type"
+    ROOM_TYPE = "type"
     MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 
