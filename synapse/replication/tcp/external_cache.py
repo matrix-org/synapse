@@ -126,16 +126,11 @@ class ExternalCache:
         if self._redis_connection is None:
             return None
 
-<<<<<<< HEAD
         cache_key = self._get_redis_key(cache_name, key)
-
-        result = await make_deferred_yieldable(self._redis_connection.get(cache_key))
-=======
         with response_timer.labels("get").time():
             result = await make_deferred_yieldable(
-                self._redis_connection.get(self._get_redis_key(cache_name, key))
+                self._redis_connection.get(cache_key)
             )
->>>>>>> origin/develop
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
 
