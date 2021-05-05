@@ -18,7 +18,7 @@ import json
 import urllib.parse
 from binascii import unhexlify
 from typing import List, Optional
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
@@ -54,8 +54,6 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         self.datastore = Mock(return_value=Mock())
         self.datastore.get_current_state_deltas = Mock(return_value=(0, []))
 
-        self.secrets = Mock()
-
         self.hs = self.setup_test_homeserver()
 
         self.hs.config.registration_shared_secret = "shared"
@@ -84,14 +82,13 @@ class UserRegisterTestCase(unittest.HomeserverTestCase):
         Calling GET on the endpoint will return a randomised nonce, using the
         homeserver's secrets provider.
         """
-        secrets = Mock()
-        secrets.token_hex = Mock(return_value="abcd")
+        with patch("secrets.token_hex") as token_hex:
+            # Patch secrets.token_hex for the duration of this context
+            token_hex.return_value = "abcd"
 
-        self.hs.get_secrets = Mock(return_value=secrets)
+            channel = self.make_request("GET", self.url)
 
-        channel = self.make_request("GET", self.url)
-
-        self.assertEqual(channel.json_body, {"nonce": "abcd"})
+            self.assertEqual(channel.json_body, {"nonce": "abcd"})
 
     def test_expired_nonce(self):
         """

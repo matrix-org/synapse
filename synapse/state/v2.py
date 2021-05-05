@@ -18,6 +18,7 @@ import logging
 from typing import (
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -37,7 +38,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
-from synapse.types import Collection, MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)

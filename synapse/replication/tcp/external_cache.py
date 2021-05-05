@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Optional
 
-from prometheus_client import Counter
+from prometheus_client import Counter, Histogram
 
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util import json_decoder, json_encoder
@@ -39,6 +39,20 @@ delete_counter = Counter(
     "synapse_external_cache_delete",
     "Number of times we deleted keys from a cache",
     labelnames=["cache_name"],
+)
+
+response_timer = Histogram(
+    "synapse_external_cache_response_time_seconds",
+    "Time taken to get a response from Redis for a cache get/set request",
+    labelnames=["method"],
+    buckets=(
+        0.001,
+        0.002,
+        0.005,
+        0.01,
+        0.02,
+        0.05,
+    ),
 )
 
 
@@ -95,13 +109,14 @@ class ExternalCache:
 
         logger.debug("Caching %s %s: %r", cache_name, key, encoded_value)
 
-        return await make_deferred_yieldable(
-            self._redis_connection.set(
-                self._get_redis_key(cache_name, key),
-                encoded_value,
-                pexpire=expiry_ms,
+        with response_timer.labels("set").time():
+            return await make_deferred_yieldable(
+                self._redis_connection.set(
+                    self._get_redis_key(cache_name, key),
+                    encoded_value,
+                    pexpire=expiry_ms,
+                )
             )
-        )
 
     async def get(
         self, cache_name: str, key: str, expiry_ms: Optional[int] = None
@@ -111,9 +126,16 @@ class ExternalCache:
         if self._redis_connection is None:
             return None
 
+<<<<<<< HEAD
         cache_key = self._get_redis_key(cache_name, key)
 
         result = await make_deferred_yieldable(self._redis_connection.get(cache_key))
+=======
+        with response_timer.labels("get").time():
+            result = await make_deferred_yieldable(
+                self._redis_connection.get(self._get_redis_key(cache_name, key))
+            )
+>>>>>>> origin/develop
 
         logger.debug("Got cache result %s %s: %r", cache_name, key, result)
 

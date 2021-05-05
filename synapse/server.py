@@ -77,6 +77,7 @@ from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
+from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
@@ -125,7 +126,6 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
-from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
@@ -286,6 +286,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.run_background_tasks:
             self.setup_background_tasks()
 
+    def start_listening(self) -> None:
+        """Start the HTTP, manhole, metrics, etc listeners
+
+        Does nothing in this base class; overridden in derived classes to start the
+        appropriate listeners.
+        """
+        pass
+
     def setup_background_tasks(self) -> None:
         """
         Some handlers have side effects on instantiation (like registering
@@ -417,10 +425,10 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_presence_handler(self) -> BasePresenceHandler:
-        if self.config.worker_app:
-            return WorkerPresenceHandler(self)
-        else:
+        if self.get_instance_name() in self.config.worker.writers.presence:
             return PresenceHandler(self)
+        else:
+            return WorkerPresenceHandler(self)
 
     @cache_in_self
     def get_typing_writer_handler(self) -> TypingWriterHandler:
@@ -633,10 +641,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return GroupAttestionRenewer(self)
 
     @cache_in_self
-    def get_secrets(self) -> Secrets:
-        return Secrets()
-
-    @cache_in_self
     def get_stats_handler(self) -> StatsHandler:
         return StatsHandler(self)
 
@@ -745,6 +749,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_space_summary_handler(self) -> SpaceSummaryHandler:
         return SpaceSummaryHandler(self)
+
+    @cache_in_self
+    def get_event_auth_handler(self) -> EventAuthHandler:
+        return EventAuthHandler(self)
 
     @cache_in_self
     def get_external_cache(self) -> ExternalCache:

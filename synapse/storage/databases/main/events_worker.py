@@ -15,7 +15,16 @@
 import logging
 import threading
 from collections import namedtuple
-from typing import Container, Dict, Iterable, List, Optional, Tuple, overload
+from typing import (
+    Collection,
+    Container,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+    overload,
+)
 
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
@@ -45,7 +54,7 @@ from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import Collection, JsonDict, get_domain_from_id
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
