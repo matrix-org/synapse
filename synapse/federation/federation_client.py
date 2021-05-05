@@ -391,7 +391,6 @@ class FederationClient(FederationBase):
         Returns:
             A list of PDUs that have valid signatures and hashes.
         """
-        deferreds = self._check_sigs_and_hashes(room_version, pdus)
 
         async def handle_check_result(pdu: EventBase, deferred: Deferred):
             try:
@@ -426,6 +425,7 @@ class FederationClient(FederationBase):
             return res
 
         handle = preserve_fn(handle_check_result)
+        deferreds = self._check_sigs_and_hashes(room_version, pdus)
         deferreds2 = [handle(pdu, deferred) for pdu, deferred in zip(pdus, deferreds)]
 
         valid_pdus = await make_deferred_yieldable(

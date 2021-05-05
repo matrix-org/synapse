@@ -224,15 +224,13 @@ class Keyring:
         self, server_and_json: Iterable[Tuple[str, EventBase, int]]
     ) -> List[defer.Deferred]:
         return [
-            defer.ensureDeferred(
-                run_in_background(
-                    self._verify_object,
-                    VerifyJsonRequest.from_event(
-                        server_name,
-                        validity_time,
-                        event,
-                    ),
-                )
+            run_in_background(
+                self._verify_object,
+                VerifyJsonRequest.from_event(
+                    server_name,
+                    validity_time,
+                    event,
+                ),
             )
             for server_name, event, validity_time in server_and_json
         ]
