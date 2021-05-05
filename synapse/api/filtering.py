@@ -23,6 +23,7 @@ from jsonschema import FormatChecker
 from synapse.api.constants import EventContentFields
 from synapse.api.errors import SynapseError
 from synapse.api.presence import UserPresenceState
+from synapse.events import EventBase
 from synapse.types import RoomID, UserID
 
 FILTER_SCHEMA = {
@@ -290,6 +291,13 @@ class Filter:
             ev_type = "m.presence"
             contains_url = False
             labels = []  # type: List[str]
+        elif isinstance(event, EventBase):
+            sender = event.sender
+            room_id = event.room_id
+            ev_type = event.type
+            content = event.content
+            contains_url = isinstance(content.get("url"), str)
+            labels = content.get(EventContentFields.LABELS, [])
         else:
             sender = event.get("sender", None)
             if not sender:

@@ -38,6 +38,8 @@ class EventValidator:
         if event.format_version == EventFormatVersions.V1:
             EventID.from_string(event.event_id)
 
+        event_dict = event.get_dict()
+
         required = [
             "auth_events",
             "content",
@@ -49,7 +51,7 @@ class EventValidator:
         ]
 
         for k in required:
-            if not hasattr(event, k):
+            if k not in event_dict:
                 raise SynapseError(400, "Event does not have key %s" % (k,))
 
         # Check that the following keys have string values

@@ -16,12 +16,15 @@
 
 import abc
 import os
-from typing import Dict, Optional, Tuple, Type
+import zlib
+from typing import Dict, List, Optional, Tuple, Type, Union
 
-from unpaddedbase64 import encode_base64
+import attr
+from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.room_versions import EventFormatVersions, RoomVersion, RoomVersions
 from synapse.types import JsonDict, RoomStreamToken
+from synapse.util import json_decoder, json_encoder
 from synapse.util.caches import intern_dict
 from synapse.util.frozenutils import freeze
 from synapse.util.stringutils import strtobool
@@ -35,6 +38,26 @@ from synapse.util.stringutils import strtobool
 # homeserver object itself.
 
 USE_FROZEN_DICTS = strtobool(os.environ.get("SYNAPSE_USE_FROZEN_DICTS", "0"))
+
+
+_PRESET_ZDICT = b"""{"auth_events":[],"prev_events":[],"type":"m.room.member",m.room.message"room_id":,"sender":,"content":{"msgtype":"m.text","body":""room_version":"creator":"depth":"prev_state":"state_key":""origin":"origin_server_ts":"hashes":{"sha256":"signatures":,"unsigned":{"age_ts":"ed25519"""
+
+
+def _encode_dict(d: JsonDict) -> bytes:
+    json_bytes = json_encoder.encode(d).encode("utf-8")
+    c = zlib.compressobj(1, zdict=_PRESET_ZDICT)
+    result_bytes = c.compress(json_bytes)
+    result_bytes += c.flush()
+    return result_bytes
+
+
+def _decode_dict(b: bytes) -> JsonDict:
+    d = zlib.decompressobj(zdict=_PRESET_ZDICT)
+
+    result_bytes = d.decompress(b)
+    result_bytes += d.flush()
+
+    return json_decoder.decode(result_bytes.decode("utf-8"))
 
 
 class DictProperty:
@@ -205,7 +228,81 @@ class _EventInternalMetadata:
         return self._dict.get("redacted", False)
 
 
+@attr.s(slots=True, auto_attribs=True)
+class _Signatures:
+    _signatures_bytes: bytes
+
+    @staticmethod
+    def from_dict(signature_dict: JsonDict) -> "_Signatures":
+        return _Signatures(_encode_dict(signature_dict))
+
+    def get_dict(self) -> JsonDict:
+        return _decode_dict(self._signatures_bytes)
+
+    def get(self, server_name):
+        return self.get_dict().get(server_name)
+
+    def update(self, other: Union[JsonDict, "_Signatures"]):
+        if isinstance(other, _Signatures):
+            other_dict = _decode_dict(other._signatures_bytes)
+        else:
+            other_dict = other
+
+        signatures = self.get_dict()
+        signatures.update(other_dict)
+        self._signatures_bytes = _encode_dict(signatures)
+
+
+class _SmallListV1(str):
+    __slots__ = []
+
+    def get(self):
+        return self.split(",")
+
+    @staticmethod
+    def create(event_ids):
+        return _SmallListV1(",".join(event_ids))
+
+
+class _SmallListV2_V3(bytes):
+    __slots__ = []
+
+    def get(self, url_safe):
+        i = 0
+        while i * 32 < len(self):
+            bit = self[i * 32 : (i + 1) * 32]
+            i += 1
+            yield "$" + encode_base64(bit, urlsafe=url_safe)
+
+    @staticmethod
+    def create(event_ids):
+        return _SmallListV2_V3(
+            b"".join(decode_base64(event_id[1:]) for event_id in event_ids)
+        )
+
+
 class EventBase(metaclass=abc.ABCMeta):
+    __slots__ = [
+        "room_version",
+        "signatures",
+        "unsigned",
+        "rejected_reason",
+        "_encoded_dict",
+        "_auth_event_ids",
+        "depth",
+        "_content",
+        "_hashes",
+        "origin",
+        "origin_server_ts",
+        "_prev_event_ids",
+        "redacts",
+        "room_id",
+        "sender",
+        "type",
+        "state_key",
+        "internal_metadata",
+    ]
+
     @property
     @abc.abstractmethod
     def format_version(self) -> int:
@@ -224,31 +321,43 @@ class EventBase(metaclass=abc.ABCMeta):
         assert room_version.event_format == self.format_version
 
         self.room_version = room_version
-        self.signatures = signatures
+        self.signatures = _Signatures.from_dict(signatures)
         self.unsigned = unsigned
         self.rejected_reason = rejected_reason
 
-        self._dict = event_dict
+        self._encoded_dict = _encode_dict(event_dict)
+
+        self.depth = event_dict["depth"]
+        self.origin = event_dict["origin"]
+        self.origin_server_ts = event_dict["origin_server_ts"]
+        self.redacts = event_dict.get("redacts")
+        self.room_id = event_dict["room_id"]
+        self.sender = event_dict["sender"]
+        self.type = event_dict["type"]
+        if "state_key" in event_dict:
+            self.state_key = event_dict["state_key"]
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
-    auth_events = DictProperty("auth_events")
-    depth = DictProperty("depth")
-    content = DictProperty("content")
-    hashes = DictProperty("hashes")
-    origin = DictProperty("origin")
-    origin_server_ts = DictProperty("origin_server_ts")
-    prev_events = DictProperty("prev_events")
-    redacts = DefaultDictProperty("redacts", None)
-    room_id = DictProperty("room_id")
-    sender = DictProperty("sender")
-    state_key = DictProperty("state_key")
-    type = DictProperty("type")
-    user_id = DictProperty("sender")
+    @property
+    def content(self) -> JsonDict:
+        return self.get_dict()["content"]
+
+    @property
+    def hashes(self) -> JsonDict:
+        return self.get_dict()["hashes"]
+
+    @property
+    def prev_events(self) -> List[str]:
+        return list(self._prev_events)
 
     @property
     def event_id(self) -> str:
         raise NotImplementedError()
+
+    @property
+    def user_id(self) -> str:
+        return self.sender
 
     @property
     def membership(self):
@@ -258,16 +367,12 @@ class EventBase(metaclass=abc.ABCMeta):
         return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self) -> JsonDict:
-        d = dict(self._dict)
-        d.update({"signatures": self.signatures, "unsigned": dict(self.unsigned)})
+        d = _decode_dict(self._encoded_dict)
+        d.update(
+            {"signatures": self.signatures.get_dict(), "unsigned": dict(self.unsigned)}
+        )
 
         return d
-
-    def get(self, key, default=None):
-        return self._dict.get(key, default)
-
-    def get_internal_metadata_dict(self):
-        return self.internal_metadata.get_dict()
 
     def get_pdu_json(self, time_now=None) -> JsonDict:
         pdu_json = self.get_dict()
@@ -285,41 +390,11 @@ class EventBase(metaclass=abc.ABCMeta):
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
-    def __getitem__(self, field):
-        return self._dict[field]
-
-    def __contains__(self, field):
-        return field in self._dict
-
-    def items(self):
-        return list(self._dict.items())
-
-    def keys(self):
-        return self._dict.keys()
-
-    def prev_event_ids(self):
-        """Returns the list of prev event IDs. The order matches the order
-        specified in the event, though there is no meaning to it.
-
-        Returns:
-            list[str]: The list of event IDs of this event's prev_events
-        """
-        return [e for e, _ in self.prev_events]
-
-    def auth_event_ids(self):
-        """Returns the list of auth event IDs. The order matches the order
-        specified in the event, though there is no meaning to it.
-
-        Returns:
-            list[str]: The list of event IDs of this event's auth_events
-        """
-        return [e for e, _ in self.auth_events]
-
     def freeze(self):
         """'Freeze' the event dict, so it cannot be modified by accident"""
 
         # this will be a no-op if the event dict is already frozen.
-        self._dict = freeze(self._dict)
+        # self._dict = freeze(self._dict)
 
 
 class FrozenEvent(EventBase):
@@ -355,6 +430,12 @@ class FrozenEvent(EventBase):
             frozen_dict = event_dict
 
         self._event_id = event_dict["event_id"]
+        self._auth_event_ids = _SmallListV1.create(
+            e for e, _ in event_dict["auth_events"]
+        )
+        self._prev_event_ids = _SmallListV1.create(
+            e for e, _ in event_dict["prev_events"]
+        )
 
         super().__init__(
             frozen_dict,
@@ -369,18 +450,26 @@ class FrozenEvent(EventBase):
     def event_id(self) -> str:
         return self._event_id
 
+    def auth_event_ids(self):
+        return list(self._auth_event_ids.get())
+
+    def prev_event_ids(self):
+        return list(self._prev_event_ids.get())
+
     def __str__(self):
         return self.__repr__()
 
     def __repr__(self):
         return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
-            self.get("event_id", None),
-            self.get("type", None),
-            self.get("state_key", None),
+            self.event_id,
+            self.type,
+            getattr(self, "state_key", None),
         )
 
 
 class FrozenEventV2(EventBase):
+    __slots__ = ["_event_id"]
+
     format_version = EventFormatVersions.V2  # All events of this type are V2
 
     def __init__(
@@ -415,6 +504,8 @@ class FrozenEventV2(EventBase):
             frozen_dict = event_dict
 
         self._event_id = None
+        self._auth_event_ids = _SmallListV2_V3.create(event_dict["auth_events"])
+        self._prev_event_ids = _SmallListV2_V3.create(event_dict["prev_events"])
 
         super().__init__(
             frozen_dict,
@@ -436,24 +527,6 @@ class FrozenEventV2(EventBase):
         self._event_id = "$" + encode_base64(compute_event_reference_hash(self)[1])
         return self._event_id
 
-    def prev_event_ids(self):
-        """Returns the list of prev event IDs. The order matches the order
-        specified in the event, though there is no meaning to it.
-
-        Returns:
-            list[str]: The list of event IDs of this event's prev_events
-        """
-        return self.prev_events
-
-    def auth_event_ids(self):
-        """Returns the list of auth event IDs. The order matches the order
-        specified in the event, though there is no meaning to it.
-
-        Returns:
-            list[str]: The list of event IDs of this event's auth_events
-        """
-        return self.auth_events
-
     def __str__(self):
         return self.__repr__()
 
@@ -461,13 +534,21 @@ class FrozenEventV2(EventBase):
         return "<%s event_id=%r, type=%r, state_key=%r>" % (
             self.__class__.__name__,
             self.event_id,
-            self.get("type", None),
-            self.get("state_key", None),
+            self.type,
+            self.state_key if self.is_state() else None,
         )
+
+    def auth_event_ids(self):
+        return list(self._auth_event_ids.get(False))
+
+    def prev_event_ids(self):
+        return list(self._prev_event_ids.get(False))
 
 
 class FrozenEventV3(FrozenEventV2):
     """FrozenEventV3, which differs from FrozenEventV2 only in the event_id format"""
+
+    __slots__ = ["_event_id"]
 
     format_version = EventFormatVersions.V3  # All events of this type are V3
 
@@ -483,6 +564,12 @@ class FrozenEventV3(FrozenEventV2):
             compute_event_reference_hash(self)[1], urlsafe=True
         )
         return self._event_id
+
+    def auth_event_ids(self):
+        return list(self._auth_event_ids.get(True))
+
+    def prev_event_ids(self):
+        return list(self._prev_event_ids.get(True))
 
 
 def _event_type_from_format_version(format_version: int) -> Type[EventBase]:

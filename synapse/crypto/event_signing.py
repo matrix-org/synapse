@@ -48,7 +48,7 @@ def check_event_content_hash(
 
     # some malformed events lack a 'hashes'. Protect against it being missing
     # or a weird type by basically treating it the same as an unhashed event.
-    hashes = event.get("hashes")
+    hashes = getattr(event, "hashes", None)
     # nb it might be a frozendict or a dict
     if not isinstance(hashes, collections.abc.Mapping):
         raise SynapseError(
