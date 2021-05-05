@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional
 
 from typing_extensions import TypedDict
 
+import synapse.http.servlet
 from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
@@ -30,6 +31,7 @@ from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
     parse_string,
+    parse_boolean,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
@@ -158,12 +160,7 @@ class LoginRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest):
         login_submission = parse_json_object_from_request(request)
 
-        param = bytes(LoginRestServlet.REFRESH_TOKEN_PARAM, "utf-8")
-        should_issue_refresh_token = (
-            request.args is not None
-            and param in request.args
-            and request.args[param][0] == b"true"
-        )
+        should_issue_refresh_token = parse_boolean(request, name=LoginRestServlet.REFRESH_TOKEN_PARAM, default=False)
 
         try:
             if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
