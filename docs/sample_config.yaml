@@ -1251,7 +1251,7 @@ account_validity:
 
 # MSC2918
 # TODO: docs
-access_token_lifetime: 5m
+#access_token_lifetime: 5m
 
 # The user must provide all of the below types of 3PID when registering.
 #

@@ -188,7 +188,7 @@ class RegistrationConfig(Config):
 
         access_token_lifetime = config.get("access_token_lifetime", "5m")
         access_token_lifetime = self.parse_duration(access_token_lifetime)
-        self.access_token_lifetime = access_token_lifetime  # type: int
+        self.access_token_lifetime = access_token_lifetime
 
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
@@ -288,7 +288,7 @@ class RegistrationConfig(Config):
 
         # MSC2918
         # TODO: docs
-        access_token_lifetime: 5m
+        #access_token_lifetime: 5m
 
         # The user must provide all of the below types of 3PID when registering.
         #
