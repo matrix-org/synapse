@@ -147,11 +147,11 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
-            # logger.info(
-            #     "federation_server.on_backfill_request versions=%d -> %s",
-            #     len(versions),
-            #     versions,
-            # )
+            logger.info(
+                "federation_server.on_backfill_request versions=%d -> %s",
+                len(versions),
+                versions,
+            )
             pdus = await self.handler.on_backfill_request(
                 origin, room_id, versions, limit
             )
@@ -602,19 +602,7 @@ class FederationServer(FederationBase):
 
             time_now = self._clock.time_msec()
             auth_pdus = await self.handler.on_event_auth(event_id)
-
-            for pdu in auth_pdus:
-                if pdu.type == "m.room.member" and pdu.state_key == "@maria:hs1":
-                    logger.info(
-                        "on_event_auth pdu=%s auth_events(%d)=%s",
-                        pdu,
-                        len(pdu.auth_event_ids()),
-                        pdu.auth_event_ids(),
-                    )
-
             res = {"auth_chain": [a.get_pdu_json(time_now) for a in auth_pdus]}
-            logger.info("on_event_auth res=%s", res)
-
         return 200, res
 
     @log_function

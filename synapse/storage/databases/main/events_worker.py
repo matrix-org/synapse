@@ -359,24 +359,11 @@ class EventsWorkerStore(SQLBaseStore):
             set(event_ids), allow_rejected=allow_rejected
         )
 
-        # logger.info("get_events_as_list event_entry_map=%s", event_entry_map)
-
         events = []
         for event_id in event_ids:
             entry = event_entry_map.get(event_id, None)
             if not entry:
                 continue
-
-            if (
-                entry.event.type == "m.room.member"
-                and entry.event.state_key == "@maria:hs1"
-            ):
-                logger.info(
-                    "get_events_as_list entry=%s auth_event_ids(%d)=%s",
-                    entry.event,
-                    len(entry.event.auth_event_ids()),
-                    entry.event.auth_event_ids(),
-                )
 
             if not allow_rejected:
                 assert not entry.event.rejected_reason, (
@@ -502,22 +489,10 @@ class EventsWorkerStore(SQLBaseStore):
         event_entry_map = self._get_events_from_cache(
             event_ids, allow_rejected=allow_rejected
         )
-        for key in event_entry_map:
-            event = event_entry_map[key].event
-            if event.type == "m.room.member" and event.state_key == "@maria:hs1":
-                logger.info(
-                    "_get_events_from_cache_or_db event=%s auth_events(%d)=%s",
-                    event,
-                    len(event.auth_event_ids()),
-                    event.auth_event_ids(),
-                )
 
         missing_events_ids = [e for e in event_ids if e not in event_entry_map]
 
         if missing_events_ids:
-            logger.info(
-                "_get_events_from_cache_or_db missing_events_ids=%s", missing_events_ids
-            )
             log_ctx = current_context()
             log_ctx.record_event_fetch(len(missing_events_ids))
 
@@ -558,17 +533,6 @@ class EventsWorkerStore(SQLBaseStore):
             )
             if not ret:
                 continue
-
-            if (
-                ret.event.type == "m.room.member"
-                and ret.event.state_key == "@maria:hs1"
-            ):
-                logger.info(
-                    "_get_event_cache.get event_id=%s auth_events(%d)=%s",
-                    event_id,
-                    len(ret.event.auth_event_ids()),
-                    ret.event.auth_event_ids(),
-                )
 
             if allow_rejected or not ret.event.rejected_reason:
                 event_map[event_id] = ret
@@ -723,6 +687,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         while events_to_fetch:
             row_map = await self._enqueue_events(events_to_fetch)
+
             # we need to recursively fetch any redactions of those events
             redaction_ids = set()
             for event_id in events_to_fetch:
@@ -851,16 +816,6 @@ class EventsWorkerStore(SQLBaseStore):
                 event=original_ev, redacted_event=redacted_event
             )
 
-            if (
-                original_ev.type == "m.room.member"
-                and original_ev.state_key == "@maria:hs1"
-            ):
-                logger.info(
-                    "_get_event_cache.set (from events_workers) event_id=%s auth_events(%d)=%s",
-                    event_id,
-                    len(original_ev.auth_event_ids()),
-                    original_ev.auth_event_ids(),
-                )
             self._get_event_cache.set((event_id,), cache_entry)
             result_map[event_id] = cache_entry
 
@@ -943,7 +898,6 @@ class EventsWorkerStore(SQLBaseStore):
         """
         event_dict = {}
         for evs in batch_iter(event_ids, 200):
-            # TODO: REMOVE marker ERIC!!! WHERE EVENTS ARE FETCHED
             sql = """\
                 SELECT
                   e.event_id,
@@ -968,7 +922,6 @@ class EventsWorkerStore(SQLBaseStore):
 
             for row in txn:
                 event_id = row[0]
-                logger.info("_fetch_event_rows event_id=%s json=%s", event_id, row[3])
                 event_dict[event_id] = {
                     "event_id": event_id,
                     "stream_ordering": row[1],

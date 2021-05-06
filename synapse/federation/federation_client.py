@@ -447,13 +447,6 @@ class FederationClient(FederationBase):
         signed_auth = await self._check_sigs_and_hash_and_fetch(
             destination, auth_chain, outlier=True, room_version=room_version
         )
-        logger.info(
-            "get_event_auth auth_chain(%d)=%s signed_auth(%d)=%s",
-            len(auth_chain),
-            auth_chain,
-            len(signed_auth),
-            signed_auth,
-        )
 
         signed_auth.sort(key=lambda e: e.depth)
 

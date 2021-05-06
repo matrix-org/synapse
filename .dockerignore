@@ -5,7 +5,6 @@
 !docker
 !scripts
 !synapse
-!python-signedjson
 !MANIFEST.in
 !README.rst
 !setup.py

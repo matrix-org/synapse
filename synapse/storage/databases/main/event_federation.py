@@ -982,7 +982,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     if successor_event_id in event_results:
                         continue
 
-                    # TODO: Do we need to filter out state events?
                     event_results.add(successor_event_id)
 
                     successorQueue.put(successor_event_id)

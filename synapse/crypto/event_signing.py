@@ -21,7 +21,6 @@ import logging
 from typing import Any, Callable, Dict, Tuple
 
 from canonicaljson import encode_canonical_json
-from signedjson.key import encode_signing_key_base64
 from signedjson.sign import sign_json
 from signedjson.types import SigningKey
 from unpaddedbase64 import decode_base64, encode_base64
@@ -153,13 +152,6 @@ def compute_event_signature(
     redact_json.pop("unsigned", None)
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Signing event: %s", encode_canonical_json(redact_json))
-    # logger.info(
-    #     "sign_json signature_name=%s signing_key=%s encode_signing_key_base64=%s, json=%s",
-    #     signature_name,
-    #     signing_key,
-    #     encode_signing_key_base64(signing_key),
-    #     redact_json,
-    # )
     redact_json = sign_json(redact_json, signature_name, signing_key)
     if logger.isEnabledFor(logging.DEBUG):
         logger.debug("Signed event: %s", encode_canonical_json(redact_json))
