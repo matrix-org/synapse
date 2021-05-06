@@ -45,5 +45,5 @@ if [[ -n "$1" ]]; then
   EXTRA_COMPLEMENT_ARGS+="-run $1 "
 fi
 
-# Run the tests on the resulting image!
-COMPLEMENT_BASE_IMAGE=complement-synapse go test -tags msc2716 -v -count=1 ./tests/main_test.go ./tests/msc2716_test.go -run TestBackfillingHistory/parallel/Historical_messages_are_visible_on_federated_server
+# Run the tests!
+COMPLEMENT_BASE_IMAGE=complement-synapse go test -tags msc2716 -v -count=1 ./tests/main_test.go ./tests/msc2716_test.go

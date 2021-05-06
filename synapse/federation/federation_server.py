@@ -147,11 +147,6 @@ class FederationServer(FederationBase):
             origin_host, _ = parse_server_name(origin)
             await self.check_server_matches_acl(origin_host, room_id)
 
-            logger.info(
-                "federation_server.on_backfill_request versions=%d -> %s",
-                len(versions),
-                versions,
-            )
             pdus = await self.handler.on_backfill_request(
                 origin, room_id, versions, limit
             )

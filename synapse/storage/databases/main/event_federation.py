@@ -956,15 +956,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
-            logger.info("_get_backfill_events query: %s", event_id)
             txn.execute(query, (event_id, False, limit - len(event_results)))
 
             for row in txn:
-                logger.info("_get_backfill_events query row: %s", row)
                 if row[1] not in event_results:
                     queue.put((-row[0], row[1]))
 
-            # From each event, go forwards through sucesors to find chains of historical backfilled floating outliers
+            # From each event, go forwards through successors to find chains of
+            # historical backfilled floating outliers
             successorQueue = PriorityQueue()
             successorQueue.put(event_id)
             while not successorQueue.empty() and len(event_results) < limit:
@@ -974,9 +973,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     break
 
                 successor_event_ids = self.get_successor_events_txn(txn, [event_id])
-                logger.info(
-                    "_get_backfill_events successor_event_ids: %s", successor_event_ids
-                )
                 for successor_event_id in successor_event_ids:
                     # Skip any branches we have already gone down
                     if successor_event_id in event_results:
