@@ -741,6 +741,12 @@ acme:
 #
 #allow_profile_lookup_over_federation: false
 
+# Uncomment to disable device display name lookup over federation. By default, the
+# Federation API allows other homeservers to obtain device display names of any user
+# on this homeserver. Defaults to 'true'.
+#
+#allow_device_name_lookup_over_federation: false
+
 
 ## Caching ##
 
