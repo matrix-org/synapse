@@ -78,7 +78,8 @@ REQUIREMENTS = [
     # we use attr.validators.deep_iterable, which arrived in 19.1.0 (Note:
     # Fedora 31 only has 19.1, so if we want to upgrade we should wait until 33
     # is out in November.)
-    "attrs>=19.1.0",
+    # Note: 21.1.0 broke `/sync`, see #9936
+    "attrs>=19.1.0,<21.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",

@@ -14,7 +14,6 @@
 
 import itertools
 import logging
-from collections import defaultdict
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import PresenceState
@@ -230,49 +229,24 @@ class SyncRestServlet(RestServlet):
         )
 
         logger.debug("building sync response dict")
-
-        response: dict = defaultdict(dict)
-        response["next_batch"] = await sync_result.next_batch.to_string(self.store)
-
-        if sync_result.account_data:
-            response["account_data"] = {"events": sync_result.account_data}
-        if sync_result.presence:
-            response["presence"] = SyncRestServlet.encode_presence(
-                sync_result.presence, time_now
-            )
-
-        if sync_result.to_device:
-            response["to_device"] = {"events": sync_result.to_device}
-
-        if sync_result.device_lists.changed:
-            response["device_lists"]["changed"] = list(sync_result.device_lists.changed)
-        if sync_result.device_lists.left:
-            response["device_lists"]["left"] = list(sync_result.device_lists.left)
-
-        if sync_result.device_one_time_keys_count:
-            response[
-                "device_one_time_keys_count"
-            ] = sync_result.device_one_time_keys_count
-        if sync_result.device_unused_fallback_key_types:
-            response[
-                "org.matrix.msc2732.device_unused_fallback_key_types"
-            ] = sync_result.device_unused_fallback_key_types
-
-        if joined:
-            response["rooms"]["join"] = joined
-        if invited:
-            response["rooms"]["invite"] = invited
-        if archived:
-            response["rooms"]["leave"] = archived
-
-        if sync_result.groups.join:
-            response["groups"]["join"] = sync_result.groups.join
-        if sync_result.groups.invite:
-            response["groups"]["invite"] = sync_result.groups.invite
-        if sync_result.groups.leave:
-            response["groups"]["leave"] = sync_result.groups.leave
-
-        return response
+        return {
+            "account_data": {"events": sync_result.account_data},
+            "to_device": {"events": sync_result.to_device},
+            "device_lists": {
+                "changed": list(sync_result.device_lists.changed),
+                "left": list(sync_result.device_lists.left),
+            },
+            "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
+            "rooms": {"join": joined, "invite": invited, "leave": archived},
+            "groups": {
+                "join": sync_result.groups.join,
+                "invite": sync_result.groups.invite,
+                "leave": sync_result.groups.leave,
+            },
+            "device_one_time_keys_count": sync_result.device_one_time_keys_count,
+            "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
+            "next_batch": await sync_result.next_batch.to_string(self.store),
+        }
 
     @staticmethod
     def encode_presence(events, time_now):

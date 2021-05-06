@@ -306,9 +306,8 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
 
-        self.assertNotIn(
-            "rooms", channel.json_body, "Got invites without server notice"
-        )
+        invites = channel.json_body["rooms"]["invite"]
+        self.assertEqual(len(invites), 0, invites)
 
     def test_invite_with_notice(self):
         """Tests that, if the MAU limit is hit, the server notices user invites each user
@@ -365,8 +364,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             # We could also pick another user and sync with it, which would return an
             # invite to a system notices room, but it doesn't matter which user we're
             # using so we use the last one because it saves us an extra sync.
-            if "rooms" in channel.json_body:
-                invites = channel.json_body["rooms"]["invite"]
+            invites = channel.json_body["rooms"]["invite"]
 
         # Make sure we have an invite to process.
         self.assertEqual(len(invites), 1, invites)

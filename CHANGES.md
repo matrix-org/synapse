@@ -1,3 +1,12 @@
+Synapse 1.33.1 (2021-05-06)
+===========================
+
+Bugfixes
+--------
+
+- Fix bug where `/sync` would break if using the latest version of `attrs` dependency, by pinning to a previous version. ([\#9937](https://github.com/matrix-org/synapse/issues/9937))
+
+
 Synapse 1.33.0 (2021-05-05)
 ===========================
 
