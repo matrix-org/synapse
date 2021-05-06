@@ -14,7 +14,6 @@
 
 import logging
 import threading
-from collections import namedtuple
 from typing import (
     Collection,
     Container,
@@ -25,7 +24,9 @@ from typing import (
     Tuple,
     overload,
 )
+from weakref import WeakValueDictionary
 
+import attr
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
 
@@ -73,7 +74,10 @@ EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 
 
-_EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _EventCacheEntry:
+    event: EventBase
+    redacted_event: Optional[EventBase]
 
 
 class EventRedactBehaviour(Names):
@@ -157,9 +161,14 @@ class EventsWorkerStore(SQLBaseStore):
 
         self._get_event_cache = LruCache(
             cache_name="*getEvent*",
-            keylen=3,
             max_size=hs.config.caches.event_cache_size,
         )
+        # We seperately track which events we have in memory. This is mainly to
+        # guard against loading the same event into memory multiple times when
+        # `_get_event_cache` overflows.
+        self._in_memory_events = (
+            WeakValueDictionary()
+        )  # type: WeakValueDictionary[str, _EventCacheEntry]
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
@@ -519,6 +528,7 @@ class EventsWorkerStore(SQLBaseStore):
 
     def _invalidate_get_event_cache(self, event_id):
         self._get_event_cache.invalidate((event_id,))
+        self._in_memory_events.pop(event_id, None)
 
     def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
         """Fetch events from the caches
@@ -539,6 +549,9 @@ class EventsWorkerStore(SQLBaseStore):
             ret = self._get_event_cache.get(
                 (event_id,), None, update_metrics=update_metrics
             )
+            if not ret:
+                ret = self._in_memory_events.get(event_id)
+
             if not ret:
                 continue
 
@@ -825,6 +838,7 @@ class EventsWorkerStore(SQLBaseStore):
             )
 
             self._get_event_cache.set((event_id,), cache_entry)
+            self._in_memory_events[event_id] = cache_entry
             result_map[event_id] = cache_entry
 
         return result_map
@@ -1056,7 +1070,11 @@ class EventsWorkerStore(SQLBaseStore):
             set[str]: The events we have already seen.
         """
         # if the event cache contains the event, obviously we've seen it.
-        results = {x for x in event_ids if self._get_event_cache.contains(x)}
+        results = {
+            x
+            for x in event_ids
+            if self._get_event_cache.contains((x,)) or x in self._in_memory_events
+        }
 
         def have_seen_events_txn(txn, chunk):
             sql = "SELECT event_id FROM events as e WHERE "
