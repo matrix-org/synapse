@@ -340,7 +340,9 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     content=event_dict["content"],
                     outlier=True,
                     prev_event_ids=[fake_prev_event_id],
-                    auth_event_ids=auth_event_ids,
+                    # Make sure to use a copy of this list as we add to it and loop here.
+                    # Otherwise it will be the same reference and update when we append here later.
+                    auth_event_ids=auth_event_ids.copy(),
                 )
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
@@ -353,7 +355,9 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     event_dict,
                     outlier=True,
                     prev_event_ids=[fake_prev_event_id],
-                    auth_event_ids=auth_event_ids,
+                    # Make sure to use a copy of this list as we add to it and loop here.
+                    # Otherwise it will be the same reference and update when we append here later.
+                    auth_event_ids=auth_event_ids.copy(),
                 )
                 event_id = event.event_id
 
