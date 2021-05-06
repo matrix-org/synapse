@@ -21,13 +21,11 @@ from synapse.api.constants import UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
-    InvalidClientCredentialsError,
     InvalidClientTokenError,
     MissingClientTokenError,
     ResourceLimitError,
 )
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import UserID
 
 from tests import unittest
 from tests.test_utils import simple_async_mock
