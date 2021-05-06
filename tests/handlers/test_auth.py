@@ -36,8 +36,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.large_number_of_users = 100
 
     def test_macaroon_caveats(self):
-        self.hs.clock.now = 5000
-
         token = self.macaroon_generator.generate_guest_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
