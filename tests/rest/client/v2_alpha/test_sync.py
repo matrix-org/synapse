@@ -37,7 +37,35 @@ class FilterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "/sync")
 
         self.assertEqual(channel.code, 200)
-        self.assertIn("next_batch", channel.json_body)
+        self.assertTrue(
+            {
+                "next_batch",
+                "rooms",
+                "presence",
+                "account_data",
+                "to_device",
+                "device_lists",
+            }.issubset(set(channel.json_body.keys()))
+        )
+
+    def test_sync_presence_disabled(self):
+        """
+        When presence is disabled, the key does not appear in /sync.
+        """
+        self.hs.config.use_presence = False
+
+        channel = self.make_request("GET", "/sync")
+
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(
+            {
+                "next_batch",
+                "rooms",
+                "account_data",
+                "to_device",
+                "device_lists",
+            }.issubset(set(channel.json_body.keys()))
+        )
 
 
 class SyncFilterTestCase(unittest.HomeserverTestCase):
