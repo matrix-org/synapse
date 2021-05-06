@@ -1,3 +1,21 @@
+Synapse 1.33.0 (2021-05-05)
+===========================
+
+Features
+--------
+
+- Build Debian packages for Ubuntu 21.04 (Hirsute Hippo). ([\#9909](https://github.com/matrix-org/synapse/issues/9909))
+
+
+Synapse 1.33.0rc2 (2021-04-29)
+==============================
+
+Bugfixes
+--------
+
+- Fix tight loop when handling presence replication when using workers. Introduced in v1.33.0rc1. ([\#9900](https://github.com/matrix-org/synapse/issues/9900))
+
+
 Synapse 1.33.0rc1 (2021-04-28)
 ==============================
 

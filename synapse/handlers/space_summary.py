@@ -288,6 +288,7 @@ class SpaceSummaryHandler:
             ev.data
             for ev in res.events
             if ev.event_type == EventTypes.MSC1772_SPACE_CHILD
+            or ev.event_type == EventTypes.SpaceChild
         )
 
     async def _is_room_accessible(self, room_id: str, requester: Optional[str]) -> bool:
@@ -331,7 +332,9 @@ class SpaceSummaryHandler:
         )
 
         # TODO: update once MSC1772 lands
-        room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
+        room_type = create_event.content.get(EventContentFields.ROOM_TYPE)
+        if not room_type:
+            room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
 
         entry = {
             "room_id": stats["room_id"],
@@ -344,6 +347,7 @@ class SpaceSummaryHandler:
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
+            "creation_ts": create_event.origin_server_ts,
             "room_type": room_type,
         }
 
@@ -360,8 +364,9 @@ class SpaceSummaryHandler:
             [
                 event_id
                 for key, event_id in current_state_ids.items()
-                # TODO: update once MSC1772 lands
+                # TODO: update once MSC1772 has been FCP for a period of time.
                 if key[0] == EventTypes.MSC1772_SPACE_CHILD
+                or key[0] == EventTypes.SpaceChild
             ]
         )
 

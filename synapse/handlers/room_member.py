@@ -1064,7 +1064,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.distributor = hs.get_distributor()
