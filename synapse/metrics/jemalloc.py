@@ -53,6 +53,8 @@ def _setup_jemalloc_stats():
         logger.debug("jemalloc not found")
         return
 
+    logger.debug("Found jemalloc at %s", jemalloc_path)
+
     jemalloc = ctypes.CDLL(jemalloc_path)
 
     def _mallctl(
@@ -189,4 +191,6 @@ def setup_jemalloc_stats():
     try:
         _setup_jemalloc_stats()
     except Exception as e:
+        # This should only happen if we find the loaded jemalloc library, but
+        # fail to load it somehow (e.g. we somehow picked the wrong version).
         logger.info("Failed to setup collector to record jemalloc stats: %s", e)
