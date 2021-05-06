@@ -1,0 +1,1 @@
+Fix bug where `/sync` would break if using the latest version of `attrs` dependency, by pinning to a previous version.
