@@ -613,9 +613,31 @@ class RoomTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+
         # Create user
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
+
+    def test_create_room(self):
+        """Test that an admin can create a room for someone else"""
+        user_1 = self.register_user("foo", "pass")
+
+        url = "/_synapse/admin/v1/rooms"
+        channel = self.make_request(
+            "POST",
+            url.encode("ascii"),
+            {"owner": user_1},
+            access_token=self.admin_user_tok,
+        )
+
+        # Check request completed successfully
+        self.assertEqual(200, int(channel.code), msg=channel.json_body)
+
+        users_in_room = self.get_success(
+            self.store.get_users_in_room(channel.json_body["room_id"])
+        )
+        self.assertEqual([user_1], users_in_room)
 
     def test_list_rooms(self):
         """Test that we can list rooms"""

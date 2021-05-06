@@ -2,6 +2,8 @@
 - [List Room API](#list-room-api)
   * [Parameters](#parameters)
   * [Usage](#usage)
+- [Create Room API](#create-room-api)
+  * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
 - [Delete Room API](#delete-room-api)
@@ -278,6 +280,34 @@ Response:
 
 Once the `next_token` parameter is no longer present, we know we've reached the
 end of the list.
+
+# Create Room API
+
+The Create Room admin API allows server admins to create a new room on the server.
+It is possible to specify an owner for the room other than the requester himself.
+In that case, the server admin, who made the request **does not** become a member
+of the created room.
+
+## Usage
+
+The API is:
+
+```json
+POST /_synapse/admin/v1/rooms
+```
+
+the body parameters are the same as in
+<https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom>
+with one additional optional parameter
+```json
+{
+    "owner": "@someuser:example.com"
+}
+```
+
+The response body is identical to the one of
+<https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom>
+
 
 # Room Details API
 

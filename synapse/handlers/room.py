@@ -591,6 +591,10 @@ class RoomCreationHandler(BaseHandler):
                 values to go in the body of the 'join' event (typically
                 `avatar_url` and/or `displayname`.
 
+            owner:
+                An owner for the new room. If None -> requester will be used.
+                Can only be set if requester is server admin.
+
         Returns:
                 First, a dict containing the keys `room_id` and, if an alias
                 was, requested, `room_alias`. Secondly, the stream_id of the
@@ -613,6 +617,11 @@ class RoomCreationHandler(BaseHandler):
             is_requester_admin = True
         else:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
+
+        if ("owner" in config) and is_requester_admin:
+            creator = UserID.from_string(config["owner"])
+        else:
+            creator = requester.user
 
         # Check whether the third party rules allows/changes the room create
         # request.
@@ -753,6 +762,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=invite_list,
             initial_state=initial_state,
             creation_content=creation_content,
+            creator=creator,
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
@@ -851,12 +861,13 @@ class RoomCreationHandler(BaseHandler):
 
     async def _send_events_for_new_room(
         self,
-        creator: Requester,
+        requester: Requester,
         room_id: str,
         preset_config: str,
         invite_list: List[str],
         initial_state: MutableStateMap,
         creation_content: JsonDict,
+        creator: Optional[UserID] = None,
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
@@ -871,7 +882,9 @@ class RoomCreationHandler(BaseHandler):
             The stream_id of the last event persisted.
         """
 
-        creator_id = creator.user.to_string()
+        if not creator:
+            creator = requester.user
+        creator_id = creator.to_string()
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
@@ -892,7 +905,7 @@ class RoomCreationHandler(BaseHandler):
                 _,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                creator,
+                requester,
                 event,
                 ratelimit=False,
                 ignore_shadow_ban=True,
@@ -906,8 +919,8 @@ class RoomCreationHandler(BaseHandler):
 
         logger.debug("Sending %s in new room", EventTypes.Member)
         await self.room_member_handler.update_membership(
+            requester,
             creator,
-            creator.user,
             room_id,
             "join",
             ratelimit=ratelimit,
