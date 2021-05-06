@@ -289,6 +289,15 @@ class EventsPersistenceStorage:
             event if it was deduplicated due to an existing event matching the
             transaction ID.
         """
+
+        if event.type == "m.room.member" and event.state_key == "@maria:hs1":
+            logger.info(
+                "persist_event event=%s auth_events(%d)=%s",
+                event,
+                len(event.auth_event_ids()),
+                event.auth_event_ids(),
+            )
+
         deferred = self._event_persist_queue.add_to_queue(
             event.room_id, [(event, context)], backfilled=backfilled
         )

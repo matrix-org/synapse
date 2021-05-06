@@ -57,8 +57,8 @@ COPY synapse /synapse/synapse/
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
 
 # Install our local dev copy of signedjson
-COPY python-signedjson /python-signedjson/
-RUN cd /python-signedjson && pip install --prefix="/install" . && cd ..
+# COPY python-signedjson /python-signedjson/
+# RUN cd /python-signedjson && pip install --prefix="/install" . && cd ..
 
 
 ###

@@ -385,6 +385,7 @@ class PersistEventsStore:
         # Insert into event_to_state_groups.
         self._store_event_state_mappings_txn(txn, events_and_contexts)
 
+        # TODO: REMOVE marker ERIC!!! WHERE event auth chain is stored
         self._persist_event_auth_chain_txn(txn, [e for e, _ in events_and_contexts])
 
         # _store_rejected_events_txn filters out any events which were
@@ -1337,6 +1338,9 @@ class PersistEventsStore:
 
             return im
 
+        # if event.type == "m.room.member" and event.state_key == "@maria:hs1":
+        #     logger.info("_store_event_txn event_dict=%s", event_dict(event))
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
@@ -1569,6 +1573,16 @@ class PersistEventsStore:
 
         def prefill():
             for cache_entry in to_prefill:
+                if (
+                    cache_entry[0].type == "m.room.member"
+                    and cache_entry[0].state_key == "@maria:hs1"
+                ):
+                    logger.info(
+                        "_get_event_cache.set (from events.py) event_id=%s auth_events(%d)=%s",
+                        cache_entry[0].event_id,
+                        len(cache_entry[0].auth_event_ids()),
+                        cache_entry[0].auth_event_ids(),
+                    )
                 self.store._get_event_cache.set((cache_entry[0].event_id,), cache_entry)
 
         txn.call_after(prefill)

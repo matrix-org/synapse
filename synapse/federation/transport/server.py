@@ -467,21 +467,21 @@ class FederationBackfillServlet(BaseFederationServlet):
     PATH = "/backfill/(?P<room_id>[^/]*)/?"
 
     async def on_GET(self, origin, content, query, room_id):
-        logger.info(
-            "FederationBackfillServlet.on_GET query=%s",
-            query,
-        )
+        # logger.info(
+        #     "FederationBackfillServlet.on_GET query=%s",
+        #     query,
+        # )
         versions = [x.decode("ascii") for x in query[b"v"]]
         limit = parse_integer_from_args(query, "limit", None)
 
         if not limit:
             return 400, {"error": "Did not include limit param"}
 
-        logger.info(
-            "FederationBackfillServlet.on_GET versions=%d -> %s",
-            len(versions),
-            versions,
-        )
+        # logger.info(
+        #     "FederationBackfillServlet.on_GET versions=%d -> %s",
+        #     len(versions),
+        #     versions,
+        # )
         return await self.handler.on_backfill_request(origin, room_id, versions, limit)
 
 

@@ -309,10 +309,10 @@ def create_local_event_from_event_dict(
     event_dict.setdefault("signatures", {})
 
     add_hashes_and_signatures(room_version, event_dict, hostname, signing_key)
-    logger.info(
-        "create_local_event_from_event_dict after add_hashes_and_signatures event_dict=%s",
-        event_dict,
-    )
+    # logger.info(
+    #     "create_local_event_from_event_dict after add_hashes_and_signatures event_dict=%s",
+    #     event_dict,
+    # )
     return make_event_from_dict(
         event_dict, room_version, internal_metadata_dict=internal_metadata_dict
     )

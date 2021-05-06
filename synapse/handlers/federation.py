@@ -2448,15 +2448,15 @@ class FederationHandler(BaseHandler):
 
         if missing_auth:
             # If we don't have all the auth events, we need to get them.
-            logger.info("auth_events contains unknown events: %s", missing_auth)
+            # logger.info("auth_events contains unknown events: %s", missing_auth)
             try:
                 try:
                     remote_auth_chain = await self.federation_client.get_event_auth(
                         origin, event.room_id, event.event_id
                     )
-                    logger.info(
-                        "auth_events retrieved remote_auth_chain=%s", remote_auth_chain
-                    )
+                    # logger.info(
+                    #     "auth_events retrieved remote_auth_chain=%s", remote_auth_chain
+                    # )
                 except RequestSendFailed as e1:
                     # The other side isn't around or doesn't implement the
                     # endpoint, so lets just bail out.
@@ -2466,7 +2466,7 @@ class FederationHandler(BaseHandler):
                 seen_remotes = await self.store.have_seen_events(
                     [e.event_id for e in remote_auth_chain]
                 )
-                logger.info("auth_events seen_remotes=%s", seen_remotes)
+                # logger.info("auth_events seen_remotes=%s", seen_remotes)
 
                 for e in remote_auth_chain:
                     if e.event_id in seen_remotes:
@@ -2484,7 +2484,7 @@ class FederationHandler(BaseHandler):
                         }
                         e.internal_metadata.outlier = True
 
-                        logger.info(
+                        logger.debug(
                             "do_auth %s missing_auth: %s", event.event_id, e.event_id
                         )
                         await self._handle_new_event(origin, e, auth_events=auth)

@@ -343,11 +343,23 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                     auth_event_ids=auth_event_ids,
                 )
                 logger.info(
-                    "/bulksend member state event_id=%s state_key=%s, content=%s",
+                    "/bulksend member state event_id=%s state_key=%s, content=%s auth_event_ids(%d)=%s",
                     event_id,
                     event_dict["state_key"],
                     event_dict["content"],
+                    len(auth_event_ids),
+                    auth_event_ids,
                 )
+
+                double_check_event = await self.store.get_event(event_id)
+                double_check_event_auth_ids = list(double_check_event.auth_event_ids())
+                logger.info(
+                    "/bulksend double_check_event_id=%s auth_event_ids(%d)=%s",
+                    double_check_event.event_id,
+                    len(double_check_event_auth_ids),
+                    double_check_event_auth_ids,
+                )
+
             else:
                 # TODO: Add some complement tests that adds state that is not member joins
                 # and will use this code path
@@ -406,17 +418,19 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 event_auth_ids,
             )
 
-            double_check_event = await self.store.get_event(event_id)
-            double_check_event_auth_ids = list(double_check_event.auth_event_ids())
-            logger.info(
-                "/bulksend double_check_event_id=%s auth_event_ids(%d)=%s",
-                double_check_event.event_id,
-                len(double_check_event_auth_ids),
-                double_check_event_auth_ids,
-            )
-
             event_ids.append(event_id)
             prev_event_ids = [event_id]
+
+        triple_check_event = await self.store.get_event(
+            auth_event_ids[len(auth_event_ids) - 1]
+        )
+        triple_check_event_auth_ids = list(triple_check_event.auth_event_ids())
+        logger.info(
+            "/bulksend triple_check_event_id=%s auth_event_ids(%d)=%s",
+            triple_check_event.event_id,
+            len(triple_check_event_auth_ids),
+            triple_check_event_auth_ids,
+        )
 
         return 200, {"state_events": auth_event_ids, "events": event_ids}
 
