@@ -359,6 +359,9 @@ class RoomMembersRestServletV2(RestServlet):
         room_data = await self.state.get_current_state(
             room_id=room_id, event_type=EventTypes.PowerLevels
         )
+        if not room_data:
+            return 200, members
+
         power_levels = room_data.get("content")
         power_level_users = power_levels["users"] if "users" in power_levels else {}
         default_power_level = (
@@ -411,6 +414,8 @@ class RoomPowerLevelsRestServlet(RestServlet):
         room_data = await self.state.get_current_state(
             room_id=room_id, event_type=EventTypes.PowerLevels, state_key=""
         )
+        if not room_data:
+            return 204, {}
 
         return 200, room_data.get("content")
 

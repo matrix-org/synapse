@@ -222,9 +222,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached(max_entries=100000, iterable=True)
-    async def get_users_in_room_with_state(
-        self, room_id: str
-    ) -> List[Dict]:
+    async def get_users_in_room_with_state(self, room_id: str) -> List[Dict]:
         """Get a mapping from user ID to membership for all users in a given room.
 
         Args:

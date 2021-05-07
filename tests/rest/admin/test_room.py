@@ -1212,7 +1212,9 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         # Have another user join the room
         user_3 = self.register_user("foobar", "pass")
-        self.helper.invite(room_id_2, src=self.admin_user, targ=user_3, tok=self.admin_user_tok)
+        self.helper.invite(
+            room_id_2, src=self.admin_user, targ=user_3, tok=self.admin_user_tok
+        )
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_1,)
         channel = self.make_request(
