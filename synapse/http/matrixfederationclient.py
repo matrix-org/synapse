@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import cgi
 import codecs
 import logging
@@ -19,7 +20,7 @@ import sys
 import typing
 import urllib.parse
 from io import BytesIO, StringIO
-from typing import Callable, Dict, List, Optional, Tuple, Union
+from typing import Callable, Dict, Generic, List, Optional, Tuple, TypeVar, Union
 
 import attr
 import treq
@@ -48,6 +49,7 @@ from synapse.http.client import (
     BlacklistingAgentWrapper,
     BlacklistingReactorWrapper,
     BodyExceededMaxSize,
+    ByteWriteable,
     encode_query_args,
     read_body_with_max_size,
 )
@@ -86,6 +88,24 @@ _next_id = 1
 
 
 QueryArgs = Dict[str, Union[str, List[str]]]
+
+
+T = TypeVar("T")
+
+
+class ByteParser(ByteWriteable, Generic[T]):
+    """A `ByteWriteable` that has an additional `finish` function that returns
+    the parsed data.
+    """
+
+    CONTENT_TYPE = abc.abstractproperty()  # type: str  # type: ignore
+
+    @abc.abstractmethod
+    def finish(self) -> T:
+        """Called when response has finished streaming and the parser should
+        return the final result (or error).
+        """
+        pass
 
 
 @attr.s(slots=True, frozen=True)
@@ -148,13 +168,29 @@ class MatrixFederationRequest:
         return self.json
 
 
+class JsonParser(ByteParser[Union[JsonDict, list]]):
+    """A parser that buffers the response and tries and parses it as JSON."""
+
+    CONTENT_TYPE = "application/json"
+
+    def __init__(self):
+        self._buffer = StringIO()
+        self._binary_wrapper = BinaryIOWrapper(self._buffer)
+
+    def write(self, data: bytes) -> int:
+        return self._binary_wrapper.write(data)
+
+    def finish(self) -> Union[JsonDict, list]:
+        return json_decoder.decode(self._buffer.getvalue())
+
+
 async def _handle_json_response(
     reactor: IReactorTime,
     timeout_sec: float,
     request: MatrixFederationRequest,
     response: IResponse,
     start_ms: int,
-) -> JsonDict:
+) -> Union[JsonDict, list]:
     """
     Reads the JSON body of a response, with a timeout
 
@@ -168,19 +204,43 @@ async def _handle_json_response(
     Returns:
         The parsed JSON response
     """
-    try:
-        check_content_type_is_json(response.headers)
+    return await _handle_response(
+        reactor, timeout_sec, request, response, start_ms, JsonParser()
+    )
 
-        buf = StringIO()
-        d = read_body_with_max_size(response, BinaryIOWrapper(buf), MAX_RESPONSE_SIZE)
+
+async def _handle_response(
+    reactor: IReactorTime,
+    timeout_sec: float,
+    request: MatrixFederationRequest,
+    response: IResponse,
+    start_ms: int,
+    parser: ByteParser[T],
+) -> T:
+    """
+    Reads the JSON body of a response, with a timeout
+
+    Args:
+        reactor: twisted reactor, for the timeout
+        timeout_sec: number of seconds to wait for response to complete
+        request: the request that triggered the response
+        response: response to the request
+        start_ms: Timestamp when request was made
+        parser: The parser for the response
+
+    Returns:
+        The parsed response
+    """
+
+    try:
+        check_content_type_is(response.headers, parser.CONTENT_TYPE)
+
+        d = read_body_with_max_size(response, parser, MAX_RESPONSE_SIZE)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
-        def parse(_len: int):
-            return json_decoder.decode(buf.getvalue())
+        length = await make_deferred_yieldable(d)
 
-        d.addCallback(parse)
-
-        body = await make_deferred_yieldable(d)
+        value = parser.finish()
     except BodyExceededMaxSize as e:
         # The response was too big.
         logger.warning(
@@ -193,9 +253,9 @@ async def _handle_json_response(
         )
         raise RequestSendFailed(e, can_retry=False) from e
     except ValueError as e:
-        # The JSON content was invalid.
+        # The content was invalid.
         logger.warning(
-            "{%s} [%s] Failed to parse JSON response - %s %s",
+            "{%s} [%s] Failed to parse response - %s %s",
             request.txn_id,
             request.destination,
             request.method,
@@ -225,16 +285,17 @@ async def _handle_json_response(
     time_taken_secs = reactor.seconds() - start_ms / 1000
 
     logger.info(
-        "{%s} [%s] Completed request: %d %s in %.2f secs - %s %s",
+        "{%s} [%s] Completed request: %d %s in %.2f secs, got %d bytes - %s %s",
         request.txn_id,
         request.destination,
         response.code,
         response.phrase.decode("ascii", errors="replace"),
         time_taken_secs,
+        length,
         request.method,
         request.uri.decode("ascii"),
     )
-    return body
+    return value
 
 
 class BinaryIOWrapper:
@@ -1068,16 +1129,16 @@ def _flatten_response_never_received(e):
         return repr(e)
 
 
-def check_content_type_is_json(headers: Headers) -> None:
+def check_content_type_is(headers: Headers, expected_content_type: str) -> None:
     """
     Check that a set of HTTP headers have a Content-Type header, and that it
-    is application/json.
+    is the expected value..
 
     Args:
         headers: headers to check
 
     Raises:
-        RequestSendFailed: if the Content-Type header is missing or isn't JSON
+        RequestSendFailed: if the Content-Type header is missing or doesn't match
 
     """
     content_type_headers = headers.getRawHeaders(b"Content-Type")
@@ -1089,11 +1150,10 @@ def check_content_type_is_json(headers: Headers) -> None:
 
     c_type = content_type_headers[0].decode("ascii")  # only the first header
     val, options = cgi.parse_header(c_type)
-    if val != "application/json":
+    if val != expected_content_type:
         raise RequestSendFailed(
             RuntimeError(
-                "Remote server sent Content-Type header of '%s', not 'application/json'"
-                % c_type,
+                f"Remote server sent Content-Type header of '{c_type}', not '{expected_content_type}'",
             ),
             can_retry=False,
         )
