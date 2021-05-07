@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Any, List, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 if TYPE_CHECKING:
     import synapse.events
@@ -93,17 +93,15 @@ class AccountValidity:
         if not implemented:
             raise NotImplementedError()
 
-    async def user_expired(self, user_id: str) -> bool:
+    async def is_user_expired(self, user_id: str) -> bool:
         """Check whether the user is expired.
 
-        Modules are expected th return two booleans, the first one indicating whether the
-        user is expired, the second one indicating whether the module was able to
-        determine if the user was expired.
+        Modules are expected to return either a boolean indicating whether the user is
+        expired, or None if it was not able to figure it out.
 
-        If a module returns False on the second return value, the first one is ignored
-        and the next module (in the order the modules have been loaded at startup) is
-        called. If a module returns True on the second value, the first one is used and
-        this function returns.
+        If a module returns None, the next module (in the order the modules have been
+        loaded at startup) is called. If it returns a boolean, its value is used and the
+        function returns.
         If none of the modules have been able to determine whether the user is expired,
         Synapse will consider them not expired to avoid locking them out of their account
         in case of a technical incident.
@@ -115,8 +113,8 @@ class AccountValidity:
             Whether the user has expired.
         """
         for module in self.modules:
-            expired, success = await module.user_expired(user_id)
-            if success:
+            expired = await module.is_user_expired(user_id)  # type: Optional[bool]
+            if expired is not None:
                 return expired
 
         return False

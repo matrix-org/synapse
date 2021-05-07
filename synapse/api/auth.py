@@ -225,7 +225,7 @@ class Auth:
 
             # Deny the request if the user account has expired.
             if not allow_expired:
-                if await self.hs.get_account_validity().user_expired(
+                if await self.hs.get_account_validity().is_user_expired(
                     user_info.user_id
                 ) or (
                     self._account_validity_enabled

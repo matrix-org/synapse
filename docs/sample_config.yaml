@@ -1374,25 +1374,16 @@ account_threepid_delegates:
 # Server admins can (optionally) get Synapse to check the validity of all user
 # accounts against one or more custom modules.
 #
-# An account validity module must implement two APIs:
+# See the documentation on how to write an account validity module:
+# https://github.com/matrix-org/synapse/blob/master/docs/account_validity.md
 #
-#  * `user_expired`, which takes a Matrix user ID and returns one boolean to
-#    indicate whether the provided account has expired, and one boolean to
-#    indicate whether it succeeded in figuring out this info. If this second
-#    boolean value is False, the `user_expired function of the next module
-#    (in the order modules are configured in this file) is called. If there
-#    is no more module to use, Synapse will consider the account as not expired.
-#
-#  * `on_user_registration`, which is called after any successful registration
-#    with the Matrix ID of the newly registered user.
-#
-account_validity:
-   #- module: "my_custom_project.SomeAccountValidity"
-   #  config:
-   #    example_option: 'things'
-   #- module: "my_custom_project.SomeOtherAccountValidity"
-   #  config:
-   #    other_example_option: 'stuff'
+account_validity_modules:
+    #- module: "my_custom_project.SomeAccountValidity"
+    #  config:
+    #    example_option: 'things'
+    #- module: "my_custom_project.SomeOtherAccountValidity"
+    #  config:
+    #    other_example_option: 'stuff'
 
 
 ## Metrics ###

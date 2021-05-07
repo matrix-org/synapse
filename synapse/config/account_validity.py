@@ -59,22 +59,16 @@ class AccountValidityConfig(Config):
         # legacy config was provided.
         self.account_validity_modules = []
 
-        account_validity_config = config.get("account_validity")
-        if account_validity_config is None:
-            return
-
-        if isinstance(account_validity_config, dict):
-            # If the configuration is for the legacy feature, then read it as such.
-            self.read_legacy_config(account_validity_config)
-        elif isinstance(account_validity_config, list):
-            for i, module in enumerate(account_validity_config):
+        if config.get("account_validity_modules") is not None:
+            for i, module in enumerate(config.get("account_validity_modules")):
                 config_path = ("account_validity", "<item %i>" % i)
                 if not isinstance(module, dict):
                     raise ConfigError("expected a mapping", config_path)
 
                 self.account_validity_modules.append(load_module(module, config_path))
-        else:
-            raise ConfigError("account_validity syntax is incorrect")
+        elif config.get("account_validity") is not None:
+            # If the configuration is for the legacy feature, then read it as such.
+            self.read_legacy_config(config.get("account_validity"))
 
     def read_legacy_config(self, account_validity_config):
         logger.warning(LEGACY_ACCOUNT_VALIDITY_IN_USE)
@@ -119,23 +113,14 @@ class AccountValidityConfig(Config):
         # Server admins can (optionally) get Synapse to check the validity of all user
         # accounts against one or more custom modules.
         #
-        # An account validity module must implement two APIs:
+        # See the documentation on how to write an account validity module:
+        # https://github.com/matrix-org/synapse/blob/master/docs/account_validity.md
         #
-        #  * `user_expired`, which takes a Matrix user ID and returns one boolean to
-        #    indicate whether the provided account has expired, and one boolean to
-        #    indicate whether it succeeded in figuring out this info. If this second
-        #    boolean value is False, the `user_expired function of the next module
-        #    (in the order modules are configured in this file) is called. If there
-        #    is no more module to use, Synapse will consider the account as not expired.
-        #
-        #  * `on_user_registration`, which is called after any successful registration
-        #    with the Matrix ID of the newly registered user.
-        #
-        account_validity:
-           #- module: "my_custom_project.SomeAccountValidity"
-           #  config:
-           #    example_option: 'things'
-           #- module: "my_custom_project.SomeOtherAccountValidity"
-           #  config:
-           #    other_example_option: 'stuff'
+        account_validity_modules:
+            #- module: "my_custom_project.SomeAccountValidity"
+            #  config:
+            #    example_option: 'things'
+            #- module: "my_custom_project.SomeOtherAccountValidity"
+            #  config:
+            #    other_example_option: 'stuff'
         """

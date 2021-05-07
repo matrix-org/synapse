@@ -77,8 +77,10 @@ class ModuleApi:
             app_name = self._hs.config.email_app_name
 
             self._from_string = self._hs.config.email_notif_from % {"app": app_name}
-        except Exception:
-            # If substitution failed, fall back to the bare strings.
+        except (KeyError, TypeError):
+            # If substitution failed (which can happen if the string contains
+            # placeholders other than just "app", or if the type of the placeholder is
+            # not a string), fall back to the bare strings.
             self._from_string = self._hs.config.email_notif_from
 
         self._raw_from = email.utils.parseaddr(self._from_string)[1]
@@ -314,7 +316,7 @@ class ModuleApi:
         """
         # see if the access token corresponds to a device
         user_info = yield defer.ensureDeferred(
-            self._hs.get_auth().get_user_by_access_token(access_token)
+            self._auth.get_user_by_access_token(access_token)
         )
         device_id = user_info.get("device_id")
         user_id = user_info["user"].to_string()
@@ -588,10 +590,10 @@ class ModuleApi:
         return self._hs.config.read_templates(filenames, custom_template_directory)
 
     async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
-        """Lookup the profile info for the user with the given localpart.
+        """Look up the profile info for the user with the given localpart.
 
         Args:
-            localpart: The localpart to lookup profile information for.
+            localpart: The localpart to look up profile information for.
 
         Returns:
             The profile information (i.e. display name and avatar URL).
@@ -599,11 +601,11 @@ class ModuleApi:
         return await self._store.get_profileinfo(localpart)
 
     async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
-        """Lookup the threepids (email addresses and phone numbers) associated with the
+        """Look up the threepids (email addresses and phone numbers) associated with the
         given Matrix user ID.
 
         Args:
-            user_id: The Matrix user ID to lookup threepids for.
+            user_id: The Matrix user ID to look up threepids for.
 
         Returns:
             A list of threepids, each threepid being represented by a dictionary
@@ -612,10 +614,6 @@ class ModuleApi:
             threepid's address.
         """
         return await self._store.user_get_threepids(user_id)
-
-    def current_time_ms(self) -> int:
-        """Get the current time in milliseconds."""
-        return self._clock.time_msec()
 
 
 class PublicRoomListManager:
