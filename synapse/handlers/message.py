@@ -1050,6 +1050,13 @@ class EventCreationHandler:
         )
 
         if state_entry.state_group:
+            await self._external_cache.set(
+                "event_to_prev_state_group",
+                event.event_id,
+                state_entry.state_group,
+                expiry_ms=60 * 60 * 1000,
+            )
+
             if state_entry.state_group in self._external_cache_joined_hosts_updates:
                 return
 
@@ -1057,12 +1064,6 @@ class EventCreationHandler:
 
             # Note that the expiry times must be larger than the expiry time in
             # _external_cache_joined_hosts_updates.
-            await self._external_cache.set(
-                "event_to_prev_state_group",
-                event.event_id,
-                state_entry.state_group,
-                expiry_ms=60 * 60 * 1000,
-            )
             await self._external_cache.set(
                 "get_joined_hosts",
                 str(state_entry.state_group),
