@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Remember to update this number every time a change is made to database
-# schema files, so the users will be informed on server restarts.
 SCHEMA_VERSION = 59
+"""Represents the expectations made by the codebase about the database schema
+
+This should be incremented whenever the codebase changes its requirements on the
+shape of the database schema (even if those requirements are backwards-compatible with
+older versions of Synapse).
+
+See `README.md <synapse/storage/schema/README.md>`_  for more information on how this
+works.
+"""

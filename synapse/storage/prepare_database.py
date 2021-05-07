@@ -63,6 +63,13 @@ class _SchemaState:
     current_version: int = attr.ib()
     """The current schema version of the database"""
 
+    compat_version: Optional[int] = attr.ib()
+    """The SCHEMA_VERSION of the oldest version of Synapse for this database
+
+    If this is None, we have an old version of the database without the necessary
+    table.
+    """
+
     applied_deltas: Collection[str] = attr.ib(factory=tuple)
     """Any delta files for `current_version` which have already been applied"""
 
@@ -276,7 +283,7 @@ def _setup_new_database(
 
     _upgrade_existing_database(
         cur,
-        _SchemaState(current_version=max_current_ver),
+        _SchemaState(current_version=max_current_ver, compat_version=None),
         database_engine=database_engine,
         config=None,
         databases=databases,
@@ -350,7 +357,10 @@ def _upgrade_existing_database(
 
     is_worker = config and config.worker_app is not None
 
-    if current_schema_state.current_version > SCHEMA_VERSION:
+    if (
+        current_schema_state.compat_version is not None
+        and current_schema_state.compat_version > SCHEMA_VERSION
+    ):
         raise ValueError(
             "Cannot use this database as it is too "
             + "new for the server to understand"
@@ -643,6 +653,12 @@ def _get_or_create_schema_state(
     current_version = int(row[0])
     upgraded = bool(row[1])
 
+    compat_version: Optional[int] = None
+    txn.execute("SELECT compat_version FROM schema_compat_version")
+    row = txn.fetchone()
+    if row is not None:
+        compat_version = int(row[0])
+
     txn.execute(
         "SELECT file FROM applied_schema_deltas WHERE version >= ?",
         (current_version,),
@@ -651,6 +667,7 @@ def _get_or_create_schema_state(
 
     return _SchemaState(
         current_version=current_version,
+        compat_version=compat_version,
         applied_deltas=applied_deltas,
         upgraded=upgraded,
     )
