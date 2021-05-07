@@ -16,14 +16,14 @@ import logging
 from typing import Any, List, Set, Tuple
 
 from synapse.api.errors import SynapseError
-from synapse.storage._base import SQLBaseStore
+from synapse.storage.databases.main import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.state import StateGroupWorkerStore
 from synapse.types import RoomStreamToken
 
 logger = logging.getLogger(__name__)
 
 
-class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
+class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
     async def purge_history(
         self, room_id: str, token: str, delete_local_events: bool
     ) -> Set[int]:
@@ -203,8 +203,6 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
             "DELETE FROM event_to_state_groups "
             "WHERE event_id IN (SELECT event_id from events_to_purge)"
         )
-        for event_id, _ in event_rows:
-            txn.call_after(self._get_state_group_for_event.invalidate, (event_id,))
 
         # Delete all remote non-state events
         for table in (
@@ -282,6 +280,18 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         # finally, drop the temp table. this will commit the txn in sqlite,
         # so make sure to keep this actually last.
         txn.execute("DROP TABLE events_to_purge")
+
+        for event_id, should_delete in event_rows:
+            self._invalidate_cache_and_stream(
+                txn, self._get_state_group_for_event, (event_id,)
+            )
+
+            # FIXME: this is racy - what if have_seen_event gets called between the
+            #    transaction completing and the invalidation running?
+            if should_delete:
+                self._invalidate_cache_and_stream(
+                    txn, self.have_seen_event, (event_id,)
+                )
 
         logger.info("[purge] done")
 
@@ -422,7 +432,14 @@ class PurgeEventsStore(StateGroupWorkerStore, SQLBaseStore):
         #       index on them. In any case we should be clearing out 'stream' tables
         #       periodically anyway (#5888)
 
-        # TODO: we could probably usefully do a bunch of cache invalidation here
+        # TODO: we could probably usefully do a bunch more cache invalidation here
+
+        # we have no way to know which events to clear out of have_seen_event
+        # so just have to drop the whole cache
+        #
+        # FIXME: this is racy - what if have_seen_event gets called between the
+        #    DELETE completing and the invalidation running?
+        self._invalidate_all_cache_and_stream(txn, self.have_seen_event)
 
         logger.info("[purge] done")
 

@@ -22,6 +22,7 @@ from typing import (
     Iterable,
     List,
     Optional,
+    Set,
     Tuple,
     overload,
 )
@@ -55,7 +56,7 @@ from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
 from synapse.util.metrics import Measure
@@ -1046,7 +1047,7 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {r["event_id"] for r in rows}
 
-    async def have_seen_events(self, event_ids):
+    async def have_seen_events(self, event_ids: Collection[str]) -> Set[str]:
         """Given a list of event ids, check if we have already processed them.
 
         Args:
@@ -1055,22 +1056,45 @@ class EventsWorkerStore(SQLBaseStore):
         Returns:
             set[str]: The events we have already seen.
         """
+        res = await self._have_seen_events_dict(event_ids)
+        return {x for (x, y) in res.items() if y}
+
+    @cachedList("have_seen_event", "event_ids")
+    async def _have_seen_events_dict(
+        self, event_ids: Collection[str]
+    ) -> Dict[str, bool]:
+        """Helper for have_seen_events
+
+        Returns a dict, which is the right format for @cachedList
+        """
         # if the event cache contains the event, obviously we've seen it.
-        results = {x for x in event_ids if self._get_event_cache.contains(x)}
+        cache_results = {x for x in event_ids if self._get_event_cache.contains(x)}
+        results = {x: True for x in cache_results}
 
         def have_seen_events_txn(txn, chunk):
+            # assume everything in this chunk is not found initially
+            results.update({x: False for x in chunk})
+
+            # check the db and update the results for any row that is found
             sql = "SELECT event_id FROM events as e WHERE "
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "e.event_id", chunk
             )
             txn.execute(sql + clause, args)
-            results.update(row[0] for row in txn)
+            results.update({row[0]: True for row in txn})
 
-        for chunk in batch_iter((x for x in event_ids if x not in results), 100):
+        for chunk in batch_iter((x for x in event_ids if x not in cache_results), 100):
             await self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )
+
         return results
+
+    @cached(max_entries=100000)
+    async def have_seen_event(self, event_id):
+        # this only exists for the benefit of the @cachedList descriptor on
+        # _have_seen_events_dict
+        raise NotImplementedError()
 
     def _get_current_state_event_counts_txn(self, txn, room_id):
         """
