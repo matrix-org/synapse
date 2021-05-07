@@ -221,6 +221,37 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _get_users_in_room_with_profiles,
         )
 
+    @cached(max_entries=100000, iterable=True)
+    async def get_users_in_room_with_state(
+        self, room_id: str
+    ) -> List[Dict]:
+        """Get a mapping from user ID to membership for all users in a given room.
+
+        Args:
+            room_id: The ID of the room to retrieve the users of.
+
+        Returns:
+            A mapping from user ID to ProfileInfo.
+        """
+
+        def _get_users_in_room_with_state(txn) -> Dict[str, ProfileInfo]:
+            sql = """
+                SELECT user_id, membership FROM room_memberships as m
+                INNER JOIN current_state_events as c
+                ON m.event_id = c.event_id
+                AND m.room_id = c.room_id
+                AND m.user_id = c.state_key
+                WHERE c.type = 'm.room.member' AND c.room_id = ?
+            """
+            txn.execute(sql, (room_id))
+
+            return [{"user_id": r[0], "membership": r[1]} for r in txn]
+
+        return await self.db_pool.runInteraction(
+            "get_users_in_room_with_state",
+            _get_users_in_room_with_state,
+        )
+
     @cached(max_entries=100000)
     async def get_room_summary(self, room_id: str) -> Dict[str, MemberSummary]:
         """Get the details of a room roughly suitable for use by the room
@@ -430,6 +461,24 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             return None, None
 
         return results_dict.get("membership"), results_dict.get("event_id")
+
+    async def get_local_current_membership_for_users_in_room(
+        self, room_id: str
+    ) -> List[Dict[str, str]]:
+        """Retrieve the current local membership state and event ID for all users in a room.
+
+        Args:
+            room_id: The ID of the room.
+
+        Returns:
+            A list of dicts.
+        """
+        return await self.db_pool.simple_select_list(
+            "local_current_membership",
+            {"room_id": room_id},
+            ("user_id", "membership"),
+            desc="get_local_current_membership_for_users_in_room",
+        )
 
     @cached(max_entries=500000, iterable=True)
     async def get_rooms_for_user_with_stream_ordering(

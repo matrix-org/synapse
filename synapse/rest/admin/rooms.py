@@ -330,6 +330,91 @@ class RoomMembersRestServlet(RestServlet):
         return 200, ret
 
 
+class RoomMembersRestServletV2(RestServlet):
+    """
+    Get members list of a room including power level for each user.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/members$", "v2")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        ret = await self.store.get_room(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        members = await self.store.get_local_current_membership_for_users_in_room(
+            room_id
+        )
+        # TODO: or members = await self.store.get_users_in_room_with_state(room_id)
+        room_data = await self.state.get_current_state(
+            room_id=room_id, event_type=EventTypes.PowerLevels
+        )
+        power_levels = room_data.get("content")
+        power_level_users = power_levels["users"] if "users" in power_levels else {}
+        default_power_level = (
+            power_levels["users_default"] if "users_default" in power_levels else 0
+        )
+
+        def user_power_level(user_id) -> int:
+            return (
+                power_level_users[user_id]
+                if user_id in power_level_users
+                else default_power_level
+            )
+
+        ret = {
+            "members": [
+                {
+                    **member,
+                    "power_level": user_power_level(member["user_id"]),
+                }
+                for member in members
+            ],
+            "total": len(members),
+        }
+
+        return 200, ret
+
+
+class RoomPowerLevelsRestServlet(RestServlet):
+    """
+    Get power levels of a room including power level for each user.
+    """
+
+    PATTERNS = admin_patterns("/rooms/(?P<room_id>[^/]+)/power_levels$")
+
+    def __init__(self, hs: "HomeServer"):
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
+        self.state = hs.get_state_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        await assert_requester_is_admin(self.auth, request)
+
+        ret = await self.store.get_room(room_id)
+        if not ret:
+            raise NotFoundError("Room not found")
+
+        room_data = await self.state.get_current_state(
+            room_id=room_id, event_type=EventTypes.PowerLevels, state_key=""
+        )
+
+        return 200, room_data.get("content")
+
+
 class RoomStateRestServlet(RestServlet):
     """
     Get full state within a room.

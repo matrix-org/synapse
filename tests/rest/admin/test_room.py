@@ -1212,8 +1212,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
 
         # Have another user join the room
         user_3 = self.register_user("foobar", "pass")
-        user_tok_3 = self.login("foobar", "pass")
-        self.helper.join(room_id_2, user_3, tok=user_tok_3)
+        self.helper.invite(room_id_2, src=self.admin_user, targ=user_3, tok=self.admin_user_tok)
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_1,)
         channel = self.make_request(
@@ -1223,10 +1222,23 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
-        self.assertCountEqual(
-            ["@admin:test", "@foo:test", "@bar:test"], channel.json_body["members"]
-        )
+        self.assertIn("@admin:test", channel.json_body["members"])
+        self.assertIn("@foo:test", channel.json_body["members"])
+        self.assertIn("@bar:test", channel.json_body["members"])
         self.assertEqual(channel.json_body["total"], 3)
+
+        url = "/_synapse/admin/v2/rooms/%s/members" % (room_id_1,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertEqual(len(channel.json_body["members"]), 3)
+        self.assertEqual(channel.json_body["total"], 3)
+        self.assertIn("user_id", channel.json_body["members"][0])
+        self.assertIn("membership", channel.json_body["members"][0])
 
         url = "/_synapse/admin/v1/rooms/%s/members" % (room_id_2,)
         channel = self.make_request(
@@ -1236,10 +1248,44 @@ class RoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
 
-        self.assertCountEqual(
-            ["@admin:test", "@bar:test", "@foobar:test"], channel.json_body["members"]
+        self.assertIn("@admin:test", channel.json_body["members"])
+        self.assertIn("@bar:test", channel.json_body["members"])
+        self.assertEqual(channel.json_body["total"], 2)
+
+        url = "/_synapse/admin/v2/rooms/%s/members" % (room_id_2,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
         )
-        self.assertEqual(channel.json_body["total"], 3)
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+    def test_room_power_levels(self):
+        """Test that room power_levels can be requested correctly"""
+        # Create two test rooms
+        room_id_1 = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+
+        # Have another user join the room
+        user_1 = self.register_user("foo", "pass")
+        user_tok_1 = self.login("foo", "pass")
+        self.helper.join(room_id_1, user_1, tok=user_tok_1)
+
+        # Have another user join the room
+        user_2 = self.register_user("bar", "pass")
+        user_tok_2 = self.login("bar", "pass")
+        self.helper.join(room_id_1, user_2, tok=user_tok_2)
+
+        url = "/_synapse/admin/v1/rooms/%s/power_levels" % (room_id_1,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        self.assertIn("ban", channel.json_body)
+        self.assertIn("users_default", channel.json_body)
+        self.assertIn("users", channel.json_body)
 
     def test_room_state(self):
         """Test that room state can be requested correctly"""
