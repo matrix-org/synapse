@@ -981,7 +981,7 @@ class EventCreationHandler:
 
         await self.action_generator.handle_push_actions_for_event(event, context)
 
-        await self.cache_joined_hosts_for_event(event, context)
+        run_in_background(self.cache_joined_hosts_for_event, event, context)
 
         try:
             # If we're a worker we need to hit out to the master.
