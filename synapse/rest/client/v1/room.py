@@ -1020,6 +1020,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
         )
 
+    # TODO When switching to the stable endpoint, remove the POST handler.
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
