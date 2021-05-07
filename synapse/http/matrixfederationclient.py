@@ -773,7 +773,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
-        parser: Optional[Type[ByteParser[T]]] = None,
+        parser: Optional[ByteParser[T]] = None,
     ) -> T:
         ...
 
@@ -789,7 +789,7 @@ class MatrixFederationHttpClient:
         ignore_backoff: bool = False,
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
-        parser: Optional[Type[ByteParser]] = None,
+        parser: Optional[ByteParser] = None,
     ):
         """Sends the specified json data using PUT
 
@@ -864,7 +864,7 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         if parser is None:
-            parser = JsonParser
+            parser = JsonParser()
 
         body = await _handle_response(
             self.reactor,
@@ -872,7 +872,7 @@ class MatrixFederationHttpClient:
             request,
             response,
             start_ms,
-            parser=parser(),
+            parser=parser,
         )
 
         return body
