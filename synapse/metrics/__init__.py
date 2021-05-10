@@ -629,6 +629,7 @@ try:
 except AttributeError:
     pass
 
+
 __all__ = [
     "MetricsResource",
     "generate_latest",
