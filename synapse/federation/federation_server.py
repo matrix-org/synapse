@@ -44,7 +44,6 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
