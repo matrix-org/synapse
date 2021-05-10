@@ -583,7 +583,7 @@ class FederationHandler(BaseHandler):
         # events. (Note: we likely won't use the majority of the auth chain, and
         # it can be *huge* for large rooms, so it's worth ensuring that we don't
         # unnecessarily pull it from the DB).
-        missing_state_events = set(event_map) - set(state_event_ids)
+        missing_state_events = set(state_event_ids) - set(event_map)
         missing_auth_events = set(auth_event_ids) - set(auth_events_in_store)
         if missing_state_events or missing_auth_events:
             await self._get_events_and_persist(
@@ -594,7 +594,7 @@ class FederationHandler(BaseHandler):
 
             if missing_state_events:
                 new_events = await self.store.get_events(
-                    state_event_ids, allow_rejected=True
+                    missing_state_events, allow_rejected=True
                 )
                 event_map.update(new_events)
 
@@ -620,9 +620,7 @@ class FederationHandler(BaseHandler):
                         missing_auth_events,
                     )
 
-        remote_state = [
-            event_map[e_id] for e_id in state_event_ids if e_id in event_map
-        ]
+        remote_state = list(event_map.values())
 
         # check for events which were in the wrong room.
         #
