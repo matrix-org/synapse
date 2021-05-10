@@ -721,6 +721,9 @@ class EventsWorkerStore(SQLBaseStore):
             if events_to_fetch:
                 logger.debug("Also fetching redaction events %s", events_to_fetch)
 
+        # The events to return
+        result_map = {}  # type: Dict[str, _EventCacheEntry]
+
         # build a map from event_id to EventBase
         event_map = {}
         for event_id, row in fetched_events.items():
@@ -731,6 +734,16 @@ class EventsWorkerStore(SQLBaseStore):
             rejected_reason = row["rejected_reason"]
 
             if not allow_rejected and rejected_reason:
+                continue
+
+            # Check whether we already have this event in memory. This can
+            # happen multiple requests for the same event happen at the same
+            # time. (Ideally we'd have make it so that this doesn't happen, but
+            # that would require a larger refactor).
+            cached_entry = self._in_memory_events.get(event_id)
+            if cached_entry is not None:
+                result_map[event_id] = cached_entry
+                self._get_event_cache.set((event_id,), cached_entry)
                 continue
 
             # If the event or metadata cannot be parsed, log the error and act
@@ -826,8 +839,10 @@ class EventsWorkerStore(SQLBaseStore):
 
         # finally, we can decide whether each one needs redacting, and build
         # the cache entries.
-        result_map = {}
         for event_id, original_ev in event_map.items():
+            if event_id in result_map:
+                continue
+
             redactions = fetched_events[event_id]["redactions"]
             redacted_event = self._maybe_redact_event_row(
                 original_ev, redactions, event_map
