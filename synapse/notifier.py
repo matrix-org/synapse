@@ -38,6 +38,7 @@ from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging import issue9533_logger
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.opentracing import log_kv, start_active_span
 from synapse.logging.utils import log_function
@@ -425,6 +426,13 @@ class Notifier:
 
             for room in rooms:
                 user_streams |= self.room_to_user_streams.get(room, set())
+
+            if stream_key == "to_device_key":
+                issue9533_logger.debug(
+                    "to-device messages stream id %s, awaking streams for %s",
+                    new_token,
+                    users,
+                )
 
             time_now_ms = self.clock.time_msec()
             for user_stream in user_streams:
