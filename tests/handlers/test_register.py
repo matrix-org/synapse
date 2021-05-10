@@ -500,7 +500,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="user"))
 
         # Get an access token.
-        token = self.hs.get_auth_handler().generate_access_token()
+        token = "testtok"
         self.get_success(
             self.store.add_access_token_to_user(
                 user_id=user_id, token=token, device_id=None, valid_until_ms=None
@@ -577,7 +577,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.hs.get_auth_handler().generate_access_token()
+        token = self.hs.get_auth_handler().generate_access_token(user)
 
         if need_register:
             await self.handler.register_with_store(
