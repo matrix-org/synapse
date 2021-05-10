@@ -742,6 +742,8 @@ class EventsWorkerStore(SQLBaseStore):
             # that would require a larger refactor).
             cached_entry = self._in_memory_events.get(event_id)
             if cached_entry is not None:
+                # We need to add to the event_map as we read from it to fetch redactions.
+                event_map[event_id] = cached_entry.event
                 result_map[event_id] = cached_entry
                 self._get_event_cache.set((event_id,), cached_entry)
                 continue
