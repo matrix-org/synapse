@@ -6,7 +6,7 @@ Due to the security issue highlighted below, server administrators are encourage
 Security advisory
 -----------------
 
-This release fixes a denial of service attack ([CVE-2021-29471](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-29471)) against Synapse's push rules implementation. Server admins are encouraged to upgrade.
+This release fixes a denial of service attack ([CVE-2021-29471](https://github.com/matrix-org/synapse/security/advisories/GHSA-x345-32rc-8h85)) against Synapse's push rules implementation. Server admins are encouraged to upgrade.
 
 Internal Changes
 ----------------
