@@ -574,6 +574,7 @@ class RoomCreationHandler(BaseHandler):
         requester: Requester,
         config: JsonDict,
         ratelimit: bool = True,
+        creator: Optional[UserID] = None,
         creator_join_profile: Optional[JsonDict] = None,
     ) -> Tuple[dict, int]:
         """Creates a new room.
@@ -583,6 +584,10 @@ class RoomCreationHandler(BaseHandler):
                 The user who requested the room creation.
             config : A dict of configuration options.
             ratelimit: set to False to disable the rate limiter
+
+            creator:
+                A creator for the new room. If None -> requester will be used.
+                Can only be set if requester is server admin.
 
             creator_join_profile:
                 Set to override the displayname and avatar for the creating
@@ -614,9 +619,7 @@ class RoomCreationHandler(BaseHandler):
         else:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
 
-        if ("creator" in config) and is_requester_admin:
-            creator = UserID.from_string(config["creator"])
-        else:
+        if not creator or not is_requester_admin:
             creator = requester.user
 
         # Check whether the third party rules allows/changes the room create

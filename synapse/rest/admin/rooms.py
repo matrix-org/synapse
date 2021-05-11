@@ -258,7 +258,12 @@ class RoomsRestServlet(RestServlet):
         await assert_user_is_admin(self.auth, requester.user)
 
         content = parse_json_object_from_request(request)
-        response, _ = await self.room_creation_handler.create_room(requester, content)
+        if "creator" in content:
+            creator = UserID.from_string(content["creator"])
+            content.pop("creator")
+        response, _ = await self.room_creation_handler.create_room(
+            requester, content, creator=creator
+        )
 
         return 200, response
 
