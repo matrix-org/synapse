@@ -679,6 +679,19 @@ class RoomCreationHandler(BaseHandler):
             invite_3pid_list = []
             invite_list = []
 
+        if invite_list or invite_3pid_list:
+            try:
+                # If there are invites in the request, see if the ratelimiting settings
+                # allow that number of invites to be sent from the current user.
+                await self.room_member_handler.ratelimit_multiple_invites(
+                    requester,
+                    room_id=None,
+                    n_invites=len(invite_list) + len(invite_3pid_list),
+                    update=False,
+                )
+            except LimitExceededError:
+                raise SynapseError(400, "Cannot invite so many users at once")
+
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
         power_level_content_override = config.get("power_level_content_override")
@@ -701,17 +714,6 @@ class RoomCreationHandler(BaseHandler):
             is_public=is_public,
             room_version=room_version,
         )
-
-        if invite_list or invite_3pid_list:
-            try:
-                await self.room_member_handler.ratelimit_multiple_invites(
-                    requester,
-                    room_id,
-                    nb_invites=len(invite_list) + len(invite_3pid_list),
-                    update=False,
-                )
-            except LimitExceededError:
-                raise SynapseError(400, "Cannot invite so many users at once")
 
         # Check whether this visibility value is blocked by a third party module
         allowed_by_third_party_rules = await (

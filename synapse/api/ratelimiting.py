@@ -57,7 +57,7 @@ class Ratelimiter:
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
-        nb_actions: int = 1,
+        n_actions: int = 1,
         _time_now_s: Optional[int] = None,
     ) -> Tuple[bool, float]:
         """Can the entity (e.g. user or IP address) perform the action?
@@ -77,7 +77,9 @@ class Ratelimiter:
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
             update: Whether to count this check as performing the action
-            nb_actions: The number of actions the user wants to do.
+            n_actions: The number of times the user wants to do this action. If the user
+                cannot do all of the actions, the user's action count is not incremented
+                at all.
             _time_now_s: The current time. Optional, defaults to the current time according
                 to self.clock. Only used by tests.
 
@@ -126,18 +128,16 @@ class Ratelimiter:
         time_delta = time_now_s - time_start
         performed_count = action_count - time_delta * rate_hz
         if performed_count < 0:
-            # Whether the actions are allowed depends if performing them exceeds the
-            # burst count.
-            allowed = nb_actions <= burst_count
+            performed_count = 0
             time_start = time_now_s
-            action_count = nb_actions
-        elif performed_count + nb_actions > burst_count:
+
+        if performed_count + n_actions > burst_count:
             # Deny, we have exceeded our burst count
             allowed = False
         else:
             # We haven't reached our limit yet
             allowed = True
-            action_count += nb_actions
+            action_count += n_actions
 
         if update:
             self.actions[key] = (action_count, time_start, rate_hz)

@@ -166,8 +166,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     async def ratelimit_multiple_invites(
         self,
         requester: Optional[Requester],
-        room_id: str,
-        nb_invites: int,
+        room_id: Optional[str],
+        n_invites: int,
         update: bool = True,
     ):
         """Ratelimit more than one invite sent by the given requester in the given room.
@@ -175,7 +175,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Args:
             requester: The requester sending the invites.
             room_id: The room the invites are being sent in.
-            nb_invites: The amount of invites to ratelimit for.
+            n_invites: The amount of invites to ratelimit for.
             update: Whether to update the ratelimiter's cache.
 
         Raises:
@@ -185,7 +185,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             requester,
             room_id,
             update=update,
-            nb_actions=nb_invites,
+            nb_actions=n_invites,
         )
 
     async def ratelimit_invite(
