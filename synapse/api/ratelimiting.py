@@ -185,7 +185,7 @@ class Ratelimiter:
         rate_hz: Optional[float] = None,
         burst_count: Optional[int] = None,
         update: bool = True,
-        nb_actions: int = 1,
+        n_actions: int = 1,
         _time_now_s: Optional[int] = None,
     ):
         """Checks if an action can be performed. If not, raises a LimitExceededError
@@ -205,7 +205,7 @@ class Ratelimiter:
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
             update: Whether to count this check as performing the action
-            nb_actions: The number of actions the user wants to do.
+            n_actions: The number of actions the user wants to do.
             _time_now_s: The current time. Optional, defaults to the current time according
                 to self.clock. Only used by tests.
 
@@ -221,7 +221,7 @@ class Ratelimiter:
             rate_hz=rate_hz,
             burst_count=burst_count,
             update=update,
-            nb_actions=nb_actions,
+            n_actions=n_actions,
             _time_now_s=time_now_s,
         )
 

@@ -270,7 +270,7 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         self.assertEquals(20.0, time_allowed)
 
         allowed, time_allowed = self.get_success_or_raise(
-            limiter.can_do_action(None, key="test_id", n_actions=2,_time_now_s=10)
+            limiter.can_do_action(None, key="test_id", n_actions=2, _time_now_s=10)
         )
         self.assertFalse(allowed)
         self.assertEquals(10.0, time_allowed)
