@@ -185,7 +185,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             requester,
             room_id,
             update=update,
-            nb_actions=n_invites,
+            n_actions=n_invites,
         )
 
     async def ratelimit_invite(
