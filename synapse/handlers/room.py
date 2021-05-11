@@ -1327,7 +1327,7 @@ class RoomShutdownHandler:
             new_room_id = None
             logger.info("Shutting down room %r", room_id)
 
-        users = await self.state.get_current_users_in_room(room_id)
+        users = await self.store.get_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
         for user_id in users:
