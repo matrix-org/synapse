@@ -459,7 +459,7 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
     # If order is not a string or doesn't meet the requirements, ignore it.
     if not isinstance(order, str):
         order = None
-    elif len(order) > 50 or _INVALID_ORDER_CHARS_RE.match(order):
+    elif len(order) > 50 or _INVALID_ORDER_CHARS_RE.search(order):
         order = None
 
     # Items without an order come last.

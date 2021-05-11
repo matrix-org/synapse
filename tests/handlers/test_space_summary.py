@@ -72,7 +72,7 @@ class TestSpaceSummarySort(unittest.TestCase):
 
     def test_invalid_ordering_value(self):
         """Invalid orderings are considered the same as missing."""
-        ev1 = _create_event("!abc:test", "\nfoo")
+        ev1 = _create_event("!abc:test", "foo\n")
         ev2 = _create_event("!xyz:test", "xyz")
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
