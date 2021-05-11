@@ -91,10 +91,11 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
         self._presence_handler = hs.get_presence_handler()
 
     @staticmethod
-    async def _serialize_payload(user_id, state, ignore_status_msg=False):
+    async def _serialize_payload(user_id, state, ignore_status_msg=False, force_notify=False):
         return {
             "state": state,
             "ignore_status_msg": ignore_status_msg,
+            "force_notify": force_notify,
         }
 
     async def _handle_request(self, request, user_id):

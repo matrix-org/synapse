@@ -413,7 +413,6 @@ def _test_sending_local_online_presence_to_local_user(self: HomeserverTestCase, 
 
     if test_with_workers:
         self.replicate()
-    self.pump(0.1)
 
     # The presence receiver should have received online presence again.
     print("Sync token initially:", sync_token)
