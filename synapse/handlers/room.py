@@ -591,10 +591,6 @@ class RoomCreationHandler(BaseHandler):
                 values to go in the body of the 'join' event (typically
                 `avatar_url` and/or `displayname`.
 
-            owner:
-                An owner for the new room. If None -> requester will be used.
-                Can only be set if requester is server admin.
-
         Returns:
                 First, a dict containing the keys `room_id` and, if an alias
                 was, requested, `room_alias`. Secondly, the stream_id of the
@@ -618,8 +614,8 @@ class RoomCreationHandler(BaseHandler):
         else:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
 
-        if ("owner" in config) and is_requester_admin:
-            creator = UserID.from_string(config["owner"])
+        if ("creator" in config) and is_requester_admin:
+            creator = UserID.from_string(config["creator"])
         else:
             creator = requester.user
 
