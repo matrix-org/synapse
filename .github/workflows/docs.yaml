@@ -1,0 +1,34 @@
+name: Deploy the documentation
+#on:
+#  release:
+#    types: [created]
+
+on:
+  push:
+    branches:
+      - develop
+
+  workflow_dispatch:
+
+jobs:
+  pages:
+    name: GitHub Pages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Setup mdbook
+        uses: peaceiris/actions-mdbook@v1
+        with:
+          mdbook-version: '0.4.8'
+
+      - name: Build the documentatino
+        run: mdbook build
+
+      - name: Deploy latest documentation
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          keep_files: true
+          publish_dir: ./book
+          destination_dir: ./latest
