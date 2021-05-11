@@ -1521,6 +1521,7 @@ room_prejoin_state:
    # - m.room.avatar
    # - m.room.encryption
    # - m.room.name
+   # - m.room.create
    #
    # Uncomment the following to disable these defaults (so that only the event
    # types listed in 'additional_event_types' are shared). Defaults to 'false'.
