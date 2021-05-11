@@ -1,3 +1,19 @@
+Synapse 1.33.2 (2021-05-11)
+===========================
+
+Due to the security issue highlighted below, server administrators are encouraged to update Synapse. We are not aware of these vulnerabilities being exploited in the wild.
+
+Security advisory
+-----------------
+
+This release fixes a denial of service attack ([CVE-2021-29471](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-29471)) against Synapse's push rules implementation. Server admins are encouraged to upgrade.
+
+Internal Changes
+----------------
+
+- Unpin attrs dependency. ([\#9946](https://github.com/matrix-org/synapse/issues/9946))
+
+
 Synapse 1.33.1 (2021-05-06)
 ===========================
 
