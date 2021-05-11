@@ -627,7 +627,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             url.encode("ascii"),
-            {"owner": user_1},
+            {"creator": user_1},
             access_token=self.admin_user_tok,
         )
 
