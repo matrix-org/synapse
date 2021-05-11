@@ -1001,14 +1001,14 @@ class TransportLayerClient:
         )
 
         params = {
-            "suggested_only": "true" if suggested_only else "false",
+            "suggested_only": suggested_only,
             "exclude_rooms": exclude_rooms,
         }
         if max_rooms_per_space is not None:
-            params["max_rooms_per_space"] = str(max_rooms_per_space)
+            params["max_rooms_per_space"] = max_rooms_per_space
 
-        return await self.client.get_json(
-            destination=destination, path=path, args=params
+        return await self.client.post_json(
+            destination=destination, path=path, data=params
         )
 
 
