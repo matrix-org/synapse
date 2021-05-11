@@ -38,7 +38,7 @@ from synapse.api.errors import (
     LimitExceededError,
     NotFoundError,
     StoreError,
-    SynapseError
+    SynapseError,
 )
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion

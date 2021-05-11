@@ -463,15 +463,7 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEquals(400, channel.code)
 
-    @unittest.override_config(
-        {
-            "rc_invites": {
-                "per_room": {
-                    "burst_count": 3
-                }
-            }
-        }
-    )
+    @unittest.override_config({"rc_invites": {"per_room": {"burst_count": 3}}})
     def test_post_room_invitees_ratelimit(self):
         """Test that invites sent when creating a room are ratelimited by a RateLimiter,
         which ratelimits them correctly, including by not limiting when the requester is
@@ -480,19 +472,19 @@ class RoomsCreateTestCase(RoomBase):
 
         # Build the request's content. We use local MXIDs because invites over federation
         # are more difficult to mock.
-        content = json.dumps({
-            "invite": [
-                "@alice1:red",
-                "@alice2:red",
-                "@alice3:red",
-                "@alice4:red",
-            ]
-        }).encode("utf8")
+        content = json.dumps(
+            {
+                "invite": [
+                    "@alice1:red",
+                    "@alice2:red",
+                    "@alice3:red",
+                    "@alice4:red",
+                ]
+            }
+        ).encode("utf8")
 
         # Test that the invites are correctly ratelimited.
-        channel = self.make_request(
-            "POST", "/createRoom", content
-        )
+        channel = self.make_request("POST", "/createRoom", content)
         self.assertEqual(400, channel.code)
         self.assertEqual(
             "Cannot invite so many users at once",
@@ -505,9 +497,7 @@ class RoomsCreateTestCase(RoomBase):
         )
 
         # Test that the invites aren't ratelimited anymore.
-        channel = self.make_request(
-            "POST", "/createRoom", content
-        )
+        channel = self.make_request("POST", "/createRoom", content)
         self.assertEqual(200, channel.code)
 
 
