@@ -116,9 +116,12 @@ class EventTypes:
     MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
 
+class ToDeviceEventTypes:
+    RoomKeyRequest = "m.room_key_request"
+
+
 class EduTypes:
     Presence = "m.presence"
-    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:

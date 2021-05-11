@@ -995,6 +995,7 @@ class TransportLayerClient:
                returned per space
             exclude_rooms: a list of any rooms we can skip
         """
+        # TODO When switching to the stable endpoint, use GET instead of POST.
         path = _create_path(
             FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/spaces/%s", room_id
         )
