@@ -285,8 +285,8 @@ end of the list.
 
 The Create Room admin API allows server admins to create a new room on the server.
 It is possible to specify an owner for the room other than the requester himself.
-In that case, the server admin, who made the request **does not** become a member
-of the created room.
+In that case, the server admin who made the request **does not** become a member
+of the created room unless they are explicitly included in the membership list.
 
 ## Usage
 
@@ -296,17 +296,16 @@ The API is:
 POST /_synapse/admin/v1/rooms
 ```
 
-the body parameters are the same as in
-<https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom>
-with one additional optional parameter
+The body parameters are the same as in
+[`POST /_matrix/client/r0/createRoom`](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom)
+with one additional optional parameter:
 ```json
 {
     "owner": "@someuser:example.com"
 }
 ```
 
-The response body is identical to the one of
-<https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom>
+The response body is identical to that of [`POST /_matrix/client/r0/createRoom`](https://matrix.org/docs/spec/client_server/r0.6.1#post-matrix-client-r0-createroom).
 
 
 # Room Details API
