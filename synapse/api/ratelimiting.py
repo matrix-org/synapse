@@ -205,7 +205,9 @@ class Ratelimiter:
             burst_count: How many actions that can be performed before being limited.
                 Overrides the value set during instantiation if set.
             update: Whether to count this check as performing the action
-            n_actions: The number of actions the user wants to do.
+            n_actions: The number of times the user wants to do this action. If the user
+                cannot do all of the actions, the user's action count is not incremented
+                at all.
             _time_now_s: The current time. Optional, defaults to the current time according
                 to self.clock. Only used by tests.
 
