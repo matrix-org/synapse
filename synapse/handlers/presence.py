@@ -296,6 +296,30 @@ class BasePresenceHandler(abc.ABC):
         for destinations, states in hosts_and_states:
             self._federation.send_presence_to_destinations(states, destinations)
 
+    async def resend_current_presence_for_users(self, user_ids: Iterable[str]):
+        """
+        Grabs the current presence state for a given set of users and adds it
+        to the top of the presence stream.
+
+        Args:
+            user_ids: The IDs of the users to use.
+        """
+        # Get the current presence state for each user (defaults to offline if not found)
+        current_presence_for_users = await self.current_state_for_users(user_ids)
+
+        for user_id, current_presence_state in current_presence_for_users.items():
+            # Convert the UserPresenceState object into a serializable dict
+            state = {
+                "presence": current_presence_state.state,
+                "status_message": current_presence_state.status_msg,
+            }
+
+            # Copy the presence state to the tip of the presence stream
+            print(f"Adding a presence update for {user_id}: {state}")
+            await self.set_state(UserID.from_string(user_id), state)
+
+        print("bla")
+
 
 class _NullContextManager(ContextManager[None]):
     """A context manager which does nothing."""
