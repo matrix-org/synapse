@@ -57,6 +57,7 @@ class PresenceStore(SQLBaseStore):
                 db_conn, "presence_stream", "stream_id"
             )
 
+        self.hs = hs
         self._presence_on_startup = self._get_active_presence(db_conn)
 
         presence_cache_prefill, min_presence_val = self.db_pool.get_cache_dict(
@@ -265,6 +266,14 @@ class PresenceStore(SQLBaseStore):
             ),
             desc="add_users_to_send_full_presence_to",
         )
+
+        # Add a new entry to the presence stream. Since we use stream tokens to determine whether a
+        # local user should receive a full snapshot presence when they sync, we need to bump the
+        # presence stream so that subsequent syncs with no presence activity in between won't result
+        # in the client receiving multiple full snapshots of presence.
+        # If we bump the stream ID, then the user will get a higher stream token next sync, and thus
+        # won't receive another snapshot.
+        await self.hs.get_presence_handler().resend_current_presence_for_users(user_ids)
 
     async def get_presence_for_all_users(
         self,
