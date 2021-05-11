@@ -1376,6 +1376,32 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
     PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
     PATH = "/spaces/(?P<room_id>[^/]*)"
 
+    async def on_GET(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
+        max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
+
+        exclude_rooms = []
+        if b"exclude_rooms" in query:
+            try:
+                exclude_rooms = [
+                    room_id.decode("ascii") for room_id in query[b"exclude_rooms"]
+                ]
+            except Exception:
+                raise SynapseError(
+                    400, "Bad query parameter for exclude_rooms", Codes.INVALID_PARAM
+                )
+
+        return 200, await self.handler.federation_space_summary(
+            room_id, suggested_only, max_rooms_per_space, exclude_rooms
+        )
+
+    # TODO When switching to the stable endpoint, remove the POST handler.
     async def on_POST(
         self,
         origin: str,

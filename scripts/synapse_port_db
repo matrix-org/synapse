@@ -913,10 +913,11 @@ class Porter(object):
                     (curr_forward_id + 1,),
                 )
 
-            txn.execute(
-                "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
-                (curr_backward_id + 1,),
-            )
+            if curr_backward_id:
+                txn.execute(
+                    "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
+                    (curr_backward_id + 1,),
+                )
 
         await self.postgres_store.db_pool.runInteraction(
             "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
@@ -954,10 +955,11 @@ class Porter(object):
                 (curr_chain_id,),
             )
 
-        await self.postgres_store.db_pool.runInteraction(
-            "_setup_event_auth_chain_id", r,
-        )
-
+        if curr_chain_id is not None:
+            await self.postgres_store.db_pool.runInteraction(
+                "_setup_event_auth_chain_id",
+                r,
+            )
 
 
 ##############################################

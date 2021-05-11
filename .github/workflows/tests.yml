@@ -273,7 +273,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Patch Buildkite-specific test scripts
         run: |
-          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/create_postgres_db.py
+          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/postgres_exec.py
           sed -i -e 's/host: postgres/host: localhost/' .buildkite/postgres-config.yaml
           sed -i -e 's|/src/||' .buildkite/{sqlite,postgres}-config.yaml
           sed -i -e 's/\$TOP/\$GITHUB_WORKSPACE/' .coveragerc

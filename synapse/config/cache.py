@@ -17,6 +17,8 @@ import re
 import threading
 from typing import Callable, Dict
 
+from synapse.python_dependencies import DependencyException, check_requirements
+
 from ._base import Config, ConfigError
 
 # The prefix for all cache factor-related environment variables
@@ -188,6 +190,15 @@ class CacheConfig(Config):
                     "caches.per_cache_factors.%s must be a number" % (cache,)
                 )
             self.cache_factors[cache] = factor
+
+        self.track_memory_usage = cache_config.get("track_memory_usage", False)
+        if self.track_memory_usage:
+            try:
+                check_requirements("cache_memory")
+            except DependencyException as e:
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()

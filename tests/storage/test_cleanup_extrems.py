@@ -47,10 +47,8 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
 
         schema_path = os.path.join(
-            prepare_database.dir_path,
-            "databases",
+            prepare_database.schema_path,
             "main",
-            "schema",
             "delta",
             "54",
             "delete_forward_extremities.sql",

@@ -1,0 +1,1 @@
+Fix bugs introduced in v1.23.0 which made the PostgreSQL port script fail when run with a newly-created SQLite database.
