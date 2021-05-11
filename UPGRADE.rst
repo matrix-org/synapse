@@ -92,7 +92,7 @@ Upgrading to v1.34.0
 -----------------------------------------------
 
 The ``room_invite_state_types`` configuration setting has been deprecated and
-replaced with ``disable_default_event_types`` and ``additional_event_types``.
+replaced with ``room_prejoin_state``. See the `sample configuration file <https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515>`_.
 
 If you have set ``room_invite_state_types`` to the default value you should simply
 remove it from your configuration file. The default value used to be:
@@ -112,7 +112,7 @@ your customisations.
 
 If you have customised this value by removing state types, you should rename
 ``room_invite_state_types`` to ``additional_event_types``, and set
-``disable_default_event_types`` to ``true``
+``disable_default_event_types`` to ``true``.
 
 Upgrading to v1.33.0
 ====================
