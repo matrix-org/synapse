@@ -284,7 +284,7 @@ end of the list.
 # Create Room API
 
 The Create Room admin API allows server admins to create a new room on the server.
-It is possible to specify an owner for the room other than the requester himself.
+It is possible to specify a creator for the room other than the requester themselves.
 In that case, the server admin who made the request **does not** become a member
 of the created room unless they are explicitly included in the membership list.
 
@@ -301,7 +301,7 @@ The body parameters are the same as in
 with one additional optional parameter:
 ```json
 {
-    "owner": "@someuser:example.com"
+    "creator": "@someuser:example.com"
 }
 ```
 
