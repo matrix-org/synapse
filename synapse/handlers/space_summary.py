@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # number of rooms to return. We'll stop once we hit this limit.
-# TODO: allow clients to reduce this with a request param.
 MAX_ROOMS = 50
 
 # max number of events to return per room.
