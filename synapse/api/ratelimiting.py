@@ -131,7 +131,7 @@ class Ratelimiter:
             performed_count = 0
             time_start = time_now_s
 
-        if performed_count + n_actions > burst_count:
+        if performed_count > burst_count - n_actions:
             # Deny, we have exceeded our burst count
             allowed = False
         else:
