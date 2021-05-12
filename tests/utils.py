@@ -236,7 +236,7 @@ def setup_test_homeserver(
     else:
         database_config = {
             "name": "sqlite3",
-            "args": {"database": "test.db", "cp_min": 1, "cp_max": 1},
+            "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
     database = DatabaseConnectionConfig("master", database_config)
