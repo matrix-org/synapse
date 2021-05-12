@@ -24,7 +24,6 @@ from synapse.events.utils import serialize_event
 from synapse.http.client import SimpleHttpClient
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.constants import HOUR_IN_MS
 
 if TYPE_CHECKING:
     from synapse.appservice import ApplicationService
@@ -46,6 +45,8 @@ failed_transactions_counter = Counter(
 sent_events_counter = Counter(
     "synapse_appservice_api_sent_events", "Number of events sent to the AS", ["service"]
 )
+
+HOUR_IN_MS = 60 * 60 * 1000
 
 
 APP_SERVICE_PREFIX = "/_matrix/app/unstable"
