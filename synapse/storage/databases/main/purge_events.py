@@ -286,11 +286,13 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 txn, self._get_state_group_for_event, (event_id,)
             )
 
-            # FIXME: this is racy - what if have_seen_event gets called between the
-            #    transaction completing and the invalidation running?
+            # XXX: This is racy, since have_seen_events could be called between the
+            #    transaction completing and the invalidation running. On the other hand,
+            #    that's no different to calling `have_seen_events` just before the
+            #    event is deleted from the database.
             if should_delete:
                 self._invalidate_cache_and_stream(
-                    txn, self.have_seen_event, (event_id,)
+                    txn, self.have_seen_event, (room_id, event_id)
                 )
 
         logger.info("[purge] done")
@@ -434,12 +436,9 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
 
         # TODO: we could probably usefully do a bunch more cache invalidation here
 
-        # we have no way to know which events to clear out of have_seen_event
-        # so just have to drop the whole cache
-        #
-        # FIXME: this is racy - what if have_seen_event gets called between the
-        #    DELETE completing and the invalidation running?
-        self._invalidate_all_cache_and_stream(txn, self.have_seen_event)
+        # XXX: as with purge_history, this is racy, but no worse than other races
+        #   that already exist.
+        self._invalidate_cache_and_stream(txn, self.have_seen_event, (room_id,))
 
         logger.info("[purge] done")
 

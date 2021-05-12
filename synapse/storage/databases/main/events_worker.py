@@ -1046,51 +1046,70 @@ class EventsWorkerStore(SQLBaseStore):
 
         return {r["event_id"] for r in rows}
 
-    async def have_seen_events(self, event_ids: Collection[str]) -> Set[str]:
+    async def have_seen_events(
+        self, room_id: str, event_ids: Iterable[str]
+    ) -> Set[str]:
         """Given a list of event ids, check if we have already processed them.
 
+        The room_id is only used to structure the cache (so that it can later be
+        invalidated by room_id) - there is no guarantee that the events are actually
+        in the room in question.
+
         Args:
-            event_ids (iterable[str]):
+            room_id: Room we are polling
+            event_ids: events we are looking for
 
         Returns:
             set[str]: The events we have already seen.
         """
-        res = await self._have_seen_events_dict(event_ids)
-        return {x for (x, y) in res.items() if y}
+        res = await self._have_seen_events_dict(
+            (room_id, event_id) for event_id in event_ids
+        )
+        return {eid for ((_rid, eid), have_event) in res.items() if have_event}
 
-    @cachedList("have_seen_event", "event_ids")
+    @cachedList("have_seen_event", "keys")
     async def _have_seen_events_dict(
-        self, event_ids: Collection[str]
-    ) -> Dict[str, bool]:
+        self, keys: Iterable[Tuple[str, str]]
+    ) -> Dict[Tuple[str, str], bool]:
         """Helper for have_seen_events
 
-        Returns a dict, which is the right format for @cachedList
+        Returns:
+             a dict {(room_id, event_id)-> bool}
         """
         # if the event cache contains the event, obviously we've seen it.
-        cache_results = {x for x in event_ids if self._get_event_cache.contains(x)}
+        cache_results = {
+            eid for (_rid, eid) in keys if self._get_event_cache.contains(eid)
+        }
         results = {x: True for x in cache_results}
 
-        def have_seen_events_txn(txn, chunk):
+        def have_seen_events_txn(txn, chunk: Tuple[str, ...]):
             # assume everything in this chunk is not found initially
             results.update({x: False for x in chunk})
 
             # check the db and update the results for any row that is found
-            sql = "SELECT event_id FROM events as e WHERE "
+            # NB this deliberately does *not* query on room_id, to make this an
+            #   index-only lookup on `events_event_id_key`.
+            sql = "SELECT event_id FROM events AS e WHERE"
             clause, args = make_in_list_sql_clause(
                 txn.database_engine, "e.event_id", chunk
             )
             txn.execute(sql + clause, args)
             results.update({row[0]: True for row in txn})
 
-        for chunk in batch_iter((x for x in event_ids if x not in cache_results), 100):
+        # each batch requires its own index scan, so we make the batches as big as
+        # possible.
+        for chunk in batch_iter(
+            (eid for (_rid, eid) in keys if eid not in cache_results),
+            500,
+        ):
             await self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )
 
         return results
 
-    @cached(max_entries=100000)
-    async def have_seen_event(self, event_id):
+    @cached(max_entries=100000, tree=True)
+    async def have_seen_event(self, room_id: str, event_id: str):
         # this only exists for the benefit of the @cachedList descriptor on
         # _have_seen_events_dict
         raise NotImplementedError()
