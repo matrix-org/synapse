@@ -73,6 +73,7 @@ class ReplicationPresenceSetState(ReplicationEndpoint):
         {
             "state": { ... },
             "ignore_status_msg": false,
+            "force_notify": false
         }
 
         200 OK

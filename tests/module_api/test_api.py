@@ -313,13 +313,17 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
         self.module_api = homeserver.get_module_api()
-        self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
 
     def make_homeserver(self, reactor, clock):
-        return self.setup_test_homeserver()
+        config = self.default_config()
+        # This isn't a real configuration option but is used to provide the main
+        # homeserver and worker homeserver different options.
+        main_replication_secret = config.pop("main_replication_secret", None)
+        if main_replication_secret:
+            config["worker_replication_secret"] = main_replication_secret
+        return self.setup_test_homeserver(config=config)
 
     def _get_worker_hs_config(self) -> dict:
         config = self.default_config()
@@ -345,7 +349,7 @@ def _test_sending_local_online_presence_to_local_user(self: HomeserverTestCase, 
     """
     if test_with_workers:
         # Create a worker process to make module_api calls against
-        worker_hs = self.make_worker_hs("synapse.app.client_reader")
+        worker_hs = self.make_worker_hs("synapse.app.generic_worker")
 
     # Create a user who will send presence updates
     self.presence_receiver_id = self.register_user("presence_receiver", "monkey")
@@ -403,16 +407,16 @@ def _test_sending_local_online_presence_to_local_user(self: HomeserverTestCase, 
 
     # Trigger sending local online presence on the worker process. We expect this information
     # to be saved to the database where all other workers can access it.
-    self.get_success(
-        module_api_to_use.send_local_online_presence_to(
-            [
-                self.presence_receiver_id,
-            ]
-        )
+    d = module_api_to_use.send_local_online_presence_to(
+        [
+            self.presence_receiver_id,
+        ]
     )
 
     if test_with_workers:
         self.replicate()
+    print(d)
+    self.get_success(d)
 
     # The presence receiver should have received online presence again.
     print("Sync token initially:", sync_token)
