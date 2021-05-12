@@ -146,12 +146,24 @@ class SpaceSummaryHandler:
                 rooms = []  # type: List[JsonDict]
                 events = []
                 for room in fed_rooms:
-                    # Pull whether it is world readable from the returned information
-                    # since we may not have the state of this room.
-                    include_room = room.get("world_readable") is True
                     fed_room_id = room.get("room_id")
+                    if not fed_room_id:
+                        continue
 
-                    if not include_room and fed_room_id:
+                    # Check whether the room is world readable from the response.
+                    include_room = room.get("world_readable") is True
+
+                    # If the room is not world-readable, get the allowed spaces from
+                    # the response.
+                    allowed_spaces = room.get("allowed_spaces")
+                    if not include_room and allowed_spaces:
+                        include_room = await self._event_auth_handler.user_in_rooms(
+                            allowed_spaces, requester
+                        )
+
+                    # Finally, check ourselves if we can access the room (this will
+                    # fail if we don't have any state for this room).
+                    if not include_room:
                         include_room = await self._is_room_accessible(
                             fed_room_id, requester, None
                         )
@@ -198,6 +210,11 @@ class SpaceSummaryHandler:
                     _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
                 )
                 processed_events.add(ev_key)
+
+        # Before returning to the client, remove the allowed_spaces key for any
+        # rooms.
+        for room in rooms_result:
+            room.pop("allowed_spaces", None)
 
         return {"rooms": rooms_result, "events": events_result}
 
@@ -486,6 +503,14 @@ class SpaceSummaryHandler:
         if not room_type:
             room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
 
+        room_version = await self._store.get_room_version(room_id)
+        (
+            allow_via_spaces,
+            allowed_spaces,
+        ) = await self._event_auth_handler.get_allowed_spaces(
+            current_state_ids, room_version
+        )
+
         entry = {
             "room_id": stats["room_id"],
             "name": stats["name"],
@@ -499,6 +524,7 @@ class SpaceSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
             "room_type": room_type,
+            "allowed_spaces": allowed_spaces if allow_via_spaces else None,
         }
 
         # Filter out Nones – rather omit the field altogether
