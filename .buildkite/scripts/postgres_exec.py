@@ -1,4 +1,5 @@
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+#!/usr/bin/env python
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
+import sys
 
-from synapse.logging._remote import RemoteHandler
-from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
+import psycopg2
 
-# These are imported to allow for nicer logging configuration files.
-__all__ = ["RemoteHandler", "JsonFormatter", "TerseJsonFormatter"]
+# a very simple replacment for `psql`, to make up for the lack of the postgres client
+# libraries in the synapse docker image.
 
-# Debug logger for https://github.com/matrix-org/synapse/issues/9533 etc
-issue9533_logger = logging.getLogger("synapse.9533_debug")
+# We use "postgres" as a database because it's bound to exist and the "synapse" one
+# doesn't exist yet.
+db_conn = psycopg2.connect(
+    user="postgres", host="postgres", password="postgres", dbname="postgres"
+)
+db_conn.autocommit = True
+cur = db_conn.cursor()
+for c in sys.argv[1:]:
+    cur.execute(c)

@@ -741,6 +741,12 @@ acme:
 #
 #allow_profile_lookup_over_federation: false
 
+# Uncomment to disable device display name lookup over federation. By default, the
+# Federation API allows other homeservers to obtain device display names of any user
+# on this homeserver. Defaults to 'true'.
+#
+#allow_device_name_lookup_over_federation: false
+
 
 ## Caching ##
 
@@ -1515,6 +1521,7 @@ room_prejoin_state:
    # - m.room.avatar
    # - m.room.encryption
    # - m.room.name
+   # - m.room.create
    #
    # Uncomment the following to disable these defaults (so that only the event
    # types listed in 'additional_event_types' are shared). Defaults to 'false'.
