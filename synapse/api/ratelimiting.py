@@ -131,6 +131,10 @@ class Ratelimiter:
             performed_count = 0
             time_start = time_now_s
 
+        # This check would be easier read as performed_count + n_actions > burst_count,
+        # but performed_count might be a very precise float (with lots of numbers
+        # following the point) in which case Python might round it up when adding it to
+        # n_actions. Writing it this way ensures it doesn't happen.
         if performed_count > burst_count - n_actions:
             # Deny, we have exceeded our burst count
             allowed = False
