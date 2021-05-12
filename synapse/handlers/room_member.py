@@ -163,6 +163,31 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     async def forget(self, user: UserID, room_id: str) -> None:
         raise NotImplementedError()
 
+    async def ratelimit_multiple_invites(
+        self,
+        requester: Optional[Requester],
+        room_id: Optional[str],
+        n_invites: int,
+        update: bool = True,
+    ):
+        """Ratelimit more than one invite sent by the given requester in the given room.
+
+        Args:
+            requester: The requester sending the invites.
+            room_id: The room the invites are being sent in.
+            n_invites: The amount of invites to ratelimit for.
+            update: Whether to update the ratelimiter's cache.
+
+        Raises:
+            LimitExceededError: The requester can't send that many invites in the room.
+        """
+        await self._invites_per_room_limiter.ratelimit(
+            requester,
+            room_id,
+            update=update,
+            n_actions=n_invites,
+        )
+
     async def ratelimit_invite(
         self,
         requester: Optional[Requester],
