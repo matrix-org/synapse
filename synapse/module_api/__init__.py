@@ -400,12 +400,6 @@ class ModuleApi:
         Note that this method can only be run on the main or federation_sender worker
         processes.
         """
-        if not self._hs.should_send_federation():
-            raise Exception(
-                "send_local_online_presence_to can only be run "
-                "on processes that send federation",
-            )
-
         local_users = set()
         remote_users = set()
         for user in users:
@@ -413,6 +407,12 @@ class ModuleApi:
                 local_users.add(user)
             else:
                 remote_users.add(user)
+
+        if remote_users and not self._hs.should_send_federation():
+            raise Exception(
+                "send_local_online_presence_to can only be called "
+                "with remote users on processes that send federation",
+            )
 
         if local_users:
             # Force a presence initial_sync for these users next time they sync.
