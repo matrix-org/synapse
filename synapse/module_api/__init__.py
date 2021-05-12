@@ -397,13 +397,17 @@ class ModuleApi:
         Updates to remote users will be sent immediately, whereas local users will receive
         them on their next sync attempt.
 
-        Note that this method can only be run on the main or federation_sender worker
-        processes.
+        Note that this method can only be run on the main or worker processes that have the
+        ability to write to the presence stream.
         """
-        if not self._hs.should_send_federation():
+        if (
+            self._hs.config.worker_app
+            and self._hs._instance_name not in self._hs.config.worker.writers.presence
+        ):
             raise Exception(
                 "send_local_online_presence_to can only be run "
-                "on processes that send federation",
+                "on processes that have the ability to write to the"
+                "presence stream (this includes the main process)",
             )
 
         local_users = set()
@@ -430,7 +434,7 @@ class ModuleApi:
             # We pull out the presence handler here to break a cyclic
             # dependency between the presence router and module API.
             presence_handler = self._hs.get_presence_handler()
-            await presence_handler.maybe_send_presence_to_interested_destinations(
+            await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events
             )
 

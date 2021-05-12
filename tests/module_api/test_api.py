@@ -314,6 +314,15 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
         presence.register_servlets,
     ]
 
+    def default_config(self):
+        conf = super().default_config()
+        conf["redis"] = {"enabled": "true"}
+        conf["stream_writers"] = {"presence": ["presence_writer"]}
+        conf["instance_map"] = {
+            "presence_writer": {"host": "testserv", "port": 1001},
+        }
+        return conf
+
     def prepare(self, reactor, clock, homeserver):
         self.module_api = homeserver.get_module_api()
         self.sync_handler = homeserver.get_sync_handler()
@@ -343,7 +352,9 @@ def _test_sending_local_online_presence_to_local_user(
     """
     if test_with_workers:
         # Create a worker process to make module_api calls against
-        worker_hs = test_case.make_worker_hs("synapse.app.generic_worker")
+        worker_hs = test_case.make_worker_hs(
+            "synapse.app.generic_worker", {"worker_name": "presence_writer"}
+        )
 
     # Create a user who will send presence updates
     test_case.presence_receiver_id = test_case.register_user(
@@ -471,13 +482,21 @@ def _test_sending_local_online_presence_to_local_user(
     test_case.assertEqual(len(presence_updates), 1)
 
     # Now trigger sending local online presence.
-    test_case.get_success(
-        test_case.module_api.send_local_online_presence_to(
-            [
-                test_case.presence_receiver_id,
-            ]
-        )
+    d = module_api_to_use.send_local_online_presence_to(
+        [
+            test_case.presence_receiver_id,
+        ]
     )
+    d = defer.ensureDeferred(d)
+
+    if test_with_workers:
+        # In order for the required presence_set_state replication request to occur between the
+        # worker and main process, we need to pump the reactor. Otherwise, the coordinator that
+        # reads the request on the main process won't do so, and the request will time out.
+        while not d.called:
+            test_case.reactor.advance(0.1)
+
+    test_case.get_success(d)
 
     # Presence receiver should *not* have received offline state
     presence_updates, sync_token = sync_presence(
