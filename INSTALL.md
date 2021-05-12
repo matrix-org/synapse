@@ -164,13 +164,26 @@ sudo dnf groupinstall "Development Tools"
 
 ##### macOS
 
-Installing prerequisites on macOS:
+Installing prerequisites on macOS (Big Sur):
 
+You'll need the updated Xcode developer tools:
 ```sh
 xcode-select --install
-sudo easy_install pip
-sudo pip install virtualenv
-brew install pkg-config libffi
+```
+
+Install virtualenv with Pip:
+```sh
+sudo pip3 install virtualenv
+```
+
+Install Homebrew:
+```sh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Install libjpeg:
+```sh
+brew install jpeg
 ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
