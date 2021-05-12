@@ -315,10 +315,7 @@ class BasePresenceHandler(abc.ABC):
             }
 
             # Copy the presence state to the tip of the presence stream
-            print(f"Adding a presence update for {user_id}: {state}")
             await self.set_state(UserID.from_string(user_id), state, force_notify=True)
-
-        print("bla")
 
 
 class _NullContextManager(ContextManager[None]):

@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from twisted.internet import defer
 from unittest.mock import Mock
 
 from synapse.api.constants import EduTypes
@@ -227,8 +228,8 @@ class ModuleApiTestCase(HomeserverTestCase):
     def test_send_local_online_presence_to_federation(self):
         """Tests that send_local_presence_to_users sends local online presence to remote users."""
         # Create a user who will send presence updates
-        self.presence_sender_id = self.register_user("presence_sender", "monkey")
-        self.presence_sender_tok = self.login("presence_sender", "monkey")
+        self.presence_sender_id = self.register_user("presence_sender1", "monkey")
+        self.presence_sender_tok = self.login("presence_sender1", "monkey")
 
         # And a room they're a part of
         room_id = self.helper.create_room_as(
@@ -313,29 +314,23 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
     ]
 
     def prepare(self, reactor, clock, homeserver):
-        self.store = homeserver.get_datastore()
         self.module_api = homeserver.get_module_api()
-        self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
-
-    def make_homeserver(self, reactor, clock):
-        return self.setup_test_homeserver()
-
-    def _get_worker_hs_config(self) -> dict:
-        config = self.default_config()
-        config["worker_app"] = "synapse.app.generic_worker"
-        config["worker_replication_host"] = "testserv"
-        config["worker_replication_http_port"] = "8765"
-
-        return config
 
     def test_send_local_online_presence_to_workers(self):
         # Test sending local online presence to users from a worker process
         _test_sending_local_online_presence_to_local_user(self, test_with_workers=True)
 
 
-def _test_sending_local_online_presence_to_local_user(self: HomeserverTestCase, test_with_workers: bool = False):
+def _test_sending_local_online_presence_to_local_user(test_case: HomeserverTestCase, test_with_workers: bool = False):
     """Tests that send_local_presence_to_users sends local online presence to local users.
+
+    This simultaneously tests two different usecases:
+        * Testing that this method works when either called from a worker or the main process.
+            - We test this by calling this method from both a TestCase that runs in monolith mode, and one that
+              runs with a main and generic_worker.
+        * Testing that multiple devices syncing simultaneously will all receive a snapshot of local,
+            online presence - but only once per device.
 
     Args:
         test_with_workers: If True, this method will call ModuleApi.send_local_online_presence_to on a
@@ -345,135 +340,136 @@ def _test_sending_local_online_presence_to_local_user(self: HomeserverTestCase, 
     """
     if test_with_workers:
         # Create a worker process to make module_api calls against
-        worker_hs = self.make_worker_hs("synapse.app.client_reader")
+        worker_hs = test_case.make_worker_hs("synapse.app.generic_worker")
 
     # Create a user who will send presence updates
-    self.presence_receiver_id = self.register_user("presence_receiver", "monkey")
-    self.presence_receiver_tok = self.login("presence_receiver", "monkey")
+    test_case.presence_receiver_id = test_case.register_user("presence_receiver1", "monkey")
+    test_case.presence_receiver_tok = test_case.login("presence_receiver1", "monkey")
 
     # And another user that will send presence updates out
-    self.presence_sender_id = self.register_user("presence_sender", "monkey")
-    self.presence_sender_tok = self.login("presence_sender", "monkey")
+    test_case.presence_sender_id = test_case.register_user("presence_sender2", "monkey")
+    test_case.presence_sender_tok = test_case.login("presence_sender2", "monkey")
 
     # Put them in a room together so they will receive each other's presence updates
-    room_id = self.helper.create_room_as(
-        self.presence_receiver_id,
-        tok=self.presence_receiver_tok,
+    room_id = test_case.helper.create_room_as(
+        test_case.presence_receiver_id,
+        tok=test_case.presence_receiver_tok,
     )
-    self.helper.join(room_id, self.presence_sender_id, tok=self.presence_sender_tok)
+    test_case.helper.join(room_id, test_case.presence_sender_id, tok=test_case.presence_sender_tok)
 
     # Presence sender comes online
     send_presence_update(
-        self,
-        self.presence_sender_id,
-        self.presence_sender_tok,
+        test_case,
+        test_case.presence_sender_id,
+        test_case.presence_sender_tok,
         "online",
         "I'm online!",
     )
 
     # Presence receiver should have received it
-    presence_updates, sync_token = sync_presence(self, self.presence_receiver_id)
-    self.assertEqual(len(presence_updates), 1)
+    presence_updates, sync_token = sync_presence(test_case, test_case.presence_receiver_id)
+    test_case.assertEqual(len(presence_updates), 1)
 
     presence_update = presence_updates[0]  # type: UserPresenceState
-    self.assertEqual(presence_update.user_id, self.presence_sender_id)
-    self.assertEqual(presence_update.state, "online")
+    test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
+    test_case.assertEqual(presence_update.state, "online")
 
     if test_with_workers:
         # Replicate the current sync presence token from the main process to the worker process.
         # We need to do this so that the worker process knows the current presence stream ID to
         # insert into the database when we call ModuleApi.send_local_online_presence_to.
-        self.replicate()
+        test_case.replicate()
 
     # Syncing again should result in no presence updates
     presence_updates, sync_token = sync_presence(
-        self, self.presence_receiver_id, sync_token
+        test_case, test_case.presence_receiver_id, sync_token
     )
-    self.assertEqual(len(presence_updates), 0)
+    test_case.assertEqual(len(presence_updates), 0)
 
     # We do an (initial) sync with a second "device" now, getting a new sync token.
     # We'll use this in a moment.
-    _, sync_token_second_device = sync_presence(self, self.presence_receiver_id)
+    _, sync_token_second_device = sync_presence(test_case, test_case.presence_receiver_id)
 
-    # Determine on which worker to call ModuleApi.send_local_online_presence_to on
+    # Determine on which process (main or worker) to call ModuleApi.send_local_online_presence_to on
     if test_with_workers:
         module_api_to_use = worker_hs.get_module_api()
     else:
-        module_api_to_use = self.module_api
+        module_api_to_use = test_case.module_api
 
-    # Trigger sending local online presence on the worker process. We expect this information
-    # to be saved to the database where all other workers can access it.
-    self.get_success(
-        module_api_to_use.send_local_online_presence_to(
-            [
-                self.presence_receiver_id,
-            ]
-        )
+    # Trigger sending local online presence. We expect this information
+    # to be saved to the database where all processes can access it.
+    # Note that we're syncing via the master.
+    d = module_api_to_use.send_local_online_presence_to(
+        [
+            test_case.presence_receiver_id,
+        ]
     )
+    d = defer.ensureDeferred(d)
 
     if test_with_workers:
-        self.replicate()
+        # In order for the required presence_set_state replication request to occur between the
+        # worker and main process, we need to pump the reactor. Otherwise, the coordinator that
+        # reads the request on the main process won't do so, and the request will time out.
+        while not d.called:
+            test_case.reactor.advance(0.1)
+
+    test_case.get_success(d)
 
     # The presence receiver should have received online presence again.
-    print("Sync token initially:", sync_token)
     presence_updates, sync_token = sync_presence(
-        self, self.presence_receiver_id, sync_token
+        test_case, test_case.presence_receiver_id, sync_token
     )
-    self.assertEqual(len(presence_updates), 1)
-    print("Sync token after a sync:", sync_token)
+    test_case.assertEqual(len(presence_updates), 1)
 
     presence_update = presence_updates[0]  # type: UserPresenceState
-    self.assertEqual(presence_update.user_id, self.presence_sender_id)
-    self.assertEqual(presence_update.state, "online")
+    test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
+    test_case.assertEqual(presence_update.state, "online")
 
     # We attempt to sync with the second sync token we received above - just to check that
     # multiple syncing devices will each receive the necessary online presence.
     presence_updates, sync_token_second_device = sync_presence(
-        self, self.presence_receiver_id, sync_token_second_device
+        test_case, test_case.presence_receiver_id, sync_token_second_device
     )
-    self.assertEqual(len(presence_updates), 1)
+    test_case.assertEqual(len(presence_updates), 1)
 
     presence_update = presence_updates[0]  # type: UserPresenceState
-    self.assertEqual(presence_update.user_id, self.presence_sender_id)
-    self.assertEqual(presence_update.state, "online")
+    test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
+    test_case.assertEqual(presence_update.state, "online")
 
     # However, if we now sync with either "device", we won't receive another burst of online presence
     # until the API is called again sometime in the future
     presence_updates, sync_token = sync_presence(
-        self, self.presence_receiver_id, sync_token
+        test_case, test_case.presence_receiver_id, sync_token
     )
-    print("Sync token after the second sync:", sync_token)
-    print(presence_updates)
 
     # Now we check that we don't receive *offline* updates using ModuleApi.send_local_online_presence_to.
 
     # Presence sender goes offline
     send_presence_update(
-        self,
-        self.presence_sender_id,
-        self.presence_sender_tok,
+        test_case,
+        test_case.presence_sender_id,
+        test_case.presence_sender_tok,
         "offline",
         "I slink back into the darkness.",
     )
 
     # Presence receiver should have received the updated, offline state
     presence_updates, sync_token = sync_presence(
-        self, self.presence_receiver_id, sync_token
+        test_case, test_case.presence_receiver_id, sync_token
     )
-    print("Sync token after the third sync:", sync_token)
-    self.assertEqual(len(presence_updates), 1)
+    test_case.assertEqual(len(presence_updates), 1)
 
     # Now trigger sending local online presence.
-    self.get_success(
-        self.module_api.send_local_online_presence_to(
+    test_case.get_success(
+        test_case.module_api.send_local_online_presence_to(
             [
-                self.presence_receiver_id,
+                test_case.presence_receiver_id,
             ]
         )
     )
 
     # Presence receiver should *not* have received offline state
     presence_updates, sync_token = sync_presence(
-        self, self.presence_receiver_id, sync_token
+        test_case, test_case.presence_receiver_id, sync_token
     )
-    self.assertEqual(len(presence_updates), 0)
+    test_case.assertEqual(len(presence_updates), 0)
