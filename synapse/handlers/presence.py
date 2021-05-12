@@ -222,7 +222,11 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     async def set_state(
-        self, target_user: UserID, state: JsonDict, ignore_status_msg: bool = False, force_notify: bool = False
+        self,
+        target_user: UserID,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user. """
 
@@ -700,7 +704,9 @@ class PresenceHandler(BasePresenceHandler):
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
 
-    async def _update_states(self, new_states: Iterable[UserPresenceState], force_notify: bool = False) -> None:
+    async def _update_states(
+        self, new_states: Iterable[UserPresenceState], force_notify: bool = False
+    ) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
         should be sent to clients/servers.
@@ -1084,7 +1090,11 @@ class PresenceHandler(BasePresenceHandler):
             await self._update_states(updates)
 
     async def set_state(
-        self, target_user: UserID, state: JsonDict, ignore_status_msg: bool = False, force_notify: bool = False
+        self,
+        target_user: UserID,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
         """Set the presence state of the user."""
         status_msg = state.get("status_msg", None)
@@ -1117,7 +1127,9 @@ class PresenceHandler(BasePresenceHandler):
         ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
-        await self._update_states([prev_state.copy_and_replace(**new_fields)], force_notify=force_notify)
+        await self._update_states(
+            [prev_state.copy_and_replace(**new_fields)], force_notify=force_notify
+        )
 
     async def is_visible(self, observed_user: UserID, observer_user: UserID) -> bool:
         """Returns whether a user can see another user's presence."""

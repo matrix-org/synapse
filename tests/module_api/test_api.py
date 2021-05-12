@@ -11,8 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from twisted.internet import defer
 from unittest.mock import Mock
+
+from twisted.internet import defer
 
 from synapse.api.constants import EduTypes
 from synapse.events import EventBase
@@ -20,12 +21,12 @@ from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, presence, room
-from synapse.types import create_requester, StreamToken
+from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
+from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
-from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.utils import USE_POSTGRES_FOR_TESTS
 
 
@@ -322,7 +323,9 @@ class ModuleApiWorkerTestCase(BaseMultiWorkerStreamTestCase):
         _test_sending_local_online_presence_to_local_user(self, test_with_workers=True)
 
 
-def _test_sending_local_online_presence_to_local_user(test_case: HomeserverTestCase, test_with_workers: bool = False):
+def _test_sending_local_online_presence_to_local_user(
+    test_case: HomeserverTestCase, test_with_workers: bool = False
+):
     """Tests that send_local_presence_to_users sends local online presence to local users.
 
     This simultaneously tests two different usecases:
@@ -343,7 +346,9 @@ def _test_sending_local_online_presence_to_local_user(test_case: HomeserverTestC
         worker_hs = test_case.make_worker_hs("synapse.app.generic_worker")
 
     # Create a user who will send presence updates
-    test_case.presence_receiver_id = test_case.register_user("presence_receiver1", "monkey")
+    test_case.presence_receiver_id = test_case.register_user(
+        "presence_receiver1", "monkey"
+    )
     test_case.presence_receiver_tok = test_case.login("presence_receiver1", "monkey")
 
     # And another user that will send presence updates out
@@ -355,7 +360,9 @@ def _test_sending_local_online_presence_to_local_user(test_case: HomeserverTestC
         test_case.presence_receiver_id,
         tok=test_case.presence_receiver_tok,
     )
-    test_case.helper.join(room_id, test_case.presence_sender_id, tok=test_case.presence_sender_tok)
+    test_case.helper.join(
+        room_id, test_case.presence_sender_id, tok=test_case.presence_sender_tok
+    )
 
     # Presence sender comes online
     send_presence_update(
@@ -367,7 +374,9 @@ def _test_sending_local_online_presence_to_local_user(test_case: HomeserverTestC
     )
 
     # Presence receiver should have received it
-    presence_updates, sync_token = sync_presence(test_case, test_case.presence_receiver_id)
+    presence_updates, sync_token = sync_presence(
+        test_case, test_case.presence_receiver_id
+    )
     test_case.assertEqual(len(presence_updates), 1)
 
     presence_update = presence_updates[0]  # type: UserPresenceState
@@ -388,7 +397,9 @@ def _test_sending_local_online_presence_to_local_user(test_case: HomeserverTestC
 
     # We do an (initial) sync with a second "device" now, getting a new sync token.
     # We'll use this in a moment.
-    _, sync_token_second_device = sync_presence(test_case, test_case.presence_receiver_id)
+    _, sync_token_second_device = sync_presence(
+        test_case, test_case.presence_receiver_id
+    )
 
     # Determine on which process (main or worker) to call ModuleApi.send_local_online_presence_to on
     if test_with_workers:
