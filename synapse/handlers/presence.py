@@ -228,7 +228,15 @@ class BasePresenceHandler(abc.ABC):
         ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user. """
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
 
     @abc.abstractmethod
     async def bump_presence_active_time(self, user: UserID):
@@ -305,6 +313,9 @@ class BasePresenceHandler(abc.ABC):
         Grabs the current presence state for a given set of users and adds it
         to the top of the presence stream.
 
+        This is used to bump the current presence stream ID without actually changing
+        any user's presence state.
+
         Args:
             user_ids: The IDs of the users to use.
         """
@@ -318,7 +329,11 @@ class BasePresenceHandler(abc.ABC):
                 "status_message": current_presence_state.status_msg,
             }
 
-            # Copy the presence state to the tip of the presence stream
+            # Copy the presence state to the tip of the presence stream.
+            #
+            # We set force_notify=True here so that this presence update is guaranteed to
+            # increment the presence stream ID (which resending the current user's presence
+            # otherwise would not do).
             await self.set_state(UserID.from_string(user_id), state, force_notify=True)
 
 
@@ -507,7 +522,15 @@ class WorkerPresenceHandler(BasePresenceHandler):
         ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user."""
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
         presence = state["presence"]
 
         valid_presence = (
@@ -713,6 +736,10 @@ class PresenceHandler(BasePresenceHandler):
 
         Args:
             new_states: The new user presence state updates to process.
+            force_notify: Whether to force notifying clients of this presence state update,
+                even if it doesn't change the state of a user's presence (e.g online -> online).
+                This is currently used to bump the max presence stream ID without changing any
+                user's presence (see PresenceHandler.resend_current_presence_for_users).
         """
         now = self.clock.time_msec()
 
@@ -1096,7 +1123,15 @@ class PresenceHandler(BasePresenceHandler):
         ignore_status_msg: bool = False,
         force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user."""
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
 
