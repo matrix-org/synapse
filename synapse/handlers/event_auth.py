@@ -37,7 +37,7 @@ class EventAuthHandler:
 
         Args:
             state_ids: The state of the room as it currently is.
-            room_version: The room version of the room being joined.
+            room_version: The room version of the room to query.
 
         Returns:
             A tuple:
@@ -79,6 +79,31 @@ class EventAuthHandler:
 
         return True, result
 
+    async def user_in_rooms(self, room_ids: Collection[str], user_id: str) -> bool:
+        """
+        Check whether a user is a member of any of the provided rooms.
+
+        Args:
+            room_ids: The rooms to check for membership.
+            user_id: The user to check.
+
+        Returns:
+            True if the user is in any of the rooms, false otherwise.
+        """
+        if not room_ids:
+            return False
+
+        # Get the list of joined rooms and see if there's an overlap.
+        joined_rooms = await self._store.get_rooms_for_user(user_id)
+
+        # Check each room and see if the user is in it.
+        for room_id in room_ids:
+            if room_id in joined_rooms:
+                return True
+
+        # The user was not in any of the rooms.
+        return False
+
     async def can_join_without_invite(
         self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
     ) -> bool:
@@ -104,14 +129,6 @@ class EventAuthHandler:
         if not allow_via_spaces:
             return True
 
-        # Get the list of joined rooms and see if there's an overlap.
-        joined_rooms = await self._store.get_rooms_for_user(user_id)
-
         # If the user was joined to one of the spaces specified, they can join
         # this room!
-        for space_id in allowed_spaces:
-            if space_id in joined_rooms:
-                return True
-
-        # The user was not in any of the required spaces.
-        return False
+        return await self.user_in_rooms(allowed_spaces, user_id)
