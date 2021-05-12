@@ -14,6 +14,7 @@
 
 import itertools
 import logging
+import re
 from collections import deque
 from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple, cast
 
@@ -226,6 +227,23 @@ class SpaceSummaryHandler:
         suggested_only: bool,
         max_children: Optional[int],
     ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
+        """
+        Generate a room entry and a list of event entries for a given room.
+
+        Args:
+            requester: The requesting user, or None if this is over federation.
+            room_id: The room ID to summarize.
+            suggested_only: True if only suggested children should be returned.
+                Otherwise, all children are returned.
+            max_children: The maximum number of children to return for this node.
+
+        Returns:
+            A tuple of:
+                An iterable of a single value of the room.
+
+                An iterable of the sorted children events. This may be limited
+                to a maximum size or may include all children.
+        """
         if not await self._is_room_accessible(room_id, requester):
             return (), ()
 
@@ -357,6 +375,18 @@ class SpaceSummaryHandler:
         return room_entry
 
     async def _get_child_events(self, room_id: str) -> Iterable[EventBase]:
+        """
+        Get the child events for a given room.
+
+        The returned results are sorted for stability.
+
+        Args:
+            room_id: The room id to get the children of.
+
+        Returns:
+            An iterable of sorted child events.
+        """
+
         # look for child rooms/spaces.
         current_state_ids = await self._store.get_current_state_ids(room_id)
 
@@ -370,8 +400,9 @@ class SpaceSummaryHandler:
             ]
         )
 
-        # filter out any events without a "via" (which implies it has been redacted)
-        return (e for e in events if _has_valid_via(e))
+        # filter out any events without a "via" (which implies it has been redacted),
+        # and order to ensure we return stable results.
+        return sorted(filter(_has_valid_via, events), key=_child_events_comparison_key)
 
 
 @attr.s(frozen=True, slots=True)
@@ -397,3 +428,39 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
         return True
     logger.debug("Ignorning not-suggested child %s", edge_event.state_key)
     return False
+
+
+# Order may only contain characters in the range of \x20 (space) to \x7F (~).
+_INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7F]")
+
+
+def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str], str]:
+    """
+    Generate a value for comparing two child events for ordering.
+
+    The rules for ordering are supposed to be:
+
+    1. The 'order' key, if it is valid.
+    2. The 'origin_server_ts' of the 'm.room.create' event.
+    3. The 'room_id'.
+
+    But we skip step 2 since we may not have any state from the room.
+
+    Args:
+        child: The event for generating a comparison key.
+
+    Returns:
+        The comparison key as a tuple of:
+            False if the ordering is valid.
+            The ordering field.
+            The room ID.
+    """
+    order = child.content.get("order")
+    # If order is not a string or doesn't meet the requirements, ignore it.
+    if not isinstance(order, str):
+        order = None
+    elif len(order) > 50 or _INVALID_ORDER_CHARS_RE.search(order):
+        order = None
+
+    # Items without an order come last.
+    return (order is None, order, child.room_id)
