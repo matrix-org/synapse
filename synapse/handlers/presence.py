@@ -308,17 +308,28 @@ class BasePresenceHandler(abc.ABC):
         for destinations, states in hosts_and_states:
             self._federation.send_presence_to_destinations(states, destinations)
 
-    async def resend_current_presence_for_users(self, user_ids: Iterable[str]):
+    async def add_users_to_send_full_presence_to(self, user_ids: Iterable[str]):
         """
-        Grabs the current presence state for a given set of users and adds it
+        Adds to the list of users who should receive a full snapshot of presence
+        upon their next sync. Note that this only works for local users.
+
+        Then, grabs the current presence state for a given set of users and adds it
         to the top of the presence stream.
 
-        This is used to bump the current presence stream ID without actually changing
-        any user's presence state.
-
         Args:
-            user_ids: The IDs of the users to use.
+            user_ids: The IDs of the local users to send full presence to.
         """
+        # Mark the user as receiving full presence on their next sync
+        await self.store.add_users_to_send_full_presence_to(user_ids)
+
+        # Add a new entry to the presence stream. Since we use stream tokens to determine whether a
+        # local user should receive a full snapshot of presence when they sync, we need to bump the
+        # presence stream so that subsequent syncs with no presence activity in between won't result
+        # in the client receiving multiple full snapshots of presence.
+        #
+        # If we bump the stream ID, then the user will get a higher stream token next sync, and thus
+        # correctly won't receive a second snapshot.
+
         # Get the current presence state for each user (defaults to offline if not found)
         current_presence_for_users = await self.current_state_for_users(user_ids)
 
@@ -330,7 +341,7 @@ class BasePresenceHandler(abc.ABC):
             }
 
             # Copy the presence state to the tip of the presence stream.
-            #
+
             # We set force_notify=True here so that this presence update is guaranteed to
             # increment the presence stream ID (which resending the current user's presence
             # otherwise would not do).
@@ -739,7 +750,7 @@ class PresenceHandler(BasePresenceHandler):
             force_notify: Whether to force notifying clients of this presence state update,
                 even if it doesn't change the state of a user's presence (e.g online -> online).
                 This is currently used to bump the max presence stream ID without changing any
-                user's presence (see PresenceHandler.resend_current_presence_for_users).
+                user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
         """
         now = self.clock.time_msec()
 

@@ -418,22 +418,22 @@ class ModuleApi:
             else:
                 remote_users.add(user)
 
+        # We pull out the presence handler here to break a cyclic
+        # dependency between the presence router and module API.
+        presence_handler = self._hs.get_presence_handler()
+
         if local_users:
             # Force a presence initial_sync for these users next time they sync.
-            await self._store.add_users_to_send_full_presence_to(local_users)
+            await presence_handler.add_users_to_send_full_presence_to(local_users)
 
         for user in remote_users:
             # Retrieve presence state for currently online users that this user
-            # is considered interested in
+            # is considered interested in.
             presence_events, _ = await self._presence_stream.get_new_events(
                 UserID.from_string(user), from_key=None, include_offline=False
             )
 
             # Send to remote destinations.
-
-            # We pull out the presence handler here to break a cyclic
-            # dependency between the presence router and module API.
-            presence_handler = self._hs.get_presence_handler()
             await presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events
             )
