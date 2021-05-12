@@ -1,1 +1,0 @@
-Support stable identifiers for [MSC1772](https://github.com/matrix-org/matrix-doc/pull/1772) Spaces. `m.space.child` events will now be taken into account when populating the experimental spaces summary response. Please see `UPGRADE.rst` if you have customised `room_invite_state_types` in your configuration.

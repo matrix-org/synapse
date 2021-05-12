@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.32.0 where the associated connection was improperly logged for SQL logging statements.
