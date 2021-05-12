@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.27.0 preventing users and appservices exempt from ratelimiting from creating rooms with many invitees.
