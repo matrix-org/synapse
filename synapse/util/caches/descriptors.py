@@ -48,7 +48,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 class _CachedFunction(Generic[F]):
     invalidate = None  # type: Any
     invalidate_all = None  # type: Any
-    invalidate_many = None  # type: Any
     prefill = None  # type: Any
     cache = None  # type: Any
     num_args = None  # type: Any
@@ -312,8 +311,6 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
             wrapped.prefill = lambda key, val: cache.prefill(key[0], val)
         else:
             wrapped.invalidate = cache.invalidate
-            # invalidate_many is considered deprecated: use `invalidate` directly.
-            wrapped.invalidate_many = cache.invalidate
             wrapped.prefill = cache.prefill
 
         wrapped.invalidate_all = cache.invalidate_all
