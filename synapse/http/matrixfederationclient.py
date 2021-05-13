@@ -198,31 +198,6 @@ class JsonParser(ByteParser[Union[JsonDict, list]]):
         return json_decoder.decode(self._buffer.getvalue())
 
 
-async def _handle_json_response(
-    reactor: IReactorTime,
-    timeout_sec: float,
-    request: MatrixFederationRequest,
-    response: IResponse,
-    start_ms: int,
-) -> Union[JsonDict, list]:
-    """
-    Reads the JSON body of a response, with a timeout
-
-    Args:
-        reactor: twisted reactor, for the timeout
-        timeout_sec: number of seconds to wait for response to complete
-        request: the request that triggered the response
-        response: response to the request
-        start_ms: Timestamp when request was made
-
-    Returns:
-        The parsed JSON response
-    """
-    return await _handle_response(
-        reactor, timeout_sec, request, response, start_ms, JsonParser()
-    )
-
-
 async def _handle_response(
     reactor: IReactorTime,
     timeout_sec: float,
@@ -950,12 +925,8 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor,
-            _sec_timeout,
-            request,
-            response,
-            start_ms,
+        body = await _handle_response(
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
         return body
 
@@ -1027,8 +998,8 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms
+        body = await _handle_response(
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
 
         return body
@@ -1095,8 +1066,8 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms
+        body = await _handle_response(
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
         return body
 
