@@ -104,6 +104,7 @@ from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
+from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
@@ -548,6 +549,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_search_handler(self) -> SearchHandler:
         return SearchHandler(self)
+
+    @cache_in_self
+    def get_send_email_handler(self) -> SendEmailHandler:
+        return SendEmailHandler(self)
 
     @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:
