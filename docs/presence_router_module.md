@@ -29,8 +29,10 @@ which can be given a list of local or remote MXIDs to broadcast known, online us
 presence to (for those users that the receiving user is considered interested in). 
 It does not include state for users who are currently offline, and it can only be
 called on workers that support sending federation. Additionally, this method must
-only be called from the main process, or from a worker that supports writing to
+only be called from the process that has been configured to write to the
 the [presence stream](https://github.com/matrix-org/synapse/blob/master/docs/workers.md#stream-writers).
+By default, this is the main process, but another worker can be configured to do
+so.
 
 ### Module structure
 

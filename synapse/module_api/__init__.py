@@ -397,8 +397,8 @@ class ModuleApi:
         Updates to remote users will be sent immediately, whereas local users will receive
         them on their next sync attempt.
 
-        Note that this method can only be run on the main or worker processes that have the
-        ability to write to the presence stream.
+        Note that this method can only be run on the process that is configured to write to the
+        presence stream. By default this is the main process.
         """
         if (
             self._hs.config.worker_app
@@ -406,8 +406,8 @@ class ModuleApi:
         ):
             raise Exception(
                 "send_local_online_presence_to can only be run "
-                "on processes that have the ability to write to the"
-                "presence stream (this includes the main process)",
+                "on the process that is configured to write to the "
+                "presence stream (by default this is the main process)",
             )
 
         local_users = set()
