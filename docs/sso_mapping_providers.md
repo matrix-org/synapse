@@ -68,7 +68,7 @@ A custom mapping provider must specify the following methods:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
                      information from.
     - This method must return a string, which is the unique, immutable identifier
-      for the  user. Commonly the ``sub`` claim of the response.
+      for the user. Commonly the `sub` claim of the response.
 * `map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
@@ -156,7 +156,7 @@ A custom mapping provider must specify the following methods:
       - `client_redirect_url` - A string, the URL that the client will be
                                 redirected to.
     - This method must return a string, which is the unique, immutable identifier
-      for the user. Commonly the ``uid`` claim of the response.
+      for the user. Commonly the `uid` claim of the response.
 * `saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
@@ -176,8 +176,8 @@ A custom mapping provider must specify the following methods:
       to build a new user. The following keys are allowed:
        * `mxid_localpart` - A string, the mxid localpart of the new user. If this is
          `None`, the user is prompted to pick their own username. This is only used
-        during a user's first login. Once a localpart has been associated with a
-        remote user ID (see `get_remote_user_id`) it cannot be updated.
+         during a user's first login. Once a localpart has been associated with a
+         remote user ID (see `get_remote_user_id`) it cannot be updated.
        * `displayname` - The displayname of the new user. If not provided, will default to
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
