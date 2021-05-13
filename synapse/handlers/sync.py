@@ -14,7 +14,17 @@
 # limitations under the License.
 import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -28,7 +38,6 @@ from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
-    Collection,
     JsonDict,
     MutableStateMap,
     Requester,
@@ -1181,7 +1190,7 @@ class SyncHandler:
 
             # Step 1b, check for newly joined rooms
             for room_id in newly_joined_rooms:
-                joined_users = await self.state.get_current_users_in_room(room_id)
+                joined_users = await self.store.get_users_in_room(room_id)
                 newly_joined_or_invited_users.update(joined_users)
 
             # TODO: Check that these users are actually new, i.e. either they
@@ -1197,7 +1206,7 @@ class SyncHandler:
 
             # Now find users that we no longer track
             for room_id in newly_left_rooms:
-                left_users = await self.state.get_current_users_in_room(room_id)
+                left_users = await self.store.get_users_in_room(room_id)
                 newly_left_users.update(left_users)
 
             # Remove any users that we still share a room with.
@@ -1352,7 +1361,7 @@ class SyncHandler:
 
         extra_users_ids = set(newly_joined_or_invited_users)
         for room_id in newly_joined_rooms:
-            users = await self.state.get_current_users_in_room(room_id)
+            users = await self.store.get_users_in_room(room_id)
             extra_users_ids.update(users)
         extra_users_ids.discard(user.to_string())
 

@@ -78,14 +78,15 @@ REQUIREMENTS = [
     # we use attr.validators.deep_iterable, which arrived in 19.1.0 (Note:
     # Fedora 31 only has 19.1, so if we want to upgrade we should wait until 33
     # is out in November.)
-    "attrs>=19.1.0",
+    # Note: 21.1.0 broke `/sync`, see #9936
+    "attrs>=19.1.0,!=21.1.0",
     "netaddr>=0.7.18",
     "Jinja2>=2.9",
     "bleach>=1.4.3",
     "typing-extensions>=3.7.4",
     # We enforce that we have a `cryptography` version that bundles an `openssl`
     # with the latest security patches.
-    "cryptography>=3.4.7;python_version>='3.6'",
+    "cryptography>=3.4.7",
 ]
 
 CONDITIONAL_REQUIREMENTS = {
@@ -100,14 +101,9 @@ CONDITIONAL_REQUIREMENTS = {
     # that use the protocol, such as Let's Encrypt.
     "acme": [
         "txacme>=0.9.2",
-        # txacme depends on eliot. Eliot 1.8.0 is incompatible with
-        # python 3.5.2, as per https://github.com/itamarst/eliot/issues/418
-        "eliot<1.8.0;python_version<'3.5.3'",
     ],
     "saml2": [
-        # pysaml2 6.4.0 is incompatible with Python 3.5 (see https://github.com/IdentityPython/pysaml2/issues/749)
-        "pysaml2>=4.5.0,<6.4.0;python_version<'3.6'",
-        "pysaml2>=4.5.0;python_version>='3.6'",
+        "pysaml2>=4.5.0",
     ],
     "oidc": ["authlib>=0.14.0"],
     # systemd-python is necessary for logging to the systemd journal via
@@ -121,6 +117,8 @@ CONDITIONAL_REQUIREMENTS = {
     # hiredis is not a *strict* dependency, but it makes things much faster.
     # (if it is not installed, we fall back to slow code.)
     "redis": ["txredisapi>=1.4.7", "hiredis"],
+    # Required to use experimental `caches.track_memory_usage` config option.
+    "cache_memory": ["pympler"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]

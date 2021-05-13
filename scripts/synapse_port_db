@@ -634,8 +634,11 @@ class Porter(object):
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
             await self._setup_sequence(
-                "account_data_sequence", ("room_account_data", "room_tags_revisions", "account_data"))
-            await self._setup_sequence("receipts_sequence", ("receipts_linearized", ))
+                "account_data_sequence",
+                ("room_account_data", "room_tags_revisions", "account_data"),
+            )
+            await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
+            await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
             await self._setup_auth_chain_sequence()
 
             # Step 3. Get tables.
@@ -910,10 +913,11 @@ class Porter(object):
                     (curr_forward_id + 1,),
                 )
 
-            txn.execute(
-                "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
-                (curr_backward_id + 1,),
-            )
+            if curr_backward_id:
+                txn.execute(
+                    "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
+                    (curr_backward_id + 1,),
+                )
 
         await self.postgres_store.db_pool.runInteraction(
             "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
@@ -951,10 +955,11 @@ class Porter(object):
                 (curr_chain_id,),
             )
 
-        await self.postgres_store.db_pool.runInteraction(
-            "_setup_event_auth_chain_id", r,
-        )
-
+        if curr_chain_id is not None:
+            await self.postgres_store.db_pool.runInteraction(
+                "_setup_event_auth_chain_id",
+                r,
+            )
 
 
 ##############################################

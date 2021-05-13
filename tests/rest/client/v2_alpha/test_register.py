@@ -310,6 +310,57 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertIsNotNone(channel.json_body.get("sid"))
 
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_reject_invalid_email(self):
+        """Check that bad emails are rejected"""
+
+        # Test for email with multiple @
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": "email@@email", "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        # Check error to ensure that we're not erroring due to a bug in the test.
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
+        # Test for email with no @
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": "email", "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
+        # Test for super long email
+        email = "a@" + "a" * 1000
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": email, "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
 
 class AccountValidityTestCase(unittest.HomeserverTestCase):
 

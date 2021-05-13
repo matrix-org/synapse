@@ -28,6 +28,7 @@ from synapse.api.presence import UserPresenceState
 from synapse.events import EventBase
 from synapse.federation.units import Edu
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import SynapseTags, set_tag
 from synapse.metrics import sent_transactions_counter
 from synapse.metrics.background_process_metrics import run_as_background_process
@@ -154,22 +155,19 @@ class PerDestinationQueue:
             + len(self._pending_edus_keyed)
         )
 
-    def send_pdus(self, pdus: Iterable[EventBase]) -> None:
-        """Add PDUs to the queue, and start the transmission loop if necessary
+    def send_pdu(self, pdu: EventBase) -> None:
+        """Add a PDU to the queue, and start the transmission loop if necessary
 
         Args:
-            pdus: pdus to send
+            pdu: pdu to send
         """
         if not self._catching_up or self._last_successful_stream_ordering is None:
             # only enqueue the PDU if we are not catching up (False) or do not
             # yet know if we have anything to catch up (None)
-            self._pending_pdus.extend(pdus)
+            self._pending_pdus.append(pdu)
         else:
-            self._catchup_last_skipped = max(
-                pdu.internal_metadata.stream_ordering
-                for pdu in pdus
-                if pdu.internal_metadata.stream_ordering is not None
-            )
+            assert pdu.internal_metadata.stream_ordering
+            self._catchup_last_skipped = pdu.internal_metadata.stream_ordering
 
         self.attempt_new_transaction()
 
@@ -576,6 +574,14 @@ class PerDestinationQueue:
             )
             for content in contents
         ]
+
+        if edus:
+            issue9533_logger.debug(
+                "Sending %i to-device messages to %s, up to stream id %i",
+                len(edus),
+                self._destination,
+                stream_id,
+            )
 
         return (edus, stream_id)
 

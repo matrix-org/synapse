@@ -85,18 +85,47 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
-Upgrading to v1.34.0
+Upgrading to v1.35.0
 ====================
 
 Deprecation of the built-in account validity feature
 ----------------------------------------------------
 
-As of Synapse v1.34.0, the built-in account validity feature is deprecated in favour of
+As of Synapse v1.35.0, the built-in account validity feature is deprecated in favour of
 plugin modules. If you are using this feature and want to keep its current behaviour,
 please use the `synapse-email-account-validity <https://github.com/matrix-org/synapse-email-account-validity>`_
 module.
 
 Synapse's built-in account validity feature will be removed in a future release.
+
+Upgrading to v1.34.0
+====================
+
+`room_invite_state_types` configuration setting
+-----------------------------------------------
+
+The ``room_invite_state_types`` configuration setting has been deprecated and
+replaced with ``room_prejoin_state``. See the `sample configuration file <https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515>`_.
+
+If you have set ``room_invite_state_types`` to the default value you should simply
+remove it from your configuration file. The default value used to be:
+
+.. code:: yaml
+
+   room_invite_state_types:
+      - "m.room.join_rules"
+      - "m.room.canonical_alias"
+      - "m.room.avatar"
+      - "m.room.encryption"
+      - "m.room.name"
+
+If you have customised this value by adding addition state types, you should
+remove ``room_invite_state_types`` and configure ``additional_event_types`` with
+your customisations.
+
+If you have customised this value by removing state types, you should rename
+``room_invite_state_types`` to ``additional_event_types``, and set
+``disable_default_event_types`` to ``true``.
 
 Upgrading to v1.33.0
 ====================
@@ -124,6 +153,26 @@ upon attempting to use a valid renewal token more than once.
 Upgrading to v1.32.0
 ====================
 
+Regression causing connected Prometheus instances to become overwhelmed
+-----------------------------------------------------------------------
+
+This release introduces `a regression <https://github.com/matrix-org/synapse/issues/9853>`_
+that can overwhelm connected Prometheus instances. This issue is not present in
+Synapse v1.32.0rc1.
+
+If you have been affected, please downgrade to 1.31.0. You then may need to
+remove excess writeahead logs in order for Prometheus to recover. Instructions
+for doing so are provided
+`here <https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183>`_.
+
+Dropping support for old Python, Postgres and SQLite versions
+-------------------------------------------------------------
+
+In line with our `deprecation policy <https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md>`_,
+we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no longer supported upstream.
+
+This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or SQLite 3.22+.
+
 Removal of old List Accounts Admin API
 --------------------------------------
 
@@ -133,6 +182,16 @@ The `v2 list accounts API <https://github.com/matrix-org/synapse/blob/master/doc
 has been available since Synapse 1.7.0 (2019-12-13), and is accessible under ``GET /_synapse/admin/v2/users``.
 
 The deprecation of the old endpoint was announced with Synapse 1.28.0 (released on 2021-02-25).
+
+Application Services must use type ``m.login.application_service`` when registering users
+-----------------------------------------------------------------------------------------
+
+In compliance with the
+`Application Service spec <https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions>`_,
+Application Services are now required to use the ``m.login.application_service`` type when registering users via the
+``/_matrix/client/r0/register`` endpoint. This behaviour was deprecated in Synapse v1.30.0.
+
+Please ensure your Application Services are up to date.
 
 Upgrading to v1.29.0
 ====================
