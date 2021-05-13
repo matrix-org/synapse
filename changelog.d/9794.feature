@@ -1,0 +1,1 @@
+Renamed encryption_enabled_by_default_for_room_type to force_encryption_enabled_for_room_type to clarify its forceful nature.
