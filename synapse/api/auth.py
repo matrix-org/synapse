@@ -87,7 +87,6 @@ class Auth:
         )
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
-
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
 
     async def check_from_context(
