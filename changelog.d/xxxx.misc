@@ -1,0 +1,1 @@
+Ensure python uses `malloc` when running Synapse in Docker.

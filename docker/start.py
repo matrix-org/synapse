@@ -218,6 +218,7 @@ def main(args, environ):
 
     if os.path.isfile(jemallocpath):
         environ["LD_PRELOAD"] = jemallocpath
+        environ["PYTHONMALLOC"] = "malloc"
     else:
         log("Could not find %s, will not use" % (jemallocpath,))
 
