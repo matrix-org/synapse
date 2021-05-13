@@ -1111,7 +1111,7 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         # The V1 API has the shape of `[200, {...}]`, which we handle by
         # prefixing with `item.*`.
         prefix = "item." if v1_api else ""
-            
+
         self._coro_state = ijson.items_coro(
             _event_list_parser(room_version, self._response.state),
             prefix + "state.item",

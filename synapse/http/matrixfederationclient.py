@@ -104,12 +104,15 @@ QueryArgs = Dict[str, Union[str, List[str]]]
 T = TypeVar("T")
 
 
-class ByteParser(ByteWriteable, Generic[T]):
+class ByteParser(ByteWriteable, Generic[T], abc.ABC):
     """A `ByteWriteable` that has an additional `finish` function that returns
     the parsed data.
     """
 
     CONTENT_TYPE = abc.abstractproperty()  # type: str  # type: ignore
+    """The expected content type of the response, e.g. `application/json`. If
+    the content type doesn't match we fail the request.
+    """
 
     @abc.abstractmethod
     def finish(self) -> T:
@@ -823,6 +826,8 @@ class MatrixFederationHttpClient:
                 of the request. Workaround for #3622 in Synapse <= v0.99.3. This
                 will be attempted before backing off if backing off has been
                 enabled.
+            parser: The parser to use to decode the response. Defaults to
+                parsing as JSON.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
