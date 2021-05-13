@@ -13,9 +13,9 @@
 # limitations under the License.
 
 import email.utils
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 import logging
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from typing import TYPE_CHECKING
 
 from synapse.logging.context import make_deferred_yieldable
