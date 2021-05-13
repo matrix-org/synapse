@@ -176,12 +176,7 @@ Install virtualenv with Pip:
 sudo pip3 install virtualenv
 ```
 
-Install Homebrew:
-```sh
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
-
-Install libjpeg:
+Install libjpeg. You can use Homebrew (https://brew.sh):
 ```sh
 brew install jpeg
 ```
