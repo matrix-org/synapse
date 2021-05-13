@@ -90,17 +90,17 @@ class TracerConfig(Config):
             #
             #homeserver_whitelist:
             #  - ".*"
-            
-            # A list of the matrix IDs of users whose requests will always be traced, 
+
+            # A list of the matrix IDs of users whose requests will always be traced,
             # even if the tracing system would otherwise drop the traces due to
             # probabilistic sampling.
             #
             # By default, the list is empty.
-            # 
+            #
             #force_tracing_for_users:
             #  - "@user1:server_name"
             #  - "@user2:server_name"
-            
+
             # Jaeger can be configured to sample traces at different rates.
             # All configuration options provided by Jaeger can be set here.
             # Jaeger's configuration is mostly related to trace sampling which

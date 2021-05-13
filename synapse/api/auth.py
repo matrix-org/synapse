@@ -265,12 +265,7 @@ class Auth:
             if device_id:
                 opentracing.set_tag("device_id", device_id)
             if user_info.token_owner in self._force_tracing_for_users:
-                logger.info("enabling tracing for %s", user_info.token_owner)
                 opentracing.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
-            else:
-                logger.info(
-                    "%s not in %s", user_info.token_owner, self._force_tracing_for_users
-                )
 
             return requester
         except KeyError:
