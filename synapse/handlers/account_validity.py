@@ -167,7 +167,7 @@ class AccountValidityHandler:
             await self.send_email_handler.send_email(
                 email_address=raw_to,
                 subject=self._renew_email_subject,
-                app_name=self.app_name,
+                app_name=self._app_name,
                 html=html_text,
                 text=plain_text,
             )
