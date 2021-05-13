@@ -434,8 +434,9 @@ class ModuleApi:
             )
 
             # Send to remote destinations.
-            await presence_handler.get_federation_queue().send_presence_to_destinations(
-                presence_events
+            destination = UserID.from_string(user).domain
+            presence_handler.get_federation_queue().send_presence_to_destinations(
+                presence_events, destination
             )
 
 
