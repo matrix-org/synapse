@@ -330,22 +330,22 @@ class BasePresenceHandler(abc.ABC):
         # If we bump the stream ID, then the user will get a higher stream token next sync, and thus
         # correctly won't receive a second snapshot.
 
-        # Get the current presence state for each user (defaults to offline if not found)
-        current_presence_for_users = await self.current_state_for_users(user_ids)
+        # Get the current presence state for one of the users (defaults to offline if not found)
+        user_id = yield user_ids
+        current_presence_state = await self.get_state(user_id)
 
-        for user_id, current_presence_state in current_presence_for_users.items():
-            # Convert the UserPresenceState object into a serializable dict
-            state = {
-                "presence": current_presence_state.state,
-                "status_message": current_presence_state.status_msg,
-            }
+        # Convert the UserPresenceState object into a serializable dict
+        state = {
+            "presence": current_presence_state.state,
+            "status_message": current_presence_state.status_msg,
+        }
 
-            # Copy the presence state to the tip of the presence stream.
+        # Copy the presence state to the tip of the presence stream.
 
-            # We set force_notify=True here so that this presence update is guaranteed to
-            # increment the presence stream ID (which resending the current user's presence
-            # otherwise would not do).
-            await self.set_state(UserID.from_string(user_id), state, force_notify=True)
+        # We set force_notify=True here so that this presence update is guaranteed to
+        # increment the presence stream ID (which resending the current user's presence
+        # otherwise would not do).
+        await self.set_state(UserID.from_string(user_id), state, force_notify=True)
 
 
 class _NullContextManager(ContextManager[None]):
