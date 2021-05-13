@@ -180,7 +180,7 @@ class MatrixFederationRequest:
 
 
 class JsonParser(ByteParser[Union[JsonDict, list]]):
-    """A parser that buffers the response and tries and parses it as JSON."""
+    """A parser that buffers the response and tries to parse it as JSON."""
 
     CONTENT_TYPE = "application/json"
 
@@ -229,7 +229,7 @@ async def _handle_response(
     parser: ByteParser[T],
 ) -> T:
     """
-    Reads the JSON body of a response, with a timeout
+    Reads the body of a response with a timeout and sends it to a parser
 
     Args:
         reactor: twisted reactor, for the timeout

@@ -1108,26 +1108,18 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
     def __init__(self, room_version: RoomVersion, v1_api: bool):
         self._response = SendJoinResponse([], [])
 
-        if v1_api:
-            # The V1 API has the shape of `[200, {...}]`, which we handle by
-            # prefixing with `item.*`.
-            self._coro_state = ijson.items_coro(
-                _event_list_parser(room_version, self._response.state),
-                "item.state.item",
-            )
-            self._coro_auth = ijson.items_coro(
-                _event_list_parser(room_version, self._response.auth_events),
-                "item.auth_chain.item",
-            )
-        else:
-            self._coro_state = ijson.items_coro(
-                _event_list_parser(room_version, self._response.state),
-                "state.item",
-            )
-            self._coro_auth = ijson.items_coro(
-                _event_list_parser(room_version, self._response.auth_events),
-                "auth_chain.item",
-            )
+        # The V1 API has the shape of `[200, {...}]`, which we handle by
+        # prefixing with `item.*`.
+        prefix = "item." if v1_api else ""
+            
+        self._coro_state = ijson.items_coro(
+            _event_list_parser(room_version, self._response.state),
+            prefix + "state.item",
+        )
+        self._coro_auth = ijson.items_coro(
+            _event_list_parser(room_version, self._response.auth_events),
+            prefix + "auth_chain.item",
+        )
 
     def write(self, data: bytes) -> int:
         self._coro_state.send(data)
