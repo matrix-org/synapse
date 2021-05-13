@@ -29,7 +29,16 @@ logger = logging.getLogger(__name__)
 class SendEmailHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self.sendmail = self.hs.get_sendmail()
+
+        self._sendmail = hs.get_sendmail()
+        self._reactor = hs.get_reactor()
+
+        self._from = hs.config.email.email_notif_from
+        self._smtp_host = hs.config.email.email_smtp_host
+        self._smtp_port = hs.config.email.email_smtp_port
+        self._smtp_user = hs.config.email.email_smtp_user
+        self._smtp_pass = hs.config.email.email_smtp_pass
+        self._require_transport_security = hs.config.email.require_transport_security
 
     async def send_email(
         self,
@@ -39,11 +48,19 @@ class SendEmailHandler:
         html: str,
         text: str,
     ) -> None:
-        """Send an email with the given information."""
+        """Send a multipart email with the given information.
+
+        Args:
+            email_address: The address to send the email to.
+            subject: The email's subject.
+            app_name: The app name to include in the From header.
+            html: The HTML content to include in the email.
+            text: The plain text content to include in the email.
+        """
         try:
-            from_string = self.hs.config.email_notif_from % {"app": app_name}
-        except TypeError:
-            from_string = self.hs.config.email_notif_from
+            from_string = self._from % {"app": app_name}
+        except (KeyError, TypeError):
+            from_string = self._from
 
         raw_from = email.utils.parseaddr(from_string)[1]
         raw_to = email.utils.parseaddr(email_address)[1]
@@ -66,16 +83,16 @@ class SendEmailHandler:
         logger.info("Sending email to %s" % email_address)
 
         await make_deferred_yieldable(
-            self.sendmail(
-                self.hs.config.email_smtp_host,
+            self._sendmail(
+                self._smtp_host,
                 raw_from,
                 raw_to,
                 multipart_msg.as_string().encode("utf8"),
-                reactor=self.hs.get_reactor(),
-                port=self.hs.config.email_smtp_port,
-                requireAuthentication=self.hs.config.email_smtp_user is not None,
-                username=self.hs.config.email_smtp_user,
-                password=self.hs.config.email_smtp_pass,
-                requireTransportSecurity=self.hs.config.require_transport_security,
+                reactor=self._reactor,
+                port=self._smtp_port,
+                requireAuthentication=self._smtp_user is not None,
+                username=self._smtp_user,
+                password=self._smtp_pass,
+                requireTransportSecurity=self._require_transport_security,
             )
         )

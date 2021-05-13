@@ -36,7 +36,7 @@ class AccountValidityHandler:
         self.send_email_handler = self.hs.get_send_email_handler()
         self.clock = self.hs.get_clock()
 
-        self.app_name = self.hs.config.email_app_name
+        self._app_name = self.hs.config.email_app_name
 
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
