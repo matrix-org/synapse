@@ -160,7 +160,6 @@ class LruCache(Generic[KT, VT]):
         self,
         max_size: int,
         cache_name: Optional[str] = None,
-        keylen: int = 1,
         cache_type: Type[Union[dict, TreeCache]] = dict,
         size_callback: Optional[Callable] = None,
         metrics_collection_callback: Optional[Callable[[], None]] = None,
@@ -172,9 +171,6 @@ class LruCache(Generic[KT, VT]):
 
             cache_name: The name of this cache, for the prometheus metrics. If unset,
                 no metrics will be reported on this cache.
-
-            keylen: The length of the tuple used as the cache key. Ignored unless
-                cache_type is `TreeCache`.
 
             cache_type (type):
                 type of underlying cache to be used. Typically one of dict
