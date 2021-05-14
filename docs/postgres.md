@@ -97,7 +97,7 @@ different locales can cause issues if the locale library is updated from
 underneath the database, or if a different version of the locale is used on any
 replicas.
 
-The safest way to fix the issue is to dump of the database and recreate it with
+The safest way to fix the issue is to dump the database and recreate it with
 the correct `COLLATE` and `CTYPE` parameters (as shown above). It is also possible to change the
 parameters on a live database and run a `REINDEX` on the entire database,
 however extreme care must be taken to avoid database corruption.
