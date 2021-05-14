@@ -331,8 +331,8 @@ class BasePresenceHandler(abc.ABC):
         # correctly won't receive a second snapshot.
 
         # Get the current presence state for one of the users (defaults to offline if not found)
-        user_id = yield user_ids
-        current_presence_state = await self.get_state(user_id)
+        user_id = next(iter(user_ids))
+        current_presence_state = await self.get_state(UserID.from_string(user_id))
 
         # Convert the UserPresenceState object into a serializable dict
         state = {
