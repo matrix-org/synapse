@@ -55,9 +55,7 @@ def random_string_with_symbols(length: int) -> str:
 def is_ascii(s: bytes) -> bool:
     try:
         s.decode("ascii").encode("ascii")
-    except UnicodeDecodeError:
-        return False
-    except UnicodeEncodeError:
+    except UnicodeError:
         return False
     return True
 
