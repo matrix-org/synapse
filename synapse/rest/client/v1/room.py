@@ -21,7 +21,7 @@ import re
 from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, EventContentFields, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -277,6 +277,25 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
+    async def _send_marker_event_for_insertion(
+        self, requester, room_id, insertion_event_id, auth_event_ids
+    ):
+        marker_event_dict = {
+            "type": EventTypes.MSC2716_MARKER,
+            "sender": requester.user.to_string(),
+            "content": {
+                EventContentFields.MSC2716_PREV_INSERTION: insertion_event_id,
+            },
+            "room_id": room_id,
+        }
+
+        (event, _,) = await self.event_creation_handler.create_and_send_nonmember_event(
+            requester,
+            marker_event_dict,
+            # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
+            auth_event_ids=auth_event_ids,
+        )
+
     def register(self, http_server):
         # /rooms/$roomid/bulksend
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/bulksend"
@@ -364,18 +383,51 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             auth_event_ids.append(event_id)
 
         events_to_insert = body["events"]
+
+        # Since we can only add backfilled events from an "insertion" point,
+        # If they did not provide a `chunk_id` to branch from, add an "insertion" point
+        # to start from.
+        if EventContentFields.MSC2716_CHUNK_ID not in events_to_insert[0]["content"]:
+            first_event = events_to_insert[0]
+            initial_chunk_id = random_string(64)
+
+            # Prepend to the list
+            events_to_insert.insert(
+                0,
+                {
+                    "type": EventTypes.MSC2716_INSERTION,
+                    "sender": requester.user.to_string(),
+                    "content": {
+                        EventContentFields.MSC2716_NEXT_CHUNK_ID: initial_chunk_id,
+                        "m.historical": True,
+                        # TODO: Why is `body` necessary for this to show up in /messages
+                        "body": "TODO_REMOVE - INITIAL",
+                    },
+                    # Since this initial insertion event is put at the start of the chunk,
+                    # copy the origin_server_ts from the first event we're inserting
+                    "origin_server_ts": first_event["origin_server_ts"],
+                },
+            )
+
+            # Then copy the chunk_id onto the event we're trying to insert first
+            first_event["content"][
+                EventContentFields.MSC2716_CHUNK_ID
+            ] = initial_chunk_id
+
+        # Add an "insertion" event to the end of each chunk so the next chunk can be connected to this one
+        next_chunk_id = random_string(64)
         events_to_insert.append(
             {
                 "type": EventTypes.MSC2716_INSERTION,
-                # requester.user.to_string()
-                "sender": events_to_insert[len(events_to_insert) - 1]["sender"],
+                "sender": requester.user.to_string(),
                 "content": {
-                    "next_chunk_id": random_string(64),
+                    EventContentFields.MSC2716_NEXT_CHUNK_ID: next_chunk_id,
                     "m.historical": True,
                     # TODO: Why is `body` necessary for this to show up in /messages
-                    "body": "TODO_REMOVE",
+                    "body": "TODO_REMOVE - END_CHUNK",
                 },
-                # Copy the origin_server_ts from the last event we're inserting
+                # Since the insertion event is put at the end of the chunk,
+                # copy the origin_server_ts from the last event we're inserting
                 "origin_server_ts": events_to_insert[len(events_to_insert) - 1][
                     "origin_server_ts"
                 ],
@@ -413,7 +465,19 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             event_ids.append(event_id)
             prev_event_ids = [event_id]
 
-        return 200, {"state_events": auth_event_ids, "events": event_ids}
+            # Add "marker" events in the normal "live" timeline for each "insertion"
+            # event to signal homeservers to paginate over to the historical messages
+            # when they scrollback
+            if event.type == EventTypes.MSC2716_INSERTION:
+                await self._send_marker_event_for_insertion(
+                    requester, room_id, event_id, auth_event_ids
+                )
+
+        return 200, {
+            "state_events": auth_event_ids,
+            "events": event_ids,
+            "next_chunk_id": next_chunk_id,
+        }
 
     def on_GET(self, request, room_id):
         return 501, "Not implemented"

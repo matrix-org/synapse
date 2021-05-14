@@ -172,6 +172,13 @@ class EventContentFields:
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
+    # For "insertion" events
+    MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
+    # Used on normal message events to indicate where the chunk connects to
+    MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
+    # For "marker" events
+    MSC2716_PREV_INSERTION = "org.matrix.msc2716.prev_insertion"
+
 
 class RoomEncryptionAlgorithms:
     MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
