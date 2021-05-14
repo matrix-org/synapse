@@ -33,14 +33,14 @@ Assuming your PostgreSQL database user is called `postgres`, first authenticate 
     # Or, if your system uses sudo to get administrative rights
     sudo -u postgres bash
 
-Then, create a postgres user, and a database, with:
+Then, create a postgres user and a database with:
 
     # this will prompt for a password for the new user
     createuser --pwprompt synapse_user
 
     createdb --encoding=UTF8 --locale=C --template=template0 --owner=synapse_user synapse
 
-The above will create a user called ``synapse_user`, and a database called
+The above will create a user called `synapse_user`, and a database called
 `synapse`.
 
 Note that the PostgreSQL database *must* have the correct encoding set
