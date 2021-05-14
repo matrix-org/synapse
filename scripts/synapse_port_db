@@ -741,7 +741,7 @@ class Porter(object):
             return col
 
         outrows = []
-        for i, row in enumerate(rows):
+        for row in rows:
             try:
                 outrows.append(
                     tuple(conv(j, col) for j, col in enumerate(row) if j > 0)
@@ -1025,7 +1025,7 @@ class CursesProgress(Progress):
 
         self.total_processed = 0
         self.total_remaining = 0
-        for table, data in self.tables.items():
+        for data in self.tables.values():
             self.total_processed += data["num_done"] - data["start"]
             self.total_remaining += data["total"] - data["num_done"]
 

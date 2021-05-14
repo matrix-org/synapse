@@ -159,7 +159,7 @@ def run_builds(dists, jobs=1, skip_tests=False):
         res = e.map(lambda dist: builder.run_build(dist, skip_tests), dists)
 
     # make sure we consume the iterable so that exceptions are raised.
-    for r in res:
+    for _ in res:
         pass
 
 
