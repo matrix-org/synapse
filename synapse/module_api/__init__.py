@@ -36,12 +36,20 @@ from twisted.web.server import Request
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
 from synapse.http.site import SynapseRequest
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.server import (
+    DirectServeHtmlResource,
+    DirectServeJsonResource,
+    respond_with_html,
+)
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
 from synapse.types import JsonDict, UserID, create_requester
 from synapse.util import Clock
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -51,7 +59,20 @@ This package defines the 'stable' API which can be used by extension modules whi
 are loaded into Synapse.
 """
 
-__all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"]
+__all__ = [
+    "errors",
+    "make_deferred_yieldable",
+    "parse_json_object_from_request",
+    "respond_with_html",
+    "run_in_background",
+    "cached",
+    "UserID",
+    "DatabasePool",
+    "LoggingTransaction",
+    "DirectServeHtmlResource",
+    "DirectServeJsonResource",
+    "ModuleApi",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +82,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs, auth_handler):
+    def __init__(self, hs: "HomeServer", auth_handler):
         self._hs = hs
 
         self._store = hs.get_datastore()
@@ -70,8 +91,8 @@ class ModuleApi:
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
         self._state = hs.get_state_handler()
-        self._sendmail = hs.get_sendmail()
         self._clock = hs.get_clock()  # type: Clock
+        self._send_email_handler = hs.get_send_email_handler()
 
         try:
             app_name = self._hs.config.email_app_name
@@ -542,32 +563,12 @@ class ModuleApi:
             html: The email's HTML content.
             text: The email's text content.
         """
-        raw_to = email.utils.parseaddr(recipient)[1]
-
-        multipart_msg = MIMEMultipart("alternative")
-        multipart_msg["Subject"] = subject
-        multipart_msg["From"] = self._from_string
-        multipart_msg["To"] = recipient
-        multipart_msg["Date"] = email.utils.formatdate()
-        multipart_msg["Message-ID"] = email.utils.make_msgid()
-        multipart_msg.attach(MIMEText(html, "html", "utf8"))
-        multipart_msg.attach(MIMEText(text, "plain", "utf8"))
-
-        logger.info("Sending email to %s", recipient)
-
-        await make_deferred_yieldable(
-            self._sendmail(
-                self._hs.config.email_smtp_host,
-                self._raw_from,
-                raw_to,
-                multipart_msg.as_string().encode("utf8"),
-                reactor=self._hs.get_reactor(),
-                port=self._hs.config.email_smtp_port,
-                requireAuthentication=self._hs.config.email_smtp_user is not None,
-                username=self._hs.config.email_smtp_user,
-                password=self._hs.config.email_smtp_pass,
-                requireTransportSecurity=self._hs.config.require_transport_security,
-            )
+        await self._send_email_handler.send_email(
+            email_address=recipient,
+            subject=subject,
+            app_name=None,
+            html=html,
+            text=text,
         )
 
     def read_templates(
