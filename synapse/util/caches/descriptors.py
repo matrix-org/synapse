@@ -322,8 +322,8 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
 class DeferredCacheListDescriptor(_CacheDescriptorBase):
     """Wraps an existing cache to support bulk fetching of keys.
 
-    Given a list of keys it looks in the cache to find any hits, then passes
-    the list of missing keys to the wrapped function.
+    Given an iterable of keys it looks in the cache to find any hits, then passes
+    the tuple of missing keys to the wrapped function.
 
     Once wrapped, the function returns a Deferred which resolves to the list
     of results.
@@ -437,7 +437,9 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     return f
 
                 args_to_call = dict(arg_dict)
-                args_to_call[self.list_name] = list(missing)
+                # copy the missing set before sending it to the callee, to guard against
+                # modification.
+                args_to_call[self.list_name] = tuple(missing)
 
                 cached_defers.append(
                     defer.maybeDeferred(
@@ -522,14 +524,14 @@ def cachedList(
 
     Used to do batch lookups for an already created cache. A single argument
     is specified as a list that is iterated through to lookup keys in the
-    original cache. A new list consisting of the keys that weren't in the cache
-    get passed to the original function, the result of which is stored in the
+    original cache. A new tuple consisting of the (deduplicated) keys that weren't in
+    the cache gets passed to the original function, the result of which is stored in the
     cache.
 
     Args:
         cached_method_name: The name of the single-item lookup method.
             This is only used to find the cache to use.
-        list_name: The name of the argument that is the list to use to
+        list_name: The name of the argument that is the iterable to use to
             do batch lookups in the cache.
         num_args: Number of arguments to use as the key in the cache
             (including list_name). Defaults to all named parameters.
