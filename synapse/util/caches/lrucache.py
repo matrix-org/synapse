@@ -34,7 +34,7 @@ from typing_extensions import Literal
 from synapse.config import cache as cache_config
 from synapse.util import caches
 from synapse.util.caches import CacheMetric, register_cache
-from synapse.util.caches.treecache import TreeCache
+from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 
 try:
     from pympler.asizeof import Asizer
@@ -403,7 +403,9 @@ class LruCache(Generic[KT, VT]):
             popped = cache.pop(key)
             if popped is None:
                 return
-            for leaf in enumerate_leaves(popped, keylen - len(cast(tuple, key))):
+            # for each deleted node, we now need to remove it from the linked list
+            # and run its callbacks.
+            for leaf in iterate_tree_cache_entry(popped):
                 delete_node(leaf)
 
         @synchronized
