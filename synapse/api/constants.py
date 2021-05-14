@@ -106,6 +106,9 @@ class EventTypes:
     MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
     MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
+    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_MARKER = "org.matrix.msc2716.marker"
+
 
 class EduTypes:
     Presence = "m.presence"

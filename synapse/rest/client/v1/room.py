@@ -363,9 +363,28 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
             auth_event_ids.append(event_id)
 
+        events_to_insert = body["events"]
+        events_to_insert.append(
+            {
+                "type": EventTypes.MSC2716_INSERTION,
+                # requester.user.to_string()
+                "sender": events_to_insert[len(events_to_insert) - 1]["sender"],
+                "content": {
+                    "next_chunk_id": random_string(64),
+                    "m.historical": True,
+                    # TODO: Why is `body` necessary for this to show up in /messages
+                    "body": "TODO_REMOVE",
+                },
+                # Copy the origin_server_ts from the last event we're inserting
+                "origin_server_ts": events_to_insert[len(events_to_insert) - 1][
+                    "origin_server_ts"
+                ],
+            }
+        )
+
         event_ids = []
         prev_event_ids = prev_events_from_query
-        for ev in body["events"]:
+        for ev in events_to_insert:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
             event_dict = {
