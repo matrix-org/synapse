@@ -1,9 +1,16 @@
-Synapse 1.34.0rc1 (2021-05-12)
-==============================
+Synapse 1.34.0 (2021-05-17)
+===========================
 
 This release deprecates the `room_invite_state_types` configuration setting. See the [upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.34.0/UPGRADE.rst#upgrading-to-v1340) for instructions on updating your configuration file to use the new `room_prejoin_state` setting.
 
 This release also deprecates the `POST /_synapse/admin/v1/rooms/<room_id>/delete` admin API route. Server administrators are encouraged to update their scripts to use the new `DELETE /_synapse/admin/v1/rooms/<room_id>` route instead.
+
+
+No significant changes.
+
+
+Synapse 1.34.0rc1 (2021-05-12)
+==============================
 
 Features
 --------
