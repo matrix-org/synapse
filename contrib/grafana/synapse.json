@@ -7,14 +7,6 @@
       "type": "datasource",
       "pluginId": "prometheus",
       "pluginName": "Prometheus"
-    },
-    {
-      "name": "DS_JKI.RE",
-      "label": "jki.re",
-      "description": "",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
     }
   ],
   "__requires": [
@@ -62,7 +54,7 @@
   "gnetId": null,
   "graphTooltip": 0,
   "id": null,
-  "iteration": 1621244093567,
+  "iteration": 1621258266004,
   "links": [
     {
       "asDropdown": false,
@@ -9697,7 +9689,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 1
+            "y": 44
           },
           "hiddenSeries": false,
           "id": 182,
@@ -9816,7 +9808,7 @@
             "h": 8,
             "w": 12,
             "x": 12,
-            "y": 1
+            "y": 44
           },
           "hiddenSeries": false,
           "id": 184,
@@ -9898,7 +9890,7 @@
           "bars": false,
           "dashLength": 10,
           "dashes": false,
-          "datasource": "${DS_JKI.RE}",
+          "datasource": "$datasource",
           "fieldConfig": {
             "defaults": {
               "custom": {}
@@ -9911,7 +9903,7 @@
             "h": 8,
             "w": 12,
             "x": 0,
-            "y": 9
+            "y": 52
           },
           "hiddenSeries": false,
           "id": 186,
@@ -9967,6 +9959,7 @@
           },
           "yaxes": [
             {
+              "$$hashKey": "object:165",
               "format": "hertz",
               "label": null,
               "logBase": 1,
@@ -9975,6 +9968,7 @@
               "show": true
             },
             {
+              "$$hashKey": "object:166",
               "format": "short",
               "label": null,
               "logBase": 1,
@@ -10309,7 +10303,7 @@
         "auto_count": 100,
         "auto_min": "60s",
         "current": {
-          "selected": true,
+          "selected": false,
           "text": "auto",
           "value": "$__auto_interval_bucket_size"
         },
@@ -10476,5 +10470,5 @@
   "timezone": "",
   "title": "Synapse",
   "uid": "000000012",
-  "version": 89
+  "version": 90
 }
