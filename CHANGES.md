@@ -6,7 +6,7 @@ This release deprecates the `room_invite_state_types` configuration setting. See
 This release also deprecates the `POST /_synapse/admin/v1/rooms/<room_id>/delete` admin API route. Server administrators are encouraged to update their scripts to use the new `DELETE /_synapse/admin/v1/rooms/<room_id>` route instead.
 
 
-No significant changes.
+No significant changes since v1.34.0rc1.
 
 
 Synapse 1.34.0rc1 (2021-05-12)
@@ -181,7 +181,7 @@ Synapse 1.32.1 (2021-04-21)
 ===========================
 
 This release fixes [a regression](https://github.com/matrix-org/synapse/issues/9853)
-in Synapse 1.32.0 that caused connected Prometheus instances to become unstable. 
+in Synapse 1.32.0 that caused connected Prometheus instances to become unstable.
 
 However, as this release is still subject to the `LoggingContext` change in 1.32.0,
 it is recommended to remain on or downgrade to 1.31.0.
@@ -197,11 +197,11 @@ Synapse 1.32.0 (2021-04-20)
 
 **Note:** This release introduces [a regression](https://github.com/matrix-org/synapse/issues/9853)
 that can overwhelm connected Prometheus instances. This issue was not present in
-1.32.0rc1. If affected, it is recommended to downgrade to 1.31.0 in the meantime, and 
+1.32.0rc1. If affected, it is recommended to downgrade to 1.31.0 in the meantime, and
 follow [these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
 to clean up any excess writeahead logs.
 
-**Note:** This release also mistakenly included a change that may affected Synapse 
+**Note:** This release also mistakenly included a change that may affected Synapse
 modules that import `synapse.logging.context.LoggingContext`, such as
 [synapse-s3-storage-provider](https://github.com/matrix-org/synapse-s3-storage-provider).
 This will be fixed in a later Synapse version.
@@ -212,8 +212,8 @@ This release removes the deprecated `GET /_synapse/admin/v1/users/<user_id>` adm
 
 This release requires Application Services to use type `m.login.application_service` when registering users via the `/_matrix/client/r0/register` endpoint to comply with the spec. Please ensure your Application Services are up to date.
 
-If you are using the `packages.matrix.org` Debian repository for Synapse packages, 
-note that we have recently updated the expiry date on the gpg signing key. If you see an 
+If you are using the `packages.matrix.org` Debian repository for Synapse packages,
+note that we have recently updated the expiry date on the gpg signing key. If you see an
 error similar to `The following signatures were invalid: EXPKEYSIG F473DD4473365DE1`, you
 will need to get a fresh copy of the keys. You can do so with:
 
