@@ -32,7 +32,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # number of rooms to return. We'll stop once we hit this limit.
-# TODO: allow clients to reduce this with a request param.
 MAX_ROOMS = 50
 
 # max number of events to return per room.
@@ -231,11 +230,15 @@ class SpaceSummaryHandler:
         Generate a room entry and a list of event entries for a given room.
 
         Args:
-            requester: The requesting user, or None if this is over federation.
+            requester:
+                The user requesting the summary, if it is a local request. None
+                if this is a federation request.
             room_id: The room ID to summarize.
             suggested_only: True if only suggested children should be returned.
                 Otherwise, all children are returned.
-            max_children: The maximum number of children to return for this node.
+            max_children:
+                The maximum number of children rooms to include. This is capped
+                to a server-set limit.
 
         Returns:
             A tuple of:
@@ -278,6 +281,26 @@ class SpaceSummaryHandler:
         max_children: Optional[int],
         exclude_rooms: Iterable[str],
     ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
+        """
+        Request room entries and a list of event entries for a given room by querying a remote server.
+
+        Args:
+            room: The room to summarize.
+            suggested_only: True if only suggested children should be returned.
+                Otherwise, all children are returned.
+            max_children:
+                The maximum number of children rooms to include. This is capped
+                to a server-set limit.
+            exclude_rooms:
+                Rooms IDs which do not need to be summarized.
+
+        Returns:
+            A tuple of:
+                An iterable of rooms.
+
+                An iterable of the sorted children events. This may be limited
+                to a maximum size or may include all children.
+        """
         room_id = room.room_id
         logger.info("Requesting summary for %s via %s", room_id, room.via)
 
@@ -310,8 +333,26 @@ class SpaceSummaryHandler:
         )
 
     async def _is_room_accessible(self, room_id: str, requester: Optional[str]) -> bool:
-        # if we have an authenticated requesting user, first check if they are in the
-        # room
+        """
+        Calculate whether the room should be shown in the spaces summary.
+
+        It should be included if:
+
+        * The requester is joined or invited to the room.
+        * The history visibility is set to world readable.
+
+        Args:
+            room_id: The room ID to summarize.
+            requester:
+                The user requesting the summary, if it is a local request. None
+                if this is a federation request.
+
+        Returns:
+             True if the room should be included in the spaces summary.
+        """
+
+        # if we have an authenticated requesting user, first check if they are able to view
+        # stripped state in the room.
         if requester:
             try:
                 await self._auth.check_user_in_room(room_id, requester)
