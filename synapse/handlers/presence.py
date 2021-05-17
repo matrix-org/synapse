@@ -35,7 +35,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -309,7 +308,7 @@ class BasePresenceHandler(abc.ABC):
         for destinations, states in hosts_and_states:
             self._federation.send_presence_to_destinations(states, destinations)
 
-    async def add_users_to_send_full_presence_to(self, user_ids: Sequence[str]):
+    async def add_users_to_send_full_presence_to(self, user_ids: Collection[str]):
         """
         Adds to the list of users who should receive a full snapshot of presence
         upon their next sync. Note that this only works for local users.
@@ -320,10 +319,14 @@ class BasePresenceHandler(abc.ABC):
         Args:
             user_ids: The IDs of the local users to send full presence to.
         """
-        # Retrieve one of the users from the given list before we do anything else
-        user_id = user_ids[0]
+        # Retrieve one of the users from the given set
+        if not user_ids:
+            raise Exception(
+                "add_users_to_send_full_presence_to must be called with at least one user"
+            )
+        user_id = next(iter(user_ids))
 
-        # Mark the user as receiving full presence on their next sync
+        # Mark all users as receiving full presence on their next sync
         await self.store.add_users_to_send_full_presence_to(user_ids)
 
         # Add a new entry to the presence stream. Since we use stream tokens to determine whether a
