@@ -33,7 +33,7 @@ class EventAuthHandler:
         self, state_ids: StateMap[str], room_version: RoomVersion
     ) -> Tuple[bool, Collection[str]]:
         """
-        Generate a list of spaces allow access to a room.
+        Generate a list of spaces which allow access to a room.
 
         Args:
             state_ids: The state of the room as it currently is.
