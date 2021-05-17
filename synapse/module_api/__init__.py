@@ -421,7 +421,7 @@ class ModuleApi:
 
         if local_users:
             # Force a presence initial_sync for these users next time they sync.
-            await presence_handler.add_users_to_send_full_presence_to(local_users)
+            await presence_handler.send_full_presence_to_users(local_users)
 
         for user in remote_users:
             # Retrieve presence state for currently online users that this user
