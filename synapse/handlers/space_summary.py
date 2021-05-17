@@ -143,7 +143,6 @@ class SpaceSummaryHandler:
                 # A room may be visible if it is world readable, or if it is accessible
                 # to the specific user.
                 room_ids = set()
-                rooms = []  # type: List[JsonDict]
                 events = []
                 for room in fed_rooms:
                     fed_room_id = room.get("room_id")
@@ -183,8 +182,8 @@ class SpaceSummaryHandler:
                 logger.debug(
                     "Query of %s returned rooms %s, events %s",
                     room_id,
-                    [room.get("room_id") for room in rooms],
-                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
+                    [room.get("room_id") for room in fed_rooms],
+                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in fed_events],
                 )
 
             # the room we queried may or may not have been returned, but don't process
