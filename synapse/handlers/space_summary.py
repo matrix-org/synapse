@@ -430,7 +430,7 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
     return False
 
 
-# Order may only contain characters in the range of \x20 (space) to \x7E (~).
+# Order may only contain characters in the range of \x20 (space) to \x7E (~) inclusive.
 _INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7E]")
 
 
