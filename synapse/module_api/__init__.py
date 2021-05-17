@@ -400,9 +400,7 @@ class ModuleApi:
         Note that this method can only be run on the process that is configured to write to the
         presence stream. By default this is the main process.
         """
-        if (
-            self._hs._instance_name not in self._hs.config.worker.writers.presence
-        ):
+        if self._hs._instance_name not in self._hs.config.worker.writers.presence:
             raise Exception(
                 "send_local_online_presence_to can only be run "
                 "on the process that is configured to write to the "
