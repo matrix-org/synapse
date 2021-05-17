@@ -401,8 +401,7 @@ class ModuleApi:
         presence stream. By default this is the main process.
         """
         if (
-            self._hs.config.worker_app
-            and self._hs._instance_name not in self._hs.config.worker.writers.presence
+            self._hs._instance_name not in self._hs.config.worker.writers.presence
         ):
             raise Exception(
                 "send_local_online_presence_to can only be run "
