@@ -64,13 +64,13 @@ class EventAuthHandler:
         # If allowed is of the wrong form, then only allow invited users.
         allowed_spaces = join_rules_event.content.get("allow", [])
         if not isinstance(allowed_spaces, list):
-            raise AuthError(
-                403,
-                "You do not belong to any of the required spaces to join this room.",
-            )
+            allowed_spaces = ()
 
         # Get the list of joined rooms and see if there's an overlap.
-        joined_rooms = await self._store.get_rooms_for_user(user_id)
+        if allowed_spaces:
+            joined_rooms = await self._store.get_rooms_for_user(user_id)
+        else:
+            joined_rooms = ()
 
         # Pull out the other room IDs, invalid data gets filtered.
         for space in allowed_spaces:
