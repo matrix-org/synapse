@@ -29,7 +29,7 @@ class ExperimentalConfig(Config):
         self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
 
         # Spaces (MSC1772, MSC2946, MSC3083, etc)
-        self.spaces_enabled = experimental.get("spaces_enabled", False)  # type: bool
+        self.spaces_enabled = experimental.get("spaces_enabled", True)  # type: bool
         if self.spaces_enabled:
             KNOWN_ROOM_VERSIONS[RoomVersions.MSC3083.identifier] = RoomVersions.MSC3083
 
