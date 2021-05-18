@@ -11,11 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
+from synapse.events import EventBase
 from synapse.types import StateMap
 
 if TYPE_CHECKING:
@@ -31,7 +32,11 @@ class EventAuthHandler:
         self._store = hs.get_datastore()
 
     async def check_restricted_join_rules(
-        self, state_ids: StateMap[str], room_version: RoomVersion, user_id: str
+        self,
+        state_ids: StateMap[str],
+        room_version: RoomVersion,
+        user_id: str,
+        prev_member_event: Optional[EventBase],
     ) -> None:
         """
         Check whether a user can join a room without an invite due to restricted join rules.
@@ -43,10 +48,18 @@ class EventAuthHandler:
             state_ids: The state of the room as it currently is.
             room_version: The room version of the room being joined.
             user_id: The user joining the room.
+            prev_member_event: The current membership event for this user.
 
         Raises:
             AuthError if the user is cannot join the room.
         """
+        # If the member is invited or currently joined, then nothing to do.
+        if prev_member_event and (
+            prev_member_event.membership == Membership.JOIN
+            or prev_member_event.membership == Membership.INVITE
+        ):
+            return
+
         # This only applies to room versions which support the new join rule.
         if not room_version.msc3083_join_rules:
             return
