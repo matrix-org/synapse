@@ -64,24 +64,12 @@ class EventAuthHandler:
         if allowed_spaces is None:
             return
 
-        # Get the list of joined rooms and see if there's an overlap.
-        if allowed_spaces:
-            joined_rooms = await self._store.get_rooms_for_user(user_id)
-        else:
-            joined_rooms = ()
-
-        # Pull out the other room IDs, invalid data gets filtered.
-        for space_id in allowed_spaces:
-            # The user was joined to one of the spaces specified, they can join
-            # this room!
-            if space_id in joined_rooms:
-                return
-
         # The user was not in any of the required spaces.
-        raise AuthError(
-            403,
-            "You do not belong to any of the required spaces to join this room.",
-        )
+        if not await self.is_user_in_rooms(allowed_spaces, user_id):
+            raise AuthError(
+                403,
+                "You do not belong to any of the required spaces to join this room.",
+            )
 
     async def get_spaces_that_allow_join(
         self, state_ids: StateMap[str], room_version: RoomVersion
@@ -131,3 +119,28 @@ class EventAuthHandler:
             result.append(space_id)
 
         return result
+
+    async def is_user_in_rooms(self, room_ids: Collection[str], user_id: str) -> bool:
+        """
+        Check whether a user is a member of any of the provided rooms.
+
+        Args:
+            room_ids: The rooms to check for membership.
+            user_id: The user to check.
+
+        Returns:
+            True if the user is in any of the rooms, false otherwise.
+        """
+        if not room_ids:
+            return False
+
+        # Get the list of joined rooms and see if there's an overlap.
+        joined_rooms = await self._store.get_rooms_for_user(user_id)
+
+        # Check each room and see if the user is in it.
+        for room_id in room_ids:
+            if room_id in joined_rooms:
+                return True
+
+        # The user was not in any of the rooms.
+        return False
