@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C
 #
@@ -13,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Union
+from typing import Optional, Union
 
 from twisted.internet.defer import succeed
 
@@ -74,7 +73,10 @@ class FallbackAuthTests(unittest.HomeserverTestCase):
         return channel
 
     def recaptcha(
-        self, session: str, expected_post_response: int, post_session: str = None
+        self,
+        session: str,
+        expected_post_response: int,
+        post_session: Optional[str] = None,
     ) -> None:
         """Get and respond to a fallback recaptcha. Returns the second request."""
         if post_session is None:
@@ -161,7 +163,11 @@ class UIAuthTests(unittest.HomeserverTestCase):
 
     def default_config(self):
         config = super().default_config()
-        config["public_baseurl"] = "https://synapse.test"
+
+        # public_baseurl uses an http:// scheme because FakeChannel.isSecure() returns
+        # False, so synapse will see the requested uri as http://..., so using http in
+        # the public_baseurl stops Synapse trying to redirect to https.
+        config["public_baseurl"] = "http://synapse.test"
 
         if HAS_OIDC:
             # we enable OIDC as a way of testing SSO flows

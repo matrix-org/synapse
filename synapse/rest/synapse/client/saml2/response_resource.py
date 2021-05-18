@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright 2018 New Vector Ltd
 #
@@ -14,7 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import TYPE_CHECKING
+
 from synapse.http.server import DirectServeHtmlResource
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class SAML2ResponseResource(DirectServeHtmlResource):
@@ -22,16 +26,17 @@ class SAML2ResponseResource(DirectServeHtmlResource):
 
     isLeaf = 1
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._saml_handler = hs.get_saml_handler()
+        self._sso_handler = hs.get_sso_handler()
 
     async def _async_render_GET(self, request):
         # We're not expecting any GET request on that resource if everything goes right,
         # but some IdPs sometimes end up responding with a 302 redirect on this endpoint.
         # In this case, just tell the user that something went wrong and they should
         # try to authenticate again.
-        self._saml_handler._render_error(
+        self._sso_handler.render_error(
             request, "unexpected_get", "Unexpected GET request on /saml2/authn_response"
         )
 

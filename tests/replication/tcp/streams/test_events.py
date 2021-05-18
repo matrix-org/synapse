@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -240,7 +239,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # the state rows are unsorted
         state_rows = []  # type: List[EventsStreamCurrentStateRow]
-        for stream_name, token, row in received_rows:
+        for stream_name, _, row in received_rows:
             self.assertEqual("events", stream_name)
             self.assertIsInstance(row, EventsStreamRow)
             self.assertEqual(row.type, "state")
@@ -357,7 +356,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
             # the state rows are unsorted
             state_rows = []  # type: List[EventsStreamCurrentStateRow]
-            for j in range(STATES_PER_USER + 1):
+            for _ in range(STATES_PER_USER + 1):
                 stream_name, token, row = received_rows.pop(0)
                 self.assertEqual("events", stream_name)
                 self.assertIsInstance(row, EventsStreamRow)

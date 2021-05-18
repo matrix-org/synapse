@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,14 +31,6 @@ from synapse.types import UserID
 TEMPLATE_LANGUAGE = "en"
 
 logger = logging.getLogger(__name__)
-
-# use hmac.compare_digest if we have it (python 2.7.7), else just use equality
-if hasattr(hmac, "compare_digest"):
-    compare_digest = hmac.compare_digest
-else:
-
-    def compare_digest(a, b):
-        return a == b
 
 
 class ConsentResource(DirectServeHtmlResource):
@@ -210,5 +201,5 @@ class ConsentResource(DirectServeHtmlResource):
             .encode("ascii")
         )
 
-        if not compare_digest(want_mac, userhmac):
+        if not hmac.compare_digest(want_mac, userhmac):
             raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -90,7 +89,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         self.clock = hs.get_clock()
 
         self.protocol_meta_cache = ResponseCache(
-            hs, "as_protocol_meta", timeout_ms=HOUR_IN_MS
+            hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
         )  # type: ResponseCache[Tuple[str, str]]
 
     async def query_user(self, service, user_id):

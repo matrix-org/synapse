@@ -1,0 +1,322 @@
+name: Tests
+
+on:
+  push:
+    branches: ["develop", "release-*"]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toxenv:
+          - "check-sampleconfig"
+          - "check_codestyle"
+          - "check_isort"
+          - "mypy"
+          - "packaging"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install tox
+      - run: tox -e ${{ matrix.toxenv }}
+
+  lint-crlf:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Check line endings
+        run: scripts-dev/check_line_terminators.sh
+
+  lint-newsfile:
+    if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install tox
+      - name: Patch Buildkite-specific test script
+        run: |
+          sed -i -e 's/\$BUILDKITE_PULL_REQUEST/${{ github.event.number }}/' \
+            scripts-dev/check-newsfragment
+      - run: scripts-dev/check-newsfragment
+
+  lint-sdist:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: "3.x"
+      - run: pip install wheel
+      - run: python setup.py sdist bdist_wheel
+      - uses: actions/upload-artifact@v2
+        with:
+          name: Python Distributions
+          path: dist/*
+
+  # Dummy step to gate other tests on without repeating the whole list
+  linting-done:
+    if: ${{ always() }} # Run this even if prior jobs were skipped
+    needs: [lint, lint-crlf, lint-newsfile, lint-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"
+
+  trial:
+    if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
+    needs: linting-done
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.6", "3.7", "3.8", "3.9"]
+        database: ["sqlite"]
+        include:
+          # Newest Python without optional deps
+          - python-version: "3.9"
+            toxenv: "py-noextras,combine"
+
+          # Oldest Python with PostgreSQL
+          - python-version: "3.6"
+            database: "postgres"
+            postgres-version: "9.6"
+
+          # Newest Python with PostgreSQL
+          - python-version: "3.9"
+            database: "postgres"
+            postgres-version: "13"
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - name: Set up PostgreSQL ${{ matrix.postgres-version }}
+        if: ${{ matrix.postgres-version }}
+        run: |
+          docker run -d -p 5432:5432 \
+            -e POSTGRES_PASSWORD=postgres \
+            -e POSTGRES_INITDB_ARGS="--lc-collate C --lc-ctype C --encoding UTF8" \
+            postgres:${{ matrix.postgres-version }}
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install tox
+      - name: Await PostgreSQL
+        if: ${{ matrix.postgres-version }}
+        timeout-minutes: 2
+        run: until pg_isready -h localhost; do sleep 1; done
+      - run: tox -e py,combine
+        env:
+          TRIAL_FLAGS: "--jobs=2"
+          SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
+          SYNAPSE_POSTGRES_HOST: localhost
+          SYNAPSE_POSTGRES_USER: postgres
+          SYNAPSE_POSTGRES_PASSWORD: postgres
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+  trial-olddeps:
+    if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
+    needs: linting-done
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Test with old deps
+        uses: docker://ubuntu:bionic # For old python and sqlite
+        with:
+          workdir: /github/workspace
+          entrypoint: .buildkite/scripts/test_old_deps.sh
+        env:
+          TRIAL_FLAGS: "--jobs=2"
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+  trial-pypy:
+    # Very slow; only run if the branch name includes 'pypy'
+    if: ${{ contains(github.ref, 'pypy') && !failure() }}
+    needs: linting-done
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["pypy-3.6"]
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1 libxml2-dev libxslt-dev
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install tox
+      - run: tox -e py,combine
+        env:
+          TRIAL_FLAGS: "--jobs=2"
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+  sytest:
+    if: ${{ !failure() }}
+    needs: linting-done
+    runs-on: ubuntu-latest
+    container:
+      image: matrixdotorg/sytest-synapse:${{ matrix.sytest-tag }}
+      volumes:
+        - ${{ github.workspace }}:/src
+      env:
+        BUILDKITE_BRANCH: ${{ github.head_ref }}
+        POSTGRES: ${{ matrix.postgres && 1}}
+        MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
+        WORKERS: ${{ matrix.workers && 1 }}
+        REDIS: ${{ matrix.redis && 1 }}
+        BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - sytest-tag: bionic
+
+          - sytest-tag: bionic
+            postgres: postgres
+
+          - sytest-tag: testing
+            postgres: postgres
+
+          - sytest-tag: bionic
+            postgres: multi-postgres
+            workers: workers
+
+          - sytest-tag: buster
+            postgres: multi-postgres
+            workers: workers
+
+          - sytest-tag: buster
+            postgres: postgres
+            workers: workers
+            redis: redis
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: Prepare test blacklist
+        run: cat sytest-blacklist .buildkite/worker-blacklist > synapse-blacklist-with-workers
+      - name: Run SyTest
+        run: /bootstrap.sh synapse
+        working-directory: /src
+      - name: Dump results.tap
+        if: ${{ always() }}
+        run: cat /logs/results.tap
+      - name: Upload SyTest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
+
+  portdb:
+    if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
+    needs: linting-done
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - python-version: "3.6"
+            postgres-version: "9.6"
+
+          - python-version: "3.9"
+            postgres-version: "13"
+
+    services:
+      postgres:
+        image: postgres:${{ matrix.postgres-version }}
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_PASSWORD: "postgres"
+          POSTGRES_INITDB_ARGS: "--lc-collate C --lc-ctype C --encoding UTF8"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Patch Buildkite-specific test scripts
+        run: |
+          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/postgres_exec.py
+          sed -i -e 's/host: postgres/host: localhost/' .buildkite/postgres-config.yaml
+          sed -i -e 's|/src/||' .buildkite/{sqlite,postgres}-config.yaml
+          sed -i -e 's/\$TOP/\$GITHUB_WORKSPACE/' .coveragerc
+      - run: .buildkite/scripts/test_synapse_port_db.sh
+
+  complement:
+    if: ${{ !failure() }}
+    needs: linting-done
+    runs-on: ubuntu-latest
+    container:
+      # https://github.com/matrix-org/complement/blob/master/dockerfiles/ComplementCIBuildkite.Dockerfile
+      image: matrixdotorg/complement:latest
+      env:
+        CI: true
+      ports:
+        - 8448:8448
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock
+
+    steps:
+      - name: Run actions/checkout@v2 for synapse
+        uses: actions/checkout@v2
+        with:
+          path: synapse
+
+      - name: Run actions/checkout@v2 for complement
+        uses: actions/checkout@v2
+        with:
+          repository: "matrix-org/complement"
+          path: complement
+
+      # Build initial Synapse image
+      - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
+        working-directory: synapse
+
+      # Build a ready-to-run Synapse image based on the initial image above.
+      # This new image includes a config file, keys for signing and TLS, and
+      # other settings to make it suitable for testing under Complement.
+      - run: docker build -t complement-synapse -f Synapse.Dockerfile .
+        working-directory: complement/dockerfiles
+
+      # Run Complement
+      - run: go test -v -tags synapse_blacklist ./tests
+        env:
+          COMPLEMENT_BASE_IMAGE: complement-synapse:latest
+        working-directory: complement

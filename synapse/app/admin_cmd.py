@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,12 +69,6 @@ class AdminCmdSlavedStore(
 
 class AdminCmdServer(HomeServer):
     DATASTORE_CLASS = AdminCmdSlavedStore
-
-    def _listen_http(self, listener_config):
-        pass
-
-    def start_listening(self, listeners):
-        pass
 
 
 async def export_data_command(hs, args):
@@ -210,7 +203,9 @@ def start(config_options):
     config.update_user_directory = False
     config.run_background_tasks = False
     config.start_pushers = False
+    config.pusher_shard_config.instances = []
     config.send_federation = False
+    config.federation_shard_config.instances = []
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -231,7 +226,7 @@ def start(config_options):
 
     async def run():
         with LoggingContext("command"):
-            _base.start(ss, [])
+            _base.start(ss)
             await args.func(ss, args)
 
     _base.start_worker_reactor(

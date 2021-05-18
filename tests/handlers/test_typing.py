@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +15,7 @@
 
 import json
 from typing import Dict
-
-from mock import ANY, Mock, call
+from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer
 from twisted.web.resource import Resource

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +16,7 @@ import json
 import os
 import urllib.parse
 from binascii import unhexlify
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
 

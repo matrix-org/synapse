@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -244,7 +243,7 @@ class MediaStorage:
                     await consumer.wait()
                 return local_path
 
-        raise Exception("file could not be found")
+        raise NotFoundError()
 
     def _file_info_to_path(self, file_info: FileInfo) -> str:
         """Converts file_info into a relative path.

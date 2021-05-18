@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -61,7 +60,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         is_guest = content["is_guest"]
         is_appservice_ghost = content["is_appservice_ghost"]
 
-        device_id, access_token = await self.registration_handler.register_device(
+        res = await self.registration_handler.register_device_inner(
             user_id,
             device_id,
             initial_display_name,
@@ -69,7 +68,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             is_appservice_ghost=is_appservice_ghost,
         )
 
-        return 200, {"device_id": device_id, "access_token": access_token}
+        return 200, res
 
 
 def register_servlets(hs, http_server):

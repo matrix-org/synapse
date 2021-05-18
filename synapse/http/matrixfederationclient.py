@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import cgi
+import codecs
 import logging
 import random
 import sys
+import typing
 import urllib.parse
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import attr
@@ -59,7 +59,7 @@ from synapse.logging.opentracing import (
     start_active_span,
     tags,
 )
-from synapse.types import JsonDict
+from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
@@ -73,6 +73,9 @@ incoming_responses_counter = Counter(
     "synapse_http_matrixfederationclient_responses", "", ["method", "code"]
 )
 
+# a federation response can be rather large (eg a big state_ids is 50M or so), so we
+# need a generous limit here.
+MAX_RESPONSE_SIZE = 100 * 1024 * 1024
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
@@ -168,12 +171,27 @@ async def _handle_json_response(
     try:
         check_content_type_is_json(response.headers)
 
-        # Use the custom JSON decoder (partially re-implements treq.json_content).
-        d = treq.text_content(response, encoding="utf-8")
-        d.addCallback(json_decoder.decode)
+        buf = StringIO()
+        d = read_body_with_max_size(response, BinaryIOWrapper(buf), MAX_RESPONSE_SIZE)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
+        def parse(_len: int):
+            return json_decoder.decode(buf.getvalue())
+
+        d.addCallback(parse)
+
         body = await make_deferred_yieldable(d)
+    except BodyExceededMaxSize as e:
+        # The response was too big.
+        logger.warning(
+            "{%s} [%s] JSON response exceeded max size %i - %s %s",
+            request.txn_id,
+            request.destination,
+            MAX_RESPONSE_SIZE,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=False) from e
     except ValueError as e:
         # The JSON content was invalid.
         logger.warning(
@@ -219,6 +237,18 @@ async def _handle_json_response(
     return body
 
 
+class BinaryIOWrapper:
+    """A wrapper for a TextIO which converts from bytes on the fly."""
+
+    def __init__(self, file: typing.TextIO, encoding="utf-8", errors="strict"):
+        self.decoder = codecs.getincrementaldecoder(encoding)(errors)
+        self.file = file
+
+    def write(self, b: Union[bytes, bytearray]) -> int:
+        self.file.write(self.decoder.decode(b))
+        return len(b)
+
+
 class MatrixFederationHttpClient:
     """HTTP client used to talk to other homeservers over the federation
     protocol. Send client certificates and signs requests.
@@ -237,14 +267,14 @@ class MatrixFederationHttpClient:
         # addresses, to prevent DNS rebinding.
         self.reactor = BlacklistingReactorWrapper(
             hs.get_reactor(), None, hs.config.federation_ip_range_blacklist
-        )
+        )  # type: ISynapseReactor
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
-        self.agent = MatrixFederationAgent(
+        federation_agent = MatrixFederationAgent(
             self.reactor,
             tls_client_options_factory,
             user_agent,
@@ -254,7 +284,7 @@ class MatrixFederationHttpClient:
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
-            self.agent,
+            federation_agent,
             ip_blacklist=hs.config.federation_ip_range_blacklist,
         )
 
@@ -272,7 +302,7 @@ class MatrixFederationHttpClient:
         self,
         request: MatrixFederationRequest,
         try_trailing_slash_on_400: bool = False,
-        **send_request_args
+        **send_request_args,
     ) -> IResponse:
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
@@ -534,9 +564,10 @@ class MatrixFederationHttpClient:
                             response.code, response_phrase, body
                         )
 
-                        # Retry if the error is a 429 (Too Many Requests),
-                        # otherwise just raise a standard HttpResponseException
-                        if response.code == 429:
+                        # Retry if the error is a 5xx or a 429 (Too Many
+                        # Requests), otherwise just raise a standard
+                        # `HttpResponseException`
+                        if 500 <= response.code < 600 or response.code == 429:
                             raise RequestSendFailed(exc, can_retry=True) from exc
                         else:
                             raise exc
@@ -1049,14 +1080,14 @@ def check_content_type_is_json(headers: Headers) -> None:
         RequestSendFailed: if the Content-Type header is missing or isn't JSON
 
     """
-    c_type = headers.getRawHeaders(b"Content-Type")
-    if c_type is None:
+    content_type_headers = headers.getRawHeaders(b"Content-Type")
+    if content_type_headers is None:
         raise RequestSendFailed(
             RuntimeError("No Content-Type header received from remote server"),
             can_retry=False,
         )
 
-    c_type = c_type[0].decode("ascii")  # only the first header
+    c_type = content_type_headers[0].decode("ascii")  # only the first header
     val, options = cgi.parse_header(c_type)
     if val != "application/json":
         raise RequestSendFailed(

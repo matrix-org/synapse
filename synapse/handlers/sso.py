@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +18,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -31,8 +31,8 @@ from urllib.parse import urlencode
 import attr
 from typing_extensions import NoReturn, Protocol
 
-from twisted.web.http import Request
 from twisted.web.iweb import IRequest
+from twisted.web.server import Request
 
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError
@@ -41,7 +41,7 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.types import Collection, JsonDict, UserID, contains_invalid_mxid_characters
+from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters
 from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
@@ -96,6 +96,11 @@ class SsoIdentityProvider(Protocol):
     @property
     def idp_brand(self) -> Optional[str]:
         """Optional branding identifier"""
+        return None
+
+    @property
+    def unstable_idp_brand(self) -> Optional[str]:
+        """Optional brand identifier for the unstable API (see MSC2858)."""
         return None
 
     @abc.abstractmethod
@@ -456,6 +461,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            auth_provider_id,
             request,
             client_redirect_url,
             extra_login_attributes,
@@ -605,6 +611,7 @@ class SsoHandler:
             default_display_name=attributes.display_name,
             bind_emails=attributes.emails,
             user_agent_ips=[(user_agent, ip_address)],
+            auth_provider_id=auth_provider_id,
         )
 
         await self._store.record_user_external_id(
@@ -886,6 +893,7 @@ class SsoHandler:
 
         await self._auth_handler.complete_sso_login(
             user_id,
+            session.auth_provider_id,
             request,
             session.client_redirect_url,
             session.extra_login_attributes,

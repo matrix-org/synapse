@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,7 +36,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
     def test_wait_for_sync_for_user_auth_blocking(self):
         user_id1 = "@user1:test"
         user_id2 = "@user2:test"
-        sync_config = self._generate_sync_config(user_id1)
+        sync_config = generate_sync_config(user_id1)
         requester = create_requester(user_id1)
 
         self.reactor.advance(100)  # So we get not 0 time
@@ -60,7 +59,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
         self.auth_blocking._hs_disabled = False
 
-        sync_config = self._generate_sync_config(user_id2)
+        sync_config = generate_sync_config(user_id2)
         requester = create_requester(user_id2)
 
         e = self.get_failure(
@@ -69,11 +68,12 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertEquals(e.value.errcode, Codes.RESOURCE_LIMIT_EXCEEDED)
 
-    def _generate_sync_config(self, user_id):
-        return SyncConfig(
-            user=UserID(user_id.split(":")[0][1:], user_id.split(":")[1]),
-            filter_collection=DEFAULT_FILTER_COLLECTION,
-            is_guest=False,
-            request_key="request_key",
-            device_id="device_id",
-        )
+
+def generate_sync_config(user_id: str) -> SyncConfig:
+    return SyncConfig(
+        user=UserID(user_id.split(":")[0][1:], user_id.split(":")[1]),
+        filter_collection=DEFAULT_FILTER_COLLECTION,
+        is_guest=False,
+        request_key="request_key",
+        device_id="device_id",
+    )

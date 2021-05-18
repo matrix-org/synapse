@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@ import os
 import warnings
 from datetime import datetime
 from hashlib import sha256
-from typing import List, Optional
+from typing import List, Optional, Pattern
 
 from unpaddedbase64 import encode_base64
 
@@ -125,7 +124,7 @@ class TlsConfig(Config):
             fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []  # type: List[str]
+        self.federation_certificate_verification_whitelist = []  # type: List[Pattern]
         for entry in fed_whitelist_entries:
             try:
                 entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
@@ -270,7 +269,7 @@ class TlsConfig(Config):
         tls_certificate_path,
         tls_private_key_path,
         acme_domain,
-        **kwargs
+        **kwargs,
     ):
         """If the acme_domain is specified acme will be enabled.
         If the TLS paths are not specified the default will be certs in the

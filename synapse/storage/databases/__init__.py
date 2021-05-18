@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -79,7 +78,7 @@ class Databases:
                     # If we're on a process that can persist events also
                     # instantiate a `PersistEventsStore`
                     if hs.get_instance_name() in hs.config.worker.writers.events:
-                        persist_events = PersistEventsStore(hs, database, main)
+                        persist_events = PersistEventsStore(hs, database, main, db_conn)
 
                 if "state" in database_config.databases:
                     logger.info(

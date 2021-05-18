@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -85,7 +84,9 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 if keys:
                     result["keys"] = keys
 
-                device_display_name = device.display_name
+                device_display_name = None
+                if self.hs.config.allow_device_name_lookup_over_federation:
+                    device_display_name = device.display_name
                 if device_display_name:
                     result["device_display_name"] = device_display_name
 

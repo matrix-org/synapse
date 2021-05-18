@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -133,6 +132,38 @@ def parse_and_validate_server_name(server_name: str) -> Tuple[str, Optional[int]
     return host, port
 
 
+def valid_id_server_location(id_server: str) -> bool:
+    """Check whether an identity server location, such as the one passed as the
+    `id_server` parameter to `/_matrix/client/r0/account/3pid/bind`, is valid.
+
+    A valid identity server location consists of a valid hostname and optional
+    port number, optionally followed by any number of `/` delimited path
+    components, without any fragment or query string parts.
+
+    Args:
+        id_server: identity server location string to validate
+
+    Returns:
+        True if valid, False otherwise.
+    """
+
+    components = id_server.split("/", 1)
+
+    host = components[0]
+
+    try:
+        parse_and_validate_server_name(host)
+    except ValueError:
+        return False
+
+    if len(components) < 2:
+        # no path
+        return True
+
+    path = components[1]
+    return "#" not in path and "?" not in path
+
+
 def parse_and_validate_mxc_uri(mxc: str) -> Tuple[str, Optional[int], str]:
     """Parse the given string as an MXC URI
 
@@ -189,3 +220,23 @@ def strtobool(val: str) -> bool:
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+_BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def base62_encode(num: int, minwidth: int = 1) -> str:
+    """Encode a number using base62
+
+    Args:
+        num: number to be encoded
+        minwidth: width to pad to, if the number is small
+    """
+    res = ""
+    while num:
+        num, rem = divmod(num, 62)
+        res = _BASE62[rem] + res
+
+    # pad to minimum width
+    pad = "0" * (minwidth - len(res))
+    return pad + res

@@ -1,0 +1,23 @@
+# Inherit from the official Synapse docker image
+FROM matrixdotorg/synapse
+
+# Install deps
+RUN apt-get update
+RUN apt-get install -y supervisor redis nginx
+
+# Remove the default nginx sites
+RUN rm /etc/nginx/sites-enabled/default
+
+# Copy Synapse worker, nginx and supervisord configuration template files
+COPY ./docker/conf-workers/* /conf/
+
+# Expose nginx listener port
+EXPOSE 8080/tcp
+
+# Volume for user-editable config files, logs etc.
+VOLUME ["/data"]
+
+# A script to read environment variables and create the necessary
+# files to run the desired worker configuration. Will start supervisord.
+COPY ./docker/configure_workers_and_start.py /configure_workers_and_start.py
+ENTRYPOINT ["/configure_workers_and_start.py"]

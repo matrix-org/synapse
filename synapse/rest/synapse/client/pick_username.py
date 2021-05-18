@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, List
 
-from twisted.web.http import Request
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
 from synapse.handlers.sso import get_username_mapping_session_cookie_from_request
@@ -104,6 +103,9 @@ class AccountDetailsResource(DirectServeHtmlResource):
         respond_with_html(request, 200, html)
 
     async def _async_render_POST(self, request: SynapseRequest):
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         try:
             session_id = get_username_mapping_session_cookie_from_request(request)
         except SynapseError as e:

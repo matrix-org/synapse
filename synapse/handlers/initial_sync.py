@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
@@ -48,7 +47,7 @@ class InitialSyncHandler(BaseHandler):
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.snapshot_cache = ResponseCache(
-            hs, "initial_sync_cache"
+            hs.get_clock(), "initial_sync_cache"
         )  # type: ResponseCache[Tuple[str, Optional[StreamToken], Optional[StreamToken], str, Optional[int], bool, bool]]
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
@@ -412,7 +411,7 @@ class InitialSyncHandler(BaseHandler):
 
             return [
                 {
-                    "type": EventTypes.Presence,
+                    "type": EduTypes.Presence,
                     "content": format_user_presence_state(s, time_now),
                 }
                 for s in states
