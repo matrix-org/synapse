@@ -74,7 +74,7 @@ systemctl restart matrix-synapse.target
 `/etc/systemd/system/matrix-synapse.service.d/override-hardened.conf` (the
 directory may have to be created). It enables certain sandboxing features in
 systemd to further secure the synapse service. You may read the comments to
-understand what the override file is doing. The same file at may also be copied
+understand what the override file is doing. The same file will need to be copied
 to
 `/etc/systemd/system/matrix-synapse-worker@.service.d/override-hardened-worker.conf`
 (this directory may also have to be created) in order to apply the same
@@ -88,7 +88,7 @@ specified locations.
 ```sh
 systemctl daemon-reload
 
-# Restart the services
+# Restart services
 systemctl restart matrix-synapse.target
 ```
 
