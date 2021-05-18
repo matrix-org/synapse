@@ -15,7 +15,7 @@
 import logging
 
 from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
 from ._base import client_patterns
 
@@ -44,8 +44,10 @@ class ReceiptRestServlet(RestServlet):
 
         await self.presence_handler.bump_presence_active_time(requester.user)
 
+        body = parse_json_object_from_request(request, allow_empty_body=True)
         await self.receipts_handler.received_client_receipt(
-            room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id
+            room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id,
+            extra_content=body,
         )
 
         return 200, {}
