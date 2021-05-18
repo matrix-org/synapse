@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Collection, Optional
 
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError
@@ -59,24 +59,10 @@ class EventAuthHandler:
         ):
             return
 
-        # This only applies to room versions which support the new join rule.
-        if not room_version.msc3083_join_rules:
+        # Get the spaces which allow access to this room, if applicable.
+        allowed_spaces = await self.get_spaces_that_allow_join(state_ids, room_version)
+        if allowed_spaces is None:
             return
-
-        # If there's no join rule, then it defaults to invite (so this doesn't apply).
-        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
-        if not join_rules_event_id:
-            return
-
-        # If the join rule is not restricted, this doesn't apply.
-        join_rules_event = await self._store.get_event(join_rules_event_id)
-        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
-            return
-
-        # If allowed is of the wrong form, then only allow invited users.
-        allowed_spaces = join_rules_event.content.get("allow", [])
-        if not isinstance(allowed_spaces, list):
-            allowed_spaces = ()
 
         # Get the list of joined rooms and see if there's an overlap.
         if allowed_spaces:
@@ -85,14 +71,7 @@ class EventAuthHandler:
             joined_rooms = ()
 
         # Pull out the other room IDs, invalid data gets filtered.
-        for space in allowed_spaces:
-            if not isinstance(space, dict):
-                continue
-
-            space_id = space.get("space")
-            if not isinstance(space_id, str):
-                continue
-
+        for space_id in allowed_spaces:
             # The user was joined to one of the spaces specified, they can join
             # this room!
             if space_id in joined_rooms:
@@ -103,3 +82,52 @@ class EventAuthHandler:
             403,
             "You do not belong to any of the required spaces to join this room.",
         )
+
+    async def get_spaces_that_allow_join(
+        self, state_ids: StateMap[str], room_version: RoomVersion
+    ) -> Optional[Collection[str]]:
+        """
+        Generate a list of spaces which allow access to a room.
+
+        Args:
+            state_ids: The state of the room as it currently is.
+            room_version: The room version of the room to query.
+
+        Returns:
+            None if room access via spaces doesn't apply for this room.
+
+            Otherwise, a collection of spaces (if any) which provide membership
+            to the room.
+        """
+        # This only applies to room versions which support the new join rule.
+        if not room_version.msc3083_join_rules:
+            return None
+
+        # If there's no join rule, then it defaults to invite (so this doesn't apply).
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
+        if not join_rules_event_id:
+            return None
+
+        # If the join rule is not restricted, this doesn't apply.
+        join_rules_event = await self._store.get_event(join_rules_event_id)
+        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
+            return None
+
+        # If allowed is of the wrong form, then only allow invited users.
+        allowed_spaces = join_rules_event.content.get("allow", [])
+        if not isinstance(allowed_spaces, list):
+            return ()
+
+        # Pull out the other room IDs, invalid data gets filtered.
+        result = []
+        for space in allowed_spaces:
+            if not isinstance(space, dict):
+                continue
+
+            space_id = space.get("space")
+            if not isinstance(space_id, str):
+                continue
+
+            result.append(space_id)
+
+        return result
