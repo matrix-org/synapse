@@ -268,16 +268,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
             # If the member is not already in the room and is not accepting an invite,
             # check if they should be allowed access via membership in a space.
-            if (
-                newly_joined
-                and not user_is_invited
-                and not await self.event_auth_handler.can_join_without_invite(
+            if newly_joined and not user_is_invited:
+                await self.event_auth_handler.check_restricted_join_rules(
                     prev_state_ids, event.room_version, user_id
-                )
-            ):
-                raise AuthError(
-                    403,
-                    "You do not belong to any of the required spaces to join this room.",
                 )
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
