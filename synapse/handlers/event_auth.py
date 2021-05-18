@@ -51,12 +51,11 @@ class EventAuthHandler:
             prev_member_event: The current membership event for this user.
 
         Raises:
-            AuthError if the user is cannot join the room.
+            AuthError if the user cannot join the room.
         """
         # If the member is invited or currently joined, then nothing to do.
         if prev_member_event and (
-            prev_member_event.membership == Membership.JOIN
-            or prev_member_event.membership == Membership.INVITE
+            prev_member_event.membership in (Membership.JOIN, Membership.INVITE)
         ):
             return
 
