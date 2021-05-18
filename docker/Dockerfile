@@ -55,7 +55,6 @@ COPY synapse /synapse/synapse/
 #
 # This is aiming at installing only the `packages=find_packages(...)` from `setup.py
 RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
->>>>>>> upstream/release-v1.34.0
 
 ###
 ### Stage 1: runtime
