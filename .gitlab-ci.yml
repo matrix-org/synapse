@@ -8,6 +8,6 @@ build:
   before_script:
   - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-  - docker pull $CI_REGISTRY_IMAGE:latest || true
-  - docker build --pull --cache-from $CI_REGISTRY_IMAGE:latest --tag $CI_REGISTRY_IMAGE:latest -f docker/Dockerfile .
-  - docker push $CI_REGISTRY_IMAGE:latest
+  - synversion=$(cat synapse/__init__.py | grep '__version__ = "' | sed -E 's/^__version__ = "(.+)"$/\1/')
+  - docker build --tag $CI_REGISTRY_IMAGE:$synversion -f docker/Dockerfile .
+  - docker push $CI_REGISTRY_IMAGE:$synversion
