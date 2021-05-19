@@ -457,13 +457,16 @@ class SpaceSummaryHandler:
 
             # Otherwise, if they should be allowed access via membership in a space.
             # Get the spaces which allow access to this room, if applicable.
-            allowed_spaces = await self._event_auth_handler.get_spaces_that_allow_join(
+            if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
-            )
-            if allowed_spaces and await self._event_auth_handler.is_user_in_rooms(
-                allowed_spaces, requester
             ):
-                return True
+                allowed_spaces = (
+                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
+                )
+                if await self._event_auth_handler.is_user_in_rooms(
+                    allowed_spaces, requester
+                ):
+                    return True
 
         # If this is a request over federation, check if the host is in the room or
         # is in one of the spaces specified via the join rules.
@@ -474,10 +477,12 @@ class SpaceSummaryHandler:
             # Alternately, if the host has a user in any of the spaces specified
             # for access, then the host can see this room (and should do filtering
             # if the requester cannot see it).
-            allowed_spaces = await self._event_auth_handler.get_spaces_that_allow_join(
+            if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
-            )
-            if allowed_spaces:
+            ):
+                allowed_spaces = (
+                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
+                )
                 for space_id in allowed_spaces:
                     if await self._auth.check_host_in_room(space_id, origin):
                         return True
@@ -517,9 +522,13 @@ class SpaceSummaryHandler:
             room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
 
         room_version = await self._store.get_room_version(room_id)
-        allowed_spaces = await self._event_auth_handler.get_spaces_that_allow_join(
+        allowed_spaces = None
+        if await self._event_auth_handler.has_restricted_join_rules(
             current_state_ids, room_version
-        )
+        ):
+            allowed_spaces = await self._event_auth_handler.get_spaces_that_allow_join(
+                current_state_ids
+            )
 
         entry = {
             "room_id": stats["room_id"],
@@ -534,7 +543,7 @@ class SpaceSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
             "room_type": room_type,
-            "allowed_spaces": allowed_spaces if allowed_spaces else None,
+            "allowed_spaces": allowed_spaces,
         }
 
         # Filter out Nones – rather omit the field altogether

@@ -59,52 +59,68 @@ class EventAuthHandler:
         ):
             return
 
-        # Get the spaces which allow access to this room, if applicable.
-        allowed_spaces = await self.get_spaces_that_allow_join(state_ids, room_version)
-        if allowed_spaces is None:
-            # This is not a room with a restricted join rule, so we don't need to do the
-            # restricted room specific checks.
-            #
-            # Note: We'll be applying the standard join rule checks later, which will
-            # catch the cases of e.g. trying to join private rooms without an invite.
+        # This is not a room with a restricted join rule, so we don't need to do the
+        # restricted room specific checks.
+        #
+        # Note: We'll be applying the standard join rule checks later, which will
+        # catch the cases of e.g. trying to join private rooms without an invite.
+        if not await self.has_restricted_join_rules(state_ids, room_version):
             return
 
-        # The user was not in any of the required spaces.
+        # Get the spaces which allow access to this room and check if the user is
+        # in any of them.
+        allowed_spaces = await self.get_spaces_that_allow_join(state_ids)
         if not await self.is_user_in_rooms(allowed_spaces, user_id):
             raise AuthError(
                 403,
                 "You do not belong to any of the required spaces to join this room.",
             )
 
-    async def get_spaces_that_allow_join(
+    async def has_restricted_join_rules(
         self, state_ids: StateMap[str], room_version: RoomVersion
-    ) -> Optional[Collection[str]]:
+    ) -> bool:
         """
-        Generate a list of spaces which allow access to a room.
+        Return if the room has the proper join rules set for access via spaces.
 
         Args:
             state_ids: The state of the room as it currently is.
             room_version: The room version of the room to query.
 
         Returns:
-            None if room access via spaces doesn't apply for this room.
-
-            Otherwise, a collection of spaces (if any) which provide membership
-            to the room.
+            True if the proper room version and join rules are set for restricted access.
         """
         # This only applies to room versions which support the new join rule.
         if not room_version.msc3083_join_rules:
-            return None
+            return False
 
         # If there's no join rule, then it defaults to invite (so this doesn't apply).
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
         if not join_rules_event_id:
-            return None
+            return False
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        if join_rules_event.content.get("join_rule") != JoinRules.MSC3083_RESTRICTED:
-            return None
+        return join_rules_event.content.get("join_rule") == JoinRules.MSC3083_RESTRICTED
+
+    async def get_spaces_that_allow_join(
+        self, state_ids: StateMap[str]
+    ) -> Collection[str]:
+        """
+        Generate a list of spaces which allow access to a room.
+
+        Args:
+            state_ids: The state of the room as it currently is.
+
+        Returns:
+            A collection of spaces which provide membership to the room.
+        """
+        # If there's no join rule, then it defaults to invite (so this doesn't apply).
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
+        if not join_rules_event_id:
+            return ()
+
+        # If the join rule is not restricted, this doesn't apply.
+        join_rules_event = await self._store.get_event(join_rules_event_id)
 
         # If allowed is of the wrong form, then only allow invited users.
         allowed_spaces = join_rules_event.content.get("allow", [])
