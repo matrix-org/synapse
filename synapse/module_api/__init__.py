@@ -35,13 +35,13 @@ from twisted.web.server import Request
 
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
-from synapse.http.site import SynapseRequest
-from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.server import (
     DirectServeHtmlResource,
     DirectServeJsonResource,
     respond_with_html,
 )
+from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction

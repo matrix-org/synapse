@@ -14,9 +14,9 @@
 
 """Exception types which are exposed as part of the stable module API"""
 
-from synapse.config._base import ConfigError
-from synapse.api.errors import (
+from synapse.api.errors import (  # noqa: F401
     InvalidClientCredentialsError,
     RedirectException,
     SynapseError,
-)# noqa: F401
+)
+from synapse.config._base import ConfigError

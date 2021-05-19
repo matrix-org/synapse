@@ -98,6 +98,14 @@ module.
 
 Synapse's built-in account validity feature will be removed in a future release.
 
+
+Removal of account validity template configuration settings
+-----------------------------------------------------------
+
+In line with previous changes around templates management in Synapse, support has been
+removed for the configuration settings ``template_dir``, ``account_renewed_html_path`` and
+``invalid_token_html_path`` in the ``account_validity`` section of the configuration file.
+
 Upgrading to v1.34.0
 ====================
 
