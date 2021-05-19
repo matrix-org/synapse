@@ -336,7 +336,9 @@ class DeviceWorkerStore(SQLBaseStore):
                     if keys:
                         result["keys"] = keys
 
-                    device_display_name = device.display_name
+                    device_display_name = None
+                    if self.hs.config.allow_device_name_lookup_over_federation:
+                        device_display_name = device.display_name
                     if device_display_name:
                         result["device_display_name"] = device_display_name
                 else:
