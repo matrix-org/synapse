@@ -62,6 +62,11 @@ class EventAuthHandler:
         # Get the spaces which allow access to this room, if applicable.
         allowed_spaces = await self.get_spaces_that_allow_join(state_ids, room_version)
         if allowed_spaces is None:
+            # This is not a room with a restricted join rule, so we don't need to do the
+            # restricted room specific checks.
+            #
+            # Note: We'll be applying the standard join rule checks later, which will
+            # catch the cases of e.g. trying to join private rooms without an invite.
             return
 
         # The user was not in any of the required spaces.
