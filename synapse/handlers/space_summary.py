@@ -140,7 +140,7 @@ class SpaceSummaryHandler:
                 # as the requesting server, are allowed to see, but the requesting
                 # user is not permitted see.
                 #
-                # Filter the returned results to only what is accessible o the user.
+                # Filter the returned results to only what is accessible to the user.
                 room_ids = set()
                 events = []
                 for room in fed_rooms:
