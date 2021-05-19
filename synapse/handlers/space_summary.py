@@ -140,8 +140,7 @@ class SpaceSummaryHandler:
                 # as the requesting server, are allowed to see, but the requesting
                 # user is not permitted see.
                 #
-                # A room may be visible if it is world readable, or if it is accessible
-                # to the specific user.
+                # Filter the returned results to only what is accessible o the user.
                 room_ids = set()
                 events = []
                 for room in fed_rooms:
@@ -149,29 +148,39 @@ class SpaceSummaryHandler:
                     if not fed_room_id:
                         continue
 
-                    # Check whether the room is world readable from the response.
+                    # The room should only be included in the summary if:
+                    #     a. the user is in the room;
+                    #     b. the room is world readable; or
+                    #     c. the user is in a space that has been granted access to
+                    #        the room.
+                    #
+                    # Note that we know the user is not in the root room (which is
+                    # why the remote call was made in the first place), but the user
+                    # could be in one of the children rooms and we just didn't know
+                    # about the link.
                     include_room = room.get("world_readable") is True
 
-                    # If the room is not world-readable, get the allowed spaces from
-                    # the response.
+                    # Check if the user is a member of any of the allowed spaces
+                    # from the response.
                     allowed_spaces = room.get("allowed_spaces")
                     if not include_room and allowed_spaces:
                         include_room = await self._event_auth_handler.is_user_in_rooms(
                             allowed_spaces, requester
                         )
 
-                    # Finally, check ourselves if we can access the room (this will
-                    # fail if we don't have any state for this room).
-                    if not include_room:
+                    # Finally, if this isn't the requested room, check ourselves
+                    # if we can access the room.
+                    if not include_room and fed_room_id != queue_entry.room_id:
                         include_room = await self._is_room_accessible(
                             fed_room_id, requester, None
                         )
 
+                    # The user can see the room, include it!
                     if include_room:
                         rooms_result.append(room)
                         room_ids.add(fed_room_id)
 
-                    # any rooms returned don't need visiting again (even if the user
+                    # All rooms returned don't need visiting again (even if the user
                     # didn't have access to them).
                     processed_rooms.add(cast(str, room_id))
 
