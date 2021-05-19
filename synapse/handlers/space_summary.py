@@ -16,7 +16,7 @@ import itertools
 import logging
 import re
 from collections import deque
-from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple, cast
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
@@ -145,7 +145,7 @@ class SpaceSummaryHandler:
                 events = []
                 for room in fed_rooms:
                     fed_room_id = room.get("room_id")
-                    if not fed_room_id:
+                    if not fed_room_id or not isinstance(fed_room_id, str):
                         continue
 
                     # The room should only be included in the summary if:
@@ -163,7 +163,11 @@ class SpaceSummaryHandler:
                     # Check if the user is a member of any of the allowed spaces
                     # from the response.
                     allowed_spaces = room.get("allowed_spaces")
-                    if not include_room and allowed_spaces:
+                    if (
+                        not include_room
+                        and allowed_spaces
+                        and isinstance(allowed_spaces, list)
+                    ):
                         include_room = await self._event_auth_handler.is_user_in_rooms(
                             allowed_spaces, requester
                         )
@@ -182,7 +186,7 @@ class SpaceSummaryHandler:
 
                     # All rooms returned don't need visiting again (even if the user
                     # didn't have access to them).
-                    processed_rooms.add(cast(str, room_id))
+                    processed_rooms.add(fed_room_id)
 
                 for event in fed_events:
                     if event.get("room_id") in room_ids:
