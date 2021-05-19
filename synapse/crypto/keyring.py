@@ -74,15 +74,12 @@ class VerifyJsonRequest:
         minimum_valid_until_ts: time at which we require the signing key to
             be valid. (0 implies we don't care)
 
-        request_name: The name of the request.
-
         key_ids: The set of key_ids to that could be used to verify the JSON object
     """
 
     server_name = attr.ib(type=str)
     get_json_object = attr.ib(type=Callable[[], JsonDict])
     minimum_valid_until_ts = attr.ib(type=int)
-    request_name = attr.ib(type=str)
     key_ids = attr.ib(type=List[str])
 
     @staticmethod
@@ -90,7 +87,6 @@ class VerifyJsonRequest:
         server_name: str,
         json_object: JsonDict,
         minimum_valid_until_ms: int,
-        request_name: str,
     ):
         """Create a VerifyJsonRequest to verify all signatures on a signed JSON
         object for the given server.
@@ -100,7 +96,6 @@ class VerifyJsonRequest:
             server_name,
             lambda: json_object,
             minimum_valid_until_ms,
-            request_name=request_name,
             key_ids=key_ids,
         )
 
@@ -120,7 +115,6 @@ class VerifyJsonRequest:
             # memory than the Event object itself.
             lambda: prune_event_dict(event.room_version, event.get_pdu_json()),
             minimum_valid_until_ms,
-            request_name=event.event_id,
             key_ids=key_ids,
         )
 
@@ -177,7 +171,6 @@ class Keyring:
         server_name: str,
         json_object: JsonDict,
         validity_time: int,
-        request_name: str,
     ) -> defer.Deferred:
         """Verify that a JSON object has been signed by a given server
 
@@ -189,9 +182,6 @@ class Keyring:
             validity_time: timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
 
-            request_name: an identifier for this json object (eg, an event id)
-                for logging.
-
         Returns:
             Deferred[None]: completes if the the object was correctly signed, otherwise
                 errbacks with an error
@@ -200,26 +190,22 @@ class Keyring:
             server_name,
             json_object,
             validity_time,
-            request_name,
         )
         return defer.ensureDeferred(self.process_request(request))
 
     def verify_json_objects_for_server(
-        self, server_and_json: Iterable[Tuple[str, dict, int, str]]
+        self, server_and_json: Iterable[Tuple[str, dict, int]]
     ) -> List[defer.Deferred]:
         """Bulk verifies signatures of json objects, bulk fetching keys as
         necessary.
 
         Args:
             server_and_json:
-                Iterable of (server_name, json_object, validity_time, request_name)
+                Iterable of (server_name, json_object, validity_time)
                 tuples.
 
                 validity_time is a timestamp at which the signing key must be
                 valid.
-
-                request_name is an identifier for this json object (eg, an event id)
-                for logging.
 
         Returns:
             List<Deferred[None]>: for each input triplet, a deferred indicating success
@@ -235,11 +221,10 @@ class Keyring:
                         server_name,
                         json_object,
                         validity_time,
-                        request_name,
                     ),
                 )
             )
-            for server_name, json_object, validity_time, request_name in server_and_json
+            for server_name, json_object, validity_time in server_and_json
         ]
 
     def verify_events_for_server(

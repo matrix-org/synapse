@@ -109,7 +109,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         async def first_lookup():
             with LoggingContext("context_11", request=FakeRequest("context_11")):
                 res_deferreds = kr.verify_json_objects_for_server(
-                    [("server10", json1, 0, "test10"), ("server11", {}, 0, "test11")]
+                    [("server10", json1, 0), ("server11", {}, 0)]
                 )
 
                 # the unsigned json should be rejected pretty quickly
@@ -147,7 +147,13 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         async def second_lookup():
             with LoggingContext("context_12", request=FakeRequest("context_12")):
                 res_deferreds_2 = kr.verify_json_objects_for_server(
-                    [("server10", json1, 0, "test")]
+                    [
+                        (
+                            "server10",
+                            json1,
+                            0,
+                        )
+                    ]
                 )
                 res_deferreds_2[0].addBoth(self.check_context, None)
                 second_lookup_state[0] = 1
@@ -184,11 +190,11 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server9", key1)
 
         # should fail immediately on an unsigned object
-        d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
+        d = _verify_json_for_server(kr, "server9", {}, 0)
         self.get_failure(d, SynapseError)
 
         # should succeed on a signed object
-        d = _verify_json_for_server(kr, "server9", json1, 500, "test signed")
+        d = _verify_json_for_server(kr, "server9", json1, 500)
         # self.assertFalse(d.called)
         self.get_success(d)
 
@@ -215,14 +221,12 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server9", key1)
 
         # should fail immediately on an unsigned object
-        d = _verify_json_for_server(kr, "server9", {}, 0, "test unsigned")
+        d = _verify_json_for_server(kr, "server9", {}, 0)
         self.get_failure(d, SynapseError)
 
         # should fail on a signed object with a non-zero minimum_valid_until_ms,
         # as it tries to refetch the keys and fails.
-        d = _verify_json_for_server(
-            kr, "server9", json1, 500, "test signed non-zero min"
-        )
+        d = _verify_json_for_server(kr, "server9", json1, 500)
         self.get_failure(d, SynapseError)
 
         # We expect the keyring tried to refetch the key once.
@@ -232,7 +236,10 @@ class KeyringTestCase(unittest.HomeserverTestCase):
 
         # should succeed on a signed object with a 0 minimum_valid_until_ms
         d = _verify_json_for_server(
-            kr, "server9", json1, 0, "test signed with zero min"
+            kr,
+            "server9",
+            json1,
+            0,
         )
         self.get_success(d)
 
@@ -260,7 +267,14 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         # the first request should succeed; the second should fail because the key
         # has expired
         results = kr.verify_json_objects_for_server(
-            [("server1", json1, 500, "test1"), ("server1", json1, 1500, "test2")]
+            [
+                (
+                    "server1",
+                    json1,
+                    500,
+                ),
+                ("server1", json1, 1500),
+            ]
         )
         self.assertEqual(len(results), 2)
         self.get_success(results[0])
@@ -301,7 +315,18 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server1", key1)
 
         results = kr.verify_json_objects_for_server(
-            [("server1", json1, 1200, "test1"), ("server1", json1, 1500, "test2")]
+            [
+                (
+                    "server1",
+                    json1,
+                    1200,
+                ),
+                (
+                    "server1",
+                    json1,
+                    1500,
+                ),
+            ]
         )
         self.assertEqual(len(results), 2)
         self.get_success(results[0])
