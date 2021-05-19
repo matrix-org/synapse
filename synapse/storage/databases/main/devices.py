@@ -326,8 +326,10 @@ class DeviceWorkerStore(SQLBaseStore):
                     "device_id": device_id,
                     "prev_id": [prev_id] if prev_id else [],
                     "stream_id": stream_id,
-                    "org.matrix.opentracing_context": opentracing_context,
                 }
+
+                if opentracing_context != "{}":
+                    result["org.matrix.opentracing_context"] = opentracing_context
 
                 prev_id = stream_id
 
