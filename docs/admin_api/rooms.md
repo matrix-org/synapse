@@ -529,6 +529,21 @@ You will have to manually handle, if you so choose, the following:
 * Removal of the Content Violation room if desired.
 
 
+# Delist Room From Public Directory API
+
+Allows delisting a room from both the public room directory and any application service-specific
+room lists. The room will still exist, but not be publicly visible. Note that this **does not**
+prevent room owners or application services from adding the room to public room lists again
+afterwards.
+
+```
+    DELETE /_synapse/admin/v1/rooms/directory/<room_id_or_alias>
+```
+
+The room will be removed from both the public directory and any application service
+directories. The response body for a successful request is empty.
+
+
 # Make Room Admin API
 
 Grants another user the highest power available to a local user who is in the room.

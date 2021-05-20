@@ -192,6 +192,50 @@ class DeleteRoomRestServlet(RestServlet):
         return (200, ret)
 
 
+class DelistRoomFromDirectoryRestServlet(ResolveRoomIdMixin, RestServlet):
+    """Modifies both the the public room and application service directory listings
+    for a room.
+    """
+
+    PATTERNS = admin_patterns("/rooms/directory/(?P<room_identifier>[^/]*)$")
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self.hs = hs
+        self.auth = hs.get_auth()
+        self.directory_handler = hs.get_directory_handler()
+
+    async def on_DELETE(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
+        """Removes a room from both the public and appservice room directories by its ID
+
+        Args:
+            request: The request.
+            room_identifier: The ID of the room to remove, or an alias leading to it.
+
+        Returns:
+            A tuple of status code, response JSON dict.
+        """
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        # Get the ID of the room if an alias was provided
+        room_id, _ = await self.resolve_room_id(room_identifier)
+
+        # Remove the room from the public room directory
+        await self.directory_handler.edit_published_room_list(
+            requester, room_id, "private"
+        )
+
+        # Remove the room from all application-service public room directories
+        await self.directory_handler.remove_room_from_published_appservice_room_list(
+            room_id
+        )
+
+        return 200, {}
+
+
 class ListRoomRestServlet(RestServlet):
     """
     List all rooms that are known to the homeserver. Results are returned
