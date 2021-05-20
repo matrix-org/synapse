@@ -55,7 +55,10 @@ class BatchingQueue(Generic[V, R]):
     """
 
     def __init__(
-        self, name: str, clock: Clock, process_items: Callable[[List[V]], Awaitable[R]]
+        self,
+        name: str,
+        clock: Clock,
+        process_batch_callback: Callable[[List[V]], Awaitable[R]],
     ):
         self._name = name
         self._clock = clock
@@ -64,11 +67,11 @@ class BatchingQueue(Generic[V, R]):
         self._processing_keys = set()  # type: Set[Hashable]
 
         # The currently pending batch of values by key, with a Deferred to call
-        # with the result of the corresponding `process_items` call.
+        # with the result of the corresponding `process_batch_callback` call.
         self._next_values = {}  # type: Dict[Hashable, List[Tuple[V, defer.Deferred]]]
 
         # The function to call with batches of values.
-        self.process_items = process_items
+        self._process_batch_callback = process_batch_callback
 
         LaterGauge(
             "synapse_util_batching_queue_number_queued",
@@ -108,7 +111,7 @@ class BatchingQueue(Generic[V, R]):
 
     async def _process_queue(self, key: Hashable) -> None:
         """A background task to repeatedly pull things off the queue for the
-        given key and call the `self.process_items` with the values.
+        given key and call the `self.process_batch_callback` with the values.
         """
 
         try:
@@ -129,7 +132,7 @@ class BatchingQueue(Generic[V, R]):
 
                 try:
                     values = [value for value, _ in next_values]
-                    results = await self.process_items(values)
+                    results = await self._process_batch_callback(values)
 
                     for _, deferred in next_values:
                         with PreserveLoggingContext():
