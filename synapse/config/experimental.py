@@ -50,5 +50,5 @@ class ExperimentalConfig(Config):
           # * Restricting room membership based on space membership (MSC3083).
           #
           # Uncomment to disable support for Spaces.
-          #spaces_enabled: False
+          #spaces_enabled: false
         """
