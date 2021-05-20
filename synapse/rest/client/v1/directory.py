@@ -15,7 +15,6 @@
 
 
 import logging
-from typing import Tuple
 
 from synapse.api.errors import (
     AuthError,
@@ -25,9 +24,8 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.http.site import SynapseRequest
 from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.types import JsonDict, RoomAlias
+from synapse.types import RoomAlias
 
 logger = logging.getLogger(__name__)
 
@@ -166,59 +164,23 @@ class ClientAppserviceDirectoryListServer(RestServlet):
         self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
-    async def on_PUT(
-        self, request: SynapseRequest, network_id: str, room_id: str
-    ) -> Tuple[int, JsonDict]:
+    def on_PUT(self, request, network_id, room_id):
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
-        return await self._edit_appservice_room_visibility(
-            request, network_id, room_id, visibility
-        )
+        return self._edit(request, network_id, room_id, visibility)
 
-    async def on_DELETE(
-        self, request: SynapseRequest, network_id: str, room_id: str
-    ) -> Tuple[int, JsonDict]:
-        return await self._edit_appservice_room_visibility(
-            request, network_id, room_id, "private"
-        )
+    def on_DELETE(self, request, network_id, room_id):
+        return self._edit(request, network_id, room_id, "private")
 
-    async def _edit_appservice_room_visibility(
-        self, request: SynapseRequest, network_id: str, room_id: str, visibility: str
-    ) -> Tuple[int, JsonDict]:
-        """Adds or removes a room ID from the appservice room list.
-
-        Args:
-            request: The initiating request.
-            network_id: The third-party network ID of the appservice.
-            room_id: The ID of the room to add or remove.
-            visibility: The visibility of the room. "public" to list, "private" to delist.
-
-        Returns:
-            A tuple of (http status code, empty json dict).
-
-        Raises:
-            AuthError if the request was not performed by an appservice or homeserver admin.
-        """
+    async def _edit(self, request, network_id, room_id, visibility):
         requester = await self.auth.get_user_by_req(request)
-        is_server_admin = await self.auth.is_server_admin(requester.user)
-
-        if requester.app_service:
-            appservice_id = requester.app_service.id
-        elif is_server_admin and visibility == "private":
-            # We allow homeserver admins to remove entries from the appservice room list,
-            # while we don't allow them to add entries. This limitation is because:
-            #
-            # 1. There shouldn't be much reason for a homeserver admin to use the appservice
-            #    room list to list a room over the client room list.
-            # 2. We can't retrieve a proper appservice ID for a homeserver admin.
-            appservice_id = ""
-        else:
+        if not requester.app_service:
             raise AuthError(
                 403, "Only appservices can edit the appservice published room list"
             )
 
         await self.directory_handler.edit_published_appservice_room_list(
-            appservice_id, network_id, room_id, visibility
+            requester.app_service.id, network_id, room_id, visibility
         )
 
         return 200, {}
