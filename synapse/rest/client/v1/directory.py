@@ -179,8 +179,17 @@ class ClientAppserviceDirectoryListServer(RestServlet):
                 403, "Only appservices can edit the appservice published room list"
             )
 
-        await self.directory_handler.edit_published_appservice_room_list(
-            requester.app_service.id, network_id, room_id, visibility
-        )
+        if visibility == "public":
+            await self.directory_handler.add_room_to_published_appservice_room_list(
+                room_id, requester.app_service.id, network_id
+            )
+        elif visibility == "private":
+            await self.directory_handler.remove_room_from_published_appservice_room_list(
+                room_id, requester.app_service.id, network_id
+            )
+        else:
+            raise SynapseError(
+                400, "Invalid visibility setting", errcode=Codes.INVALID_PARAM
+            )
 
         return 200, {}

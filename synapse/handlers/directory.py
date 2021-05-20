@@ -468,23 +468,37 @@ class DirectoryHandler(BaseHandler):
 
         await self.store.set_room_is_public(room_id, making_public)
 
-    async def edit_published_appservice_room_list(
-        self, appservice_id: str, network_id: str, room_id: str, visibility: str
-    ):
-        """Add or remove a room from the appservice/network specific public
-        room list.
+    async def add_room_to_published_appservice_room_list(
+        self, room_id: str, appservice_id: str, network_id: str
+    ) -> None:
+        """Add a room to the appservice/network specific public room list.
 
         Args:
-            appservice_id: ID of the appservice that owns the list
-            network_id: The ID of the network the list is associated with
-            room_id
-            visibility: either "public" or "private"
+            room_id: The ID of the room to add to the directory.
+            appservice_id: The ID of the appservice that owns the list.
+            network_id: The ID of the network the list is associated with.
         """
-        if visibility not in ["public", "private"]:
-            raise SynapseError(400, "Invalid visibility setting")
-
         await self.store.set_room_is_public_appservice(
-            room_id, appservice_id, network_id, visibility == "public"
+            room_id, appservice_id, network_id, True
+        )
+
+    async def remove_room_from_published_appservice_room_list(
+        self,
+        room_id: str,
+        appservice_id: Optional[str] = None,
+        network_id: Optional[str] = None,
+    ) -> None:
+        """Remove a room from the appservice/network specific public room list.
+
+        Args:
+            room_id: The ID of the room to remove from the directory.
+            appservice_id: The ID of the appservice that owns the list. If None, this function
+                will attempt to remove the room from all appservice lists.
+            network_id: The ID of the network the list is associated with. If None, this function
+                will attempt to remove the room from all appservice network lists.
+        """
+        await self.store.set_room_is_public_appservice(
+            room_id, appservice_id, network_id, False
         )
 
     async def get_aliases_for_room(
