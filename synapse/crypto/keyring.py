@@ -229,11 +229,32 @@ class Keyring:
         )
 
     def verify_events_for_server(
-        self, server_and_json: Iterable[Tuple[str, EventBase, int]]
+        self, server_and_events: Iterable[Tuple[str, EventBase, int]]
     ) -> List[defer.Deferred]:
+        """Bulk verification of signatures on events.
+
+        Args:
+            server_and_events:
+                Iterable of `(server_name, event, validity_time)` tuples.
+
+                `server_name` is which server we are verifying the signature for
+                on the event.
+
+                `event` is the event that we'll verify the signatures of for
+                the given `server_name`.
+
+                `validity_time` is a timestamp at which the signing key must be
+                valid.
+
+        Returns:
+            List<Deferred[None]>: for each input triplet, a deferred indicating success
+                or failure to verify each event's signature for the given
+                server_name. The deferreds run their callbacks in the sentinel
+                logcontext.
+        """
         return self._verify_objects(
             VerifyJsonRequest.from_event(server_name, event, validity_time)
-            for server_name, event, validity_time in server_and_json
+            for server_name, event, validity_time in server_and_events
         )
 
     def _verify_objects(
