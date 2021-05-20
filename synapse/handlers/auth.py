@@ -14,7 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
+import binascii
 import logging
+import random
 import time
 import unicodedata
 import urllib.parse
@@ -35,6 +38,7 @@ from typing import (
 
 import attr
 import bcrypt
+import nacl.signing
 import pymacaroons
 
 from twisted.web.server import Request
@@ -196,6 +200,8 @@ class AuthHandler(BaseHandler):
                 self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
 
         self.bcrypt_rounds = hs.config.bcrypt_rounds
+
+        self.signing_keys = hs.config.key.signing_key
 
         # we can't use hs.get_module_api() here, because to do so will create an
         # import loop.
@@ -777,6 +783,23 @@ class AuthHandler(BaseHandler):
         refresh_token: str,
         valid_until_ms: Optional[int],
     ) -> Tuple[str, str]:
+        """
+        Consumes a refresh token and generate both a new access token and a new refresh token from it.
+
+        The consumed refresh token is considered invalid after the first use of the new access token or the new refresh token.
+
+        Args:
+            refresh_token: The token to consume.
+            valid_until_ms: The expiration timestamp of the new access token.
+
+        Returns:
+            A tuple containing the new access token and refresh token
+        """
+
+        # Verify the token signature first before looking up the token
+        if not self.verify_refresh_token(refresh_token):
+            raise SynapseError(400, "invalid refresh token")
+
         existing_token = await self.store.lookup_refresh_token(refresh_token)
         if existing_token is None:
             raise SynapseError(400, "refresh token does not exist")
@@ -804,12 +827,64 @@ class AuthHandler(BaseHandler):
         )
         return access_token, new_refresh_token
 
+    def _generate_refresh_token(self) -> str:
+        """
+        Generates a random and signed refresh token.
+
+        The token is signed with the first signing key in config
+        and can verified with verify_refresh_token.
+        """
+        rand = random.randbytes(128)
+        signed = self.signing_keys[0].sign(rand)
+        return "%s.%s" % (
+            base64.urlsafe_b64encode(signed.signature).decode("ascii"),
+            base64.urlsafe_b64encode(signed.message).decode("ascii"),
+        )
+
+    def verify_refresh_token(self, token: str) -> bool:
+        """
+        Verifies a refresh token signature.
+
+        Args:
+            token: The refresh token to verify
+
+        Returns:
+            Whether the token is valid or not
+        """
+        parts = token.split(".", maxsplit=2)
+        if len(parts) != 2:
+            return False
+        try:
+            signature = base64.urlsafe_b64decode(parts[0])
+            message = base64.urlsafe_b64decode(parts[1])
+        except binascii.Error:
+            return False
+
+        for key in self.signing_keys:
+            try:
+                key.verify_key.verify(message, signature)
+                return True
+            except nacl.signing.BadSignatureError:
+                pass
+
+        return False
+
     async def get_refresh_token_for_user_id(
         self,
         user_id: str,
-        device_id: Optional[str],
+        device_id: str,
     ) -> Tuple[str, int]:
-        refresh_token = self.macaroon_gen.generate_refresh_token(user_id)
+        """
+        Creates a new refresh token for the user with the given user ID.
+
+        Args:
+            user_id: canonical user ID
+            device_id: the device ID to associate with the token.
+
+        Returns:
+            The newly created refresh token and its ID in the database
+        """
+        refresh_token = self._generate_refresh_token()
         refresh_token_id = await self.store.add_refresh_token_to_user(
             user_id=user_id,
             token=refresh_token,
@@ -842,6 +917,8 @@ class AuthHandler(BaseHandler):
             valid_until_ms: when the token is valid until. None for
                 no expiry.
             is_appservice_ghost: Whether the user is an application ghost user
+            refresh_token_id: the refresh token ID that will be associated with
+                this access token.
         Returns:
               The access token for the user's session.
         Raises:
