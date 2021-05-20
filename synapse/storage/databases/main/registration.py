@@ -74,7 +74,7 @@ class RefreshTokenLookupResult:
     user_id = attr.ib(type=str)
     device_id = attr.ib(type=str)
     token_id = attr.ib(type=int)
-    next_token_id = attr.ib(type=int)
+    next_token_id = attr.ib(type=Optional[int])
     has_next_refresh_token_been_refreshed = attr.ib(type=bool)
     has_next_access_token_been_used = attr.ib(type=bool)
 

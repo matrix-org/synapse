@@ -46,10 +46,13 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
     ):
         """
         Args:
+            user_id (int)
             device_id (str|None): Device ID to use, if None a new one is
                 generated.
             initial_display_name (str|None)
             is_guest (bool)
+            is_appservice_ghost (bool)
+            should_issue_refresh_token (bool)
         """
         return {
             "device_id": device_id,
