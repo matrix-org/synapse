@@ -35,3 +35,20 @@ class ExperimentalConfig(Config):
 
         # MSC3026 (busy presence state)
         self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool
+
+    def generate_config_section(self, **kwargs):
+        return """\
+        # Enable experimental features in Synapse.
+        #
+        # Experimental features might break or be removed without a deprecation
+        # period.
+        #
+        experimental_features:
+          # Support for Spaces (MSC1772), it enables the following:
+          #
+          # * The Spaces Summary API (MSC2946).
+          # * Restricting room membership based on space membership (MSC3083).
+          #
+          # Uncomment to disable support for Spaces.
+          #spaces_enabled: False
+        """
