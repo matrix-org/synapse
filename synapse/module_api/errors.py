@@ -19,4 +19,4 @@ from synapse.api.errors import (  # noqa: F401
     RedirectException,
     SynapseError,
 )
-from synapse.config._base import ConfigError
+from synapse.config._base import ConfigError  # noqa: F401

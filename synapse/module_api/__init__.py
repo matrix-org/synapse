@@ -14,8 +14,6 @@
 # limitations under the License.
 import email.utils
 import logging
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -31,7 +29,6 @@ from typing import (
 import jinja2
 
 from twisted.internet import defer
-from twisted.web.server import Request
 
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
