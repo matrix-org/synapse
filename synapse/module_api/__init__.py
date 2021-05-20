@@ -145,7 +145,7 @@ class ModuleApi:
         """Allow accessing the application name configured in the homeserver's
         configuration.
         """
-        return self._hs.config.email_app_name
+        return self._hs.config.email.email_app_name
 
     def get_user_by_req(
         self,
