@@ -40,6 +40,10 @@ class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 
+    @staticmethod
+    def set_limits(max_image_pixels: int):
+        Image.MAX_IMAGE_PIXELS = max_image_pixels
+
     def __init__(self, input_path: str):
         try:
             self.image = Image.open(input_path)
