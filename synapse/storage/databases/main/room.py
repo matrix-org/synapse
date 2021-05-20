@@ -1359,65 +1359,58 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         self.hs.get_notifier().on_new_replication_data()
 
     async def set_room_is_public_appservice(
-        self, room_id, appservice_id, network_id, is_public
-    ):
-        """Edit the appservice/network specific public room list.
+        self,
+        room_id: str,
+        appservice_id: Optional[str],
+        network_id: Optional[str],
+        is_public: bool,
+    ) -> None:
+        """Edit a room's visibility across one or more appservice/network-specific public
+        room lists.
 
         Each appservice can have a number of published room lists associated
         with them, keyed off of an appservice defined `network_id`, which
         basically represents a single instance of a bridge to a third party
         network.
 
+        Both the appservice and network ID are optional only when removing a room from the directory.
+        If argument appservice_id or network_id are None, the room may be removed from multiple
+        appservices/networks.
+
         Args:
-            room_id (str)
-            appservice_id (str)
-            network_id (str)
-            is_public (bool): Whether to publish or unpublish the room from the
-                list.
+            room_id: The ID of the room to modify.
+            appservice_id: The ID of the network the listing is associated with. If None,
+                any room entries matching the other provided identifiers will have its
+                visibility modified.
+            network_id: The ID of the network the listing is associated with. If None,
+                any room entries matching the other provided identifiers will have its
+                visibility modified.
+            is_public: Whether to publish or unpublish the room from the list.
         """
-
-        def set_room_is_public_appservice_txn(txn, next_id):
-            if is_public:
-                try:
-                    self.db_pool.simple_insert_txn(
-                        txn,
-                        table="appservice_room_list",
-                        values={
-                            "appservice_id": appservice_id,
-                            "network_id": network_id,
-                            "room_id": room_id,
-                        },
-                    )
-                except self.database_engine.module.IntegrityError:
-                    # We've already inserted, nothing to do.
-                    return
-            else:
-                self.db_pool.simple_delete_txn(
-                    txn,
-                    table="appservice_room_list",
-                    keyvalues={
-                        "room_id": room_id,
-                    },
-                )
-
-            entries = self.db_pool.simple_select_list_txn(
-                txn,
-                table="public_room_list_stream",
-                keyvalues={
-                    "room_id": room_id,
-                    "appservice_id": appservice_id,
-                    "network_id": network_id,
-                },
-                retcols=("stream_id", "visibility"),
+        if is_public and (not appservice_id or not network_id):
+            raise RuntimeError(
+                "appservice_id and network_id must be set when adding "
+                "to an application service public room list"
             )
 
-            entries.sort(key=lambda r: r["stream_id"])
+        async def _add_room_to_appservice_list_txn(txn):
+            # Attempt to insert the new room entry
+            try:
+                self.db_pool.simple_insert_txn(
+                    txn,
+                    table="appservice_room_list",
+                    values={
+                        "room_id": room_id,
+                        "appservice_id": appservice_id,
+                        "network_id": network_id,
+                    },
+                )
+            except self.database_engine.module.IntegrityError:
+                # This entry already exists, so there's nothing to do.
+                return
 
-            add_to_stream = True
-            if entries:
-                add_to_stream = bool(entries[-1]["visibility"]) != is_public
-
-            if add_to_stream:
+            # Update the public room list stream with the change
+            async with self._public_room_id_gen.get_next() as next_id:
                 self.db_pool.simple_insert_txn(
                     txn,
                     table="public_room_list_stream",
@@ -1430,12 +1423,62 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                     },
                 )
 
-        async with self._public_room_id_gen.get_next() as next_id:
-            await self.db_pool.runInteraction(
-                "set_room_is_public_appservice",
-                set_room_is_public_appservice_txn,
-                next_id,
+        async def _remove_room_from_appservice_list_txn(txn):
+            # Only filter rooms by appservice and network ID if they have been provided.
+            # This allows calls to this method to remove a room across multiple
+            # appservices and/or networks at once.
+            room_search_values = {
+                "room_id": room_id,
+            }
+            if appservice_id:
+                room_search_values["appservice_id"] = appservice_id
+            if network_id:
+                room_search_values["network_id"] = network_id
+
+            # Retrieve a list of all room/appservice/network tuples that match our search terms.
+            room_entries = self.db_pool.simple_select_list_txn(
+                txn,
+                table="appservice_room_list",
+                keyvalues=room_search_values,
+                retcols=("room_id", "appservice_id", "network_id"),
             )
+
+            # Remove the found entries and update the public room list stream with the changes
+            for entry in room_entries:
+                sql = """
+                DELETE FROM appservice_room_list
+                WHERE room_id = ?
+                    AND appservice_id = ?
+                    AND network_id = ?
+                """
+                txn.execute(
+                    sql, (entry["room_id"], entry["appservice_id"], entry["network_id"])
+                )
+
+                async with self._public_room_id_gen.get_next() as next_id:
+                    self.db_pool.simple_insert_txn(
+                        txn,
+                        table="public_room_list_stream",
+                        values={
+                            "stream_id": next_id,
+                            "room_id": entry["room_id"],
+                            "visibility": "private",
+                            "appservice_id": entry["appservice_id"],
+                            "network_id": entry["network_id"],
+                        },
+                    )
+
+        if is_public:
+            await self.db_pool.runInteraction(
+                "add_room_to_appservice_list_txn",
+                _add_room_to_appservice_list_txn,
+            )
+        else:
+            await self.db_pool.runInteraction(
+                "remove_room_from_appservice_list_txn",
+                _remove_room_from_appservice_list_txn,
+            )
+
         self.hs.get_notifier().on_new_replication_data()
 
     async def add_event_report(
