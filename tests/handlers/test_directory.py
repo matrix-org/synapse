@@ -559,28 +559,6 @@ class TestAppserviceRoomDirectoryList(unittest.HomeserverTestCase):
         # Check that the room is no longer in the public room directory
         self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
 
-    def test_admin_remove_from_appservice_room_directory(self):
-        """Tests that a homeserver admin can remove a room from the appservice-specific room directory"""
-        # Check that the room is not currently in the public room directory
-        self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
-
-        # Attempt to list the room as an appservice
-        self._set_visibility_of_appservice_room(
-            self.room_id,
-            visible=True,
-        )
-
-        # Check that the room is currently in the public room directory
-        self.assertTrue(self._is_room_in_public_room_directory(self.room_id))
-
-        # Attempt to remove the room as a homeserver admin
-        self._set_visibility_of_appservice_room(
-            self.room_id, visible=False, access_token=self.admin_tok
-        )
-
-        # Check that the room is no longer in the public room directory
-        self.assertFalse(self._is_room_in_public_room_directory(self.room_id))
-
     def _set_visibility_of_appservice_room(
         self,
         room_id: str,
