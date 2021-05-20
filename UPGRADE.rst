@@ -88,7 +88,7 @@ for example:
 Upgrading to v1.34.0
 ====================
 
-`room_invite_state_types` configuration setting
+``room_invite_state_types`` configuration setting
 -----------------------------------------------
 
 The ``room_invite_state_types`` configuration setting has been deprecated and
@@ -106,13 +106,10 @@ remove it from your configuration file. The default value used to be:
       - "m.room.encryption"
       - "m.room.name"
 
-If you have customised this value by adding addition state types, you should
-remove ``room_invite_state_types`` and configure ``additional_event_types`` with
-your customisations.
+If you have customised this value, you should remove ``room_invite_state_types`` and
+configure ``room_prejoin_state`` instead.
 
-If you have customised this value by removing state types, you should rename
-``room_invite_state_types`` to ``additional_event_types``, and set
-``disable_default_event_types`` to ``true``.
+
 
 Upgrading to v1.33.0
 ====================

@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 import re
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
@@ -997,7 +998,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:
-            expiration_ts = self.rand.randrange(
+            expiration_ts = random.randrange(
                 expiration_ts - self._account_validity_startup_job_max_delta,
                 expiration_ts,
             )
