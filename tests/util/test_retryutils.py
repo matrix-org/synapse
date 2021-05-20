@@ -52,9 +52,9 @@ class RetryLimiterTestCase(HomeserverTestCase):
             pass
 
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
-        self.assertEqual(new_timings["failure_ts"], failure_ts)
-        self.assertEqual(new_timings["retry_last_ts"], failure_ts)
-        self.assertEqual(new_timings["retry_interval"], MIN_RETRY_INTERVAL)
+        self.assertEqual(new_timings.failure_ts, failure_ts)
+        self.assertEqual(new_timings.retry_last_ts, failure_ts)
+        self.assertEqual(new_timings.retry_interval, MIN_RETRY_INTERVAL)
 
         # now if we try again we should get a failure
         self.get_failure(
@@ -78,13 +78,13 @@ class RetryLimiterTestCase(HomeserverTestCase):
             pass
 
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
-        self.assertEqual(new_timings["failure_ts"], failure_ts)
-        self.assertEqual(new_timings["retry_last_ts"], retry_ts)
+        self.assertEqual(new_timings.failure_ts, failure_ts)
+        self.assertEqual(new_timings.retry_last_ts, retry_ts)
         self.assertGreaterEqual(
-            new_timings["retry_interval"], MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 0.5
+            new_timings.retry_interval, MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 0.5
         )
         self.assertLessEqual(
-            new_timings["retry_interval"], MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0
+            new_timings.retry_interval, MIN_RETRY_INTERVAL * RETRY_MULTIPLIER * 2.0
         )
 
         #

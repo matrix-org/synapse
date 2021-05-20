@@ -16,6 +16,7 @@ import logging
 from collections import namedtuple
 from typing import Iterable, List, Optional, Tuple
 
+import attr
 from canonicaljson import encode_canonical_json
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -37,6 +38,22 @@ _TransactionRow = namedtuple(
 _UpdateTransactionRow = namedtuple(
     "_TransactionRow", ("response_code", "response_json")
 )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class DestinationRetryTimings:
+    """The current destination retry timing info for a remote server."""
+
+    # The first time we tried and failed to reach the remote server, in ms.
+    failure_ts: int
+
+    # The last time we tried and failed to reach the remote server, in ms.
+    retry_last_ts: int
+
+    # How long since the last time we tried to reach the remote server before
+    # trying again, in ms.
+    retry_interval: int
+
 
 SENTINEL = object()
 
@@ -138,7 +155,10 @@ class TransactionWorkerStore(SQLBaseStore):
             desc="set_received_txn_response",
         )
 
-    async def get_destination_retry_timings(self, destination):
+    async def get_destination_retry_timings(
+        self,
+        destination: str,
+    ) -> Optional[DestinationRetryTimings]:
         """Gets the current retry timings (if any) for a given destination.
 
         Args:
@@ -164,19 +184,21 @@ class TransactionWorkerStore(SQLBaseStore):
         self._destination_retry_cache[destination] = result
         return result
 
-    def _get_destination_retry_timings(self, txn, destination):
+    def _get_destination_retry_timings(
+        self, txn, destination: str
+    ) -> Optional[DestinationRetryTimings]:
         result = self.db_pool.simple_select_one_txn(
             txn,
             table="destinations",
             keyvalues={"destination": destination},
-            retcols=("destination", "failure_ts", "retry_last_ts", "retry_interval"),
+            retcols=("failure_ts", "retry_last_ts", "retry_interval"),
             allow_none=True,
         )
 
         # check we have a row and retry_last_ts is not null or zero
         # (retry_last_ts can't be negative)
         if result and result["retry_last_ts"]:
-            return result
+            return DestinationRetryTimings(**result)
         else:
             return None
 

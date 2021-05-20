@@ -82,10 +82,10 @@ async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **k
     retry_timings = await store.get_destination_retry_timings(destination)
 
     if retry_timings:
-        failure_ts = retry_timings["failure_ts"]
+        failure_ts = retry_timings.failure_ts
         retry_last_ts, retry_interval = (
-            retry_timings["retry_last_ts"],
-            retry_timings["retry_interval"],
+            retry_timings.retry_last_ts,
+            retry_timings.retry_interval,
         )
 
         now = int(clock.time_msec())
