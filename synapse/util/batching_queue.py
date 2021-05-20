@@ -28,6 +28,7 @@ from typing import (
 from twisted.internet import defer
 
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
+from synapse.metrics import LaterGauge
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.util import Clock
 
@@ -66,6 +67,20 @@ class BatchingQueue(Generic[V, R]):
 
         # The function to call with batches of values.
         self.process_items = process_items
+
+        LaterGauge(
+            "synapse_util_batching_queue_number_queued",
+            "The number of items waiting in the queue across all keys",
+            labelnames=("name",),
+            caller=lambda: sum(len(v) for v in self._next_values.values()),
+        )
+
+        LaterGauge(
+            "synapse_util_batching_queue_number_of_keys",
+            "The number of distinct keys that have items queued",
+            labelnames=("name",),
+            caller=lambda: len(self._next_values),
+        )
 
     async def add_to_queue(self, value: V, key: Hashable = ()) -> R:
         """Adds the value to the queue with the given key, returning the result
