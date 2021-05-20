@@ -44,7 +44,9 @@ class BatchingQueue(Generic[V, R]):
     with all pending work (for a given key).
 
     The provided processing function will only be called once at a time for each
-    key.
+    key. It will be called the next reactor tick after `add_to_queue` has been
+    called, and will keep being called until the queue has been drained (for the
+    given key).
 
     Note that the return value of `add_to_queue` will be the return value of the
     processing function that processed the given item. This means that the
@@ -85,6 +87,11 @@ class BatchingQueue(Generic[V, R]):
     async def add_to_queue(self, value: V, key: Hashable = ()) -> R:
         """Adds the value to the queue with the given key, returning the result
         of the processing function for the batch that included the given value.
+
+        The optional `key` argument allows sharding the queue by some key. The
+        queues will then be processed in parallel, i.e. the process batch
+        function will be called in parallel with batched values from a single
+        key.
         """
 
         # First we create a defer and add it and the value to the list of
