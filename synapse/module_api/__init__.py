@@ -141,7 +141,7 @@ class ModuleApi:
 
     def get_user_by_req(
         self,
-        req: Request,
+        req: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
     ):
@@ -563,7 +563,7 @@ class ModuleApi:
         await self._send_email_handler.send_email(
             email_address=recipient,
             subject=subject,
-            app_name=None,
+            app_name=self.email_app_name,
             html=html,
             text=text,
         )
