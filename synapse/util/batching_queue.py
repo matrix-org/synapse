@@ -120,7 +120,7 @@ class BatchingQueue(Generic[V, R]):
 
             self._processing_keys.add(key)
 
-            while self._next_values:
+            while True:
                 # We purposefully wait a reactor tick to allow us to batch
                 # together requests that we're about to receive. A common
                 # pattern is to call `add_to_queue` multiple times at once, and
@@ -129,6 +129,9 @@ class BatchingQueue(Generic[V, R]):
                 await self._clock.sleep(0)
 
                 next_values = self._next_values.pop(key, [])
+                if not next_values:
+                    # We've exhausted the queue.
+                    break
 
                 try:
                     values = [value for value, _ in next_values]
