@@ -61,7 +61,6 @@ from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events, login, presence, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
@@ -237,7 +236,6 @@ class GenericWorkerSlavedStore(
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
-    SlavedTransactionStore,
     SlavedProfileStore,
     SlavedClientIpStore,
     SlavedFilteringStore,
