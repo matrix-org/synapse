@@ -39,6 +39,8 @@ class AccountValidityHandler:
 
         self._app_name = self.hs.config.email_app_name
 
+        self._app_name = self.hs.config.email_app_name
+
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
         )
