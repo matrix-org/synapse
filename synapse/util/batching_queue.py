@@ -71,14 +71,14 @@ class BatchingQueue(Generic[V, R]):
         LaterGauge(
             "synapse_util_batching_queue_number_queued",
             "The number of items waiting in the queue across all keys",
-            labelnames=("name",),
+            labels=("name",),
             caller=lambda: sum(len(v) for v in self._next_values.values()),
         )
 
         LaterGauge(
             "synapse_util_batching_queue_number_of_keys",
             "The number of distinct keys that have items queued",
-            labelnames=("name",),
+            labels=("name",),
             caller=lambda: len(self._next_values),
         )
 
