@@ -47,6 +47,11 @@ class Thumbnailer:
             # If an error occurs opening the image, a thumbnail won't be able to
             # be generated.
             raise ThumbnailError from e
+        except Image.DecompressionBombError as e:
+            # If an image decompression bomb error occurs opening the image,
+            # then the image exceeds the pixel limit and a thumbnail won't
+            # be able to be generated.
+            raise ThumbnailError from e
 
         self.width, self.height = self.image.size
         self.transpose_method = None
