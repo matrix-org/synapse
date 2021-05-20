@@ -143,6 +143,9 @@ class BatchingQueue(Generic[V, R]):
 
                 except Exception as e:
                     for _, deferred in next_values:
+                        if deferred.called:
+                            continue
+
                         with PreserveLoggingContext():
                             deferred.errback(e)
 
