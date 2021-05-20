@@ -71,7 +71,7 @@ class VerifyJsonRequest:
     Attributes:
         server_name: The name of the server to verify against.
 
-        json_object_callback: A callback to fetch the JSON object to verify.
+        get_json_object: A callback to fetch the JSON object to verify.
             A callback is used to allow deferring the creation of the JSON
             object to verify until needed, e.g. for events we can defer
             creating the redacted copy. This reduces the memory usage when
@@ -94,7 +94,7 @@ class VerifyJsonRequest:
     """
 
     server_name = attr.ib(type=str)
-    json_object_callback = attr.ib(type=Callable[[], JsonDict])
+    get_json_object = attr.ib(type=Callable[[], JsonDict])
     minimum_valid_until_ts = attr.ib(type=int)
     request_name = attr.ib(type=str)
     key_ids = attr.ib(type=List[str])
@@ -970,7 +970,7 @@ async def _handle_key_deferred(verify_request: VerifyJsonRequest) -> None:
     with PreserveLoggingContext():
         _, key_id, verify_key = await verify_request.key_ready
 
-    json_object = verify_request.json_object_callback()
+    json_object = verify_request.get_json_object()
 
     try:
         verify_signed_json(json_object, server_name, verify_key)
