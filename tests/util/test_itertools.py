@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List
+from typing import Dict, Iterable, List, Sequence
 
 from synapse.util.iterutils import chunk_seq, sorted_topologically
 
@@ -44,7 +44,7 @@ class ChunkSeqTests(TestCase):
         )
 
     def test_empty_input(self):
-        parts = chunk_seq([], 5)
+        parts = chunk_seq([], 5)  # type: Iterable[Sequence]
 
         self.assertEqual(
             list(parts),

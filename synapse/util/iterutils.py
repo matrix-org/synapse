@@ -45,10 +45,7 @@ def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Collection[T]]:
     return iter(lambda: tuple(islice(sourceiter, size)), ())
 
 
-ISeq = TypeVar("ISeq", bound=Sequence)
-
-
-def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[Iterable[ISeq]]:
+def chunk_seq(iseq: Sequence[T], maxlen: int) -> Iterable[Sequence[T]]:
     """Split the given sequence into chunks of the given size
 
     The last chunk may be shorter than the given size.
