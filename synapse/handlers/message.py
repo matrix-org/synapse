@@ -788,6 +788,8 @@ class EventCreationHandler:
                 inherit_depth=inherit_depth,
             )
 
+            current_state_ids = await context.get_current_state_ids()
+
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
                 event.sender,
             )
@@ -878,6 +880,7 @@ class EventCreationHandler:
                 old_state = await self.store.get_events_as_list(auth_event_ids)
 
         context = await self.state.compute_event_context(event, old_state=old_state)
+
         if requester:
             context.app_service = requester.app_service
 
@@ -1006,7 +1009,11 @@ class EventCreationHandler:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 
-        await self.action_generator.handle_push_actions_for_event(event, context)
+        # TODO: Skip actions for historical messages or figure out how to
+        # generate proper context.current_state_ids and state_groups for our historical events
+        # which have prev_events that reference non-persisted events because
+        # we are persisting in reverse-chronolical
+        # await self.action_generator.handle_push_actions_for_event(event, context)
 
         await self.cache_joined_hosts_for_event(event)
 
@@ -1289,7 +1296,7 @@ class EventCreationHandler:
         # Mark any `m.historical` messages as backfilled so they don't appear
         # in `/sync` and have the proper decrementing `stream_ordering` as we import
         backfilled = False
-        if event.content.get("m.historical", None):
+        if event.content.get(EventContentFields.MSC2716_HISTORICAL, None):
             backfilled = True
 
         # Note that this returns the event that was persisted, which may not be

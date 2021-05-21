@@ -368,13 +368,13 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             auth_event_ids.append(event_id)
 
         logger.info("bulk insert events %s", body["events"])
-        events_to_insert = body["events"]
+        events_to_create = body["events"]
 
         # If provided, connect the chunk to the last insertion point
         # The chunk ID passed in comes from the chunk_id in the
         # "insertion" event from the previous chunk.
         if chunk_id_from_query:
-            last_event_in_chunk = events_to_insert[len(events_to_insert) - 1]
+            last_event_in_chunk = events_to_create[len(events_to_create) - 1]
             last_event_in_chunk["content"][
                 EventContentFields.MSC2716_CHUNK_ID
             ] = chunk_id_from_query
@@ -387,21 +387,26 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             "sender": requester.user.to_string(),
             "content": {
                 EventContentFields.MSC2716_NEXT_CHUNK_ID: next_chunk_id,
-                "m.historical": True,
+                EventContentFields.MSC2716_HISTORICAL: True,
                 # TODO: Why is `body` necessary for this to show up in /messages
                 "body": "TODO_REMOVE - INSERTION",
             },
             # Since the insertion event is put at the end of the chunk,
             # copy the origin_server_ts from the last event we're inserting
-            "origin_server_ts": events_to_insert[0]["origin_server_ts"],
+            "origin_server_ts": events_to_create[0]["origin_server_ts"],
         }
         # Prepend the insertion event to the start of the chunk
-        events_to_insert = [insertion_event] + events_to_insert
+        events_to_create = [insertion_event] + events_to_create
 
         event_ids = []
         prev_event_ids = prev_events_from_query
-        for ev in events_to_insert:
+        events_to_persist = []
+        for ev in events_to_create:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
+
+            # Mark all events as historical
+            # This has important semantics within the Synapse internals to backfill properly
+            ev["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
             event_dict = {
                 "type": ev["type"],
@@ -409,26 +414,47 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 "content": ev["content"],
                 "room_id": room_id,
                 "sender": ev["sender"],  # requester.user.to_string(),
-                "prev_events": prev_event_ids,
+                "prev_events": prev_event_ids.copy(),
             }
 
-            # TODO: persist in reverse chronological order
-            (
-                event,
-                _,
-            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+            event, context = await self.event_creation_handler.create_event(
                 requester,
                 event_dict,
-                # TODO: Should these be an outlier?
-                # outlier=True,
-                inherit_depth=True,
+                prev_event_ids=event_dict.get("prev_events"),
                 # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
                 auth_event_ids=auth_event_ids,
+                inherit_depth=True,
             )
+            current_state_ids = await context.get_current_state_ids()
+            logger.info(
+                "bulksend event=%s current_state_ids=%s",
+                event,
+                current_state_ids,
+            )
+
+            # TODO: Should we add the same `hs.is_mine_id(event.sender)` assert check that `create_and_send_nonmember_event` has?
+
+            events_to_persist.append((event, context))
             event_id = event.event_id
 
             event_ids.append(event_id)
-            prev_event_ids = [event_id]
+            # We add `event_id` so it references the last message.
+            # We add `prev_events_from_query` so it can find the proper depth
+            # while persisting. I wish we could rely on just `event_id` but
+            # since we are persisting in reverse-chronolical order below,
+            # that event isn't persisted yet.
+            prev_event_ids = [event_id] + prev_events_from_query
+
+        # Persist events in reverse-chronological order so they have the
+        # correct stream_ordering as they are backfilled (which decrements).
+        # Events are sorted by (topological_ordering, stream_ordering)
+        # where topological_ordering is just depth.
+        for (event, context) in reversed(events_to_persist):
+            ev = await self.event_creation_handler.handle_new_client_event(
+                requester=requester,
+                event=event,
+                context=context,
+            )
 
         return 200, {
             "state_events": auth_event_ids,
