@@ -51,6 +51,8 @@ class RetryLimiterTestCase(HomeserverTestCase):
         except AssertionError:
             pass
 
+        self.pump()
+
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertEqual(new_timings.failure_ts, failure_ts)
         self.assertEqual(new_timings.retry_last_ts, failure_ts)
@@ -76,6 +78,8 @@ class RetryLimiterTestCase(HomeserverTestCase):
                 raise AssertionError("argh")
         except AssertionError:
             pass
+
+        self.pump()
 
         new_timings = self.get_success(store.get_destination_retry_timings("test_dest"))
         self.assertEqual(new_timings.failure_ts, failure_ts)
