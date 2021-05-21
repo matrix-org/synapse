@@ -50,8 +50,6 @@ class SpaceSummaryHandler:
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self._auth = hs.get_auth()
-        self._room_list_handler = hs.get_room_list_handler()
-        self._state_handler = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
