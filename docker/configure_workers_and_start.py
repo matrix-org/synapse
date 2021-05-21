@@ -193,9 +193,9 @@ NGINX_LOCATION_CONFIG_BLOCK = """
 """
 
 NGINX_UPSTREAM_CONFIG_BLOCK = """
-upstream {upstream_worker_type} {
+upstream {upstream_worker_type} {{
 {body}
-}
+}}
 """
 
 
