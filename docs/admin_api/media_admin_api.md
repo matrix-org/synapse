@@ -159,6 +159,26 @@ Response:
 {}
 ```
 
+## Unprotecting media from being quarantined
+
+This API reverts the protection of a media.
+
+Request:
+
+```
+DELETE /_synapse/admin/v1/media/protect/<media_id>
+
+{}
+```
+
+Where `media_id` is in the  form of `abcdefg12345...`.
+
+Response:
+
+```json
+{}
+```
+
 # Delete local media
 This API deletes the *local* media from the disk of your own server.
 This includes any local thumbnails and copies of media downloaded from

@@ -137,8 +137,21 @@ class ProtectMediaByID(RestServlet):
 
         logging.info("Protecting local media by ID: %s", media_id)
 
-        # Quarantine this media id
-        await self.store.mark_local_media_as_safe(media_id)
+        # Protect this media id
+        await self.store.mark_local_media_as_safe(media_id, safe=True)
+
+        return 200, {}
+
+    async def on_DELETE(
+        self, request: SynapseRequest, media_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info("Unprotecting local media by ID: %s", media_id)
+
+        # Unprotect this media id
+        await self.store.mark_local_media_as_safe(media_id, safe=False)
 
         return 200, {}
 
