@@ -318,31 +318,7 @@ steps:
   #
   ################################################################################
 
-  - label: "SyTest Monolith :sqlite::ubuntu: 18.04"
-    agents:
-      queue: "medium"
-    command:
-      - "bash .buildkite/merge_base_branch.sh"
-      - "bash /bootstrap.sh synapse"
-    plugins:
-      - docker#v3.7.0:
-          image: "matrixdotorg/sytest-synapse:bionic"
-          propagate-environment: true
-          always-pull: true
-          workdir: "/src"
-          entrypoint: "/bin/sh"
-          init: false
-          shell: ["-x", "-c"]
-          mount-buildkite-agent: false
-          volumes: ["./logs:/logs"]
-      - artifacts#v1.3.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-      - matrix-org/annotate:
-          path: "logs/annotate.md"
-          style: "error"
-    retry: *retry_setup
-
-  - label: "SyTest Monolith :postgres::ubuntu: 18.04"
+  - label: "SyTest Monolith :postgres::debian: 10"
     agents:
       queue: "medium"
     env:
@@ -352,63 +328,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.7.0:
-          image: "matrixdotorg/sytest-synapse:bionic"
-          propagate-environment: true
-          always-pull: true
-          workdir: "/src"
-          entrypoint: "/bin/sh"
-          init: false
-          shell: ["-x", "-c"]
-          mount-buildkite-agent: false
-          volumes: ["./logs:/logs"]
-      - artifacts#v1.3.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-      - matrix-org/annotate:
-          path: "logs/annotate.md"
-          style: "error"
-    retry: *retry_setup
-
-  - label: "SyTest Monolith :postgres::debian: testing"
-    agents:
-      queue: "medium"
-    env:
-      POSTGRES: "1"
-    command:
-      - "bash .buildkite/merge_base_branch.sh"
-      - "bash /bootstrap.sh synapse"
-    plugins:
-      - docker#v3.7.0:
-          image: "matrixdotorg/sytest-synapse:testing"
-          propagate-environment: true
-          always-pull: true
-          workdir: "/src"
-          entrypoint: "/bin/sh"
-          init: false
-          shell: ["-x", "-c"]
-          mount-buildkite-agent: false
-          volumes: ["./logs:/logs"]
-      - artifacts#v1.3.0:
-          upload: [ "logs/**/*.log", "logs/**/*.log.*", "logs/results.tap" ]
-      - matrix-org/annotate:
-          path: "logs/annotate.md"
-          style: "error"
-    retry: *retry_setup
-
-  - label: "SyTest Workers :postgres::ubuntu: 18.04"
-    agents:
-      queue: "xlarge"
-    env:
-      MULTI_POSTGRES: "1"  # Test with split out databases
-      POSTGRES: "1"
-      WORKERS: "1"
-      BLACKLIST: "synapse-blacklist-with-workers"
-    command:
-      - "bash .buildkite/merge_base_branch.sh"
-      - "bash -c 'cat /src/sytest-blacklist /src/.buildkite/worker-blacklist > /src/synapse-blacklist-with-workers'"
-      - "bash /bootstrap.sh synapse"
-    plugins:
-      - docker#v3.7.0:
-          image: "matrixdotorg/sytest-synapse:bionic"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -438,7 +358,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.7.0:
-          image: "matrixdotorg/sytest-synapse:buster"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
@@ -469,7 +389,7 @@ steps:
       - "bash /bootstrap.sh synapse"
     plugins:
       - docker#v3.7.0:
-          image: "matrixdotorg/sytest-synapse:buster"
+          image: "matrixdotorg/sytest-synapse:dinsic"
           propagate-environment: true
           always-pull: true
           workdir: "/src"
