@@ -177,7 +177,10 @@ class EventContentFields:
     # Used on normal message events to indicate where the chunk connects to
     MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
     # For "marker" events
-    MSC2716_PREV_INSERTION = "org.matrix.msc2716.prev_insertion"
+    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+    MSC2716_MARKER_INSERTION_PREV_EVENTS = (
+        "org.matrix.msc2716.marker.insertion_prev_events"
+    )
 
 
 class RoomEncryptionAlgorithms:
