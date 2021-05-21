@@ -1,0 +1,1 @@
+Don't hammer the database for destination retry timings every ~5mins.
