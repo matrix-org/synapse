@@ -296,11 +296,8 @@ steps:
   # This is configured by setting `MULTI_POSTGRES=1` in the environment.
   #
   # We mostly care about testing each topology.
-  # To vary the Python and Postgres versions, we use Docker images which are based
-  # on an assortment of Linux distributions.
-  #   - "bionic" (Ubuntu 18.04) has Python 3.6 and Postgres 10
-  #   - "buster" (Debian 10) has Python 3.7 and Postgres 11
-  #   - "testing" (Debian 11) (currently) has Python 3.9 and Postgres 13
+  # For DINSIC specifically, we currently test across one Linux distribution,
+  # Debian buster (10), which has Python 3.7 and Postgres 11
   #
   # TODO: this leaves us without sytests for Postgres 9.6. How much do we care
   #    about that?
