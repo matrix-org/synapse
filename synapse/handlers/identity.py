@@ -251,6 +251,8 @@ class IdentityHandler(BaseHandler):
         """
         if threepid.get("id_server"):
             id_servers = [threepid["id_server"]]
+        elif self.hs.config.bind_new_user_emails_to_sydent:
+            id_servers = [self.hs.config.bind_new_user_emails_to_sydent]
         else:
             id_servers = await self.store.get_id_servers_user_bound(
                 user_id=mxid, medium=threepid["medium"], address=threepid["address"]
