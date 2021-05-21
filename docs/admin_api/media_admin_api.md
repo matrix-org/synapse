@@ -7,6 +7,7 @@
   * [Quarantining media in a room](#quarantining-media-in-a-room)
   * [Quarantining all media of a user](#quarantining-all-media-of-a-user)
   * [Protecting media from being quarantined](#protecting-media-from-being-quarantined)
+  * [Unprotecting media from being quarantined](#unprotecting-media-from-being-quarantined)
 - [Delete local media](#delete-local-media)
   * [Delete a specific local media](#delete-a-specific-local-media)
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
