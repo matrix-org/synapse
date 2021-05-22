@@ -16,7 +16,7 @@ import json
 import os
 from binascii import unhexlify
 
-from parameterized import parameterized_class
+from parameterized import parameterized
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
@@ -566,13 +566,6 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
             self.assertFalse(os.path.exists(local_path))
 
 
-@parameterized_class(
-    ("method",),
-    [
-        ("POST",),
-        ("DELETE",),
-    ],
-)
 class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -607,17 +600,19 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         self.url = "/_synapse/admin/v1/media/protect/%s" % self.media_id
 
-    def test_no_auth(self):
+    @parameterized.expand(["POST", "DELETE"])
+    def test_no_auth(self, method: str):
         """
         Try to protect media without authentication.
         """
 
-        channel = self.make_request(self.method, self.url, b"{}")
+        channel = self.make_request(method, self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    def test_requester_is_no_admin(self):
+    @parameterized.expand(["POST", "DELETE"])
+    def test_requester_is_no_admin(self, method: str):
         """
         If the user is not a server admin, an error is returned.
         """
@@ -625,7 +620,7 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.other_user_token = self.login("user", "pass")
 
         channel = self.make_request(
-            self.method,
+            method,
             self.url,
             access_token=self.other_user_token,
         )
