@@ -119,6 +119,21 @@ class QuarantineMediaByID(RestServlet):
 
         return 200, {}
 
+    async def on_DELETE(
+        self, request: SynapseRequest, server_name: str, media_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info(
+            "Remove from quarantine local media by ID: %s/%s", server_name, media_id
+        )
+
+        # Remove from quarantine this media id
+        await self.store.remove_quarantine_media_by_id(server_name, media_id)
+
+        return 200, {}
+
 
 class ProtectMediaByID(RestServlet):
     """Protect local media from being quarantined."""
