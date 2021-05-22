@@ -1,0 +1,1 @@
+Fixed server not having access to `homeserver.log` by moving the default path to `/data/homeserver.log`. Contributed by Sergio Miguéns Iglesias.
