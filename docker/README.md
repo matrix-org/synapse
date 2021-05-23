@@ -66,6 +66,7 @@ The following environment variables are supported in `generate` mode:
   such as the database and media store. Defaults to `/data`.
 * `UID`, `GID`: the user id and group id to use for creating the data
   directories. Defaults to `991`, `991`.
+* `LOG_FILE_PATH`: where the homeserver.log file will be stored.
 
 ## Running synapse
 
@@ -186,7 +187,7 @@ point to another Dockerfile.
 ## Disabling the healthcheck
 
 If you are using a non-standard port or tls inside docker you can disable the healthcheck
-whilst running the above `docker run` commands. 
+whilst running the above `docker run` commands.
 
 ```
    --no-healthcheck
@@ -212,7 +213,7 @@ If you wish to point the healthcheck at a different port with docker command, ad
 ## Setting the healthcheck in docker-compose file
 
 You can add the following to set a custom healthcheck in a docker compose file.
-You will need docker-compose version >2.1 for this to work. 
+You will need docker-compose version >2.1 for this to work.
 
 ```
 healthcheck:
