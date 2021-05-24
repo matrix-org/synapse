@@ -34,17 +34,24 @@ fi
 
 # If we're using workers, modify the docker files slightly.
 if [[ -n "$WORKERS" ]]; then
-  DOCKERTAG_SUFFIX=-workers
-  DOCKERFILE_SUFFIX=Workers
+  BASE_IMAGE=matrixdotorg/synapse-workers
+  BASE_DOCKERFILE=docker/Dockerfile-workers
+  export COMPLEMENT_BASE_IMAGE=complement-synapse-workers
+  COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
   # And provide some more configuration to complement.
   export COMPLEMENT_CA=true
   export COMPLEMENT_VERSION_CHECK_ITERATIONS=500
+else
+  BASE_IMAGE=matrixdotorg/synapse
+  BASE_DOCKERFILE=docker/Dockerfile
+  export COMPLEMENT_BASE_IMAGE=complement-synapse
+  COMPLEMENT_DOCKERFILE=Synapse.Dockerfile
 fi
 
 # Build the base Synapse image from the local checkout
-docker build -t matrixdotorg/synapse$DOCKERTAG_SUFFIX -f docker/Dockerfile$DOCKERTAG_SUFFIX .
+docker build -t $BASE_IMAGE -f "$BASE_DOCKERFILE" .
 # Build the Synapse monolith image from Complement, based on the above image we just built
-docker build -t complement-synapse$DOCKERTAG_SUFFIX -f "$COMPLEMENT_DIR/dockerfiles/Synapse$DOCKERFILE_SUFFIX.Dockerfile" "$COMPLEMENT_DIR/dockerfiles"
+docker build -t $COMPLEMENT_BASE_IMAGE -f "$COMPLEMENT_DIR/dockerfiles/$COMPLEMENT_DOCKERFILE" "$COMPLEMENT_DIR/dockerfiles"
 
 cd "$COMPLEMENT_DIR"
 
@@ -55,4 +62,4 @@ if [[ -n "$1" ]]; then
 fi
 
 # Run the tests!
-COMPLEMENT_BASE_IMAGE=complement-synapse$DOCKERTAG_SUFFIX go test -v -tags synapse_blacklist,msc2946,msc3083 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests
+go test -v -tags synapse_blacklist,msc2946,msc3083 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests
