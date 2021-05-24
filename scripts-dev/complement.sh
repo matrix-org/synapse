@@ -10,6 +10,9 @@
 # checkout by setting the COMPLEMENT_DIR environment variable to the
 # filepath of a local Complement checkout.
 #
+# By default Synapse is run in monolith mode. This can be overridden by
+# setting the WORKERS environment variable.
+#
 # A regular expression of test method names can be supplied as the first
 # argument to the script. Complement will then only run those tests. If
 # no regex is supplied, all tests are run. For example;
