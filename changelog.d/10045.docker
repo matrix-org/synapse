@@ -1,1 +1,1 @@
-Fixed server not having access to `homeserver.log` by moving the default path to `/data/homeserver.log`. Contributed by Sergio Miguéns Iglesias.
+Fix bug introduced in Synapse 1.33.0 which caused a `Permission denied: '/homeserver.log'` error when starting Synapse with the generated log configuration. Contributed by Sergio Miguéns Iglesias.
