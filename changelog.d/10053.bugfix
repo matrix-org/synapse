@@ -1,0 +1,2 @@
+fixed a bug that made the default docker image setup to display a permission
+error after generating a fresh config file and running the container.
