@@ -377,9 +377,8 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         self.http_client.get_json.side_effect = get_json
 
-        keys_to_fetch = {SERVER_NAME: {"key1": 0}}
-        keys = self.get_success(fetcher.get_keys(keys_to_fetch))
-        k = keys[SERVER_NAME][testverifykey_id]
+        keys = self.get_success(fetcher.get_keys(SERVER_NAME, ["key1"], 0))
+        k = keys[testverifykey_id]
         self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
         self.assertEqual(k.verify_key, testverifykey)
         self.assertEqual(k.verify_key.alg, "ed25519")
@@ -406,7 +405,7 @@ class ServerKeyFetcherTestCase(unittest.HomeserverTestCase):
         # change the server name: the result should be ignored
         response["server_name"] = "OTHER_SERVER"
 
-        keys = self.get_success(fetcher.get_keys(keys_to_fetch))
+        keys = self.get_success(fetcher.get_keys(SERVER_NAME, ["key1"], 0))
         self.assertEqual(keys, {})
 
 
@@ -493,10 +492,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         self.expect_outgoing_key_query(SERVER_NAME, "key1", response)
 
-        keys_to_fetch = {SERVER_NAME: {"key1": 0}}
-        keys = self.get_success(fetcher.get_keys(keys_to_fetch))
-        self.assertIn(SERVER_NAME, keys)
-        k = keys[SERVER_NAME][testverifykey_id]
+        keys = self.get_success(fetcher.get_keys(SERVER_NAME, ["key1"], 0))
+        self.assertIn(testverifykey_id, keys)
+        k = keys[testverifykey_id]
         self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
         self.assertEqual(k.verify_key, testverifykey)
         self.assertEqual(k.verify_key.alg, "ed25519")
@@ -543,10 +541,9 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         self.expect_outgoing_key_query(SERVER_NAME, "key1", response)
 
-        keys_to_fetch = {SERVER_NAME: {"key1": 0}}
-        keys = self.get_success(fetcher.get_keys(keys_to_fetch))
-        self.assertIn(SERVER_NAME, keys)
-        k = keys[SERVER_NAME][testverifykey_id]
+        keys = self.get_success(fetcher.get_keys(SERVER_NAME, ["key1"], 0))
+        self.assertIn(testverifykey_id, keys)
+        k = keys[testverifykey_id]
         self.assertEqual(k.valid_until_ts, VALID_UNTIL_TS)
         self.assertEqual(k.verify_key, testverifykey)
         self.assertEqual(k.verify_key.alg, "ed25519")
@@ -587,14 +584,13 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
 
         def get_key_from_perspectives(response):
             fetcher = PerspectivesKeyFetcher(self.hs)
-            keys_to_fetch = {SERVER_NAME: {"key1": 0}}
             self.expect_outgoing_key_query(SERVER_NAME, "key1", response)
-            return self.get_success(fetcher.get_keys(keys_to_fetch))
+            return self.get_success(fetcher.get_keys(SERVER_NAME, ["key1"], 0))
 
         # start with a valid response so we can check we are testing the right thing
         response = build_response()
         keys = get_key_from_perspectives(response)
-        k = keys[SERVER_NAME][testverifykey_id]
+        k = keys[testverifykey_id]
         self.assertEqual(k.verify_key, testverifykey)
 
         # remove the perspectives server's signature
