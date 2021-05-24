@@ -270,7 +270,6 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         cache = DeferredCache(
             name=self.orig.__name__,
             max_entries=self.max_entries,
-            keylen=self.num_args,
             tree=self.tree,
             iterable=self.iterable,
         )  # type: DeferredCache[CacheKey, Any]

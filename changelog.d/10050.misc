@@ -1,0 +1,1 @@
+Fix typo in `get_state_ids_for_event` docstring where the return type was incorrect.
