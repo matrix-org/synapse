@@ -23,13 +23,14 @@ from typing import (
     Mapping,
     Sequence,
     Set,
+    Tuple,
     TypeVar,
 )
 
 T = TypeVar("T")
 
 
-def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Collection[T]]:
+def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T, ...]]:
     """batch an iterable up into tuples with a maximum size
 
     Args:
