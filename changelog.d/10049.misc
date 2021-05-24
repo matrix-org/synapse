@@ -1,0 +1,1 @@
+Add `inherit_depth` parameter and pipe through the event creation methods.

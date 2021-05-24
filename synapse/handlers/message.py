@@ -480,6 +480,8 @@ class EventCreationHandler:
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
+        outlier: bool = False,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -506,6 +508,13 @@ class EventCreationHandler:
 
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
+
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
+
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
@@ -561,11 +570,14 @@ class EventCreationHandler:
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
+        builder.internal_metadata.outlier = outlier
+
         event, context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            inherit_depth=inherit_depth,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -722,9 +734,12 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
+        auth_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
+        outlier: bool = False,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -734,10 +749,19 @@ class EventCreationHandler:
         Args:
             requester: The requester sending the event.
             event_dict: An entire event.
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
 
         Returns:
             The event, and its stream ordering (if deduplication happened,
@@ -776,8 +800,16 @@ class EventCreationHandler:
                     assert event.internal_metadata.stream_ordering
                     return event, event.internal_metadata.stream_ordering
 
+            prev_events = event_dict.get("prev_events")
+
             event, context = await self.create_event(
-                requester, event_dict, txn_id=txn_id
+                requester,
+                event_dict,
+                txn_id=txn_id,
+                prev_event_ids=prev_events,
+                auth_event_ids=auth_event_ids,
+                outlier=outlier,
+                inherit_depth=inherit_depth,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -809,6 +841,7 @@ class EventCreationHandler:
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        inherit_depth: bool = False,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -825,6 +858,9 @@ class EventCreationHandler:
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
+
+            inherit_depth: True to inherit the depth from the successor of the most
+                recent event from prev_event_ids. False to progress the depth as normal.
 
         Returns:
             Tuple of created event, context
@@ -849,9 +885,24 @@ class EventCreationHandler:
         ), "Attempting to create an event with no prev_events"
 
         event = await builder.build(
-            prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
+            inherit_depth=inherit_depth,
         )
-        context = await self.state.compute_event_context(event)
+
+        old_state = None
+
+        # Pass on the outlier property from the builder to the event
+        # after it is created
+        if builder.internal_metadata.outlier:
+            event.internal_metadata.outlier = builder.internal_metadata.outlier
+
+            # Calculate the state for outliers that pass in their own `auth_event_ids`
+            if auth_event_ids:
+                old_state = await self.store.get_events_as_list(auth_event_ids)
+
+        context = await self.state.compute_event_context(event, old_state=old_state)
+
         if requester:
             context.app_service = requester.app_service
 
