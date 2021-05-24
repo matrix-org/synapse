@@ -1,0 +1,1 @@
+Fix `get_state_ids_for_event` return type typo to match what the function actually does.
