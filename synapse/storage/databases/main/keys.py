@@ -15,7 +15,7 @@
 
 import itertools
 import logging
-from typing import Collection, Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 
 from signedjson.key import decode_verify_key_bytes
 
@@ -55,7 +55,7 @@ class KeyStore(SQLBaseStore):
         """
         keys = {}
 
-        def _get_keys(txn: Cursor, batch: Collection[Tuple[str, str]]) -> None:
+        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str], ...]) -> None:
             """Processes a batch of keys to fetch, and adds the result to `keys`."""
 
             # batch_iter always returns tuples so it's safe to do len(batch)
