@@ -21,7 +21,7 @@ from typing import Callable, List
 NEW_FORMAT_ID_RE = re.compile(r"^\d\d\d\d-\d\d-\d\d")
 
 
-def _wrap_in_base_path(func: "Callable[..., str]") -> "Callable[..., str]":
+def _wrap_in_base_path(func: Callable[..., str]) -> Callable[..., str]:
     """Takes a function that returns a relative path and turns it into an
     absolute path based on the location of the primary media store
     """

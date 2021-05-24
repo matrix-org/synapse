@@ -294,8 +294,7 @@ class Porter(object):
         return table, already_ported, total_to_port, forward_chunk, backward_chunk
 
     async def get_table_constraints(self) -> Dict[str, Set[str]]:
-        """Returns a map of tables that have foreign key constraints to tables they depend on.
-        """
+        """Returns a map of tables that have foreign key constraints to tables they depend on."""
 
         def _get_constraints(txn):
             # We can pull the information about foreign key constraints out from
@@ -504,7 +503,9 @@ class Porter(object):
                 return
 
     def build_db_store(
-        self, db_config: DatabaseConnectionConfig, allow_outdated_version: bool = False,
+        self,
+        db_config: DatabaseConnectionConfig,
+        allow_outdated_version: bool = False,
     ):
         """Builds and returns a database store using the provided configuration.
 
@@ -740,7 +741,7 @@ class Porter(object):
             return col
 
         outrows = []
-        for i, row in enumerate(rows):
+        for row in rows:
             try:
                 outrows.append(
                     tuple(conv(j, col) for j, col in enumerate(row) if j > 0)
@@ -890,8 +891,7 @@ class Porter(object):
         await self.postgres_store.db_pool.runInteraction("setup_user_id_seq", r)
 
     async def _setup_events_stream_seqs(self) -> None:
-        """Set the event stream sequences to the correct values.
-        """
+        """Set the event stream sequences to the correct values."""
 
         # We get called before we've ported the events table, so we need to
         # fetch the current positions from the SQLite store.
@@ -913,18 +913,21 @@ class Porter(object):
                     (curr_forward_id + 1,),
                 )
 
-            txn.execute(
-                "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
-                (curr_backward_id + 1,),
-            )
+            if curr_backward_id:
+                txn.execute(
+                    "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
+                    (curr_backward_id + 1,),
+                )
 
         await self.postgres_store.db_pool.runInteraction(
-            "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
+            "_setup_events_stream_seqs",
+            _setup_events_stream_seqs_set_pos,
         )
 
-    async def _setup_sequence(self, sequence_name: str, stream_id_tables: Iterable[str]) -> None:
-        """Set a sequence to the correct value.
-        """
+    async def _setup_sequence(
+        self, sequence_name: str, stream_id_tables: Iterable[str]
+    ) -> None:
+        """Set a sequence to the correct value."""
         current_stream_ids = []
         for stream_id_table in stream_id_tables:
             max_stream_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
@@ -938,26 +941,32 @@ class Porter(object):
         next_id = max(current_stream_ids) + 1
 
         def r(txn):
-            sql = "ALTER SEQUENCE %s RESTART WITH" % (sequence_name, )
-            txn.execute(sql + " %s", (next_id, ))
+            sql = "ALTER SEQUENCE %s RESTART WITH" % (sequence_name,)
+            txn.execute(sql + " %s", (next_id,))
 
-        await self.postgres_store.db_pool.runInteraction("_setup_%s" % (sequence_name,), r)
+        await self.postgres_store.db_pool.runInteraction(
+            "_setup_%s" % (sequence_name,), r
+        )
 
     async def _setup_auth_chain_sequence(self) -> None:
         curr_chain_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
-            table="event_auth_chains", keyvalues={}, retcol="MAX(chain_id)", allow_none=True
+            table="event_auth_chains",
+            keyvalues={},
+            retcol="MAX(chain_id)",
+            allow_none=True,
         )
 
         def r(txn):
             txn.execute(
                 "ALTER SEQUENCE event_auth_chain_id RESTART WITH %s",
-                (curr_chain_id,),
+                (curr_chain_id + 1,),
             )
 
-        await self.postgres_store.db_pool.runInteraction(
-            "_setup_event_auth_chain_id", r,
-        )
-
+        if curr_chain_id is not None:
+            await self.postgres_store.db_pool.runInteraction(
+                "_setup_event_auth_chain_id",
+                r,
+            )
 
 
 ##############################################
@@ -966,8 +975,7 @@ class Porter(object):
 
 
 class Progress(object):
-    """Used to report progress of the port
-    """
+    """Used to report progress of the port"""
 
     def __init__(self):
         self.tables = {}
@@ -992,8 +1000,7 @@ class Progress(object):
 
 
 class CursesProgress(Progress):
-    """Reports progress to a curses window
-    """
+    """Reports progress to a curses window"""
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
@@ -1018,7 +1025,7 @@ class CursesProgress(Progress):
 
         self.total_processed = 0
         self.total_remaining = 0
-        for table, data in self.tables.items():
+        for data in self.tables.values():
             self.total_processed += data["num_done"] - data["start"]
             self.total_remaining += data["total"] - data["num_done"]
 
@@ -1109,8 +1116,7 @@ class CursesProgress(Progress):
 
 
 class TerminalProgress(Progress):
-    """Just prints progress to the terminal
-    """
+    """Just prints progress to the terminal"""
 
     def update(self, table, num_done):
         super(TerminalProgress, self).update(table, num_done)

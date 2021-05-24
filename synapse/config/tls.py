@@ -16,7 +16,7 @@ import logging
 import os
 import warnings
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Pattern
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
@@ -114,7 +114,7 @@ class TlsConfig(Config):
             fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []  # type: List[str]
+        self.federation_certificate_verification_whitelist = []  # type: List[Pattern]
         for entry in fed_whitelist_entries:
             try:
                 entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))

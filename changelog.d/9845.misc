@@ -1,1 +1,0 @@
-Only store the raw data in the in-memory caches, rather than objects that include references to e.g. the data stores.

@@ -17,6 +17,9 @@
 
 """Contains constants from the specification."""
 
+# the max size of a (canonical-json-encoded) event
+MAX_PDU_SIZE = 65536
+
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2 ** 63 - 1
 
@@ -107,13 +110,18 @@ class EventTypes:
 
     Dummy = "org.matrix.dummy_event"
 
+    SpaceChild = "m.space.child"
+    SpaceParent = "m.space.parent"
     MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
     MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
 
+class ToDeviceEventTypes:
+    RoomKeyRequest = "m.room_key_request"
+
+
 class EduTypes:
     Presence = "m.presence"
-    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:
@@ -171,6 +179,7 @@ class EventContentFields:
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
+    ROOM_TYPE = "type"
     MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 

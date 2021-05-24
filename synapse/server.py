@@ -104,6 +104,7 @@ from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
+from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
 from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
@@ -126,7 +127,6 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
-from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
@@ -286,6 +286,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         # unless handlers are instantiated.
         if self.config.run_background_tasks:
             self.setup_background_tasks()
+
+    def start_listening(self) -> None:
+        """Start the HTTP, manhole, metrics, etc listeners
+
+        Does nothing in this base class; overridden in derived classes to start the
+        appropriate listeners.
+        """
+        pass
 
     def setup_background_tasks(self) -> None:
         """
@@ -543,6 +551,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SearchHandler(self)
 
     @cache_in_self
+    def get_send_email_handler(self) -> SendEmailHandler:
+        return SendEmailHandler(self)
+
+    @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:
         return SetPasswordHandler(self)
 
@@ -632,10 +644,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_groups_attestation_renewer(self) -> GroupAttestionRenewer:
         return GroupAttestionRenewer(self)
-
-    @cache_in_self
-    def get_secrets(self) -> Secrets:
-        return Secrets()
 
     @cache_in_self
     def get_stats_handler(self) -> StatsHandler:

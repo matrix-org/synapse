@@ -15,7 +15,7 @@
 # limitations under the License.
 import logging
 import sys
-from typing import Dict, Iterable, Optional
+from typing import Dict, Optional
 
 from twisted.internet import address
 from twisted.web.resource import IResource
@@ -32,7 +32,7 @@ from synapse.api.urls import (
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
-from synapse.app._base import register_start
+from synapse.app._base import max_request_body_size, register_start
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
@@ -61,7 +61,6 @@ from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events, login, presence, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
@@ -237,7 +236,6 @@ class GenericWorkerSlavedStore(
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
-    SlavedTransactionStore,
     SlavedProfileStore,
     SlavedClientIpStore,
     SlavedFilteringStore,
@@ -367,6 +365,7 @@ class GenericWorkerServer(HomeServer):
                 listener_config,
                 root_resource,
                 self.version_string,
+                max_request_body_size=max_request_body_size(self.config),
                 reactor=self.get_reactor(),
             ),
             reactor=self.get_reactor(),
@@ -374,8 +373,8 @@ class GenericWorkerServer(HomeServer):
 
         logger.info("Synapse worker now listening on port %d", port)
 
-    def start_listening(self, listeners: Iterable[ListenerConfig]):
-        for listener in listeners:
+    def start_listening(self):
+        for listener in self.config.worker_listeners:
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":
@@ -453,6 +452,10 @@ def start(config_options):
         config.server.update_user_directory = False
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
+
+    if config.server.gc_seconds:
+        synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = GenericWorkerServer(
         config.server_name,
@@ -468,7 +471,7 @@ def start(config_options):
     # streams. Will no-op if no streams can be written to by this worker.
     hs.get_replication_streamer()
 
-    register_start(_base.start, hs, config.worker_listeners)
+    register_start(_base.start, hs)
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 
