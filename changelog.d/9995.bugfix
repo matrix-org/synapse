@@ -1,1 +1,0 @@
-Fix `synctl`'s `--no-daemonize` parameter to work correctly with worker processes.
