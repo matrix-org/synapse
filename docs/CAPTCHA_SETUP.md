@@ -10,7 +10,7 @@ from Google.
 1. Set the type to reCAPTCHA v2 using the "I'm not a robot" Checkbox option.
 This is the only type of captcha that works with Synapse.
 1. Add your server name to the list of authorized domains.
-1. Agree to the terms of service and submit
+1. Agree to the terms of service and submit.
 1. Copy your site key and secret key and add them to your `homeserver.yaml`
 configuration file
     ```
