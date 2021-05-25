@@ -22,7 +22,7 @@ logger = logging.Logger(__name__)
 
 
 class RoomDefaultEncryptionTypes:
-    """Possible values for the encryption_enabled_by_default_for_room_type config option"""
+    """Possible values for the force_encryption_enabled_for_room_type config option"""
 
     ALL = "all"
     INVITE = "invite"
@@ -35,17 +35,17 @@ class RoomConfig(Config):
     def read_config(self, config, **kwargs):
         # Whether new, locally-created rooms should have encryption enabled
         encryption_for_room_type = config.get(
-            "encryption_enabled_by_default_for_room_type",
+            "force_encryption_enabled_for_room_type",
             RoomDefaultEncryptionTypes.OFF,
         )
         if encryption_for_room_type == RoomDefaultEncryptionTypes.ALL:
-            self.encryption_enabled_by_default_for_room_presets = [
+            self.force_encryption_enabled_for_room_presets = [
                 RoomCreationPreset.PRIVATE_CHAT,
                 RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
                 RoomCreationPreset.PUBLIC_CHAT,
             ]
         elif encryption_for_room_type == RoomDefaultEncryptionTypes.INVITE:
-            self.encryption_enabled_by_default_for_room_presets = [
+            self.force_encryption_enabled_for_room_presets = [
                 RoomCreationPreset.PRIVATE_CHAT,
                 RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
             ]
@@ -55,10 +55,10 @@ class RoomConfig(Config):
         ):
             # PyYAML translates "off" into False if it's unquoted, so we also need to
             # check for encryption_for_room_type being False.
-            self.encryption_enabled_by_default_for_room_presets = []
+            self.force_encryption_enabled_for_room_presets = []
         else:
             raise ConfigError(
-                "Invalid value for encryption_enabled_by_default_for_room_type"
+                "Invalid value for force_encryption_enabled_for_room_type"
             )
 
     def generate_config_section(self, **kwargs):
@@ -80,5 +80,5 @@ class RoomConfig(Config):
         # Note that this option will only affect rooms created after it is set. It
         # will also not affect rooms created by other servers.
         #
-        #encryption_enabled_by_default_for_room_type: invite
+        #force_encryption_enabled_for_room_type: invite
         """

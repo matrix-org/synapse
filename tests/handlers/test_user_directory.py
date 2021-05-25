@@ -188,10 +188,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
-    @override_config({"encryption_enabled_by_default_for_room_type": "all"})
+    @override_config({"force_encryption_enabled_for_room_typ": "all"})
     def test_encrypted_by_default_config_option_all(self):
         """Tests that invite-only and non-invite-only rooms have encryption enabled by
-        default when the config option encryption_enabled_by_default_for_room_type is "all".
+        default when the config option force_encryption_enabled_for_room_type is "all".
         """
         # Create a user
         user = self.register_user("user", "pass")
@@ -219,10 +219,10 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
-    @override_config({"encryption_enabled_by_default_for_room_type": "invite"})
+    @override_config({"force_encryption_enabled_for_room_type": "invite"})
     def test_encrypted_by_default_config_option_invite(self):
         """Tests that only new, invite-only rooms have encryption enabled by default when
-        the config option encryption_enabled_by_default_for_room_type is "invite".
+        the config option force_encryption_enabled_for_room_type is "invite".
         """
         # Create a user
         user = self.register_user("user", "pass")
@@ -250,11 +250,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             expect_code=404,
         )
 
-    @override_config({"encryption_enabled_by_default_for_room_type": "off"})
+    @override_config({"force_encryption_enabled_for_room_type": "off"})
     def test_encrypted_by_default_config_option_off(self):
         """Tests that neither new invite-only nor non-invite-only rooms have encryption
         enabled by default when the config option
-        encryption_enabled_by_default_for_room_type is "off".
+        force_encryption_enabled_for_room_type is "off".
         """
         # Create a user
         user = self.register_user("user", "pass")
