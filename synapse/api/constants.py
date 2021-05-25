@@ -183,6 +183,11 @@ class EventContentFields:
     MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 
+class RoomTypes:
+    SPACE = "m.space"
+    MSC1772_SPACE = "org.matrix.msc1772.space"
+
+
 class RoomEncryptionAlgorithms:
     MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
     DEFAULT = MEGOLM_V1_AES_SHA2

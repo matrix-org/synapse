@@ -25,6 +25,7 @@ from synapse.api.constants import (
     EventTypes,
     HistoryVisibility,
     Membership,
+    RoomTypes,
 )
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
@@ -328,26 +329,30 @@ class SpaceSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id)
 
-        # look for child rooms/spaces.
-        child_events = await self._get_child_events(room_id)
-
-        if suggested_only:
-            # we only care about suggested children
-            child_events = filter(_is_suggested_child_event, child_events)
-
-        if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
-            max_children = MAX_ROOMS_PER_SPACE
-
-        now = self._clock.time_msec()
+        # If the the room is a space, check if there are any children.
         events_result = []  # type: List[JsonDict]
-        for edge_event in itertools.islice(child_events, max_children):
-            events_result.append(
-                await self._event_serializer.serialize_event(
-                    edge_event,
-                    time_now=now,
-                    event_format=format_event_for_client_v2,
+        if room_entry.get("room_type") in (RoomTypes.SPACE, RoomTypes.MSC1772_SPACE):
+
+            # look for child rooms/spaces.
+            child_events = await self._get_child_events(room_id)
+
+            if suggested_only:
+                # we only care about suggested children
+                child_events = filter(_is_suggested_child_event, child_events)
+
+            if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
+                max_children = MAX_ROOMS_PER_SPACE
+
+            now = self._clock.time_msec()
+            for edge_event in itertools.islice(child_events, max_children):
+                events_result.append(
+                    await self._event_serializer.serialize_event(
+                        edge_event,
+                        time_now=now,
+                        event_format=format_event_for_client_v2,
+                    )
                 )
-            )
+
         return room_entry, events_result
 
     async def _summarize_remote_room(
