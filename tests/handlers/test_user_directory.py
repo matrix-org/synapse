@@ -189,7 +189,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 0)
 
     @override_config({"force_encryption_enabled_for_room_typ": "all"})
-    def test_encrypted_by_default_config_option_all(self):
+    def test_force_encryption_config_option_all(self):
         """Tests that invite-only and non-invite-only rooms have encryption enabled by
         default when the config option force_encryption_enabled_for_room_type is "all".
         """
@@ -220,7 +220,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
     @override_config({"force_encryption_enabled_for_room_type": "invite"})
-    def test_encrypted_by_default_config_option_invite(self):
+    def test_force_encryption_config_option_invite(self):
         """Tests that only new, invite-only rooms have encryption enabled by default when
         the config option force_encryption_enabled_for_room_type is "invite".
         """
@@ -251,7 +251,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
     @override_config({"force_encryption_enabled_for_room_type": "off"})
-    def test_encrypted_by_default_config_option_off(self):
+    def test_force_encryption_config_option_off(self):
         """Tests that neither new invite-only nor non-invite-only rooms have encryption
         enabled by default when the config option
         force_encryption_enabled_for_room_type is "off".
