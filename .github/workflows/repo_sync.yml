@@ -1,0 +1,27 @@
+name: Sync with Upstream
+
+on:
+  schedule: 
+  - cron: "*/35 * * * *"
+
+jobs:
+  develop:
+    name: develop
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Synchronize repository
+      uses: repo-sync/github-sync@v2
+      with:
+        source_repo: https://github.com/matrix-org/synapse
+        source_branch: develop
+        destination_branch: upstream/develop
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Create pull request
+      uses: repo-sync/pull-request@v2
+      with:
+        source_branch: upstream/develop
+        destination_branch: develop
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        pr_title: "Pulling ${{ github.ref }} into develop"
+        pr_body: ":crown: *An automated PR to sync with upstream*"
