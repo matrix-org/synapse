@@ -1,6 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,6 +82,7 @@ from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerH
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
+from synapse.handlers.modules import ModulesHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import (
@@ -682,6 +681,10 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_message_handler(self) -> MessageHandler:
         return MessageHandler(self)
+
+    @cache_in_self
+    def get_modules_handler(self) -> ModulesHandler:
+        return ModulesHandler(self)
 
     @cache_in_self
     def get_pagination_handler(self) -> PaginationHandler:

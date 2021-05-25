@@ -16,6 +16,7 @@ from synapse.config import (
     key,
     logger,
     metrics,
+    modules,
     oidc,
     password_auth_providers,
     push,
@@ -85,6 +86,7 @@ class RootConfig:
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
     tracer: tracer.TracerConfig
     redis: redis.RedisConfig
+    modules: modules.ModulesConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...
