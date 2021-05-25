@@ -167,7 +167,7 @@ This API reverts the protection of a media.
 Request:
 
 ```
-DELETE /_synapse/admin/v1/media/protect/<media_id>
+POST /_synapse/admin/v1/media/unprotect/<media_id>
 
 {}
 ```

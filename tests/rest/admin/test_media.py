@@ -598,21 +598,21 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
         self.media_id = server_and_media_id.split("/")[1]
 
-        self.url = "/_synapse/admin/v1/media/protect/%s" % self.media_id
+        self.url = "/_synapse/admin/v1/media/%s/%s"
 
-    @parameterized.expand(["POST", "DELETE"])
-    def test_no_auth(self, method: str):
+    @parameterized.expand(["protect", "unprotect"])
+    def test_no_auth(self, action: str):
         """
         Try to protect media without authentication.
         """
 
-        channel = self.make_request(method, self.url, b"{}")
+        channel = self.make_request("POST", self.url % (action, self.media_id), b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    @parameterized.expand(["POST", "DELETE"])
-    def test_requester_is_no_admin(self, method: str):
+    @parameterized.expand(["protect", "unprotect"])
+    def test_requester_is_no_admin(self, action: str):
         """
         If the user is not a server admin, an error is returned.
         """
@@ -620,8 +620,8 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.other_user_token = self.login("user", "pass")
 
         channel = self.make_request(
-            method,
-            self.url,
+            "POST",
+            self.url % (action, self.media_id),
             access_token=self.other_user_token,
         )
 
@@ -637,7 +637,11 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(media_info["safe_from_quarantine"])
 
         # protect
-        channel = self.make_request("POST", self.url, access_token=self.admin_user_tok)
+        channel = self.make_request(
+            "POST",
+            self.url % ("protect", self.media_id),
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertFalse(channel.json_body)
@@ -647,7 +651,9 @@ class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # unprotect
         channel = self.make_request(
-            "DELETE", self.url, access_token=self.admin_user_tok
+            "POST",
+            self.url % ("unprotect", self.media_id),
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
