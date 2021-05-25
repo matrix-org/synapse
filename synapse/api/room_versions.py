@@ -183,5 +183,4 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.MSC2176,
         RoomVersions.MSC3083,
     )
-    # Note that we do not include MSC3083 here unless it is enabled in the config.
 }  # type: Dict[str, RoomVersion]
