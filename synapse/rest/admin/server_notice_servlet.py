@@ -54,7 +54,6 @@ class SendServerNoticeServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.txns = HttpTransactionCache(hs)
-        self.snm = hs.get_server_notices_manager()
 
     def register(self, json_resource: HttpServer):
         PATTERN = "/send_server_notice"
@@ -77,7 +76,10 @@ class SendServerNoticeServlet(RestServlet):
         event_type = body.get("type", EventTypes.Message)
         state_key = body.get("state_key")
 
-        if not self.snm.is_enabled():
+        # We grab the server notices manager here as its initialisation has a check for worker processes,
+        # but worker processes still need to initialise SendServerNoticeServlet (as it is part of the
+        # admin api).
+        if not self.hs.get_server_notices_manager().is_enabled():
             raise SynapseError(400, "Server notices are not enabled on this server")
 
         user_id = body["user_id"]
@@ -85,7 +87,7 @@ class SendServerNoticeServlet(RestServlet):
         if not self.hs.is_mine_id(user_id):
             raise SynapseError(400, "Server notices can only be sent to local users")
 
-        event = await self.snm.send_notice(
+        event = await self.hs.get_server_notices_manager().send_notice(
             user_id=body["user_id"],
             type=event_type,
             state_key=state_key,

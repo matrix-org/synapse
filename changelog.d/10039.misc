@@ -1,0 +1,1 @@
+Fix running complement tests with Synapse workers.

@@ -1,0 +1,1 @@
+Fixed a bug with very high resolution image uploads throwing internal server errors.

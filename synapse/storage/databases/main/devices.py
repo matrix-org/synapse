@@ -1053,7 +1053,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         # Map of (user_id, device_id) -> bool. If there is an entry that implies
         # the device exists.
         self.device_id_exists_cache = LruCache(
-            cache_name="device_id_exists", keylen=2, max_size=10000
+            cache_name="device_id_exists", max_size=10000
         )
 
     async def store_device(
