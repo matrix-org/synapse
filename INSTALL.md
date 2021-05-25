@@ -400,8 +400,8 @@ Once you have installed synapse as above, you will need to configure it.
 ### Using PostgreSQL
 
 By default Synapse uses an [SQLite](https://sqlite.org/) database and in doing so trades
-performance for convenience. Almost all installations should opt to use [PostgreSQL](https://www.postgresql.org).
-Advantages include:
+performance for convenience. Almost all installations should opt to use [PostgreSQL](https://www.postgresql.org)
+instead. Advantages include:
 
 - significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
