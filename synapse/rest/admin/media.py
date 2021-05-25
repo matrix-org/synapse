@@ -119,7 +119,21 @@ class QuarantineMediaByID(RestServlet):
 
         return 200, {}
 
-    async def on_DELETE(
+
+class UnquarantineMediaByID(RestServlet):
+    """Quarantines local or remote media by a given ID so that no one can download
+    it via this server.
+    """
+
+    PATTERNS = admin_patterns(
+        "/media/unquarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(
         self, request: SynapseRequest, server_name: str, media_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
@@ -282,6 +296,7 @@ def register_servlets_for_media_repo(hs: "HomeServer", http_server):
     PurgeMediaCacheRestServlet(hs).register(http_server)
     QuarantineMediaInRoom(hs).register(http_server)
     QuarantineMediaByID(hs).register(http_server)
+    UnquarantineMediaByID(hs).register(http_server)
     QuarantineMediaByUser(hs).register(http_server)
     ProtectMediaByID(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)

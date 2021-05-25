@@ -577,7 +577,7 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         media_repo = hs.get_media_repository_resource()
         self.store = hs.get_datastore()
-        server_name = hs.hostname
+        self.server_name = hs.hostname
 
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
@@ -599,24 +599,25 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         server_and_media_id = response["content_uri"][6:]  # Cut off 'mxc://'
         self.media_id = server_and_media_id.split("/")[1]
 
-        self.url = "/_synapse/admin/v1/media/quarantine/%s/%s" % (
-            server_name,
-            self.media_id,
-        )
+        self.url = "/_synapse/admin/v1/media/%s/%s/%s"
 
-    @parameterized.expand(["POST", "DELETE"])
-    def test_no_auth(self, method: str):
+    @parameterized.expand(["quarantine", "unquarantine"])
+    def test_no_auth(self, action: str):
         """
         Try to protect media without authentication.
         """
 
-        channel = self.make_request(method, self.url, b"{}")
+        channel = self.make_request(
+            "POST",
+            self.url % (action, self.server_name, self.media_id),
+            b"{}",
+        )
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-    @parameterized.expand(["POST", "DELETE"])
-    def test_requester_is_no_admin(self, method: str):
+    @parameterized.expand(["quarantine", "unquarantine"])
+    def test_requester_is_no_admin(self, action: str):
         """
         If the user is not a server admin, an error is returned.
         """
@@ -624,8 +625,8 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.other_user_token = self.login("user", "pass")
 
         channel = self.make_request(
-            method,
-            self.url,
+            "POST",
+            self.url % (action, self.server_name, self.media_id),
             access_token=self.other_user_token,
         )
 
@@ -641,7 +642,11 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         self.assertFalse(media_info["quarantined_by"])
 
         # quarantining
-        channel = self.make_request("POST", self.url, access_token=self.admin_user_tok)
+        channel = self.make_request(
+            "POST",
+            self.url % ("quarantine", self.server_name, self.media_id),
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertFalse(channel.json_body)
@@ -651,7 +656,9 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
 
         # remove from quarantine
         channel = self.make_request(
-            "DELETE", self.url, access_token=self.admin_user_tok
+            "POST",
+            self.url % ("unquarantine", self.server_name, self.media_id),
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)

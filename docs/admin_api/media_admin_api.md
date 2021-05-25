@@ -84,7 +84,7 @@ This API removes a single piece of local or remote media from quarantine.
 Request:
 
 ```
-DELETE /_synapse/admin/v1/media/quarantine/<server_name>/<media_id>
+POST /_synapse/admin/v1/media/unquarantine/<server_name>/<media_id>
 
 {}
 ```
