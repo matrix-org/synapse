@@ -75,10 +75,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
         supported_hooks = list(spam_checker_methods.intersection(props))
 
         # Register the hooks through the module API.
-        hooks = {
-            hook: getattr(spam_checker, hook)
-            for hook in supported_hooks
-        }
+        hooks = {hook: getattr(spam_checker, hook) for hook in supported_hooks}
 
         api.register_spam_checker_callbacks(**hooks)
 
@@ -89,20 +86,27 @@ class SpamChecker:
 
     def register_callbacks(
         self,
-        check_event_for_spam: Callable[
-            ["synapse.events.EventBase"], Union[bool, str]
+        check_event_for_spam: Optional[
+            Callable[["synapse.events.EventBase"], Union[bool, str]]
         ] = None,
-        user_may_invite: Callable[[str, str, str], bool] = None,
-        user_may_create_room: Callable[[str], bool] = None,
-        user_may_create_room_alias: Callable[[str, RoomAlias], bool] = None,
-        user_may_publish_room: Callable[[str, str], bool] = None,
-        check_username_for_spam: Callable[[Dict[str, str]], bool] = None,
-        check_registration_for_spam: Callable[
-            [Optional[dict], Optional[str], Collection[Tuple[str, str]], Optional[str]],
-            bool,
+        user_may_invite: Optional[Callable[[str, str, str], bool]] = None,
+        user_may_create_room: Optional[Callable[[str], bool]] = None,
+        user_may_create_room_alias: Optional[Callable[[str, RoomAlias], bool]] = None,
+        user_may_publish_room: Optional[Callable[[str, str], bool]] = None,
+        check_username_for_spam: Optional[Callable[[Dict[str, str]], bool]] = None,
+        check_registration_for_spam: Optional[
+            Callable[
+                [
+                    Optional[dict],
+                    Optional[str],
+                    Collection[Tuple[str, str]],
+                    Optional[str],
+                ],
+                bool,
+            ]
         ] = None,
-        check_media_file_for_spam: Callable[
-            [ReadableFileWrapper, FileInfo], bool
+        check_media_file_for_spam: Optional[
+            Callable[[ReadableFileWrapper, FileInfo], bool]
         ] = None,
     ):
         """Register callbacks from module for each hook."""
