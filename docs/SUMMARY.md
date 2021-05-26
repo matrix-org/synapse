@@ -1,15 +1,20 @@
 # Summary
 
-- [Introduction](welcome_and_overview.md)
-- [Setup](setup/README.md)
+# Introduction
+- [Welcome and Overview](welcome_and_overview.md)
+
+# Setup
   - [Installation](setup/installation.md)
   - [Using Postgres](postgres.md)
   - [Configuring a Reverse Proxy](reverse_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
   - [Delegation](delegate.md)
-- [Upgrading](upgrading/README.md)
+
+# Upgrading
+  - [Upgrading between Synapse Versions](upgrading/README.md)
   - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
-- [Usage](usage/README.md)
+
+# Usage
   - [Federation](federate.md)
   - [Configuration](usage/configuration/README.md)
     - [Sample Configuration Files](usage/configuration/sample_config.md)
@@ -56,7 +61,8 @@
     - [Monitoring](metrics-howto.md)
     - [Structured Logging](structured_logging.md)
     - [Scripts]()
-- [Development](development/README.md)
+
+# Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
   - [Git Usage](dev/git.md)
@@ -75,5 +81,6 @@
     - [Media Repository](media_repository.md)
     - [Room and User Statistics](room_and_user_statistics.md)
   - [Scripts]()
-- [Other](other/README.md)
+
+# Other
   - [Dependency Deprecation Policy](deprecation_policy.md)
