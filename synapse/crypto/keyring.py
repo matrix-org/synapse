@@ -274,7 +274,7 @@ class Keyring:
                 Codes.UNAUTHORIZED,
             )
 
-        # Add they keys we need to verify to the queue for retrieval. We queue
+        # Add the keys we need to verify to the queue for retrieval. We queue
         # up requests for the same server so we don't end up with many in flight
         # requests for the same keys.
         found_keys_by_server = await self._server_queue.add_to_queue(
@@ -292,7 +292,7 @@ class Keyring:
             if not key_result:
                 raise SynapseError(
                     401,
-                    f"Missing keys for {verify_request.server_name}: {key_id}",
+                    f"Failed to retrieve key {key_id} for {verify_request.server_name}",
                     Codes.UNAUTHORIZED,
                 )
 
@@ -346,12 +346,8 @@ class Keyring:
         for request in requests:
             by_server = server_to_key_to_ts.setdefault(request.server_name, {})
             for key_id in request.key_ids:
-                existing_ts = by_server.get(key_id)
-
-                if existing_ts:
-                    by_server[key_id] = max(request.minimum_valid_until_ts, existing_ts)
-                else:
-                    by_server[key_id] = request.minimum_valid_until_ts
+               existing_ts = by_server.get(key_id, 0)
+               by_server[key_id] = max(request.minimum_valid_until_ts, existing_ts)
 
         deduped_requests = [
             _FetchKeyRequest(server_name, minimum_valid_ts, [key_id])
