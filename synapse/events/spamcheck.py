@@ -15,7 +15,17 @@
 
 import inspect
 import logging
-from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Tuple, Union
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+    Union,
+)
 
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
@@ -30,19 +40,118 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class SpamChecker:
-    def __init__(self, hs: "synapse.server.HomeServer"):
-        self.spam_checkers = []  # type: List[Any]
+class LegacySpamCheckerWrapper:
+    """Wrapper that loads spam checkers configured using the old configuration, and
+    registers the spam checker hooks they implement.
+    """
+    @staticmethod
+    def load_modules(hs: "synapse.server.HomeServer"):
+        spam_checkers = []  # type: List[Any]
         api = hs.get_module_api()
-
         for module, config in hs.config.spam_checkers:
             # Older spam checkers don't accept the `api` argument, so we
             # try and detect support.
             spam_args = inspect.getfullargspec(module)
             if "api" in spam_args.args:
-                self.spam_checkers.append(module(config=config, api=api))
+                spam_checkers.append(module(config=config, api=api))
             else:
-                self.spam_checkers.append(module(config=config))
+                spam_checkers.append(module(config=config))
+
+        # The known spam checker hooks. If a spam checker module implements a method
+        # which name appears in this set, we'll want to register it.
+        spam_checker_methods = {
+            "check_event_for_spam",
+            "user_may_invite",
+            "user_may_create_room",
+            "user_may_create_room_alias",
+            "user_may_publish_room",
+            "check_username_for_spam",
+            "check_registration_for_spam",
+            "check_media_file_for_spam",
+        }
+
+        for spam_checker in spam_checkers:
+            # Get the properties (attributes and methods) of the module and filter it
+            # down to the supported method names.
+            props = dir(spam_checker)
+            supported_hooks = list(spam_checker_methods.intersection(props))
+
+            # Register the hooks through the module API.
+            hooks = {
+                hook: getattr(spam_checker, hook)
+                for hook in supported_hooks
+            }
+
+            api.register_spam_checker_callbacks(**hooks)
+
+
+class SpamChecker:
+    def __init__(self, hs: "synapse.server.HomeServer"):
+        self._callbacks: Dict[str, List[Callable]] = {}
+
+    def register_callbacks(
+        self,
+        check_event_for_spam: Callable[
+            ["synapse.events.EventBase"], Union[bool, str]
+        ] = None,
+        user_may_invite: Callable[[str, str, str], bool] = None,
+        user_may_create_room: Callable[[str], bool] = None,
+        user_may_create_room_alias: Callable[[str, RoomAlias], bool] = None,
+        user_may_publish_room: Callable[[str, str], bool] = None,
+        check_username_for_spam: Callable[[Dict[str, str]], bool] = None,
+        check_registration_for_spam: Callable[
+            [Optional[dict], Optional[str], Collection[Tuple[str, str]], Optional[str]],
+            bool,
+        ] = None,
+        check_media_file_for_spam: Callable[
+            [ReadableFileWrapper, FileInfo], bool
+        ] = None,
+    ):
+        """Register callbacks from module for each hook."""
+        if check_event_for_spam is not None:
+            self._register_callback("check_event_for_spam", check_event_for_spam)
+
+        if user_may_invite is not None:
+            self._register_callback("user_may_invite", user_may_invite)
+
+        if user_may_create_room is not None:
+            self._register_callback("user_may_create_room", user_may_create_room)
+
+        if user_may_create_room_alias is not None:
+            self._register_callback(
+                "user_may_create_room_alias",
+                user_may_create_room_alias,
+            )
+
+        if user_may_publish_room is not None:
+            self._register_callback("user_may_publish_room", user_may_publish_room)
+
+        if check_username_for_spam is not None:
+            self._register_callback("check_username_for_spam", check_username_for_spam)
+
+        if check_registration_for_spam is not None:
+            self._register_callback(
+                "check_registration_for_spam",
+                check_registration_for_spam,
+            )
+
+        if check_media_file_for_spam is not None:
+            self._register_callback(
+                "check_media_file_for_spam",
+                check_media_file_for_spam,
+            )
+
+    def _register_callback(self, fn_name: str, callback: Callable):
+        """Registers the given callback for the given hook name.
+
+        Args:
+            fn_name: The hook name.
+            callback: The function to attach to this hook name.
+        """
+        if fn_name not in self._callbacks.keys():
+            self._callbacks[fn_name] = []
+
+        self._callbacks[fn_name].append(callback)
 
     async def check_event_for_spam(
         self, event: "synapse.events.EventBase"
@@ -60,8 +169,8 @@ class SpamChecker:
             True or a string if the event is spammy. If a string is returned it
             will be used as the error message returned to the user.
         """
-        for spam_checker in self.spam_checkers:
-            if await maybe_awaitable(spam_checker.check_event_for_spam(event)):
+        for checker in self._callbacks.get("check_event_for_spam", []):
+            if await maybe_awaitable(checker(event)):
                 return True
 
         return False
@@ -81,13 +190,9 @@ class SpamChecker:
         Returns:
             True if the user may send an invite, otherwise False
         """
-        for spam_checker in self.spam_checkers:
+        for checker in self._callbacks.get("user_may_invite", []):
             if (
-                await maybe_awaitable(
-                    spam_checker.user_may_invite(
-                        inviter_userid, invitee_userid, room_id
-                    )
-                )
+                await maybe_awaitable(checker(inviter_userid, invitee_userid, room_id))
                 is False
             ):
                 return False
@@ -105,11 +210,8 @@ class SpamChecker:
         Returns:
             True if the user may create a room, otherwise False
         """
-        for spam_checker in self.spam_checkers:
-            if (
-                await maybe_awaitable(spam_checker.user_may_create_room(userid))
-                is False
-            ):
+        for checker in self._callbacks.get("user_may_create_room", []):
+            if await maybe_awaitable(checker(userid)) is False:
                 return False
 
         return True
@@ -128,13 +230,8 @@ class SpamChecker:
         Returns:
             True if the user may create a room alias, otherwise False
         """
-        for spam_checker in self.spam_checkers:
-            if (
-                await maybe_awaitable(
-                    spam_checker.user_may_create_room_alias(userid, room_alias)
-                )
-                is False
-            ):
+        for checker in self._callbacks.get("user_may_create_room_alias", []):
+            if await maybe_awaitable(checker(userid, room_alias)) is False:
                 return False
 
         return True
@@ -151,13 +248,8 @@ class SpamChecker:
         Returns:
             True if the user may publish the room, otherwise False
         """
-        for spam_checker in self.spam_checkers:
-            if (
-                await maybe_awaitable(
-                    spam_checker.user_may_publish_room(userid, room_id)
-                )
-                is False
-            ):
+        for checker in self._callbacks.get("user_may_publish_room", []):
+            if await maybe_awaitable(checker(userid, room_id)) is False:
                 return False
 
         return True
@@ -177,15 +269,11 @@ class SpamChecker:
         Returns:
             True if the user is spammy.
         """
-        for spam_checker in self.spam_checkers:
-            # For backwards compatibility, only run if the method exists on the
-            # spam checker
-            checker = getattr(spam_checker, "check_username_for_spam", None)
-            if checker:
-                # Make a copy of the user profile object to ensure the spam checker
-                # cannot modify it.
-                if await maybe_awaitable(checker(user_profile.copy())):
-                    return True
+        for checker in self._callbacks.get("check_username_for_spam", []):
+            # Make a copy of the user profile object to ensure the spam checker cannot
+            # modify it.
+            if await maybe_awaitable(checker(user_profile.copy())):
+                return True
 
         return False
 
@@ -211,33 +299,28 @@ class SpamChecker:
             Enum for how the request should be handled
         """
 
-        for spam_checker in self.spam_checkers:
-            # For backwards compatibility, only run if the method exists on the
-            # spam checker
-            checker = getattr(spam_checker, "check_registration_for_spam", None)
-            if checker:
-                # Provide auth_provider_id if the function supports it
-                checker_args = inspect.signature(checker)
-                if len(checker_args.parameters) == 4:
-                    d = checker(
-                        email_threepid,
-                        username,
-                        request_info,
-                        auth_provider_id,
-                    )
-                elif len(checker_args.parameters) == 3:
-                    d = checker(email_threepid, username, request_info)
-                else:
-                    logger.error(
-                        "Invalid signature for %s.check_registration_for_spam. Denying registration",
-                        spam_checker.__module__,
-                    )
-                    return RegistrationBehaviour.DENY
+        for checker in self._callbacks.get("check_registration_for_spam", []):
+            # Provide auth_provider_id if the function supports it
+            checker_args = inspect.signature(checker)
+            if len(checker_args.parameters) == 4:
+                d = checker(
+                    email_threepid,
+                    username,
+                    request_info,
+                    auth_provider_id,
+                )
+            elif len(checker_args.parameters) == 3:
+                d = checker(email_threepid, username, request_info)
+            else:
+                logger.error(
+                    "Invalid signature for check_registration_for_spam. Denying registration",
+                )
+                return RegistrationBehaviour.DENY
 
-                behaviour = await maybe_awaitable(d)
-                assert isinstance(behaviour, RegistrationBehaviour)
-                if behaviour != RegistrationBehaviour.ALLOW:
-                    return behaviour
+            behaviour = await maybe_awaitable(d)
+            assert isinstance(behaviour, RegistrationBehaviour)
+            if behaviour != RegistrationBehaviour.ALLOW:
+                return behaviour
 
         return RegistrationBehaviour.ALLOW
 
@@ -275,13 +358,9 @@ class SpamChecker:
             allowed.
         """
 
-        for spam_checker in self.spam_checkers:
-            # For backwards compatibility, only run if the method exists on the
-            # spam checker
-            checker = getattr(spam_checker, "check_media_file_for_spam", None)
-            if checker:
-                spam = await maybe_awaitable(checker(file_wrapper, file_info))
-                if spam:
-                    return True
+        for checker in self._callbacks.get("check_registration_for_spam", []):
+            spam = await maybe_awaitable(checker(file_wrapper, file_info))
+            if spam:
+                return True
 
         return False
