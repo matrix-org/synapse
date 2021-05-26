@@ -15,7 +15,7 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, List, Optional, Union, Literal, overload
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -150,7 +150,7 @@ def _parse_string_value(
     allowed_values: Optional[Iterable[str]],
     name: str,
     encoding: Optional[str],
-) -> str:
+) -> Union[str, bytes]:
     if encoding:
         try:
             value = value.decode(encoding)
@@ -167,10 +167,34 @@ def _parse_string_value(
         return value
 
 
+@overload
 def parse_strings_from_args(
     args: List[str],
     name: Union[bytes, str],
-    default: Optional[str] = None,
+    default: Optional[List[str]] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: Literal[None] = None,
+) -> Optional[List[bytes]]:
+    ...
+
+
+@overload
+def parse_strings_from_args(
+    args: List[str],
+    name: Union[bytes, str],
+    default: Optional[List[str]] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[List[str]]:
+    ...
+
+
+def parse_strings_from_args(
+    args: List[str],
+    name: Union[bytes, str],
+    default: Optional[List[str]] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: Optional[str] = "ascii",
