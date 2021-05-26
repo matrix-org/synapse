@@ -34,7 +34,13 @@ jobs:
     if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
     runs-on: ubuntu-latest
     steps:
+      # Note: This and the script can be simplified once we drop Buildkite. See:
+      #   https://github.com/actions/checkout/issues/266#issuecomment-638346893
+      #   https://github.com/actions/checkout/issues/416
       - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@v2
       - run: pip install tox
       - name: Patch Buildkite-specific test script
