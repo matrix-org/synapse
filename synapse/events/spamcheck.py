@@ -40,49 +40,47 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class LegacySpamCheckerWrapper:
+def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
     """Wrapper that loads spam checkers configured using the old configuration, and
     registers the spam checker hooks they implement.
     """
-    @staticmethod
-    def load_modules(hs: "synapse.server.HomeServer"):
-        spam_checkers = []  # type: List[Any]
-        api = hs.get_module_api()
-        for module, config in hs.config.spam_checkers:
-            # Older spam checkers don't accept the `api` argument, so we
-            # try and detect support.
-            spam_args = inspect.getfullargspec(module)
-            if "api" in spam_args.args:
-                spam_checkers.append(module(config=config, api=api))
-            else:
-                spam_checkers.append(module(config=config))
+    spam_checkers = []  # type: List[Any]
+    api = hs.get_module_api()
+    for module, config in hs.config.spam_checkers:
+        # Older spam checkers don't accept the `api` argument, so we
+        # try and detect support.
+        spam_args = inspect.getfullargspec(module)
+        if "api" in spam_args.args:
+            spam_checkers.append(module(config=config, api=api))
+        else:
+            spam_checkers.append(module(config=config))
 
-        # The known spam checker hooks. If a spam checker module implements a method
-        # which name appears in this set, we'll want to register it.
-        spam_checker_methods = {
-            "check_event_for_spam",
-            "user_may_invite",
-            "user_may_create_room",
-            "user_may_create_room_alias",
-            "user_may_publish_room",
-            "check_username_for_spam",
-            "check_registration_for_spam",
-            "check_media_file_for_spam",
+    # The known spam checker hooks. If a spam checker module implements a method
+    # which name appears in this set, we'll want to register it.
+    spam_checker_methods = {
+        "check_event_for_spam",
+        "user_may_invite",
+        "user_may_create_room",
+        "user_may_create_room_alias",
+        "user_may_publish_room",
+        "check_username_for_spam",
+        "check_registration_for_spam",
+        "check_media_file_for_spam",
+    }
+
+    for spam_checker in spam_checkers:
+        # Get the properties (attributes and methods) of the module and filter it
+        # down to the supported method names.
+        props = dir(spam_checker)
+        supported_hooks = list(spam_checker_methods.intersection(props))
+
+        # Register the hooks through the module API.
+        hooks = {
+            hook: getattr(spam_checker, hook)
+            for hook in supported_hooks
         }
 
-        for spam_checker in spam_checkers:
-            # Get the properties (attributes and methods) of the module and filter it
-            # down to the supported method names.
-            props = dir(spam_checker)
-            supported_hooks = list(spam_checker_methods.intersection(props))
-
-            # Register the hooks through the module API.
-            hooks = {
-                hook: getattr(spam_checker, hook)
-                for hook in supported_hooks
-            }
-
-            api.register_spam_checker_callbacks(**hooks)
+        api.register_spam_checker_callbacks(**hooks)
 
 
 class SpamChecker:
