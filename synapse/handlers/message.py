@@ -788,8 +788,6 @@ class EventCreationHandler:
                 inherit_depth=inherit_depth,
             )
 
-            current_state_ids = await context.get_current_state_ids()
-
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
                 event.sender,
             )
@@ -1009,11 +1007,13 @@ class EventCreationHandler:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 
-        # TODO: Skip actions for historical messages or figure out how to
-        # generate proper context.current_state_ids and state_groups for our historical events
-        # which have prev_events that reference non-persisted events because
-        # we are persisting in reverse-chronolical
-        # await self.action_generator.handle_push_actions_for_event(event, context)
+        # Skip push notification actions for historical messages
+        # because we don't want to notify people about old history back in time.
+        # The historical messages also do not have the proper `context.current_state_ids`
+        # and `state_groups` because they have `prev_events` that aren't persisted yet
+        # (historical messages persisted in reverse-chronological order).
+        if event.content.get(EventContentFields.MSC2716_HISTORICAL, None) is None:
+            await self.action_generator.handle_push_actions_for_event(event, context)
 
         await self.cache_joined_hosts_for_event(event)
 
