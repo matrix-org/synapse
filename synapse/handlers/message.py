@@ -1296,7 +1296,7 @@ class EventCreationHandler:
         # Mark any `m.historical` messages as backfilled so they don't appear
         # in `/sync` and have the proper decrementing `stream_ordering` as we import
         backfilled = False
-        if event.content.get(EventContentFields.MSC2716_HISTORICAL, None):
+        if event.content.get(EventContentFields.MSC2716_HISTORICAL, None) is not None:
             backfilled = True
 
         # Note that this returns the event that was persisted, which may not be
