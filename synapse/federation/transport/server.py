@@ -15,7 +15,7 @@
 import functools
 import logging
 import re
-from typing import Container, Mapping, Optional, Sequence, Tuple, Type
+from typing import Container, List, Mapping, Optional, Sequence, Tuple, Type
 
 import synapse
 from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH
@@ -56,15 +56,15 @@ logger = logging.getLogger(__name__)
 class TransportLayerServer(JsonResource):
     """Handles incoming federation HTTP requests"""
 
-    def __init__(self, hs, servlet_groups=None):
+    def __init__(self, hs: HomeServer, servlet_groups: Optional[List[str]] = None):
         """Initialize the TransportLayerServer
 
         Will by default register all servlets. For custom behaviour, pass in
         a list of servlet_groups to register.
 
         Args:
-            hs (synapse.server.HomeServer): homeserver
-            servlet_groups (list[str], optional): List of servlet groups to register.
+            hs: homeserver
+            servlet_groups: List of servlet groups to register.
                 Defaults to ``DEFAULT_SERVLET_GROUPS``.
         """
         self.hs = hs
@@ -78,7 +78,7 @@ class TransportLayerServer(JsonResource):
 
         self.register_servlets()
 
-    def register_servlets(self):
+    def register_servlets(self) -> None:
         register_servlets(
             self.hs,
             resource=self,
@@ -91,13 +91,9 @@ class TransportLayerServer(JsonResource):
 class AuthenticationError(SynapseError):
     """There was a problem authenticating the request"""
 
-    pass
-
 
 class NoAuthenticationError(AuthenticationError):
     """The request had no authentication information"""
-
-    pass
 
 
 class Authenticator:
