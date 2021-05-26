@@ -37,7 +37,7 @@
       - [Using `synctl` with Workers](synctl_workers.md)
       - [Systemd](systemd-with-workers/README.md)
   - [Administration](usage/administration/README.md)
-    - [Admin API](admin_api/README.rst)
+    - [Admin API](usage/administration/admin_api/README.md)
       - [Account Validity](admin_api/account_validity.rst)
       - [Delete Group](admin_api/delete_group.md)
       - [Event Reports](admin_api/event_reports.md)
