@@ -13,9 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
 
 from twisted.internet import defer
+from twisted.web.resource import IResource
 
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
@@ -56,6 +67,9 @@ class ModuleApi:
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
 
+        self._callbacks: Dict[str, List[Callable]] = {}
+        self._web_resources: Dict[str, IResource] = {}
+
     @property
     def http_client(self):
         """Allows making outbound HTTP requests to remote resources.
@@ -72,6 +86,58 @@ class ModuleApi:
         An instance of synapse.module_api.PublicRoomListManager
         """
         return self._public_room_list_manager
+
+    def register_hook(self, fn_name: str, callback: Callable):
+        """Registers the given callback as a hook with the given name.
+
+        If multiple modules register the same hook, their callbacks will be run in the
+        same order as the modules appear in the configuration file (highest first).
+
+        Args:
+            fn_name: The hook name.
+            callback: The function to call for this hook.
+        """
+        if fn_name not in self._callbacks.keys():
+            self._callbacks[fn_name] = [callback]
+            return
+
+        self._callbacks[fn_name].append(callback)
+
+    def get_registered_hook(self, fn_name: str) -> List[Callable]:
+        """Get the callbacks registered by modules for the given hook name.
+
+        Args:
+            fn_name: The name of the hook.
+
+        Returns:
+            The callbacks implementing the hook, or an empty list if there is no callback
+            for this hook.
+        """
+        return self._callbacks.get(fn_name, [])
+
+    def register_web_resource(self, path: str, resource: IResource):
+        """Registers a web resource to be served at the given path.
+
+        If multiple modules register a resource for the same path, the module that
+        appears the highest in the configuration file takes priority.
+
+        Args:
+            path: The path to register the resource for.
+            resource: The resource to attach to this path.
+        """
+        # Don't register a resource that's already been registered. Like with hooks, we
+        # want to give priority to the module that's the highest in the configuration
+        # file, so in case of a conflict we keep the resource registered by this module.
+        if path not in self._web_resources.keys():
+            self._web_resources[path] = resource
+
+    def get_registered_web_resources(self) -> Dict[str, IResource]:
+        """Get the web resources registered by modules.
+
+        Returns:
+            A dict associating a path with the resource to attach to it.
+        """
+        return self._web_resources
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request

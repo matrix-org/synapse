@@ -82,7 +82,6 @@ from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerH
 from synapse.handlers.identity import IdentityHandler
 from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
-from synapse.handlers.modules import ModulesHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
 from synapse.handlers.presence import (
@@ -681,10 +680,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_message_handler(self) -> MessageHandler:
         return MessageHandler(self)
-
-    @cache_in_self
-    def get_modules_handler(self) -> ModulesHandler:
-        return ModulesHandler(self)
 
     @cache_in_self
     def get_pagination_handler(self) -> PaginationHandler:

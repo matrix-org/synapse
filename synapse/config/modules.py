@@ -31,10 +31,9 @@ class ModulesConfig(Config):
             self.loaded_modules.append(load_module(module, config_path))
 
     def generate_config_section(self, **kwargs):
-        return (
-            """
+        return """
             ## Modules ##
-            
+
             # Server admins can expand Synapse's functionalities by using external modules
             # to complement certain operations.
             #
@@ -48,4 +47,3 @@ class ModulesConfig(Config):
                 # - module: my_other_super_module.SomeClass
                 #   config: {}
             """
-        )

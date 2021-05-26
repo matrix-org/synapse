@@ -337,6 +337,12 @@ async def start(hs: "synapse.server.HomeServer"):
     # Start the tracer
     synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
 
+    # Instantiate the modules so they can register their web resources to the module API
+    # before we start the listeners.
+    module_api = hs.get_module_api()
+    for module, config in hs.config.modules.loaded_modules:
+        module(config=config, api=module_api)
+
     # It is now safe to start your Synapse.
     hs.start_listening()
     hs.get_datastore().db_pool.start_profiling()
