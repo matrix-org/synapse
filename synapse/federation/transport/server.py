@@ -1562,13 +1562,12 @@ def register_servlets(
                 server_name=hs.hostname,
             ).register(resource)
 
-        if hs.config.experimental.spaces_enabled:
-            FederationSpaceSummaryServlet(
-                handler=hs.get_space_summary_handler(),
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-            ).register(resource)
+        FederationSpaceSummaryServlet(
+            handler=hs.get_space_summary_handler(),
+            authenticator=authenticator,
+            ratelimiter=ratelimiter,
+            server_name=hs.hostname,
+        ).register(resource)
 
     if "openid" in servlet_groups:
         for servletclass in OPENID_SERVLET_CLASSES:
