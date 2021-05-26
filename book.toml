@@ -24,3 +24,9 @@ git-repository-url = "https://github.com/matrix-org/synapse"
 
 # The path that the docs are hosted on
 site-url = "/synapse/"
+
+# Additional HTML, JS, CSS that's injected into each page of the book.
+# More information is available in docs/website_files/README.md
+additional-css = ["docs/website_files/table-of-contents.css"]
+additional-js = ["docs/website_files/table-of-contents.js"]
+theme = "docs/website_files/theme"
