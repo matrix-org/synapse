@@ -304,8 +304,8 @@ class Keyring:
                 )
 
             verify_key = key_result.verify_key
+            json_object = verify_request.get_json_object()
             try:
-                json_object = verify_request.get_json_object()
                 verify_signed_json(
                     json_object,
                     verify_request.server_name,
