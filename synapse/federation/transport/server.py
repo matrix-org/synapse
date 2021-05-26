@@ -28,6 +28,7 @@ from synapse.api.urls import (
     FEDERATION_V1_PREFIX,
     FEDERATION_V2_PREFIX,
 )
+from synapse.handlers.groups_local import GroupsLocalHandler
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
     parse_boolean_from_args,
@@ -1105,6 +1106,10 @@ class FederationGroupsLocalInviteServlet(BaseGroupsLocalServlet):
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "group_id doesn't match origin")
 
+        assert isinstance(
+            self.handler, GroupsLocalHandler
+        ), "Workers cannot handle group invites."
+
         new_content = await self.handler.on_invite(group_id, user_id, content)
 
         return 200, new_content
@@ -1118,6 +1123,10 @@ class FederationGroupsRemoveLocalUserServlet(BaseGroupsLocalServlet):
     async def on_POST(self, origin, content, query, group_id, user_id):
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
+
+        assert isinstance(
+            self.handler, GroupsLocalHandler
+        ), "Workers cannot handle group removals."
 
         new_content = await self.handler.user_removed_from_group(
             group_id, user_id, content
