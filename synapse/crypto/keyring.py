@@ -214,15 +214,13 @@ class Keyring:
                 logcontext.
         """
         return [
-            defer.ensureDeferred(
-                run_in_background(
-                    self.process_request,
-                    VerifyJsonRequest.from_json_object(
-                        server_name,
-                        json_object,
-                        validity_time,
-                    ),
-                )
+            run_in_background(
+                self.process_request,
+                VerifyJsonRequest.from_json_object(
+                    server_name,
+                    json_object,
+                    validity_time,
+                ),
             )
             for server_name, json_object, validity_time in server_and_json
         ]
