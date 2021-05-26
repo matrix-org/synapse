@@ -27,6 +27,6 @@ site-url = "/synapse/"
 
 # Additional HTML, JS, CSS that's injected into each page of the book.
 # More information is available in docs/website_files/README.md
-additional-css = ["docs/website_files/table-of-contents.css"]
+additional-css = ["docs/website_files/table-of-contents.css", "docs/website_files/remove-nav-buttons.css"]
 additional-js = ["docs/website_files/table-of-contents.js"]
 theme = "docs/website_files/theme"
