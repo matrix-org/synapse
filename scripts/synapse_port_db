@@ -959,7 +959,7 @@ class Porter(object):
         def r(txn):
             txn.execute(
                 "ALTER SEQUENCE event_auth_chain_id RESTART WITH %s",
-                (curr_chain_id,),
+                (curr_chain_id + 1,),
             )
 
         if curr_chain_id is not None:

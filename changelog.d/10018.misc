@@ -1,1 +1,0 @@
-Reduce memory usage when verifying signatures on large numbers of events at once.
