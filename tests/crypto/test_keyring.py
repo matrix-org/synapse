@@ -22,7 +22,6 @@ import signedjson.sign
 from nacl.signing import SigningKey
 from signedjson.key import encode_verify_key_base64, get_verify_key
 
-from twisted.internet import defer
 from twisted.internet.defer import Deferred, ensureDeferred
 
 from synapse.api.errors import SynapseError
@@ -611,21 +610,9 @@ def get_key_id(key):
     return "%s:%s" % (key.alg, key.version)
 
 
-@defer.inlineCallbacks
-def run_in_context(f, *args, **kwargs):
-    with LoggingContext("testctx"):
-        rv = yield f(*args, **kwargs)
-    return rv
-
-
-def _verify_json_for_server(kr, *args):
+async def _verify_json_for_server(kr, *args):
     """thin wrapper around verify_json_for_server which makes sure it is wrapped
     with the patched defer.inlineCallbacks.
     """
-
-    @defer.inlineCallbacks
-    def v():
-        rv1 = yield kr.verify_json_for_server(*args)
-        return rv1
-
-    return run_in_context(v)
+    with LoggingContext("testctx"):
+        return await kr.verify_json_for_server(*args)

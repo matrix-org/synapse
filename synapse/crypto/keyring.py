@@ -166,12 +166,12 @@ class Keyring:
             process_batch_callback=self._inner_fetch_key_requests,
         )  # type: BatchingQueue[_FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]]
 
-    def verify_json_for_server(
+    async def verify_json_for_server(
         self,
         server_name: str,
         json_object: JsonDict,
         validity_time: int,
-    ) -> defer.Deferred:
+    ):
         """Verify that a JSON object has been signed by a given server
 
         Args:
@@ -191,7 +191,7 @@ class Keyring:
             json_object,
             validity_time,
         )
-        return defer.ensureDeferred(self.process_request(request))
+        return await self.process_request(request)
 
     def verify_json_objects_for_server(
         self, server_and_json: Iterable[Tuple[str, dict, int]]
