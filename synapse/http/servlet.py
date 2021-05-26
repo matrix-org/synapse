@@ -15,7 +15,7 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import Iterable, List, Optional, Union, Literal, overload
+from typing import Iterable, List, Literal, Optional, Union, overload
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
