@@ -37,6 +37,7 @@ import twisted.internet.tcp
 from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
+from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
@@ -256,6 +257,22 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.version_string = version_string
 
         self.datastores = None  # type: Optional[Databases]
+
+        self._module_web_resources: Dict[str, IResource] = {}
+
+    def register_module_web_resource(self, path: str, resource: IResource):
+        """Allows a module to register a web resource to be served at the given path.
+
+        If multiple modules register a resource for the same path, the module that
+        appears the highest in the configuration file takes priority.
+
+        Args:
+            path: The path to register the resource for.
+            resource: The resource to attach to this path.
+        """
+        # Don't register a resource that's already been registered.
+        if path not in self._module_web_resources.keys():
+            self._module_web_resources[path] = resource
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.

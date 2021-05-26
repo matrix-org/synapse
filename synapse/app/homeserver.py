@@ -125,7 +125,7 @@ class SynapseHomeServer(HomeServer):
             resources[path] = resource
 
         # Attach additional resources registered by modules.
-        resources.update(module_api.get_registered_web_resources())
+        resources.update(self._module_web_resources)
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
