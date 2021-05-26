@@ -19,6 +19,10 @@ create-missing = false
 # Disabled until https://github.com/rust-lang/mdBook/issues/1543 is fixed
 #edit-url-template = "https://github.com/matrix-org/synapse/edit/develop/{path}"
 
+# Remove the numbers that appear before each item in the sidebar, as they can
+# get quite messy as we nest deeper
+no-section-label = true
+
 # The source code URL of the repository
 git-repository-url = "https://github.com/matrix-org/synapse"
 
@@ -26,7 +30,11 @@ git-repository-url = "https://github.com/matrix-org/synapse"
 site-url = "/synapse/"
 
 # Additional HTML, JS, CSS that's injected into each page of the book.
-# More information is available in docs/website_files/README.md
-additional-css = ["docs/website_files/table-of-contents.css", "docs/website_files/remove-nav-buttons.css"]
+# More information available in docs/website_files/README.md
+additional-css = [
+    "docs/website_files/table-of-contents.css",
+    "docs/website_files/remove-nav-buttons.css",
+    "docs/website_files/indent-section-headers.css",
+]
 additional-js = ["docs/website_files/table-of-contents.js"]
 theme = "docs/website_files/theme"

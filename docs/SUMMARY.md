@@ -1,15 +1,20 @@
 # Summary
 
-- [Introduction](welcome_and_overview.md)
-- [Setup](setup/README.md)
+# Introduction
+- [Welcome and Overview](welcome_and_overview.md)
+
+# Setup
   - [Installation](setup/installation.md)
   - [Using Postgres](postgres.md)
   - [Configuring a Reverse Proxy](reverse_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
   - [Delegation](delegate.md)
-- [Upgrading](upgrading/README.md)
+
+# Upgrading
+  - [Upgrading between Synapse Versions](upgrading/README.md)
   - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
-- [Usage](usage/README.md)
+
+# Usage
   - [Federation](federate.md)
   - [Configuration](usage/configuration/README.md)
     - [Sample Configuration Files](usage/configuration/sample_config.md)
@@ -36,27 +41,29 @@
     - [Workers](workers.md)
       - [Using `synctl` with Workers](synctl_workers.md)
       - [Systemd](systemd-with-workers/README.md)
-  - [Administration](usage/administration/README.md)
-    - [Admin API](usage/administration/admin_api/README.md)
-      - [Account Validity](admin_api/account_validity.rst)
-      - [Delete Group](admin_api/delete_group.md)
-      - [Event Reports](admin_api/event_reports.md)
-      - [Media](admin_api/media_admin_api.md)
-      - [Purge History](admin_api/purge_history_api.rst)
-      - [Purge Rooms](admin_api/purge_room.md)
-      - [Register Users](admin_api/register_api.rst)
-      - [Manipulate Room Membership](admin_api/room_membership.md)
-      - [Rooms](admin_api/rooms.md)
-      - [Server Notices](admin_api/server_notices.md)
-      - [Shutdown Room](admin_api/shutdown_room.md)
-      - [Statistics](admin_api/statistics.md)
-      - [Users](admin_api/user_admin_api.rst)
-      - [Server Version](admin_api/version_api.rst)
-    - [Manhole](manhole.md)
-    - [Monitoring](metrics-howto.md)
-    - [Structured Logging](structured_logging.md)
-    - [Scripts]()
-- [Development](development/README.md)
+
+# Administration
+  - [Admin API](usage/administration/admin_api/README.md)
+    - [Account Validity](admin_api/account_validity.rst)
+    - [Delete Group](admin_api/delete_group.md)
+    - [Event Reports](admin_api/event_reports.md)
+    - [Media](admin_api/media_admin_api.md)
+    - [Purge History](admin_api/purge_history_api.rst)
+    - [Purge Rooms](admin_api/purge_room.md)
+    - [Register Users](admin_api/register_api.rst)
+    - [Manipulate Room Membership](admin_api/room_membership.md)
+    - [Rooms](admin_api/rooms.md)
+    - [Server Notices](admin_api/server_notices.md)
+    - [Shutdown Room](admin_api/shutdown_room.md)
+    - [Statistics](admin_api/statistics.md)
+    - [Users](admin_api/user_admin_api.rst)
+    - [Server Version](admin_api/version_api.rst)
+  - [Manhole](manhole.md)
+  - [Monitoring](metrics-howto.md)
+  - [Structured Logging](structured_logging.md)
+  - [Scripts]()
+
+# Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
   - [Git Usage](dev/git.md)
@@ -75,5 +82,6 @@
     - [Media Repository](media_repository.md)
     - [Room and User Statistics](room_and_user_statistics.md)
   - [Scripts]()
-- [Other](other/README.md)
+
+# Other
   - [Dependency Deprecation Policy](deprecation_policy.md)
