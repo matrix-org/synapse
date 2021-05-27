@@ -21,7 +21,7 @@ import re
 from typing import TYPE_CHECKING, List, Optional, Tuple
 from urllib import parse as urlparse
 
-from synapse.api.constants import EventTypes, EventContentFields, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -296,6 +296,13 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
         chunk_id_from_query = parse_string(request, "chunk_id", default=None)
+
+        if prev_events_from_query is None:
+            raise SynapseError(
+                400,
+                "prev_event query parameter is required when inserting historical messages back in time",
+                errcode=Codes.MISSING_PARAM,
+            )
 
         # For the event we are inserting next to (`prev_events_from_query`),
         # find the most recent auth events (derived from state events) that

@@ -172,7 +172,7 @@ def _parse_string_value(
 def parse_strings_from_args(
     args: List[str],
     name: Union[bytes, str],
-    default: Optional[str] = None,
+    default: Optional[List[str]] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: Optional[str] = "ascii",
