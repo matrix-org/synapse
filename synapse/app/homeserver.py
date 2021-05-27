@@ -126,6 +126,7 @@ class SynapseHomeServer(HomeServer):
 
         # Attach additional resources registered by modules.
         resources.update(self._module_web_resources)
+        self._module_web_resources_consumed = True
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:

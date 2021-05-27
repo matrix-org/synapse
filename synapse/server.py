@@ -40,6 +40,7 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
+from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
@@ -259,6 +260,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.datastores = None  # type: Optional[Databases]
 
         self._module_web_resources: Dict[str, IResource] = {}
+        self._module_web_resources_consumed = False
 
     def register_module_web_resource(self, path: str, resource: IResource):
         """Allows a module to register a web resource to be served at the given path.
@@ -269,7 +271,16 @@ class HomeServer(metaclass=abc.ABCMeta):
         Args:
             path: The path to register the resource for.
             resource: The resource to attach to this path.
+
+        Raises:
+            SynapseError(500): A module tried to register a web resource after the HTTP
+                listeners have been started.
         """
+        if self._module_web_resources_consumed:
+            raise SynapseError(
+                500, "Tried to register a web resource from a module after startup",
+            )
+
         # Don't register a resource that's already been registered.
         if path not in self._module_web_resources.keys():
             self._module_web_resources[path] = resource
