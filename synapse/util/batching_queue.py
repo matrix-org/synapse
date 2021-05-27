@@ -48,6 +48,9 @@ class BatchingQueue(Generic[V, R]):
     called, and will keep being called until the queue has been drained (for the
     given key).
 
+    If the processing function raises an exception then the exception is proxied
+    through to the callers waiting on that batch of work.
+
     Note that the return value of `add_to_queue` will be the return value of the
     processing function that processed the given item. This means that the
     returned value will likely include data for other items that were in the
