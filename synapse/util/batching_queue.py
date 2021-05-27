@@ -46,7 +46,7 @@ number_queued = Gauge(
 )
 
 number_in_flight = Gauge(
-    "synapse_util_batching_queue_in_flight",
+    "synapse_util_batching_queue_number_pending",
     "The number of items across all keys either being processed or waiting in a queue",
     labelnames=("name",),
 )
