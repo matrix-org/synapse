@@ -1,0 +1,1 @@
+Remove some dead code regarding TLS certificate handling.

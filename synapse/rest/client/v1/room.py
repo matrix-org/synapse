@@ -1060,9 +1060,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-
-    if hs.config.experimental.spaces_enabled:
-        RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomSpaceSummaryRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:

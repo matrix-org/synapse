@@ -1,1 +1,0 @@
-Fix a validation bug introduced in v1.34.0 in the ordering of spaces in the space summary API.
