@@ -17,7 +17,7 @@
 import base64
 import binascii
 import logging
-import random
+import secrets
 import time
 import unicodedata
 import urllib.parse
@@ -834,7 +834,7 @@ class AuthHandler(BaseHandler):
         The token is signed with the first signing key in config
         and can verified with verify_refresh_token.
         """
-        rand = random.randbytes(128)
+        rand = secrets.token_bytes(128)
         signed = self.signing_keys[0].sign(rand)
         return "%s.%s" % (
             base64.urlsafe_b64encode(signed.signature).decode("ascii"),
@@ -1712,21 +1712,6 @@ class AuthHandler(BaseHandler):
 class MacaroonGenerator:
 
     hs = attr.ib()
-
-    def generate_refresh_token(
-        self, user_id: str, extra_caveats: Optional[List[str]] = None
-    ) -> str:
-        extra_caveats = extra_caveats or []
-        macaroon = self._generate_base_macaroon(user_id)
-        macaroon.add_first_party_caveat("type = refresh")
-        # Include a nonce, to make sure that each login gets a different
-        # access token.
-        macaroon.add_first_party_caveat(
-            "nonce = %s" % (stringutils.random_string_with_symbols(16),)
-        )
-        for caveat in extra_caveats:
-            macaroon.add_first_party_caveat(caveat)
-        return macaroon.serialize()
 
     def generate_access_token(
         self, user_id: str, extra_caveats: Optional[List[str]] = None
