@@ -667,6 +667,32 @@ class QuarantineMediaByIDTestCase(unittest.HomeserverTestCase):
         media_info = self.get_success(self.store.get_local_media(self.media_id))
         self.assertFalse(media_info["quarantined_by"])
 
+    def test_quarantine_protected_media(self):
+        """
+        Tests that quarantining from protected media fails
+        """
+
+        # protect
+        self.get_success(self.store.mark_local_media_as_safe(self.media_id, safe=True))
+
+        # verify protection
+        media_info = self.get_success(self.store.get_local_media(self.media_id))
+        self.assertTrue(media_info["safe_from_quarantine"])
+
+        # quarantining
+        channel = self.make_request(
+            "POST",
+            self.url % ("quarantine", self.server_name, self.media_id),
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertFalse(channel.json_body)
+
+        # verify that is not in quarantine
+        media_info = self.get_success(self.store.get_local_media(self.media_id))
+        self.assertFalse(media_info["quarantined_by"])
+
 
 class ProtectMediaByIDTestCase(unittest.HomeserverTestCase):
 

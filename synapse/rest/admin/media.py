@@ -144,7 +144,7 @@ class UnquarantineMediaByID(RestServlet):
         )
 
         # Remove from quarantine this media id
-        await self.store.remove_quarantine_media_by_id(server_name, media_id)
+        await self.store.quarantine_media_by_id(server_name, media_id, None)
 
         return 200, {}
 
