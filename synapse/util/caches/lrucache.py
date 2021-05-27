@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import threading
+import weakref
 from functools import wraps
 from typing import (
     Any,
@@ -29,12 +31,14 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Literal
+from typing_extensions import Literal, Protocol
 
 from synapse.config import cache as cache_config
 from synapse.util import caches
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
+
+logger = logging.getLogger(__name__)
 
 try:
     from pympler.asizeof import Asizer
@@ -82,19 +86,132 @@ def enumerate_leaves(node, depth):
                 yield m
 
 
+class _CacheEntry(Protocol):
+    """A protocol for cache entries used by `_ListNode` that allows it to cause
+    the cache entry to be dropped.
+    """
+
+    def drop_from_cache(self) -> None:
+        """Request the entry be dropped from the cache.
+
+        Note: This should call `.remove_from_list()` on all `_ListNodes`
+        referencing it.
+        """
+        ...
+
+
+P = TypeVar("P", bound=_CacheEntry)
+
+
+class _ListNode(Generic[P]):
+    """A node in a doubly linked list, with an (optional) weak reference to a
+    cache entry.
+
+    The weak reference should only be `None` for the root node.
+    """
+
+    # We don't use attrs here as in py3.6 you can't have `attr.s(slots=True)`
+    # and inherit from `Generic` for some reason
+    __slots__ = [
+        "cache_entry",
+        "prev_node",
+        "next_node",
+    ]
+
+    def __init__(
+        self, cache_entry: Optional["weakref.ReferenceType[P]"] = None
+    ) -> None:
+        self.cache_entry = cache_entry
+        self.prev_node: Optional[_ListNode[P]] = self
+        self.next_node: Optional[_ListNode[P]] = self
+
+    @staticmethod
+    def insert_after(
+        cache_entry: "weakref.ReferenceType[P]", root: "_ListNode"
+    ) -> "_ListNode":
+        """Create a new list node that is placed after the given root node."""
+        node = _ListNode(cache_entry)
+        node.move_after(root)
+        return node
+
+    def remove_from_list(self):
+        """Remove this node from the list."""
+        if self.prev_node is None or self.next_node is None:
+            # We've already been removed from the list.
+            return
+
+        prev_node = self.prev_node
+        next_node = self.next_node
+
+        prev_node.next_node = next_node
+        next_node.prev_node = prev_node
+
+        # We set these to None so that we don't get circular references,
+        # allowing us to be dropped without having to go via the GC.
+        self.next_node = None
+        self.prev_node = None
+
+    def move_after(self, root: "_ListNode"):
+        """Move this node from its current location in the list to after the
+        given node.
+        """
+        self.remove_from_list()
+
+        prev_node = root
+        next_node = root.next_node
+
+        assert prev_node is not None
+        assert next_node is not None
+
+        self.prev_node = prev_node
+        self.next_node = next_node
+
+        prev_node.next_node = self
+        next_node.prev_node = self
+
+    def get_cache_entry(self) -> Optional[P]:
+        """Get the cache entry, returns None if this is the root node (i.e.
+        cache_entry is None) or if the entry has been dropped.
+        """
+
+        if not self.cache_entry:
+            return None
+
+        return self.cache_entry()
+
+
+GLOBAL_ROOT = _ListNode[_CacheEntry]()
+
+
 class _Node:
-    __slots__ = ["prev_node", "next_node", "key", "value", "callbacks", "memory"]
+    __slots__ = [
+        "list_node",
+        "global_list_node",
+        "cache",
+        "key",
+        "value",
+        "callbacks",
+        "memory",
+        "__weakref__",
+    ]
 
     def __init__(
         self,
-        prev_node,
-        next_node,
+        root: "_ListNode[_Node]",
         key,
         value,
+        cache: "LruCache",
         callbacks: Collection[Callable[[], None]] = (),
     ):
-        self.prev_node = prev_node
-        self.next_node = next_node
+        self_ref = weakref.ref(self, lambda _: self.drop_from_lists())
+        self.list_node = _ListNode.insert_after(self_ref, root)
+        self.global_list_node = _ListNode.insert_after(self_ref, GLOBAL_ROOT)
+
+        # We store a weak reference to the cache object so that this _Node can
+        # remove itself from the cache. If the cache is dropped we ensure we
+        # remove our entries in the lists.
+        self.cache = weakref.ref(cache, lambda _: self.drop_from_lists())
+
         self.key = key
         self.value = value
 
@@ -146,6 +263,19 @@ class _Node:
             callback()
 
         self.callbacks = None
+
+    def drop_from_cache(self) -> None:
+        """Implements `_CacheEntry` protocol."""
+        cache = self.cache()
+        if not cache or not cache.pop(self.key, None):
+            # `cache.pop` should call `drop_from_lists()`, unless this Node had
+            # already been removed from the cache.
+            self.drop_from_lists()
+
+    def drop_from_lists(self) -> None:
+        """Remove this node from the cache lists."""
+        self.list_node.remove_from_list()
+        self.global_list_node.remove_from_list()
 
 
 class LruCache(Generic[KT, VT]):
@@ -219,19 +349,29 @@ class LruCache(Generic[KT, VT]):
         # this is exposed for access from outside this class
         self.metrics = metrics
 
-        list_root = _Node(None, None, None, None)
-        list_root.next_node = list_root
-        list_root.prev_node = list_root
+        list_root = _ListNode[_Node]()
 
         lock = threading.Lock()
 
         def evict():
+            orphaned = 0
             while cache_len() > self.max_size:
                 todelete = list_root.prev_node
-                evicted_len = delete_node(todelete)
-                cache.pop(todelete.key, None)
+                assert todelete is not None
+
+                node = todelete.get_cache_entry()
+                if not node:
+                    todelete.remove_from_list()
+                    orphaned += 1
+                    continue
+
+                evicted_len = delete_node(node)
+                cache.pop(node.key, None)
                 if metrics:
                     metrics.inc_evictions(evicted_len)
+
+            if orphaned:
+                logger.warning("Found %d orphaned nodes in cache %r", cache_name)
 
         def synchronized(f: FT) -> FT:
             @wraps(f)
@@ -255,11 +395,7 @@ class LruCache(Generic[KT, VT]):
         self.len = synchronized(cache_len)
 
         def add_node(key, value, callbacks: Collection[Callable[[], None]] = ()):
-            prev_node = list_root
-            next_node = prev_node.next_node
-            node = _Node(prev_node, next_node, key, value, callbacks)
-            prev_node.next_node = node
-            next_node.prev_node = node
+            node = _Node(list_root, key, value, self, callbacks)
             cache[key] = node
 
             if size_callback:
@@ -268,23 +404,12 @@ class LruCache(Generic[KT, VT]):
             if caches.TRACK_MEMORY_USAGE and metrics:
                 metrics.inc_memory_usage(node.memory)
 
-        def move_node_to_front(node):
-            prev_node = node.prev_node
-            next_node = node.next_node
-            prev_node.next_node = next_node
-            next_node.prev_node = prev_node
-            prev_node = list_root
-            next_node = prev_node.next_node
-            node.prev_node = prev_node
-            node.next_node = next_node
-            prev_node.next_node = node
-            next_node.prev_node = node
+        def move_node_to_front(node: _Node):
+            node.list_node.move_after(list_root)
+            node.global_list_node.move_after(GLOBAL_ROOT)
 
-        def delete_node(node):
-            prev_node = node.prev_node
-            next_node = node.next_node
-            prev_node.next_node = next_node
-            next_node.prev_node = prev_node
+        def delete_node(node: _Node) -> int:
+            node.drop_from_lists()
 
             deleted_len = 1
             if size_callback:
@@ -411,10 +536,13 @@ class LruCache(Generic[KT, VT]):
 
         @synchronized
         def cache_clear() -> None:
-            list_root.next_node = list_root
-            list_root.prev_node = list_root
             for node in cache.values():
                 node.run_and_clear_callbacks()
+                node.drop_from_lists()
+
+            list_root.next_node = list_root
+            list_root.prev_node = list_root
+
             cache.clear()
             if size_callback:
                 cached_cache_len[0] = 0
