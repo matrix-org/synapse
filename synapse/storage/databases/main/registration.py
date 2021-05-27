@@ -62,6 +62,7 @@ class TokenLookupResult:
     device_id = attr.ib(type=Optional[str], default=None)
     valid_until_ms = attr.ib(type=Optional[int], default=None)
     token_owner = attr.ib(type=str)
+    token_used = attr.ib(type=bool, default=False)
 
     # Make the token owner default to the user ID, which is the common case.
     @token_owner.default
@@ -421,7 +422,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 access_tokens.id as token_id,
                 access_tokens.device_id,
                 access_tokens.valid_until_ms,
-                access_tokens.user_id as token_owner
+                access_tokens.user_id as token_owner,
+                access_tokens.used as token_used
             FROM users
             INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
@@ -1052,6 +1054,21 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="update_access_token_last_validated",
         )
 
+    async def mark_access_token_as_used(self, token_id: int) -> None:
+        """Mark the access token as used, which invalidates the old refresh token.
+
+        Args:
+            token_id: The ID of the access token to update.
+        Raises:
+            StoreError if there was a problem updating this.
+        """
+        await self.db_pool.simple_update_one(
+            "access_tokens",
+            {"id": token_id},
+            {"used": True},
+            desc="mark_access_token_as_used",
+        )
+
     async def lookup_refresh_token(
         self, token: str
     ) -> Optional[RefreshTokenLookupResult]:
@@ -1066,7 +1083,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     rt.device_id,
                     rt.next_token_id,
                     (nrt.next_token_id IS NOT NULL) has_next_refresh_token_been_refreshed,
-                    (at.last_validated IS NOT NULL) has_next_access_token_been_used
+                    at.used has_next_access_token_been_used
                 FROM refresh_tokens rt
                 LEFT JOIN refresh_tokens nrt ON rt.next_token_id = nrt.id
                 LEFT JOIN access_tokens at ON at.refresh_token_id = nrt.id
