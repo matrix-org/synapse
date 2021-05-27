@@ -143,16 +143,16 @@ class BatchingQueue(Generic[V, R]):
                     values = [value for value, _ in next_values]
                     results = await self._process_batch_callback(values)
 
-                    for _, deferred in next_values:
-                        with PreserveLoggingContext():
+                    with PreserveLoggingContext():
+                        for _, deferred in next_values:
                             deferred.callback(results)
 
                 except Exception as e:
-                    for _, deferred in next_values:
-                        if deferred.called:
-                            continue
+                    with PreserveLoggingContext():
+                        for _, deferred in next_values:
+                            if deferred.called:
+                                continue
 
-                        with PreserveLoggingContext():
                             deferred.errback(e)
 
         finally:
