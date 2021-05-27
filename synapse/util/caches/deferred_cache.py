@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -71,7 +70,6 @@ class DeferredCache(Generic[KT, VT]):
         self,
         name: str,
         max_entries: int = 1000,
-        keylen: int = 1,
         tree: bool = False,
         iterable: bool = False,
         apply_cache_factor_from_config: bool = True,
@@ -102,7 +100,6 @@ class DeferredCache(Generic[KT, VT]):
         # a Deferred.
         self.cache = LruCache(
             max_size=max_entries,
-            keylen=keylen,
             cache_name=name,
             cache_type=cache_type,
             size_callback=(lambda d: len(d) or 1) if iterable else None,

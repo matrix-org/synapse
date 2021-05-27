@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from twisted.web.client import PartialDownloadError
 
@@ -23,13 +22,16 @@ from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util import json_decoder
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class UserInteractiveAuthChecker:
     """Abstract base class for an interactive auth checker"""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         pass
 
     def is_enabled(self) -> bool:
@@ -58,10 +60,10 @@ class UserInteractiveAuthChecker:
 class DummyAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.DUMMY
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return True
 
-    async def check_auth(self, authdict, clientip):
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return True
 
 
@@ -71,24 +73,24 @@ class TermsAuthChecker(UserInteractiveAuthChecker):
     def is_enabled(self):
         return True
 
-    async def check_auth(self, authdict, clientip):
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return True
 
 
 class RecaptchaAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.RECAPTCHA
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self._enabled = bool(hs.config.recaptcha_private_key)
         self._http_client = hs.get_proxied_http_client()
         self._url = hs.config.recaptcha_siteverify_api
         self._secret = hs.config.recaptcha_private_key
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return self._enabled
 
-    async def check_auth(self, authdict, clientip):
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
         try:
             user_response = authdict["response"]
         except KeyError:
@@ -133,11 +135,11 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 
 
 class _BaseThreepidAuthChecker:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
 
-    async def _check_threepid(self, medium, authdict):
+    async def _check_threepid(self, medium: str, authdict: dict) -> dict:
         if "threepid_creds" not in authdict:
             raise LoginError(400, "Missing threepid_creds", Codes.MISSING_PARAM)
 
@@ -207,31 +209,31 @@ class _BaseThreepidAuthChecker:
 class EmailIdentityAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
     AUTH_TYPE = LoginType.EMAIL_IDENTITY
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         UserInteractiveAuthChecker.__init__(self, hs)
         _BaseThreepidAuthChecker.__init__(self, hs)
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return self.hs.config.threepid_behaviour_email in (
             ThreepidBehaviour.REMOTE,
             ThreepidBehaviour.LOCAL,
         )
 
-    async def check_auth(self, authdict, clientip):
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("email", authdict)
 
 
 class MsisdnAuthChecker(UserInteractiveAuthChecker, _BaseThreepidAuthChecker):
     AUTH_TYPE = LoginType.MSISDN
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         UserInteractiveAuthChecker.__init__(self, hs)
         _BaseThreepidAuthChecker.__init__(self, hs)
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return bool(self.hs.config.account_threepid_delegate_msisdn)
 
-    async def check_auth(self, authdict, clientip):
+    async def check_auth(self, authdict: dict, clientip: str) -> Any:
         return await self._check_threepid("msisdn", authdict)
 
 

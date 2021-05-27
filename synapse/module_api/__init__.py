@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -51,18 +50,11 @@ class ModuleApi:
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
+        self._state = hs.get_state_handler()
 
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
-
-        # The next time these users sync, they will receive the current presence
-        # state of all local users. Users are added by send_local_online_presence_to,
-        # and removed after a successful sync.
-        #
-        # We make this a private variable to deter modules from accessing it directly,
-        # though other classes in Synapse will still do so.
-        self._send_full_presence_to_local_users = set()
 
     @property
     def http_client(self):
@@ -405,37 +397,44 @@ class ModuleApi:
         Updates to remote users will be sent immediately, whereas local users will receive
         them on their next sync attempt.
 
-        Note that this method can only be run on the main or federation_sender worker
-        processes.
+        Note that this method can only be run on the process that is configured to write to the
+        presence stream. By default this is the main process.
         """
-        if not self._hs.should_send_federation():
+        if self._hs._instance_name not in self._hs.config.worker.writers.presence:
             raise Exception(
                 "send_local_online_presence_to can only be run "
-                "on processes that send federation",
+                "on the process that is configured to write to the "
+                "presence stream (by default this is the main process)",
             )
 
+        local_users = set()
+        remote_users = set()
         for user in users:
             if self._hs.is_mine_id(user):
-                # Modify SyncHandler._generate_sync_entry_for_presence to call
-                # presence_source.get_new_events with an empty `from_key` if
-                # that user's ID were in a list modified by ModuleApi somewhere.
-                # That user would then get all presence state on next incremental sync.
-
-                # Force a presence initial_sync for this user next time
-                self._send_full_presence_to_local_users.add(user)
+                local_users.add(user)
             else:
-                # Retrieve presence state for currently online users that this user
-                # is considered interested in
-                presence_events, _ = await self._presence_stream.get_new_events(
-                    UserID.from_string(user), from_key=None, include_offline=False
-                )
+                remote_users.add(user)
 
-                # Send to remote destinations
-                await make_deferred_yieldable(
-                    # We pull the federation sender here as we can only do so on workers
-                    # that support sending presence
-                    self._hs.get_federation_sender().send_presence(presence_events)
-                )
+        # We pull out the presence handler here to break a cyclic
+        # dependency between the presence router and module API.
+        presence_handler = self._hs.get_presence_handler()
+
+        if local_users:
+            # Force a presence initial_sync for these users next time they sync.
+            await presence_handler.send_full_presence_to_users(local_users)
+
+        for user in remote_users:
+            # Retrieve presence state for currently online users that this user
+            # is considered interested in.
+            presence_events, _ = await self._presence_stream.get_new_events(
+                UserID.from_string(user), from_key=None, include_offline=False
+            )
+
+            # Send to remote destinations.
+            destination = UserID.from_string(user).domain
+            presence_handler.get_federation_queue().send_presence_to_destinations(
+                presence_events, destination
+            )
 
 
 class PublicRoomListManager:

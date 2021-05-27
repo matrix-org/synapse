@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +16,8 @@ import json
 import urllib.parse
 from typing import List, Optional
 from unittest.mock import Mock
+
+from parameterized import parameterized_class
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
@@ -145,6 +146,13 @@ class ShutdownRoomTestCase(unittest.HomeserverTestCase):
         )
 
 
+@parameterized_class(
+    ("method", "url_template"),
+    [
+        ("POST", "/_synapse/admin/v1/rooms/%s/delete"),
+        ("DELETE", "/_synapse/admin/v1/rooms/%s"),
+    ],
+)
 class DeleteRoomTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -176,7 +184,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self.room_id = self.helper.create_room_as(
             self.other_user, tok=self.other_user_tok
         )
-        self.url = "/_synapse/admin/v1/rooms/%s/delete" % self.room_id
+        self.url = self.url_template % self.room_id
 
     def test_requester_is_no_admin(self):
         """
@@ -184,7 +192,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url,
             json.dumps({}),
             access_token=self.other_user_tok,
@@ -197,10 +205,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that unknown rooms/server return error 404.
         """
-        url = "/_synapse/admin/v1/rooms/!unknown:test/delete"
+        url = self.url_template % "!unknown:test"
 
         channel = self.make_request(
-            "POST",
+            self.method,
             url,
             json.dumps({}),
             access_token=self.admin_user_tok,
@@ -213,10 +221,10 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         """
         Check that invalid room names, return an error 400.
         """
-        url = "/_synapse/admin/v1/rooms/invalidroom/delete"
+        url = self.url_template % "invalidroom"
 
         channel = self.make_request(
-            "POST",
+            self.method,
             url,
             json.dumps({}),
             access_token=self.admin_user_tok,
@@ -235,7 +243,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"new_room_user_id": "@unknown:test"})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -254,7 +262,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"new_room_user_id": "@not:exist.bla"})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -273,7 +281,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": "NotBool"})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -289,7 +297,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"purge": "NotBool"})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url,
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -315,7 +323,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": True, "purge": True})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -348,7 +356,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": False, "purge": True})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -382,7 +390,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         body = json.dumps({"block": False, "purge": False})
 
         channel = self.make_request(
-            "POST",
+            self.method,
             self.url.encode("ascii"),
             content=body.encode(encoding="utf_8"),
             access_token=self.admin_user_tok,
@@ -427,10 +435,9 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
         # Test that the admin can still send shutdown
-        url = "/_synapse/admin/v1/rooms/%s/delete" % self.room_id
         channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
+            self.method,
+            self.url,
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
@@ -474,10 +481,9 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
         self._is_member(room_id=self.room_id, user_id=self.other_user)
 
         # Test that the admin can still send shutdown
-        url = "/_synapse/admin/v1/rooms/%s/delete" % self.room_id
         channel = self.make_request(
-            "POST",
-            url.encode("ascii"),
+            self.method,
+            self.url,
             json.dumps({"new_room_user_id": self.admin_user}),
             access_token=self.admin_user_tok,
         )
@@ -616,7 +622,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Create 3 test rooms
         total_rooms = 3
         room_ids = []
-        for x in range(total_rooms):
+        for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )
@@ -680,7 +686,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Create 5 test rooms
         total_rooms = 5
         room_ids = []
-        for x in range(total_rooms):
+        for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )
@@ -1578,7 +1584,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             channel.json_body["event"]["event_id"], events[midway]["event_id"]
         )
 
-        for i, found_event in enumerate(channel.json_body["events_before"]):
+        for found_event in channel.json_body["events_before"]:
             for j, posted_event in enumerate(events):
                 if found_event["event_id"] == posted_event["event_id"]:
                     self.assertTrue(j < midway)
@@ -1586,7 +1592,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             else:
                 self.fail("Event %s from events_before not found" % j)
 
-        for i, found_event in enumerate(channel.json_body["events_after"]):
+        for found_event in channel.json_body["events_after"]:
             for j, posted_event in enumerate(events):
                 if found_event["event_id"] == posted_event["event_id"]:
                     self.assertTrue(j > midway)

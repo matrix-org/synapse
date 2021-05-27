@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 
 
-from synapse.util.caches.treecache import TreeCache
+from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 
 from .. import unittest
 
@@ -65,11 +64,13 @@ class TreeCacheTestCase(unittest.TestCase):
         cache[("a", "b")] = "AB"
         cache[("b", "a")] = "BA"
         self.assertEquals(cache.get(("a", "a")), "AA")
-        cache.pop(("a",))
+        popped = cache.pop(("a",))
         self.assertEquals(cache.get(("a", "a")), None)
         self.assertEquals(cache.get(("a", "b")), None)
         self.assertEquals(cache.get(("b", "a")), "BA")
         self.assertEquals(len(cache), 1)
+
+        self.assertEquals({"AA", "AB"}, set(iterate_tree_cache_entry(popped)))
 
     def test_clear(self):
         cache = TreeCache()

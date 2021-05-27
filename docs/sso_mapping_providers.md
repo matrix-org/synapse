@@ -67,8 +67,8 @@ A custom mapping provider must specify the following methods:
     - Arguments:
       - `userinfo` - A `authlib.oidc.core.claims.UserInfo` object to extract user
                      information from.
-    - This method must return a string, which is the unique identifier for the
-      user. Commonly the ``sub`` claim of the response.
+    - This method must return a string, which is the unique, immutable identifier
+      for the user. Commonly the `sub` claim of the response.
 * `map_user_attributes(self, userinfo, token, failures)`
     - This method must be async.
     - Arguments:
@@ -87,7 +87,9 @@ A custom mapping provider must specify the following methods:
                      `localpart` value, such as `john.doe1`.
     - Returns a dictionary with two keys:
       - `localpart`: A string, used to generate the Matrix ID. If this is
-        `None`, the user is prompted to pick their own username.
+        `None`, the user is prompted to pick their own username. This is only used
+        during a user's first login. Once a localpart has been associated with a
+        remote user ID (see `get_remote_user_id`) it cannot be updated.
       - `displayname`: An optional string, the display name for the user.
 * `get_extra_attributes(self, userinfo, token)`
     - This method must be async.
@@ -106,7 +108,7 @@ A custom mapping provider must specify the following methods:
 
 Synapse has a built-in OpenID mapping provider if a custom provider isn't
 specified in the config. It is located at
-[`synapse.handlers.oidc_handler.JinjaOidcMappingProvider`](../synapse/handlers/oidc_handler.py).
+[`synapse.handlers.oidc.JinjaOidcMappingProvider`](../synapse/handlers/oidc.py).
 
 ## SAML Mapping Providers
 
@@ -153,8 +155,8 @@ A custom mapping provider must specify the following methods:
                           information from.
       - `client_redirect_url` - A string, the URL that the client will be
                                 redirected to.
-    - This method must return a string, which is the unique identifier for the
-      user. Commonly the ``uid`` claim of the response.
+    - This method must return a string, which is the unique, immutable identifier
+      for the user. Commonly the `uid` claim of the response.
 * `saml_response_to_user_attributes(self, saml_response, failures, client_redirect_url)`
     - Arguments:
       - `saml_response` - A `saml2.response.AuthnResponse` object to extract user
@@ -172,8 +174,10 @@ A custom mapping provider must specify the following methods:
                                 redirected to.
     - This method must return a dictionary, which will then be used by Synapse
       to build a new user. The following keys are allowed:
-       * `mxid_localpart` - The mxid localpart of the new user.  If this is
-         `None`, the user is prompted to pick their own username.
+       * `mxid_localpart` - A string, the mxid localpart of the new user. If this is
+         `None`, the user is prompted to pick their own username. This is only used
+         during a user's first login. Once a localpart has been associated with a
+         remote user ID (see `get_remote_user_id`) it cannot be updated.
        * `displayname` - The displayname of the new user. If not provided, will default to
                          the value of `mxid_localpart`.
        * `emails` - A list of emails for the new user. If not provided, will
@@ -190,4 +194,4 @@ A custom mapping provider must specify the following methods:
 
 Synapse has a built-in SAML mapping provider if a custom provider isn't
 specified in the config. It is located at
-[`synapse.handlers.saml_handler.DefaultSamlMappingProvider`](../synapse/handlers/saml_handler.py).
+[`synapse.handlers.saml.DefaultSamlMappingProvider`](../synapse/handlers/saml.py).

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,10 +47,8 @@ class CleanupExtremBackgroundUpdateStoreTestCase(HomeserverTestCase):
         )
 
         schema_path = os.path.join(
-            prepare_database.dir_path,
-            "databases",
+            prepare_database.schema_path,
             "main",
-            "schema",
             "delta",
             "54",
             "delete_forward_extremities.sql",

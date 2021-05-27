@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -468,7 +467,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             number_media: Number of media to be created for the user
         """
         upload_resource = self.media_repo.children[b"upload"]
-        for i in range(number_media):
+        for _ in range(number_media):
             # file size is 67 Byte
             image_data = unhexlify(
                 b"89504e470d0a1a0a0000000d4948445200000001000000010806"

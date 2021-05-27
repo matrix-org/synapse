@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,22 +48,22 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id2, user=self.admin_user, tok=self.admin_user_tok)
 
         # Two rooms and two users. Every user sends and reports every room event
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id1,
                 user_tok=self.other_user_tok,
             )
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id2,
                 user_tok=self.other_user_tok,
             )
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id1,
                 user_tok=self.admin_user_tok,
             )
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id2,
                 user_tok=self.admin_user_tok,

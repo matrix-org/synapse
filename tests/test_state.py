@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,7 +37,7 @@ def create_event(
     depth=2,
     event_id=None,
     prev_events: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ):
     global _next_event_id
 

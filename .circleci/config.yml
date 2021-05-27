@@ -41,7 +41,7 @@ workflows:
       - dockerhubuploadlatest:
           filters:
             branches:
-              only: master
+              only: [ master, main ]
 
 commands:
   docker_prepare:

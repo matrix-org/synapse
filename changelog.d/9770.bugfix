@@ -1,1 +1,0 @@
-Fix bug where sharded federation senders could get stuck repeatedly querying the DB in a loop, using lots of CPU.

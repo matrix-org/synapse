@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -159,7 +158,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     def make_client(cls, hs):
         """Create a client that makes requests.
 
-        Returns a callable that accepts the same parameters as `_serialize_payload`.
+        Returns a callable that accepts the same parameters as
+        `_serialize_payload`, and also accepts an optional `instance_name`
+        parameter to specify which instance to hit (the instance must be in
+        the `instance_map` config).
         """
         clock = hs.get_clock()
         client = hs.get_simple_http_client()
