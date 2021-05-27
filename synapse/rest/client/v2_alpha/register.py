@@ -742,7 +742,7 @@ class RegisterRestServlet(RestServlet):
 
         if valid_until_ms is not None:
             expires_in_ms = valid_until_ms - self.clock.time_msec()
-            result["expires_in"] = int(expires_in_ms / 1000)
+            result["expires_in_ms"] = expires_in_ms
 
         if refresh_token is not None:
             result["refresh_token"] = refresh_token

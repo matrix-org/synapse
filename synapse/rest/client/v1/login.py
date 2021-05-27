@@ -49,7 +49,7 @@ LoginResponse = TypedDict(
         "user_id": str,
         "access_token": str,
         "home_server": str,
-        "expires_in": Optional[int],
+        "expires_in_ms": Optional[int],
         "refresh_token": Optional[str],
         "device_id": str,
         "well_known": Optional[Dict[str, Any]],
@@ -351,7 +351,7 @@ class LoginRestServlet(RestServlet):
 
         if valid_until_ms is not None:
             expires_in_ms = valid_until_ms - self.clock.time_msec()
-            result["expires_in"] = int(expires_in_ms / 1000)
+            result["expires_in_ms"] = expires_in_ms
 
         if refresh_token is not None:
             result["refresh_token"] = refresh_token
@@ -460,6 +460,7 @@ class RefreshTokenServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self._auth_handler = hs.get_auth_handler()
         self._clock = hs.get_clock()
+        self.access_token_lifetime = hs.config.access_token_lifetime
 
     async def on_POST(
         self,
@@ -469,7 +470,7 @@ class RefreshTokenServlet(RestServlet):
 
         try:
             token = refresh_submission["refresh_token"]
-            valid_until_ms = self._clock.time_msec() + 60 * 1000
+            valid_until_ms = self._clock.time_msec() + self.access_token_lifetime
             access_token, refresh_token = await self._auth_handler.refresh_token(
                 token, valid_until_ms
             )
@@ -479,7 +480,7 @@ class RefreshTokenServlet(RestServlet):
                 {
                     "access_token": access_token,
                     "refresh_token": refresh_token,
-                    "expires_in": int(expires_in_ms / 1000),
+                    "expires_in_ms": expires_in_ms,
                 },
             )
 
