@@ -92,13 +92,19 @@ class BatchingQueueTestCase(TestCase):
         queue_d1 = defer.ensureDeferred(self.queue.add_to_queue("foo1"))
         self.clock.pump([0])
 
+        self.assertEqual(len(self._pending_calls), 1)
+
+        # We queue up work after the process function has been called, testing
+        # that they get correctly queued up.
         queue_d2 = defer.ensureDeferred(self.queue.add_to_queue("foo2"))
+        queue_d3 = defer.ensureDeferred(self.queue.add_to_queue("foo3"))
 
         # We should see only *one* call to `_process_queue`
         self.assertEqual(len(self._pending_calls), 1)
         self.assertEqual(self._pending_calls[0][0], ["foo1"])
         self.assertFalse(queue_d1.called)
         self.assertFalse(queue_d2.called)
+        self.assertFalse(queue_d3.called)
 
         # Return value of the `_process_queue` should be propagated back to the
         # first.
@@ -106,18 +112,21 @@ class BatchingQueueTestCase(TestCase):
 
         self.assertEqual(self.successResultOf(queue_d1), "bar1")
         self.assertFalse(queue_d2.called)
+        self.assertFalse(queue_d3.called)
 
         # We should now see a second call to `_process_queue`
         self.clock.pump([0])
         self.assertEqual(len(self._pending_calls), 1)
-        self.assertEqual(self._pending_calls[0][0], ["foo2"])
+        self.assertEqual(self._pending_calls[0][0], ["foo2", "foo3"])
         self.assertFalse(queue_d2.called)
+        self.assertFalse(queue_d3.called)
 
         # Return value of the `_process_queue` should be propagated back to the
         # second.
         self._pending_calls.pop()[1].callback("bar2")
 
         self.assertEqual(self.successResultOf(queue_d2), "bar2")
+        self.assertEqual(self.successResultOf(queue_d3), "bar2")
 
     def test_different_keys(self):
         """Test that calls to different keys get processed in parallel."""
