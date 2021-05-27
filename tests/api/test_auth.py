@@ -61,6 +61,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             user_id=self.test_user, token_id=5, device_id="device"
         )
         self.store.get_user_by_access_token = simple_async_mock(user_info)
+        self.store.mark_access_token_as_used = simple_async_mock(None)
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
@@ -285,6 +286,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         self.store.get_user_by_access_token = get_user
         self.store.get_user_by_id = simple_async_mock({"is_guest": False})
+        self.store.mark_access_token_as_used = simple_async_mock(None)
 
         # check the token works
         request = Mock(args={})
