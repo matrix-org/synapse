@@ -460,7 +460,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
-        self._get_linearized_receipts_for_room.invalidate_many((room_id,))
+        self._get_linearized_receipts_for_room.invalidate((room_id,))
         self.get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )
@@ -659,9 +659,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
         txn.call_after(self.get_receipts_for_user.invalidate, (user_id, receipt_type))
         # FIXME: This shouldn't invalidate the whole cache
-        txn.call_after(
-            self._get_linearized_receipts_for_room.invalidate_many, (room_id,)
-        )
+        txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
         self.db_pool.simple_delete_txn(
             txn,
