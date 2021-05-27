@@ -43,6 +43,7 @@ from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
     parse_json_object_from_request,
     parse_string,
 )
@@ -422,6 +423,12 @@ class RegisterRestServlet(RestServlet):
                 "Do not understand membership kind: %s" % (kind.decode("utf8"),)
             )
 
+        # Check if this registration should also issue a refresh token, as per
+        # MSC2918
+        should_issue_refresh_token = parse_boolean(
+            request, name="org.matrix.msc2918.refresh_token", default=False
+        )
+
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.
         desired_username = None
@@ -455,7 +462,10 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Desired Username is missing or not a string")
 
             result = await self._do_appservice_registration(
-                desired_username, access_token, body
+                desired_username,
+                access_token,
+                body,
+                should_issue_refresh_token=should_issue_refresh_token,
             )
 
             return 200, result
@@ -653,7 +663,9 @@ class RegisterRestServlet(RestServlet):
             registered = True
 
         return_dict = await self._create_registration_details(
-            registered_user_id, params
+            registered_user_id,
+            params,
+            should_issue_refresh_token=should_issue_refresh_token,
         )
 
         if registered:
@@ -665,7 +677,9 @@ class RegisterRestServlet(RestServlet):
 
         return 200, return_dict
 
-    async def _do_appservice_registration(self, username, as_token, body):
+    async def _do_appservice_registration(
+        self, username, as_token, body, should_issue_refresh_token: bool = False
+    ):
         user_id = await self.registration_handler.appservice_register(
             username, as_token
         )
@@ -673,10 +687,15 @@ class RegisterRestServlet(RestServlet):
             user_id,
             body,
             is_appservice_ghost=True,
+            should_issue_refresh_token=should_issue_refresh_token,
         )
 
     async def _create_registration_details(
-        self, user_id, params, is_appservice_ghost=False
+        self,
+        user_id,
+        params,
+        is_appservice_ghost=False,
+        should_issue_refresh_token: bool = False,
     ):
         """Complete registration of newly-registered user
 
@@ -704,9 +723,14 @@ class RegisterRestServlet(RestServlet):
                 initial_display_name,
                 is_guest=False,
                 is_appservice_ghost=is_appservice_ghost,
+                should_issue_refresh_token=should_issue_refresh_token,
             )
 
             result.update({"access_token": access_token, "device_id": device_id})
+
+            if valid_until_ms is not None:
+                expires_in_ms = valid_until_ms - self.clock.time_msec()
+                result["expires_in_ms"] = expires_in_ms
 
             if refresh_token is not None:
                 result["refresh_token"] = refresh_token
