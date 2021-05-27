@@ -1,12 +1,10 @@
 name: Deploy the documentation
-#on:
-#  release:
-#    types: [created]
 
 on:
   push:
     branches:
       - develop
+      - release-v*
 
   workflow_dispatch:
 
@@ -22,9 +20,15 @@ jobs:
         with:
           mdbook-version: '0.4.8'
 
-      - name: Build the documentatino
-        run: mdbook build
+      - name: Build the documentation
+        # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
+        # However, we're using docs/README.md for other purposes and need to pick a new page
+        # as the default. Let's opt for the welcome page instead.
+        run: |
+          mdbook build
+          cp book/welcome_and_overview.html book/index.html
 
+      # Deploy to the latest documentation directories
       - name: Deploy latest documentation
         uses: peaceiris/actions-gh-pages@v3
         with:
@@ -32,3 +36,21 @@ jobs:
           keep_files: true
           publish_dir: ./book
           destination_dir: ./latest
+
+      - name: Get the current Synapse version
+        id: vars
+        run: echo ::set-output name=synapse-version::`python3 -c 'import synapse; print(synapse.__version__)'`
+
+      # Deploy to the version-specific directory
+      - name: Deploy release-specific documentation
+        # We only carry out this step if we're running on a release branch, and the current Synapse version
+        # does not have "rc" in the name.
+        # The result is that only full releases are deployed, but can be updated if the release branch gets
+        # retroactive fixes.
+        if: ${{ startsWith( github.ref, 'refs/heads/release-v' ) && !contains( steps.vars.outputs.synapse-version, 'rc') }}
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          keep_files: true
+          publish_dir: ./book
+          destination_dir: ./v${{ steps.vars.outputs.synapse-version }}
