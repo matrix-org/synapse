@@ -15,7 +15,9 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import Iterable, List, Literal, Optional, Union, overload
+from typing import Iterable, List, Optional, Union, overload
+
+from typing_extensions import Literal
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -289,17 +291,13 @@ def parse_string_from_args(
     strings = parse_strings_from_args(
         args,
         name,
-        default=default,
+        default=[default],
         required=required,
         allowed_values=allowed_values,
         encoding=encoding,
     )
 
-    if isinstance(strings, list):
-        return strings[0]
-
-    # Return the default
-    return strings
+    return strings[0]
 
 
 def parse_json_value_from_request(request, allow_empty_body=False):
