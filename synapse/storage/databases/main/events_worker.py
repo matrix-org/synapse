@@ -1077,31 +1077,31 @@ class EventsWorkerStore(SQLBaseStore):
              a dict {(room_id, event_id)-> bool}
         """
         # if the event cache contains the event, obviously we've seen it.
+
         cache_results = {
-            eid for (_rid, eid) in keys if self._get_event_cache.contains(eid)
+            (rid, eid) for (rid, eid) in keys if self._get_event_cache.contains((eid,))
         }
         results = {x: True for x in cache_results}
 
-        def have_seen_events_txn(txn, chunk: Tuple[str, ...]):
-            # assume everything in this chunk is not found initially
-            results.update({x: False for x in chunk})
+        def have_seen_events_txn(txn, chunk: Tuple[Tuple[str, str], ...]):
+            # we deliberately do *not* query the database for room_id, to make the
+            # query an index-only lookup on `events_event_id_key`.
+            #
+            # We therefore pull the events from the database into a set...
 
-            # check the db and update the results for any row that is found
-            # NB this deliberately does *not* query on room_id, to make this an
-            #   index-only lookup on `events_event_id_key`.
-            sql = "SELECT event_id FROM events AS e WHERE"
+            sql = "SELECT event_id FROM events AS e WHERE "
             clause, args = make_in_list_sql_clause(
-                txn.database_engine, "e.event_id", chunk
+                txn.database_engine, "e.event_id", [eid for (_rid, eid) in chunk]
             )
             txn.execute(sql + clause, args)
-            results.update({row[0]: True for row in txn})
+            found_events = {eid for eid, in txn}
+
+            # ... and then we can update the results for each row in the batch
+            results.update({(rid, eid): (eid in found_events) for (rid, eid) in chunk})
 
         # each batch requires its own index scan, so we make the batches as big as
         # possible.
-        for chunk in batch_iter(
-            (eid for (_rid, eid) in keys if eid not in cache_results),
-            500,
-        ):
+        for chunk in batch_iter((k for k in keys if k not in cache_results), 500):
             await self.db_pool.runInteraction(
                 "have_seen_events", have_seen_events_txn, chunk
             )
