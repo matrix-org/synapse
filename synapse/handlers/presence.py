@@ -222,9 +222,21 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     async def set_state(
-        self, target_user: UserID, state: JsonDict, ignore_status_msg: bool = False
+        self,
+        target_user: UserID,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user. """
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
 
     @abc.abstractmethod
     async def bump_presence_active_time(self, user: UserID):
@@ -295,6 +307,51 @@ class BasePresenceHandler(abc.ABC):
 
         for destinations, states in hosts_and_states:
             self._federation.send_presence_to_destinations(states, destinations)
+
+    async def send_full_presence_to_users(self, user_ids: Collection[str]):
+        """
+        Adds to the list of users who should receive a full snapshot of presence
+        upon their next sync. Note that this only works for local users.
+
+        Then, grabs the current presence state for a given set of users and adds it
+        to the top of the presence stream.
+
+        Args:
+            user_ids: The IDs of the local users to send full presence to.
+        """
+        # Retrieve one of the users from the given set
+        if not user_ids:
+            raise Exception(
+                "send_full_presence_to_users must be called with at least one user"
+            )
+        user_id = next(iter(user_ids))
+
+        # Mark all users as receiving full presence on their next sync
+        await self.store.add_users_to_send_full_presence_to(user_ids)
+
+        # Add a new entry to the presence stream. Since we use stream tokens to determine whether a
+        # local user should receive a full snapshot of presence when they sync, we need to bump the
+        # presence stream so that subsequent syncs with no presence activity in between won't result
+        # in the client receiving multiple full snapshots of presence.
+        #
+        # If we bump the stream ID, then the user will get a higher stream token next sync, and thus
+        # correctly won't receive a second snapshot.
+
+        # Get the current presence state for one of the users (defaults to offline if not found)
+        current_presence_state = await self.get_state(UserID.from_string(user_id))
+
+        # Convert the UserPresenceState object into a serializable dict
+        state = {
+            "presence": current_presence_state.state,
+            "status_message": current_presence_state.status_msg,
+        }
+
+        # Copy the presence state to the tip of the presence stream.
+
+        # We set force_notify=True here so that this presence update is guaranteed to
+        # increment the presence stream ID (which resending the current user's presence
+        # otherwise would not do).
+        await self.set_state(UserID.from_string(user_id), state, force_notify=True)
 
 
 class _NullContextManager(ContextManager[None]):
@@ -480,8 +537,17 @@ class WorkerPresenceHandler(BasePresenceHandler):
         target_user: UserID,
         state: JsonDict,
         ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user."""
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
         presence = state["presence"]
 
         valid_presence = (
@@ -508,6 +574,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             user_id=user_id,
             state=state,
             ignore_status_msg=ignore_status_msg,
+            force_notify=force_notify,
         )
 
     async def bump_presence_active_time(self, user: UserID) -> None:
@@ -677,13 +744,19 @@ class PresenceHandler(BasePresenceHandler):
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
 
-    async def _update_states(self, new_states: Iterable[UserPresenceState]) -> None:
+    async def _update_states(
+        self, new_states: Iterable[UserPresenceState], force_notify: bool = False
+    ) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
         should be sent to clients/servers.
 
         Args:
             new_states: The new user presence state updates to process.
+            force_notify: Whether to force notifying clients of this presence state update,
+                even if it doesn't change the state of a user's presence (e.g online -> online).
+                This is currently used to bump the max presence stream ID without changing any
+                user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
         """
         now = self.clock.time_msec()
 
@@ -719,6 +792,9 @@ class PresenceHandler(BasePresenceHandler):
                     wheel_timer=self.wheel_timer,
                     now=now,
                 )
+
+                if force_notify:
+                    should_notify = True
 
                 self.user_to_current_state[user_id] = new_state
 
@@ -1058,9 +1134,21 @@ class PresenceHandler(BasePresenceHandler):
             await self._update_states(updates)
 
     async def set_state(
-        self, target_user: UserID, state: JsonDict, ignore_status_msg: bool = False
+        self,
+        target_user: UserID,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user."""
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
 
@@ -1091,7 +1179,9 @@ class PresenceHandler(BasePresenceHandler):
         ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
-        await self._update_states([prev_state.copy_and_replace(**new_fields)])
+        await self._update_states(
+            [prev_state.copy_and_replace(**new_fields)], force_notify=force_notify
+        )
 
     async def is_visible(self, observed_user: UserID, observer_user: UserID) -> bool:
         """Returns whether a user can see another user's presence."""
@@ -1389,11 +1479,10 @@ class PresenceEventSource:
         #
         #   Presence -> Notifier -> PresenceEventSource -> Presence
         #
-        # Same with get_module_api, get_presence_router
+        # Same with get_presence_router:
         #
         #   AuthHandler -> Notifier -> PresenceEventSource -> ModuleApi -> AuthHandler
         self.get_presence_handler = hs.get_presence_handler
-        self.get_module_api = hs.get_module_api
         self.get_presence_router = hs.get_presence_router
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -1424,15 +1513,20 @@ class PresenceEventSource:
         stream_change_cache = self.store.presence_stream_cache
 
         with Measure(self.clock, "presence.get_new_events"):
-            if user_id in self.get_module_api()._send_full_presence_to_local_users:
-                # This user has been specified by a module to receive all current, online
-                # user presence. Removing from_key and setting include_offline to false
-                # will do effectively this.
-                from_key = None
-                include_offline = False
-
             if from_key is not None:
                 from_key = int(from_key)
+
+                # Check if this user should receive all current, online user presence. We only
+                # bother to do this if from_key is set, as otherwise the user will receive all
+                # user presence anyways.
+                if await self.store.should_user_receive_full_presence_with_token(
+                    user_id, from_key
+                ):
+                    # This user has been specified by a module to receive all current, online
+                    # user presence. Removing from_key and setting include_offline to false
+                    # will do effectively this.
+                    from_key = None
+                    include_offline = False
 
             max_token = self.store.get_current_presence_token()
             if from_key == max_token:
@@ -1466,12 +1560,6 @@ class PresenceEventSource:
                 presence_updates = await self._filter_all_presence_updates_for_user(
                     user_id, include_offline, from_key
                 )
-
-                # Remove the user from the list of users to receive all presence
-                if user_id in self.get_module_api()._send_full_presence_to_local_users:
-                    self.get_module_api()._send_full_presence_to_local_users.remove(
-                        user_id
-                    )
 
                 return presence_updates, max_token
 
@@ -1521,10 +1609,6 @@ class PresenceEventSource:
                 interested_and_updated_users
             )
             presence_updates = list(users_to_state.values())
-
-        # Remove the user from the list of users to receive all presence
-        if user_id in self.get_module_api()._send_full_presence_to_local_users:
-            self.get_module_api()._send_full_presence_to_local_users.remove(user_id)
 
         if not include_offline:
             # Filter out offline presence states

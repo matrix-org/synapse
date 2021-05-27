@@ -16,10 +16,7 @@ import logging
 import os
 import warnings
 from datetime import datetime
-from hashlib import sha256
-from typing import List, Optional
-
-from unpaddedbase64 import encode_base64
+from typing import List, Optional, Pattern
 
 from OpenSSL import SSL, crypto
 from twisted.internet._sslverify import Certificate, trustRootFromCertificates
@@ -83,13 +80,6 @@ class TlsConfig(Config):
                     "configured."
                 )
 
-        self._original_tls_fingerprints = config.get("tls_fingerprints", [])
-
-        if self._original_tls_fingerprints is None:
-            self._original_tls_fingerprints = []
-
-        self.tls_fingerprints = list(self._original_tls_fingerprints)
-
         # Whether to verify certificates on outbound federation traffic
         self.federation_verify_certificates = config.get(
             "federation_verify_certificates", True
@@ -124,7 +114,7 @@ class TlsConfig(Config):
             fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []  # type: List[str]
+        self.federation_certificate_verification_whitelist = []  # type: List[Pattern]
         for entry in fed_whitelist_entries:
             try:
                 entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
@@ -225,41 +215,12 @@ class TlsConfig(Config):
         days_remaining = (expires_on - now).days
         return days_remaining
 
-    def read_certificate_from_disk(self, require_cert_and_key: bool):
+    def read_certificate_from_disk(self):
         """
         Read the certificates and private key from disk.
-
-        Args:
-            require_cert_and_key: set to True to throw an error if the certificate
-                and key file are not given
         """
-        if require_cert_and_key:
-            self.tls_private_key = self.read_tls_private_key()
-            self.tls_certificate = self.read_tls_certificate()
-        elif self.tls_certificate_file:
-            # we only need the certificate for the tls_fingerprints. Reload it if we
-            # can, but it's not a fatal error if we can't.
-            try:
-                self.tls_certificate = self.read_tls_certificate()
-            except Exception as e:
-                logger.info(
-                    "Unable to read TLS certificate (%s). Ignoring as no "
-                    "tls listeners enabled.",
-                    e,
-                )
-
-        self.tls_fingerprints = list(self._original_tls_fingerprints)
-
-        if self.tls_certificate:
-            # Check that our own certificate is included in the list of fingerprints
-            # and include it if it is not.
-            x509_certificate_bytes = crypto.dump_certificate(
-                crypto.FILETYPE_ASN1, self.tls_certificate
-            )
-            sha256_fingerprint = encode_base64(sha256(x509_certificate_bytes).digest())
-            sha256_fingerprints = {f["sha256"] for f in self.tls_fingerprints}
-            if sha256_fingerprint not in sha256_fingerprints:
-                self.tls_fingerprints.append({"sha256": sha256_fingerprint})
+        self.tls_private_key = self.read_tls_private_key()
+        self.tls_certificate = self.read_tls_certificate()
 
     def generate_config_section(
         self,
@@ -443,33 +404,6 @@ class TlsConfig(Config):
             # If unspecified, we will use CONFDIR/client.key.
             #
             account_key_file: %(default_acme_account_file)s
-
-        # List of allowed TLS fingerprints for this server to publish along
-        # with the signing keys for this server. Other matrix servers that
-        # make HTTPS requests to this server will check that the TLS
-        # certificates returned by this server match one of the fingerprints.
-        #
-        # Synapse automatically adds the fingerprint of its own certificate
-        # to the list. So if federation traffic is handled directly by synapse
-        # then no modification to the list is required.
-        #
-        # If synapse is run behind a load balancer that handles the TLS then it
-        # will be necessary to add the fingerprints of the certificates used by
-        # the loadbalancers to this list if they are different to the one
-        # synapse is using.
-        #
-        # Homeservers are permitted to cache the list of TLS fingerprints
-        # returned in the key responses up to the "valid_until_ts" returned in
-        # key. It may be necessary to publish the fingerprints of a new
-        # certificate and wait until the "valid_until_ts" of the previous key
-        # responses have passed before deploying it.
-        #
-        # You can calculate a fingerprint from a given TLS listener via:
-        # openssl s_client -connect $host:$port < /dev/null 2> /dev/null |
-        #   openssl x509 -outform DER | openssl sha256 -binary | base64 | tr -d '='
-        # or by checking matrix.org/federationtester/api/report?server_name=$host
-        #
-        #tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
         """
             # Lowercase the string representation of boolean values
             % {

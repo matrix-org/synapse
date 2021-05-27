@@ -32,7 +32,14 @@ from synapse.api.constants import (
     RoomCreationPreset,
     RoomEncryptionAlgorithms,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+)
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
@@ -125,10 +132,6 @@ class RoomCreationHandler(BaseHandler):
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
-
-        self._invite_burst_count = (
-            hs.config.ratelimiting.rc_invites_per_room.burst_count
-        )
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
@@ -676,8 +679,18 @@ class RoomCreationHandler(BaseHandler):
             invite_3pid_list = []
             invite_list = []
 
-        if len(invite_list) + len(invite_3pid_list) > self._invite_burst_count:
-            raise SynapseError(400, "Cannot invite so many users at once")
+        if invite_list or invite_3pid_list:
+            try:
+                # If there are invites in the request, see if the ratelimiting settings
+                # allow that number of invites to be sent from the current user.
+                await self.room_member_handler.ratelimit_multiple_invites(
+                    requester,
+                    room_id=None,
+                    n_invites=len(invite_list) + len(invite_3pid_list),
+                    update=False,
+                )
+            except LimitExceededError:
+                raise SynapseError(400, "Cannot invite so many users at once")
 
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 

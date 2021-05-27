@@ -1,4 +1,5 @@
-# Copyright 2015, 2016 OpenMarket Ltd
+#!/usr/bin/env python
+# Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,10 +13,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.databases.main.transactions import TransactionStore
+import sys
 
-from ._base import BaseSlavedStore
+import psycopg2
 
+# a very simple replacment for `psql`, to make up for the lack of the postgres client
+# libraries in the synapse docker image.
 
-class SlavedTransactionStore(TransactionStore, BaseSlavedStore):
-    pass
+# We use "postgres" as a database because it's bound to exist and the "synapse" one
+# doesn't exist yet.
+db_conn = psycopg2.connect(
+    user="postgres", host="postgres", password="postgres", dbname="postgres"
+)
+db_conn.autocommit = True
+cur = db_conn.cursor()
+for c in sys.argv[1:]:
+    cur.execute(c)

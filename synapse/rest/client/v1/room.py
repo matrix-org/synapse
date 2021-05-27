@@ -1020,6 +1020,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
         )
 
+    # TODO When switching to the stable endpoint, remove the POST handler.
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
@@ -1059,9 +1060,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-
-    if hs.config.experimental.spaces_enabled:
-        RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomSpaceSummaryRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:

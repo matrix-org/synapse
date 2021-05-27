@@ -163,6 +163,31 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     async def forget(self, user: UserID, room_id: str) -> None:
         raise NotImplementedError()
 
+    async def ratelimit_multiple_invites(
+        self,
+        requester: Optional[Requester],
+        room_id: Optional[str],
+        n_invites: int,
+        update: bool = True,
+    ):
+        """Ratelimit more than one invite sent by the given requester in the given room.
+
+        Args:
+            requester: The requester sending the invites.
+            room_id: The room the invites are being sent in.
+            n_invites: The amount of invites to ratelimit for.
+            update: Whether to update the ratelimiter's cache.
+
+        Raises:
+            LimitExceededError: The requester can't send that many invites in the room.
+        """
+        await self._invites_per_room_limiter.ratelimit(
+            requester,
+            room_id,
+            update=update,
+            n_actions=n_invites,
+        )
+
     async def ratelimit_invite(
         self,
         requester: Optional[Requester],
@@ -235,25 +260,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
-            user_is_invited = False
+            prev_member_event = None
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
-                user_is_invited = prev_member_event.membership == Membership.INVITE
 
-            # If the member is not already in the room and is not accepting an invite,
-            # check if they should be allowed access via membership in a space.
-            if (
-                newly_joined
-                and not user_is_invited
-                and not await self.event_auth_handler.can_join_without_invite(
-                    prev_state_ids, event.room_version, user_id
-                )
-            ):
-                raise AuthError(
-                    403,
-                    "You do not belong to any of the required spaces to join this room.",
-                )
+            # Check if the member should be allowed access via membership in a space.
+            await self.event_auth_handler.check_restricted_join_rules(
+                prev_state_ids, event.room_version, user_id, prev_member_event
+            )
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.

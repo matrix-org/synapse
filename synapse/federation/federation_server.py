@@ -44,7 +44,6 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
-from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -865,14 +864,6 @@ class FederationHandlerRegistry:
         # EDU received.
         self._edu_type_to_instance = {}  # type: Dict[str, List[str]]
 
-        # A rate limiter for incoming room key requests per origin.
-        self._room_key_request_rate_limiter = Ratelimiter(
-            store=hs.get_datastore(),
-            clock=self.clock,
-            rate_hz=self.config.rc_key_requests.per_second,
-            burst_count=self.config.rc_key_requests.burst_count,
-        )
-
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
     ) -> None:
@@ -924,16 +915,6 @@ class FederationHandlerRegistry:
 
     async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
         if not self.config.use_presence and edu_type == EduTypes.Presence:
-            return
-
-        # If the incoming room key requests from a particular origin are over
-        # the limit, drop them.
-        if (
-            edu_type == EduTypes.RoomKeyRequest
-            and not await self._room_key_request_rate_limiter.can_do_action(
-                None, origin
-            )
-        ):
             return
 
         # Check if we have a handler on this instance

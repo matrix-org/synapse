@@ -85,6 +85,32 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.34.0
+====================
+
+``room_invite_state_types`` configuration setting
+-----------------------------------------------
+
+The ``room_invite_state_types`` configuration setting has been deprecated and
+replaced with ``room_prejoin_state``. See the `sample configuration file <https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515>`_.
+
+If you have set ``room_invite_state_types`` to the default value you should simply
+remove it from your configuration file. The default value used to be:
+
+.. code:: yaml
+
+   room_invite_state_types:
+      - "m.room.join_rules"
+      - "m.room.canonical_alias"
+      - "m.room.avatar"
+      - "m.room.encryption"
+      - "m.room.name"
+
+If you have customised this value, you should remove ``room_invite_state_types`` and
+configure ``room_prejoin_state`` instead.
+
+
+
 Upgrading to v1.33.0
 ====================
 

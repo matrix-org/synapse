@@ -722,9 +722,7 @@ class RegistrationHandler(BaseHandler):
         )
         if is_guest:
             assert valid_until_ms is None
-            access_token = self.macaroon_gen.generate_access_token(
-                user_id, ["guest = true"]
-            )
+            access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             access_token = await self._auth_handler.get_access_token_for_user_id(
                 user_id,
