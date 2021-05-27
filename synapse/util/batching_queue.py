@@ -120,10 +120,10 @@ class BatchingQueue(Generic[V, R]):
         given key and call the `self._process_batch_callback` with the values.
         """
 
-        try:
-            if key in self._processing_keys:
-                return
+        if key in self._processing_keys:
+            return
 
+        try:
             self._processing_keys.add(key)
 
             while True:
