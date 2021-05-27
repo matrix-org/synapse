@@ -278,7 +278,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         if self._module_web_resources_consumed:
             raise SynapseError(
-                500, "Tried to register a web resource from a module after startup",
+                500,
+                "Tried to register a web resource from a module after startup",
             )
 
         # Don't register a resource that's already been registered.

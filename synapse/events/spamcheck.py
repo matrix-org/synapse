@@ -47,14 +47,14 @@ USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], bool]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], bool]
 CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[Dict[str, str]], bool]
 CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
-                [
-                    Optional[dict],
-                    Optional[str],
-                    Collection[Tuple[str, str]],
-                    Optional[str],
-                ],
-                RegistrationBehaviour,
-            ]
+    [
+        Optional[dict],
+        Optional[str],
+        Collection[Tuple[str, str]],
+        Optional[str],
+    ],
+    RegistrationBehaviour,
+]
 CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[[ReadableFileWrapper, FileInfo], bool]
 
 
@@ -122,7 +122,9 @@ class SpamChecker:
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
-        user_may_create_room_alias: Optional[USER_MAY_CREATE_ROOM_ALIAS_CALLBACK] = None,
+        user_may_create_room_alias: Optional[
+            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
+        ] = None,
         user_may_publish_room: Optional[USER_MAY_PUBLISH_ROOM_CALLBACK] = None,
         check_username_for_spam: Optional[CHECK_USERNAME_FOR_SPAM_CALLBACK] = None,
         check_registration_for_spam: Optional[
@@ -141,7 +143,9 @@ class SpamChecker:
             self._user_may_create_room_callbacks.append(user_may_create_room)
 
         if user_may_create_room_alias is not None:
-            self._user_may_create_room_alias_callbacks.append(user_may_create_room_alias)
+            self._user_may_create_room_alias_callbacks.append(
+                user_may_create_room_alias
+            )
 
         if user_may_publish_room is not None:
             self._user_may_publish_room_callbacks.append(user_may_publish_room)
@@ -174,7 +178,8 @@ class SpamChecker:
                 self._check_registration_for_spam_callbacks.append(wrapper)
             else:
                 raise SynapseError(
-                    500, "Bad signature for callback check_registration_for_spam",
+                    500,
+                    "Bad signature for callback check_registration_for_spam",
                 )
 
         if check_media_file_for_spam is not None:
