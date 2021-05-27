@@ -1398,7 +1398,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
                 )
 
         return 200, await self.handler.federation_space_summary(
-            room_id, suggested_only, max_rooms_per_space, exclude_rooms
+            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
         )
 
     # TODO When switching to the stable endpoint, remove the POST handler.

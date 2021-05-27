@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.35.0rc1 when calling the spaces summary API via a GET request.
