@@ -1110,11 +1110,34 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def replace_refresh_token(self, token_id: int, next_token_id: int) -> None:
-        await self.db_pool.simple_update_one(
-            "refresh_tokens",
-            {"id": token_id},
-            {"next_token_id": next_token_id},
-            desc="replace_refresh_token",
+        def _replace_refresh_token_txn(txn) -> None:
+            # First check if there was an existing refresh token
+            old_next_token_id = self.db_pool.simple_select_one_onecol_txn(
+                txn,
+                "refresh_tokens",
+                {"id": token_id},
+                "next_token_id",
+                allow_none=True,
+            )
+
+            self.db_pool.simple_update_one_txn(
+                txn,
+                "refresh_tokens",
+                {"id": token_id},
+                {"next_token_id": next_token_id},
+            )
+
+            # Delete the old "next" token if it exists. This should cascade and
+            # delete the associated access_token
+            if old_next_token_id is not None:
+                self.db_pool.simple_delete_one_txn(
+                    txn,
+                    "refresh_tokens",
+                    {"id": old_next_token_id},
+                )
+
+        await self.db_pool.runInteraction(
+            "replace_refresh_token", _replace_refresh_token_txn
         )
 
 
