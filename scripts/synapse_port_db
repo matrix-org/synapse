@@ -94,6 +94,7 @@ BOOLEAN_COLUMNS = {
     "local_media_repository": ["safe_from_quarantine"],
     "users": ["shadow_banned"],
     "e2e_fallback_keys_json": ["used"],
+    "access_tokens": ["used"],
 }
 
 
