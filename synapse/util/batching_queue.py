@@ -52,6 +52,12 @@ class BatchingQueue(Generic[V, R]):
     processing function that processed the given item. This means that the
     returned value will likely include data for other items that were in the
     batch.
+
+    Args:
+        name: A name for the queue, used for logging contexts and metrics.
+        clock: The clock to use to schedule work.
+        process_batch_callback: The callback to to be run to process a batch of
+            work.
     """
 
     def __init__(
