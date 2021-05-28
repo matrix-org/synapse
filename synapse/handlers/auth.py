@@ -38,7 +38,6 @@ from typing import (
 
 import attr
 import bcrypt
-import nacl.signing
 import pymacaroons
 import unpaddedbase64
 
@@ -845,31 +844,31 @@ class AuthHandler(BaseHandler):
 
     def verify_refresh_token(self, token: str) -> bool:
         """
-        Verifies a refresh token signature.
+        Verifies the shape of a refresh token.
 
         Args:
             token: The refresh token to verify
 
         Returns:
-            Whether the token is valid or not
+            Whether the token has the right shape
         """
-        parts = token.split(".", maxsplit=2)
-        if len(parts) != 2:
-            return False
-        try:
-            signature = base64.urlsafe_b64decode(parts[0])
-            message = base64.urlsafe_b64decode(parts[1])
-        except binascii.Error:
+        parts = token.split("_", maxsplit=4)
+        if len(parts) != 4:
             return False
 
-        for key in self.signing_keys:
-            try:
-                key.verify_key.verify(message, signature)
-                return True
-            except nacl.signing.BadSignatureError:
-                pass
+        type, localpart, rand, crc = parts
 
-        return False
+        # Refresh tokens are prefixed by "syr_", let's check that
+        if type != "syr":
+            return False
+
+        # Check the CRC
+        base = f"{type}_{localpart}_{rand}"
+        expected_crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        if crc != expected_crc:
+            return False
+
+        return True
 
     async def get_refresh_token_for_user_id(
         self,
@@ -886,7 +885,7 @@ class AuthHandler(BaseHandler):
         Returns:
             The newly created refresh token and its ID in the database
         """
-        refresh_token = self._generate_refresh_token()
+        refresh_token = self.generate_refresh_token(UserID.from_string(user_id))
         refresh_token_id = await self.store.add_refresh_token_to_user(
             user_id=user_id,
             token=refresh_token,
@@ -1332,6 +1331,19 @@ class AuthHandler(BaseHandler):
         b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))
         random_string = stringutils.random_string(20)
         base = f"syt_{b64local}_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
+
+    def generate_refresh_token(self, for_user: UserID) -> str:
+        """Generates an opaque string, for use as a refresh token"""
+
+        # we use the following format for access tokens:
+        #    syr_<base64 local part>_<random string>_<base62 crc check>
+
+        b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))
+        random_string = stringutils.random_string(20)
+        base = f"syr_{b64local}_{random_string}"
 
         crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
         return f"{base}_{crc}"
