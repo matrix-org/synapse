@@ -234,7 +234,7 @@ jobs:
         working-directory: /src
       - name: Summarise results.tap
         if: ${{ always() }}
-        run: /scripts/tap_to_gha.pl /logs/results.tap
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
       - name: Upload SyTest logs
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
