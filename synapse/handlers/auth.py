@@ -13,9 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import base64
 import logging
-import secrets
 import time
 import unicodedata
 import urllib.parse
@@ -200,8 +198,6 @@ class AuthHandler(BaseHandler):
                 self.checkers[inst.AUTH_TYPE] = inst  # type: ignore
 
         self.bcrypt_rounds = hs.config.bcrypt_rounds
-
-        self.signing_keys = hs.config.key.signing_key
 
         # we can't use hs.get_module_api() here, because to do so will create an
         # import loop.
@@ -826,20 +822,6 @@ class AuthHandler(BaseHandler):
             existing_token.token_id, new_refresh_token_id
         )
         return access_token, new_refresh_token
-
-    def _generate_refresh_token(self) -> str:
-        """
-        Generates a random and signed refresh token.
-
-        The token is signed with the first signing key in config
-        and can verified with verify_refresh_token.
-        """
-        rand = secrets.token_bytes(128)
-        signed = self.signing_keys[0].sign(rand)
-        return "%s.%s" % (
-            base64.urlsafe_b64encode(signed.signature).decode("ascii"),
-            base64.urlsafe_b64encode(signed.message).decode("ascii"),
-        )
 
     def verify_refresh_token(self, token: str) -> bool:
         """
