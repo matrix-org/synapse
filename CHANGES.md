@@ -4,8 +4,8 @@ Synapse 1.35.0rc3 (2021-05-28)
 Bugfixes
 --------
 
-- Fixed a bug causing replication requests to fail when receiving a lot of events via federation. ([\#10082](https://github.com/matrix-org/synapse/issues/10082))
-- Fix HTTP response size limit to allow joining very large rooms over federation. ([\#10093](https://github.com/matrix-org/synapse/issues/10093))
+- Fixed a bug causing replication requests to fail when receiving a lot of events via federation. Introduced in v1.33.0. ([\#10082](https://github.com/matrix-org/synapse/issues/10082))
+- Fix HTTP response size limit to allow joining very large rooms over federation. Introduced in v1.33.0. ([\#10093](https://github.com/matrix-org/synapse/issues/10093))
 
 
 Internal Changes
