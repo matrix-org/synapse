@@ -326,7 +326,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        async def block_all( user_profile):
+        async def block_all(user_profile):
             # All users are spammy.
             return True
 

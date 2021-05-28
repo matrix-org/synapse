@@ -37,23 +37,17 @@ class TestSpamChecker:
     def parse_config(config):
         return config
 
-    def check_registration_for_spam(
-        self, email_threepid, username, request_info
-    ):
+    def check_registration_for_spam(self, email_threepid, username, request_info):
         pass
 
 
 class DenyAll(TestSpamChecker):
-    def check_registration_for_spam(
-        self, email_threepid, username, request_info
-    ):
+    def check_registration_for_spam(self, email_threepid, username, request_info):
         return RegistrationBehaviour.DENY
 
 
 class BanAll(TestSpamChecker):
-    def check_registration_for_spam(
-        self, email_threepid, username, request_info
-    ):
+    def check_registration_for_spam(self, email_threepid, username, request_info):
         return RegistrationBehaviour.SHADOW_BAN
 
 
