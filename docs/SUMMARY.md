@@ -17,7 +17,8 @@
 # Usage
   - [Federation](federate.md)
   - [Configuration](usage/configuration/README.md)
-    - [Sample Configuration Files](usage/configuration/sample_config.md)
+    - [Homeserver Sample Config File](usage/configuration/homeserver_sample_config.md)
+    - [Logging Sample Config File](usage/configuration/logging_sample_config.md)
     - [User Authentication](usage/configuration/user_authentication/README.md)
       - [Single-Sign On]()
         - [OpenID Connect](openid.md)
