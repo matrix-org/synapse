@@ -27,6 +27,7 @@ from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
+    assert_params_in_dict,
     parse_boolean,
     parse_json_object_from_request,
     parse_string,
@@ -467,24 +468,24 @@ class RefreshTokenServlet(RestServlet):
     ):
         refresh_submission = parse_json_object_from_request(request)
 
-        try:
-            token = refresh_submission["refresh_token"]
-            valid_until_ms = self._clock.time_msec() + self.access_token_lifetime
-            access_token, refresh_token = await self._auth_handler.refresh_token(
-                token, valid_until_ms
-            )
-            expires_in_ms = valid_until_ms - self._clock.time_msec()
-            return (
-                200,
-                {
-                    "access_token": access_token,
-                    "refresh_token": refresh_token,
-                    "expires_in_ms": expires_in_ms,
-                },
-            )
+        assert_params_in_dict(refresh_submission, ["refresh_token"])
+        token = refresh_submission["refresh_token"]
+        if not isinstance(token, str):
+            raise SynapseError(400, "Invalid param: refresh_token", Codes.INVALID_PARAM)
 
-        except KeyError:
-            raise SynapseError(400, "Missing JSON keys.")
+        valid_until_ms = self._clock.time_msec() + self.access_token_lifetime
+        access_token, refresh_token = await self._auth_handler.refresh_token(
+            token, valid_until_ms
+        )
+        expires_in_ms = valid_until_ms - self._clock.time_msec()
+        return (
+            200,
+            {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "expires_in_ms": expires_in_ms,
+            },
+        )
 
 
 class SsoRedirectServlet(RestServlet):
