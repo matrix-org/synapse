@@ -16,11 +16,7 @@ import logging
 from http import HTTPStatus
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.http.servlet import (
-    RestServlet,
-    assert_params_in_dict,
-    parse_json_object_from_request,
-)
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
 from ._base import client_patterns
 
@@ -42,15 +38,14 @@ class ReportEventRestServlet(RestServlet):
         user_id = requester.user.to_string()
 
         body = parse_json_object_from_request(request)
-        assert_params_in_dict(body, ("reason", "score"))
 
-        if not isinstance(body["reason"], str):
+        if not isinstance(body.get("reason", ""), str):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Param 'reason' must be a string",
                 Codes.BAD_JSON,
             )
-        if not isinstance(body["score"], int):
+        if not isinstance(body.get("score", 0), int):
             raise SynapseError(
                 HTTPStatus.BAD_REQUEST,
                 "Param 'score' must be an integer",
@@ -61,7 +56,7 @@ class ReportEventRestServlet(RestServlet):
             room_id=room_id,
             event_id=event_id,
             user_id=user_id,
-            reason=body["reason"],
+            reason=body.get("reason"),
             content=body,
             received_ts=self.clock.time_msec(),
         )

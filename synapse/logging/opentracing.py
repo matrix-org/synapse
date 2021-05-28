@@ -265,6 +265,12 @@ class SynapseTags:
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
 
+    # incoming HTTP request ID  (as written in the logs)
+    REQUEST_ID = "request_id"
+
+    # HTTP request tag (used to distinguish full vs incremental syncs, etc)
+    REQUEST_TAG = "request_tag"
+
 
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
@@ -824,7 +830,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         return
 
     request_tags = {
-        "request_id": request.get_request_id(),
+        SynapseTags.REQUEST_ID: request.get_request_id(),
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
@@ -833,9 +839,9 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
 
     request_name = request.request_metrics.name
     if extract_context:
-        scope = start_active_span_from_request(request, request_name, tags=request_tags)
+        scope = start_active_span_from_request(request, request_name)
     else:
-        scope = start_active_span(request_name, tags=request_tags)
+        scope = start_active_span(request_name)
 
     with scope:
         try:
@@ -845,4 +851,11 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
             # with JsonResource).
             scope.span.set_operation_name(request.request_metrics.name)
 
-            scope.span.set_tag("request_tag", request.request_metrics.start_context.tag)
+            # set the tags *after* the servlet completes, in case it decided to
+            # prioritise the span (tags will get dropped on unprioritised spans)
+            request_tags[
+                SynapseTags.REQUEST_TAG
+            ] = request.request_metrics.start_context.tag
+
+            for k, v in request_tags.items():
+                scope.span.set_tag(k, v)
