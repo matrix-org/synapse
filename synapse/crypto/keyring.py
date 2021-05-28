@@ -288,31 +288,25 @@ class Keyring:
         # Add the keys we need to verify to the queue for retrieval. We queue
         # up requests for the same server so we don't end up with many in flight
         # requests for the same keys.
+        key_request = verify_request.to_fetch_key_request()
         found_keys_by_server = await self._server_queue.add_to_queue(
-            verify_request.to_fetch_key_request(), key=verify_request.server_name
+            key_request, key=verify_request.server_name
         )
 
         # Since we batch up requests the returned set of keys may contain keys
         # from other servers, so we pull out only the ones we care about.s
         found_keys = found_keys_by_server.get(verify_request.server_name, {})
 
-        # For each signature to check we ensure we have fetched the necessary
-        # keys and the signature matches.
+        # Verify each signature we got valid keys for, raising if we can't
+        # verify any of them.
+        verified = False
         for key_id in verify_request.key_ids:
             key_result = found_keys.get(key_id)
             if not key_result:
-                raise SynapseError(
-                    401,
-                    f"Failed to retrieve key {key_id} for {verify_request.server_name}",
-                    Codes.UNAUTHORIZED,
-                )
+                continue
 
             if key_result.valid_until_ts < verify_request.minimum_valid_until_ts:
-                raise SynapseError(
-                    401,
-                    f"Failed to find key with recent enough `valid_until_ts` for {verify_request.server_name}: {key_id}",
-                    Codes.UNAUTHORIZED,
-                )
+                continue
 
             verify_key = key_result.verify_key
             json_object = verify_request.get_json_object()
@@ -322,6 +316,7 @@ class Keyring:
                     verify_request.server_name,
                     verify_key,
                 )
+                verified = True
             except SignatureVerifyException as e:
                 logger.debug(
                     "Error verifying signature for %s:%s:%s with key %s: %s",
@@ -342,6 +337,13 @@ class Keyring:
                     ),
                     Codes.UNAUTHORIZED,
                 )
+
+        if not verified:
+            raise SynapseError(
+                401,
+                f"Failed to find any key to satisfy: {key_request}",
+                Codes.UNAUTHORIZED,
+            )
 
     async def _inner_fetch_key_requests(
         self, requests: List[_FetchKeyRequest]
