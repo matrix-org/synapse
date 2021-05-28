@@ -202,8 +202,9 @@ class SpamChecker:
             will be used as the error message returned to the user.
         """
         for callback in self._check_event_for_spam_callbacks:
-            if await maybe_awaitable(callback(event)):
-                return True
+            res = await maybe_awaitable(callback(event))
+            if res:
+                return res
 
         return False
 
