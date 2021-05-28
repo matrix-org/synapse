@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -111,7 +110,7 @@ class ResponseCache(Generic[T]):
         return result.observe()
 
     def wrap(
-        self, key: T, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
+        self, key: T, callback: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> defer.Deferred:
         """Wrap together a *get* and *set* call, taking care of logcontexts
 

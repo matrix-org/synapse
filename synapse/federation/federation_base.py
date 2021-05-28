@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -138,11 +137,7 @@ class FederationBase:
         return deferreds
 
 
-class PduToCheckSig(
-    namedtuple(
-        "PduToCheckSig", ["pdu", "redacted_pdu_json", "sender_domain", "deferreds"]
-    )
-):
+class PduToCheckSig(namedtuple("PduToCheckSig", ["pdu", "sender_domain", "deferreds"])):
     pass
 
 
@@ -185,7 +180,6 @@ def _check_sigs_on_pdus(
     pdus_to_check = [
         PduToCheckSig(
             pdu=p,
-            redacted_pdu_json=prune_event(p).get_pdu_json(),
             sender_domain=get_domain_from_id(p.sender),
             deferreds=[],
         )
@@ -196,13 +190,12 @@ def _check_sigs_on_pdus(
     # (except if its a 3pid invite, in which case it may be sent by any server)
     pdus_to_check_sender = [p for p in pdus_to_check if not _is_invite_via_3pid(p.pdu)]
 
-    more_deferreds = keyring.verify_json_objects_for_server(
+    more_deferreds = keyring.verify_events_for_server(
         [
             (
                 p.sender_domain,
-                p.redacted_pdu_json,
+                p.pdu,
                 p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
-                p.pdu.event_id,
             )
             for p in pdus_to_check_sender
         ]
@@ -231,13 +224,12 @@ def _check_sigs_on_pdus(
             if p.sender_domain != get_domain_from_id(p.pdu.event_id)
         ]
 
-        more_deferreds = keyring.verify_json_objects_for_server(
+        more_deferreds = keyring.verify_events_for_server(
             [
                 (
                     get_domain_from_id(p.pdu.event_id),
-                    p.redacted_pdu_json,
+                    p.pdu,
                     p.pdu.origin_server_ts if room_version.enforce_key_validity else 0,
-                    p.pdu.event_id,
                 )
                 for p in pdus_to_check_event_id
             ]

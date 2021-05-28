@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -541,7 +540,7 @@ class StateGroupStorage:
             state_filter: The state filter used to fetch state from the database.
 
         Returns:
-            A dict from (type, state_key) -> state_event
+            A dict from (type, state_key) -> state_event_id
         """
         state_map = await self.get_state_ids_for_events(
             [event_id], state_filter or StateFilter.all()

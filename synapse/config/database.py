@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -59,6 +58,7 @@ DEFAULT_CONFIG = """\
 #    password: secretpassword
 #    database: synapse
 #    host: localhost
+#    port: 5432
 #    cp_min: 5
 #    cp_max: 10
 #

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -182,6 +181,6 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V5,
         RoomVersions.V6,
         RoomVersions.MSC2176,
+        RoomVersions.MSC3083,
     )
-    # Note that we do not include MSC3083 here unless it is enabled in the config.
 }  # type: Dict[str, RoomVersion]

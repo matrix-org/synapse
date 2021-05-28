@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C
 #
@@ -31,12 +30,14 @@ from twisted.internet import defer, error, reactor
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
+from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
-from synapse.config.server import ListenerConfig
+from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.util.async_helpers import Linearizer
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
@@ -115,6 +116,7 @@ def start_reactor(
 
     def run():
         logger.info("Running")
+        setup_jemalloc_stats()
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
@@ -259,13 +261,10 @@ def refresh_certificate(hs):
     Refresh the TLS certificates that Synapse is using by re-reading them from
     disk and updating the TLS context factories to use them.
     """
-
     if not hs.config.has_tls_listener():
-        # attempt to reload the certs for the good of the tls_fingerprints
-        hs.config.read_certificate_from_disk(require_cert_and_key=False)
         return
 
-    hs.config.read_certificate_from_disk(require_cert_and_key=True)
+    hs.config.read_certificate_from_disk()
     hs.tls_server_context_factory = context_factory.ServerContextFactory(hs.config)
 
     if hs._listening_services:
@@ -289,7 +288,7 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerConfig]):
+async def start(hs: "synapse.server.HomeServer"):
     """
     Start a Synapse server or worker.
 
@@ -301,7 +300,6 @@ async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerCon
 
     Args:
         hs: homeserver instance
-        listeners: Listener configuration ('listeners' in homeserver.yaml)
     """
     # Set up the SIGHUP machinery.
     if hasattr(signal, "SIGHUP"):
@@ -337,7 +335,7 @@ async def start(hs: "synapse.server.HomeServer", listeners: Iterable[ListenerCon
     synapse.logging.opentracing.init_tracer(hs)  # type: ignore[attr-defined] # noqa
 
     # It is now safe to start your Synapse.
-    hs.start_listening(listeners)
+    hs.start_listening()
     hs.get_datastore().db_pool.start_profiling()
     hs.get_pusherpool().start()
 
@@ -531,3 +529,25 @@ def sdnotify(state):
         # this is a bit surprising, since we don't expect to have a NOTIFY_SOCKET
         # unless systemd is expecting us to notify it.
         logger.warning("Unable to send notification to systemd: %s", e)
+
+
+def max_request_body_size(config: HomeServerConfig) -> int:
+    """Get a suitable maximum size for incoming HTTP requests"""
+
+    # Other than media uploads, the biggest request we expect to see is a fully-loaded
+    # /federation/v1/send request.
+    #
+    # The main thing in such a request is up to 50 PDUs, and up to 100 EDUs. PDUs are
+    # limited to 65536 bytes (possibly slightly more if the sender didn't use canonical
+    # json encoding); there is no specced limit to EDUs (see
+    # https://github.com/matrix-org/matrix-doc/issues/3121).
+    #
+    # in short, we somewhat arbitrarily limit requests to 200 * 64K (about 12.5M)
+    #
+    max_request_size = 200 * MAX_PDU_SIZE
+
+    # if we have a media repo enabled, we may need to allow larger uploads than that
+    if config.media.can_load_media_repo:
+        max_request_size = max(max_request_size, config.media.max_upload_size)
+
+    return max_request_size

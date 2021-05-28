@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2020, 2021 The Matrix.org Foundation C.I.C.
@@ -54,6 +53,7 @@ from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
     PushersRestServlet,
+    RateLimitRestServlet,
     ResetPasswordRestServlet,
     SearchUsersRestServlet,
     ShadowBanRestServlet,
@@ -239,6 +239,7 @@ def register_servlets(hs, http_server):
     ShadowBanRestServlet(hs).register(http_server)
     ForwardExtremitiesRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
+    RateLimitRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(hs, http_server):

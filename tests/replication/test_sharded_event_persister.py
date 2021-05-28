@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,7 +30,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
     """Checks event persisting sharding works"""
 
     # Event persister sharding requires postgres (due to needing
-    # `MutliWriterIdGenerator`).
+    # `MultiWriterIdGenerator`).
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
 

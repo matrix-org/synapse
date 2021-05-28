@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -242,18 +241,23 @@ class BackgroundProcessLoggingContext(LoggingContext):
     processes.
     """
 
-    __slots__ = ["_id", "_proc"]
+    __slots__ = ["_proc"]
 
-    def __init__(self, name: str, id: Optional[Union[int, str]] = None):
-        super().__init__(name)
-        self._id = id
+    def __init__(self, name: str, instance_id: Optional[Union[int, str]] = None):
+        """
 
+        Args:
+            name: The name of the background process. Each distinct `name` gets a
+                separate prometheus time series.
+
+            instance_id: an identifer to add to `name` to distinguish this instance of
+                the named background process in the logs. If this is `None`, one is
+                made up based on id(self).
+        """
+        if instance_id is None:
+            instance_id = id(self)
+        super().__init__("%s-%s" % (name, instance_id))
         self._proc = _BackgroundProcess(name, self)
-
-    def __str__(self) -> str:
-        if self._id is not None:
-            return "%s-%s" % (self.name, self._id)
-        return "%s@%x" % (self.name, id(self))
 
     def start(self, rusage: "Optional[resource._RUsage]"):
         """Log context has started running (again)."""

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -21,6 +20,7 @@ from time import monotonic as monotonic_time
 from typing import (
     Any,
     Callable,
+    Collection,
     Dict,
     Iterable,
     Iterator,
@@ -49,7 +49,6 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
-from synapse.types import Collection
 
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
@@ -172,10 +171,7 @@ class LoggingDatabaseConnection:
 
 
 # The type of entry which goes on our after_callbacks and exception_callbacks lists.
-#
-# Python 3.5.2 doesn't support Callable with an ellipsis, so we wrap it in quotes so
-# that mypy sees the type but the runtime python doesn't.
-_CallbackListEntry = Tuple["Callable[..., None]", Iterable[Any], Dict[str, Any]]
+_CallbackListEntry = Tuple[Callable[..., None], Iterable[Any], Dict[str, Any]]
 
 
 R = TypeVar("R")
@@ -222,7 +218,7 @@ class LoggingTransaction:
         self.after_callbacks = after_callbacks
         self.exception_callbacks = exception_callbacks
 
-    def call_after(self, callback: "Callable[..., None]", *args: Any, **kwargs: Any):
+    def call_after(self, callback: Callable[..., None], *args: Any, **kwargs: Any):
         """Call the given callback on the main twisted thread after the
         transaction has finished. Used to invalidate the caches on the
         correct thread.
@@ -234,7 +230,7 @@ class LoggingTransaction:
         self.after_callbacks.append((callback, args, kwargs))
 
     def call_on_exception(
-        self, callback: "Callable[..., None]", *args: Any, **kwargs: Any
+        self, callback: Callable[..., None], *args: Any, **kwargs: Any
     ):
         # if self.exception_callbacks is None, that means that whatever constructed the
         # LoggingTransaction isn't expecting there to be any callbacks; assert that
@@ -486,9 +482,9 @@ class DatabasePool:
         desc: str,
         after_callbacks: List[_CallbackListEntry],
         exception_callbacks: List[_CallbackListEntry],
-        func: "Callable[..., R]",
+        func: Callable[..., R],
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Start a new database transaction with the given connection.
 
@@ -619,10 +615,10 @@ class DatabasePool:
     async def runInteraction(
         self,
         desc: str,
-        func: "Callable[..., R]",
+        func: Callable[..., R],
         *args: Any,
         db_autocommit: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Starts a transaction on the database and runs a given function
 
@@ -679,10 +675,10 @@ class DatabasePool:
 
     async def runWithConnection(
         self,
-        func: "Callable[..., R]",
+        func: Callable[..., R],
         *args: Any,
         db_autocommit: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
@@ -719,7 +715,9 @@ class DatabasePool:
             # pool).
             assert not self.engine.in_transaction(conn)
 
-            with LoggingContext("runWithConnection", parent_context) as context:
+            with LoggingContext(
+                str(curr_context), parent_context=parent_context
+            ) as context:
                 sched_duration_sec = monotonic_time() - start_time
                 sql_scheduling_timer.observe(sched_duration_sec)
                 context.add_database_scheduled(sched_duration_sec)
@@ -775,7 +773,7 @@ class DatabasePool:
         desc: str,
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
-        *args: Any
+        *args: Any,
     ) -> R:
         """Runs a single query for a result set.
 

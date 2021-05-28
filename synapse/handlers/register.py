@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -747,9 +746,7 @@ class RegistrationHandler(BaseHandler):
         )
         if is_guest:
             assert valid_until_ms is None
-            access_token = self.macaroon_gen.generate_access_token(
-                user_id, ["guest = true"]
-            )
+            access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             if should_issue_refresh_token:
                 (

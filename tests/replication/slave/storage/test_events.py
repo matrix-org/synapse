@@ -340,7 +340,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         prev_state: Optional[list] = None,
         redacts=None,
         push_actions: Iterable = frozenset(),
-        **content
+        **content,
     ):
         prev_events = prev_events or []
         auth_events = auth_events or []

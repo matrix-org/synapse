@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -500,7 +499,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError("fetch_error")
 
         # Handle code exchange failure
-        from synapse.handlers.oidc_handler import OidcError
+        from synapse.handlers.oidc import OidcError
 
         self.provider._exchange_code = simple_async_mock(
             raises=OidcError("invalid_request")
@@ -584,7 +583,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 body=b'{"error": "foo", "error_description": "bar"}',
             )
         )
-        from synapse.handlers.oidc_handler import OidcError
+        from synapse.handlers.oidc import OidcError
 
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "foo")
@@ -1127,7 +1126,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         client_redirect_url: str,
         ui_auth_session_id: str = "",
     ) -> str:
-        from synapse.handlers.oidc_handler import OidcSessionData
+        from synapse.handlers.oidc import OidcSessionData
 
         return self.handler._token_generator.generate_oidc_session_token(
             state=state,
@@ -1153,7 +1152,7 @@ async def _make_callback_with_userinfo(
         userinfo: the OIDC userinfo dict
         client_redirect_url: the URL to redirect to on success.
     """
-    from synapse.handlers.oidc_handler import OidcSessionData
+    from synapse.handlers.oidc import OidcSessionData
 
     handler = hs.get_oidc_handler()
     provider = handler._providers["oidc"]

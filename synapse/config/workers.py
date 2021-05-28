@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,6 +64,14 @@ class WriterLocations:
     Attributes:
         events: The instances that write to the event and backfill streams.
         typing: The instance that writes to the typing stream.
+        to_device: The instances that write to the to_device stream. Currently
+            can only be a single instance.
+        account_data: The instances that write to the account data streams. Currently
+            can only be a single instance.
+        receipts: The instances that write to the receipts stream. Currently
+            can only be a single instance.
+        presence: The instances that write to the presence stream. Currently
+            can only be a single instance.
     """
 
     events = attr.ib(
@@ -82,6 +89,11 @@ class WriterLocations:
         converter=_instance_to_list_converter,
     )
     receipts = attr.ib(
+        default=["master"],
+        type=List[str],
+        converter=_instance_to_list_converter,
+    )
+    presence = attr.ib(
         default=["master"],
         type=List[str],
         converter=_instance_to_list_converter,
@@ -189,7 +201,14 @@ class WorkerConfig(Config):
 
         # Check that the configured writers for events and typing also appears in
         # `instance_map`.
-        for stream in ("events", "typing", "to_device", "account_data", "receipts"):
+        for stream in (
+            "events",
+            "typing",
+            "to_device",
+            "account_data",
+            "receipts",
+            "presence",
+        ):
             instances = _instance_to_list_converter(getattr(self.writers, stream))
             for instance in instances:
                 if instance != "master" and instance not in self.instance_map:
@@ -215,6 +234,11 @@ class WorkerConfig(Config):
 
         if len(self.writers.events) == 0:
             raise ConfigError("Must specify at least one instance to handle `events`.")
+
+        if len(self.writers.presence) != 1:
+            raise ConfigError(
+                "Must only specify one instance to handle `presence` messages."
+            )
 
         self.events_shard_config = RoutableShardedWorkerHandlingConfig(
             self.writers.events
