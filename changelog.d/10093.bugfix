@@ -1,1 +1,0 @@
-Fix HTTP response size limit to allow joining very large rooms over federation.
