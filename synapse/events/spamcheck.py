@@ -25,6 +25,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 from synapse.api.errors import SynapseError
@@ -46,6 +47,14 @@ USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], bool]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], bool]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], bool]
 CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[Dict[str, str]], bool]
+LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
+    [
+        Optional[dict],
+        Optional[str],
+        Collection[Tuple[str, str]],
+    ],
+    RegistrationBehaviour,
+]
 CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
         Optional[dict],
@@ -128,7 +137,10 @@ class SpamChecker:
         user_may_publish_room: Optional[USER_MAY_PUBLISH_ROOM_CALLBACK] = None,
         check_username_for_spam: Optional[CHECK_USERNAME_FOR_SPAM_CALLBACK] = None,
         check_registration_for_spam: Optional[
-            CHECK_REGISTRATION_FOR_SPAM_CALLBACK
+            Union[
+                LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+                CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+            ]
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
     ):
@@ -156,20 +168,29 @@ class SpamChecker:
         if check_registration_for_spam is not None:
             checker_args = inspect.signature(check_registration_for_spam)
             if len(checker_args.parameters) == 4:
-                self._check_registration_for_spam_callbacks.append(
+                # Let mypy know that at this point we're pretty sure which side of the
+                # Union we're on.
+                checker = cast(
+                    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
                     check_registration_for_spam,
                 )
+                self._check_registration_for_spam_callbacks.append(checker)
             elif len(checker_args.parameters) == 3:
                 # Backwards compatibility; some modules might implement a hook that
                 # doesn't expect a 4th argument. In this case, wrap it in a function that
                 # gives it only 3 arguments and drops the auth_provider_id on the floor.
+                legacy_checker = cast(
+                    LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+                    check_registration_for_spam,
+                )
+
                 def wrapper(
                     email_threepid: Optional[dict],
                     username: Optional[str],
                     request_info: Collection[Tuple[str, str]],
                     auth_provider_id: Optional[str] = None,
                 ) -> RegistrationBehaviour:
-                    return check_registration_for_spam(
+                    return legacy_checker(
                         email_threepid,
                         username,
                         request_info,
@@ -202,7 +223,7 @@ class SpamChecker:
             will be used as the error message returned to the user.
         """
         for callback in self._check_event_for_spam_callbacks:
-            res = await maybe_awaitable(callback(event))
+            res = await maybe_awaitable(callback(event))  # type: Union[bool, str]
             if res:
                 return res
 
