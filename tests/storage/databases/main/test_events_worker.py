@@ -47,6 +47,7 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
                         "event_id": eid,
                         "room_id": rid,
                         "topological_ordering": idx,
+                        "stream_ordering": idx,
                         "type": "test",
                         "processed": True,
                         "outlier": False,
