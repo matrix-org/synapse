@@ -75,9 +75,9 @@ The following fields are returned in the JSON response body:
 * `name`: string - The name of the room.
 * `event_id`: string - The ID of the reported event.
 * `user_id`: string - This is the user who reported the event and wrote the reason.
-* `reason`: string - Comment made by the `user_id` in this report. May be blank.
+* `reason`: string - Comment made by the `user_id` in this report. May be blank or `null`.
 * `score`: integer - Content is reported based upon a negative score, where -100 is
-  "most offensive" and 0 is "inoffensive".
+  "most offensive" and 0 is "inoffensive". May be `null`.
 * `sender`: string - This is the ID of the user who sent the original message/event that
   was reported.
 * `canonical_alias`: string - The canonical alias of the room. `null` if the room does not

@@ -228,6 +228,9 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/event/
+    ^/_matrix/client/(api/v1|r0|unstable)/joined_rooms$
+    ^/_matrix/client/(api/v1|r0|unstable)/search$
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
