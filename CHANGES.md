@@ -1,3 +1,12 @@
+Synapse 1.35.0rc2 (2021-05-27)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.35.0rc1 when calling the spaces summary API via a GET request. ([\#10079](https://github.com/matrix-org/synapse/issues/10079))
+
+
 Synapse 1.35.0rc1 (2021-05-25)
 ==============================
 

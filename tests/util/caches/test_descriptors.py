@@ -622,17 +622,17 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEquals(callcount2[0], 1)
 
         a.func2.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.pop.call_count, 1)
+        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 1)
 
         yield a.func2("foo")
         a.func2.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.pop.call_count, 2)
+        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 2)
 
         self.assertEquals(callcount[0], 1)
         self.assertEquals(callcount2[0], 2)
 
         a.func.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.pop.call_count, 3)
+        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 3)
         yield a.func("foo")
 
         self.assertEquals(callcount[0], 2)

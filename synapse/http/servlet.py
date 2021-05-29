@@ -15,7 +15,9 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import Iterable, List, Optional, Union
+from typing import Iterable, List, Optional, Union, overload
+
+from typing_extensions import Literal
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -130,8 +132,7 @@ def parse_string(
         allowed_values: List of allowed values for the
             string, or None if any value is allowed, defaults to None. Must be
             the same type as name, if given.
-        encoding: The encoding to decode the string content with.
-
+        encoding : The encoding to decode the string content with.
     Returns:
         A string value or the default. Unicode if encoding
         was given, bytes otherwise.
@@ -151,7 +152,7 @@ def _parse_string_value(
     allowed_values: Optional[Iterable[str]],
     name: str,
     encoding: Optional[str],
-) -> str:
+) -> Union[str, bytes]:
     if encoding:
         try:
             value = value.decode(encoding)
@@ -166,6 +167,30 @@ def _parse_string_value(
         raise SynapseError(400, message)
     else:
         return value
+
+
+@overload
+def parse_strings_from_args(
+    args: List[str],
+    name: Union[bytes, str],
+    default: Optional[List[str]] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: Literal[None] = None,
+) -> Optional[List[bytes]]:
+    ...
+
+
+@overload
+def parse_strings_from_args(
+    args: List[str],
+    name: Union[bytes, str],
+    default: Optional[List[str]] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[List[str]]:
+    ...
 
 
 def parse_strings_from_args(
@@ -266,17 +291,13 @@ def parse_string_from_args(
     strings = parse_strings_from_args(
         args,
         name,
-        default=default,
+        default=[default],
         required=required,
         allowed_values=allowed_values,
         encoding=encoding,
     )
 
-    if isinstance(strings, list):
-        return strings[0]
-
-    # Return the default
-    return strings
+    return strings[0]
 
 
 def parse_json_value_from_request(request, allow_empty_body=False):
