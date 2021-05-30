@@ -1,0 +1,1 @@
+Fix a bug where messages in `device_inbox` table where not deleted, when deleting device(s).
