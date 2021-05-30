@@ -1130,6 +1130,12 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             desc="delete_device",
         )
 
+        await self.db_pool.simple_delete_one(
+            table="device_inbox",
+            keyvalues={"user_id": user_id, "device_id": device_id},
+            desc="delete_device",
+        )
+
         self.device_id_exists_cache.invalidate((user_id, device_id))
 
     async def delete_devices(self, user_id: str, device_ids: List[str]) -> None:
@@ -1146,6 +1152,15 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             keyvalues={"user_id": user_id, "hidden": False},
             desc="delete_devices",
         )
+
+        await self.db_pool.simple_delete_many(
+            table="device_inbox",
+            column="device_id",
+            iterable=device_ids,
+            keyvalues={"user_id": user_id},
+            desc="delete_devices",
+        )
+
         for device_id in device_ids:
             self.device_id_exists_cache.invalidate((user_id, device_id))
 
