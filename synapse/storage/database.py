@@ -533,9 +533,16 @@ class DatabasePool:
                     exception_callbacks=exception_callbacks,
                 )
                 try:
-                    r = func(cursor, *args, **kwargs)
-                    conn.commit()
-                    return r
+                    with opentracing.start_active_span(
+                        "db.txn",
+                        tags={
+                            opentracing.SynapseTags.DB_TXN_DESC: desc,
+                            opentracing.SynapseTags.DB_TXN_ID: name,
+                        },
+                    ):
+                        r = func(cursor, *args, **kwargs)
+                        conn.commit()
+                        return r
                 except self.engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.

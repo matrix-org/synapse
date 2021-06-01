@@ -271,6 +271,12 @@ class SynapseTags:
     # HTTP request tag (used to distinguish full vs incremental syncs, etc)
     REQUEST_TAG = "request_tag"
 
+    # Text description of a database transaction
+    DB_TXN_DESC = "db.txn_desc"
+
+    # Uniqueish ID of a database transaction
+    DB_TXN_ID = "db.txn_id"
+
 
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
