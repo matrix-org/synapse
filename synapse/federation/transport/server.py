@@ -385,6 +385,7 @@ class BaseFederationServerServlet(BaseFederationServlet):
 
     See BaseFederationServlet for more information.
     """
+
     def __init__(
         self,
         hs: HomeServer,
@@ -886,6 +887,7 @@ class BaseGroupsServerServlet(BaseFederationServlet):
 
     See BaseFederationServlet for more information.
     """
+
     def __init__(
         self,
         hs: HomeServer,
@@ -1098,6 +1100,7 @@ class BaseGroupsLocalServlet(BaseFederationServlet):
 
     See BaseFederationServlet for more information.
     """
+
     def __init__(
         self,
         hs: HomeServer,
