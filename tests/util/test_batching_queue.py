@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from prometheus_client.samples import Sample
+
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable
@@ -45,37 +47,32 @@ class BatchingQueueTestCase(TestCase):
         self._pending_calls.append((values, d))
         return await make_deferred_yieldable(d)
 
+    def _get_sample_with_name(self, metric, name: str) -> Sample:
+        """For a prometheus metric get the sample that has a matching "name"
+        label.
+        """
+        for sample in metric.collect()[0].samples:
+            if sample.labels.get("name") == name:
+                return sample
+
+        self.fail("Found no matching sample")
+
     def _assert_metrics(self, queued, keys, in_flight):
         """Assert that the metrics are correct"""
 
-        self.assertEqual(len(number_queued.collect()), 1)
-        self.assertEqual(len(number_queued.collect()[0].samples), 1)
+        sample = self._get_sample_with_name(number_queued, self.queue._name)
         self.assertEqual(
-            number_queued.collect()[0].samples[0].labels,
-            {"name": self.queue._name},
-        )
-        self.assertEqual(
-            number_queued.collect()[0].samples[0].value,
+            sample.value,
             queued,
             "number_queued",
         )
 
-        self.assertEqual(len(number_of_keys.collect()), 1)
-        self.assertEqual(len(number_of_keys.collect()[0].samples), 1)
-        self.assertEqual(
-            number_queued.collect()[0].samples[0].labels, {"name": self.queue._name}
-        )
-        self.assertEqual(
-            number_of_keys.collect()[0].samples[0].value, keys, "number_of_keys"
-        )
+        sample = self._get_sample_with_name(number_of_keys, self.queue._name)
+        self.assertEqual(sample.value, keys, "number_of_keys")
 
-        self.assertEqual(len(number_in_flight.collect()), 1)
-        self.assertEqual(len(number_in_flight.collect()[0].samples), 1)
+        sample = self._get_sample_with_name(number_in_flight, self.queue._name)
         self.assertEqual(
-            number_queued.collect()[0].samples[0].labels, {"name": self.queue._name}
-        )
-        self.assertEqual(
-            number_in_flight.collect()[0].samples[0].value,
+            sample.value,
             in_flight,
             "number_in_flight",
         )
