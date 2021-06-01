@@ -487,6 +487,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
             devices = list(messages_by_device.keys())
             if len(devices) == 1 and devices[0] == "*":
                 # Handle wildcard device_ids.
+                # We exclude hidden devices (such as cross-signing keys) here as they are
+                # not expected to receive send-to-device events.
                 devices = self.db_pool.simple_select_onecol_txn(
                     txn,
                     table="devices",
@@ -503,6 +505,8 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 if not devices:
                     continue
 
+                # We exclude hidden devices (such as cross-signing keys) here as they are
+                # not expected to receive send-to-device events.
                 rows = self.db_pool.simple_select_many_txn(
                     txn,
                     table="devices",
