@@ -57,7 +57,6 @@ class HomeServerConfig(RootConfig):
 
     config_classes = [
         ServerConfig,
-        ExperimentalConfig,
         TlsConfig,
         FederationConfig,
         CacheConfig,
@@ -94,4 +93,5 @@ class HomeServerConfig(RootConfig):
         TracerConfig,
         WorkerConfig,
         RedisConfig,
+        ExperimentalConfig,
     ]

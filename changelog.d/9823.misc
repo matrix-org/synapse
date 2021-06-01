@@ -1,1 +1,0 @@
-Allow sending full presence to users via workers other than the one that called `ModuleApi.send_local_online_presence_to`.

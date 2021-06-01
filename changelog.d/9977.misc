@@ -1,1 +1,0 @@
-Split multipart email sending into a dedicated handler.
