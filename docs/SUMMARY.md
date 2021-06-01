@@ -19,6 +19,7 @@
   - [Configuration](usage/configuration/README.md)
     - [Homeserver Sample Config File](usage/configuration/homeserver_sample_config.md)
     - [Logging Sample Config File](usage/configuration/logging_sample_config.md)
+    - [Structured Logging](structured_logging.md)
     - [User Authentication](usage/configuration/user_authentication/README.md)
       - [Single-Sign On]()
         - [OpenID Connect](openid.md)
@@ -60,7 +61,6 @@
       - [Server Version](admin_api/version_api.rst)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
-    - [Structured Logging](structured_logging.md)
     - [Scripts]()
 
 # Development
