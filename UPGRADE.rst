@@ -85,46 +85,6 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
-
-Upgrading to v1.35.0
-====================
-
-Deprecation of ``experimental.msc2858_enabled`` config option
--------------------------------------------------------------
-
-The ``msc2858_enabled`` option enabled support for MSC2858 with unstable
-prefixes. The MSC has since been accepted into the Matrix spec, and Synapse
-supports the MSC with stable prefixes as of v1.30.0. As such, the use of
-``msc2858_enabled`` is deprecated, and it will be removed entirely in the first
-Synapse release in August.
-
-If using an OIDC provider, any ``idp_brand`` config should be updated as
-follows:
-
-* ``org.matrix.gitlab`` to ``gitlab``
-* ``org.matrix.github`` to ``github``
-* ``org.matrix.apple`` to ``apple``
-* ``org.matrix.google`` to ``google``
-* ``org.matrix.facebook`` to ``facebook``
-* ``org.matrix.twitter`` to ``twitter``
-
-To maintain backwards compatibility servers can specify ``idp_unstable_brand``
-with the old value, which will be used to populate the brand names returned in
-the ``org.matrix.msc2858.identity_providers`` login flow.
-
-
-Clients that currently rely on the experimental MSC2858 support, should:
-
-1. Migrate from checking ``org.matrix.msc2858.identity_providers`` to
-   ``identity_providers`` in the flows returned by ``/login``. Note that the
-   ``brand`` values have changed format (as above).
-
-2. Replace HTTP calls to
-   ``/_matrix/client/unstable/org.matrix.msc2858/login/sso/redirect/..`` with
-   ``/_matrix/client/r0/login/sso/redirect/..``.
-
-
-
 Upgrading to v1.34.0
 ====================
 
