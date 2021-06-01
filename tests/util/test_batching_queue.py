@@ -11,8 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from prometheus_client.samples import Sample
-
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable
@@ -47,13 +45,13 @@ class BatchingQueueTestCase(TestCase):
         self._pending_calls.append((values, d))
         return await make_deferred_yieldable(d)
 
-    def _get_sample_with_name(self, metric, name: str) -> Sample:
-        """For a prometheus metric get the sample that has a matching "name"
-        label.
+    def _get_sample_with_name(self, metric, name) -> int:
+        """For a prometheus metric get the value of the sample that has a
+        matching "name" label.
         """
         for sample in metric.collect()[0].samples:
             if sample.labels.get("name") == name:
-                return sample
+                return sample.value
 
         self.fail("Found no matching sample")
 
@@ -62,17 +60,17 @@ class BatchingQueueTestCase(TestCase):
 
         sample = self._get_sample_with_name(number_queued, self.queue._name)
         self.assertEqual(
-            sample.value,
+            sample,
             queued,
             "number_queued",
         )
 
         sample = self._get_sample_with_name(number_of_keys, self.queue._name)
-        self.assertEqual(sample.value, keys, "number_of_keys")
+        self.assertEqual(sample, keys, "number_of_keys")
 
         sample = self._get_sample_with_name(number_in_flight, self.queue._name)
         self.assertEqual(
-            sample.value,
+            sample,
             in_flight,
             "number_in_flight",
         )
