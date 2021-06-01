@@ -668,16 +668,17 @@ class DatabasePool:
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
-            result = await self.runWithConnection(
-                self.new_transaction,
-                desc,
-                after_callbacks,
-                exception_callbacks,
-                func,
-                *args,
-                db_autocommit=db_autocommit,
-                **kwargs,
-            )
+            with opentracing.start_active_span(f"db.{desc}"):
+                result = await self.runWithConnection(
+                    self.new_transaction,
+                    desc,
+                    after_callbacks,
+                    exception_callbacks,
+                    func,
+                    *args,
+                    db_autocommit=db_autocommit,
+                    **kwargs,
+                )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
