@@ -1,6 +1,8 @@
 Synapse 1.35.0 (2021-06-01)
 ===========================
 
+No changes since v1.35.0rc3.
+
 Deprecations and Removals
 -------------------------
 
