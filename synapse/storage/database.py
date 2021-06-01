@@ -40,6 +40,7 @@ from twisted.enterprise import adbapi
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
+from synapse.logging import opentracing
 from synapse.logging.context import (
     LoggingContext,
     current_context,
@@ -313,7 +314,14 @@ class LoggingTransaction:
         start = time.time()
 
         try:
-            return func(sql, *args)
+            with opentracing.start_active_span(
+                "db.query",
+                tags={
+                    opentracing.tags.DATABASE_TYPE: "sql",
+                    opentracing.tags.DATABASE_STATEMENT: sql,
+                },
+            ):
+                return func(sql, *args)
         except Exception as e:
             sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
