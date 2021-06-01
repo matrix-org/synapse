@@ -1,3 +1,13 @@
+Unreleased
+==========
+
+This release deprecates the `experimental.msc2858_enabled` config option, and
+will be removed in the first release in August. Note that the OIDC provider
+`idp_brand` config values have changed from e.g. `org.matrix.gitlab` to `gitlab`. See the
+[upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.35/UPGRADE.rst#upgrading-to-v1350)
+for details.
+
+
 Synapse 1.35.0rc3 (2021-05-28)
 ==============================
 
