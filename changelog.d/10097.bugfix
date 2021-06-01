@@ -1,1 +1,1 @@
-Fix a bug which is stopping synapse from storing messages in `device_inbox` for hidden devices.
+Fix a bug which allowed hidden devices to receive send-to-device events.
