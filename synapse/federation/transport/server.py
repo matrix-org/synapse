@@ -381,6 +381,10 @@ class BaseFederationServlet:
 
 
 class BaseFederationServerServlet(BaseFederationServlet):
+    """Abstract base class for federation servlet classes which provides a federation server handler.
+
+    See BaseFederationServlet for more information.
+    """
     def __init__(
         self,
         hs: HomeServer,
@@ -878,6 +882,10 @@ class FederationVersionServlet(BaseFederationServlet):
 
 
 class BaseGroupsServerServlet(BaseFederationServlet):
+    """Abstract base class for federation servlet classes which provides a groups server handler.
+
+    See BaseFederationServlet for more information.
+    """
     def __init__(
         self,
         hs: HomeServer,
@@ -1086,6 +1094,10 @@ class FederationGroupsRemoveUserServlet(BaseGroupsServerServlet):
 
 
 class BaseGroupsLocalServlet(BaseFederationServlet):
+    """Abstract base class for federation servlet classes which provides a groups local handler.
+
+    See BaseFederationServlet for more information.
+    """
     def __init__(
         self,
         hs: HomeServer,
