@@ -1,3 +1,12 @@
+Synapse 1.35.0 (2021-06-01)
+===========================
+
+Deprecations and Removals
+-------------------------
+
+- The core Synapse development team plan to drop support for the [unstable API of MSC2858](https://github.com/matrix-org/matrix-doc/blob/master/proposals/2858-Multiple-SSO-Identity-Providers.md#unstable-prefix), including the undocumented `experimental.msc2858_enabled` config option, in August 2021. Client authors should ensure that their clients are updated to use the stable API (which has been supported since Synapse 1.30) well before that time, to give their users time to upgrade. ([\#10101](https://github.com/matrix-org/synapse/issues/10101))
+
+
 Synapse 1.35.0rc3 (2021-05-28)
 ==============================
 
