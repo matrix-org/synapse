@@ -734,6 +734,7 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
+        prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
@@ -749,6 +750,10 @@ class EventCreationHandler:
         Args:
             requester: The requester sending the event.
             event_dict: An entire event.
+            prev_event_ids:
+                The event IDs to use as the prev events.
+                Should normally be left as None to automatically request them
+                from the database.
             auth_event_ids:
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
@@ -800,13 +805,11 @@ class EventCreationHandler:
                     assert event.internal_metadata.stream_ordering
                     return event, event.internal_metadata.stream_ordering
 
-            prev_events = event_dict.get("prev_events")
-
             event, context = await self.create_event(
                 requester,
                 event_dict,
                 txn_id=txn_id,
-                prev_event_ids=prev_events,
+                prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
                 outlier=outlier,
                 inherit_depth=inherit_depth,
