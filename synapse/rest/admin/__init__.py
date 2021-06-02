@@ -80,7 +80,7 @@ logger = logging.getLogger(__name__)
 class VersionServlet(RestServlet):
     PATTERNS = admin_patterns("/server_version$")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.res = {
             "server_version": get_version_string(synapse),
             "python_version": platform.python_version(),
@@ -95,7 +95,7 @@ class PurgeHistoryRestServlet(RestServlet):
         "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
@@ -177,7 +177,7 @@ class PurgeHistoryRestServlet(RestServlet):
 class PurgeHistoryStatusRestServlet(RestServlet):
     PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]+)")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
 
@@ -204,7 +204,7 @@ class PurgeHistoryStatusRestServlet(RestServlet):
 class AdminRestResource(JsonResource):
     """The REST resource which gets mounted at /_synapse/admin"""
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         JsonResource.__init__(self, hs, canonical_json=False)
         register_servlets(hs, self)
 

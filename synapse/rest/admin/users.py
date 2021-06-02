@@ -552,7 +552,7 @@ class DeactivateAccountRestServlet(RestServlet):
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = admin_patterns("/account_validity/validity$")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()

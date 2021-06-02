@@ -44,7 +44,7 @@ class QuarantineMediaInRoom(RestServlet):
         *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
     ]
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
@@ -71,7 +71,7 @@ class QuarantineMediaByUser(RestServlet):
 
     PATTERNS = admin_patterns("/user/(?P<user_id>[^/]+)/media/quarantine")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
@@ -100,7 +100,7 @@ class QuarantineMediaByID(RestServlet):
         "/media/quarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
     )
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
@@ -125,7 +125,7 @@ class ProtectMediaByID(RestServlet):
 
     PATTERNS = admin_patterns("/media/protect/(?P<media_id>[^/]+)")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
@@ -148,7 +148,7 @@ class UnprotectMediaByID(RestServlet):
 
     PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]+)")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
@@ -171,7 +171,7 @@ class ListMediaInRoom(RestServlet):
 
     PATTERNS = admin_patterns("/room/(?P<room_id>[^/]+)/media")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
@@ -191,7 +191,7 @@ class ListMediaInRoom(RestServlet):
 class PurgeMediaCacheRestServlet(RestServlet):
     PATTERNS = admin_patterns("/purge_media_cache")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.media_repository = hs.get_media_repository()
         self.auth = hs.get_auth()
 
@@ -211,7 +211,7 @@ class DeleteMediaByID(RestServlet):
 
     PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.server_name = hs.hostname
@@ -241,7 +241,7 @@ class DeleteMediaByDateSize(RestServlet):
 
     PATTERNS = admin_patterns("/media/(?P<server_name>[^/]+)/delete")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.server_name = hs.hostname

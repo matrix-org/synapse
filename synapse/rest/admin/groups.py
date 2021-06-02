@@ -31,7 +31,7 @@ class DeleteGroupAdminRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/delete_group/(?P<group_id>[^/]*)")
 
-    def __init__(self, hs: "HomeServer") -> None:
+    def __init__(self, hs: "HomeServer"):
         self.group_server = hs.get_groups_server_handler()
         self.is_mine_id = hs.is_mine_id
         self.auth = hs.get_auth()
