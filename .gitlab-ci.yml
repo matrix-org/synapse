@@ -3,11 +3,10 @@ build:
   image: docker:latest
   services:
   - docker:dind
-  only:
-  - master
   before_script:
   - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
   script:
-  - synversion=$(cat synapse/__init__.py | grep '__version__ = "' | sed -E 's/^__version__ = "(.+)"$/\1/')
-  - docker build --tag $CI_REGISTRY_IMAGE:$synversion -f docker/Dockerfile .
-  - docker push $CI_REGISTRY_IMAGE:$synversion
+  - if [ $CI_COMMIT_BRANCH == "master" ]; then tag=$(cat synapse/__init__.py | grep '__version__ = "' | sed -E 's/^__version__ = "(.+)"$/\1/'); fi
+  - if [ $CI_COMMIT_BRANCH != "master" ]; then tag=$CI_COMMIT_SHA; fi
+  - docker build --tag $CI_REGISTRY_IMAGE:$tag -f docker/Dockerfile .
+  - docker push $CI_REGISTRY_IMAGE:$tag
