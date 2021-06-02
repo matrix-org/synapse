@@ -189,11 +189,11 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server9", key1)
 
         # should fail immediately on an unsigned object
-        d = _verify_json_for_server(kr, "server9", {}, 0)
+        d = kr.verify_json_for_server("server9", {}, 0)
         self.get_failure(d, SynapseError)
 
         # should succeed on a signed object
-        d = _verify_json_for_server(kr, "server9", json1, 500)
+        d = kr.verify_json_for_server("server9", json1, 500)
         # self.assertFalse(d.called)
         self.get_success(d)
 
@@ -220,12 +220,12 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         signedjson.sign.sign_json(json1, "server9", key1)
 
         # should fail immediately on an unsigned object
-        d = _verify_json_for_server(kr, "server9", {}, 0)
+        d = kr.verify_json_for_server("server9", {}, 0)
         self.get_failure(d, SynapseError)
 
         # should fail on a signed object with a non-zero minimum_valid_until_ms,
         # as it tries to refetch the keys and fails.
-        d = _verify_json_for_server(kr, "server9", json1, 500)
+        d = kr.verify_json_for_server("server9", json1, 500)
         self.get_failure(d, SynapseError)
 
         # We expect the keyring tried to refetch the key once.
@@ -234,8 +234,7 @@ class KeyringTestCase(unittest.HomeserverTestCase):
         )
 
         # should succeed on a signed object with a 0 minimum_valid_until_ms
-        d = _verify_json_for_server(
-            kr,
+        d = kr.verify_json_for_server(
             "server9",
             json1,
             0,
@@ -608,11 +607,3 @@ class PerspectivesKeyFetcherTestCase(unittest.HomeserverTestCase):
 def get_key_id(key):
     """Get the matrix ID tag for a given SigningKey or VerifyKey"""
     return "%s:%s" % (key.alg, key.version)
-
-
-async def _verify_json_for_server(kr, *args):
-    """thin wrapper around verify_json_for_server which makes sure it is wrapped
-    with the patched defer.inlineCallbacks.
-    """
-    with LoggingContext("testctx"):
-        return await kr.verify_json_for_server(*args)

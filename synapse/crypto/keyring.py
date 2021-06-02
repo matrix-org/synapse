@@ -184,6 +184,8 @@ class Keyring:
     ) -> None:
         """Verify that a JSON object has been signed by a given server
 
+        Completes if the the object was correctly signed, otherwise raises.
+
         Args:
             server_name: name of the server which must have signed this object
 
@@ -191,10 +193,6 @@ class Keyring:
 
             validity_time: timestamp at which we require the signing key to
                 be valid. (0 implies we don't care)
-
-        Returns:
-            Deferred[None]: completes if the the object was correctly signed, otherwise
-                errbacks with an error
         """
         request = VerifyJsonRequest.from_json_object(
             server_name,
