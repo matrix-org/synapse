@@ -143,8 +143,7 @@ class _FetchKeyRequest:
 
     Attributes:
         server_name: The name of the server that owns the keys.
-        minimum_valid_until_ts: The earliest timestamp at which we need the
-            keys to be valid at.
+        minimum_valid_until_ts: The timestamp which the keys must be valid until.
         key_ids: The IDs of the keys to attempt to fetch
     """
 
@@ -182,7 +181,7 @@ class Keyring:
         server_name: str,
         json_object: JsonDict,
         validity_time: int,
-    ):
+    ) -> None:
         """Verify that a JSON object has been signed by a given server
 
         Args:
