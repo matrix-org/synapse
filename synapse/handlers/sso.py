@@ -41,7 +41,12 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters, create_requester
+from synapse.types import (
+    JsonDict,
+    UserID,
+    contains_invalid_mxid_characters,
+    create_requester,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
