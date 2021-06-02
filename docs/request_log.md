@@ -13,15 +13,15 @@ See the following for how to decode the dense data available from the default lo
 | Part  | Explaination | 
 | ----- | ------------ |
 | AAAA  | Timestamp request was logged (not recieved) |
-| BBBB  | Logger name (synapse.access.(http|https).<tag>, where 'tag' is defined in the `listeners` config section, normally the port) |
+| BBBB  | Logger name (synapse.access.(http\|https).<tag>, where 'tag' is defined in the `listeners` config section, normally the port) |
 | CCCC  | Line number in code |
 | DDDD  | Log Level |
 | EEEE  | Request Identifier (This identifier is shared by related log lines)|
 | FFFF  | Source IP (Or X-Forwarded-For if enabled) |
 | GGGG  | Server Port |
 | HHHH  | Federated Server or Local User making request (blank if unauthenticated or not supplied) |
-| IIII  | Total Time to process (prefixed with - if the socket was closed before the response was generated) |
-| JJJJ  | Time to send response over network once generated |
+| IIII  | Total Time to process the request |
+| JJJJ  | Time to send response over network once generated (this may be negative if the socket is closed before the response is generated)|
 | KKKK  | Userland CPU time |
 | LLLL  | System CPU time |
 | MMMM  | Total time waiting for a free DB connection from the pool across all parallel DB work from this request |
@@ -34,7 +34,11 @@ See the following for how to decode the dense data available from the default lo
 | TTTT  | Events fetched from DB to service this request (note that this does not include events fetched from the cache) |
 
 
-MMMM / NNNN can be greater than IIII if there are multiple slow database queries running in parallel.
+MMMM / NNNN can be greater than IIII if there are multiple slow database queries
+running in parallel.
 
-Some actions can result in multiple identical http requests, which will return the same data, but only the first request will report any time in IIII/NNNN/MMMM - the others will be awaiting the first query to return a response and will simultaneously return with the first request, but with very small processing times.
-
+Some actions can result in multiple identical http requests, which will return
+the same data, but only the first request will report any time in
+`IIII/NNNN/MMMM` - the others will be awaiting the first query to return a
+response and will simultaneously return with the first request, but with very
+small processing times.
