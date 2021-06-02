@@ -356,10 +356,13 @@ def init_tracer(hs: "HomeServer"):
 
     set_homeserver_whitelist(hs.config.opentracer_whitelist)
 
+    from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
+
     config = JaegerConfig(
         config=hs.config.jaeger_config,
         service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
         scope_manager=LogContextScopeManager(hs.config),
+        metrics_factory=PrometheusMetricsFactory(),
     )
 
     # If we have the rust jaeger reporter available let's use that.
