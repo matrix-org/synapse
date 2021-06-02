@@ -38,12 +38,11 @@ class QuarantineMediaInRoom(RestServlet):
     this server.
     """
 
-    PATTERNS = (
-        admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
-        +
+    PATTERNS = [
+        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine"),
         # This path kept around for legacy reasons
-        admin_patterns("/quarantine_media/(?P<room_id>[^/]+)")
-    )
+        *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
+    ]
 
     def __init__(self, hs: "HomeServer") -> None:
         self.store = hs.get_datastore()
