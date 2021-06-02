@@ -14,7 +14,6 @@
 
 import logging
 import threading
-from collections import namedtuple
 from typing import (
     Collection,
     Container,
@@ -27,6 +26,7 @@ from typing import (
     overload,
 )
 
+import attr
 from constantly import NamedConstant, Names
 from typing_extensions import Literal
 
@@ -74,7 +74,10 @@ EVENT_QUEUE_ITERATIONS = 3  # No. times we block waiting for requests for events
 EVENT_QUEUE_TIMEOUT_S = 0.1  # Timeout when waiting for requests for events
 
 
-_EventCacheEntry = namedtuple("_EventCacheEntry", ("event", "redacted_event"))
+@attr.s(slots=True, auto_attribs=True)
+class _EventCacheEntry:
+    event: EventBase
+    redacted_event: Optional[EventBase]
 
 
 class EventRedactBehaviour(Names):
@@ -476,7 +479,9 @@ class EventsWorkerStore(SQLBaseStore):
 
         return events
 
-    async def _get_events_from_cache_or_db(self, event_ids, allow_rejected=False):
+    async def _get_events_from_cache_or_db(
+        self, event_ids: Iterable[str], allow_rejected: bool = False
+    ) -> Dict[str, _EventCacheEntry]:
         """Fetch a bunch of events from the cache or the database.
 
         If events are pulled from the database, they will be cached for future lookups.
@@ -485,14 +490,13 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
 
-            event_ids (Iterable[str]): The event_ids of the events to fetch
+            event_ids: The event_ids of the events to fetch
 
-            allow_rejected (bool): Whether to include rejected events. If False,
+            allow_rejected: Whether to include rejected events. If False,
                 rejected events are omitted from the response.
 
         Returns:
-            Dict[str, _EventCacheEntry]:
-                map from event id to result
+            map from event id to result
         """
         event_entry_map = self._get_events_from_cache(
             event_ids,
@@ -528,18 +532,13 @@ class EventsWorkerStore(SQLBaseStore):
         self._get_event_cache.invalidate((event_id,))
 
     def _get_events_from_cache(
-        self, events, update_metrics=True
+        self, events: Iterable[str], update_metrics: bool = True
     ) -> Dict[str, _EventCacheEntry]:
         """Fetch events from the caches
 
         Args:
-            events (Iterable[str]): list of event_ids to fetch
-            update_metrics (bool): Whether to update the cache hit ratio metrics
-
-        Returns:
-            dict of event_id -> _EventCacheEntry for each event_id in cache. If
-            allow_rejected is `False` then there will still be an entry but it
-            will be `None`
+            events: list of event_ids to fetch
+            update_metrics: Whether to update the cache hit ratio metrics
         """
         event_map = {}
 
@@ -677,7 +676,9 @@ class EventsWorkerStore(SQLBaseStore):
                 with PreserveLoggingContext():
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
-    async def _get_events_from_db(self, event_ids):
+    async def _get_events_from_db(
+        self, event_ids: Iterable[str]
+    ) -> Dict[str, _EventCacheEntry]:
         """Fetch a bunch of events from the database.
 
         Returned events will be added to the cache for future lookups.
@@ -685,12 +686,11 @@ class EventsWorkerStore(SQLBaseStore):
         Unknown events are omitted from the response.
 
         Args:
-            event_ids (Iterable[str]): The event_ids of the events to fetch
+            event_ids: The event_ids of the events to fetch
 
         Returns:
-            Dict[str, _EventCacheEntry]:
-                map from event id to result. May return extra events which
-                weren't asked for.
+            map from event id to result. May return extra events which
+            weren't asked for.
         """
         fetched_events = {}
         events_to_fetch = event_ids
