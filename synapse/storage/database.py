@@ -733,25 +733,29 @@ class DatabasePool:
             with LoggingContext(
                 str(curr_context), parent_context=parent_context
             ) as context:
-                sched_duration_sec = monotonic_time() - start_time
-                sql_scheduling_timer.observe(sched_duration_sec)
-                context.add_database_scheduled(sched_duration_sec)
+                with opentracing.start_active_span(
+                    operation_name="db.connection",
+                ):
+                    sched_duration_sec = monotonic_time() - start_time
+                    sql_scheduling_timer.observe(sched_duration_sec)
+                    context.add_database_scheduled(sched_duration_sec)
 
-                if self.engine.is_connection_closed(conn):
-                    logger.debug("Reconnecting closed database connection")
-                    conn.reconnect()
+                    if self.engine.is_connection_closed(conn):
+                        logger.debug("Reconnecting closed database connection")
+                        conn.reconnect()
+                        opentracing.log_kv({"message", "reconnected"})
 
-                try:
-                    if db_autocommit:
-                        self.engine.attempt_to_set_autocommit(conn, True)
+                    try:
+                        if db_autocommit:
+                            self.engine.attempt_to_set_autocommit(conn, True)
 
-                    db_conn = LoggingDatabaseConnection(
-                        conn, self.engine, "runWithConnection"
-                    )
-                    return func(db_conn, *args, **kwargs)
-                finally:
-                    if db_autocommit:
-                        self.engine.attempt_to_set_autocommit(conn, False)
+                        db_conn = LoggingDatabaseConnection(
+                            conn, self.engine, "runWithConnection"
+                        )
+                        return func(db_conn, *args, **kwargs)
+                    finally:
+                        if db_autocommit:
+                            self.engine.attempt_to_set_autocommit(conn, False)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
