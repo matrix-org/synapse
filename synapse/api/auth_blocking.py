@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,18 +13,21 @@
 # limitations under the License.
 
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import LimitBlockingTypes, UserTypes
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.config.server import is_threepid_reserved
 from synapse.types import Requester
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class AuthBlocking:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
         self._server_notices_mxid = hs.config.server_notices_mxid
@@ -36,6 +38,7 @@ class AuthBlocking:
         self._limit_usage_by_mau = hs.config.limit_usage_by_mau
         self._mau_limits_reserved_threepids = hs.config.mau_limits_reserved_threepids
         self._server_name = hs.hostname
+        self._track_appservice_user_ips = hs.config.appservice.track_appservice_user_ips
 
     async def check_auth_blocking(
         self,
@@ -43,7 +46,7 @@ class AuthBlocking:
         threepid: Optional[dict] = None,
         user_type: Optional[str] = None,
         requester: Optional[Requester] = None,
-    ):
+    ) -> None:
         """Checks if the user should be rejected for some external reason,
         such as monthly active user limiting or global disable flag
 
@@ -75,6 +78,12 @@ class AuthBlocking:
             elif requester.authenticated_entity == self._server_name:
                 # We never block the server from doing actions on behalf of
                 # users.
+                return
+            elif requester.app_service and not self._track_appservice_user_ips:
+                # If we're authenticated as an appservice then we only block
+                # auth if `track_appservice_user_ips` is set, as that option
+                # implicitly means that application services are part of MAU
+                # limits.
                 return
 
         # Never fail an auth check for the server notices users or support user

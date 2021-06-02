@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import Optional
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
@@ -27,7 +27,7 @@ MAX_STATE_DELTA_HOPS = 100
 
 
 class StateGroupBackgroundUpdateStore(SQLBaseStore):
-    """Defines functions related to state groups needed to run the state backgroud
+    """Defines functions related to state groups needed to run the state background
     updates.
     """
 
@@ -73,8 +73,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
             return count
 
     def _get_state_groups_from_groups_txn(
-        self, txn, groups, state_filter=StateFilter.all()
+        self, txn, groups, state_filter: Optional[StateFilter] = None
     ):
+        state_filter = state_filter or StateFilter.all()
+
         results = {group: {} for group in groups}
 
         where_clause, where_args = state_filter.make_sql_filter_clause()

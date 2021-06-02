@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,7 +23,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.types import UserID
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,7 @@ class BaseHandler:
 
         # The rate_hz and burst_count are overridden on a per-user basis
         self.request_ratelimiter = Ratelimiter(
-            clock=self.clock, rate_hz=0, burst_count=0
+            store=self.store, clock=self.clock, rate_hz=0, burst_count=0
         )
         self._rc_message = self.hs.config.rc_message
 
@@ -57,6 +56,7 @@ class BaseHandler:
         # by the presence of rate limits in the config
         if self.hs.config.rc_admin_redaction:
             self.admin_redaction_ratelimiter = Ratelimiter(
+                store=self.store,
                 clock=self.clock,
                 rate_hz=self.hs.config.rc_admin_redaction.per_second,
                 burst_count=self.hs.config.rc_admin_redaction.burst_count,
@@ -91,11 +91,6 @@ class BaseHandler:
         if app_service is not None:
             return  # do not ratelimit app service senders
 
-        # Disable rate limiting of users belonging to any AS that is configured
-        # not to be rate limited in its registration file (rate_limited: true|false).
-        if requester.app_service and not requester.app_service.is_rate_limited():
-            return
-
         messages_per_second = self._rc_message.per_second
         burst_count = self._rc_message.burst_count
 
@@ -113,11 +108,11 @@ class BaseHandler:
         if is_admin_redaction and self.admin_redaction_ratelimiter:
             # If we have separate config for admin redactions, use a separate
             # ratelimiter as to not have user_ids clash
-            self.admin_redaction_ratelimiter.ratelimit(user_id, update=update)
+            await self.admin_redaction_ratelimiter.ratelimit(requester, update=update)
         else:
             # Override rate and burst count per-user
-            self.request_ratelimiter.ratelimit(
-                user_id,
+            await self.request_ratelimiter.ratelimit(
+                requester,
                 rate_hz=messages_per_second,
                 burst_count=burst_count,
                 update=update,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +16,16 @@ import logging
 import re
 
 logger = logging.getLogger(__name__)
+
+
+# it's unclear what the maximum length of an email address is. RFC3696 (as corrected
+# by errata) says:
+#    the upper limit on address lengths should normally be considered to be 254.
+#
+# In practice, mail servers appear to be more tolerant and allow 400 characters
+# or so. Let's allow 500, which should be plenty for everyone.
+#
+MAX_EMAIL_ADDRESS_LENGTH = 500
 
 
 def check_3pid_allowed(hs, medium, address):
@@ -71,3 +80,23 @@ def canonicalise_email(address: str) -> str:
         raise ValueError("Unable to parse email address")
 
     return parts[0].casefold() + "@" + parts[1].lower()
+
+
+def validate_email(address: str) -> str:
+    """Does some basic validation on an email address.
+
+    Returns the canonicalised email, as returned by `canonicalise_email`.
+
+    Raises a ValueError if the email is invalid.
+    """
+    # First we try canonicalising in case that fails
+    address = canonicalise_email(address)
+
+    # Email addresses have to be at least 3 characters.
+    if len(address) < 3:
+        raise ValueError("Unable to parse email address")
+
+    if len(address) > MAX_EMAIL_ADDRESS_LENGTH:
+        raise ValueError("Unable to parse email address")
+
+    return address

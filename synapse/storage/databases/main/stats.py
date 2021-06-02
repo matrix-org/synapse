@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018, 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -15,10 +14,11 @@
 # limitations under the License.
 
 import logging
-from collections import Counter
 from enum import Enum
 from itertools import chain
 from typing import Any, Dict, List, Optional, Tuple
+
+from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
@@ -65,18 +65,37 @@ TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
 class UserSortOrder(Enum):
     """
     Enum to define the sorting method used when returning users
-    with get_users_media_usage_paginate
+    with get_users_paginate in __init__.py
+    and get_users_media_usage_paginate in stats.py
 
-    MEDIA_LENGTH = ordered by size of uploaded media. Smallest to largest.
-    MEDIA_COUNT = ordered by number of uploaded media. Smallest to largest.
+    When moves this to __init__.py gets `builtins.ImportError` with
+    `most likely due to a circular import`
+
+    MEDIA_LENGTH = ordered by size of uploaded media.
+    MEDIA_COUNT = ordered by number of uploaded media.
     USER_ID = ordered alphabetically by `user_id`.
+    NAME = ordered alphabetically by `user_id`. This is for compatibility reasons,
+    as the user_id is returned in the name field in the response in list users admin API.
     DISPLAYNAME = ordered alphabetically by `displayname`
+    GUEST = ordered by `is_guest`
+    ADMIN = ordered by `admin`
+    DEACTIVATED = ordered by `deactivated`
+    USER_TYPE = ordered alphabetically by `user_type`
+    AVATAR_URL = ordered alphabetically by `avatar_url`
+    SHADOW_BANNED = ordered by `shadow_banned`
     """
 
     MEDIA_LENGTH = "media_length"
     MEDIA_COUNT = "media_count"
     USER_ID = "user_id"
+    NAME = "name"
     DISPLAYNAME = "displayname"
+    GUEST = "is_guest"
+    ADMIN = "admin"
+    DEACTIVATED = "deactivated"
+    USER_TYPE = "user_type"
+    AVATAR_URL = "avatar_url"
+    SHADOW_BANNED = "shadow_banned"
 
 
 class StatsStore(StateDeltasStore):
@@ -319,7 +338,9 @@ class StatsStore(StateDeltasStore):
         return slice_list
 
     @cached()
-    async def get_earliest_token_for_stats(self, stats_type: str, id: str) -> int:
+    async def get_earliest_token_for_stats(
+        self, stats_type: str, id: str
+    ) -> Optional[int]:
         """
         Fetch the "earliest token". This is used by the room stats delta
         processor to ignore deltas that have been processed between the
@@ -339,7 +360,7 @@ class StatsStore(StateDeltasStore):
         )
 
     async def bulk_update_stats_delta(
-        self, ts: int, updates: Dict[str, Dict[str, Dict[str, Counter]]], stream_id: int
+        self, ts: int, updates: Dict[str, Dict[str, Counter[str]]], stream_id: int
     ) -> None:
         """Bulk update stats tables for a given stream_id and updates the stats
         incremental position.
@@ -665,7 +686,7 @@ class StatsStore(StateDeltasStore):
 
     async def get_changes_room_total_events_and_bytes(
         self, min_pos: int, max_pos: int
-    ) -> Dict[str, Dict[str, int]]:
+    ) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
         """Fetches the counts of events in the given range of stream IDs.
 
         Args:
@@ -683,18 +704,19 @@ class StatsStore(StateDeltasStore):
             max_pos,
         )
 
-    def get_changes_room_total_events_and_bytes_txn(self, txn, low_pos, high_pos):
+    def get_changes_room_total_events_and_bytes_txn(
+        self, txn, low_pos: int, high_pos: int
+    ) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
         """Gets the total_events and total_event_bytes counts for rooms and
         senders, in a range of stream_orderings (including backfilled events).
 
         Args:
             txn
-            low_pos (int): Low stream ordering
-            high_pos (int): High stream ordering
+            low_pos: Low stream ordering
+            high_pos: High stream ordering
 
         Returns:
-            tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]: The
-            room and user deltas for total_events/total_event_bytes in the
+            The room and user deltas for total_events/total_event_bytes in the
             format of `stats_id` -> fields
         """
 
@@ -997,7 +1019,9 @@ class StatsStore(StateDeltasStore):
                 ORDER BY {order_by_column} {order}
                 LIMIT ? OFFSET ?
             """.format(
-                sql_base=sql_base, order_by_column=order_by_column, order=order,
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
             )
 
             args += [limit, start]

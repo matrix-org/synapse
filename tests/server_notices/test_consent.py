@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -70,7 +69,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         the notice URL + an authentication code.
         """
         # Initial sync, to get the user consent room invite
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
         self.assertEqual(channel.code, 200)
@@ -79,7 +78,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         room_id = list(channel.json_body["rooms"]["invite"].keys())[0]
 
         # Join the room
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/" + room_id + "/join",
             access_token=self.access_token,
@@ -87,7 +86,7 @@ class ConsentNoticesTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
         # Sync again, to get the message in the room
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/client/r0/sync", access_token=self.access_token
         )
         self.assertEqual(channel.code, 200)

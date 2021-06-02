@@ -22,7 +22,6 @@ them.
 
 See doc/log_contexts.rst for details on how this works.
 """
-
 import inspect
 import logging
 import threading
@@ -30,6 +29,7 @@ import types
 import warnings
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
+import attr
 from typing_extensions import Literal
 
 from twisted.internet import defer, threads
@@ -181,6 +181,29 @@ class ContextResourceUsage:
         return res
 
 
+@attr.s(slots=True)
+class ContextRequest:
+    """
+    A bundle of attributes from the SynapseRequest object.
+
+    This exists to:
+
+    * Avoid a cycle between LoggingContext and SynapseRequest.
+    * Be a single variable that can be passed from parent LoggingContexts to
+      their children.
+    """
+
+    request_id = attr.ib(type=str)
+    ip_address = attr.ib(type=str)
+    site_tag = attr.ib(type=str)
+    requester = attr.ib(type=Optional[str])
+    authenticated_entity = attr.ib(type=Optional[str])
+    method = attr.ib(type=str)
+    url = attr.ib(type=str)
+    protocol = attr.ib(type=str)
+    user_agent = attr.ib(type=str)
+
+
 LoggingContextOrSentinel = Union["LoggingContext", "_Sentinel"]
 
 
@@ -202,10 +225,6 @@ class _Sentinel:
 
     def copy_to(self, record):
         pass
-
-    def copy_to_twisted_log_entry(self, record):
-        record["request"] = None
-        record["scope"] = None
 
     def start(self, rusage: "Optional[resource._RUsage]"):
         pass
@@ -239,7 +258,8 @@ class LoggingContext:
           child to the parent
 
     Args:
-        name (str): Name for the context for debugging.
+        name: Name for the context for logging. If this is omitted, it is
+           inherited from the parent context.
         parent_context (LoggingContext|None): The parent of the new context
     """
 
@@ -256,9 +276,13 @@ class LoggingContext:
         "scope",
     ]
 
-    def __init__(self, name=None, parent_context=None, request=None) -> None:
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        parent_context: "Optional[LoggingContext]" = None,
+        request: Optional[ContextRequest] = None,
+    ) -> None:
         self.previous_context = current_context()
-        self.name = name
 
         # track the resources used by this context so far
         self._resource_usage = ContextResourceUsage()
@@ -280,16 +304,27 @@ class LoggingContext:
         self.parent_context = parent_context
 
         if self.parent_context is not None:
-            self.parent_context.copy_to(self)
+            # we track the current request_id
+            self.request = self.parent_context.request
+
+            # we also track the current scope:
+            self.scope = self.parent_context.scope
 
         if request is not None:
             # the request param overrides the request from the parent context
             self.request = request
 
+        # if we don't have a `name`, but do have a parent context, use its name.
+        if self.parent_context and name is None:
+            name = str(self.parent_context)
+        if name is None:
+            raise ValueError(
+                "LoggingContext must be given either a name or a parent context"
+            )
+        self.name = name
+
     def __str__(self) -> str:
-        if self.request:
-            return str(self.request)
-        return "%s@%x" % (self.name, id(self))
+        return self.name
 
     @classmethod
     def current_context(cls) -> LoggingContextOrSentinel:
@@ -337,7 +372,10 @@ class LoggingContext:
         if self.previous_context != old_context:
             logcontext_error(
                 "Expected previous context %r, found %r"
-                % (self.previous_context, old_context,)
+                % (
+                    self.previous_context,
+                    old_context,
+                )
             )
         return self
 
@@ -371,13 +409,6 @@ class LoggingContext:
 
         # we also track the current scope:
         record.scope = self.scope
-
-    def copy_to_twisted_log_entry(self, record) -> None:
-        """
-        Copy logging fields from this context to a Twisted log record.
-        """
-        record["request"] = self.request
-        record["scope"] = self.scope
 
     def start(self, rusage: "Optional[resource._RUsage]") -> None:
         """
@@ -542,28 +573,40 @@ class LoggingContext:
 class LoggingContextFilter(logging.Filter):
     """Logging filter that adds values from the current logging context to each
     record.
-    Args:
-        **defaults: Default values to avoid formatters complaining about
-            missing fields
     """
 
-    def __init__(self, **defaults) -> None:
-        self.defaults = defaults
+    def __init__(self, request: str = ""):
+        self._default_request = request
 
-    def filter(self, record) -> Literal[True]:
+    def filter(self, record: logging.LogRecord) -> Literal[True]:
         """Add each fields from the logging contexts to the record.
         Returns:
             True to include the record in the log output.
         """
         context = current_context()
-        for key, value in self.defaults.items():
-            setattr(record, key, value)
+        record.request = self._default_request  # type: ignore
 
         # context should never be None, but if it somehow ends up being, then
         # we end up in a death spiral of infinite loops, so let's check, for
         # robustness' sake.
         if context is not None:
-            context.copy_to(record)
+            # Logging is interested in the request ID. Note that for backwards
+            # compatibility this is stored as the "request" on the record.
+            record.request = str(context)  # type: ignore
+
+            # Add some data from the HTTP request.
+            request = context.request
+            if request is None:
+                return True
+
+            record.ip_address = request.ip_address  # type: ignore
+            record.site_tag = request.site_tag  # type: ignore
+            record.requester = request.requester  # type: ignore
+            record.authenticated_entity = request.authenticated_entity  # type: ignore
+            record.method = request.method  # type: ignore
+            record.url = request.url  # type: ignore
+            record.protocol = request.protocol  # type: ignore
+            record.user_agent = request.user_agent  # type: ignore
 
         return True
 
@@ -571,7 +614,7 @@ class LoggingContextFilter(logging.Filter):
 class PreserveLoggingContext:
     """Context manager which replaces the logging context
 
-     The previous logging context is restored on exit."""
+    The previous logging context is restored on exit."""
 
     __slots__ = ["_old_context", "_new_context"]
 
@@ -594,7 +637,10 @@ class PreserveLoggingContext:
             else:
                 logcontext_error(
                     "Expected logging context %s but found %s"
-                    % (self._new_context, context,)
+                    % (
+                        self._new_context,
+                        context,
+                    )
                 )
 
 
@@ -630,13 +676,11 @@ def set_current_context(context: LoggingContextOrSentinel) -> LoggingContextOrSe
     return current
 
 
-def nested_logging_context(
-    suffix: str, parent_context: Optional[LoggingContext] = None
-) -> LoggingContext:
+def nested_logging_context(suffix: str) -> LoggingContext:
     """Creates a new logging context as a child of another.
 
-    The nested logging context will have a 'request' made up of the parent context's
-    request, plus the given suffix.
+    The nested logging context will have a 'name' made up of the parent context's
+    name, plus the given suffix.
 
     CPU/db usage stats will be added to the parent context's on exit.
 
@@ -646,19 +690,24 @@ def nested_logging_context(
             # ... do stuff
 
     Args:
-        suffix (str): suffix to add to the parent context's 'request'.
-        parent_context (LoggingContext|None): parent context. Will use the current context
-            if None.
+        suffix: suffix to add to the parent context's 'name'.
 
     Returns:
         LoggingContext: new logging context.
     """
-    if parent_context is not None:
-        context = parent_context  # type: LoggingContextOrSentinel
+    curr_context = current_context()
+    if not curr_context:
+        logger.warning(
+            "Starting nested logging context from sentinel context: metrics will be lost"
+        )
+        parent_context = None
     else:
-        context = current_context()
+        assert isinstance(curr_context, LoggingContext)
+        parent_context = curr_context
+    prefix = str(curr_context)
     return LoggingContext(
-        parent_context=context, request=str(context.request) + "-" + suffix
+        prefix + "-" + suffix,
+        parent_context=parent_context,
     )
 
 
@@ -671,7 +720,7 @@ def preserve_fn(f):
     return g
 
 
-def run_in_background(f, *args, **kwargs):
+def run_in_background(f, *args, **kwargs) -> defer.Deferred:
     """Calls a function, ensuring that the current context is restored after
     return from the function, and that the sentinel context is set once the
     deferred returned by the function completes.
@@ -691,7 +740,7 @@ def run_in_background(f, *args, **kwargs):
     current = current_context()
     try:
         res = f(*args, **kwargs)
-    except:  # noqa: E722
+    except Exception:
         # the assumption here is that the caller doesn't want to be disturbed
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
@@ -699,8 +748,10 @@ def run_in_background(f, *args, **kwargs):
     if isinstance(res, types.CoroutineType):
         res = defer.ensureDeferred(res)
 
+    # At this point we should have a Deferred, if not then f was a synchronous
+    # function, wrap it in a Deferred for consistency.
     if not isinstance(res, defer.Deferred):
-        return res
+        return defer.succeed(res)
 
     if res.called and not res.paused:
         # The function should have maintained the logcontext, so we can
@@ -836,10 +887,18 @@ def defer_to_threadpool(reactor, threadpool, f, *args, **kwargs):
         Deferred: A Deferred which fires a callback with the result of `f`, or an
             errback if `f` throws an exception.
     """
-    logcontext = current_context()
+    curr_context = current_context()
+    if not curr_context:
+        logger.warning(
+            "Calling defer_to_threadpool from sentinel context: metrics will be lost"
+        )
+        parent_context = None
+    else:
+        assert isinstance(curr_context, LoggingContext)
+        parent_context = curr_context
 
     def g():
-        with LoggingContext(parent_context=logcontext):
+        with LoggingContext(str(curr_context), parent_context=parent_context):
             return f(*args, **kwargs)
 
     return make_deferred_yieldable(threads.deferToThreadPool(reactor, threadpool, g))

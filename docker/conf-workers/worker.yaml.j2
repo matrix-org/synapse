@@ -1,0 +1,26 @@
+# This is a configuration template for a single worker instance, and is
+# used by Dockerfile-workers.
+# Values will be change depending on whichever workers are selected when
+# running that image.
+
+worker_app: "{{ app }}"
+worker_name: "{{ name }}"
+
+# The replication listener on the main synapse process.
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+  - type: http
+    port: {{ port }}
+{% if listener_resources %}
+    resources:
+      - names:
+{%- for resource in listener_resources %}
+        - {{ resource }}
+{%- endfor %}
+{% endif %}
+
+worker_log_config: {{ worker_log_config_filepath }}
+
+{{ worker_extra_conf }}

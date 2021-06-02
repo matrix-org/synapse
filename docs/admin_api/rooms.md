@@ -4,10 +4,14 @@
   * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
+- [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
   * [Parameters](#parameters-1)
   * [Response](#response)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
+- [Make Room Admin API](#make-room-admin-api)
+- [Forward Extremities Admin API](#forward-extremities-admin-api)
+- [Event Context API](#event-context-api)
 
 # List Room API
 
@@ -87,7 +91,7 @@ GET /_synapse/admin/v1/rooms
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
@@ -139,7 +143,7 @@ GET /_synapse/admin/v1/rooms?search_term=TWIM
 
 Response:
 
-```
+```json
 {
   "rooms": [
     {
@@ -174,7 +178,7 @@ GET /_synapse/admin/v1/rooms?order_by=size
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
@@ -230,14 +234,14 @@ GET /_synapse/admin/v1/rooms?order_by=size&from=100
 
 Response:
 
-```
+```jsonc
 {
   "rooms": [
     {
       "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
       "name": "Music Theory",
       "canonical_alias": "#musictheory:matrix.org",
-      "joined_members": 127
+      "joined_members": 127,
       "joined_local_members": 2,
       "version": "1",
       "creator": "@foo:matrix.org",
@@ -254,7 +258,7 @@ Response:
       "room_id": "!twcBhHVdZlQWuuxBhN:termina.org.uk",
       "name": "weechat-matrix",
       "canonical_alias": "#weechat-matrix:termina.org.uk",
-      "joined_members": 137
+      "joined_members": 137,
       "joined_local_members": 20,
       "version": "4",
       "creator": "@foo:termina.org.uk",
@@ -289,6 +293,7 @@ The following fields are possible in the JSON response body:
 * `canonical_alias` - The canonical (main) alias address of the room.
 * `joined_members` - How many users are currently in the room.
 * `joined_local_members` - How many local users are currently in the room.
+* `joined_local_devices` - How many local devices are currently in the room.
 * `version` - The version of the room as a string.
 * `creator` - The `user_id` of the room creator.
 * `encryption` - Algorithm of end-to-end encryption of messages. Is `null` if encryption is not active.
@@ -311,15 +316,16 @@ GET /_synapse/admin/v1/rooms/<room_id>
 
 Response:
 
-```
+```json
 {
   "room_id": "!mscvqgqpHYjBGDxNym:matrix.org",
   "name": "Music Theory",
   "avatar": "mxc://matrix.org/AQDaVFlbkQoErdOgqWRgiGSV",
   "topic": "Theory, Composition, Notation, Analysis",
   "canonical_alias": "#musictheory:matrix.org",
-  "joined_members": 127
+  "joined_members": 127,
   "joined_local_members": 2,
+  "joined_local_devices": 2,
   "version": "1",
   "creator": "@foo:matrix.org",
   "encryption": null,
@@ -353,14 +359,44 @@ GET /_synapse/admin/v1/rooms/<room_id>/members
 
 Response:
 
-```
+```json
 {
   "members": [
     "@foo:matrix.org",
     "@bar:matrix.org",
-    "@foobar:matrix.org
-    ],
+    "@foobar:matrix.org"
+  ],
   "total": 3
+}
+```
+
+# Room State API
+
+The Room State admin API allows server admins to get a list of all state events in a room.
+
+The response includes the following fields:
+
+* `state` - The current state of the room at the time of request.
+
+## Usage
+
+A standard request:
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/state
+
+{}
+```
+
+Response:
+
+```json
+{
+  "state": [
+    {"type": "m.room.create", "state_key": "", "etc": true},
+    {"type": "m.room.power_levels", "state_key": "", "etc": true},
+    {"type": "m.room.name", "state_key": "", "etc": true}
+  ]
 }
 ```
 
@@ -392,7 +428,7 @@ the new room. Users on other servers will be unaffected.
 The API is:
 
 ```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
+DELETE /_synapse/admin/v1/rooms/<room_id>
 ```
 
 with a body of:
@@ -465,6 +501,7 @@ The following fields are returned in the JSON response body:
                     the old room to the new.
 * `new_room_id` - A string representing the room ID of the new room.
 
+
 ## Undoing room shutdowns
 
 *Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
@@ -491,3 +528,198 @@ You will have to manually handle, if you so choose, the following:
 * Aliases that would have been redirected to the Content Violation room.
 * Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
 * Removal of the Content Violation room if desired.
+
+## Deprecated endpoint
+
+The previous deprecated API will be removed in a future release, it was:
+
+```
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+It behaves the same way than the current endpoint except the path and the method.
+
+# Make Room Admin API
+
+Grants another user the highest power available to a local user who is in the room.
+If the user is not in the room, and it is not publicly joinable, then invite the user.
+
+By default the server admin (the caller) is granted power, but another user can
+optionally be specified, e.g.:
+
+```
+    POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
+    {
+        "user_id": "@foo:example.com"
+    }
+```
+
+# Forward Extremities Admin API
+
+Enables querying and deleting forward extremities from rooms. When a lot of forward
+extremities accumulate in a room, performance can become degraded. For details, see 
+[#1760](https://github.com/matrix-org/synapse/issues/1760).
+
+## Check for forward extremities
+
+To check the status of forward extremities for a room:
+
+```
+    GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+```
+
+A response as follows will be returned:
+
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "event_id": "$M5SP266vsnxctfwFgFLNceaCo3ujhRtg_NiiHabcdefgh",
+      "state_group": 439,
+      "depth": 123,
+      "received_ts": 1611263016761
+    }
+  ]
+}    
+```
+
+## Deleting forward extremities
+
+**WARNING**: Please ensure you know what you're doing and have read 
+the related issue [#1760](https://github.com/matrix-org/synapse/issues/1760).
+Under no situations should this API be executed as an automated maintenance task!
+
+If a room has lots of forward extremities, the extra can be
+deleted as follows:
+
+```
+    DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+```
+
+A response as follows will be returned, indicating the amount of forward extremities
+that were deleted.
+
+```json
+{
+  "deleted": 1
+}
+```
+
+# Event Context API
+
+This API lets a client find the context of an event. This is designed primarily to investigate abuse reports.
+
+```
+GET /_synapse/admin/v1/rooms/<room_id>/context/<event_id>
+```
+
+This API mimmicks [GET /_matrix/client/r0/rooms/{roomId}/context/{eventId}](https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-rooms-roomid-context-eventid). Please refer to the link for all details on parameters and reseponse.
+
+Example response:
+
+```json
+{
+  "end": "t29-57_2_0_2",
+  "events_after": [
+    {
+      "content": {
+        "body": "This is an example text message",
+        "msgtype": "m.text",
+        "format": "org.matrix.custom.html",
+        "formatted_body": "<b>This is an example text message</b>"
+      },
+      "type": "m.room.message",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      }
+    }
+  ],
+  "event": {
+    "content": {
+      "body": "filename.jpg",
+      "info": {
+        "h": 398,
+        "w": 394,
+        "mimetype": "image/jpeg",
+        "size": 31037
+      },
+      "url": "mxc://example.org/JWEIFJgwEIhweiWJE",
+      "msgtype": "m.image"
+    },
+    "type": "m.room.message",
+    "event_id": "$f3h4d129462ha:example.com",
+    "room_id": "!636q39766251:example.com",
+    "sender": "@example:example.org",
+    "origin_server_ts": 1432735824653,
+    "unsigned": {
+      "age": 1234
+    }
+  },
+  "events_before": [
+    {
+      "content": {
+        "body": "something-important.doc",
+        "filename": "something-important.doc",
+        "info": {
+          "mimetype": "application/msword",
+          "size": 46144
+        },
+        "msgtype": "m.file",
+        "url": "mxc://example.org/FHyPlCeYUSFFxlgbQYZmoEoe"
+      },
+      "type": "m.room.message",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      }
+    }
+  ],
+  "start": "t27-54_2_0_2",
+  "state": [
+    {
+      "content": {
+        "creator": "@example:example.org",
+        "room_version": "1",
+        "m.federate": true,
+        "predecessor": {
+          "event_id": "$something:example.org",
+          "room_id": "!oldroom:example.org"
+        }
+      },
+      "type": "m.room.create",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      },
+      "state_key": ""
+    },
+    {
+      "content": {
+        "membership": "join",
+        "avatar_url": "mxc://example.org/SEsfnsuifSDFSSEF",
+        "displayname": "Alice Margatroid"
+      },
+      "type": "m.room.member",
+      "event_id": "$143273582443PhrSn:example.org",
+      "room_id": "!636q39766251:example.com",
+      "sender": "@example:example.org",
+      "origin_server_ts": 1432735824653,
+      "unsigned": {
+        "age": 1234
+      },
+      "state_key": "@alice:example.org"
+    }
+  ]
+}
+```

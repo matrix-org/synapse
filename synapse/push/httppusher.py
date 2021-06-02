@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -15,23 +14,23 @@
 # limitations under the License.
 import logging
 import urllib.parse
-from typing import TYPE_CHECKING, Any, Dict, Iterable, Union
+from typing import TYPE_CHECKING, Any, Dict, Iterable, Optional, Union
 
 from prometheus_client import Counter
 
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
+from twisted.internet.interfaces import IDelayedCall
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.push import Pusher, PusherConfigException
-from synapse.types import RoomStreamToken
+from synapse.push import Pusher, PusherConfig, PusherConfigException
 
 from . import push_rule_evaluator, push_tools
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -63,32 +62,29 @@ class HttpPusher(Pusher):
     # This one's in ms because we compare it against the clock
     GIVE_UP_AFTER_MS = 24 * 60 * 60 * 1000
 
-    def __init__(self, hs: "HomeServer", pusherdict: Dict[str, Any]):
-        super().__init__(hs, pusherdict)
+    def __init__(self, hs: "HomeServer", pusher_config: PusherConfig):
+        super().__init__(hs, pusher_config)
         self.storage = self.hs.get_storage()
-        self.app_display_name = pusherdict["app_display_name"]
-        self.device_display_name = pusherdict["device_display_name"]
-        self.pushkey_ts = pusherdict["ts"]
-        self.data = pusherdict["data"]
-        self.last_stream_ordering = pusherdict["last_stream_ordering"]
+        self.app_display_name = pusher_config.app_display_name
+        self.device_display_name = pusher_config.device_display_name
+        self.pushkey_ts = pusher_config.ts
+        self.data = pusher_config.data
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
-        self.failing_since = pusherdict["failing_since"]
-        self.timed_call = None
+        self.failing_since = pusher_config.failing_since
+        self.timed_call = None  # type: Optional[IDelayedCall]
         self._is_processing = False
         self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
+        self._pusherpool = hs.get_pusherpool()
 
-        if "data" not in pusherdict:
-            raise PusherConfigException("No 'data' key for HTTP pusher")
-        self.data = pusherdict["data"]
+        self.data = pusher_config.data
+        if self.data is None:
+            raise PusherConfigException("'data' key can not be null for HTTP pusher")
 
         self.name = "%s/%s/%s" % (
-            pusherdict["user_name"],
-            pusherdict["app_id"],
-            pusherdict["pushkey"],
+            pusher_config.user_name,
+            pusher_config.app_id,
+            pusher_config.pushkey,
         )
-
-        if self.data is None:
-            raise PusherConfigException("data can not be null for HTTP pusher")
 
         # Validate that there's a URL and it is of the proper form.
         if "url" not in self.data:
@@ -121,17 +117,6 @@ class HttpPusher(Pusher):
         """
         if should_check_for_notifs:
             self._start_processing()
-
-    def on_new_notifications(self, max_token: RoomStreamToken) -> None:
-        # We just use the minimum stream ordering and ignore the vector clock
-        # component. This is safe to do as long as we *always* ignore the vector
-        # clock components.
-        max_stream_ordering = max_token.stream
-
-        self.max_stream_ordering = max(
-            max_stream_ordering, self.max_stream_ordering or 0
-        )
-        self._start_processing()
 
     def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
         # Note that the min here shouldn't be relied upon to be accurate.
@@ -192,11 +177,10 @@ class HttpPusher(Pusher):
         Never call this directly: use _process which will only allow this to
         run once per pusher.
         """
-
-        fn = self.store.get_unread_push_actions_for_user_in_range_for_http
-        assert self.max_stream_ordering is not None
-        unprocessed = await fn(
-            self.user_id, self.last_stream_ordering, self.max_stream_ordering
+        unprocessed = (
+            await self.store.get_unread_push_actions_for_user_in_range_for_http(
+                self.user_id, self.last_stream_ordering, self.max_stream_ordering
+            )
         )
 
         logger.info(
@@ -223,12 +207,14 @@ class HttpPusher(Pusher):
                 http_push_processed_counter.inc()
                 self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
                 self.last_stream_ordering = push_action["stream_ordering"]
-                pusher_still_exists = await self.store.update_pusher_last_stream_ordering_and_success(
-                    self.app_id,
-                    self.pushkey,
-                    self.user_id,
-                    self.last_stream_ordering,
-                    self.clock.time_msec(),
+                pusher_still_exists = (
+                    await self.store.update_pusher_last_stream_ordering_and_success(
+                        self.app_id,
+                        self.pushkey,
+                        self.user_id,
+                        self.last_stream_ordering,
+                        self.clock.time_msec(),
+                    )
                 )
                 if not pusher_still_exists:
                     # The pusher has been deleted while we were processing, so
@@ -303,17 +289,18 @@ class HttpPusher(Pusher):
         if rejected is False:
             return False
 
-        if isinstance(rejected, list) or isinstance(rejected, tuple):
+        if isinstance(rejected, (list, tuple)):
             for pk in rejected:
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it
                     # was the one we actually sent...
                     logger.warning(
-                        ("Ignoring rejected pushkey %s because we didn't send it"), pk,
+                        ("Ignoring rejected pushkey %s because we didn't send it"),
+                        pk,
                     )
                 else:
                     logger.info("Pushkey %s was rejected: removing", pk)
-                    await self.hs.remove_pusher(self.app_id, pk, self.user_id)
+                    await self._pusherpool.remove_pusher(self.app_id, pk, self.user_id)
         return True
 
     async def _build_notification_dict(
@@ -329,6 +316,8 @@ class HttpPusher(Pusher):
             #  or may do so (i.e. is encrypted so has unknown effects).
             priority = "high"
 
+        # This was checked in the __init__, but mypy doesn't seem to know that.
+        assert self.data is not None
         if self.data.get("format") == "event_id_only":
             d = {
                 "notification": {

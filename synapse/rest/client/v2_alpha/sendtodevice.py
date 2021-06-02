@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +16,7 @@ import logging
 from typing import Tuple
 
 from synapse.http import servlet
-from synapse.http.servlet import parse_json_object_from_request
+from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
 from synapse.logging.opentracing import set_tag, trace
 from synapse.rest.client.transactions import HttpTransactionCache
 
@@ -54,11 +53,10 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
-
-        sender_user_id = requester.user.to_string()
+        assert_params_in_dict(content, ("messages",))
 
         await self.device_message_handler.send_device_message(
-            sender_user_id, message_type, content["messages"]
+            requester, message_type, content["messages"]
         )
 
         response = (200, {})  # type: Tuple[int, dict]

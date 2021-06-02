@@ -1,6 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2019 New Vector Ltd
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,10 +16,11 @@
 import logging
 import os
 import urllib
-from typing import Awaitable
+from typing import Awaitable, Dict, Generator, List, Optional, Tuple
 
 from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
@@ -46,20 +46,22 @@ TEXT_CONTENT_TYPES = [
 ]
 
 
-def parse_media_id(request):
+def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     try:
+        # The type on postpath seems incorrect in Twisted 21.2.0.
+        postpath = request.postpath  # type: List[bytes]  # type: ignore
+        assert postpath
+
         # This allows users to append e.g. /test.png to the URL. Useful for
         # clients that parse the URL to see content type.
-        server_name, media_id = request.postpath[:2]
-
-        if isinstance(server_name, bytes):
-            server_name = server_name.decode("utf-8")
-            media_id = media_id.decode("utf8")
+        server_name_bytes, media_id_bytes = postpath[:2]
+        server_name = server_name_bytes.decode("utf-8")
+        media_id = media_id_bytes.decode("utf8")
 
         file_name = None
-        if len(request.postpath) > 2:
+        if len(postpath) > 2:
             try:
-                file_name = urllib.parse.unquote(request.postpath[-1].decode("utf-8"))
+                file_name = urllib.parse.unquote(postpath[-1].decode("utf-8"))
             except UnicodeDecodeError:
                 pass
         return server_name, media_id, file_name
@@ -69,7 +71,7 @@ def parse_media_id(request):
         )
 
 
-def respond_404(request):
+def respond_404(request: Request) -> None:
     respond_with_json(
         request,
         404,
@@ -79,8 +81,12 @@ def respond_404(request):
 
 
 async def respond_with_file(
-    request, media_type, file_path, file_size=None, upload_name=None
-):
+    request: Request,
+    media_type: str,
+    file_path: str,
+    file_size: Optional[int] = None,
+    upload_name: Optional[str] = None,
+) -> None:
     logger.debug("Responding with %r", file_path)
 
     if os.path.isfile(file_path):
@@ -98,15 +104,20 @@ async def respond_with_file(
         respond_404(request)
 
 
-def add_file_headers(request, media_type, file_size, upload_name):
+def add_file_headers(
+    request: Request,
+    media_type: str,
+    file_size: Optional[int],
+    upload_name: Optional[str],
+) -> None:
     """Adds the correct response headers in preparation for responding with the
     media.
 
     Args:
-        request (twisted.web.http.Request)
-        media_type (str): The media/content type.
-        file_size (int): Size in bytes of the media, if known.
-        upload_name (str): The name of the requested file, if any.
+        request
+        media_type: The media/content type.
+        file_size: Size in bytes of the media, if known.
+        upload_name: The name of the requested file, if any.
     """
 
     def _quote(x):
@@ -127,7 +138,7 @@ def add_file_headers(request, media_type, file_size, upload_name):
         # section 3.6 [2] to be a `token` or a `quoted-string`, where a `token`
         # is (essentially) a single US-ASCII word, and a `quoted-string` is a
         # US-ASCII string surrounded by double-quotes, using backslash as an
-        # escape charater. Note that %-encoding is *not* permitted.
+        # escape character. Note that %-encoding is *not* permitted.
         #
         # `filename*` is defined to be an `ext-value`, which is defined in
         # RFC5987 section 3.2.1 [3] to be `charset "'" [ language ] "'" value-chars`,
@@ -153,7 +164,8 @@ def add_file_headers(request, media_type, file_size, upload_name):
     # select private. don't bother setting Expires as all our
     # clients are smart enough to be happy with Cache-Control
     request.setHeader(b"Cache-Control", b"public,max-age=86400,s-maxage=86400")
-    request.setHeader(b"Content-Length", b"%d" % (file_size,))
+    if file_size is not None:
+        request.setHeader(b"Content-Length", b"%d" % (file_size,))
 
     # Tell web crawlers to not index, archive, or follow links in media. This
     # should help to prevent things in the media repo from showing up in web
@@ -184,7 +196,7 @@ _FILENAME_SEPARATOR_CHARS = {
 }
 
 
-def _can_encode_filename_as_token(x):
+def _can_encode_filename_as_token(x: str) -> bool:
     for c in x:
         # from RFC2616:
         #
@@ -206,17 +218,21 @@ def _can_encode_filename_as_token(x):
 
 
 async def respond_with_responder(
-    request, responder, media_type, file_size, upload_name=None
-):
+    request: Request,
+    responder: "Optional[Responder]",
+    media_type: str,
+    file_size: Optional[int],
+    upload_name: Optional[str] = None,
+) -> None:
     """Responds to the request with given responder. If responder is None then
     returns 404.
 
     Args:
-        request (twisted.web.http.Request)
-        responder (Responder|None)
-        media_type (str): The media/content type.
-        file_size (int|None): Size in bytes of the media. If not known it should be None
-        upload_name (str|None): The name of the requested file, if any.
+        request
+        responder
+        media_type: The media/content type.
+        file_size: Size in bytes of the media. If not known it should be None
+        upload_name: The name of the requested file, if any.
     """
     if request._disconnected:
         logger.warning(
@@ -285,6 +301,7 @@ class FileInfo:
         thumbnail_height (int)
         thumbnail_method (str)
         thumbnail_type (str): Content type of thumbnail, e.g. image/png
+        thumbnail_length (int): The size of the media file, in bytes.
     """
 
     def __init__(
@@ -297,6 +314,7 @@ class FileInfo:
         thumbnail_height=None,
         thumbnail_method=None,
         thumbnail_type=None,
+        thumbnail_length=None,
     ):
         self.server_name = server_name
         self.file_id = file_id
@@ -306,24 +324,25 @@ class FileInfo:
         self.thumbnail_height = thumbnail_height
         self.thumbnail_method = thumbnail_method
         self.thumbnail_type = thumbnail_type
+        self.thumbnail_length = thumbnail_length
 
 
-def get_filename_from_headers(headers):
+def get_filename_from_headers(headers: Dict[bytes, List[bytes]]) -> Optional[str]:
     """
     Get the filename of the downloaded file by inspecting the
     Content-Disposition HTTP header.
 
     Args:
-        headers (dict[bytes, list[bytes]]): The HTTP request headers.
+        headers: The HTTP request headers.
 
     Returns:
-        A Unicode string of the filename, or None.
+        The filename, or None.
     """
     content_disposition = headers.get(b"Content-Disposition", [b""])
 
     # No header, bail out.
     if not content_disposition[0]:
-        return
+        return None
 
     _, params = _parse_header(content_disposition[0])
 
@@ -356,17 +375,16 @@ def get_filename_from_headers(headers):
     return upload_name
 
 
-def _parse_header(line):
+def _parse_header(line: bytes) -> Tuple[bytes, Dict[bytes, bytes]]:
     """Parse a Content-type like header.
 
     Cargo-culted from `cgi`, but works on bytes rather than strings.
 
     Args:
-        line (bytes): header to be parsed
+        line: header to be parsed
 
     Returns:
-        Tuple[bytes, dict[bytes, bytes]]:
-            the main content-type, followed by the parameter dictionary
+        The main content-type, followed by the parameter dictionary
     """
     parts = _parseparam(b";" + line)
     key = next(parts)
@@ -386,16 +404,16 @@ def _parse_header(line):
     return key, pdict
 
 
-def _parseparam(s):
+def _parseparam(s: bytes) -> Generator[bytes, None, None]:
     """Generator which splits the input on ;, respecting double-quoted sequences
 
     Cargo-culted from `cgi`, but works on bytes rather than strings.
 
     Args:
-        s (bytes): header to be parsed
+        s: header to be parsed
 
     Returns:
-        Iterable[bytes]: the split input
+        The split input
     """
     while s[:1] == b";":
         s = s[1:]

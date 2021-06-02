@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -86,7 +85,6 @@ class DeleteDevicesRestServlet(RestServlet):
             requester,
             request,
             body,
-            self.hs.get_ip_from_request(request),
             "remove device(s) from your account",
         )
 
@@ -136,7 +134,6 @@ class DeviceRestServlet(RestServlet):
             requester,
             request,
             body,
-            self.hs.get_ip_from_request(request),
             "remove a device from your account",
         )
 
@@ -214,7 +211,9 @@ class DehydratedDeviceServlet(RestServlet):
 
         if "device_data" not in submission:
             raise errors.SynapseError(
-                400, "device_data missing", errcode=errors.Codes.MISSING_PARAM,
+                400,
+                "device_data missing",
+                errcode=errors.Codes.MISSING_PARAM,
             )
         elif not isinstance(submission["device_data"], dict):
             raise errors.SynapseError(
@@ -267,11 +266,15 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 
         if "device_id" not in submission:
             raise errors.SynapseError(
-                400, "device_id missing", errcode=errors.Codes.MISSING_PARAM,
+                400,
+                "device_id missing",
+                errcode=errors.Codes.MISSING_PARAM,
             )
         elif not isinstance(submission["device_id"], str):
             raise errors.SynapseError(
-                400, "device_id must be a string", errcode=errors.Codes.INVALID_PARAM,
+                400,
+                "device_id must be a string",
+                errcode=errors.Codes.INVALID_PARAM,
             )
 
         result = await self.device_handler.rehydrate_device(

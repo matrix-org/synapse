@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -198,7 +197,7 @@ class MonthlyActiveUsersTestCase(unittest.HomeserverTestCase):
     # value, although it gets stored on the config object as mau_limits.
     @override_config({"max_mau_value": 5, "mau_limit_reserved_threepids": gen_3pids(5)})
     def test_reap_monthly_active_users_reserved_users(self):
-        """ Tests that reaping correctly handles reaping where reserved users are
+        """Tests that reaping correctly handles reaping where reserved users are
         present"""
         threepids = self.hs.config.mau_limits_reserved_threepids
         initial_users = len(threepids)

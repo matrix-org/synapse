@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,7 +24,7 @@ class HealthCheckTests(unittest.HomeserverTestCase):
         return HealthResource()
 
     def test_health(self):
-        request, channel = self.make_request("GET", "/health", shorthand=False)
+        channel = self.make_request("GET", "/health", shorthand=False)
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"OK")

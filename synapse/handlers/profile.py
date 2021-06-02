@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,7 +35,7 @@ from synapse.types import (
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -156,7 +155,7 @@ class ProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-            return result["displayname"]
+            return result.get("displayname")
 
     async def set_displayname(
         self,
@@ -207,7 +206,8 @@ class ProfileHandler(BaseHandler):
         # This must be done by the target user himself.
         if by_admin:
             requester = create_requester(
-                target_user, authenticated_entity=requester.authenticated_entity,
+                target_user,
+                authenticated_entity=requester.authenticated_entity,
             )
 
         await self.store.set_profile_displayname(
@@ -246,7 +246,7 @@ class ProfileHandler(BaseHandler):
             except HttpResponseException as e:
                 raise e.to_synapse_error()
 
-            return result["avatar_url"]
+            return result.get("avatar_url")
 
     async def set_avatar_url(
         self,
@@ -286,13 +286,19 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
+        avatar_url_to_set = new_avatar_url  # type: Optional[str]
+        if new_avatar_url == "":
+            avatar_url_to_set = None
+
         # Same like set_displayname
         if by_admin:
             requester = create_requester(
                 target_user, authenticated_entity=requester.authenticated_entity
             )
 
-        await self.store.set_profile_avatar_url(target_user.localpart, new_avatar_url)
+        await self.store.set_profile_avatar_url(
+            target_user.localpart, avatar_url_to_set
+        )
 
         if self.hs.config.user_directory_search_all_users:
             profile = await self.store.get_profileinfo(target_user.localpart)
@@ -303,6 +309,15 @@ class ProfileHandler(BaseHandler):
         await self._update_join_states(requester, target_user)
 
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
+        """Handles federation profile query requests."""
+
+        if not self.hs.config.allow_profile_lookup_over_federation:
+            raise SynapseError(
+                403,
+                "Profile lookup over federation is disabled on this homeserver",
+                Codes.FORBIDDEN,
+            )
+
         user = UserID.from_string(args["user_id"])
         if not self.hs.is_mine(user):
             raise SynapseError(400, "User is not hosted on this homeserver")

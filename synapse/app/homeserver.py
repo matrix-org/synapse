@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -15,15 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import gc
 import logging
 import os
 import sys
-from typing import Iterable, Iterator
+from typing import Iterator
 
-from twisted.application import service
-from twisted.internet import defer, reactor
-from twisted.python.failure import Failure
+from twisted.internet import reactor
 from twisted.web.resource import EncodingResourceWrapper, IResource
 from twisted.web.server import GzipEncoderFactory
 from twisted.web.static import File
@@ -40,7 +36,13 @@ from synapse.api.urls import (
     WEB_CLIENT_PREFIX,
 )
 from synapse.app import _base
-from synapse.app._base import listen_ssl, listen_tcp, quit_with_error
+from synapse.app._base import (
+    listen_ssl,
+    listen_tcp,
+    max_request_body_size,
+    quit_with_error,
+    register_start,
+)
 from synapse.config._base import ConfigError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.homeserver import HomeServerConfig
@@ -63,15 +65,14 @@ from synapse.rest import ClientRestResource
 from synapse.rest.admin import AdminRestResource
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
+from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
-from synapse.util.manhole import manhole
 from synapse.util.module_loader import load_module
-from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger("synapse.app.homeserver")
@@ -131,19 +132,21 @@ class SynapseHomeServer(HomeServer):
         else:
             root_resource = OptionsResource()
 
-        root_resource = create_resource_tree(resources, root_resource)
+        site = SynapseSite(
+            "synapse.access.%s.%s" % ("https" if tls else "http", site_tag),
+            site_tag,
+            listener_config,
+            create_resource_tree(resources, root_resource),
+            self.version_string,
+            max_request_body_size=max_request_body_size(self.config),
+            reactor=self.get_reactor(),
+        )
 
         if tls:
             ports = listen_ssl(
                 bind_addresses,
                 port,
-                SynapseSite(
-                    "synapse.access.https.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                    self.version_string,
-                ),
+                site,
                 self.tls_server_context_factory,
                 reactor=self.get_reactor(),
             )
@@ -153,13 +156,7 @@ class SynapseHomeServer(HomeServer):
             ports = listen_tcp(
                 bind_addresses,
                 port,
-                SynapseSite(
-                    "synapse.access.http.%s" % (site_tag,),
-                    site_tag,
-                    listener_config,
-                    root_resource,
-                    self.version_string,
-                ),
+                site,
                 reactor=self.get_reactor(),
             )
             logger.info("Synapse now listening on TCP port %d", port)
@@ -192,20 +189,11 @@ class SynapseHomeServer(HomeServer):
                     "/_matrix/client/versions": client_resource,
                     "/.well-known/matrix/client": WellKnownResource(self),
                     "/_synapse/admin": AdminRestResource(self),
+                    **build_synapse_client_resource_tree(self),
                 }
             )
 
-            if self.get_config().oidc_enabled:
-                from synapse.rest.oidc import OIDCResource
-
-                resources["/_synapse/oidc"] = OIDCResource(self)
-
-            if self.get_config().saml2_enabled:
-                from synapse.rest.saml2 import SAML2Resource
-
-                resources["/_matrix/saml2"] = SAML2Resource(self)
-
-            if self.get_config().threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -244,7 +232,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.get_config().enable_media_repo:
+            if self.config.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
@@ -258,7 +246,7 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_loc = self.get_config().web_client_location
+            webclient_loc = self.config.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
@@ -279,7 +267,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.get_config().enable_metrics:
+        if name == "metrics" and self.config.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -287,25 +275,21 @@ class SynapseHomeServer(HomeServer):
 
         return resources
 
-    def start_listening(self, listeners: Iterable[ListenerConfig]):
-        config = self.get_config()
-
-        if config.redis_enabled:
+    def start_listening(self):
+        if self.config.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
             self.get_tcp_replication().start_replication(self)
 
-        for listener in listeners:
+        for listener in self.config.server.listeners:
             if listener.type == "http":
-                self._listening_services.extend(self._listener_http(config, listener))
+                self._listening_services.extend(
+                    self._listener_http(self.config, listener)
+                )
             elif listener.type == "manhole":
-                listen_tcp(
-                    listener.bind_addresses,
-                    listener.port,
-                    manhole(
-                        username="matrix", password="rabbithole", globals={"hs": self}
-                    ),
+                _base.listen_manhole(
+                    listener.bind_addresses, listener.port, manhole_globals={"hs": self}
                 )
             elif listener.type == "replication":
                 services = listen_tcp(
@@ -316,7 +300,7 @@ class SynapseHomeServer(HomeServer):
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
-                if not self.get_config().enable_metrics:
+                if not self.config.enable_metrics:
                     logger.warning(
                         (
                             "Metrics listener configured, but "
@@ -357,6 +341,10 @@ def setup(config_options):
         sys.exit(0)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
+
+    if config.server.gc_seconds:
+        synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = SynapseHomeServer(
         config.server_name,
@@ -413,40 +401,28 @@ def setup(config_options):
             _base.refresh_certificate(hs)
 
     async def start():
-        try:
-            # Run the ACME provisioning code, if it's enabled.
-            if hs.config.acme_enabled:
-                acme = hs.get_acme_handler()
-                # Start up the webservices which we will respond to ACME
-                # challenges with, and then provision.
-                await acme.start_listening()
-                await do_acme()
+        # Run the ACME provisioning code, if it's enabled.
+        if hs.config.acme_enabled:
+            acme = hs.get_acme_handler()
+            # Start up the webservices which we will respond to ACME
+            # challenges with, and then provision.
+            await acme.start_listening()
+            await do_acme()
 
-                # Check if it needs to be reprovisioned every day.
-                hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
+            # Check if it needs to be reprovisioned every day.
+            hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
 
-            # Load the OIDC provider metadatas, if OIDC is enabled.
-            if hs.config.oidc_enabled:
-                oidc = hs.get_oidc_handler()
-                # Loading the provider metadata also ensures the provider config is valid.
-                await oidc.load_metadata()
-                await oidc.load_jwks()
+        # Load the OIDC provider metadatas, if OIDC is enabled.
+        if hs.config.oidc_enabled:
+            oidc = hs.get_oidc_handler()
+            # Loading the provider metadata also ensures the provider config is valid.
+            await oidc.load_metadata()
 
-            _base.start(hs, config.listeners)
+        await _base.start(hs)
 
-            hs.get_datastore().db_pool.updates.start_doing_background_updates()
-        except Exception:
-            # Print the exception and bail out.
-            print("Error during startup:", file=sys.stderr)
+        hs.get_datastore().db_pool.updates.start_doing_background_updates()
 
-            # this gives better tracebacks than traceback.print_exc()
-            Failure().printTraceback(file=sys.stderr)
-
-            if reactor.running:
-                reactor.stop()
-            sys.exit(1)
-
-    reactor.callWhenRunning(lambda: defer.ensureDeferred(start()))
+    register_start(start)
 
     return hs
 
@@ -481,25 +457,6 @@ def format_config_error(e: ConfigError) -> Iterator[str]:
         indent += 1
         yield ":\n%s%s" % ("  " * indent, str(e))
         e = e.__cause__
-
-
-class SynapseService(service.Service):
-    """
-    A twisted Service class that will start synapse. Used to run synapse
-    via twistd and a .tac.
-    """
-
-    def __init__(self, config):
-        self.config = config
-
-    def startService(self):
-        hs = setup(self.config)
-        change_resource_limit(hs.config.soft_file_limit)
-        if hs.config.gc_thresholds:
-            gc.set_threshold(*hs.config.gc_thresholds)
-
-    def stopService(self):
-        return self._port.stopListening()
 
 
 def run(hs):

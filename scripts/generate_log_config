@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,4 +39,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    args.output_file.write(DEFAULT_LOG_CONFIG.substitute(log_file=args.log_file))
+    out = args.output_file
+    out.write(DEFAULT_LOG_CONFIG.substitute(log_file=args.log_file))
+    out.flush()

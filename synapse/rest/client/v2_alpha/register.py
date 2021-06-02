@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 #
@@ -13,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import hmac
 import logging
 import random
@@ -22,7 +20,7 @@ from typing import List, Union
 import synapse
 import synapse.api.auth
 import synapse.types
-from synapse.api.constants import LoginType
+from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import (
     Codes,
     InteractiveAuthIncompleteError,
@@ -32,12 +30,13 @@ from synapse.api.errors import (
 )
 from synapse.config import ConfigError
 from synapse.config.captcha import CaptchaConfig
-from synapse.config.consent_config import ConsentConfig
+from synapse.config.consent import ConsentConfig
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.config.ratelimiting import FederationRateLimitConfig
 from synapse.config.registration import RegistrationConfig
 from synapse.config.server import is_threepid_reserved
 from synapse.handlers.auth import AuthHandler
+from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
@@ -50,7 +49,11 @@ from synapse.push.mailer import Mailer
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
-from synapse.util.threepids import canonicalise_email, check_3pid_allowed
+from synapse.util.threepids import (
+    canonicalise_email,
+    check_3pid_allowed,
+    validate_email,
+)
 
 from ._base import client_patterns, interactive_auth_handler
 
@@ -112,7 +115,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         # (See on_POST in EmailThreepidRequestTokenRestServlet
         # in synapse/rest/client/v2_alpha/account.py)
         try:
-            email = canonicalise_email(body["email"])
+            email = validate_email(body["email"])
         except ValueError as e:
             raise SynapseError(400, str(e))
         send_attempt = body["send_attempt"]
@@ -124,6 +127,10 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
                 "Your email domain is not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
+
+        await self.identity_handler.ratelimit_request_token_requests(
+            request, "email", email
+        )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "email", email
@@ -190,6 +197,7 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
             body, ["client_secret", "country", "phone_number", "send_attempt"]
         )
         client_secret = body["client_secret"]
+        assert_valid_client_secret(client_secret)
         country = body["country"]
         phone_number = body["phone_number"]
         send_attempt = body["send_attempt"]
@@ -203,6 +211,10 @@ class MsisdnRegisterRequestTokenRestServlet(RestServlet):
                 "Phone numbers are not authorized to register on this server",
                 Codes.THREEPID_DENIED,
             )
+
+        await self.identity_handler.ratelimit_request_token_requests(
+            request, "msisdn", msisdn
+        )
 
         existing_user_id = await self.hs.get_datastore().get_user_id_by_threepid(
             "msisdn", msisdn
@@ -286,6 +298,7 @@ class RegistrationSubmitTokenServlet(RestServlet):
 
         sid = parse_string(request, "sid", required=True)
         client_secret = parse_string(request, "client_secret", required=True)
+        assert_valid_client_secret(client_secret)
         token = parse_string(request, "token", required=True)
 
         # Attempt to validate a 3PID session
@@ -353,7 +366,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
             )
 
-        ip = self.hs.get_ip_from_request(request)
+        ip = request.getClientIP()
         with self.ratelimiter.ratelimit(ip) as wait_deferred:
             await wait_deferred
 
@@ -397,7 +410,7 @@ class RegisterRestServlet(RestServlet):
 
         client_addr = request.getClientIP()
 
-        self.ratelimiter.ratelimit(client_addr, update=False)
+        await self.ratelimiter.ratelimit(None, client_addr, update=False)
 
         kind = b"user"
         if b"kind" in request.args:
@@ -419,15 +432,20 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Invalid username")
             desired_username = body["username"]
 
-        appservice = None
-        if self.auth.has_access_token(request):
-            appservice = self.auth.get_appservice_by_req(request)
-
         # fork off as soon as possible for ASes which have completely
         # different registration flows to normal users
 
         # == Application Service Registration ==
-        if appservice:
+        if body.get("type") == APP_SERVICE_REGISTRATION_TYPE:
+            if not self.auth.has_access_token(request):
+                raise SynapseError(
+                    400,
+                    "Appservice token must be provided when using a type of m.login.application_service",
+                )
+
+            # Verify the AS
+            self.auth.get_appservice_by_req(request)
+
             # Set the desired user according to the AS API (which uses the
             # 'user' key not 'username'). Since this is a new addition, we'll
             # fallback to 'username' if they gave one.
@@ -448,6 +466,11 @@ class RegisterRestServlet(RestServlet):
             )
 
             return 200, result
+        elif self.auth.has_access_token(request):
+            raise SynapseError(
+                400,
+                "An access token should not be provided on requests to /register (except if type is m.login.application_service)",
+            )
 
         # == Normal User Registration == (everyone else)
         if not self._registration_enabled:
@@ -494,11 +517,11 @@ class RegisterRestServlet(RestServlet):
             # user here. We carry on and go through the auth checks though,
             # for paranoia.
             registered_user_id = await self.auth_handler.get_session_data(
-                session_id, "registered_user_id", None
+                session_id, UIAuthSessionDataConstants.REGISTERED_USER_ID, None
             )
             # Extract the previously-hashed password from the session.
             password_hash = await self.auth_handler.get_session_data(
-                session_id, "password_hash", None
+                session_id, UIAuthSessionDataConstants.PASSWORD_HASH, None
             )
 
         # Ensure that the username is valid.
@@ -516,7 +539,6 @@ class RegisterRestServlet(RestServlet):
                 self._registration_flows,
                 request,
                 body,
-                self.hs.get_ip_from_request(request),
                 "register a new account",
             )
         except InteractiveAuthIncompleteError as e:
@@ -532,7 +554,9 @@ class RegisterRestServlet(RestServlet):
             if not password_hash and password:
                 password_hash = await self.auth_handler.hash(password)
                 await self.auth_handler.set_session_data(
-                    e.session_id, "password_hash", password_hash
+                    e.session_id,
+                    UIAuthSessionDataConstants.PASSWORD_HASH,
+                    password_hash,
                 )
             raise
 
@@ -633,7 +657,9 @@ class RegisterRestServlet(RestServlet):
             # Remember that the user account has been registered (and the user
             # ID it was registered with, since it might not have been specified).
             await self.auth_handler.set_session_data(
-                session_id, "registered_user_id", registered_user_id
+                session_id,
+                UIAuthSessionDataConstants.REGISTERED_USER_ID,
+                registered_user_id,
             )
 
             registered = True
@@ -655,9 +681,15 @@ class RegisterRestServlet(RestServlet):
         user_id = await self.registration_handler.appservice_register(
             username, as_token
         )
-        return await self._create_registration_details(user_id, body)
+        return await self._create_registration_details(
+            user_id,
+            body,
+            is_appservice_ghost=True,
+        )
 
-    async def _create_registration_details(self, user_id, params):
+    async def _create_registration_details(
+        self, user_id, params, is_appservice_ghost=False
+    ):
         """Complete registration of newly-registered user
 
         Allocates device_id if one was not given; also creates access_token.
@@ -674,7 +706,11 @@ class RegisterRestServlet(RestServlet):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
             device_id, access_token = await self.registration_handler.register_device(
-                user_id, device_id, initial_display_name, is_guest=False
+                user_id,
+                device_id,
+                initial_display_name,
+                is_guest=False,
+                is_appservice_ghost=is_appservice_ghost,
             )
 
             result.update({"access_token": access_token, "device_id": device_id})

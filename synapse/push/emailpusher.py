@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,18 +13,18 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Dict, List, Optional
 
-from twisted.internet.base import DelayedCall
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
+from twisted.internet.interfaces import IDelayedCall
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.push import Pusher
+from synapse.push import Pusher, PusherConfig, PusherConfigException, ThrottleParams
 from synapse.push.mailer import Mailer
-from synapse.types import RoomStreamToken
+from synapse.util.threepids import validate_email
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -61,18 +60,23 @@ class EmailPusher(Pusher):
     factor out the common parts
     """
 
-    def __init__(self, hs: "HomeServer", pusherdict: Dict[str, Any], mailer: Mailer):
-        super().__init__(hs, pusherdict)
+    def __init__(self, hs: "HomeServer", pusher_config: PusherConfig, mailer: Mailer):
+        super().__init__(hs, pusher_config)
         self.mailer = mailer
 
         self.store = self.hs.get_datastore()
-        self.email = pusherdict["pushkey"]
-        self.last_stream_ordering = pusherdict["last_stream_ordering"]
-        self.timed_call = None  # type: Optional[DelayedCall]
-        self.throttle_params = {}  # type: Dict[str, Dict[str, int]]
+        self.email = pusher_config.pushkey
+        self.timed_call = None  # type: Optional[IDelayedCall]
+        self.throttle_params = {}  # type: Dict[str, ThrottleParams]
         self._inited = False
 
         self._is_processing = False
+
+        # Make sure that the email is valid.
+        try:
+            validate_email(self.email)
+        except ValueError:
+            raise PusherConfigException("Invalid email")
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -92,20 +96,6 @@ class EmailPusher(Pusher):
             except (AlreadyCalled, AlreadyCancelled):
                 pass
             self.timed_call = None
-
-    def on_new_notifications(self, max_token: RoomStreamToken) -> None:
-        # We just use the minimum stream ordering and ignore the vector clock
-        # component. This is safe to do as long as we *always* ignore the vector
-        # clock components.
-        max_stream_ordering = max_token.stream
-
-        if self.max_stream_ordering:
-            self.max_stream_ordering = max(
-                max_stream_ordering, self.max_stream_ordering
-            )
-        else:
-            self.max_stream_ordering = max_stream_ordering
-        self._start_processing()
 
     def on_new_receipts(self, min_stream_id: int, max_stream_id: int) -> None:
         # We could wake up and cancel the timer but there tend to be quite a
@@ -132,8 +122,7 @@ class EmailPusher(Pusher):
         self._is_processing = True
 
     def _resume_processing(self) -> None:
-        """Used by tests to resume processing of events after pausing.
-        """
+        """Used by tests to resume processing of events after pausing."""
         assert self._is_processing
         self._is_processing = False
         self._start_processing()
@@ -147,6 +136,7 @@ class EmailPusher(Pusher):
 
             if not self._inited:
                 # this is our first loop: load up the throttle params
+                assert self.pusher_id is not None
                 self.throttle_params = await self.store.get_throttle_params_by_room(
                     self.pusher_id
                 )
@@ -172,9 +162,10 @@ class EmailPusher(Pusher):
         being run.
         """
         start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
-        assert self.max_stream_ordering is not None
-        unprocessed = await self.store.get_unread_push_actions_for_user_in_range_for_email(
-            self.user_id, start, self.max_stream_ordering
+        unprocessed = (
+            await self.store.get_unread_push_actions_for_user_in_range_for_email(
+                self.user_id, start, self.max_stream_ordering
+            )
         )
 
         soonest_due_at = None  # type: Optional[int]
@@ -235,19 +226,17 @@ class EmailPusher(Pusher):
             )
 
     async def save_last_stream_ordering_and_success(
-        self, last_stream_ordering: Optional[int]
+        self, last_stream_ordering: int
     ) -> None:
-        if last_stream_ordering is None:
-            # This happens if we haven't yet processed anything
-            return
-
         self.last_stream_ordering = last_stream_ordering
-        pusher_still_exists = await self.store.update_pusher_last_stream_ordering_and_success(
-            self.app_id,
-            self.email,
-            self.user_id,
-            last_stream_ordering,
-            self.clock.time_msec(),
+        pusher_still_exists = (
+            await self.store.update_pusher_last_stream_ordering_and_success(
+                self.app_id,
+                self.email,
+                self.user_id,
+                last_stream_ordering,
+                self.clock.time_msec(),
+            )
         )
         if not pusher_still_exists:
             # The pusher has been deleted while we were processing, so
@@ -260,13 +249,13 @@ class EmailPusher(Pusher):
 
     def get_room_throttle_ms(self, room_id: str) -> int:
         if room_id in self.throttle_params:
-            return self.throttle_params[room_id]["throttle_ms"]
+            return self.throttle_params[room_id].throttle_ms
         else:
             return 0
 
     def get_room_last_sent_ts(self, room_id: str) -> int:
         if room_id in self.throttle_params:
-            return self.throttle_params[room_id]["last_sent_ts"]
+            return self.throttle_params[room_id].last_sent_ts
         else:
             return 0
 
@@ -317,10 +306,11 @@ class EmailPusher(Pusher):
                 new_throttle_ms = min(
                     current_throttle_ms * THROTTLE_MULTIPLIER, THROTTLE_MAX_MS
                 )
-        self.throttle_params[room_id] = {
-            "last_sent_ts": self.clock.time_msec(),
-            "throttle_ms": new_throttle_ms,
-        }
+        self.throttle_params[room_id] = ThrottleParams(
+            self.clock.time_msec(),
+            new_throttle_ms,
+        )
+        assert self.pusher_id is not None
         await self.store.set_throttle_params(
             self.pusher_id, room_id, self.throttle_params[room_id]
         )

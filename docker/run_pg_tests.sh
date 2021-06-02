@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # This script runs the PostgreSQL tests inside a Docker container. It expects
 # the relevant source files to be mounted into /src (done automatically by the

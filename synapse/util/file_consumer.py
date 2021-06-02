@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,15 +82,13 @@ class BackgroundFileConsumer:
             self._producer.resumeProducing()
 
     def unregisterProducer(self):
-        """Part of IProducer interface
-        """
+        """Part of IProducer interface"""
         self._producer = None
         if not self._finished_deferred.called:
             self._bytes_queue.put_nowait(None)
 
     def write(self, bytes):
-        """Part of IProducer interface
-        """
+        """Part of IProducer interface"""
         if self._write_exception:
             raise self._write_exception
 
@@ -107,8 +104,7 @@ class BackgroundFileConsumer:
             self._producer.pauseProducing()
 
     def _writer(self):
-        """This is run in a background thread to write to the file.
-        """
+        """This is run in a background thread to write to the file."""
         try:
             while self._producer or not self._bytes_queue.empty():
                 # If we've paused the producer check if we should resume the
@@ -135,13 +131,11 @@ class BackgroundFileConsumer:
             self._file_obj.close()
 
     def wait(self):
-        """Returns a deferred that resolves when finished writing to file
-        """
+        """Returns a deferred that resolves when finished writing to file"""
         return make_deferred_yieldable(self._finished_deferred)
 
     def _resume_paused_producer(self):
-        """Gets called if we should resume producing after being paused
-        """
+        """Gets called if we should resume producing after being paused"""
         if self._paused_producer and self._producer:
             self._paused_producer = False
             self._producer.resumeProducing()

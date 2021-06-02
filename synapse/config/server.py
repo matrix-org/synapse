@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -15,18 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import itertools
 import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 import yaml
-from netaddr import IPSet
+from netaddr import AddrFormatError, IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.util.module_loader import load_module
+from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
 
@@ -40,6 +41,71 @@ logger = logging.Logger(__name__)
 # in the list.
 DEFAULT_BIND_ADDRESSES = ["::", "0.0.0.0"]
 
+
+def _6to4(network: IPNetwork) -> IPNetwork:
+    """Convert an IPv4 network into a 6to4 IPv6 network per RFC 3056."""
+
+    # 6to4 networks consist of:
+    # * 2002 as the first 16 bits
+    # * The first IPv4 address in the network hex-encoded as the next 32 bits
+    # * The new prefix length needs to include the bits from the 2002 prefix.
+    hex_network = hex(network.first)[2:]
+    hex_network = ("0" * (8 - len(hex_network))) + hex_network
+    return IPNetwork(
+        "2002:%s:%s::/%d"
+        % (
+            hex_network[:4],
+            hex_network[4:],
+            16 + network.prefixlen,
+        )
+    )
+
+
+def generate_ip_set(
+    ip_addresses: Optional[Iterable[str]],
+    extra_addresses: Optional[Iterable[str]] = None,
+    config_path: Optional[Iterable[str]] = None,
+) -> IPSet:
+    """
+    Generate an IPSet from a list of IP addresses or CIDRs.
+
+    Additionally, for each IPv4 network in the list of IP addresses, also
+    includes the corresponding IPv6 networks.
+
+    This includes:
+
+    * IPv4-Compatible IPv6 Address (see RFC 4291, section 2.5.5.1)
+    * IPv4-Mapped IPv6 Address (see RFC 4291, section 2.5.5.2)
+    * 6to4 Address (see RFC 3056, section 2)
+
+    Args:
+        ip_addresses: An iterable of IP addresses or CIDRs.
+        extra_addresses: An iterable of IP addresses or CIDRs.
+        config_path: The path in the configuration for error messages.
+
+    Returns:
+        A new IP set.
+    """
+    result = IPSet()
+    for ip in itertools.chain(ip_addresses or (), extra_addresses or ()):
+        try:
+            network = IPNetwork(ip)
+        except AddrFormatError as e:
+            raise ConfigError(
+                "Invalid IP range provided: %s." % (ip,), config_path
+            ) from e
+        result.add(network)
+
+        # It is possible that these already exist in the set, but that's OK.
+        if ":" not in str(network):
+            result.add(IPNetwork(network).ipv6(ipv4_compatible=True))
+            result.add(IPNetwork(network).ipv6(ipv4_compatible=False))
+            result.add(_6to4(network))
+
+    return result
+
+
+# IP ranges that are considered private / unroutable / don't make sense.
 DEFAULT_IP_RANGE_BLACKLIST = [
     # Localhost
     "127.0.0.0/8",
@@ -53,6 +119,8 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "192.0.0.0/24",
     # Link-local networks.
     "169.254.0.0/16",
+    # Formerly used for 6to4 relay.
+    "192.88.99.0/24",
     # Testing networks.
     "198.18.0.0/15",
     "192.0.2.0/24",
@@ -66,6 +134,12 @@ DEFAULT_IP_RANGE_BLACKLIST = [
     "fe80::/10",
     # Unique local addresses.
     "fc00::/7",
+    # Testing networks.
+    "2001:db8::/32",
+    # Multicast.
+    "ff00::/8",
+    # Site-local addresses
+    "fec0::/10",
 ]
 
 DEFAULT_ROOM_VERSION = "6"
@@ -161,10 +235,27 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
+
         self.public_baseurl = config.get("public_baseurl")
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
 
         # Whether to enable user presence.
-        self.use_presence = config.get("use_presence", True)
+        presence_config = config.get("presence") or {}
+        self.use_presence = presence_config.get("enabled")
+        if self.use_presence is None:
+            self.use_presence = config.get("use_presence", True)
+
+        # Custom presence router module
+        self.presence_router_module_class = None
+        self.presence_router_config = None
+        presence_router_config = presence_config.get("presence_router")
+        if presence_router_config:
+            (
+                self.presence_router_module_class,
+                self.presence_router_config,
+            ) = load_module(presence_router_config, ("presence", "presence_router"))
 
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker
@@ -185,7 +276,14 @@ class ServerConfig(Config):
         # Whether to require sharing a room with a user to retrieve their
         # profile data
         self.limit_profile_requests_to_users_who_share_rooms = config.get(
-            "limit_profile_requests_to_users_who_share_rooms", False,
+            "limit_profile_requests_to_users_who_share_rooms",
+            False,
+        )
+
+        # Whether to retrieve and display profile data for a user when they
+        # are invited to a room
+        self.include_profile_data_on_invite = config.get(
+            "include_profile_data_on_invite", True
         )
 
         if "restrict_public_rooms_to_local_users" in config and (
@@ -290,17 +388,15 @@ class ServerConfig(Config):
         )
 
         # Attempt to create an IPSet from the given ranges
-        try:
-            self.ip_range_blacklist = IPSet(ip_range_blacklist)
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_blacklist.") from e
-        # Always blacklist 0.0.0.0, ::
-        self.ip_range_blacklist.update(["0.0.0.0", "::"])
 
-        try:
-            self.ip_range_whitelist = IPSet(config.get("ip_range_whitelist", ()))
-        except Exception as e:
-            raise ConfigError("Invalid range(s) provided in ip_range_whitelist.") from e
+        # Always blacklist 0.0.0.0, ::
+        self.ip_range_blacklist = generate_ip_set(
+            ip_range_blacklist, ["0.0.0.0", "::"], config_path=("ip_range_blacklist",)
+        )
+
+        self.ip_range_whitelist = generate_ip_set(
+            config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
+        )
 
         # The federation_ip_range_blacklist is used for backwards-compatibility
         # and only applies to federation and identity servers. If it is not given,
@@ -308,19 +404,12 @@ class ServerConfig(Config):
         federation_ip_range_blacklist = config.get(
             "federation_ip_range_blacklist", ip_range_blacklist
         )
-        try:
-            self.federation_ip_range_blacklist = IPSet(federation_ip_range_blacklist)
-        except Exception as e:
-            raise ConfigError(
-                "Invalid range(s) provided in federation_ip_range_blacklist."
-            ) from e
         # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist.update(["0.0.0.0", "::"])
-
-        if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != "/":
-                self.public_baseurl += "/"
-        self.start_pushers = config.get("start_pushers", True)
+        self.federation_ip_range_blacklist = generate_ip_set(
+            federation_ip_range_blacklist,
+            ["0.0.0.0", "::"],
+            config_path=("federation_ip_range_blacklist",),
+        )
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before
@@ -483,6 +572,7 @@ class ServerConfig(Config):
             _warn_if_webclient_configured(self.listeners)
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
+        self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
 
         @attr.s
         class LimitRemoteRoomsConfig:
@@ -549,7 +639,9 @@ class ServerConfig(Config):
         if manhole:
             self.listeners.append(
                 ListenerConfig(
-                    port=manhole, bind_addresses=["127.0.0.1"], type="manhole",
+                    port=manhole,
+                    bind_addresses=["127.0.0.1"],
+                    type="manhole",
                 )
             )
 
@@ -585,7 +677,8 @@ class ServerConfig(Config):
         # and letting the client know which email address is bound to an account and
         # which one isn't.
         self.request_token_inhibit_3pid_errors = config.get(
-            "request_token_inhibit_3pid_errors", False,
+            "request_token_inhibit_3pid_errors",
+            False,
         )
 
         # List of users trialing the new experimental default push rules. This setting is
@@ -740,11 +833,12 @@ class ServerConfig(Config):
         #
         #web_client_location: https://riot.example.com/
 
-        # The public-facing base URL that clients use to access this HS
-        # (not including _matrix/...). This is the same URL a user would
-        # enter into the 'custom HS URL' field on their client. If you
-        # use synapse with a reverse proxy, this should be the URL to reach
-        # synapse via the proxy.
+        # The public-facing base URL that clients use to access this Homeserver (not
+        # including _matrix/...). This is the same URL a user might enter into the
+        # 'Custom Homeserver URL' field on their client. If you use Synapse with a
+        # reverse proxy, this should be the URL to reach Synapse via the proxy.
+        # Otherwise, it should be the URL to reach Synapse's client HTTP listener (see
+        # 'listeners' below).
         #
         #public_baseurl: https://example.com/
 
@@ -754,15 +848,33 @@ class ServerConfig(Config):
         #
         #soft_file_limit: 0
 
-        # Set to false to disable presence tracking on this homeserver.
+        # Presence tracking allows users to see the state (e.g online/offline)
+        # of other local and remote users.
         #
-        #use_presence: false
+        presence:
+          # Uncomment to disable presence tracking on this homeserver. This option
+          # replaces the previous top-level 'use_presence' option.
+          #
+          #enabled: false
+
+          # Presence routers are third-party modules that can specify additional logic
+          # to where presence updates from users are routed.
+          #
+          presence_router:
+            # The custom module's class. Uncomment to use a custom presence router module.
+            #
+            #module: "my_custom_router.PresenceRouter"
+
+            # Configuration options of the custom module. Refer to your module's
+            # documentation for available options.
+            #
+            #config:
+            #  example_option: 'something'
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
         # 'false'. Note that profile data is also available via the federation
-        # API, so this setting is of limited value if federation is enabled on
-        # the server.
+        # API, unless allow_profile_lookup_over_federation is set to false.
         #
         #require_auth_for_profile_requests: true
 
@@ -772,6 +884,14 @@ class ServerConfig(Config):
         # requesting server. Defaults to 'false'.
         #
         #limit_profile_requests_to_users_who_share_rooms: true
+
+        # Uncomment to prevent a user's profile data from being retrieved and
+        # displayed in a room until they have joined it. By default, a user's
+        # profile data is included in an invite event, regardless of the values
+        # of the above two settings, and whether or not the users share a server.
+        # Defaults to 'true'.
+        #
+        #include_profile_data_on_invite: false
 
         # If set to 'true', removes the need for authentication to access the server's
         # public rooms directory through the client API, meaning that anyone can
@@ -797,6 +917,16 @@ class ServerConfig(Config):
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
         #gc_thresholds: [700, 10, 10]
+
+        # The minimum time in seconds between each GC for a generation, regardless of
+        # the GC thresholds. This ensures that we don't do GC too frequently.
+        #
+        # A value of `[1s, 10s, 30s]` indicates that a second must pass between consecutive
+        # generation 0 GCs, etc.
+        #
+        # Defaults to `[1s, 10s, 30s]`.
+        #
+        #gc_min_interval: [0.5s, 30s, 1m]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is 100. -1 means no upper limit.
@@ -831,6 +961,18 @@ class ServerConfig(Config):
         #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
+
+        # List of IP address CIDR ranges that should be allowed for federation,
+        # identity servers, push servers, and for checking key validity for
+        # third-party invite events. This is useful for specifying exceptions to
+        # wide-ranging blacklisted target IP ranges - e.g. for communication with
+        # a push server only visible in your network.
+        #
+        # This whitelist overrides ip_range_blacklist and defaults to an empty
+        # list.
+        #
+        #ip_range_whitelist:
+        #   - '192.168.1.1'
 
         # List of ports that Synapse should listen on, their purpose and their
         # configuration.
@@ -1173,6 +1315,24 @@ class ServerConfig(Config):
             type=int,
             help="Turn on the twisted telnet manhole service on the given port.",
         )
+
+    def read_gc_intervals(self, durations) -> Optional[Tuple[float, float, float]]:
+        """Reads the three durations for the GC min interval option, returning seconds."""
+        if durations is None:
+            return None
+
+        try:
+            if len(durations) != 3:
+                raise ValueError()
+            return (
+                self.parse_duration(durations[0]) / 1000,
+                self.parse_duration(durations[1]) / 1000,
+                self.parse_duration(durations[2]) / 1000,
+            )
+        except Exception:
+            raise ConfigError(
+                "Value of `gc_min_interval` must be a list of three durations if set"
+            )
 
 
 def is_threepid_reserved(reserved_threepids, threepid):

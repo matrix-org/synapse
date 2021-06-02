@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,14 +11,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Any, Dict
+from typing import Any, Dict, Optional
+
+import attr
 
 from ._base import Config
 
 
+@attr.s(frozen=True)
+class SsoAttributeRequirement:
+    """Object describing a single requirement for SSO attributes."""
+
+    attribute = attr.ib(type=str)
+    # If a value is not given, than the attribute must simply exist.
+    value = attr.ib(type=Optional[str])
+
+    JSON_SCHEMA = {
+        "type": "object",
+        "properties": {"attribute": {"type": "string"}, "value": {"type": "string"}},
+        "required": ["attribute", "value"],
+    }
+
+
 class SSOConfig(Config):
-    """SSO Configuration
-    """
+    """SSO Configuration"""
 
     section = "sso"
 
@@ -27,24 +42,28 @@ class SSOConfig(Config):
         sso_config = config.get("sso") or {}  # type: Dict[str, Any]
 
         # The sso-specific template_dir
-        template_dir = sso_config.get("template_dir")
+        self.sso_template_dir = sso_config.get("template_dir")
 
         # Read templates from disk
         (
+            self.sso_login_idp_picker_template,
             self.sso_redirect_confirm_template,
             self.sso_auth_confirm_template,
             self.sso_error_template,
             sso_account_deactivated_template,
             sso_auth_success_template,
+            self.sso_auth_bad_user_template,
         ) = self.read_templates(
             [
+                "sso_login_idp_picker.html",
                 "sso_redirect_confirm.html",
                 "sso_auth_confirm.html",
                 "sso_error.html",
                 "sso_account_deactivated.html",
                 "sso_auth_success.html",
+                "sso_auth_bad_user.html",
             ],
-            template_dir,
+            self.sso_template_dir,
         )
 
         # These templates have no placeholders, so render them here
@@ -98,32 +117,129 @@ class SSOConfig(Config):
             #
             # Synapse will look for the following templates in this directory:
             #
+            # * HTML page to prompt the user to choose an Identity Provider during
+            #   login: 'sso_login_idp_picker.html'.
+            #
+            #   This is only used if multiple SSO Identity Providers are configured.
+            #
+            #   When rendering, this template is given the following variables:
+            #     * redirect_url: the URL that the user will be redirected to after
+            #       login.
+            #
+            #     * server_name: the homeserver's name.
+            #
+            #     * providers: a list of available Identity Providers. Each element is
+            #       an object with the following attributes:
+            #
+            #         * idp_id: unique identifier for the IdP
+            #         * idp_name: user-facing name for the IdP
+            #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+            #              for the IdP
+            #         * idp_brand: if specified in the IdP config, a textual identifier
+            #              for the brand of the IdP
+            #
+            #   The rendered HTML page should contain a form which submits its results
+            #   back as a GET request, with the following query parameters:
+            #
+            #     * redirectUrl: the client redirect URI (ie, the `redirect_url` passed
+            #       to the template)
+            #
+            #     * idp: the 'idp_id' of the chosen IDP.
+            #
+            # * HTML page to prompt new users to enter a userid and confirm other
+            #   details: 'sso_auth_account_details.html'. This is only shown if the
+            #   SSO implementation (with any user_mapping_provider) does not return
+            #   a localpart.
+            #
+            #   When rendering, this template is given the following variables:
+            #
+            #     * server_name: the homeserver's name.
+            #
+            #     * idp: details of the SSO Identity Provider that the user logged in
+            #       with: an object with the following attributes:
+            #
+            #         * idp_id: unique identifier for the IdP
+            #         * idp_name: user-facing name for the IdP
+            #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+            #              for the IdP
+            #         * idp_brand: if specified in the IdP config, a textual identifier
+            #              for the brand of the IdP
+            #
+            #     * user_attributes: an object containing details about the user that
+            #       we received from the IdP. May have the following attributes:
+            #
+            #         * display_name: the user's display_name
+            #         * emails: a list of email addresses
+            #
+            #   The template should render a form which submits the following fields:
+            #
+            #     * username: the localpart of the user's chosen user id
+            #
+            # * HTML page allowing the user to consent to the server's terms and
+            #   conditions. This is only shown for new users, and only if
+            #   `user_consent.require_at_registration` is set.
+            #
+            #   When rendering, this template is given the following variables:
+            #
+            #     * server_name: the homeserver's name.
+            #
+            #     * user_id: the user's matrix proposed ID.
+            #
+            #     * user_profile.display_name: the user's proposed display name, if any.
+            #
+            #     * consent_version: the version of the terms that the user will be
+            #       shown
+            #
+            #     * terms_url: a link to the page showing the terms.
+            #
+            #   The template should render a form which submits the following fields:
+            #
+            #     * accepted_version: the version of the terms accepted by the user
+            #       (ie, 'consent_version' from the input variables).
+            #
             # * HTML page for a confirmation step before redirecting back to the client
             #   with the login token: 'sso_redirect_confirm.html'.
             #
-            #   When rendering, this template is given three variables:
-            #     * redirect_url: the URL the user is about to be redirected to. Needs
-            #                     manual escaping (see
-            #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #   When rendering, this template is given the following variables:
+            #
+            #     * redirect_url: the URL the user is about to be redirected to.
             #
             #     * display_url: the same as `redirect_url`, but with the query
             #                    parameters stripped. The intention is to have a
             #                    human-readable URL to show to users, not to use it as
-            #                    the final address to redirect to. Needs manual escaping
-            #                    (see https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #                    the final address to redirect to.
             #
             #     * server_name: the homeserver's name.
+            #
+            #     * new_user: a boolean indicating whether this is the user's first time
+            #          logging in.
+            #
+            #     * user_id: the user's matrix ID.
+            #
+            #     * user_profile.avatar_url: an MXC URI for the user's avatar, if any.
+            #           None if the user has not set an avatar.
+            #
+            #     * user_profile.display_name: the user's display name. None if the user
+            #           has not set a display name.
             #
             # * HTML page which notifies the user that they are authenticating to confirm
             #   an operation on their account during the user interactive authentication
             #   process: 'sso_auth_confirm.html'.
             #
             #   When rendering, this template is given the following variables:
-            #     * redirect_url: the URL the user is about to be redirected to. Needs
-            #                     manual escaping (see
-            #                     https://jinja.palletsprojects.com/en/2.11.x/templates/#html-escaping).
+            #     * redirect_url: the URL the user is about to be redirected to.
             #
             #     * description: the operation which the user is being asked to confirm
+            #
+            #     * idp: details of the Identity Provider that we will use to confirm
+            #       the user's identity: an object with the following attributes:
+            #
+            #         * idp_id: unique identifier for the IdP
+            #         * idp_name: user-facing name for the IdP
+            #         * idp_icon: if specified in the IdP config, an MXC URI for an icon
+            #              for the IdP
+            #         * idp_brand: if specified in the IdP config, a textual identifier
+            #              for the brand of the IdP
             #
             # * HTML page shown after a successful user interactive authentication session:
             #   'sso_auth_success.html'.
@@ -132,6 +248,14 @@ class SSOConfig(Config):
             #   (see https://matrix.org/docs/spec/client_server/r0.6.0#fallback).
             #
             #   This template has no additional variables.
+            #
+            # * HTML page shown after a user-interactive authentication session which
+            #   does not map correctly onto the expected user: 'sso_auth_bad_user.html'.
+            #
+            #   When rendering, this template is given the following variables:
+            #     * server_name: the homeserver's name.
+            #     * user_id_to_verify: the MXID of the user that we are trying to
+            #       validate.
             #
             # * HTML page shown during single sign-on if a deactivated user (according to Synapse's database)
             #   attempts to login: 'sso_account_deactivated.html'.

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # This script generates SQL files for creating a brand new Synapse DB with the latest
 # schema, on both SQLite3 and Postgres.
@@ -6,7 +6,7 @@
 # It does so by having Synapse generate an up-to-date SQLite DB, then running
 # synapse_port_db to convert it to Postgres. It then dumps the contents of both.
 
-POSTGRES_HOST="localhost"
+export PGHOST="localhost"
 POSTGRES_DB_NAME="synapse_full_schema.$$"
 
 SQLITE_FULL_SCHEMA_OUTPUT_FILE="full.sql.sqlite"
@@ -32,7 +32,7 @@ usage() {
 while getopts "p:co:h" opt; do
   case $opt in
     p)
-      POSTGRES_USERNAME=$OPTARG
+      export PGUSER=$OPTARG
       ;;
     c)
       # Print all commands that are being executed
@@ -69,7 +69,7 @@ if [ ${#unsatisfied_requirements} -ne 0 ]; then
   exit 1
 fi
 
-if [ -z "$POSTGRES_USERNAME" ]; then
+if [ -z "$PGUSER" ]; then
   echo "No postgres username supplied"
   usage
   exit 1
@@ -84,8 +84,9 @@ fi
 # Create the output directory if it doesn't exist
 mkdir -p "$OUTPUT_DIR"
 
-read -rsp "Postgres password for '$POSTGRES_USERNAME': " POSTGRES_PASSWORD
+read -rsp "Postgres password for '$PGUSER': " PGPASSWORD
 echo ""
+export PGPASSWORD
 
 # Exit immediately if a command fails
 set -e
@@ -131,9 +132,9 @@ report_stats: false
 database:
   name: "psycopg2"
   args:
-    user: "$POSTGRES_USERNAME"
-    host: "$POSTGRES_HOST"
-    password: "$POSTGRES_PASSWORD"
+    user: "$PGUSER"
+    host: "$PGHOST"
+    password: "$PGPASSWORD"
     database: "$POSTGRES_DB_NAME"
 
 # Suppress the key server warning.
@@ -150,7 +151,7 @@ scripts-dev/update_database --database-config "$SQLITE_CONFIG"
 
 # Create the PostgreSQL database.
 echo "Creating postgres database..."
-createdb $POSTGRES_DB_NAME
+createdb --lc-collate=C --lc-ctype=C --template=template0 "$POSTGRES_DB_NAME"
 
 echo "Copying data from SQLite3 to Postgres with synapse_port_db..."
 if [ -z "$COVERAGE" ]; then
@@ -162,15 +163,26 @@ else
 fi
 
 # Delete schema_version, applied_schema_deltas and applied_module_schemas tables
+# Also delete any shadow tables from fts4
 # This needs to be done after synapse_port_db is run
 echo "Dropping unwanted db tables..."
 SQL="
 DROP TABLE schema_version;
 DROP TABLE applied_schema_deltas;
 DROP TABLE applied_module_schemas;
+DROP TABLE event_search_content;
+DROP TABLE event_search_segments;
+DROP TABLE event_search_segdir;
+DROP TABLE event_search_docsize;
+DROP TABLE event_search_stat;
+DROP TABLE user_directory_search_content;
+DROP TABLE user_directory_search_segments;
+DROP TABLE user_directory_search_segdir;
+DROP TABLE user_directory_search_docsize;
+DROP TABLE user_directory_search_stat;
 "
 sqlite3 "$SQLITE_DB" <<< "$SQL"
-psql $POSTGRES_DB_NAME -U "$POSTGRES_USERNAME" -w <<< "$SQL"
+psql "$POSTGRES_DB_NAME" -w <<< "$SQL"
 
 echo "Dumping SQLite3 schema to '$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE'..."
 sqlite3 "$SQLITE_DB" ".dump" > "$OUTPUT_DIR/$SQLITE_FULL_SCHEMA_OUTPUT_FILE"

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config
+from typing import Any, List
+
+from synapse.config.sso import SsoAttributeRequirement
+
+from ._base import Config, ConfigError
+from ._util import validate_config
 
 
 class CasConfig(Config):
@@ -30,17 +34,29 @@ class CasConfig(Config):
 
         if self.cas_enabled:
             self.cas_server_url = cas_config["server_url"]
-            self.cas_service_url = cas_config["service_url"]
+
+            # The public baseurl is required because it is used by the redirect
+            # template.
+            public_baseurl = self.public_baseurl
+            if not public_baseurl:
+                raise ConfigError("cas_config requires a public_baseurl to be set")
+
+            # TODO Update this to a _synapse URL.
+            self.cas_service_url = public_baseurl + "_matrix/client/r0/login/cas/ticket"
             self.cas_displayname_attribute = cas_config.get("displayname_attribute")
-            self.cas_required_attributes = cas_config.get("required_attributes") or {}
+            required_attributes = cas_config.get("required_attributes") or {}
+            self.cas_required_attributes = _parsed_required_attributes_def(
+                required_attributes
+            )
+
         else:
             self.cas_server_url = None
             self.cas_service_url = None
             self.cas_displayname_attribute = None
-            self.cas_required_attributes = {}
+            self.cas_required_attributes = []
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
-        return """
+        return """\
         # Enable Central Authentication Service (CAS) for registration and login.
         #
         cas_config:
@@ -52,10 +68,6 @@ class CasConfig(Config):
           # The URL of the CAS authorization endpoint.
           #
           #server_url: "https://cas-server.com"
-
-          # The public URL of the homeserver.
-          #
-          #service_url: "https://homeserver.domain.com:8448"
 
           # The attribute of the CAS response to use as the display name.
           #
@@ -73,3 +85,22 @@ class CasConfig(Config):
           #  userGroup: "staff"
           #  department: None
         """
+
+
+# CAS uses a legacy required attributes mapping, not the one provided by
+# SsoAttributeRequirement.
+REQUIRED_ATTRIBUTES_SCHEMA = {
+    "type": "object",
+    "additionalProperties": {"anyOf": [{"type": "string"}, {"type": "null"}]},
+}
+
+
+def _parsed_required_attributes_def(
+    required_attributes: Any,
+) -> List[SsoAttributeRequirement]:
+    validate_config(
+        REQUIRED_ATTRIBUTES_SCHEMA,
+        required_attributes,
+        config_path=("cas_config", "required_attributes"),
+    )
+    return [SsoAttributeRequirement(k, v) for k, v in required_attributes.items()]

@@ -20,9 +20,10 @@ recursive-include scripts *
 recursive-include scripts-dev *
 recursive-include synapse *.pyi
 recursive-include tests *.py
-include tests/http/ca.crt
-include tests/http/ca.key
-include tests/http/server.key
+recursive-include tests *.pem
+recursive-include tests *.p8
+recursive-include tests *.crt
+recursive-include tests *.key
 
 recursive-include synapse/res *
 recursive-include synapse/static *.css

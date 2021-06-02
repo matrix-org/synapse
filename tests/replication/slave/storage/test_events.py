@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Iterable, Optional
 
 from canonicaljson import encode_canonical_json
 
@@ -66,7 +67,10 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
 
         self.get_success(
             self.master_store.store_room(
-                ROOM_ID, USER_ID, is_public=False, room_version=RoomVersions.V1,
+                ROOM_ID,
+                USER_ID,
+                is_public=False,
+                room_version=RoomVersions.V1,
             )
         )
 
@@ -329,15 +333,18 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         room_id=ROOM_ID,
         type="m.room.message",
         key=None,
-        internal={},
+        internal: Optional[dict] = None,
         depth=None,
-        prev_events=[],
-        auth_events=[],
-        prev_state=[],
+        prev_events: Optional[list] = None,
+        auth_events: Optional[list] = None,
+        prev_state: Optional[list] = None,
         redacts=None,
-        push_actions=[],
-        **content
+        push_actions: Iterable = frozenset(),
+        **content,
     ):
+        prev_events = prev_events or []
+        auth_events = auth_events or []
+        prev_state = prev_state or []
 
         if depth is None:
             depth = self.event_id
@@ -366,7 +373,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if redacts is not None:
             event_dict["redacts"] = redacts
 
-        event = make_event_from_dict(event_dict, internal_metadata_dict=internal)
+        event = make_event_from_dict(event_dict, internal_metadata_dict=internal or {})
 
         self.event_id += 1
         state_handler = self.hs.get_state_handler()

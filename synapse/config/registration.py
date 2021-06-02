@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,90 +12,23 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-from distutils.util import strtobool
-
-import pkg_resources
-
 from synapse.api.constants import RoomCreationPreset
 from synapse.config._base import Config, ConfigError
 from synapse.types import RoomAlias, UserID
-from synapse.util.stringutils import random_string_with_symbols
-
-
-class AccountValidityConfig(Config):
-    section = "accountvalidity"
-
-    def __init__(self, config, synapse_config):
-        if config is None:
-            return
-        super().__init__()
-        self.enabled = config.get("enabled", False)
-        self.renew_by_email_enabled = "renew_at" in config
-
-        if self.enabled:
-            if "period" in config:
-                self.period = self.parse_duration(config["period"])
-            else:
-                raise ConfigError("'period' is required when using account validity")
-
-            if "renew_at" in config:
-                self.renew_at = self.parse_duration(config["renew_at"])
-
-            if "renew_email_subject" in config:
-                self.renew_email_subject = config["renew_email_subject"]
-            else:
-                self.renew_email_subject = "Renew your %(app)s account"
-
-            self.startup_job_max_delta = self.period * 10.0 / 100.0
-
-        if self.renew_by_email_enabled:
-            if "public_baseurl" not in synapse_config:
-                raise ConfigError("Can't send renewal emails without 'public_baseurl'")
-
-        template_dir = config.get("template_dir")
-
-        if not template_dir:
-            template_dir = pkg_resources.resource_filename("synapse", "res/templates")
-
-        if "account_renewed_html_path" in config:
-            file_path = os.path.join(template_dir, config["account_renewed_html_path"])
-
-            self.account_renewed_html_content = self.read_file(
-                file_path, "account_validity.account_renewed_html_path"
-            )
-        else:
-            self.account_renewed_html_content = (
-                "<html><body>Your account has been successfully renewed.</body><html>"
-            )
-
-        if "invalid_token_html_path" in config:
-            file_path = os.path.join(template_dir, config["invalid_token_html_path"])
-
-            self.invalid_token_html_content = self.read_file(
-                file_path, "account_validity.invalid_token_html_path"
-            )
-        else:
-            self.invalid_token_html_content = (
-                "<html><body>Invalid renewal token.</body><html>"
-            )
+from synapse.util.stringutils import random_string_with_symbols, strtobool
 
 
 class RegistrationConfig(Config):
     section = "registration"
 
     def read_config(self, config, **kwargs):
-        self.enable_registration = bool(
-            strtobool(str(config.get("enable_registration", False)))
+        self.enable_registration = strtobool(
+            str(config.get("enable_registration", False))
         )
         if "disable_registration" in config:
-            self.enable_registration = not bool(
-                strtobool(str(config["disable_registration"]))
+            self.enable_registration = not strtobool(
+                str(config["disable_registration"])
             )
-
-        self.account_validity = AccountValidityConfig(
-            config.get("account_validity") or {}, config
-        )
 
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
@@ -188,9 +120,7 @@ class RegistrationConfig(Config):
         self.session_lifetime = session_lifetime
 
         # The success template used during fallback auth.
-        self.fallback_success_template = self.read_templates(
-            ["auth_success.html"], autoescape=True
-        )[0]
+        self.fallback_success_template = self.read_template("auth_success.html")
 
     def generate_config_section(self, generate_secrets=False, **kwargs):
         if generate_secrets:
@@ -210,69 +140,6 @@ class RegistrationConfig(Config):
         # Enable registration for new users.
         #
         #enable_registration: false
-
-        # Optional account validity configuration. This allows for accounts to be denied
-        # any request after a given period.
-        #
-        # Once this feature is enabled, Synapse will look for registered users without an
-        # expiration date at startup and will add one to every account it found using the
-        # current settings at that time.
-        # This means that, if a validity period is set, and Synapse is restarted (it will
-        # then derive an expiration date from the current validity period), and some time
-        # after that the validity period changes and Synapse is restarted, the users'
-        # expiration dates won't be updated unless their account is manually renewed. This
-        # date will be randomly selected within a range [now + period - d ; now + period],
-        # where d is equal to 10%% of the validity period.
-        #
-        account_validity:
-          # The account validity feature is disabled by default. Uncomment the
-          # following line to enable it.
-          #
-          #enabled: true
-
-          # The period after which an account is valid after its registration. When
-          # renewing the account, its validity period will be extended by this amount
-          # of time. This parameter is required when using the account validity
-          # feature.
-          #
-          #period: 6w
-
-          # The amount of time before an account's expiry date at which Synapse will
-          # send an email to the account's email address with a renewal link. By
-          # default, no such emails are sent.
-          #
-          # If you enable this setting, you will also need to fill out the 'email' and
-          # 'public_baseurl' configuration sections.
-          #
-          #renew_at: 1w
-
-          # The subject of the email sent out with the renewal link. '%%(app)s' can be
-          # used as a placeholder for the 'app_name' parameter from the 'email'
-          # section.
-          #
-          # Note that the placeholder must be written '%%(app)s', including the
-          # trailing 's'.
-          #
-          # If this is not set, a default value is used.
-          #
-          #renew_email_subject: "Renew your %%(app)s account"
-
-          # Directory in which Synapse will try to find templates for the HTML files to
-          # serve to the user when trying to renew an account. If not set, default
-          # templates from within the Synapse package will be used.
-          #
-          #template_dir: "res/templates"
-
-          # File within 'template_dir' giving the HTML to be displayed to the user after
-          # they successfully renewed their account. If not set, default text is used.
-          #
-          #account_renewed_html_path: "account_renewed.html"
-
-          # File within 'template_dir' giving the HTML to be displayed when the user
-          # tries to renew an account with an invalid renewal token. If not set,
-          # default text is used.
-          #
-          #invalid_token_html_path: "invalid_token.html"
 
         # Time that a user's session remains valid for, after they log in.
         #
@@ -301,9 +168,9 @@ class RegistrationConfig(Config):
         #
         #allowed_local_3pids:
         #  - medium: email
-        #    pattern: '.*@matrix\\.org'
+        #    pattern: '^[^@]+@matrix\\.org$'
         #  - medium: email
-        #    pattern: '.*@vector\\.im'
+        #    pattern: '^[^@]+@vector\\.im$'
         #  - medium: msisdn
         #    pattern: '\\+44'
 
@@ -394,6 +261,8 @@ class RegistrationConfig(Config):
         # By default, any room aliases included in this list will be created
         # as a publicly joinable room when the first user registers for the
         # homeserver. This behaviour can be customised with the settings below.
+        # If the room already exists, make certain it is a publicly joinable
+        # room. The join rule of the room must be set to 'public'.
         #
         #auto_join_rooms:
         #  - "#example:example.com"
@@ -480,4 +349,4 @@ class RegistrationConfig(Config):
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.enable_registration = bool(strtobool(str(args.enable_registration)))
+            self.enable_registration = strtobool(str(args.enable_registration))

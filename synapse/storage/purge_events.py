@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,21 +14,24 @@
 
 import itertools
 import logging
-from typing import Set
+from typing import TYPE_CHECKING, Set
+
+from synapse.storage.databases import Databases
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class PurgeEventsStorage:
-    """High level interface for purging rooms and event history.
-    """
+    """High level interface for purging rooms and event history."""
 
-    def __init__(self, hs, stores):
+    def __init__(self, hs: "HomeServer", stores: Databases):
         self.stores = stores
 
-    async def purge_room(self, room_id: str):
-        """Deletes all record of a room
-        """
+    async def purge_room(self, room_id: str) -> None:
+        """Deletes all record of a room"""
 
         state_groups_to_delete = await self.stores.main.purge_room(room_id)
         await self.stores.state.purge_room_state(room_id, state_groups_to_delete)
@@ -70,9 +72,6 @@ class PurgeEventsStorage:
         Returns:
             The set of state groups that can be deleted.
         """
-        # Graph of state group -> previous group
-        graph = {}
-
         # Set of events that we have found to be referenced by events
         referenced_groups = set()
 
@@ -107,8 +106,6 @@ class PurgeEventsStorage:
             prevs -= state_groups_seen
             next_to_search |= prevs
             state_groups_seen |= prevs
-
-            graph.update(edges)
 
         to_delete = state_groups_seen - referenced_groups
 

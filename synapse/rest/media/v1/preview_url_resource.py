@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import datetime
 import errno
 import fnmatch
@@ -23,12 +22,13 @@ import re
 import shutil
 import sys
 import traceback
-from typing import Dict, Optional
+from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Union
 from urllib import parse as urlparse
 
 import attr
 
 from twisted.internet.error import DNSLookupError
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -38,9 +38,11 @@ from synapse.http.server import (
     respond_with_json_bytes,
 )
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
+from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -48,9 +50,18 @@ from synapse.util.stringutils import random_string
 
 from ._base import FileInfo
 
+if TYPE_CHECKING:
+    from lxml import etree
+
+    from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
-_charset_match = re.compile(br"<\s*meta[^>]*charset\s*=\s*([a-z0-9-]+)", flags=re.I)
+_charset_match = re.compile(br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9-]+)"?', flags=re.I)
+_xml_encoding_match = re.compile(
+    br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9-]+)"', flags=re.I
+)
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
 OG_TAG_NAME_MAXLEN = 50
@@ -119,7 +130,12 @@ class OEmbedError(Exception):
 class PreviewUrlResource(DirectServeJsonResource):
     isLeaf = True
 
-    def __init__(self, hs, media_repo, media_storage):
+    def __init__(
+        self,
+        hs: "HomeServer",
+        media_repo: "MediaRepository",
+        media_storage: MediaStorage,
+    ):
         super().__init__()
 
         self.auth = hs.get_auth()
@@ -133,8 +149,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             treq_args={"browser_like_redirects": True},
             ip_whitelist=hs.config.url_preview_ip_range_whitelist,
             ip_blacklist=hs.config.url_preview_ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
@@ -159,18 +174,20 @@ class PreviewUrlResource(DirectServeJsonResource):
             clock=self.clock,
             # don't spider URLs more often than once an hour
             expiry_ms=ONE_HOUR,
-        )
+        )  # type: ExpiringCache[str, ObservableDeferred]
 
         if self._worker_run_media_background_jobs:
             self._cleaner_loop = self.clock.looping_call(
                 self._start_expire_url_cache_data, 10 * 1000
             )
 
-    async def _async_render_OPTIONS(self, request):
+    async def _async_render_OPTIONS(self, request: Request) -> None:
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 
-    async def _async_render_GET(self, request):
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
@@ -287,24 +304,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info["filename"], "rb") as file:
                 body = file.read()
 
-            encoding = None
-
-            # Let's try and figure out if it has an encoding set in a meta tag.
-            # Limit it to the first 1kb, since it ought to be in the meta tags
-            # at the top.
-            match = _charset_match.search(body[:1000])
-
-            # If we find a match, it should take precedence over the
-            # Content-Type header, so set it here.
-            if match:
-                encoding = match.group(1).decode("ascii")
-
-            # If we don't find a match, we'll look at the HTTP Content-Type, and
-            # if that doesn't exist, we'll fall back to UTF-8.
-            if not encoding:
-                content_match = _content_type_match.match(media_info["media_type"])
-                encoding = content_match.group(1) if content_match else "utf-8"
-
+            encoding = get_html_media_encoding(body, media_info["media_type"])
             og = decode_and_calc_og(body, media_info["uri"], encoding)
 
             # pre-cache the image for posterity
@@ -373,7 +373,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         Check whether the URL should be downloaded as oEmbed content instead.
 
-        Params:
+        Args:
             url: The URL to check.
 
         Returns:
@@ -390,7 +390,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         """
         Request content from an oEmbed endpoint.
 
-        Params:
+        Args:
             endpoint: The oEmbed API endpoint.
             url: The URL to pass to the API.
 
@@ -450,7 +450,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
             raise OEmbedError() from e
 
-    async def _download_url(self, url: str, user):
+    async def _download_url(self, url: str, user: str) -> Dict[str, Any]:
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -580,9 +580,8 @@ class PreviewUrlResource(DirectServeJsonResource):
             "expire_url_cache_data", self._expire_url_cache_data
         )
 
-    async def _expire_url_cache_data(self):
-        """Clean up expired url cache content, media and thumbnails.
-        """
+    async def _expire_url_cache_data(self) -> None:
+        """Clean up expired url cache content, media and thumbnails."""
         # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs
@@ -676,28 +675,101 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.debug("No media removed from url cache")
 
 
-def decode_and_calc_og(body, media_uri, request_encoding=None) -> Dict[str, str]:
+def get_html_media_encoding(body: bytes, content_type: str) -> str:
+    """
+    Get the encoding of the body based on the (presumably) HTML body or media_type.
+
+    The precedence used for finding a character encoding is:
+
+    1. meta tag with a charset declared.
+    2. The XML document's character encoding attribute.
+    3. The Content-Type header.
+    4. Fallback to UTF-8.
+
+    Args:
+        body: The HTML document, as bytes.
+        content_type: The Content-Type header.
+
+    Returns:
+        The character encoding of the body, as a string.
+    """
+    # Limit searches to the first 1kb, since it ought to be at the top.
+    body_start = body[:1024]
+
+    # Let's try and figure out if it has an encoding set in a meta tag.
+    match = _charset_match.search(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # TODO Support <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+
+    # If we didn't find a match, see if it an XML document with an encoding.
+    match = _xml_encoding_match.match(body_start)
+    if match:
+        return match.group(1).decode("ascii")
+
+    # If we don't find a match, we'll look at the HTTP Content-Type, and
+    # if that doesn't exist, we'll fall back to UTF-8.
+    content_match = _content_type_match.match(content_type)
+    if content_match:
+        return content_match.group(1)
+
+    return "utf-8"
+
+
+def decode_and_calc_og(
+    body: bytes, media_uri: str, request_encoding: Optional[str] = None
+) -> Dict[str, Optional[str]]:
+    """
+    Calculate metadata for an HTML document.
+
+    This uses lxml to parse the HTML document into the OG response. If errors
+    occur during processing of the document, an empty response is returned.
+
+    Args:
+        body: The HTML document, as bytes.
+        media_url: The URI used to download the body.
+        request_encoding: The character encoding of the body, as a string.
+
+    Returns:
+        The OG response as a dictionary.
+    """
     # If there's no body, nothing useful is going to be found.
     if not body:
         return {}
 
     from lxml import etree
 
+    # Create an HTML parser. If this fails, log and return no metadata.
     try:
         parser = etree.HTMLParser(recover=True, encoding=request_encoding)
-        tree = etree.fromstring(body, parser)
-        og = _calc_og(tree, media_uri)
+    except LookupError:
+        # blindly consider the encoding as utf-8.
+        parser = etree.HTMLParser(recover=True, encoding="utf-8")
+    except Exception as e:
+        logger.warning("Unable to create HTML parser: %s" % (e,))
+        return {}
+
+    def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:
+        # Attempt to parse the body. If this fails, log and return no metadata.
+        tree = etree.fromstring(body_attempt, parser)
+
+        # The data was successfully parsed, but no tree was found.
+        if tree is None:
+            return {}
+
+        return _calc_og(tree, media_uri)
+
+    # Attempt to parse the body. If this fails, log and return no metadata.
+    try:
+        return _attempt_calc_og(body)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
-        parser = etree.HTMLParser(recover=True, encoding=request_encoding)
-        tree = etree.fromstring(body.decode("utf-8", "ignore"), parser)
-        og = _calc_og(tree, media_uri)
-
-    return og
+        return _attempt_calc_og(body.decode("utf-8", "ignore"))
 
 
-def _calc_og(tree, media_uri):
+def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     # suck our tree into lxml and define our OG response.
 
     # if we see any image URLs in the OG response, then spider them
@@ -801,7 +873,9 @@ def _calc_og(tree, media_uri):
                 for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
             )
             og["og:description"] = summarize_paragraphs(text_nodes)
-    else:
+    elif og["og:description"]:
+        # This must be a non-empty string at this point.
+        assert isinstance(og["og:description"], str)
         og["og:description"] = summarize_paragraphs([og["og:description"]])
 
     # TODO: delete the url downloads to stop diskfilling,
@@ -809,7 +883,9 @@ def _calc_og(tree, media_uri):
     return og
 
 
-def _iterate_over_text(tree, *tags_to_ignore):
+def _iterate_over_text(
+    tree, *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
+) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.
     """
@@ -843,32 +919,32 @@ def _iterate_over_text(tree, *tags_to_ignore):
             )
 
 
-def _rebase_url(url, base):
-    base = list(urlparse.urlparse(base))
-    url = list(urlparse.urlparse(url))
-    if not url[0]:  # fix up schema
-        url[0] = base[0] or "http"
-    if not url[1]:  # fix up hostname
-        url[1] = base[1]
-        if not url[2].startswith("/"):
-            url[2] = re.sub(r"/[^/]+$", "/", base[2]) + url[2]
-    return urlparse.urlunparse(url)
+def _rebase_url(url: str, base: str) -> str:
+    base_parts = list(urlparse.urlparse(base))
+    url_parts = list(urlparse.urlparse(url))
+    if not url_parts[0]:  # fix up schema
+        url_parts[0] = base_parts[0] or "http"
+    if not url_parts[1]:  # fix up hostname
+        url_parts[1] = base_parts[1]
+        if not url_parts[2].startswith("/"):
+            url_parts[2] = re.sub(r"/[^/]+$", "/", base_parts[2]) + url_parts[2]
+    return urlparse.urlunparse(url_parts)
 
 
-def _is_media(content_type):
-    if content_type.lower().startswith("image/"):
-        return True
+def _is_media(content_type: str) -> bool:
+    return content_type.lower().startswith("image/")
 
 
-def _is_html(content_type):
+def _is_html(content_type: str) -> bool:
     content_type = content_type.lower()
-    if content_type.startswith("text/html") or content_type.startswith(
+    return content_type.startswith("text/html") or content_type.startswith(
         "application/xhtml"
-    ):
-        return True
+    )
 
 
-def summarize_paragraphs(text_nodes, min_size=200, max_size=500):
+def summarize_paragraphs(
+    text_nodes: Iterable[str], min_size: int = 200, max_size: int = 500
+) -> Optional[str]:
     # Try to get a summary of between 200 and 500 words, respecting
     # first paragraph and then word boundaries.
     # TODO: Respect sentences?

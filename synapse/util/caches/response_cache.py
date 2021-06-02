@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,16 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Generic, Optional, TypeVar
+from typing import Any, Callable, Dict, Generic, Optional, TypeVar
 
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.util import Clock
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches import register_cache
-
-if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -37,11 +34,11 @@ class ResponseCache(Generic[T]):
     used rather than trying to compute a new response.
     """
 
-    def __init__(self, hs: "HomeServer", name: str, timeout_ms: float = 0):
+    def __init__(self, clock: Clock, name: str, timeout_ms: float = 0):
         # Requests that haven't finished yet.
         self.pending_result_cache = {}  # type: Dict[T, ObservableDeferred]
 
-        self.clock = hs.get_clock()
+        self.clock = clock
         self.timeout_sec = timeout_ms / 1000.0
 
         self._name = name
@@ -113,7 +110,7 @@ class ResponseCache(Generic[T]):
         return result.observe()
 
     def wrap(
-        self, key: T, callback: "Callable[..., Any]", *args: Any, **kwargs: Any
+        self, key: T, callback: Callable[..., Any], *args: Any, **kwargs: Any
     ) -> defer.Deferred:
         """Wrap together a *get* and *set* call, taking care of logcontexts
 

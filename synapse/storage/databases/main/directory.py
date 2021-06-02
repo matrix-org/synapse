@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -85,7 +84,7 @@ class DirectoryStore(DirectoryWorkerStore):
         servers: Iterable[str],
         creator: Optional[str] = None,
     ) -> None:
-        """ Creates an association between a room alias and room_id/servers
+        """Creates an association between a room alias and room_id/servers
 
         Args:
             room_alias: The alias to create.
@@ -160,7 +159,10 @@ class DirectoryStore(DirectoryWorkerStore):
         return room_id
 
     async def update_aliases_for_room(
-        self, old_room_id: str, new_room_id: str, creator: Optional[str] = None,
+        self,
+        old_room_id: str,
+        new_room_id: str,
+        creator: Optional[str] = None,
     ) -> None:
         """Repoint all of the aliases for a given room, to a different room.
 

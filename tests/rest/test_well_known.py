@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,11 +27,11 @@ class WellKnownTests(unittest.HomeserverTestCase):
         self.hs.config.public_baseurl = "https://tesths"
         self.hs.config.default_identity_server = "https://testis"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
             {
@@ -44,8 +43,8 @@ class WellKnownTests(unittest.HomeserverTestCase):
     def test_well_known_no_public_baseurl(self):
         self.hs.config.public_baseurl = None
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
 
-        self.assertEqual(request.code, 404)
+        self.assertEqual(channel.code, 404)

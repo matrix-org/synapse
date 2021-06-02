@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,8 +31,9 @@ from twisted.internet.endpoints import (
     TCP4ClientEndpoint,
     TCP6ClientEndpoint,
 )
-from twisted.internet.interfaces import IPushProducer, ITransport
+from twisted.internet.interfaces import IPushProducer, IStreamClientEndpoint
 from twisted.internet.protocol import Factory, Protocol
+from twisted.internet.tcp import Connection
 from twisted.python.failure import Failure
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,9 @@ class LogProducer:
         format: A callable to format the log record to a string.
     """
 
-    transport = attr.ib(type=ITransport)
+    # This is essentially ITCPTransport, but that is missing certain fields
+    # (connected and registerProducer) which are part of the implementation.
+    transport = attr.ib(type=Connection)
     _format = attr.ib(type=Callable[[logging.LogRecord], str])
     _buffer = attr.ib(type=deque)
     _paused = attr.ib(default=False, type=bool, init=False)
@@ -121,7 +123,9 @@ class RemoteHandler(logging.Handler):
         try:
             ip = ip_address(self.host)
             if isinstance(ip, IPv4Address):
-                endpoint = TCP4ClientEndpoint(_reactor, self.host, self.port)
+                endpoint = TCP4ClientEndpoint(
+                    _reactor, self.host, self.port
+                )  # type: IStreamClientEndpoint
             elif isinstance(ip, IPv6Address):
                 endpoint = TCP6ClientEndpoint(_reactor, self.host, self.port)
             else:
@@ -147,8 +151,6 @@ class RemoteHandler(logging.Handler):
         if self._connection_waiter:
             return
 
-        self._connection_waiter = self._service.whenConnected(failAfterFailures=1)
-
         def fail(failure: Failure) -> None:
             # If the Deferred was cancelled (e.g. during shutdown) do not try to
             # reconnect (this will cause an infinite loop of errors).
@@ -161,9 +163,13 @@ class RemoteHandler(logging.Handler):
             self._connect()
 
         def writer(result: Protocol) -> None:
+            # Force recognising transport as a Connection and not the more
+            # generic ITransport.
+            transport = result.transport  # type: Connection  # type: ignore
+
             # We have a connection. If we already have a producer, and its
             # transport is the same, just trigger a resumeProducing.
-            if self._producer and result.transport is self._producer.transport:
+            if self._producer and transport is self._producer.transport:
                 self._producer.resumeProducing()
                 self._connection_waiter = None
                 return
@@ -174,13 +180,17 @@ class RemoteHandler(logging.Handler):
 
             # Make a new producer and start it.
             self._producer = LogProducer(
-                buffer=self._buffer, transport=result.transport, format=self.format,
+                buffer=self._buffer,
+                transport=transport,
+                format=self.format,
             )
-            result.transport.registerProducer(self._producer, True)
+            transport.registerProducer(self._producer, True)
             self._producer.resumeProducing()
             self._connection_waiter = None
 
-        self._connection_waiter.addCallbacks(writer, fail)
+        deferred = self._service.whenConnected(failAfterFailures=1)  # type: Deferred
+        deferred.addCallbacks(writer, fail)
+        self._connection_waiter = deferred
 
     def _handle_pressure(self) -> None:
         """
@@ -216,11 +226,11 @@ class RemoteHandler(logging.Handler):
         old_buffer = self._buffer
         self._buffer = deque()
 
-        for i in range(buffer_split):
+        for _ in range(buffer_split):
             self._buffer.append(old_buffer.popleft())
 
         end_buffer = []
-        for i in range(buffer_split):
+        for _ in range(buffer_split):
             end_buffer.append(old_buffer.pop())
 
         self._buffer.extend(reversed(end_buffer))

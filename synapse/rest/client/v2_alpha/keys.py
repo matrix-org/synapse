@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -274,7 +273,6 @@ class SigningKeyUploadServlet(RestServlet):
             requester,
             request,
             body,
-            self.hs.get_ip_from_request(request),
             "add a device signing key to your account",
         )
 

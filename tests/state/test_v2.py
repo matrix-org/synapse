@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -88,7 +87,7 @@ class FakeEvent:
         event_dict = {
             "auth_events": [(a, {}) for a in auth_events],
             "prev_events": [(p, {}) for p in prev_events],
-            "event_id": self.node_id,
+            "event_id": self.event_id,
             "sender": self.sender,
             "type": self.type,
             "content": self.content,
@@ -381,6 +380,60 @@ class StateTestCase(unittest.TestCase):
 
         self.do_check(events, edges, expected_state_ids)
 
+    def test_mainline_sort(self):
+        """Tests that the mainline ordering works correctly."""
+
+        events = [
+            FakeEvent(
+                id="T1", sender=ALICE, type=EventTypes.Topic, state_key="", content={}
+            ),
+            FakeEvent(
+                id="PA1",
+                sender=ALICE,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={"users": {ALICE: 100, BOB: 50}},
+            ),
+            FakeEvent(
+                id="T2", sender=ALICE, type=EventTypes.Topic, state_key="", content={}
+            ),
+            FakeEvent(
+                id="PA2",
+                sender=ALICE,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={
+                    "users": {ALICE: 100, BOB: 50},
+                    "events": {EventTypes.PowerLevels: 100},
+                },
+            ),
+            FakeEvent(
+                id="PB",
+                sender=BOB,
+                type=EventTypes.PowerLevels,
+                state_key="",
+                content={"users": {ALICE: 100, BOB: 50}},
+            ),
+            FakeEvent(
+                id="T3", sender=BOB, type=EventTypes.Topic, state_key="", content={}
+            ),
+            FakeEvent(
+                id="T4", sender=ALICE, type=EventTypes.Topic, state_key="", content={}
+            ),
+        ]
+
+        edges = [
+            ["END", "T3", "PA2", "T2", "PA1", "T1", "START"],
+            ["END", "T4", "PB", "PA1"],
+        ]
+
+        # We expect T3 to be picked as the other topics are pointing at older
+        # power levels. Note that without mainline ordering we'd pick T4 due to
+        # it being sent *after* T3.
+        expected_state_ids = ["T3", "PA2"]
+
+        self.do_check(events, edges, expected_state_ids)
+
     def do_check(self, events, edges, expected_state_ids):
         """Take a list of events and edges and calculate the state of the
         graph at END, and asserts it matches `expected_state_ids`
@@ -605,15 +658,27 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
         #           C -|-> B -> A
 
         a = FakeEvent(
-            id="A", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="A",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([], [])
 
         b = FakeEvent(
-            id="B", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="B",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([a.event_id], [])
 
         c = FakeEvent(
-            id="C", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="C",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([b.event_id], [])
 
         persisted_events = {a.event_id: a, b.event_id: b}
@@ -639,19 +704,35 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
         #      D -> C -|-> B -> A
 
         a = FakeEvent(
-            id="A", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="A",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([], [])
 
         b = FakeEvent(
-            id="B", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="B",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([a.event_id], [])
 
         c = FakeEvent(
-            id="C", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="C",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([b.event_id], [])
 
         d = FakeEvent(
-            id="D", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="D",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([c.event_id], [])
 
         persisted_events = {a.event_id: a, b.event_id: b}
@@ -682,23 +763,43 @@ class AuthChainDifferenceTestCase(unittest.TestCase):
         #              |
 
         a = FakeEvent(
-            id="A", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="A",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([], [])
 
         b = FakeEvent(
-            id="B", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="B",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([a.event_id], [])
 
         c = FakeEvent(
-            id="C", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="C",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([b.event_id], [])
 
         d = FakeEvent(
-            id="D", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="D",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([c.event_id], [])
 
         e = FakeEvent(
-            id="E", sender=ALICE, type=EventTypes.Member, state_key="", content={},
+            id="E",
+            sender=ALICE,
+            type=EventTypes.Member,
+            state_key="",
+            content={},
         ).to_event([c.event_id, b.event_id], [])
 
         persisted_events = {a.event_id: a, b.event_id: b}

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,9 +42,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         self.register_user("kermit", "monkey")
         tok = self.login("kermit", "monkey")
 
-        request, channel = self.make_request(
-            b"POST", "/createRoom", b"{}", access_token=tok
-        )
+        channel = self.make_request(b"POST", "/createRoom", b"{}", access_token=tok)
         self.assertEquals(channel.result["code"], b"200", channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -56,7 +53,7 @@ class IdentityTestCase(unittest.HomeserverTestCase):
         }
         request_data = json.dumps(params)
         request_url = ("/rooms/%s/invite" % (room_id)).encode("ascii")
-        request, channel = self.make_request(
+        channel = self.make_request(
             b"POST", request_url, request_data, access_token=tok
         )
         self.assertEquals(channel.result["code"], b"403", channel.result)

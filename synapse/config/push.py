@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -14,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ._base import Config, ShardedWorkerHandlingConfig
+from ._base import Config
 
 
 class PushConfig(Config):
@@ -26,9 +25,6 @@ class PushConfig(Config):
         self.push_group_unread_count_by_room = push_config.get(
             "group_unread_count_by_room", True
         )
-
-        pusher_instances = config.get("pusher_instances") or []
-        self.pusher_shard_config = ShardedWorkerHandlingConfig(pusher_instances)
 
         # There was a a 'redact_content' setting but mistakenly read from the
         # 'email'section'. Check for the flag in the 'push' section, and log,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -20,6 +19,7 @@ from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
+from synapse.util import glob_to_regex, re_word_boundary
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -30,22 +30,30 @@ IS_GLOB = re.compile(r"[\?\*\[\]]")
 INEQUALITY_EXPR = re.compile("^([=<>]*)([0-9]*)$")
 
 
-def _room_member_count(ev, condition, room_member_count):
+def _room_member_count(
+    ev: EventBase, condition: Dict[str, Any], room_member_count: int
+) -> bool:
     return _test_ineq_condition(condition, room_member_count)
 
 
-def _sender_notification_permission(ev, condition, sender_power_level, power_levels):
+def _sender_notification_permission(
+    ev: EventBase,
+    condition: Dict[str, Any],
+    sender_power_level: int,
+    power_levels: Dict[str, Union[int, Dict[str, int]]],
+) -> bool:
     notif_level_key = condition.get("key")
     if notif_level_key is None:
         return False
 
     notif_levels = power_levels.get("notifications", {})
+    assert isinstance(notif_levels, dict)
     room_notif_level = notif_levels.get(notif_level_key, 50)
 
     return sender_power_level >= room_notif_level
 
 
-def _test_ineq_condition(condition, number):
+def _test_ineq_condition(condition: Dict[str, Any], number: int) -> bool:
     if "is" not in condition:
         return False
     m = INEQUALITY_EXPR.match(condition["is"])
@@ -110,7 +118,7 @@ class PushRuleEvaluatorForEvent:
         event: EventBase,
         room_member_count: int,
         sender_power_level: int,
-        power_levels: dict,
+        power_levels: Dict[str, Union[int, Dict[str, int]]],
     ):
         self._event = event
         self._room_member_count = room_member_count
@@ -120,7 +128,9 @@ class PushRuleEvaluatorForEvent:
         # Maps strings of e.g. 'content.body' -> event["content"]["body"]
         self._value_cache = _flatten_dict(event)
 
-    def matches(self, condition: dict, user_id: str, display_name: str) -> bool:
+    def matches(
+        self, condition: Dict[str, Any], user_id: str, display_name: str
+    ) -> bool:
         if condition["kind"] == "event_match":
             return self._event_match(condition, user_id)
         elif condition["kind"] == "contains_display_name":
@@ -174,7 +184,7 @@ class PushRuleEvaluatorForEvent:
         r = regex_cache.get((display_name, False, True), None)
         if not r:
             r1 = re.escape(display_name)
-            r1 = _re_word_boundary(r1)
+            r1 = re_word_boundary(r1)
             r = re.compile(r1, flags=re.IGNORECASE)
             regex_cache[(display_name, False, True)] = r
 
@@ -203,7 +213,7 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
     try:
         r = regex_cache.get((glob, True, word_boundary), None)
         if not r:
-            r = _glob_to_re(glob, word_boundary)
+            r = glob_to_regex(glob, word_boundary)
             regex_cache[(glob, True, word_boundary)] = r
         return bool(r.search(value))
     except re.error:
@@ -211,57 +221,13 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
         return False
 
 
-def _glob_to_re(glob: str, word_boundary: bool) -> Pattern:
-    """Generates regex for a given glob.
-
-    Args:
-        glob
-        word_boundary: Whether to match against word boundaries or entire string.
-    """
-    if IS_GLOB.search(glob):
-        r = re.escape(glob)
-
-        r = r.replace(r"\*", ".*?")
-        r = r.replace(r"\?", ".")
-
-        # handle [abc], [a-z] and [!a-z] style ranges.
-        r = GLOB_REGEX.sub(
-            lambda x: (
-                "[%s%s]" % (x.group(1) and "^" or "", x.group(2).replace(r"\\\-", "-"))
-            ),
-            r,
-        )
-        if word_boundary:
-            r = _re_word_boundary(r)
-
-            return re.compile(r, flags=re.IGNORECASE)
-        else:
-            r = "^" + r + "$"
-
-            return re.compile(r, flags=re.IGNORECASE)
-    elif word_boundary:
-        r = re.escape(glob)
-        r = _re_word_boundary(r)
-
-        return re.compile(r, flags=re.IGNORECASE)
-    else:
-        r = "^" + re.escape(glob) + "$"
-        return re.compile(r, flags=re.IGNORECASE)
-
-
-def _re_word_boundary(r: str) -> str:
-    """
-    Adds word boundary characters to the start and end of an
-    expression to require that the match occur as a whole word,
-    but do so respecting the fact that strings starting or ending
-    with non-word characters will change word boundaries.
-    """
-    # we can't use \b as it chokes on unicode. however \W seems to be okay
-    # as shorthand for [^0-9A-Za-z_].
-    return r"(^|\W)%s(\W|$)" % (r,)
-
-
-def _flatten_dict(d, prefix=[], result=None):
+def _flatten_dict(
+    d: Union[EventBase, dict],
+    prefix: Optional[List[str]] = None,
+    result: Optional[Dict[str, str]] = None,
+) -> Dict[str, str]:
+    if prefix is None:
+        prefix = []
     if result is None:
         result = {}
     for key, value in d.items():

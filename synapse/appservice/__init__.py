@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -166,7 +165,10 @@ class ApplicationService:
 
     @cached(num_args=1, cache_context=True)
     async def matches_user_in_member_list(
-        self, room_id: str, store: "DataStore", cache_context: _CacheContext,
+        self,
+        room_id: str,
+        store: "DataStore",
+        cache_context: _CacheContext,
     ) -> bool:
         """Check if this service is interested a room based upon it's membership
 

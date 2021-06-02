@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,6 +40,14 @@ class FederationConfig(Config):
         )
         self.federation_metrics_domains = set(federation_metrics_domains)
 
+        self.allow_profile_lookup_over_federation = config.get(
+            "allow_profile_lookup_over_federation", True
+        )
+
+        self.allow_device_name_lookup_over_federation = config.get(
+            "allow_device_name_lookup_over_federation", True
+        )
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Federation ##
@@ -56,18 +63,6 @@ class FederationConfig(Config):
         #  - nyc.example.com
         #  - syd.example.com
 
-        # List of IP address CIDR ranges that should be allowed for federation,
-        # identity servers, push servers, and for checking key validity for
-        # third-party invite events. This is useful for specifying exceptions to
-        # wide-ranging blacklisted target IP ranges - e.g. for communication with
-        # a push server only visible in your network.
-        #
-        # This whitelist overrides ip_range_blacklist and defaults to an empty
-        # list.
-        #
-        #ip_range_whitelist:
-        #   - '192.168.1.1'
-
         # Report prometheus metrics on the age of PDUs being sent to and received from
         # the following domains. This can be used to give an idea of "delay" on inbound
         # and outbound federation, though be aware that any delay can be due to problems
@@ -78,6 +73,18 @@ class FederationConfig(Config):
         #federation_metrics_domains:
         #  - matrix.org
         #  - example.com
+
+        # Uncomment to disable profile lookup over federation. By default, the
+        # Federation API allows other homeservers to obtain profile data of any user
+        # on this homeserver. Defaults to 'true'.
+        #
+        #allow_profile_lookup_over_federation: false
+
+        # Uncomment to disable device display name lookup over federation. By default, the
+        # Federation API allows other homeservers to obtain device display names of any user
+        # on this homeserver. Defaults to 'true'.
+        #
+        #allow_device_name_lookup_over_federation: false
         """
 
 

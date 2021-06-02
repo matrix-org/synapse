@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,7 +26,9 @@ class DictCacheTestCase(unittest.TestCase):
         key = "test_simple_cache_hit_full"
 
         v = self.cache.get(key)
-        self.assertEqual((False, set(), {}), v)
+        self.assertIs(v.full, False)
+        self.assertEqual(v.known_absent, set())
+        self.assertEqual({}, v.value)
 
         seq = self.cache.sequence
         test_value = {"test": "test_simple_cache_hit_full"}

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
@@ -60,7 +59,7 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache.pop("key"), None)
 
     def test_del_multi(self):
-        cache = LruCache(4, keylen=2, cache_type=TreeCache)
+        cache = LruCache(4, cache_type=TreeCache)
         cache[("animal", "cat")] = "mew"
         cache[("animal", "dog")] = "woof"
         cache[("vehicles", "car")] = "vroom"
@@ -166,7 +165,7 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         m2 = Mock()
         m3 = Mock()
         m4 = Mock()
-        cache = LruCache(4, keylen=2, cache_type=TreeCache)
+        cache = LruCache(4, cache_type=TreeCache)
 
         cache.set(("a", "1"), "value", callbacks=[m1])
         cache.set(("a", "2"), "value", callbacks=[m2])

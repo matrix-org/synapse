@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List, Optional
+
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
@@ -43,7 +44,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -51,11 +52,9 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 self.db_pool,
                 stream_name="test_stream",
                 instance_name=instance_name,
-                table="foobar",
-                instance_column="instance_name",
-                id_column="stream_id",
+                tables=[("foobar", "instance_name", "stream_id")],
                 sequence_name="foobar_seq",
-                writers=writers,
+                writers=writers or ["master"],
             )
 
         return self.get_success_or_raise(self.db_pool.runWithConnection(_create))
@@ -88,7 +87,11 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
         def _insert(txn):
             txn.execute(
-                "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+                "INSERT INTO foobar VALUES (?, ?)",
+                (
+                    stream_id,
+                    instance_name,
+                ),
             )
             txn.execute("SELECT setval('foobar_seq', ?)", (stream_id,))
             txn.execute(
@@ -140,8 +143,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen.get_current_token_for_writer("master"), 8)
 
     def test_out_of_order_finish(self):
-        """Test that IDs persisted out of order are correctly handled
-        """
+        """Test that IDs persisted out of order are correctly handled"""
 
         # Prefill table with 7 rows written by 'master'
         self._insert_rows("master", 7)
@@ -248,8 +250,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(second_id_gen.get_positions(), {"first": 8, "second": 9})
 
     def test_get_next_txn(self):
-        """Test that the `get_next_txn` function works correctly.
-        """
+        """Test that the `get_next_txn` function works correctly."""
 
         # Prefill table with 7 rows written by 'master'
         self._insert_rows("master", 7)
@@ -388,8 +389,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen_worker.get_positions(), {"master": 9})
 
     def test_writer_config_change(self):
-        """Test that changing the writer config correctly works.
-        """
+        """Test that changing the writer config correctly works."""
 
         self._insert_row_with_id("first", 3)
         self._insert_row_with_id("second", 5)
@@ -436,8 +436,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen_5.get_current_token_for_writer("third"), 6)
 
     def test_sequence_consistency(self):
-        """Test that we error out if the table and sequence diverges.
-        """
+        """Test that we error out if the table and sequence diverges."""
 
         # Prefill with some rows
         self._insert_row_with_id("master", 3)
@@ -454,8 +453,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
 
 class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
-    """Tests MultiWriterIdGenerator that produce *negative* stream IDs.
-    """
+    """Tests MultiWriterIdGenerator that produce *negative* stream IDs."""
 
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
@@ -479,7 +477,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -487,23 +485,24 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 self.db_pool,
                 stream_name="test_stream",
                 instance_name=instance_name,
-                table="foobar",
-                instance_column="instance_name",
-                id_column="stream_id",
+                tables=[("foobar", "instance_name", "stream_id")],
                 sequence_name="foobar_seq",
-                writers=writers,
+                writers=writers or ["master"],
                 positive=False,
             )
 
         return self.get_success(self.db_pool.runWithConnection(_create))
 
     def _insert_row(self, instance_name: str, stream_id: int):
-        """Insert one row as the given instance with given stream_id.
-        """
+        """Insert one row as the given instance with given stream_id."""
 
         def _insert(txn):
             txn.execute(
-                "INSERT INTO foobar VALUES (?, ?)", (stream_id, instance_name,),
+                "INSERT INTO foobar VALUES (?, ?)",
+                (
+                    stream_id,
+                    instance_name,
+                ),
             )
             txn.execute(
                 """
@@ -579,3 +578,107 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         self.assertEqual(id_gen_2.get_positions(), {"first": -1, "second": -2})
         self.assertEqual(id_gen_1.get_persisted_upto_position(), -2)
         self.assertEqual(id_gen_2.get_persisted_upto_position(), -2)
+
+
+class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
+    if not USE_POSTGRES_FOR_TESTS:
+        skip = "Requires Postgres"
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.db_pool = self.store.db_pool  # type: DatabasePool
+
+        self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
+
+    def _setup_db(self, txn):
+        txn.execute("CREATE SEQUENCE foobar_seq")
+        txn.execute(
+            """
+            CREATE TABLE foobar1 (
+                stream_id BIGINT NOT NULL,
+                instance_name TEXT NOT NULL,
+                data TEXT
+            );
+            """
+        )
+
+        txn.execute(
+            """
+            CREATE TABLE foobar2 (
+                stream_id BIGINT NOT NULL,
+                instance_name TEXT NOT NULL,
+                data TEXT
+            );
+            """
+        )
+
+    def _create_id_generator(
+        self, instance_name="master", writers: Optional[List[str]] = None
+    ) -> MultiWriterIdGenerator:
+        def _create(conn):
+            return MultiWriterIdGenerator(
+                conn,
+                self.db_pool,
+                stream_name="test_stream",
+                instance_name=instance_name,
+                tables=[
+                    ("foobar1", "instance_name", "stream_id"),
+                    ("foobar2", "instance_name", "stream_id"),
+                ],
+                sequence_name="foobar_seq",
+                writers=writers or ["master"],
+            )
+
+        return self.get_success_or_raise(self.db_pool.runWithConnection(_create))
+
+    def _insert_rows(
+        self,
+        table: str,
+        instance_name: str,
+        number: int,
+        update_stream_table: bool = True,
+    ):
+        """Insert N rows as the given instance, inserting with stream IDs pulled
+        from the postgres sequence.
+        """
+
+        def _insert(txn):
+            for _ in range(number):
+                txn.execute(
+                    "INSERT INTO %s VALUES (nextval('foobar_seq'), ?)" % (table,),
+                    (instance_name,),
+                )
+                if update_stream_table:
+                    txn.execute(
+                        """
+                        INSERT INTO stream_positions VALUES ('test_stream', ?,  lastval())
+                        ON CONFLICT (stream_name, instance_name) DO UPDATE SET stream_id = lastval()
+                        """,
+                        (instance_name,),
+                    )
+
+        self.get_success(self.db_pool.runInteraction("_insert_rows", _insert))
+
+    def test_load_existing_stream(self):
+        """Test creating ID gens with multiple tables that have rows from after
+        the position in `stream_positions` table.
+        """
+        self._insert_rows("foobar1", "first", 3)
+        self._insert_rows("foobar2", "second", 3)
+        self._insert_rows("foobar2", "second", 1, update_stream_table=False)
+
+        first_id_gen = self._create_id_generator("first", writers=["first", "second"])
+        second_id_gen = self._create_id_generator("second", writers=["first", "second"])
+
+        # The first ID gen will notice that it can advance its token to 7 as it
+        # has no in progress writes...
+        self.assertEqual(first_id_gen.get_positions(), {"first": 7, "second": 6})
+        self.assertEqual(first_id_gen.get_current_token_for_writer("first"), 7)
+        self.assertEqual(first_id_gen.get_current_token_for_writer("second"), 6)
+        self.assertEqual(first_id_gen.get_persisted_upto_position(), 7)
+
+        # ... but the second ID gen doesn't know that.
+        self.assertEqual(second_id_gen.get_positions(), {"first": 3, "second": 7})
+        self.assertEqual(second_id_gen.get_current_token_for_writer("first"), 3)
+        self.assertEqual(second_id_gen.get_current_token_for_writer("second"), 7)
+        self.assertEqual(first_id_gen.get_persisted_upto_position(), 7)

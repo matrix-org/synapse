@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +15,7 @@
 import importlib
 import importlib.util
 import itertools
+from types import ModuleType
 from typing import Any, Iterable, Tuple, Type
 
 import jsonschema
@@ -25,7 +25,7 @@ from synapse.config._util import json_error_to_config_error
 
 
 def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
-    """ Loads a synapse module with its config
+    """Loads a synapse module with its config
 
     Args:
         provider: a dict with keys 'module' (the module name) and 'config'
@@ -45,11 +45,12 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
 
     # We need to import the module, and then pick the class out of
     # that, so we split based on the last dot.
-    module, clz = modulename.rsplit(".", 1)
-    module = importlib.import_module(module)
+    module_name, clz = modulename.rsplit(".", 1)
+    module = importlib.import_module(module_name)
     provider_class = getattr(module, clz)
 
-    module_config = provider.get("config")
+    # Load the module config. If None, pass an empty dictionary instead
+    module_config = provider.get("config") or {}
     try:
         provider_config = provider_class.parse_config(module_config)
     except jsonschema.ValidationError as e:
@@ -69,11 +70,11 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
     return provider_class, provider_config
 
 
-def load_python_module(location: str):
+def load_python_module(location: str) -> ModuleType:
     """Load a python module, and return a reference to its global namespace
 
     Args:
-        location (str): path to the module
+        location: path to the module
 
     Returns:
         python module object

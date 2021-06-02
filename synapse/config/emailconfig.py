@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -289,7 +288,8 @@ class EmailConfig(Config):
                 self.email_notif_template_html,
                 self.email_notif_template_text,
             ) = self.read_templates(
-                [notif_template_html, notif_template_text], template_dir,
+                [notif_template_html, notif_template_text],
+                template_dir,
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -299,7 +299,7 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if self.account_validity.renew_by_email_enabled:
+        if self.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
@@ -311,7 +311,8 @@ class EmailConfig(Config):
                 self.account_validity_template_html,
                 self.account_validity_template_text,
             ) = self.read_templates(
-                [expiry_template_html, expiry_template_text], template_dir,
+                [expiry_template_html, expiry_template_text],
+                template_dir,
             )
 
         subjects_config = email_config.get("subjects", {})
@@ -321,6 +322,22 @@ class EmailConfig(Config):
             subjects[key] = subjects_config.get(key, default)
 
         self.email_subjects = EmailSubjectConfig(**subjects)
+
+        # The invite client location should be a HTTP(S) URL or None.
+        self.invite_client_location = email_config.get("invite_client_location") or None
+        if self.invite_client_location:
+            if not isinstance(self.invite_client_location, str):
+                raise ConfigError(
+                    "Config option email.invite_client_location must be type str"
+                )
+            if not (
+                self.invite_client_location.startswith("http://")
+                or self.invite_client_location.startswith("https://")
+            ):
+                raise ConfigError(
+                    "Config option email.invite_client_location must be a http or https URL",
+                    path=("email", "invite_client_location"),
+                )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return (
@@ -388,6 +405,12 @@ class EmailConfig(Config):
           # Defaults to 1h.
           #
           #validation_token_lifetime: 15m
+
+          # The web client location to direct users to during an invite. This is passed
+          # to the identity server as the org.matrix.web_client_location key. Defaults
+          # to unset, giving no guidance to the identity server.
+          #
+          #invite_client_location: https://app.element.io
 
           # Directory in which Synapse will try to find the template files below.
           # If not set, or the files named below are not found within the template

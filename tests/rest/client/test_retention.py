@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes
 from synapse.rest import admin
@@ -250,7 +249,8 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
         mock_federation_client = Mock(spec=["backfill"])
 
         self.hs = self.setup_test_homeserver(
-            config=config, federation_client=mock_federation_client,
+            config=config,
+            federation_client=mock_federation_client,
         )
         return self.hs
 
@@ -325,7 +325,7 @@ class RetentionNoDefaultPolicyTestCase(unittest.HomeserverTestCase):
     def get_event(self, room_id, event_id, expected_code=200):
         url = "/_matrix/client/r0/rooms/%s/event/%s" % (room_id, event_id)
 
-        request, channel = self.make_request("GET", url, access_token=self.token)
+        channel = self.make_request("GET", url, access_token=self.token)
 
         self.assertEqual(channel.code, expected_code, channel.result)
 

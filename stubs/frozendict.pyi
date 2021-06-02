@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +14,7 @@
 
 # Stub for frozendict.
 
-from typing import (
-    Any,
-    Hashable,
-    Iterable,
-    Iterator,
-    Mapping,
-    overload,
-    Tuple,
-    TypeVar,
-)
+from typing import Any, Hashable, Iterable, Iterator, Mapping, Tuple, TypeVar, overload
 
 _KT = TypeVar("_KT", bound=Hashable)  # Key type.
 _VT = TypeVar("_VT")  # Value type.

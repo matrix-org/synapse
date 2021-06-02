@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # this script will use the api:
 #    https://github.com/matrix-org/synapse/blob/master/docs/admin_api/purge_history_api.rst

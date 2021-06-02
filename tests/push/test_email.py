@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +20,7 @@ import pkg_resources
 from twisted.internet.defer import Deferred
 
 import synapse.rest.admin
+from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client.v1 import login, room
 
 from tests.unittest import HomeserverTestCase
@@ -100,12 +100,19 @@ class EmailPusherTests(HomeserverTestCase):
         user_tuple = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(self.access_token)
         )
-        token_id = user_tuple.token_id
+        self.token_id = user_tuple.token_id
+
+        # We need to add email to account before we can create a pusher.
+        self.get_success(
+            hs.get_datastore().user_add_threepid(
+                self.user_id, "email", "a@example.com", 0, 0
+            )
+        )
 
         self.pusher = self.get_success(
             self.hs.get_pusherpool().add_pusher(
                 user_id=self.user_id,
-                access_token=token_id,
+                access_token=self.token_id,
                 kind="email",
                 app_id="m.email",
                 app_display_name="Email Notifications",
@@ -116,6 +123,28 @@ class EmailPusherTests(HomeserverTestCase):
             )
         )
 
+    def test_need_validated_email(self):
+        """Test that we can only add an email pusher if the user has validated
+        their email.
+        """
+        with self.assertRaises(SynapseError) as cm:
+            self.get_success_or_raise(
+                self.hs.get_pusherpool().add_pusher(
+                    user_id=self.user_id,
+                    access_token=self.token_id,
+                    kind="email",
+                    app_id="m.email",
+                    app_display_name="Email Notifications",
+                    device_display_name="b@example.com",
+                    pushkey="b@example.com",
+                    lang=None,
+                    data={},
+                )
+            )
+
+        self.assertEqual(400, cm.exception.code)
+        self.assertEqual(Codes.THREEPID_NOT_FOUND, cm.exception.errcode)
+
     def test_simple_sends_email(self):
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
@@ -124,11 +153,16 @@ class EmailPusherTests(HomeserverTestCase):
         )
         self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
 
-        # The other user sends some messages
+        # The other user sends a single message.
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
+        # The other user sends multiple messages.
         self.helper.send(room, body="Hi!", tok=self.others[0].token)
         self.helper.send(room, body="There!", tok=self.others[0].token)
 
-        # We should get emailed about that message
         self._check_for_mail()
 
     def test_invite_sends_email(self):
@@ -187,6 +221,75 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about those messages
         self._check_for_mail()
 
+    def test_multiple_rooms(self):
+        # We want to test multiple notifications from multiple rooms, so we pause
+        # processing of push while we send messages.
+        self.pusher._pause_processing()
+
+        # Create a simple room with multiple other users
+        rooms = [
+            self.helper.create_room_as(self.user_id, tok=self.access_token),
+            self.helper.create_room_as(self.user_id, tok=self.access_token),
+        ]
+
+        for r, other in zip(rooms, self.others):
+            self.helper.invite(
+                room=r, src=self.user_id, tok=self.access_token, targ=other.id
+            )
+            self.helper.join(room=r, user=other.id, tok=other.token)
+
+        # The other users send some messages
+        self.helper.send(rooms[0], body="Hi!", tok=self.others[0].token)
+        self.helper.send(rooms[1], body="There!", tok=self.others[1].token)
+        self.helper.send(rooms[1], body="There!", tok=self.others[1].token)
+
+        # Nothing should have happened yet, as we're paused.
+        assert not self.email_attempts
+
+        self.pusher._resume_processing()
+
+        # We should get emailed about those messages
+        self._check_for_mail()
+
+    def test_empty_room(self):
+        """All users leaving a room shouldn't cause the pusher to break."""
+        # Create a simple room with two users
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
+        )
+        self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
+
+        # The other user sends a single message.
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+
+        # Leave the room before the message is processed.
+        self.helper.leave(room, self.user_id, tok=self.access_token)
+        self.helper.leave(room, self.others[0].id, tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
+    def test_empty_room_multiple_messages(self):
+        """All users leaving a room shouldn't cause the pusher to break."""
+        # Create a simple room with two users
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
+        )
+        self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
+
+        # The other user sends a single message.
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+        self.helper.send(room, body="There!", tok=self.others[0].token)
+
+        # Leave the room before the message is processed.
+        self.helper.leave(room, self.user_id, tok=self.access_token)
+        self.helper.leave(room, self.others[0].id, tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
     def test_encrypted_message(self):
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
@@ -209,7 +312,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        last_stream_ordering = pushers[0]["last_stream_ordering"]
+        last_stream_ordering = pushers[0].last_stream_ordering
 
         # Advance time a bit, so the pusher will register something has happened
         self.pump(10)
@@ -220,7 +323,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        self.assertEqual(last_stream_ordering, pushers[0]["last_stream_ordering"])
+        self.assertEqual(last_stream_ordering, pushers[0].last_stream_ordering)
 
         # One email was attempted to be sent
         self.assertEqual(len(self.email_attempts), 1)
@@ -238,4 +341,7 @@ class EmailPusherTests(HomeserverTestCase):
         )
         pushers = list(pushers)
         self.assertEqual(len(pushers), 1)
-        self.assertTrue(pushers[0]["last_stream_ordering"] > last_stream_ordering)
+        self.assertTrue(pushers[0].last_stream_ordering > last_stream_ordering)
+
+        # Reset the attempts.
+        self.email_attempts = []

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +13,15 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Callable, Dict, Optional
 
-from synapse.push import Pusher
+from synapse.push import Pusher, PusherConfig
 from synapse.push.emailpusher import EmailPusher
 from synapse.push.httppusher import HttpPusher
 from synapse.push.mailer import Mailer
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +33,7 @@ class PusherFactory:
 
         self.pusher_types = {
             "http": HttpPusher
-        }  # type: Dict[str, Callable[[HomeServer, dict], Pusher]]
+        }  # type: Dict[str, Callable[[HomeServer, PusherConfig], Pusher]]
 
         logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
         if hs.config.email_enable_notifs:
@@ -47,18 +46,18 @@ class PusherFactory:
 
             logger.info("defined email pusher type")
 
-    def create_pusher(self, pusherdict: Dict[str, Any]) -> Optional[Pusher]:
-        kind = pusherdict["kind"]
+    def create_pusher(self, pusher_config: PusherConfig) -> Optional[Pusher]:
+        kind = pusher_config.kind
         f = self.pusher_types.get(kind, None)
         if not f:
             return None
-        logger.debug("creating %s pusher for %r", kind, pusherdict)
-        return f(self.hs, pusherdict)
+        logger.debug("creating %s pusher for %r", kind, pusher_config)
+        return f(self.hs, pusher_config)
 
     def _create_email_pusher(
-        self, _hs: "HomeServer", pusherdict: Dict[str, Any]
+        self, _hs: "HomeServer", pusher_config: PusherConfig
     ) -> EmailPusher:
-        app_name = self._app_name_from_pusherdict(pusherdict)
+        app_name = self._app_name_from_pusherdict(pusher_config)
         mailer = self.mailers.get(app_name)
         if not mailer:
             mailer = Mailer(
@@ -68,10 +67,10 @@ class PusherFactory:
                 template_text=self._notif_template_text,
             )
             self.mailers[app_name] = mailer
-        return EmailPusher(self.hs, pusherdict, mailer)
+        return EmailPusher(self.hs, pusher_config, mailer)
 
-    def _app_name_from_pusherdict(self, pusherdict: Dict[str, Any]) -> str:
-        data = pusherdict["data"]
+    def _app_name_from_pusherdict(self, pusher_config: PusherConfig) -> str:
+        data = pusher_config.data
 
         if isinstance(data, dict):
             brand = data.get("brand")

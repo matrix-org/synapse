@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -15,14 +14,14 @@
 # limitations under the License.
 
 import logging
-from typing import List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import MAX_PDU_SIZE, EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -42,7 +41,7 @@ def check(
     do_sig_check: bool = True,
     do_size_check: bool = True,
 ) -> None:
-    """ Checks if this event is correctly authed.
+    """Checks if this event is correctly authed.
 
     Args:
         room_version_obj: the version of the room
@@ -162,7 +161,7 @@ def check(
         logger.debug("Auth events: %s", [a.event_id for a in auth_events.values()])
 
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(event, auth_events)
+        _is_membership_change_allowed(room_version_obj, event, auth_events)
         logger.debug("Allowing! %s", event)
         return
 
@@ -206,7 +205,7 @@ def _check_size_limits(event: EventBase) -> None:
         too_big("type")
     if len(event.event_id) > 255:
         too_big("event_id")
-    if len(encode_canonical_json(event.get_pdu_json())) > 65536:
+    if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
         too_big("event")
 
 
@@ -220,8 +219,19 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def _is_membership_change_allowed(
-    event: EventBase, auth_events: StateMap[EventBase]
+    room_version: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
 ) -> None:
+    """
+    Confirms that the event which changes membership is an allowed change.
+
+    Args:
+        room_version: The version of the room.
+        event: The event to check.
+        auth_events: The current auth events of the room.
+
+    Raises:
+        AuthError if the event is not allowed.
+    """
     membership = event.content["membership"]
 
     # Check if this is the room creator joining:
@@ -315,14 +325,19 @@ def _is_membership_change_allowed(
             if user_level < invite_level:
                 raise AuthError(403, "You don't have permission to invite users")
     elif Membership.JOIN == membership:
-        # Joins are valid iff caller == target and they were:
-        # invited: They are accepting the invitation
-        # joined: It's a NOOP
+        # Joins are valid iff caller == target and:
+        # * They are not banned.
+        # * They are accepting a previously sent invitation.
+        # * They are already joined (it's a NOOP).
+        # * The room is public or restricted.
         if event.user_id != target_user_id:
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
-        elif join_rule == JoinRules.PUBLIC:
+        elif join_rule == JoinRules.PUBLIC or (
+            room_version.msc3083_join_rules
+            and join_rule == JoinRules.MSC3083_RESTRICTED
+        ):
             pass
         elif join_rule == JoinRules.INVITE:
             if not caller_in_room and not caller_invited:
@@ -423,7 +438,9 @@ def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def check_redaction(
-    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase],
+    room_version_obj: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
 ) -> bool:
     """Check whether the event sender is allowed to redact the target event.
 
@@ -459,7 +476,9 @@ def check_redaction(
 
 
 def _check_power_levels(
-    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase],
+    room_version_obj: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
 ) -> None:
     user_list = event.content.get("users", {})
     # Validate users
@@ -651,7 +670,7 @@ def _verify_third_party_invite(event: EventBase, auth_events: StateMap[EventBase
         public_key = public_key_object["public_key"]
         try:
             for server, signature_block in signed["signatures"].items():
-                for key_name, encoded_signature in signature_block.items():
+                for key_name in signature_block.keys():
                     if not key_name.startswith("ed25519:"):
                         continue
                     verify_key = decode_verify_key_bytes(
@@ -669,7 +688,7 @@ def _verify_third_party_invite(event: EventBase, auth_events: StateMap[EventBase
     return False
 
 
-def get_public_keys(invite_event):
+def get_public_keys(invite_event: EventBase) -> List[Dict[str, Any]]:
     public_keys = []
     if "public_key" in invite_event.content:
         o = {"public_key": invite_event.content["public_key"]}

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
@@ -21,7 +20,7 @@ from tests import unittest
 
 
 def get_sample_labels_value(sample):
-    """ Extract the labels and values of a sample.
+    """Extract the labels and values of a sample.
 
     prometheus_client 0.5 changed the sample type to a named tuple with more
     members than the plain tuple had in 0.4 and earlier. This function can

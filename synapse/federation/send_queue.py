@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -31,25 +30,39 @@ Events are replicated via a separate events stream.
 
 import logging
 from collections import namedtuple
-from typing import Dict, List, Tuple, Type
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Sized,
+    Tuple,
+    Type,
+)
 
 from sortedcontainers import SortedDict
 
-from twisted.internet import defer
-
 from synapse.api.presence import UserPresenceState
+from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.metrics import LaterGauge
+from synapse.replication.tcp.streams.federation import FederationStream
+from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
 from synapse.util.metrics import Measure
 
 from .units import Edu
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
-class FederationRemoteSendQueue:
+class FederationRemoteSendQueue(AbstractFederationSender):
     """A drop in replacement for FederationSender"""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
@@ -58,20 +71,17 @@ class FederationRemoteSendQueue:
         # We may have multiple federation sender instances, so we need to track
         # their positions separately.
         self._sender_instances = hs.config.worker.federation_shard_config.instances
-        self._sender_positions = {}
+        self._sender_positions = {}  # type: Dict[str, int]
 
         # Pending presence map user_id -> UserPresenceState
         self.presence_map = {}  # type: Dict[str, UserPresenceState]
-
-        # Stream position -> list[user_id]
-        self.presence_changed = SortedDict()  # type: SortedDict[int, List[str]]
 
         # Stores the destinations we need to explicitly send presence to about a
         # given user.
         # Stream position -> (user_id, destinations)
         self.presence_destinations = (
             SortedDict()
-        )  # type: SortedDict[int, Tuple[str, List[str]]]
+        )  # type: SortedDict[int, Tuple[str, Iterable[str]]]
 
         # (destination, key) -> EDU
         self.keyed_edu = {}  # type: Dict[Tuple[str, tuple], Edu]
@@ -83,7 +93,7 @@ class FederationRemoteSendQueue:
 
         self.edus = SortedDict()  # type: SortedDict[int, Edu]
 
-        # stream ID for the next entry into presence_changed/keyed_edu_changed/edus.
+        # stream ID for the next entry into keyed_edu_changed/edus.
         self.pos = 1
 
         # map from stream ID to the time that stream entry was generated, so that we
@@ -94,7 +104,7 @@ class FederationRemoteSendQueue:
         # we make a new function, so we need to make a new function so the inner
         # lambda binds to the queue rather than to the name of the queue which
         # changes. ARGH.
-        def register(name, queue):
+        def register(name: str, queue: Sized) -> None:
             LaterGauge(
                 "synapse_federation_send_queue_%s_size" % (queue_name,),
                 "",
@@ -104,7 +114,6 @@ class FederationRemoteSendQueue:
 
         for queue_name in [
             "presence_map",
-            "presence_changed",
             "keyed_edu",
             "keyed_edu_changed",
             "edus",
@@ -115,13 +124,13 @@ class FederationRemoteSendQueue:
 
         self.clock.looping_call(self._clear_queue, 30 * 1000)
 
-    def _next_pos(self):
+    def _next_pos(self) -> int:
         pos = self.pos
         self.pos += 1
         self.pos_time[self.clock.time_msec()] = pos
         return pos
 
-    def _clear_queue(self):
+    def _clear_queue(self) -> None:
         """Clear the queues for anything older than N minutes"""
 
         FIVE_MINUTES_AGO = 5 * 60 * 1000
@@ -138,27 +147,16 @@ class FederationRemoteSendQueue:
 
         self._clear_queue_before_pos(position_to_delete)
 
-    def _clear_queue_before_pos(self, position_to_delete):
+    def _clear_queue_before_pos(self, position_to_delete: int) -> None:
         """Clear all the queues from before a given position"""
         with Measure(self.clock, "send_queue._clear"):
             # Delete things out of presence maps
-            keys = self.presence_changed.keys()
-            i = self.presence_changed.bisect_left(position_to_delete)
-            for key in keys[:i]:
-                del self.presence_changed[key]
-
-            user_ids = {
-                user_id for uids in self.presence_changed.values() for user_id in uids
-            }
-
             keys = self.presence_destinations.keys()
             i = self.presence_destinations.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.presence_destinations[key]
 
-            user_ids.update(
-                user_id for user_id, _ in self.presence_destinations.values()
-            )
+            user_ids = {user_id for user_id, _ in self.presence_destinations.values()}
 
             to_del = [
                 user_id for user_id in self.presence_map if user_id not in user_ids
@@ -188,13 +186,18 @@ class FederationRemoteSendQueue:
             for key in keys[:i]:
                 del self.edus[key]
 
-    def notify_new_events(self, max_token):
+    def notify_new_events(self, max_token: RoomStreamToken) -> None:
         """As per FederationSender"""
-        # We don't need to replicate this as it gets sent down a different
-        # stream.
-        pass
+        # This should never get called.
+        raise NotImplementedError()
 
-    def build_and_send_edu(self, destination, edu_type, content, key=None):
+    def build_and_send_edu(
+        self,
+        destination: str,
+        edu_type: str,
+        content: JsonDict,
+        key: Optional[Hashable] = None,
+    ) -> None:
         """As per FederationSender"""
         if destination == self.server_name:
             logger.info("Not sending EDU to ourselves")
@@ -218,38 +221,22 @@ class FederationRemoteSendQueue:
 
         self.notifier.on_new_replication_data()
 
-    def send_read_receipt(self, receipt):
+    async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """As per FederationSender
 
         Args:
-            receipt (synapse.types.ReadReceipt):
+            receipt:
         """
         # nothing to do here: the replication listener will handle it.
-        return defer.succeed(None)
 
-    def send_presence(self, states):
+    def send_presence_to_destinations(
+        self, states: Iterable[UserPresenceState], destinations: Iterable[str]
+    ) -> None:
         """As per FederationSender
 
         Args:
-            states (list(UserPresenceState))
-        """
-        pos = self._next_pos()
-
-        # We only want to send presence for our own users, so lets always just
-        # filter here just in case.
-        local_states = list(filter(lambda s: self.is_mine_id(s.user_id), states))
-
-        self.presence_map.update({state.user_id: state for state in local_states})
-        self.presence_changed[pos] = [state.user_id for state in local_states]
-
-        self.notifier.on_new_replication_data()
-
-    def send_presence_to_destinations(self, states, destinations):
-        """As per FederationSender
-
-        Args:
-            states (list[UserPresenceState])
-            destinations (list[str])
+            states
+            destinations
         """
         for state in states:
             pos = self._next_pos()
@@ -258,15 +245,18 @@ class FederationRemoteSendQueue:
 
         self.notifier.on_new_replication_data()
 
-    def send_device_messages(self, destination):
+    def send_device_messages(self, destination: str) -> None:
         """As per FederationSender"""
         # We don't need to replicate this as it gets sent down a different
         # stream.
 
-    def get_current_token(self):
+    def wake_destination(self, server: str) -> None:
+        pass
+
+    def get_current_token(self) -> int:
         return self.pos - 1
 
-    def federation_ack(self, instance_name, token):
+    def federation_ack(self, instance_name: str, token: int) -> None:
         if self._sender_instances:
             # If we have configured multiple federation sender instances we need
             # to track their positions separately, and only clear the queue up
@@ -302,18 +292,6 @@ class FederationRemoteSendQueue:
         # list of tuple(int, BaseFederationRow), where the first is the position
         # of the federation stream.
         rows = []  # type: List[Tuple[int, BaseFederationRow]]
-
-        # Fetch changed presence
-        i = self.presence_changed.bisect_right(from_token)
-        j = self.presence_changed.bisect_right(to_token) + 1
-        dest_user_ids = [
-            (pos, user_id)
-            for pos, user_id_list in self.presence_changed.items()[i:j]
-            for user_id in user_id_list
-        ]
-
-        for (key, user_id) in dest_user_ids:
-            rows.append((key, PresenceRow(state=self.presence_map[user_id])))
 
         # Fetch presence to send to destinations
         i = self.presence_destinations.bisect_right(from_token)
@@ -405,22 +383,6 @@ class BaseFederationRow:
         raise NotImplementedError()
 
 
-class PresenceRow(
-    BaseFederationRow, namedtuple("PresenceRow", ("state",))  # UserPresenceState
-):
-    TypeId = "p"
-
-    @staticmethod
-    def from_data(data):
-        return PresenceRow(state=UserPresenceState.from_dict(data))
-
-    def to_data(self):
-        return self.state.as_dict()
-
-    def add_to_buffer(self, buff):
-        buff.presence.append(self.state)
-
-
 class PresenceDestinationsRow(
     BaseFederationRow,
     namedtuple(
@@ -468,8 +430,7 @@ class KeyedEduRow(
 
 
 class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
-    """Streams EDUs that don't have keys. See KeyedEduRow
-    """
+    """Streams EDUs that don't have keys. See KeyedEduRow"""
 
     TypeId = "e"
 
@@ -485,7 +446,6 @@ class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
 
 
 _rowtypes = (
-    PresenceRow,
     PresenceDestinationsRow,
     KeyedEduRow,
     EduRow,
@@ -497,7 +457,6 @@ TypeToRow = {Row.TypeId: Row for Row in _rowtypes}
 ParsedFederationStreamData = namedtuple(
     "ParsedFederationStreamData",
     (
-        "presence",  # list(UserPresenceState)
         "presence_destinations",  # list of tuples of UserPresenceState and destinations
         "keyed_edus",  # dict of destination -> { key -> Edu }
         "edus",  # dict of destination -> [Edu]
@@ -505,13 +464,16 @@ ParsedFederationStreamData = namedtuple(
 )
 
 
-def process_rows_for_federation(transaction_queue, rows):
+def process_rows_for_federation(
+    transaction_queue: FederationSender,
+    rows: List[FederationStream.FederationStreamRow],
+) -> None:
     """Parse a list of rows from the federation stream and put them in the
     transaction queue ready for sending to the relevant homeservers.
 
     Args:
-        transaction_queue (FederationSender)
-        rows (list(synapse.replication.tcp.streams.federation.FederationStream.FederationStreamRow))
+        transaction_queue
+        rows
     """
 
     # The federation stream contains a bunch of different types of
@@ -519,7 +481,9 @@ def process_rows_for_federation(transaction_queue, rows):
     # them into the appropriate collection and then send them off.
 
     buff = ParsedFederationStreamData(
-        presence=[], presence_destinations=[], keyed_edus={}, edus={},
+        presence_destinations=[],
+        keyed_edus={},
+        edus={},
     )
 
     # Parse the rows in the stream and add to the buffer
@@ -532,18 +496,15 @@ def process_rows_for_federation(transaction_queue, rows):
         parsed_row = RowType.from_data(row.data)
         parsed_row.add_to_buffer(buff)
 
-    if buff.presence:
-        transaction_queue.send_presence(buff.presence)
-
     for state, destinations in buff.presence_destinations:
         transaction_queue.send_presence_to_destinations(
             states=[state], destinations=destinations
         )
 
-    for destination, edu_map in buff.keyed_edus.items():
+    for edu_map in buff.keyed_edus.values():
         for key, edu in edu_map.items():
             transaction_queue.send_edu(edu, key)
 
-    for destination, edu_list in buff.edus.items():
+    for edu_list in buff.edus.values():
         for edu in edu_list:
             transaction_queue.send_edu(edu, None)

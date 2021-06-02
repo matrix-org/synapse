@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +34,7 @@ class ServerNoticesManager:
 
         self._store = hs.get_datastore()
         self._config = hs.config
+        self._account_data_handler = hs.get_account_data_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
@@ -57,7 +57,7 @@ class ServerNoticesManager:
         user_id: str,
         event_content: dict,
         type: str = EventTypes.Message,
-        state_key: Optional[bool] = None,
+        state_key: Optional[str] = None,
     ) -> EventBase:
         """Send a notice to the given user
 
@@ -163,7 +163,7 @@ class ServerNoticesManager:
         )
         room_id = info["room_id"]
 
-        max_id = await self._store.add_tag_to_room(
+        max_id = await self._account_data_handler.add_tag_to_room(
             user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
         )
         self._notifier.on_new_event("account_data_key", max_id, users=[user_id])

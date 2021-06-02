@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
@@ -16,10 +15,16 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.types import GroupID, RoomID, UserID, get_domain_from_id
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
+from synapse.types import GroupID, JsonDict, RoomID, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +37,13 @@ logger = logging.getLogger(__name__)
 # TODO: Flairs
 
 
+# Note that the maximum lengths are somewhat arbitrary.
+MAX_SHORT_DESC_LEN = 1000
+MAX_LONG_DESC_LEN = 10000
+
+
 class GroupsServerWorkerHandler:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
         self.room_list_handler = hs.get_room_list_handler()
@@ -48,16 +58,21 @@ class GroupsServerWorkerHandler:
         self.profile_handler = hs.get_profile_handler()
 
     async def check_group_is_ours(
-        self, group_id, requester_user_id, and_exists=False, and_is_admin=None
-    ):
+        self,
+        group_id: str,
+        requester_user_id: str,
+        and_exists: bool = False,
+        and_is_admin: Optional[str] = None,
+    ) -> Optional[dict]:
         """Check that the group is ours, and optionally if it exists.
 
         If group does exist then return group.
 
         Args:
-            group_id (str)
-            and_exists (bool): whether to also check if group exists
-            and_is_admin (str): whether to also check if given str is a user_id
+            group_id: The group ID to check.
+            requester_user_id: The user ID of the requester.
+            and_exists: whether to also check if group exists
+            and_is_admin: whether to also check if given str is a user_id
                 that is an admin
         """
         if not self.is_mine_id(group_id):
@@ -80,7 +95,9 @@ class GroupsServerWorkerHandler:
 
         return group
 
-    async def get_group_summary(self, group_id, requester_user_id):
+    async def get_group_summary(
+        self, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get the summary for a group as seen by requester_user_id.
 
         The group summary consists of the profile of the room, and a curated
@@ -113,6 +130,8 @@ class GroupsServerWorkerHandler:
             entry = await self.room_list_handler.generate_room_entry(
                 room_id, len(joined_users), with_alias=False, allow_private=True
             )
+            if entry is None:
+                continue
             entry = dict(entry)  # so we don't change what's cached
             entry.pop("room_id", None)
 
@@ -120,22 +139,22 @@ class GroupsServerWorkerHandler:
 
         rooms.sort(key=lambda e: e.get("order", 0))
 
-        for entry in users:
-            user_id = entry["user_id"]
+        for user in users:
+            user_id = user["user_id"]
 
             if not self.is_mine_id(requester_user_id):
                 attestation = await self.store.get_remote_attestation(group_id, user_id)
                 if not attestation:
                     continue
 
-                entry["attestation"] = attestation
+                user["attestation"] = attestation
             else:
-                entry["attestation"] = self.attestations.create_attestation(
+                user["attestation"] = self.attestations.create_attestation(
                     group_id, user_id
                 )
 
             user_profile = await self.profile_handler.get_profile_from_cache(user_id)
-            entry.update(user_profile)
+            user.update(user_profile)
 
         users.sort(key=lambda e: e.get("order", 0))
 
@@ -158,46 +177,44 @@ class GroupsServerWorkerHandler:
             "user": membership_info,
         }
 
-    async def get_group_categories(self, group_id, requester_user_id):
-        """Get all categories in a group (as seen by user)
-        """
+    async def get_group_categories(
+        self, group_id: str, requester_user_id: str
+    ) -> JsonDict:
+        """Get all categories in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         categories = await self.store.get_group_categories(group_id=group_id)
         return {"categories": categories}
 
-    async def get_group_category(self, group_id, requester_user_id, category_id):
-        """Get a specific category in a group (as seen by user)
-        """
+    async def get_group_category(
+        self, group_id: str, requester_user_id: str, category_id: str
+    ) -> JsonDict:
+        """Get a specific category in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
-        res = await self.store.get_group_category(
+        return await self.store.get_group_category(
             group_id=group_id, category_id=category_id
         )
 
-        logger.info("group %s", res)
-
-        return res
-
-    async def get_group_roles(self, group_id, requester_user_id):
-        """Get all roles in a group (as seen by user)
-        """
+    async def get_group_roles(self, group_id: str, requester_user_id: str) -> JsonDict:
+        """Get all roles in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
         roles = await self.store.get_group_roles(group_id=group_id)
         return {"roles": roles}
 
-    async def get_group_role(self, group_id, requester_user_id, role_id):
-        """Get a specific role in a group (as seen by user)
-        """
+    async def get_group_role(
+        self, group_id: str, requester_user_id: str, role_id: str
+    ) -> JsonDict:
+        """Get a specific role in a group (as seen by user)"""
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
 
-        res = await self.store.get_group_role(group_id=group_id, role_id=role_id)
-        return res
+        return await self.store.get_group_role(group_id=group_id, role_id=role_id)
 
-    async def get_group_profile(self, group_id, requester_user_id):
-        """Get the group profile as seen by requester_user_id
-        """
+    async def get_group_profile(
+        self, group_id: str, requester_user_id: str
+    ) -> JsonDict:
+        """Get the group profile as seen by requester_user_id"""
 
         await self.check_group_is_ours(group_id, requester_user_id)
 
@@ -218,7 +235,9 @@ class GroupsServerWorkerHandler:
         else:
             raise SynapseError(404, "Unknown group")
 
-    async def get_users_in_group(self, group_id, requester_user_id):
+    async def get_users_in_group(
+        self, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get the users in group as seen by requester_user_id.
 
         The ordering is arbitrary at the moment
@@ -267,7 +286,9 @@ class GroupsServerWorkerHandler:
 
         return {"chunk": chunk, "total_user_count_estimate": len(user_results)}
 
-    async def get_invited_users_in_group(self, group_id, requester_user_id):
+    async def get_invited_users_in_group(
+        self, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get the users that have been invited to a group as seen by requester_user_id.
 
         The ordering is arbitrary at the moment
@@ -297,7 +318,9 @@ class GroupsServerWorkerHandler:
 
         return {"chunk": user_profiles, "total_user_count_estimate": len(invited_users)}
 
-    async def get_rooms_in_group(self, group_id, requester_user_id):
+    async def get_rooms_in_group(
+        self, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get the rooms in group as seen by requester_user_id
 
         This returns rooms in order of decreasing number of joined users
@@ -335,17 +358,21 @@ class GroupsServerWorkerHandler:
 
 
 class GroupsServerHandler(GroupsServerWorkerHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         # Ensure attestations get renewed
         hs.get_groups_attestation_renewer()
 
     async def update_group_summary_room(
-        self, group_id, requester_user_id, room_id, category_id, content
-    ):
-        """Add/update a room to the group summary
-        """
+        self,
+        group_id: str,
+        requester_user_id: str,
+        room_id: str,
+        category_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
+        """Add/update a room to the group summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -367,10 +394,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def delete_group_summary_room(
-        self, group_id, requester_user_id, room_id, category_id
-    ):
-        """Remove a room from the summary
-        """
+        self, group_id: str, requester_user_id: str, room_id: str, category_id: str
+    ) -> JsonDict:
+        """Remove a room from the summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -381,7 +407,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def set_group_join_policy(self, group_id, requester_user_id, content):
+    async def set_group_join_policy(
+        self, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Sets the group join policy.
 
         Currently supported policies are:
@@ -401,10 +429,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def update_group_category(
-        self, group_id, requester_user_id, category_id, content
-    ):
-        """Add/Update a group category
-        """
+        self, group_id: str, requester_user_id: str, category_id: str, content: JsonDict
+    ) -> JsonDict:
+        """Add/Update a group category"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -421,9 +448,10 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def delete_group_category(self, group_id, requester_user_id, category_id):
-        """Delete a group category
-        """
+    async def delete_group_category(
+        self, group_id: str, requester_user_id: str, category_id: str
+    ) -> JsonDict:
+        """Delete a group category"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -434,9 +462,10 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def update_group_role(self, group_id, requester_user_id, role_id, content):
-        """Add/update a role in a group
-        """
+    async def update_group_role(
+        self, group_id: str, requester_user_id: str, role_id: str, content: JsonDict
+    ) -> JsonDict:
+        """Add/update a role in a group"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -451,9 +480,10 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def delete_group_role(self, group_id, requester_user_id, role_id):
-        """Remove role from group
-        """
+    async def delete_group_role(
+        self, group_id: str, requester_user_id: str, role_id: str
+    ) -> JsonDict:
+        """Remove role from group"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -463,10 +493,14 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def update_group_summary_user(
-        self, group_id, requester_user_id, user_id, role_id, content
-    ):
-        """Add/update a users entry in the group summary
-        """
+        self,
+        group_id: str,
+        requester_user_id: str,
+        user_id: str,
+        role_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
+        """Add/update a users entry in the group summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -486,10 +520,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def delete_group_summary_user(
-        self, group_id, requester_user_id, user_id, role_id
-    ):
-        """Remove a user from the group summary
-        """
+        self, group_id: str, requester_user_id: str, user_id: str, role_id: str
+    ) -> JsonDict:
+        """Remove a user from the group summary"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -500,26 +533,43 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def update_group_profile(self, group_id, requester_user_id, content):
-        """Update the group profile
-        """
+    async def update_group_profile(
+        self, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> None:
+        """Update the group profile"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
 
         profile = {}
-        for keyname in ("name", "avatar_url", "short_description", "long_description"):
+        for keyname, max_length in (
+            ("name", MAX_DISPLAYNAME_LEN),
+            ("avatar_url", MAX_AVATAR_URL_LEN),
+            ("short_description", MAX_SHORT_DESC_LEN),
+            ("long_description", MAX_LONG_DESC_LEN),
+        ):
             if keyname in content:
                 value = content[keyname]
                 if not isinstance(value, str):
-                    raise SynapseError(400, "%r value is not a string" % (keyname,))
+                    raise SynapseError(
+                        400,
+                        "%r value is not a string" % (keyname,),
+                        errcode=Codes.INVALID_PARAM,
+                    )
+                if len(value) > max_length:
+                    raise SynapseError(
+                        400,
+                        "Invalid %s parameter" % (keyname,),
+                        errcode=Codes.INVALID_PARAM,
+                    )
                 profile[keyname] = value
 
         await self.store.update_group_profile(group_id, profile)
 
-    async def add_room_to_group(self, group_id, requester_user_id, room_id, content):
-        """Add room to group
-        """
+    async def add_room_to_group(
+        self, group_id: str, requester_user_id: str, room_id: str, content: JsonDict
+    ) -> JsonDict:
+        """Add room to group"""
         RoomID.from_string(room_id)  # Ensure valid room id
 
         await self.check_group_is_ours(
@@ -533,10 +583,14 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         return {}
 
     async def update_room_in_group(
-        self, group_id, requester_user_id, room_id, config_key, content
-    ):
-        """Update room in group
-        """
+        self,
+        group_id: str,
+        requester_user_id: str,
+        room_id: str,
+        config_key: str,
+        content: JsonDict,
+    ) -> JsonDict:
+        """Update room in group"""
         RoomID.from_string(room_id)  # Ensure valid room id
 
         await self.check_group_is_ours(
@@ -554,9 +608,10 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def remove_room_from_group(self, group_id, requester_user_id, room_id):
-        """Remove room from group
-        """
+    async def remove_room_from_group(
+        self, group_id: str, requester_user_id: str, room_id: str
+    ) -> JsonDict:
+        """Remove room from group"""
         await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
@@ -565,13 +620,16 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def invite_to_group(self, group_id, user_id, requester_user_id, content):
-        """Invite user to group
-        """
+    async def invite_to_group(
+        self, group_id: str, user_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
+        """Invite user to group"""
 
         group = await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True, and_is_admin=requester_user_id
         )
+        if not group:
+            raise SynapseError(400, "Group does not exist", errcode=Codes.BAD_STATE)
 
         # TODO: Check if user knocked
 
@@ -594,6 +652,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         if self.hs.is_mine_id(user_id):
             groups_local = self.hs.get_groups_local_handler()
+            assert isinstance(
+                groups_local, GroupsLocalHandler
+            ), "Workers cannot invites users to groups."
             res = await groups_local.on_invite(group_id, user_id, content)
             local_attestation = None
         else:
@@ -629,6 +690,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 local_attestation=local_attestation,
                 remote_attestation=remote_attestation,
             )
+            return {"state": "join"}
         elif res["state"] == "invite":
             await self.store.add_group_invite(group_id, user_id)
             return {"state": "invite"}
@@ -637,13 +699,17 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         else:
             raise SynapseError(502, "Unknown state returned by HS")
 
-    async def _add_user(self, group_id, user_id, content):
+    async def _add_user(
+        self, group_id: str, user_id: str, content: JsonDict
+    ) -> Optional[JsonDict]:
         """Add a user to a group based on a content dict.
 
         See accept_invite, join_group.
         """
         if not self.hs.is_mine_id(user_id):
-            local_attestation = self.attestations.create_attestation(group_id, user_id)
+            local_attestation = self.attestations.create_attestation(
+                group_id, user_id
+            )  # type: Optional[JsonDict]
 
             remote_attestation = content["attestation"]
 
@@ -667,7 +733,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return local_attestation
 
-    async def accept_invite(self, group_id, requester_user_id, content):
+    async def accept_invite(
+        self, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         """User tries to accept an invite to the group.
 
         This is different from them asking to join, and so should error if no
@@ -686,7 +754,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {"state": "join", "attestation": local_attestation}
 
-    async def join_group(self, group_id, requester_user_id, content):
+    async def join_group(
+        self, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         """User tries to join the group.
 
         This will error if the group requires an invite/knock to join
@@ -695,6 +765,8 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         group_info = await self.check_group_is_ours(
             group_id, requester_user_id, and_exists=True
         )
+        if not group_info:
+            raise SynapseError(404, "Group does not exist", errcode=Codes.NOT_FOUND)
         if group_info["join_policy"] != "open":
             raise SynapseError(403, "Group is not publicly joinable")
 
@@ -702,26 +774,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {"state": "join", "attestation": local_attestation}
 
-    async def knock(self, group_id, requester_user_id, content):
-        """A user requests becoming a member of the group
-        """
-        await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
-
-        raise NotImplementedError()
-
-    async def accept_knock(self, group_id, requester_user_id, content):
-        """Accept a users knock to the room.
-
-        Errors if the user hasn't knocked, rather than inviting them.
-        """
-
-        await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
-
-        raise NotImplementedError()
-
     async def remove_user_from_group(
-        self, group_id, user_id, requester_user_id, content
-    ):
+        self, group_id: str, user_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Remove a user from the group; either a user is leaving or an admin
         kicked them.
         """
@@ -743,6 +798,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         if is_kick:
             if self.hs.is_mine_id(user_id):
                 groups_local = self.hs.get_groups_local_handler()
+                assert isinstance(
+                    groups_local, GroupsLocalHandler
+                ), "Workers cannot remove users from groups."
                 await groups_local.user_removed_from_group(group_id, user_id, {})
             else:
                 await self.transport_client.remove_user_from_group_notification(
@@ -759,14 +817,15 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {}
 
-    async def create_group(self, group_id, requester_user_id, content):
-        group = await self.check_group_is_ours(group_id, requester_user_id)
-
+    async def create_group(
+        self, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         logger.info("Attempting to create group with ID: %r", group_id)
 
         # parsing the id into a GroupID validates it.
         group_id_obj = GroupID.from_string(group_id)
 
+        group = await self.check_group_is_ours(group_id, requester_user_id)
         if group:
             raise SynapseError(400, "Group already exists")
 
@@ -811,7 +870,7 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
             local_attestation = self.attestations.create_attestation(
                 group_id, requester_user_id
-            )
+            )  # type: Optional[JsonDict]
         else:
             local_attestation = None
             remote_attestation = None
@@ -834,15 +893,14 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
 
         return {"group_id": group_id}
 
-    async def delete_group(self, group_id, requester_user_id):
+    async def delete_group(self, group_id: str, requester_user_id: str) -> None:
         """Deletes a group, kicking out all current members.
 
         Only group admins or server admins can call this request
 
         Args:
-            group_id (str)
-            request_user_id (str)
-
+            group_id: The group ID to delete.
+            requester_user_id: The user requesting to delete the group.
         """
 
         await self.check_group_is_ours(group_id, requester_user_id, and_exists=True)
@@ -865,6 +923,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         async def _kick_user_from_group(user_id):
             if self.hs.is_mine_id(user_id):
                 groups_local = self.hs.get_groups_local_handler()
+                assert isinstance(
+                    groups_local, GroupsLocalHandler
+                ), "Workers cannot kick users from groups."
                 await groups_local.user_removed_from_group(group_id, user_id, {})
             else:
                 await self.transport_client.remove_user_from_group_notification(
@@ -896,9 +957,8 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         await self.store.delete_group(group_id)
 
 
-def _parse_join_policy_from_contents(content):
-    """Given a content for a request, return the specified join policy or None
-    """
+def _parse_join_policy_from_contents(content: JsonDict) -> Optional[str]:
+    """Given a content for a request, return the specified join policy or None"""
 
     join_policy_dict = content.get("m.join_policy")
     if join_policy_dict:
@@ -907,9 +967,8 @@ def _parse_join_policy_from_contents(content):
         return None
 
 
-def _parse_join_policy_dict(join_policy_dict):
-    """Given a dict for the "m.join_policy" config return the join policy specified
-    """
+def _parse_join_policy_dict(join_policy_dict: JsonDict) -> str:
+    """Given a dict for the "m.join_policy" config return the join policy specified"""
     join_policy_type = join_policy_dict.get("type")
     if not join_policy_type:
         return "invite"
@@ -919,7 +978,7 @@ def _parse_join_policy_dict(join_policy_dict):
     return join_policy_type
 
 
-def _parse_visibility_from_contents(content):
+def _parse_visibility_from_contents(content: JsonDict) -> bool:
     """Given a content for a request parse out whether the entity should be
     public or not
     """
@@ -933,7 +992,7 @@ def _parse_visibility_from_contents(content):
     return is_public
 
 
-def _parse_visibility_dict(visibility):
+def _parse_visibility_dict(visibility: JsonDict) -> bool:
     """Given a dict for the "m.visibility" config return if the entity should
     be public or not
     """

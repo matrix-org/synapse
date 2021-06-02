@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,6 +14,7 @@
 # limitations under the License.
 import logging
 from io import BytesIO
+from typing import Tuple
 
 from PIL import Image
 
@@ -39,12 +40,21 @@ class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 
-    def __init__(self, input_path):
+    @staticmethod
+    def set_limits(max_image_pixels: int):
+        Image.MAX_IMAGE_PIXELS = max_image_pixels
+
+    def __init__(self, input_path: str):
         try:
             self.image = Image.open(input_path)
         except OSError as e:
             # If an error occurs opening the image, a thumbnail won't be able to
             # be generated.
+            raise ThumbnailError from e
+        except Image.DecompressionBombError as e:
+            # If an image decompression bomb error occurs opening the image,
+            # then the image exceeds the pixel limit and a thumbnail won't
+            # be able to be generated.
             raise ThumbnailError from e
 
         self.width, self.height = self.image.size
@@ -59,11 +69,11 @@ class Thumbnailer:
             # A lot of parsing errors can happen when parsing EXIF
             logger.info("Error parsing image EXIF information: %s", e)
 
-    def transpose(self):
+    def transpose(self) -> Tuple[int, int]:
         """Transpose the image using its EXIF Orientation tag
 
         Returns:
-            Tuple[int, int]: (width, height) containing the new image size in pixels.
+            A tuple containing the new image size in pixels as (width, height).
         """
         if self.transpose_method is not None:
             self.image = self.image.transpose(self.transpose_method)
@@ -73,7 +83,7 @@ class Thumbnailer:
             self.image.info["exif"] = None
         return self.image.size
 
-    def aspect(self, max_width, max_height):
+    def aspect(self, max_width: int, max_height: int) -> Tuple[int, int]:
         """Calculate the largest size that preserves aspect ratio which
         fits within the given rectangle::
 
@@ -91,15 +101,20 @@ class Thumbnailer:
         else:
             return (max_height * self.width) // self.height, max_height
 
-    def _resize(self, width, height):
+    def _resize(self, width: int, height: int) -> Image:
         # 1-bit or 8-bit color palette images need converting to RGB
         # otherwise they will be scaled using nearest neighbour which
-        # looks awful
-        if self.image.mode in ["1", "P"]:
-            self.image = self.image.convert("RGB")
+        # looks awful.
+        #
+        # If the image has transparency, use RGBA instead.
+        if self.image.mode in ["1", "L", "P"]:
+            mode = "RGB"
+            if self.image.info.get("transparency", None) is not None:
+                mode = "RGBA"
+            self.image = self.image.convert(mode)
         return self.image.resize((width, height), Image.ANTIALIAS)
 
-    def scale(self, width, height, output_type):
+    def scale(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales the image to the given dimensions.
 
         Returns:
@@ -108,7 +123,7 @@ class Thumbnailer:
         scaled = self._resize(width, height)
         return self._encode_image(scaled, output_type)
 
-    def crop(self, width, height, output_type):
+    def crop(self, width: int, height: int, output_type: str) -> BytesIO:
         """Rescales and crops the image to the given dimensions preserving
         aspect::
             (w_in / h_in) = (w_scaled / h_scaled)
@@ -136,7 +151,7 @@ class Thumbnailer:
             cropped = scaled_image.crop((crop_left, 0, crop_right, height))
         return self._encode_image(cropped, output_type)
 
-    def _encode_image(self, output_image, output_type):
+    def _encode_image(self, output_image: Image, output_type: str) -> BytesIO:
         output_bytes_io = BytesIO()
         fmt = self.FORMATS[output_type]
         if fmt == "JPEG":

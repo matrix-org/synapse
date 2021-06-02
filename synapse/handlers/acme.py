@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 import twisted
 import twisted.internet.error
@@ -21,6 +21,9 @@ from twisted.web import server, static
 from twisted.web.resource import Resource
 
 from synapse.app import check_bind_error
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +38,12 @@ solutions, please read https://github.com/matrix-org/synapse/blob/master/docs/AC
 
 
 class AcmeHandler:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.reactor = hs.get_reactor()
         self._acme_domain = hs.config.acme_domain
 
-    async def start_listening(self):
+    async def start_listening(self) -> None:
         from synapse.handlers import acme_issuing_service
 
         # Configure logging for txacme, if you need to debug
@@ -69,7 +72,9 @@ class AcmeHandler:
                 "Listening for ACME requests on %s:%i", host, self.hs.config.acme_port
             )
             try:
-                self.reactor.listenTCP(self.hs.config.acme_port, srv, interface=host)
+                self.reactor.listenTCP(
+                    self.hs.config.acme_port, srv, backlog=50, interface=host
+                )
             except twisted.internet.error.CannotListenError as e:
                 check_bind_error(e, host, bind_addresses)
 
@@ -85,7 +90,7 @@ class AcmeHandler:
             logger.error(ACME_REGISTER_FAIL_ERROR)
             raise
 
-    async def provision_certificate(self):
+    async def provision_certificate(self) -> None:
 
         logger.warning("Reprovisioning %s", self._acme_domain)
 
@@ -110,5 +115,3 @@ class AcmeHandler:
         except Exception:
             logger.exception("Failed saving!")
             raise
-
-        return True

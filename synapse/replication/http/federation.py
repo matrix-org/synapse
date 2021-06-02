@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +39,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                                     // containing the event
                 "event_format_version": .., // 1,2,3 etc: the event format version
                 "internal_metadata": { .. serialized internal_metadata .. },
+                "outlier": true|false,
                 "rejected_reason": ..,   // The event.rejected_reason field
                 "context": { .. serialized event context .. },
             }],
@@ -84,6 +84,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                     "room_version": event.room_version.identifier,
                     "event_format_version": event.format_version,
                     "internal_metadata": event.internal_metadata.get_dict(),
+                    "outlier": event.internal_metadata.is_outlier(),
                     "rejected_reason": event.rejected_reason,
                     "context": serialized_context,
                 }
@@ -116,6 +117,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 event = make_event_from_dict(
                     event_dict, room_ver, internal_metadata, rejected_reason
                 )
+                event.internal_metadata.outlier = event_payload["outlier"]
 
                 context = EventContext.deserialize(
                     self.storage, event_payload["context"]
@@ -213,8 +215,9 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
             content = parse_json_object_from_request(request)
 
             args = content["args"]
+            args["origin"] = content["origin"]
 
-        logger.info("Got %r query", query_type)
+        logger.info("Got %r query from %s", query_type, args["origin"])
 
         result = await self.registry.on_query(query_type, args)
 

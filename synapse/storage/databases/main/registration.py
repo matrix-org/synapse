@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -15,15 +14,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import random
 import re
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import attr
 
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, StoreError, SynapseError, ThreepidValidationError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingDatabaseConnection
 from synapse.storage.databases.main.cache import CacheInvalidationWorkerStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.types import Connection, Cursor
@@ -70,7 +70,12 @@ class TokenLookupResult:
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self.config = hs.config
@@ -79,14 +84,32 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         # call `find_max_generated_user_id_localpart` each time, which is
         # expensive if there are many entries.
         self._user_id_seq = build_sequence_generator(
-            database.engine, find_max_generated_user_id_localpart, "user_id_seq",
+            db_conn,
+            database.engine,
+            find_max_generated_user_id_localpart,
+            "user_id_seq",
+            table=None,
+            id_column=None,
         )
 
-        self._account_validity = hs.config.account_validity
-        if hs.config.run_background_tasks and self._account_validity.enabled:
-            self._clock.call_later(
-                0.0, self._set_expiration_date_when_missing,
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
+        self._account_validity_period = None
+        self._account_validity_startup_job_max_delta = None
+        if self._account_validity_enabled:
+            self._account_validity_period = (
+                hs.config.account_validity.account_validity_period
             )
+            self._account_validity_startup_job_max_delta = (
+                hs.config.account_validity.account_validity_startup_job_max_delta
+            )
+
+            if hs.config.run_background_tasks:
+                self._clock.call_later(
+                    0.0,
+                    self._set_expiration_date_when_missing,
+                )
 
         # Create a background job for culling expired 3PID validity tokens
         if hs.config.run_background_tasks:
@@ -110,6 +133,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 "creation_ts",
                 "user_type",
                 "deactivated",
+                "shadow_banned",
             ],
             allow_none=True,
             desc="get_user_by_id",
@@ -183,6 +207,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         expiration_ts: int,
         email_sent: bool,
         renewal_token: Optional[str] = None,
+        token_used_ts: Optional[int] = None,
     ) -> None:
         """Updates the account validity properties of the given account, with the
         given values.
@@ -196,6 +221,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 period.
             renewal_token: Renewal token the user can use to extend the validity
                 of their account. Defaults to no token.
+            token_used_ts: A timestamp of when the current token was used to renew
+                the account.
         """
 
         def set_account_validity_for_user_txn(txn):
@@ -207,6 +234,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     "expiration_ts_ms": expiration_ts,
                     "email_sent": email_sent,
                     "renewal_token": renewal_token,
+                    "token_used_ts_ms": token_used_ts,
                 },
             )
             self._invalidate_cache_and_stream(
@@ -220,7 +248,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     async def set_renewal_token_for_user(
         self, user_id: str, renewal_token: str
     ) -> None:
-        """Defines a renewal token for a given user.
+        """Defines a renewal token for a given user, and clears the token_used timestamp.
 
         Args:
             user_id: ID of the user to set the renewal token for.
@@ -233,24 +261,38 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         await self.db_pool.simple_update_one(
             table="account_validity",
             keyvalues={"user_id": user_id},
-            updatevalues={"renewal_token": renewal_token},
+            updatevalues={"renewal_token": renewal_token, "token_used_ts_ms": None},
             desc="set_renewal_token_for_user",
         )
 
-    async def get_user_from_renewal_token(self, renewal_token: str) -> str:
-        """Get a user ID from a renewal token.
+    async def get_user_from_renewal_token(
+        self, renewal_token: str
+    ) -> Tuple[str, int, Optional[int]]:
+        """Get a user ID and renewal status from a renewal token.
 
         Args:
             renewal_token: The renewal token to perform the lookup with.
 
         Returns:
-            The ID of the user to which the token belongs.
+            A tuple of containing the following values:
+                * The ID of a user to which the token belongs.
+                * An int representing the user's expiry timestamp as milliseconds since the
+                    epoch, or 0 if the token was invalid.
+                * An optional int representing the timestamp of when the user renewed their
+                    account timestamp as milliseconds since the epoch. None if the account
+                    has not been renewed using the current token yet.
         """
-        return await self.db_pool.simple_select_one_onecol(
+        ret_dict = await self.db_pool.simple_select_one(
             table="account_validity",
             keyvalues={"renewal_token": renewal_token},
-            retcol="user_id",
+            retcols=["user_id", "expiration_ts_ms", "token_used_ts_ms"],
             desc="get_user_from_renewal_token",
+        )
+
+        return (
+            ret_dict["user_id"],
+            ret_dict["expiration_ts_ms"],
+            ret_dict["token_used_ts_ms"],
         )
 
     async def get_renewal_token_for_user(self, user_id: str) -> str:
@@ -291,7 +333,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "get_users_expiring_soon",
             select_users_txn,
             self._clock.time_msec(),
-            self.config.account_validity.renew_at,
+            self.config.account_validity_renew_at,
         )
 
     async def set_renewal_mail_status(self, user_id: str, email_sent: bool) -> None:
@@ -359,6 +401,37 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             )
 
         await self.db_pool.runInteraction("set_server_admin", set_server_admin_txn)
+
+    async def set_shadow_banned(self, user: UserID, shadow_banned: bool) -> None:
+        """Sets whether a user shadow-banned.
+
+        Args:
+            user: user ID of the user to test
+            shadow_banned: true iff the user is to be shadow-banned, false otherwise.
+        """
+
+        def set_shadow_banned_txn(txn):
+            user_id = user.to_string()
+            self.db_pool.simple_update_one_txn(
+                txn,
+                table="users",
+                keyvalues={"name": user_id},
+                updatevalues={"shadow_banned": shadow_banned},
+            )
+            # In order for this to apply immediately, clear the cache for this user.
+            tokens = self.db_pool.simple_select_onecol_txn(
+                txn,
+                table="access_tokens",
+                keyvalues={"user_id": user_id},
+                retcol="token",
+            )
+            for token in tokens:
+                self._invalidate_cache_and_stream(
+                    txn, self.get_user_by_access_token, (token,)
+                )
+            self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
+
+        await self.db_pool.runInteraction("set_shadow_banned", set_shadow_banned_txn)
 
     def _query_for_auth(self, txn, token: str) -> Optional[TokenLookupResult]:
         sql = """
@@ -442,6 +515,26 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return dict(txn)
 
         return await self.db_pool.runInteraction("get_users_by_id_case_insensitive", f)
+
+    async def record_user_external_id(
+        self, auth_provider: str, external_id: str, user_id: str
+    ) -> None:
+        """Record a mapping from an external user id to a mxid
+
+        Args:
+            auth_provider: identifier for the remote auth provider
+            external_id: id on that system
+            user_id: complete mxid that it is mapped to
+        """
+        await self.db_pool.simple_insert(
+            table="user_external_ids",
+            values={
+                "auth_provider": auth_provider,
+                "external_id": external_id,
+                "user_id": user_id,
+            },
+            desc="record_user_external_id",
+        )
 
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
@@ -902,11 +995,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 delta equal to 10% of the validity period.
         """
         now_ms = self._clock.time_msec()
-        expiration_ts = now_ms + self._account_validity.period
+        expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:
-            expiration_ts = self.rand.randrange(
-                expiration_ts - self._account_validity.startup_job_max_delta,
+            expiration_ts = random.randrange(
+                expiration_ts - self._account_validity_startup_job_max_delta,
                 expiration_ts,
             )
 
@@ -943,9 +1036,50 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="del_user_pending_deactivation",
         )
 
+    async def get_access_token_last_validated(self, token_id: int) -> int:
+        """Retrieves the time (in milliseconds) of the last validation of an access token.
+
+        Args:
+            token_id: The ID of the access token to update.
+        Raises:
+            StoreError if the access token was not found.
+
+        Returns:
+            The last validation time.
+        """
+        result = await self.db_pool.simple_select_one_onecol(
+            "access_tokens", {"id": token_id}, "last_validated"
+        )
+
+        # If this token has not been validated (since starting to track this),
+        # return 0 instead of None.
+        return result or 0
+
+    async def update_access_token_last_validated(self, token_id: int) -> None:
+        """Updates the last time an access token was validated.
+
+        Args:
+            token_id: The ID of the access token to update.
+        Raises:
+            StoreError if there was a problem updating this.
+        """
+        now = self._clock.time_msec()
+
+        await self.db_pool.simple_update_one(
+            "access_tokens",
+            {"id": token_id},
+            {"last_validated": now},
+            desc="update_access_token_last_validated",
+        )
+
 
 class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
-    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+    def __init__(
+        self,
+        database: DatabasePool,
+        db_conn: LoggingDatabaseConnection,
+        hs: "HomeServer",
+    ):
         super().__init__(database, db_conn, hs)
 
         self._clock = hs.get_clock()
@@ -1068,7 +1202,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
                 FROM user_threepids
             """
 
-            txn.executemany(sql, [(id_server,) for id_server in id_servers])
+            txn.execute_batch(sql, [(id_server,) for id_server in id_servers])
 
         if id_servers:
             await self.db_pool.runInteraction(
@@ -1106,6 +1240,7 @@ class RegistrationBackgroundUpdateStore(RegistrationWorkerStore):
         self._invalidate_cache_and_stream(
             txn, self.get_user_deactivated_status, (user_id,)
         )
+        self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
         txn.call_after(self.is_guest.invalidate, (user_id,))
 
     @cached()
@@ -1150,6 +1285,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             The token ID
         """
         next_id = self._access_tokens_id_gen.get_next()
+        now = self._clock.time_msec()
 
         await self.db_pool.simple_insert(
             "access_tokens",
@@ -1160,6 +1296,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "device_id": device_id,
                 "valid_until_ms": valid_until_ms,
                 "puppets_user_id": puppets_user_id,
+                "last_validated": now,
             },
             desc="add_access_token_to_user",
         )
@@ -1306,7 +1443,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         except self.database_engine.module.IntegrityError:
             raise StoreError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
 
-        if self._account_validity.enabled:
+        if self._account_validity_enabled:
             self.set_expiration_date_for_user_txn(txn, user_id)
 
         if create_profile_with_displayname:
@@ -1332,26 +1469,6 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             )
 
         self._invalidate_cache_and_stream(txn, self.get_user_by_id, (user_id,))
-
-    async def record_user_external_id(
-        self, auth_provider: str, external_id: str, user_id: str
-    ) -> None:
-        """Record a mapping from an external user id to a mxid
-
-        Args:
-            auth_provider: identifier for the remote auth provider
-            external_id: id on that system
-            user_id: complete mxid that it is mapped to
-        """
-        await self.db_pool.simple_insert(
-            table="user_external_ids",
-            values={
-                "auth_provider": auth_provider,
-                "external_id": external_id,
-                "user_id": user_id,
-            },
-            desc="record_user_external_id",
-        )
 
     async def user_set_password_hash(
         self, user_id: str, password_hash: Optional[str]
@@ -1424,7 +1541,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
     async def user_delete_access_tokens(
         self,
         user_id: str,
-        except_token_id: Optional[str] = None,
+        except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
     ) -> List[Tuple[str, int, Optional[str]]]:
         """
@@ -1447,7 +1564,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             items = keyvalues.items()
             where_clause = " AND ".join(k + " = ?" for k, _ in items)
-            values = [v for _, v in items]
+            values = [v for _, v in items]  # type: List[Union[str, int]]
             if except_token_id:
                 where_clause += " AND id != ?"
                 values.append(except_token_id)

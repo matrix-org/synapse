@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import ThreepidValidationError
 from synapse.config.emailconfig import ThreepidBehaviour

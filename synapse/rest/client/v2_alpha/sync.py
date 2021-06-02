@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +14,7 @@
 
 import itertools
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.constants import PresenceState
 from synapse.api.errors import Codes, StoreError, SynapseError
@@ -26,10 +26,14 @@ from synapse.events.utils import (
 from synapse.handlers.presence import format_user_presence_state
 from synapse.handlers.sync import SyncConfig
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
-from synapse.types import StreamToken
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
 from ._base import client_patterns, set_timeline_upper_limit
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +77,7 @@ class SyncRestServlet(RestServlet):
     PATTERNS = client_patterns("/sync$")
     ALLOWED_PRESENCE = {"online", "offline", "unavailable"}
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -85,7 +89,10 @@ class SyncRestServlet(RestServlet):
         self._server_notices_sender = hs.get_server_notices_sender()
         self._event_serializer = hs.get_event_client_serializer()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
         if b"from" in request.args:
             # /events used to use 'from', but /sync uses 'since'.
             # Lets be helpful and whine if we see a 'from'.

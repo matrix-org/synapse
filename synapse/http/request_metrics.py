@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -213,8 +212,7 @@ class RequestMetrics:
         self.update_metrics()
 
     def update_metrics(self):
-        """Updates the in flight metrics with values from this request.
-        """
+        """Updates the in flight metrics with values from this request."""
         new_stats = self.start_context.get_resource_usage()
 
         diff = new_stats - self._request_stats
