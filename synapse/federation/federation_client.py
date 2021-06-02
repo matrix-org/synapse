@@ -21,6 +21,7 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -55,7 +56,7 @@ from synapse.federation.federation_base import FederationBase, event_from_pdu_js
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util.async_helpers import yieldable_gather_results
+from synapse.util.async_helpers import concurrently_execute, yieldable_gather_results
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -356,7 +357,7 @@ class FederationClient(FederationBase):
     async def _check_sigs_and_hash_and_fetch(
         self,
         origin: str,
-        pdus: List[EventBase],
+        pdus: Collection[EventBase],
         room_version: RoomVersion,
         outlier: bool = False,
         include_none: bool = False,
@@ -691,8 +692,6 @@ class FederationClient(FederationBase):
             state = response.state
             auth_chain = response.auth_events
 
-            pdus = {p.event_id: p for p in itertools.chain(state, auth_chain)}
-
             create_event = None
             for e in state:
                 if (e.type, e.state_key) == (EventTypes.Create, ""):
@@ -716,14 +715,29 @@ class FederationClient(FederationBase):
                     % (create_room_version,)
                 )
 
-            valid_pdus = await self._check_sigs_and_hash_and_fetch(
-                destination,
-                list(pdus.values()),
-                outlier=True,
-                room_version=room_version,
+            logger.info(
+                "Processing from send_join %d events", len(state) + len(auth_chain)
             )
 
-            valid_pdus_map = {p.event_id: p for p in valid_pdus}
+            # We now go and check the signatures and hashes for the event. Note
+            # that we limit how many events we process at a time to keep the
+            # memory overhead from exploding.
+            valid_pdus_map: Dict[str, EventBase] = {}
+
+            async def _execute(pdu: EventBase) -> None:
+                valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
+                    pdu=pdu,
+                    origin=destination,
+                    outlier=True,
+                    room_version=room_version,
+                )
+
+                if valid_pdu:
+                    valid_pdus_map[valid_pdu.event_id] = valid_pdu
+
+            await concurrently_execute(
+                _execute, itertools.chain(state, auth_chain), 10000
+            )
 
             # NB: We *need* to copy to ensure that we don't have multiple
             # references being passed on, as that causes... issues.
