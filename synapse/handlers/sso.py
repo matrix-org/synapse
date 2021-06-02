@@ -468,16 +468,22 @@ class SsoHandler:
                 new_user = True
             else:
                 if self._sso_update_display_name:
-                    attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
+                    attributes = await self._call_attribute_mapper(
+                        sso_to_matrix_id_mapper
+                    )
                     if attributes.display_name:
                         user_id_obj = UserID.from_string(user_id)
-                        profile_display_name = await self._profile_handler.get_displayname(user_id_obj)
+                        profile_display_name = (
+                            await self._profile_handler.get_displayname(user_id_obj)
+                        )
                         if profile_display_name != attributes.display_name:
                             requester = create_requester(
                                 user_id,
                                 authenticated_entity=user_id,
                             )
-                            await self._profile_handler.set_displayname(user_id_obj, requester, attributes.display_name, True)
+                            await self._profile_handler.set_displayname(
+                                user_id_obj, requester, attributes.display_name, True
+                            )
 
         await self._auth_handler.complete_sso_login(
             user_id,
