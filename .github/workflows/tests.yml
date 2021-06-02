@@ -232,9 +232,9 @@ jobs:
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
-      - name: Dump results.tap
+      - name: Summarise results.tap
         if: ${{ always() }}
-        run: cat /logs/results.tap
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
       - name: Upload SyTest logs
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
