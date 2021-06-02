@@ -495,7 +495,7 @@ class EventsWorkerStore(SQLBaseStore):
                 map from event id to result
         """
         event_entry_map = self._get_events_from_cache(
-            event_ids, allow_rejected=allow_rejected
+            event_ids,
         )
 
         missing_events_ids = [e for e in event_ids if e not in event_entry_map]
@@ -510,22 +510,30 @@ class EventsWorkerStore(SQLBaseStore):
             # of the database to check it.
             #
             missing_events = await self._get_events_from_db(
-                missing_events_ids, allow_rejected=allow_rejected
+                missing_events_ids,
             )
 
             event_entry_map.update(missing_events)
+
+        if not allow_rejected:
+            event_entry_map = {
+                event_id: entry
+                for event_id, entry in event_entry_map.items()
+                if not entry.event.rejected_reason
+            }
 
         return event_entry_map
 
     def _invalidate_get_event_cache(self, event_id):
         self._get_event_cache.invalidate((event_id,))
 
-    def _get_events_from_cache(self, events, allow_rejected, update_metrics=True):
+    def _get_events_from_cache(
+        self, events, update_metrics=True
+    ) -> Dict[str, _EventCacheEntry]:
         """Fetch events from the caches
 
         Args:
             events (Iterable[str]): list of event_ids to fetch
-            allow_rejected (bool): Whether to return events that were rejected
             update_metrics (bool): Whether to update the cache hit ratio metrics
 
         Returns:
@@ -542,10 +550,7 @@ class EventsWorkerStore(SQLBaseStore):
             if not ret:
                 continue
 
-            if allow_rejected or not ret.event.rejected_reason:
-                event_map[event_id] = ret
-            else:
-                event_map[event_id] = None
+            event_map[event_id] = ret
 
         return event_map
 
@@ -672,7 +677,7 @@ class EventsWorkerStore(SQLBaseStore):
                 with PreserveLoggingContext():
                     self.hs.get_reactor().callFromThread(fire, event_list, e)
 
-    async def _get_events_from_db(self, event_ids, allow_rejected=False):
+    async def _get_events_from_db(self, event_ids):
         """Fetch a bunch of events from the database.
 
         Returned events will be added to the cache for future lookups.
@@ -681,9 +686,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         Args:
             event_ids (Iterable[str]): The event_ids of the events to fetch
-
-            allow_rejected (bool): Whether to include rejected events. If False,
-                rejected events are omitted from the response.
 
         Returns:
             Dict[str, _EventCacheEntry]:
@@ -716,9 +718,6 @@ class EventsWorkerStore(SQLBaseStore):
             assert row["event_id"] == event_id
 
             rejected_reason = row["rejected_reason"]
-
-            if not allow_rejected and rejected_reason:
-                continue
 
             # If the event or metadata cannot be parsed, log the error and act
             # as if the event is unknown.
