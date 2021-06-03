@@ -35,6 +35,11 @@ from synapse.types import JsonDict
 
 logger = logging.getLogger(__name__)
 
+# Send join responses can be huge, so we set a separate limit here. The response
+# is parsed in a streaming manner, which helps alleviate the issue of memory
+# usage a bit.
+MAX_RESPONSE_SIZE_SEND_JOIN = 500 * 1024 * 1024
+
 
 class TransportLayerClient:
     """Sends federation HTTP requests to other servers"""
@@ -261,6 +266,7 @@ class TransportLayerClient:
             path=path,
             data=content,
             parser=SendJoinParser(room_version, v1_api=True),
+            max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
         return response
@@ -276,6 +282,7 @@ class TransportLayerClient:
             path=path,
             data=content,
             parser=SendJoinParser(room_version, v1_api=False),
+            max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
         return response
