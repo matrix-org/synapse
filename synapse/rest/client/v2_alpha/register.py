@@ -400,6 +400,7 @@ class RegisterRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
         self._registration_enabled = self.hs.config.enable_registration
+        self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
@@ -425,11 +426,14 @@ class RegisterRestServlet(RestServlet):
                 "Do not understand membership kind: %s" % (kind.decode("utf8"),)
             )
 
-        # Check if this registration should also issue a refresh token, as per
-        # MSC2918
-        should_issue_refresh_token = parse_boolean(
-            request, name="org.matrix.msc2918.refresh_token", default=False
-        )
+        if self._msc2918_enabled:
+            # Check if this registration should also issue a refresh token, as
+            # per MSC2918
+            should_issue_refresh_token = parse_boolean(
+                request, name="org.matrix.msc2918.refresh_token", default=False
+            )
+        else:
+            should_issue_refresh_token = False
 
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.

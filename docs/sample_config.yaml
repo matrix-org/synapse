@@ -1176,10 +1176,6 @@ url_preview_accept_language:
 #
 #session_lifetime: 24h
 
-# MSC2918
-# TODO: docs
-#access_token_lifetime: 5m
-
 # The user must provide all of the below types of 3PID when registering.
 #
 #registrations_require_3pid:

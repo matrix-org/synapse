@@ -84,6 +84,7 @@ class LoginRestServlet(RestServlet):
         self.cas_enabled = hs.config.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
         self._msc2858_enabled = hs.config.experimental.msc2858_enabled
+        self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self.auth = hs.get_auth()
 
@@ -159,10 +160,14 @@ class LoginRestServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest):
         login_submission = parse_json_object_from_request(request)
 
-        # Check if this login should also issue a refresh token, as per MSC2918
-        should_issue_refresh_token = parse_boolean(
-            request, name=LoginRestServlet.REFRESH_TOKEN_PARAM, default=False
-        )
+        if self._msc2918_enabled:
+            # Check if this login should also issue a refresh token, as per
+            # MSC2918
+            should_issue_refresh_token = parse_boolean(
+                request, name=LoginRestServlet.REFRESH_TOKEN_PARAM, default=False
+            )
+        else:
+            should_issue_refresh_token = False
 
         try:
             if login_submission["type"] == LoginRestServlet.APPSERVICE_TYPE:
@@ -595,7 +600,8 @@ class CasTicketServlet(RestServlet):
 
 def register_servlets(hs, http_server):
     LoginRestServlet(hs).register(http_server)
-    RefreshTokenServlet(hs).register(http_server)
+    if hs.config.access_token_lifetime is not None:
+        RefreshTokenServlet(hs).register(http_server)
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasTicketServlet(hs).register(http_server)
