@@ -794,17 +794,19 @@ class AuthHandler(BaseHandler):
 
         # Verify the token signature first before looking up the token
         if not self._verify_refresh_token(refresh_token):
-            raise SynapseError(400, "invalid refresh token")
+            raise SynapseError(401, "invalid refresh token", Codes.UNKNOWN_TOKEN)
 
         existing_token = await self.store.lookup_refresh_token(refresh_token)
         if existing_token is None:
-            raise SynapseError(400, "refresh token does not exist")
+            raise SynapseError(401, "refresh token does not exist", Codes.UNKNOWN_TOKEN)
 
         if (
             existing_token.has_next_access_token_been_used
             or existing_token.has_next_refresh_token_been_refreshed
         ):
-            raise SynapseError(400, "refresh token isn't valid anymore")
+            raise SynapseError(
+                401, "refresh token isn't valid anymore", Codes.UNKNOWN_TOKEN
+            )
 
         (
             new_refresh_token,
