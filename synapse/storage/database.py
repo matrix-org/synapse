@@ -744,7 +744,7 @@ class DatabasePool:
                     if self.engine.is_connection_closed(conn):
                         logger.debug("Reconnecting closed database connection")
                         conn.reconnect()
-                        opentracing.log_kv({"message", "reconnected"})
+                        opentracing.log_kv({"message": "reconnected"})
 
                     try:
                         if db_autocommit:
