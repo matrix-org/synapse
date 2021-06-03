@@ -1,6 +1,6 @@
 # Synapse Documentation
 
-**The documentation is currently hosted [here](https://matrix-org.github.com/synapse).**
+**The documentation is currently hosted [here](https://matrix-org.github.io/synapse).**
 Please update any links to point to the new website instead.
 
 ## About
@@ -8,7 +8,7 @@ Please update any links to point to the new website instead.
 This directory currently holds a series of markdown files documenting how to install, use
 and develop Synapse, the reference Matrix homeserver. The documentation is readable directly
 from this repository, but it is recommended to instead browse through the
-[website](https://matrix-org.github.com/synapse) for easier discoverability.
+[website](https://matrix-org.github.io/synapse) for easier discoverability.
 
 ## Adding to the documentation
 
