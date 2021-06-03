@@ -793,7 +793,7 @@ class AuthHandler(BaseHandler):
         """
 
         # Verify the token signature first before looking up the token
-        if not self.verify_refresh_token(refresh_token):
+        if not self._verify_refresh_token(refresh_token):
             raise SynapseError(400, "invalid refresh token")
 
         existing_token = await self.store.lookup_refresh_token(refresh_token)
@@ -823,7 +823,7 @@ class AuthHandler(BaseHandler):
         )
         return access_token, new_refresh_token
 
-    def verify_refresh_token(self, token: str) -> bool:
+    def _verify_refresh_token(self, token: str) -> bool:
         """
         Verifies the shape of a refresh token.
 

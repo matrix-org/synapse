@@ -53,6 +53,7 @@ class TokenLookupResult:
         valid_until_ms: The timestamp the token expires, if any.
         token_owner: The "owner" of the token. This is either the same as the
             user, or a server admin who is logged in as the user.
+        token_used: True if this token was used at least once in a request.
     """
 
     user_id = attr.ib(type=str)
@@ -72,12 +73,25 @@ class TokenLookupResult:
 
 @attr.s(frozen=True, slots=True)
 class RefreshTokenLookupResult:
+    """Result of looking up a refresh token."""
+
     user_id = attr.ib(type=str)
+    """The user this token belongs to."""
+
     device_id = attr.ib(type=str)
+    """The device associated with this refresh token."""
+
     token_id = attr.ib(type=int)
+    """The ID of this refresh token."""
+
     next_token_id = attr.ib(type=Optional[int])
+    """The ID of the refresh token which replaced this one."""
+
     has_next_refresh_token_been_refreshed = attr.ib(type=bool)
+    """True if the next refresh token was used for another refresh."""
+
     has_next_access_token_been_used = attr.ib(type=bool)
+    """True if the next access token was already used at least once."""
 
 
 class RegistrationWorkerStore(CacheInvalidationWorkerStore):
@@ -1085,7 +1099,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def mark_access_token_as_used(self, token_id: int) -> None:
-        """Mark the access token as used, which invalidates the old refresh token.
+        """
+        Mark the access token as used, which invalidates the refresh token used
+        to obtain it.
 
         Args:
             token_id: The ID of the access token to update.
@@ -1140,6 +1156,15 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
 
     async def replace_refresh_token(self, token_id: int, next_token_id: int) -> None:
+        """
+        Set the successor of a refresh token, removing the existing successor
+        if any.
+
+        Args:
+            token_id: ID of the refresh token to update.
+            next_token_id: ID of its successor.
+        """
+
         def _replace_refresh_token_txn(txn) -> None:
             # First check if there was an existing refresh token
             old_next_token_id = self.db_pool.simple_select_one_onecol_txn(
@@ -1377,8 +1402,11 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         Args:
             user_id: The user ID.
             token: The new access token to add.
-            device_id: ID of the device to associate with the access token
+            device_id: ID of the device to associate with the access token.
             valid_until_ms: when the token is valid until. None for no expiry.
+            puppets_user_id
+            refresh_token_id: ID of the refresh token generated alongside this
+                access token.
         Raises:
             StoreError if there was a problem adding this.
         Returns:
@@ -1410,6 +1438,17 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         token: str,
         device_id: Optional[str],
     ) -> int:
+        """Adds a refresh token for the given user.
+
+        Args:
+            user_id: The user ID.
+            token: The new access token to add.
+            device_id: ID of the device to associate with the refresh token.
+        Raises:
+            StoreError if there was a problem adding this.
+        Returns:
+            The token ID
+        """
         next_id = self._refresh_tokens_id_gen.get_next()
 
         await self.db_pool.simple_insert(
@@ -1421,7 +1460,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "token": token,
                 "next_token_id": None,
             },
-            desc="add_access_token_to_user",
+            desc="add_refresh_token_to_user",
         )
 
         return next_id

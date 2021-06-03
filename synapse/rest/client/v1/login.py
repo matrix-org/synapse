@@ -253,8 +253,8 @@ class LoginRestServlet(RestServlet):
 
         Args:
             login_submission:
-            should_issue_refresh_token: Wheter this login should issue a
-                refresh token alongside the access token.
+            should_issue_refresh_token: True if this login should issue
+                a refresh token alongside the access token.
 
         Returns:
             HTTP response
@@ -306,8 +306,8 @@ class LoginRestServlet(RestServlet):
             ratelimit: Whether to ratelimit the login request.
             auth_provider_id: The SSO IdP the user used, if any (just used for the
                 prometheus metrics).
-            should_issue_refresh_token: Wheter this login should issue a
-                refresh token alongside the access token.
+            should_issue_refresh_token: True if this login should issue
+                a refresh token alongside the access token.
 
         Returns:
             result: Dictionary of account information after successful login.
@@ -369,8 +369,8 @@ class LoginRestServlet(RestServlet):
 
         Args:
             login_submission: The JSON request body.
-            should_issue_refresh_token: Wheter this login should issue a
-                refresh token alongside the access token.
+            should_issue_refresh_token: True if this login should issue
+                a refresh token alongside the access token.
 
         Returns:
             The body of the JSON response.
