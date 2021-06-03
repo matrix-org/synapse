@@ -47,6 +47,7 @@ from synapse.http.servlet import (
 )
 from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
+from synapse.types import JsonDict
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -708,9 +709,9 @@ class RegisterRestServlet(RestServlet):
 
     async def _create_registration_details(
         self,
-        user_id,
-        params,
-        is_appservice_ghost=False,
+        user_id: str,
+        params: JsonDict,
+        is_appservice_ghost: bool = False,
         should_issue_refresh_token: bool = False,
     ):
         """Complete registration of newly-registered user
@@ -718,9 +719,12 @@ class RegisterRestServlet(RestServlet):
         Allocates device_id if one was not given; also creates access_token.
 
         Args:
-            (str) user_id: full canonical @user:id
-            (object) params: registration parameters, from which we pull
-                device_id, initial_device_name and inhibit_login
+            user_id: full canonical @user:id
+            params: registration parameters, from which we pull device_id,
+                initial_device_name and inhibit_login
+            is_appservice_ghost
+            should_issue_refresh_token: True if this registration should issue
+                a refresh token alongside the access token.
         Returns:
              dictionary for response from /register
         """
