@@ -40,7 +40,6 @@
       - [Spam Checker](spam_checker.md)
       - [Presence Router](presence_router_module.md)
       - [Media Storage Providers]()
-      - [Writing a Module]()
     - [Workers](workers.md)
       - [Using `synctl` with Workers](synctl_workers.md)
       - [Systemd](systemd-with-workers/README.md)
