@@ -73,7 +73,7 @@
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
     - [TCP Replication](tcp_replication.md)
-  - [Feature Documentation](development/feature_documentation/README.md)
+  - [Internal Documentation](development/internal_documentation/README.md)
     - [Single Sign-On]()
       - [SAML](dev/saml.md)
       - [CAS](dev/cas.md)
