@@ -1,0 +1,6 @@
+[Unit]
+Description=Synapse parent target
+After=network.target
+
+[Install]
+WantedBy=multi-user.target
