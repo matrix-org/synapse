@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,9 +17,8 @@ import tempfile
 from binascii import unhexlify
 from io import BytesIO
 from typing import Optional
+from unittest.mock import Mock
 from urllib import parse
-
-from mock import Mock
 
 import attr
 from parameterized import parameterized_class
@@ -30,6 +28,8 @@ from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
 from synapse.logging.context import make_deferred_yieldable
+from synapse.rest import admin
+from synapse.rest.client.v1 import login
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
@@ -37,6 +37,7 @@ from synapse.rest.media.v1.storage_provider import FileStorageProviderBackend
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.utils import default_config
 
 
 class MediaStorageTests(unittest.HomeserverTestCase):
@@ -102,7 +103,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.assertEqual(test_body, body)
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class _TestImage:
     """An image for testing thumbnailing with the expected results
 
@@ -114,13 +115,15 @@ class _TestImage:
             test should just check for success.
         expected_scaled: The expected bytes from scaled thumbnailing, or None if
             test should just check for a valid image returned.
+        expected_found: True if the file should exist on the server, or False if
+            a 404 is expected.
     """
 
     data = attr.ib(type=bytes)
     content_type = attr.ib(type=bytes)
     extension = attr.ib(type=bytes)
-    expected_cropped = attr.ib(type=Optional[bytes])
-    expected_scaled = attr.ib(type=Optional[bytes])
+    expected_cropped = attr.ib(type=Optional[bytes], default=None)
+    expected_scaled = attr.ib(type=Optional[bytes], default=None)
     expected_found = attr.ib(default=True, type=bool)
 
 
@@ -150,6 +153,21 @@ class _TestImage:
                 ),
             ),
         ),
+        # small png with transparency.
+        (
+            _TestImage(
+                unhexlify(
+                    b"89504e470d0a1a0a0000000d49484452000000010000000101000"
+                    b"00000376ef9240000000274524e5300010194fdae0000000a4944"
+                    b"4154789c636800000082008177cd72b60000000049454e44ae426"
+                    b"082"
+                ),
+                b"image/png",
+                b".png",
+                # Note that we don't check the output since it varies across
+                # different versions of Pillow.
+            ),
+        ),
         # small lossless webp
         (
             _TestImage(
@@ -159,12 +177,17 @@ class _TestImage:
                 ),
                 b"image/webp",
                 b".webp",
-                None,
-                None,
             ),
         ),
         # an empty file
-        (_TestImage(b"", b"image/gif", b".gif", None, None, False,),),
+        (
+            _TestImage(
+                b"",
+                b"image/gif",
+                b".gif",
+                expected_found=False,
+            ),
+        ),
     ],
 )
 class MediaRepoTests(unittest.HomeserverTestCase):
@@ -219,9 +242,11 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
 
-        self.media_repo = hs.get_media_repository_resource()
-        self.download_resource = self.media_repo.children[b"download"]
-        self.thumbnail_resource = self.media_repo.children[b"thumbnail"]
+        media_resource = hs.get_media_repository_resource()
+        self.download_resource = media_resource.children[b"download"]
+        self.thumbnail_resource = media_resource.children[b"thumbnail"]
+        self.store = hs.get_datastore()
+        self.media_repo = hs.get_media_repository()
 
         self.media_id = "example.com/12345"
 
@@ -345,6 +370,67 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         """
         self._test_thumbnail("scale", None, False)
 
+    def test_thumbnail_repeated_thumbnail(self):
+        """Test that fetching the same thumbnail works, and deleting the on disk
+        thumbnail regenerates it.
+        """
+        self._test_thumbnail(
+            "scale", self.test_image.expected_scaled, self.test_image.expected_found
+        )
+
+        if not self.test_image.expected_found:
+            return
+
+        # Fetching again should work, without re-requesting the image from the
+        # remote.
+        params = "?width=32&height=32&method=scale"
+        channel = make_request(
+            self.reactor,
+            FakeSite(self.thumbnail_resource),
+            "GET",
+            self.media_id + params,
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        self.assertEqual(channel.code, 200)
+        if self.test_image.expected_scaled:
+            self.assertEqual(
+                channel.result["body"],
+                self.test_image.expected_scaled,
+                channel.result["body"],
+            )
+
+        # Deleting the thumbnail on disk then re-requesting it should work as
+        # Synapse should regenerate missing thumbnails.
+        origin, media_id = self.media_id.split("/")
+        info = self.get_success(self.store.get_cached_remote_media(origin, media_id))
+        file_id = info["filesystem_id"]
+
+        thumbnail_dir = self.media_repo.filepaths.remote_media_thumbnail_dir(
+            origin, file_id
+        )
+        shutil.rmtree(thumbnail_dir, ignore_errors=True)
+
+        channel = make_request(
+            self.reactor,
+            FakeSite(self.thumbnail_resource),
+            "GET",
+            self.media_id + params,
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        self.assertEqual(channel.code, 200)
+        if self.test_image.expected_scaled:
+            self.assertEqual(
+                channel.result["body"],
+                self.test_image.expected_scaled,
+                channel.result["body"],
+            )
+
     def _test_thumbnail(self, method, expected_body, expected_found):
         params = "?width=32&height=32&method=" + method
         channel = make_request(
@@ -397,4 +483,94 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         self.assertEqual(
             headers.getRawHeaders(b"X-Robots-Tag"),
             [b"noindex, nofollow, noarchive, noimageindex"],
+        )
+
+
+class TestSpamChecker:
+    """A spam checker module that rejects all media that includes the bytes
+    `evil`.
+    """
+
+    def __init__(self, config, api):
+        self.config = config
+        self.api = api
+
+    def parse_config(config):
+        return config
+
+    async def check_event_for_spam(self, foo):
+        return False  # allow all events
+
+    async def user_may_invite(self, inviter_userid, invitee_userid, room_id):
+        return True  # allow all invites
+
+    async def user_may_create_room(self, userid):
+        return True  # allow all room creations
+
+    async def user_may_create_room_alias(self, userid, room_alias):
+        return True  # allow all room aliases
+
+    async def user_may_publish_room(self, userid, room_id):
+        return True  # allow publishing of all rooms
+
+    async def check_media_file_for_spam(self, file_wrapper, file_info) -> bool:
+        buf = BytesIO()
+        await file_wrapper.write_chunks_to(buf.write)
+
+        return b"evil" in buf.getvalue()
+
+
+class SpamCheckerTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        login.register_servlets,
+        admin.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.user = self.register_user("user", "pass")
+        self.tok = self.login("user", "pass")
+
+        # Allow for uploading and downloading to/from the media repo
+        self.media_repo = hs.get_media_repository_resource()
+        self.download_resource = self.media_repo.children[b"download"]
+        self.upload_resource = self.media_repo.children[b"upload"]
+
+    def default_config(self):
+        config = default_config("test")
+
+        config.update(
+            {
+                "spam_checker": [
+                    {
+                        "module": TestSpamChecker.__module__ + ".TestSpamChecker",
+                        "config": {},
+                    }
+                ]
+            }
+        )
+
+        return config
+
+    def test_upload_innocent(self):
+        """Attempt to upload some innocent data that should be allowed."""
+
+        image_data = unhexlify(
+            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+            b"0000001f15c4890000000a49444154789c63000100000500010d"
+            b"0a2db40000000049454e44ae426082"
+        )
+
+        self.helper.upload_media(
+            self.upload_resource, image_data, tok=self.tok, expect_code=200
+        )
+
+    def test_upload_ban(self):
+        """Attempt to upload some data that includes bytes "evil", which should
+        get rejected by the spam checker.
+        """
+
+        data = b"Some evil data"
+
+        self.helper.upload_media(
+            self.upload_resource, data, tok=self.tok, expect_code=400
         )

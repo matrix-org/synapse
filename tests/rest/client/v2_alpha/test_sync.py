@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -388,13 +387,19 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Check that room name changes increase the unread counter.
         self.helper.send_state(
-            self.room_id, "m.room.name", {"name": "my super room"}, tok=self.tok2,
+            self.room_id,
+            "m.room.name",
+            {"name": "my super room"},
+            tok=self.tok2,
         )
         self._check_unread_count(1)
 
         # Check that room topic changes increase the unread counter.
         self.helper.send_state(
-            self.room_id, "m.room.topic", {"topic": "welcome!!!"}, tok=self.tok2,
+            self.room_id,
+            "m.room.topic",
+            {"topic": "welcome!!!"},
+            tok=self.tok2,
         )
         self._check_unread_count(2)
 
@@ -404,7 +409,10 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Check that custom events with a body increase the unread counter.
         self.helper.send_event(
-            self.room_id, "org.matrix.custom_type", {"body": "hello"}, tok=self.tok2,
+            self.room_id,
+            "org.matrix.custom_type",
+            {"body": "hello"},
+            tok=self.tok2,
         )
         self._check_unread_count(4)
 
@@ -443,14 +451,18 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         """Syncs and compares the unread count with the expected value."""
 
         channel = self.make_request(
-            "GET", self.url % self.next_batch, access_token=self.tok,
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
         )
 
         self.assertEqual(channel.code, 200, channel.json_body)
 
         room_entry = channel.json_body["rooms"]["join"][self.room_id]
         self.assertEqual(
-            room_entry["org.matrix.msc2654.unread_count"], expected_count, room_entry,
+            room_entry["org.matrix.msc2654.unread_count"],
+            expected_count,
+            room_entry,
         )
 
         # Store the next batch for the next request.

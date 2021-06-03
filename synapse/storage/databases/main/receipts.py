@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -160,7 +159,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             room_id: List of room_ids.
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -189,7 +188,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
         Args:
             room_ids: The room id.
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -208,8 +207,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
     async def _get_linearized_receipts_for_room(
         self, room_id: str, to_key: int, from_key: Optional[int] = None
     ) -> List[dict]:
-        """See get_linearized_receipts_for_room
-        """
+        """See get_linearized_receipts_for_room"""
 
         def f(txn):
             if from_key:
@@ -304,7 +302,9 @@ class ReceiptsWorkerStore(SQLBaseStore):
         }
         return results
 
-    @cached(num_args=2,)
+    @cached(
+        num_args=2,
+    )
     async def get_linearized_receipts_for_all_rooms(
         self, to_key: int, from_key: Optional[int] = None
     ) -> Dict[str, JsonDict]:
@@ -312,7 +312,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         to a limit of the latest 100 read receipts.
 
         Args:
-            to_key: Max stream id to fetch receipts upto.
+            to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
 
@@ -460,7 +460,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
 
     def invalidate_caches_for_receipt(self, room_id, receipt_type, user_id):
         self.get_receipts_for_user.invalidate((user_id, receipt_type))
-        self._get_linearized_receipts_for_room.invalidate_many((room_id,))
+        self._get_linearized_receipts_for_room.invalidate((room_id,))
         self.get_last_receipt_event_id_for_user.invalidate(
             (user_id, room_id, receipt_type)
         )
@@ -659,9 +659,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         )
         txn.call_after(self.get_receipts_for_user.invalidate, (user_id, receipt_type))
         # FIXME: This shouldn't invalidate the whole cache
-        txn.call_after(
-            self._get_linearized_receipts_for_room.invalidate_many, (room_id,)
-        )
+        txn.call_after(self._get_linearized_receipts_for_room.invalidate, (room_id,))
 
         self.db_pool.simple_delete_txn(
             txn,

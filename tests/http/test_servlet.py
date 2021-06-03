@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,7 @@
 # limitations under the License.
 import json
 from io import BytesIO
-
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import (

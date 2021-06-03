@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -83,7 +82,10 @@ class DeleteDevicesRestServlet(RestServlet):
         assert_params_in_dict(body, ["devices"])
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, request, body, "remove device(s) from your account",
+            requester,
+            request,
+            body,
+            "remove device(s) from your account",
         )
 
         await self.device_handler.delete_devices(
@@ -129,7 +131,10 @@ class DeviceRestServlet(RestServlet):
                 raise
 
         await self.auth_handler.validate_user_via_ui_auth(
-            requester, request, body, "remove a device from your account",
+            requester,
+            request,
+            body,
+            "remove a device from your account",
         )
 
         await self.device_handler.delete_device(requester.user.to_string(), device_id)
@@ -206,7 +211,9 @@ class DehydratedDeviceServlet(RestServlet):
 
         if "device_data" not in submission:
             raise errors.SynapseError(
-                400, "device_data missing", errcode=errors.Codes.MISSING_PARAM,
+                400,
+                "device_data missing",
+                errcode=errors.Codes.MISSING_PARAM,
             )
         elif not isinstance(submission["device_data"], dict):
             raise errors.SynapseError(
@@ -259,11 +266,15 @@ class ClaimDehydratedDeviceServlet(RestServlet):
 
         if "device_id" not in submission:
             raise errors.SynapseError(
-                400, "device_id missing", errcode=errors.Codes.MISSING_PARAM,
+                400,
+                "device_id missing",
+                errcode=errors.Codes.MISSING_PARAM,
             )
         elif not isinstance(submission["device_id"], str):
             raise errors.SynapseError(
-                400, "device_id must be a string", errcode=errors.Codes.INVALID_PARAM,
+                400,
+                "device_id must be a string",
+                errcode=errors.Codes.INVALID_PARAM,
             )
 
         result = await self.device_handler.rehydrate_device(

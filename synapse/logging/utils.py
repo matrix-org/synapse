@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -43,8 +42,7 @@ def _log_debug_as_f(f, msg, msg_args):
 
 
 def log_function(f):
-    """ Function decorator that logs every call to that function.
-    """
+    """Function decorator that logs every call to that function."""
     func_name = f.__name__
 
     @wraps(f)

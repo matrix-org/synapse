@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -24,11 +23,20 @@
 import abc
 import functools
 import logging
-import os
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    List,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
-import twisted.internet.base
 import twisted.internet.tcp
+from twisted.internet import defer
 from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -42,6 +50,7 @@ from synapse.crypto import context_factory
 from synapse.crypto.context_factory import RegularPolicyForHTTPS
 from synapse.crypto.keyring import Keyring
 from synapse.events.builder import EventBuilderFactory
+from synapse.events.presence_router import PresenceRouter
 from synapse.events.spamcheck import SpamChecker
 from synapse.events.third_party_rules import ThirdPartyEventRules
 from synapse.events.utils import EventClientSerializer
@@ -51,7 +60,7 @@ from synapse.federation.federation_server import (
     FederationServer,
 )
 from synapse.federation.send_queue import FederationRemoteSendQueue
-from synapse.federation.sender import FederationSender
+from synapse.federation.sender import AbstractFederationSender, FederationSender
 from synapse.federation.transport.client import TransportLayerClient
 from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionRenewer
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
@@ -61,13 +70,14 @@ from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
-from synapse.handlers.cas_handler import CasHandler
+from synapse.handlers.cas import CasHandler
 from synapse.handlers.deactivate_account import DeactivateAccountHandler
 from synapse.handlers.device import DeviceHandler, DeviceWorkerHandler
 from synapse.handlers.devicemessage import DeviceMessageHandler
 from synapse.handlers.directory import DirectoryHandler
 from synapse.handlers.e2e_keys import E2eKeysHandler
 from synapse.handlers.e2e_room_keys import E2eRoomKeysHandler
+from synapse.handlers.event_auth import EventAuthHandler
 from synapse.handlers.events import EventHandler, EventStreamHandler
 from synapse.handlers.federation import FederationHandler
 from synapse.handlers.groups_local import GroupsLocalHandler, GroupsLocalWorkerHandler
@@ -76,7 +86,11 @@ from synapse.handlers.initial_sync import InitialSyncHandler
 from synapse.handlers.message import EventCreationHandler, MessageHandler
 from synapse.handlers.pagination import PaginationHandler
 from synapse.handlers.password_policy import PasswordPolicyHandler
-from synapse.handlers.presence import PresenceHandler
+from synapse.handlers.presence import (
+    BasePresenceHandler,
+    PresenceHandler,
+    WorkerPresenceHandler,
+)
 from synapse.handlers.profile import ProfileHandler
 from synapse.handlers.read_marker import ReadMarkerHandler
 from synapse.handlers.receipts import ReceiptsHandler
@@ -87,10 +101,12 @@ from synapse.handlers.room import (
     RoomShutdownHandler,
 )
 from synapse.handlers.room_list import RoomListHandler
-from synapse.handlers.room_member import RoomMemberMasterHandler
+from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.search import SearchHandler
+from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
+from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -103,6 +119,7 @@ from synapse.notifier import Notifier
 from synapse.push.action_generator import ActionGenerator
 from synapse.push.pusherpool import PusherPool
 from synapse.replication.tcp.client import ReplicationDataHandler
+from synapse.replication.tcp.external_cache import ExternalCache
 from synapse.replication.tcp.handler import ReplicationCommandHandler
 from synapse.replication.tcp.resource import ReplicationStreamer
 from synapse.replication.tcp.streams import STREAMS_MAP, Stream
@@ -110,7 +127,6 @@ from synapse.rest.media.v1.media_repository import (
     MediaRepository,
     MediaRepositoryResource,
 )
-from synapse.secrets import Secrets
 from synapse.server_notices.server_notices_manager import ServerNoticesManager
 from synapse.server_notices.server_notices_sender import ServerNoticesSender
 from synapse.server_notices.worker_server_notices_sender import (
@@ -119,7 +135,7 @@ from synapse.server_notices.worker_server_notices_sender import (
 from synapse.state import StateHandler, StateResolutionHandler
 from synapse.storage import Databases, DataStore, Storage
 from synapse.streams.events import EventSources
-from synapse.types import DomainSpecificString
+from synapse.types import DomainSpecificString, ISynapseReactor
 from synapse.util import Clock
 from synapse.util.distributor import Distributor
 from synapse.util.ratelimitutils import FederationRateLimiter
@@ -128,8 +144,10 @@ from synapse.util.stringutils import random_string
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    from synapse.handlers.oidc_handler import OidcHandler
-    from synapse.handlers.saml_handler import SamlHandler
+    from txredisapi import RedisProtocol
+
+    from synapse.handlers.oidc import OidcHandler
+    from synapse.handlers.saml import SamlHandler
 
 
 T = TypeVar("T", bound=Callable[..., Any])
@@ -235,7 +253,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         self.start_time = None  # type: Optional[int]
 
         self._instance_id = random_string(5)
-        self._instance_name = config.worker_name or "master"
+        self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
@@ -269,6 +287,14 @@ class HomeServer(metaclass=abc.ABCMeta):
         if self.config.run_background_tasks:
             self.setup_background_tasks()
 
+    def start_listening(self) -> None:
+        """Start the HTTP, manhole, metrics, etc listeners
+
+        Does nothing in this base class; overridden in derived classes to start the
+        appropriate listeners.
+        """
+        pass
+
     def setup_background_tasks(self) -> None:
         """
         Some handlers have side effects on instantiation (like registering
@@ -278,7 +304,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         for i in self.REQUIRED_ON_BACKGROUND_TASK_STARTUP:
             getattr(self, "get_" + i + "_handler")()
 
-    def get_reactor(self) -> twisted.internet.base.ReactorBase:
+    def get_reactor(self) -> ISynapseReactor:
         """
         Fetch the Twisted reactor in use by this HomeServer.
         """
@@ -306,9 +332,6 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         return self.datastores
 
-    def get_config(self) -> HomeServerConfig:
-        return self.config
-
     @cache_in_self
     def get_distributor(self) -> Distributor:
         return Distributor()
@@ -316,6 +339,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_registration_ratelimiter(self) -> Ratelimiter:
         return Ratelimiter(
+            store=self.get_datastore(),
             clock=self.get_clock(),
             rate_hz=self.config.rc_registration.per_second,
             burst_count=self.config.rc_registration.burst_count,
@@ -339,11 +363,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        return (
-            InsecureInterceptableContextFactory()
-            if self.config.use_insecure_ssl_client_just_for_testing_do_not_use
-            else RegularPolicyForHTTPS()
-        )
+        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+            return InsecureInterceptableContextFactory()
+        return RegularPolicyForHTTPS()
 
     @cache_in_self
     def get_simple_http_client(self) -> SimpleHttpClient:
@@ -357,11 +379,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         An HTTP client that uses configured HTTP(S) proxies.
         """
-        return SimpleHttpClient(
-            self,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
-        )
+        return SimpleHttpClient(self, use_proxy=True)
 
     @cache_in_self
     def get_proxied_blacklisted_http_client(self) -> SimpleHttpClient:
@@ -373,8 +391,7 @@ class HomeServer(metaclass=abc.ABCMeta):
             self,
             ip_whitelist=self.config.ip_range_whitelist,
             ip_blacklist=self.config.ip_range_blacklist,
-            http_proxy=os.getenvb(b"http_proxy"),
-            https_proxy=os.getenvb(b"HTTPS_PROXY"),
+            use_proxy=True,
         )
 
     @cache_in_self
@@ -396,7 +413,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomShutdownHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> sendmail:
+    def get_sendmail(self) -> Callable[..., defer.Deferred]:
         return sendmail
 
     @cache_in_self
@@ -408,13 +425,29 @@ class HomeServer(metaclass=abc.ABCMeta):
         return StateResolutionHandler(self)
 
     @cache_in_self
-    def get_presence_handler(self) -> PresenceHandler:
-        return PresenceHandler(self)
+    def get_presence_handler(self) -> BasePresenceHandler:
+        if self.get_instance_name() in self.config.worker.writers.presence:
+            return PresenceHandler(self)
+        else:
+            return WorkerPresenceHandler(self)
 
     @cache_in_self
-    def get_typing_handler(self):
+    def get_typing_writer_handler(self) -> TypingWriterHandler:
         if self.config.worker.writers.typing == self.get_instance_name():
             return TypingWriterHandler(self)
+        else:
+            raise Exception("Workers cannot write typing")
+
+    @cache_in_self
+    def get_presence_router(self) -> PresenceRouter:
+        return PresenceRouter(self)
+
+    @cache_in_self
+    def get_typing_handler(self) -> FollowerTypingHandler:
+        if self.config.worker.writers.typing == self.get_instance_name():
+            # Use get_typing_writer_handler to ensure that we use the same
+            # cached version.
+            return self.get_typing_writer_handler()
         else:
             return FollowerTypingHandler(self)
 
@@ -518,6 +551,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         return SearchHandler(self)
 
     @cache_in_self
+    def get_send_email_handler(self) -> SendEmailHandler:
+        return SendEmailHandler(self)
+
+    @cache_in_self
     def get_set_password_handler(self) -> SetPasswordHandler:
         return SetPasswordHandler(self)
 
@@ -556,7 +593,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return TransportLayerClient(self)
 
     @cache_in_self
-    def get_federation_sender(self):
+    def get_federation_sender(self) -> AbstractFederationSender:
         if self.should_send_federation():
             return FederationSender(self)
         elif not self.config.worker_app:
@@ -585,7 +622,9 @@ class HomeServer(metaclass=abc.ABCMeta):
         return UserDirectoryHandler(self)
 
     @cache_in_self
-    def get_groups_local_handler(self):
+    def get_groups_local_handler(
+        self,
+    ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
         if self.config.worker_app:
             return GroupsLocalWorkerHandler(self)
         else:
@@ -607,10 +646,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return GroupAttestionRenewer(self)
 
     @cache_in_self
-    def get_secrets(self) -> Secrets:
-        return Secrets()
-
-    @cache_in_self
     def get_stats_handler(self) -> StatsHandler:
         return StatsHandler(self)
 
@@ -623,7 +658,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         return ThirdPartyEventRules(self)
 
     @cache_in_self
-    def get_room_member_handler(self):
+    def get_room_member_handler(self) -> RoomMemberHandler:
         if self.config.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
@@ -633,13 +668,13 @@ class HomeServer(metaclass=abc.ABCMeta):
         return FederationHandlerRegistry(self)
 
     @cache_in_self
-    def get_server_notices_manager(self):
+    def get_server_notices_manager(self) -> ServerNoticesManager:
         if self.config.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
-    def get_server_notices_sender(self):
+    def get_server_notices_sender(self) -> WorkerServerNoticesSender:
         if self.config.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
@@ -670,13 +705,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_saml_handler(self) -> "SamlHandler":
-        from synapse.handlers.saml_handler import SamlHandler
+        from synapse.handlers.saml import SamlHandler
 
         return SamlHandler(self)
 
     @cache_in_self
     def get_oidc_handler(self) -> "OidcHandler":
-        from synapse.handlers.oidc_handler import OidcHandler
+        from synapse.handlers.oidc import OidcHandler
 
         return OidcHandler(self)
 
@@ -716,12 +751,41 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_account_data_handler(self) -> AccountDataHandler:
         return AccountDataHandler(self)
 
-    async def remove_pusher(self, app_id: str, push_key: str, user_id: str):
-        return await self.get_pusherpool().remove_pusher(app_id, push_key, user_id)
+    @cache_in_self
+    def get_space_summary_handler(self) -> SpaceSummaryHandler:
+        return SpaceSummaryHandler(self)
+
+    @cache_in_self
+    def get_event_auth_handler(self) -> EventAuthHandler:
+        return EventAuthHandler(self)
+
+    @cache_in_self
+    def get_external_cache(self) -> ExternalCache:
+        return ExternalCache(self)
+
+    @cache_in_self
+    def get_outbound_redis_connection(self) -> Optional["RedisProtocol"]:
+        if not self.config.redis.redis_enabled:
+            return None
+
+        # We only want to import redis module if we're using it, as we have
+        # `txredisapi` as an optional dependency.
+        from synapse.replication.tcp.redis import lazyConnection
+
+        logger.info(
+            "Connecting to redis (host=%r port=%r) for external cache",
+            self.config.redis_host,
+            self.config.redis_port,
+        )
+
+        return lazyConnection(
+            hs=self,
+            host=self.config.redis_host,
+            port=self.config.redis_port,
+            password=self.config.redis.redis_password,
+            reconnect=True,
+        )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation and (
-            not self.config.worker_app
-            or self.config.worker_app == "synapse.app.federation_sender"
-        )
+        return self.config.send_federation

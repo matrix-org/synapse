@@ -18,22 +18,21 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 DISTS = (
-    "debian:stretch",
     "debian:buster",
     "debian:bullseye",
     "debian:sid",
-    "ubuntu:xenial",
-    "ubuntu:bionic",
-    "ubuntu:focal",
-    "ubuntu:groovy",
+    "ubuntu:bionic",  # 18.04 LTS (our EOL forced by Py36 on 2021-12-23)
+    "ubuntu:focal",  # 20.04 LTS (our EOL forced by Py38 on 2024-10-14)
+    "ubuntu:groovy",  # 20.10 (EOL 2021-07-07)
+    "ubuntu:hirsute",  # 21.04 (EOL 2022-01-05)
 )
 
-DESC = '''\
+DESC = """\
 Builds .debs for synapse, using a Docker image for the build environment.
 
 By default, builds for all known distributions, but a list of distributions
 can be passed on the commandline for debugging.
-'''
+"""
 
 
 class Builder(object):
@@ -43,21 +42,21 @@ class Builder(object):
         self._lock = threading.Lock()
         self._failed = False
 
-    def run_build(self, dist):
+    def run_build(self, dist, skip_tests=False):
         """Build deb for a single distribution"""
 
         if self._failed:
-            print("not building %s due to earlier failure" % (dist, ))
+            print("not building %s due to earlier failure" % (dist,))
             raise Exception("failed")
 
         try:
-            self._inner_build(dist)
+            self._inner_build(dist, skip_tests)
         except Exception as e:
             print("build of %s failed: %s" % (dist, e), file=sys.stderr)
             self._failed = True
             raise
 
-    def _inner_build(self, dist):
+    def _inner_build(self, dist, skip_tests=False):
         projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
         os.chdir(projdir)
 
@@ -69,47 +68,65 @@ class Builder(object):
         # we tend to get source packages which are full of debs. (We could hack
         # around that with more magic in the build_debian.sh script, but that
         # doesn't solve the problem for natively-run dpkg-buildpakage).
-        debsdir = os.path.join(projdir, '../debs')
+        debsdir = os.path.join(projdir, "../debs")
         os.makedirs(debsdir, exist_ok=True)
 
         if self.redirect_stdout:
-            logfile = os.path.join(debsdir, "%s.buildlog" % (tag, ))
+            logfile = os.path.join(debsdir, "%s.buildlog" % (tag,))
             print("building %s: directing output to %s" % (dist, logfile))
             stdout = open(logfile, "w")
         else:
             stdout = None
 
         # first build a docker image for the build environment
-        subprocess.check_call([
-            "docker", "build",
-            "--tag", "dh-venv-builder:" + tag,
-            "--build-arg", "distro=" + dist,
-            "-f", "docker/Dockerfile-dhvirtualenv",
-            "docker",
-        ], stdout=stdout, stderr=subprocess.STDOUT)
+        subprocess.check_call(
+            [
+                "docker",
+                "build",
+                "--tag",
+                "dh-venv-builder:" + tag,
+                "--build-arg",
+                "distro=" + dist,
+                "-f",
+                "docker/Dockerfile-dhvirtualenv",
+                "docker",
+            ],
+            stdout=stdout,
+            stderr=subprocess.STDOUT,
+        )
 
         container_name = "synapse_build_" + tag
         with self._lock:
             self.active_containers.add(container_name)
 
         # then run the build itself
-        subprocess.check_call([
-            "docker", "run",
-            "--rm",
-            "--name", container_name,
-            "--volume=" + projdir + ":/synapse/source:ro",
-            "--volume=" + debsdir + ":/debs",
-            "-e", "TARGET_USERID=%i" % (os.getuid(), ),
-            "-e", "TARGET_GROUPID=%i" % (os.getgid(), ),
-            "dh-venv-builder:" + tag,
-        ], stdout=stdout, stderr=subprocess.STDOUT)
+        subprocess.check_call(
+            [
+                "docker",
+                "run",
+                "--rm",
+                "--name",
+                container_name,
+                "--volume=" + projdir + ":/synapse/source:ro",
+                "--volume=" + debsdir + ":/debs",
+                "-e",
+                "TARGET_USERID=%i" % (os.getuid(),),
+                "-e",
+                "TARGET_GROUPID=%i" % (os.getgid(),),
+                "-e",
+                "DEB_BUILD_OPTIONS=%s" % ("nocheck" if skip_tests else ""),
+                "dh-venv-builder:" + tag,
+            ],
+            stdout=stdout,
+            stderr=subprocess.STDOUT,
+        )
 
         with self._lock:
             self.active_containers.remove(container_name)
 
         if stdout is not None:
             stdout.close()
-            print("Completed build of %s" % (dist, ))
+            print("Completed build of %s" % (dist,))
 
     def kill_containers(self):
         with self._lock:
@@ -117,40 +134,56 @@ class Builder(object):
 
         for c in active:
             print("killing container %s" % (c,))
-            subprocess.run([
-                "docker", "kill", c,
-            ], stdout=subprocess.DEVNULL)
+            subprocess.run(
+                [
+                    "docker",
+                    "kill",
+                    c,
+                ],
+                stdout=subprocess.DEVNULL,
+            )
             with self._lock:
                 self.active_containers.remove(c)
 
 
-def run_builds(dists, jobs=1):
+def run_builds(dists, jobs=1, skip_tests=False):
     builder = Builder(redirect_stdout=(jobs > 1))
 
     def sig(signum, _frame):
         print("Caught SIGINT")
         builder.kill_containers()
+
     signal.signal(signal.SIGINT, sig)
 
     with ThreadPoolExecutor(max_workers=jobs) as e:
-        res = e.map(builder.run_build, dists)
+        res = e.map(lambda dist: builder.run_build(dist, skip_tests), dists)
 
     # make sure we consume the iterable so that exceptions are raised.
-    for r in res:
+    for _ in res:
         pass
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=DESC,
     )
     parser.add_argument(
-        '-j', '--jobs', type=int, default=1,
-        help='specify the number of builds to run in parallel',
+        "-j",
+        "--jobs",
+        type=int,
+        default=1,
+        help="specify the number of builds to run in parallel",
     )
     parser.add_argument(
-        'dist', nargs='*', default=DISTS,
-        help='a list of distributions to build for. Default: %(default)s',
+        "--no-check",
+        action="store_true",
+        help="skip running tests after building",
+    )
+    parser.add_argument(
+        "dist",
+        nargs="*",
+        default=DISTS,
+        help="a list of distributions to build for. Default: %(default)s",
     )
     args = parser.parse_args()
-    run_builds(dists=args.dist, jobs=args.jobs)
+    run_builds(dists=args.dist, jobs=args.jobs, skip_tests=args.no_check)

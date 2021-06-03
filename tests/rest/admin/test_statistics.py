@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -55,7 +54,10 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         If the user is not a server admin, an error 403 is returned.
         """
         channel = self.make_request(
-            "GET", self.url, json.dumps({}), access_token=self.other_user_tok,
+            "GET",
+            self.url,
+            json.dumps({}),
+            access_token=self.other_user_tok,
         )
 
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
@@ -67,7 +69,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         """
         # unkown order_by
         channel = self.make_request(
-            "GET", self.url + "?order_by=bar", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?order_by=bar",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -75,7 +79,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # negative from
         channel = self.make_request(
-            "GET", self.url + "?from=-5", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?from=-5",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -83,7 +89,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # negative limit
         channel = self.make_request(
-            "GET", self.url + "?limit=-5", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?limit=-5",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -91,7 +99,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # negative from_ts
         channel = self.make_request(
-            "GET", self.url + "?from_ts=-1234", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?from_ts=-1234",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -99,7 +109,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # negative until_ts
         channel = self.make_request(
-            "GET", self.url + "?until_ts=-1234", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?until_ts=-1234",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -117,7 +129,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # empty search term
         channel = self.make_request(
-            "GET", self.url + "?search_term=", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?search_term=",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -125,7 +139,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # invalid search order
         channel = self.make_request(
-            "GET", self.url + "?dir=bar", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?dir=bar",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
@@ -138,7 +154,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self._create_users_with_media(10, 2)
 
         channel = self.make_request(
-            "GET", self.url + "?limit=5", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?limit=5",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -154,7 +172,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self._create_users_with_media(20, 2)
 
         channel = self.make_request(
-            "GET", self.url + "?from=5", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?from=5",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -170,7 +190,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self._create_users_with_media(20, 2)
 
         channel = self.make_request(
-            "GET", self.url + "?from=5&limit=10", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?from=5&limit=10",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -190,7 +212,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         #  `next_token` does not appear
         # Number of results is the number of entries
         channel = self.make_request(
-            "GET", self.url + "?limit=20", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?limit=20",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -201,7 +225,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         #  `next_token` does not appear
         # Number of max results is larger than the number of entries
         channel = self.make_request(
-            "GET", self.url + "?limit=21", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?limit=21",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -212,7 +238,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         #  `next_token` does appear
         # Number of max results is smaller than the number of entries
         channel = self.make_request(
-            "GET", self.url + "?limit=19", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?limit=19",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -223,7 +251,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         # Set `from` to value of `next_token` for request remaining entries
         # Check `next_token` does not appear
         channel = self.make_request(
-            "GET", self.url + "?from=19", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?from=19",
+            access_token=self.admin_user_tok,
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -237,7 +267,11 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         if users have no media created
         """
 
-        channel = self.make_request("GET", self.url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(0, channel.json_body["total"])
@@ -264,10 +298,14 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         # order by user_id
         self._order_test("user_id", ["@user_a:test", "@user_b:test", "@user_c:test"])
         self._order_test(
-            "user_id", ["@user_a:test", "@user_b:test", "@user_c:test"], "f",
+            "user_id",
+            ["@user_a:test", "@user_b:test", "@user_c:test"],
+            "f",
         )
         self._order_test(
-            "user_id", ["@user_c:test", "@user_b:test", "@user_a:test"], "b",
+            "user_id",
+            ["@user_c:test", "@user_b:test", "@user_a:test"],
+            "b",
         )
 
         # order by displayname
@@ -275,32 +313,46 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             "displayname", ["@user_c:test", "@user_b:test", "@user_a:test"]
         )
         self._order_test(
-            "displayname", ["@user_c:test", "@user_b:test", "@user_a:test"], "f",
+            "displayname",
+            ["@user_c:test", "@user_b:test", "@user_a:test"],
+            "f",
         )
         self._order_test(
-            "displayname", ["@user_a:test", "@user_b:test", "@user_c:test"], "b",
+            "displayname",
+            ["@user_a:test", "@user_b:test", "@user_c:test"],
+            "b",
         )
 
         # order by media_length
         self._order_test(
-            "media_length", ["@user_a:test", "@user_c:test", "@user_b:test"],
+            "media_length",
+            ["@user_a:test", "@user_c:test", "@user_b:test"],
         )
         self._order_test(
-            "media_length", ["@user_a:test", "@user_c:test", "@user_b:test"], "f",
+            "media_length",
+            ["@user_a:test", "@user_c:test", "@user_b:test"],
+            "f",
         )
         self._order_test(
-            "media_length", ["@user_b:test", "@user_c:test", "@user_a:test"], "b",
+            "media_length",
+            ["@user_b:test", "@user_c:test", "@user_a:test"],
+            "b",
         )
 
         # order by media_count
         self._order_test(
-            "media_count", ["@user_a:test", "@user_c:test", "@user_b:test"],
+            "media_count",
+            ["@user_a:test", "@user_c:test", "@user_b:test"],
         )
         self._order_test(
-            "media_count", ["@user_a:test", "@user_c:test", "@user_b:test"], "f",
+            "media_count",
+            ["@user_a:test", "@user_c:test", "@user_b:test"],
+            "f",
         )
         self._order_test(
-            "media_count", ["@user_b:test", "@user_c:test", "@user_a:test"], "b",
+            "media_count",
+            ["@user_b:test", "@user_c:test", "@user_a:test"],
+            "b",
         )
 
     def test_from_until_ts(self):
@@ -313,14 +365,20 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         ts1 = self.clock.time_msec()
 
         # list all media when filter is not set
-        channel = self.make_request("GET", self.url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["users"][0]["media_count"], 3)
 
         # filter media starting at `ts1` after creating first media
         # result is 0
         channel = self.make_request(
-            "GET", self.url + "?from_ts=%s" % (ts1,), access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?from_ts=%s" % (ts1,),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 0)
@@ -342,7 +400,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # filter media until `ts2` and earlier
         channel = self.make_request(
-            "GET", self.url + "?until_ts=%s" % (ts2,), access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?until_ts=%s" % (ts2,),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["users"][0]["media_count"], 6)
@@ -351,7 +411,11 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         self._create_users_with_media(20, 1)
 
         # check without filter get all users
-        channel = self.make_request("GET", self.url, access_token=self.admin_user_tok,)
+        channel = self.make_request(
+            "GET",
+            self.url,
+            access_token=self.admin_user_tok,
+        )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 20)
 
@@ -376,7 +440,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
 
         # filter and get empty result
         channel = self.make_request(
-            "GET", self.url + "?search_term=foobar", access_token=self.admin_user_tok,
+            "GET",
+            self.url + "?search_term=foobar",
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["total"], 0)
@@ -401,7 +467,7 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             number_media: Number of media to be created for the user
         """
         upload_resource = self.media_repo.children[b"upload"]
-        for i in range(number_media):
+        for _ in range(number_media):
             # file size is 67 Byte
             image_data = unhexlify(
                 b"89504e470d0a1a0a0000000d4948445200000001000000010806"
@@ -441,7 +507,9 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
         if dir is not None and dir in ("b", "f"):
             url += "&dir=%s" % (dir,)
         channel = self.make_request(
-            "GET", url.encode("ascii"), access_token=self.admin_user_tok,
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual(channel.json_body["total"], len(expected_user_list))

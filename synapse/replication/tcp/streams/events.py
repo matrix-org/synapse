@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -113,8 +112,7 @@ TypeToRow = {Row.TypeId: Row for Row in _EventRows}
 
 
 class EventsStream(Stream):
-    """We received a new event, or an event went from being an outlier to not
-    """
+    """We received a new event, or an event went from being an outlier to not"""
 
     NAME = "events"
 

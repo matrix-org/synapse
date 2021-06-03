@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Union
+from typing import TYPE_CHECKING, Union
 
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester, StateMap
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class ThirdPartyEventRules:
@@ -28,7 +30,7 @@ class ThirdPartyEventRules:
     behaviours.
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.third_party_rules = None
 
         self.store = hs.get_datastore()
@@ -40,7 +42,8 @@ class ThirdPartyEventRules:
 
         if module is not None:
             self.third_party_rules = module(
-                config=config, module_api=hs.get_module_api(),
+                config=config,
+                module_api=hs.get_module_api(),
             )
 
     async def check_event_allowed(
@@ -94,10 +97,9 @@ class ThirdPartyEventRules:
         if self.third_party_rules is None:
             return True
 
-        ret = await self.third_party_rules.on_create_room(
+        return await self.third_party_rules.on_create_room(
             requester, config, is_requester_admin
         )
-        return ret
 
     async def check_threepid_can_be_invited(
         self, medium: str, address: str, room_id: str
@@ -118,10 +120,9 @@ class ThirdPartyEventRules:
 
         state_events = await self._get_state_map_for_room(room_id)
 
-        ret = await self.third_party_rules.check_threepid_can_be_invited(
+        return await self.third_party_rules.check_threepid_can_be_invited(
             medium, address, state_events
         )
-        return ret
 
     async def check_visibility_can_be_modified(
         self, room_id: str, new_visibility: str
@@ -142,7 +143,7 @@ class ThirdPartyEventRules:
         check_func = getattr(
             self.third_party_rules, "check_visibility_can_be_modified", None
         )
-        if not check_func or not isinstance(check_func, Callable):
+        if not check_func or not callable(check_func):
             return True
 
         state_events = await self._get_state_map_for_room(room_id)

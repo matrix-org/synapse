@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,21 +15,23 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict
 
+from synapse.api.constants import ToDeviceEventTypes
 from synapse.api.errors import SynapseError
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    SynapseTags,
     get_active_span_text_map,
     log_kv,
     set_tag,
-    start_active_span,
 )
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
-from synapse.types import JsonDict, UserID, get_domain_from_id
+from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
 from synapse.util import json_encoder
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,8 @@ class DeviceMessageHandler:
             )
         else:
             hs.get_federation_registry().register_instances_for_edu(
-                "m.direct_to_device", hs.config.worker.writers.to_device,
+                "m.direct_to_device",
+                hs.config.worker.writers.to_device,
             )
 
         # The handler to call when we think a user's device list might be out of
@@ -73,9 +75,18 @@ class DeviceMessageHandler:
                 hs.get_device_handler().device_list_updater.user_device_resync
             )
         else:
-            self._user_device_resync = ReplicationUserDevicesResyncRestServlet.make_client(
-                hs
+            self._user_device_resync = (
+                ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
+
+        # a rate limiter for room key requests.  The keys are
+        # (sending_user_id, sending_device_id).
+        self._ratelimiter = Ratelimiter(
+            store=self.store,
+            clock=hs.get_clock(),
+            rate_hz=hs.config.rc_key_requests.per_second,
+            burst_count=hs.config.rc_key_requests.burst_count,
+        )
 
     async def on_direct_to_device_edu(self, origin: str, content: JsonDict) -> None:
         local_messages = {}
@@ -91,11 +102,24 @@ class DeviceMessageHandler:
         for user_id, by_device in content["messages"].items():
             # we use UserID.from_string to catch invalid user ids
             if not self.is_mine(UserID.from_string(user_id)):
-                logger.warning("Request for keys for non-local user %s", user_id)
+                logger.warning("To-device message to non-local user %s", user_id)
                 raise SynapseError(400, "Not a user here")
 
             if not by_device:
                 continue
+
+            # Ratelimit key requests by the sending user.
+            if message_type == ToDeviceEventTypes.RoomKeyRequest:
+                allowed, _ = await self._ratelimiter.can_do_action(
+                    None, (sender_user_id, None)
+                )
+                if not allowed:
+                    logger.info(
+                        "Dropping room_key_request from %s to %s due to rate limit",
+                        sender_user_id,
+                        user_id,
+                    )
+                    continue
 
             messages_by_device = {
                 device_id: {
@@ -167,15 +191,36 @@ class DeviceMessageHandler:
 
     async def send_device_message(
         self,
-        sender_user_id: str,
+        requester: Requester,
         message_type: str,
         messages: Dict[str, Dict[str, JsonDict]],
     ) -> None:
-        set_tag("number_of_messages", len(messages))
+        sender_user_id = requester.user.to_string()
+
+        message_id = random_string(16)
+        set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
+
+        log_kv({"number_of_to_device_messages": len(messages)})
         set_tag("sender", sender_user_id)
         local_messages = {}
         remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
         for user_id, by_device in messages.items():
+            # Ratelimit local cross-user key requests by the sending device.
+            if (
+                message_type == ToDeviceEventTypes.RoomKeyRequest
+                and user_id != sender_user_id
+            ):
+                allowed, _ = await self._ratelimiter.can_do_action(
+                    requester, (sender_user_id, requester.device_id)
+                )
+                if not allowed:
+                    logger.info(
+                        "Dropping room_key_request from %s to %s due to rate limit",
+                        sender_user_id,
+                        user_id,
+                    )
+                    continue
+
             # we use UserID.from_string to catch invalid user ids
             if self.is_mine(UserID.from_string(user_id)):
                 messages_by_device = {
@@ -183,32 +228,35 @@ class DeviceMessageHandler:
                         "content": message_content,
                         "type": message_type,
                         "sender": sender_user_id,
+                        "message_id": message_id,
                     }
                     for device_id, message_content in by_device.items()
                 }
                 if messages_by_device:
                     local_messages[user_id] = messages_by_device
+                    log_kv(
+                        {
+                            "user_id": user_id,
+                            "device_id": list(messages_by_device),
+                        }
+                    )
             else:
                 destination = get_domain_from_id(user_id)
                 remote_messages.setdefault(destination, {})[user_id] = by_device
-
-        message_id = random_string(16)
 
         context = get_active_span_text_map()
 
         remote_edu_contents = {}
         for destination, messages in remote_messages.items():
-            with start_active_span("to_device_for_user"):
-                set_tag("destination", destination)
-                remote_edu_contents[destination] = {
-                    "messages": messages,
-                    "sender": sender_user_id,
-                    "type": message_type,
-                    "message_id": message_id,
-                    "org.matrix.opentracing_context": json_encoder.encode(context),
-                }
+            log_kv({"destination": destination})
+            remote_edu_contents[destination] = {
+                "messages": messages,
+                "sender": sender_user_id,
+                "type": message_type,
+                "message_id": message_id,
+                "org.matrix.opentracing_context": json_encoder.encode(context),
+            }
 
-        log_kv({"local_messages": local_messages})
         stream_id = await self.store.add_messages_to_device_inbox(
             local_messages, remote_edu_contents
         )
@@ -217,7 +265,6 @@ class DeviceMessageHandler:
             "to_device_key", stream_id, users=local_messages.keys()
         )
 
-        log_kv({"remote_messages": remote_messages})
         if self.federation_sender:
             for destination in remote_messages.keys():
                 # Enqueue a new federation transaction to send the new

@@ -14,15 +14,24 @@
 import contextlib
 import logging
 import time
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
+import attr
+from zope.interface import implementer
+
+from twisted.internet.interfaces import IAddress, IReactorTime
 from twisted.python.failure import Failure
+from twisted.web.resource import IResource
 from twisted.web.server import Request, Site
 
 from synapse.config.server import ListenerConfig
 from synapse.http import get_request_user_agent, redact_uri
 from synapse.http.request_metrics import RequestMetrics, requests_counter
-from synapse.logging.context import LoggingContext, PreserveLoggingContext
+from synapse.logging.context import (
+    ContextRequest,
+    LoggingContext,
+    PreserveLoggingContext,
+)
 from synapse.types import Requester
 
 logger = logging.getLogger(__name__)
@@ -41,6 +50,7 @@ class SynapseRequest(Request):
      * Redaction of access_token query-params in __repr__
      * Logging at start and end
      * Metrics to record CPU, wallclock and DB time by endpoint.
+     * A limit to the size of request which will be accepted
 
     It also provides a method `processing`, which returns a context manager. If this
     method is called, the request won't be logged until the context manager is closed;
@@ -51,15 +61,16 @@ class SynapseRequest(Request):
         logcontext: the log context for this request
     """
 
-    def __init__(self, channel, *args, **kw):
+    def __init__(self, channel, *args, max_request_body_size=1024, **kw):
         Request.__init__(self, channel, *args, **kw)
-        self.site = channel.site
+        self._max_request_body_size = max_request_body_size
+        self.site = channel.site  # type: SynapseSite
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
-        self.requester = None  # type: Optional[Union[Requester, str]]
+        self._requester = None  # type: Optional[Union[Requester, str]]
 
         # we can't yet create the logcontext, as we don't know the method.
         self.logcontext = None  # type: Optional[LoggingContext]
@@ -89,29 +100,110 @@ class SynapseRequest(Request):
             self.site.site_tag,
         )
 
+    def handleContentChunk(self, data):
+        # we should have a `content` by now.
+        assert self.content, "handleContentChunk() called before gotLength()"
+        if self.content.tell() + len(data) > self._max_request_body_size:
+            logger.warning(
+                "Aborting connection from %s because the request exceeds maximum size: %s %s",
+                self.client,
+                self.get_method(),
+                self.get_redacted_uri(),
+            )
+            self.transport.abortConnection()
+            return
+        super().handleContentChunk(data)
+
+    @property
+    def requester(self) -> Optional[Union[Requester, str]]:
+        return self._requester
+
+    @requester.setter
+    def requester(self, value: Union[Requester, str]) -> None:
+        # Store the requester, and update some properties based on it.
+
+        # This should only be called once.
+        assert self._requester is None
+
+        self._requester = value
+
+        # A logging context should exist by now (and have a ContextRequest).
+        assert self.logcontext is not None
+        assert self.logcontext.request is not None
+
+        (
+            requester,
+            authenticated_entity,
+        ) = self.get_authenticated_entity()
+        self.logcontext.request.requester = requester
+        # If there's no authenticated entity, it was the requester.
+        self.logcontext.request.authenticated_entity = authenticated_entity or requester
+
     def get_request_id(self):
         return "%s-%i" % (self.get_method(), self.request_seq)
 
-    def get_redacted_uri(self):
-        uri = self.uri
+    def get_redacted_uri(self) -> str:
+        """Gets the redacted URI associated with the request (or placeholder if the URI
+        has not yet been received).
+
+        Note: This is necessary as the placeholder value in twisted is str
+        rather than bytes, so we need to sanitise `self.uri`.
+
+        Returns:
+            The redacted URI as a string.
+        """
+        uri = self.uri  # type: Union[bytes, str]
         if isinstance(uri, bytes):
-            uri = self.uri.decode("ascii", errors="replace")
+            uri = uri.decode("ascii", errors="replace")
         return redact_uri(uri)
 
-    def get_method(self):
-        """Gets the method associated with the request (or placeholder if not
-        method has yet been received).
+    def get_method(self) -> str:
+        """Gets the method associated with the request (or placeholder if method
+        has not yet been received).
 
         Note: This is necessary as the placeholder value in twisted is str
         rather than bytes, so we need to sanitise `self.method`.
 
         Returns:
-            str
+            The request method as a string.
         """
-        method = self.method
+        method = self.method  # type: Union[bytes, str]
         if isinstance(method, bytes):
-            method = self.method.decode("ascii")
+            return self.method.decode("ascii")
         return method
+
+    def get_authenticated_entity(self) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Get the "authenticated" entity of the request, which might be the user
+        performing the action, or a user being puppeted by a server admin.
+
+        Returns:
+            A tuple:
+                The first item is a string representing the user making the request.
+
+                The second item is a string or None representing the user who
+                authenticated when making this request. See
+                Requester.authenticated_entity.
+        """
+        # Convert the requester into a string that we can log
+        if isinstance(self._requester, str):
+            return self._requester, None
+        elif isinstance(self._requester, Requester):
+            requester = self._requester.user.to_string()
+            authenticated_entity = self._requester.authenticated_entity
+
+            # If this is a request where the target user doesn't match the user who
+            # authenticated (e.g. and admin is puppetting a user) then we return both.
+            if self._requester.user.to_string() != authenticated_entity:
+                return requester, authenticated_entity
+
+            return requester, None
+        elif self._requester is not None:
+            # This shouldn't happen, but we log it so we don't lose information
+            # and can see that we're doing something wrong.
+            return repr(self._requester), None  # type: ignore[unreachable]
+
+        return None, None
 
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
@@ -119,7 +211,21 @@ class SynapseRequest(Request):
 
         # create a LogContext for this request
         request_id = self.get_request_id()
-        self.logcontext = LoggingContext(request_id, request=request_id)
+        self.logcontext = LoggingContext(
+            request_id,
+            request=ContextRequest(
+                request_id=request_id,
+                ip_address=self.getClientIP(),
+                site_tag=self.site.site_tag,
+                # The requester is going to be unknown at this point.
+                requester=None,
+                authenticated_entity=None,
+                method=self.get_method(),
+                url=self.get_redacted_uri(),
+                protocol=self.clientproto.decode("ascii", errors="replace"),
+                user_agent=get_request_user_agent(self),
+            ),
+        )
 
         # override the Server header which is set by twisted
         self.setHeader("Server", self.site.server_version_string)
@@ -249,8 +355,7 @@ class SynapseRequest(Request):
         )
 
     def _finished_processing(self):
-        """Log the completion of this request and update the metrics
-        """
+        """Log the completion of this request and update the metrics"""
         assert self.logcontext is not None
         usage = self.logcontext.get_resource_usage()
 
@@ -265,24 +370,6 @@ class SynapseRequest(Request):
         # to the client (nb may be negative)
         response_send_time = self.finish_time - self._processing_finished_time
 
-        # Convert the requester into a string that we can log
-        authenticated_entity = None
-        if isinstance(self.requester, str):
-            authenticated_entity = self.requester
-        elif isinstance(self.requester, Requester):
-            authenticated_entity = self.requester.authenticated_entity
-
-            # If this is a request where the target user doesn't match the user who
-            # authenticated (e.g. and admin is puppetting a user) then we log both.
-            if self.requester.user.to_string() != authenticated_entity:
-                authenticated_entity = "{},{}".format(
-                    authenticated_entity, self.requester.user.to_string(),
-                )
-        elif self.requester is not None:
-            # This shouldn't happen, but we log it so we don't lose information
-            # and can see that we're doing something wrong.
-            authenticated_entity = repr(self.requester)  # type: ignore[unreachable]
-
         user_agent = get_request_user_agent(self, "-")
 
         code = str(self.code)
@@ -292,6 +379,13 @@ class SynapseRequest(Request):
             code += "!"
 
         log_level = logging.INFO if self._should_log_request() else logging.DEBUG
+
+        # If this is a request where the target user doesn't match the user who
+        # authenticated (e.g. and admin is puppetting a user) then we log both.
+        requester, authenticated_entity = self.get_authenticated_entity()
+        if authenticated_entity:
+            requester = "{}.{}".format(authenticated_entity, requester)
+
         self.site.access_logger.log(
             log_level,
             "%s - %s - {%s}"
@@ -299,7 +393,7 @@ class SynapseRequest(Request):
             ' %sB %s "%s %s %s" "%s" [%d dbevts]',
             self.getClientIP(),
             self.site.site_tag,
-            authenticated_entity,
+            requester,
             processing_time,
             response_send_time,
             usage.ru_utime,
@@ -322,8 +416,7 @@ class SynapseRequest(Request):
             logger.warning("Failed to stop metrics: %r", e)
 
     def _should_log_request(self) -> bool:
-        """Whether we should log at INFO that we processed the request.
-        """
+        """Whether we should log at INFO that we processed the request."""
         if self.path == b"/health":
             return False
 
@@ -334,51 +427,130 @@ class SynapseRequest(Request):
 
 
 class XForwardedForRequest(SynapseRequest):
-    def __init__(self, *args, **kw):
-        SynapseRequest.__init__(self, *args, **kw)
+    """Request object which honours proxy headers
 
-    """
-    Add a layer on top of another request that only uses the value of an
-    X-Forwarded-For header as the result of C{getClientIP}.
+    Extends SynapseRequest to replace getClientIP, getClientAddress, and isSecure with
+    information from request headers.
     """
 
-    def getClientIP(self):
-        """
-        @return: The client address (the first address) in the value of the
-            I{X-Forwarded-For header}.  If the header is not present, return
-            C{b"-"}.
-        """
-        return (
-            self.requestHeaders.getRawHeaders(b"x-forwarded-for", [b"-"])[0]
-            .split(b",")[0]
-            .strip()
-            .decode("ascii")
+    # the client IP and ssl flag, as extracted from the headers.
+    _forwarded_for = None  # type: Optional[_XForwardedForAddress]
+    _forwarded_https = False  # type: bool
+
+    def requestReceived(self, command, path, version):
+        # this method is called by the Channel once the full request has been
+        # received, to dispatch the request to a resource.
+        # We can use it to set the IP address and protocol according to the
+        # headers.
+        self._process_forwarded_headers()
+        return super().requestReceived(command, path, version)
+
+    def _process_forwarded_headers(self):
+        headers = self.requestHeaders.getRawHeaders(b"x-forwarded-for")
+        if not headers:
+            return
+
+        # for now, we just use the first x-forwarded-for header. Really, we ought
+        # to start from the client IP address, and check whether it is trusted; if it
+        # is, work backwards through the headers until we find an untrusted address.
+        # see https://github.com/matrix-org/synapse/issues/9471
+        self._forwarded_for = _XForwardedForAddress(
+            headers[0].split(b",")[0].strip().decode("ascii")
         )
+
+        # if we got an x-forwarded-for header, also look for an x-forwarded-proto header
+        header = self.getHeader(b"x-forwarded-proto")
+        if header is not None:
+            self._forwarded_https = header.lower() == b"https"
+        else:
+            # this is done largely for backwards-compatibility so that people that
+            # haven't set an x-forwarded-proto header don't get a redirect loop.
+            logger.warning(
+                "forwarded request lacks an x-forwarded-proto header: assuming https"
+            )
+            self._forwarded_https = True
+
+    def isSecure(self):
+        if self._forwarded_https:
+            return True
+        return super().isSecure()
+
+    def getClientIP(self) -> str:
+        """
+        Return the IP address of the client who submitted this request.
+
+        This method is deprecated.  Use getClientAddress() instead.
+        """
+        if self._forwarded_for is not None:
+            return self._forwarded_for.host
+        return super().getClientIP()
+
+    def getClientAddress(self) -> IAddress:
+        """
+        Return the address of the client who submitted this request.
+        """
+        if self._forwarded_for is not None:
+            return self._forwarded_for
+        return super().getClientAddress()
+
+
+@implementer(IAddress)
+@attr.s(frozen=True, slots=True)
+class _XForwardedForAddress:
+    host = attr.ib(type=str)
 
 
 class SynapseSite(Site):
     """
-    Subclass of a twisted http Site that does access logging with python's
-    standard logging
+    Synapse-specific twisted http Site
+
+    This does two main things.
+
+    First, it replaces the requestFactory in use so that we build SynapseRequests
+    instead of regular t.w.server.Requests. All of the  constructor params are really
+    just parameters for SynapseRequest.
+
+    Second, it inhibits the log() method called by Request.finish, since SynapseRequest
+    does its own logging.
     """
 
     def __init__(
         self,
-        logger_name,
-        site_tag,
+        logger_name: str,
+        site_tag: str,
         config: ListenerConfig,
-        resource,
+        resource: IResource,
         server_version_string,
-        *args,
-        **kwargs
+        max_request_body_size: int,
+        reactor: IReactorTime,
     ):
-        Site.__init__(self, resource, *args, **kwargs)
+        """
+
+        Args:
+            logger_name:  The name of the logger to use for access logs.
+            site_tag:  A tag to use for this site - mostly in access logs.
+            config:  Configuration for the HTTP listener corresponding to this site
+            resource:  The base of the resource tree to be used for serving requests on
+                this site
+            server_version_string: A string to present for the Server header
+            max_request_body_size: Maximum request body length to allow before
+                dropping the connection
+            reactor: reactor to be used to manage connection timeouts
+        """
+        Site.__init__(self, resource, reactor=reactor)
 
         self.site_tag = site_tag
 
         assert config.http_options is not None
         proxied = config.http_options.x_forwarded
-        self.requestFactory = XForwardedForRequest if proxied else SynapseRequest
+        request_class = XForwardedForRequest if proxied else SynapseRequest
+
+        def request_factory(channel, queued) -> Request:
+            return request_class(
+                channel, max_request_body_size=max_request_body_size, queued=queued
+            )
+
+        self.requestFactory = request_factory  # type: ignore
         self.access_logger = logging.getLogger(logger_name)
         self.server_version_string = server_version_string.encode("ascii")
 

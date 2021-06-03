@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,8 +13,9 @@
 # limitations under the License.
 
 import logging
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
+from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.replication.tcp.streams import ToDeviceStream
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -115,7 +115,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
     async def get_new_messages_for_device(
         self,
         user_id: str,
-        device_id: str,
+        device_id: Optional[str],
         last_stream_id: int,
         current_stream_id: int,
         limit: int = 100,
@@ -163,7 +163,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
 
     @trace
     async def delete_messages_for_device(
-        self, user_id: str, device_id: str, up_to_stream_id: int
+        self, user_id: str, device_id: Optional[str], up_to_stream_id: int
     ) -> int:
         """
         Args:
@@ -405,6 +405,13 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 ],
             )
 
+            if remote_messages_by_destination:
+                issue9533_logger.debug(
+                    "Queued outgoing to-device messages with stream_id %i for %s",
+                    stream_id,
+                    list(remote_messages_by_destination.keys()),
+                )
+
         async with self._device_inbox_id_gen.get_next() as stream_id:
             now_ms = self.clock.time_msec()
             await self.db_pool.runInteraction(
@@ -450,7 +457,7 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 },
             )
 
-            # Add the messages to the approriate local device inboxes so that
+            # Add the messages to the appropriate local device inboxes so that
             # they'll be sent to the devices when they next sync.
             self._add_messages_to_local_device_inbox_txn(
                 txn, stream_id, local_messages_by_user_then_device
@@ -531,6 +538,16 @@ class DeviceInboxWorkerStore(SQLBaseStore):
                 }
                 for user_id, messages_by_device in local_by_user_then_device.items()
                 for device_id, message_json in messages_by_device.items()
+            ],
+        )
+
+        issue9533_logger.debug(
+            "Stored to-device messages with stream_id %i for %s",
+            stream_id,
+            [
+                (user_id, device_id)
+                for (user_id, messages_by_device) in local_by_user_then_device.items()
+                for device_id in messages_by_device.keys()
             ],
         )
 

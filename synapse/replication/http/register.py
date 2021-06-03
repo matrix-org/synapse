@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReplicationRegisterServlet(ReplicationEndpoint):
-    """Register a new user
-    """
+    """Register a new user"""
 
     NAME = "register_user"
     PATH_ARGS = ("user_id",)
@@ -78,7 +76,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
     async def _handle_request(self, request, user_id):
         content = parse_json_object_from_request(request)
 
-        self.registration_handler.check_registration_ratelimit(content["address"])
+        await self.registration_handler.check_registration_ratelimit(content["address"])
 
         await self.registration_handler.register_with_store(
             user_id=user_id,
@@ -97,8 +95,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
 
 
 class ReplicationPostRegisterActionsServlet(ReplicationEndpoint):
-    """Run any post registration actions
-    """
+    """Run any post registration actions"""
 
     NAME = "post_register"
     PATH_ARGS = ("user_id",)

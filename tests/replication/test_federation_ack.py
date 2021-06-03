@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,11 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import mock
+from unittest import mock
 
 from synapse.app.generic_worker import GenericWorkerServer
 from synapse.replication.tcp.commands import FederationAckCommand
-from synapse.replication.tcp.protocol import AbstractConnection
+from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams.federation import FederationStream
 
 from tests.unittest import HomeserverTestCase
@@ -27,7 +26,7 @@ class FederationAckTestCase(HomeserverTestCase):
     def default_config(self) -> dict:
         config = super().default_config()
         config["worker_app"] = "synapse.app.federation_sender"
-        config["send_federation"] = True
+        config["send_federation"] = False
         return config
 
     def make_homeserver(self, reactor, clock):
@@ -51,8 +50,10 @@ class FederationAckTestCase(HomeserverTestCase):
         """
         rch = self.hs.get_tcp_replication()
 
-        # wire up the ReplicationCommandHandler to a mock connection
-        mock_connection = mock.Mock(spec=AbstractConnection)
+        # wire up the ReplicationCommandHandler to a mock connection, which needs
+        # to implement IReplicationConnection. (Note that Mock doesn't understand
+        # interfaces, but casing an interface to a list gives the attributes.)
+        mock_connection = mock.Mock(spec=list(IReplicationConnection))
         rch.new_connection(mock_connection)
 
         # tell it it received an RDATA row

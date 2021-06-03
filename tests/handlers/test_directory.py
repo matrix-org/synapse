@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 
 
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse
 import synapse.api.errors
@@ -131,7 +130,9 @@ class TestCreateAlias(unittest.HomeserverTestCase):
         """A user can create an alias for a room they're in."""
         self.get_success(
             self.handler.create_association(
-                create_requester(self.test_user), self.room_alias, self.room_id,
+                create_requester(self.test_user),
+                self.room_alias,
+                self.room_id,
             )
         )
 
@@ -143,7 +144,9 @@ class TestCreateAlias(unittest.HomeserverTestCase):
 
         self.get_failure(
             self.handler.create_association(
-                create_requester(self.test_user), self.room_alias, other_room_id,
+                create_requester(self.test_user),
+                self.room_alias,
+                other_room_id,
             ),
             synapse.api.errors.SynapseError,
         )
@@ -156,7 +159,9 @@ class TestCreateAlias(unittest.HomeserverTestCase):
 
         self.get_success(
             self.handler.create_association(
-                create_requester(self.admin_user), self.room_alias, other_room_id,
+                create_requester(self.admin_user),
+                self.room_alias,
+                other_room_id,
             )
         )
 
@@ -275,8 +280,7 @@ class TestDeleteAlias(unittest.HomeserverTestCase):
 
 
 class CanonicalAliasTestCase(unittest.HomeserverTestCase):
-    """Test modifications of the canonical alias when delete aliases.
-    """
+    """Test modifications of the canonical alias when delete aliases."""
 
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -317,7 +321,10 @@ class CanonicalAliasTestCase(unittest.HomeserverTestCase):
     def _set_canonical_alias(self, content):
         """Configure the canonical alias state on the room."""
         self.helper.send_state(
-            self.room_id, "m.room.canonical_alias", content, tok=self.admin_user_tok,
+            self.room_id,
+            "m.room.canonical_alias",
+            content,
+            tok=self.admin_user_tok,
         )
 
     def _get_canonical_alias(self):

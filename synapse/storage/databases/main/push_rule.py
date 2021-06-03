@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -168,7 +167,9 @@ class PushRulesWorkerStore(
             )
 
     @cachedList(
-        cached_method_name="get_push_rules_for_user", list_name="user_ids", num_args=1,
+        cached_method_name="get_push_rules_for_user",
+        list_name="user_ids",
+        num_args=1,
     )
     async def bulk_get_push_rules(self, user_ids):
         if not user_ids:
@@ -195,7 +196,9 @@ class PushRulesWorkerStore(
             use_new_defaults = user_id in self._users_new_default_push_rules
 
             results[user_id] = _load_rules(
-                rules, enabled_map_by_user.get(user_id, {}), use_new_defaults,
+                rules,
+                enabled_map_by_user.get(user_id, {}),
+                use_new_defaults,
             )
 
         return results

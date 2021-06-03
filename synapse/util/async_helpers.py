@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -76,11 +75,16 @@ class ObservableDeferred:
         def callback(r):
             object.__setattr__(self, "_result", (True, r))
             while self._observers:
+                observer = self._observers.pop()
                 try:
-                    # TODO: Handle errors here.
-                    self._observers.pop().callback(r)
-                except Exception:
-                    pass
+                    observer.callback(r)
+                except Exception as e:
+                    logger.exception(
+                        "%r threw an exception on .callback(%r), ignoring...",
+                        observer,
+                        r,
+                        exc_info=e,
+                    )
             return r
 
         def errback(f):
@@ -90,11 +94,16 @@ class ObservableDeferred:
                 # traces when we `await` on one of the observer deferreds.
                 f.value.__failure__ = f
 
+                observer = self._observers.pop()
                 try:
-                    # TODO: Handle errors here.
-                    self._observers.pop().errback(f)
-                except Exception:
-                    pass
+                    observer.errback(f)
+                except Exception as e:
+                    logger.exception(
+                        "%r threw an exception on .errback(%r), ignoring...",
+                        observer,
+                        f,
+                        exc_info=e,
+                    )
 
             if consumeErrors:
                 return None
@@ -252,8 +261,7 @@ class Linearizer:
         self.key_to_defer = {}  # type: Dict[Hashable, _LinearizerEntry]
 
     def is_queued(self, key: Hashable) -> bool:
-        """Checks whether there is a process queued up waiting
-        """
+        """Checks whether there is a process queued up waiting"""
         entry = self.key_to_defer.get(key)
         if not entry:
             # No entry so nothing is waiting.
@@ -452,7 +460,9 @@ R = TypeVar("R")
 
 
 def timeout_deferred(
-    deferred: defer.Deferred, timeout: float, reactor: IReactorTime,
+    deferred: defer.Deferred,
+    timeout: float,
+    reactor: IReactorTime,
 ) -> defer.Deferred:
     """The in built twisted `Deferred.addTimeout` fails to time out deferreds
     that have a canceller that throws exceptions. This method creates a new
@@ -485,7 +495,7 @@ def timeout_deferred(
 
         try:
             deferred.cancel()
-        except:  # noqa: E722, if we throw any exception it'll break time outs
+        except Exception:  # if we throw any exception it'll break time outs
             logger.exception("Canceller failed during timeout")
 
         # the cancel() call should have set off a chain of errbacks which
@@ -497,7 +507,7 @@ def timeout_deferred(
     delayed_call = reactor.callLater(timeout, time_it_out)
 
     def convert_cancelled(value: failure.Failure):
-        # if the orgininal deferred was cancelled, and our timeout has fired, then
+        # if the original deferred was cancelled, and our timeout has fired, then
         # the reason it was cancelled was due to our timeout. Turn the CancelledError
         # into a TimeoutError.
         if timed_out[0] and value.check(CancelledError):
@@ -529,8 +539,7 @@ def timeout_deferred(
 
 @attr.s(slots=True, frozen=True)
 class DoneAwaitable:
-    """Simple awaitable that returns the provided value.
-    """
+    """Simple awaitable that returns the provided value."""
 
     value = attr.ib()
 
@@ -545,8 +554,7 @@ class DoneAwaitable:
 
 
 def maybe_awaitable(value: Union[Awaitable[R], R]) -> Awaitable[R]:
-    """Convert a value to an awaitable if not already an awaitable.
-    """
+    """Convert a value to an awaitable if not already an awaitable."""
     if inspect.isawaitable(value):
         assert isinstance(value, Awaitable)
         return value

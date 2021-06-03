@@ -166,7 +166,10 @@ class JsonResourceTests(unittest.TestCase):
 
         res = JsonResource(self.homeserver)
         res.register_paths(
-            "GET", [re.compile("^/_matrix/foo$")], _callback, "test_servlet",
+            "GET",
+            [re.compile("^/_matrix/foo$")],
+            _callback,
+            "test_servlet",
         )
 
         # The path was registered as GET, but this is a HEAD request.
@@ -199,6 +202,8 @@ class OptionsResourceTests(unittest.TestCase):
             parse_listener_def({"type": "http", "port": 0}),
             self.resource,
             "1.0",
+            max_request_body_size=1234,
+            reactor=self.reactor,
         )
 
         # render the request and return the channel

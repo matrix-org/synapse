@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -129,7 +128,10 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
         pls["users"][OTHER_USER] = 50
         self.helper.send_state(
-            self.room_id, EventTypes.PowerLevels, pls, tok=self.user_tok,
+            self.room_id,
+            EventTypes.PowerLevels,
+            pls,
+            tok=self.user_tok,
         )
 
         # this is the point in the DAG where we make a fork
@@ -237,7 +239,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
         # the state rows are unsorted
         state_rows = []  # type: List[EventsStreamCurrentStateRow]
-        for stream_name, token, row in received_rows:
+        for stream_name, _, row in received_rows:
             self.assertEqual("events", stream_name)
             self.assertIsInstance(row, EventsStreamRow)
             self.assertEqual(row.type, "state")
@@ -255,8 +257,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
             self.assertIsNone(sr.event_id)
 
     def test_update_function_state_row_limit(self):
-        """Test replication with many state events over several stream ids.
-        """
+        """Test replication with many state events over several stream ids."""
 
         # we want to generate lots of state changes, but for this test, we want to
         # spread out the state changes over a few stream IDs.
@@ -282,7 +283,10 @@ class EventsStreamTestCase(BaseStreamTestCase):
         )
         pls["users"].update({u: 50 for u in user_ids})
         self.helper.send_state(
-            self.room_id, EventTypes.PowerLevels, pls, tok=self.user_tok,
+            self.room_id,
+            EventTypes.PowerLevels,
+            pls,
+            tok=self.user_tok,
         )
 
         # this is the point in the DAG where we make a fork
@@ -352,7 +356,7 @@ class EventsStreamTestCase(BaseStreamTestCase):
 
             # the state rows are unsorted
             state_rows = []  # type: List[EventsStreamCurrentStateRow]
-            for j in range(STATES_PER_USER + 1):
+            for _ in range(STATES_PER_USER + 1):
                 stream_name, token, row = received_rows.pop(0)
                 self.assertEqual("events", stream_name)
                 self.assertIsInstance(row, EventsStreamRow)

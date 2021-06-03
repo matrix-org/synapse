@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +18,7 @@ import logging
 from typing import (
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -38,7 +38,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
-from synapse.types import Collection, MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
@@ -118,7 +118,11 @@ async def resolve_events_with_store(
         if event.room_id != room_id:
             raise Exception(
                 "Attempting to state-resolve for room %s with event %s which is in %s"
-                % (room_id, event.event_id, event.room_id,)
+                % (
+                    room_id,
+                    event.event_id,
+                    event.room_id,
+                )
             )
 
     full_conflicted_set = {eid for eid in full_conflicted_set if eid in event_map}

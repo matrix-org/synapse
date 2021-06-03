@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -166,6 +165,11 @@ class EmailConfig(Config):
             if not self.email_notif_from:
                 missing.append("email.notif_from")
 
+            # public_baseurl is required to build password reset and validation links that
+            # will be emailed to users
+            if config.get("public_baseurl") is None:
+                missing.append("public_baseurl")
+
             if missing:
                 raise ConfigError(
                     MISSING_PASSWORD_RESET_CONFIG_ERROR % (", ".join(missing),)
@@ -264,6 +268,9 @@ class EmailConfig(Config):
             if not self.email_notif_from:
                 missing.append("email.notif_from")
 
+            if config.get("public_baseurl") is None:
+                missing.append("public_baseurl")
+
             if missing:
                 raise ConfigError(
                     "email.enable_notifs is True but required keys are missing: %s"
@@ -281,7 +288,8 @@ class EmailConfig(Config):
                 self.email_notif_template_html,
                 self.email_notif_template_text,
             ) = self.read_templates(
-                [notif_template_html, notif_template_text], template_dir,
+                [notif_template_html, notif_template_text],
+                template_dir,
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -291,7 +299,7 @@ class EmailConfig(Config):
                 "client_base_url", email_config.get("riot_base_url", None)
             )
 
-        if self.account_validity.renew_by_email_enabled:
+        if self.account_validity_renew_by_email_enabled:
             expiry_template_html = email_config.get(
                 "expiry_template_html", "notice_expiry.html"
             )
@@ -303,7 +311,8 @@ class EmailConfig(Config):
                 self.account_validity_template_html,
                 self.account_validity_template_text,
             ) = self.read_templates(
-                [expiry_template_html, expiry_template_text], template_dir,
+                [expiry_template_html, expiry_template_text],
+                template_dir,
             )
 
         subjects_config = email_config.get("subjects", {})

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
@@ -22,8 +21,8 @@ from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
-from twisted.web.http import Request
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -35,6 +34,7 @@ from synapse.api.errors import (
 from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -57,7 +57,7 @@ from .thumbnailer import Thumbnailer, ThumbnailError
 from .upload_resource import UploadResource
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,8 @@ class MediaRepository:
         self.store = hs.get_datastore()
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
+
+        Thumbnailer.set_limits(self.max_image_pixels)
 
         self.primary_base_path = hs.config.media_store_path  # type: str
         self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
@@ -145,7 +147,7 @@ class MediaRepository:
         upload_name: Optional[str],
         content: IO,
         content_length: int,
-        auth_user: str,
+        auth_user: UserID,
     ) -> str:
         """Store uploaded content for a local user and return the mxc URL
 
@@ -184,7 +186,7 @@ class MediaRepository:
     async def get_local_media(
         self, request: Request, media_id: str, name: Optional[str]
     ) -> None:
-        """Responds to reqests for local media, if exists, or returns 404.
+        """Responds to requests for local media, if exists, or returns 404.
 
         Args:
             request: The incoming request.
@@ -306,7 +308,7 @@ class MediaRepository:
         media_info = await self.store.get_cached_remote_media(server_name, media_id)
 
         # file_id is the ID we use to track the file locally. If we've already
-        # seen the file then reuse the existing ID, otherwise genereate a new
+        # seen the file then reuse the existing ID, otherwise generate a new
         # one.
 
         # If we have an entry in the DB, try and look for it
@@ -325,7 +327,10 @@ class MediaRepository:
         # Failed to find the file anywhere, lets download it.
 
         try:
-            media_info = await self._download_remote_file(server_name, media_id,)
+            media_info = await self._download_remote_file(
+                server_name,
+                media_id,
+            )
         except SynapseError:
             raise
         except Exception as e:
@@ -351,7 +356,11 @@ class MediaRepository:
         responder = await self.media_storage.fetch_media(file_info)
         return responder, media_info
 
-    async def _download_remote_file(self, server_name: str, media_id: str,) -> dict:
+    async def _download_remote_file(
+        self,
+        server_name: str,
+        media_id: str,
+    ) -> dict:
         """Attempt to download the remote file from the given server name,
         using the given file_id as the local id.
 
@@ -460,6 +469,9 @@ class MediaRepository:
         return media_info
 
     def _get_thumbnail_requirements(self, media_type):
+        scpos = media_type.find(";")
+        if scpos > 0:
+            media_type = media_type[:scpos]
         return self.thumbnail_requirements.get(media_type, ())
 
     def _generate_thumbnail(
@@ -502,7 +514,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: str,
+        url_cache: Optional[str],
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)
@@ -773,7 +785,11 @@ class MediaRepository:
                         )
                     except Exception as e:
                         thumbnail_exists = await self.store.get_remote_media_thumbnail(
-                            server_name, media_id, t_width, t_height, t_type,
+                            server_name,
+                            media_id,
+                            t_width,
+                            t_height,
+                            t_type,
                         )
                         if not thumbnail_exists:
                             raise e
@@ -832,7 +848,10 @@ class MediaRepository:
         return await self._remove_local_media_from_disk([media_id])
 
     async def delete_old_local_media(
-        self, before_ts: int, size_gt: int = 0, keep_profiles: bool = True,
+        self,
+        before_ts: int,
+        size_gt: int = 0,
+        keep_profiles: bool = True,
     ) -> Tuple[List[str], int]:
         """
         Delete local or remote media from this server by size and timestamp. Removes
@@ -849,7 +868,9 @@ class MediaRepository:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
         old_media = await self.store.get_local_media_before(
-            before_ts, size_gt, keep_profiles,
+            before_ts,
+            size_gt,
+            keep_profiles,
         )
         return await self._remove_local_media_from_disk(old_media)
 
@@ -927,10 +948,10 @@ class MediaRepositoryResource(Resource):
 
            <thumbnail>
 
-    The thumbnail methods are "crop" and "scale". "scale" trys to return an
+    The thumbnail methods are "crop" and "scale". "scale" tries to return an
     image where either the width or the height is smaller than the requested
     size. The client should then scale and letterbox the image if it needs to
-    fit within a given rectangle. "crop" trys to return an image where the
+    fit within a given rectangle. "crop" tries to return an image where the
     width and height are close to the requested size and the aspect matches
     the requested size. The client should scale the image if it needs to fit
     within a given rectangle.

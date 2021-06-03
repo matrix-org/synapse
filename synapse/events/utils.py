@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +21,7 @@ from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.util.async_helpers import yieldable_gather_results
+from synapse.util.frozenutils import unfreeze
 
 from . import EventBase
 
@@ -34,7 +34,7 @@ SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
 
 def prune_event(event: EventBase) -> EventBase:
-    """ Returns a pruned version of the given event, which removes all keys we
+    """Returns a pruned version of the given event, which removes all keys we
     don't know about or think could potentially be dodgy.
 
     This is used when we "redact" an event. We want to remove all fields that
@@ -53,6 +53,8 @@ def prune_event(event: EventBase) -> EventBase:
     pruned_event.internal_metadata.stream_ordering = (
         event.internal_metadata.stream_ordering
     )
+
+    pruned_event.internal_metadata.outlier = event.internal_metadata.outlier
 
     # Mark the event as redacted
     pruned_event.internal_metadata.redacted = True
@@ -400,10 +402,19 @@ class EventClientSerializer:
                 # If there is an edit replace the content, preserving existing
                 # relations.
 
+                # Ensure we take copies of the edit content, otherwise we risk modifying
+                # the original event.
+                edit_content = edit.content.copy()
+
+                # Unfreeze the event content if necessary, so that we may modify it below
+                edit_content = unfreeze(edit_content)
+                serialized_event["content"] = edit_content.get("m.new_content", {})
+
+                # Check for existing relations
                 relations = event.content.get("m.relates_to")
-                serialized_event["content"] = edit.content.get("m.new_content", {})
                 if relations:
-                    serialized_event["content"]["m.relates_to"] = relations
+                    # Keep the relations, ensuring we use a dict copy of the original
+                    serialized_event["content"]["m.relates_to"] = relations.copy()
                 else:
                     serialized_event["content"].pop("m.relates_to", None)
 

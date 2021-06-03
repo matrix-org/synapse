@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import logging
+import os
+from typing import Optional
+from unittest.mock import patch
 
 import treq
 from netaddr import IPSet
@@ -100,62 +103,36 @@ class MatrixFederationAgentTests(TestCase):
 
         return http_protocol
 
-    def test_http_request(self):
-        agent = ProxyAgent(self.reactor)
+    def _test_request_direct_connection(self, agent, scheme, hostname, path):
+        """Runs a test case for a direct connection not going through a proxy.
 
-        self.reactor.lookups["test.com"] = "1.2.3.4"
-        d = agent.request(b"GET", b"http://test.com")
+        Args:
+            agent (ProxyAgent): the proxy agent being tested
 
-        # there should be a pending TCP connection
-        clients = self.reactor.tcpClients
-        self.assertEqual(len(clients), 1)
-        (host, port, client_factory, _timeout, _bindAddress) = clients[0]
-        self.assertEqual(host, "1.2.3.4")
-        self.assertEqual(port, 80)
+            scheme (bytes): expected to be either "http" or "https"
 
-        # make a test server, and wire up the client
-        http_server = self._make_connection(
-            client_factory, _get_test_protocol_factory()
-        )
+            hostname (bytes): the hostname to connect to in the test
 
-        # the FakeTransport is async, so we need to pump the reactor
-        self.reactor.advance(0)
+            path (bytes): the path to connect to in the test
+        """
+        is_https = scheme == b"https"
 
-        # now there should be a pending request
-        self.assertEqual(len(http_server.requests), 1)
-
-        request = http_server.requests[0]
-        self.assertEqual(request.method, b"GET")
-        self.assertEqual(request.path, b"/")
-        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
-        request.write(b"result")
-        request.finish()
-
-        self.reactor.advance(0)
-
-        resp = self.successResultOf(d)
-        body = self.successResultOf(treq.content(resp))
-        self.assertEqual(body, b"result")
-
-    def test_https_request(self):
-        agent = ProxyAgent(self.reactor, contextFactory=get_test_https_policy())
-
-        self.reactor.lookups["test.com"] = "1.2.3.4"
-        d = agent.request(b"GET", b"https://test.com/abc")
+        self.reactor.lookups[hostname.decode()] = "1.2.3.4"
+        d = agent.request(b"GET", scheme + b"://" + hostname + b"/" + path)
 
         # there should be a pending TCP connection
         clients = self.reactor.tcpClients
         self.assertEqual(len(clients), 1)
         (host, port, client_factory, _timeout, _bindAddress) = clients[0]
         self.assertEqual(host, "1.2.3.4")
-        self.assertEqual(port, 443)
+        self.assertEqual(port, 443 if is_https else 80)
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
             client_factory,
             _get_test_protocol_factory(),
-            ssl=True,
-            expected_sni=b"test.com",
+            ssl=is_https,
+            expected_sni=hostname if is_https else None,
         )
 
         # the FakeTransport is async, so we need to pump the reactor
@@ -166,8 +143,8 @@ class MatrixFederationAgentTests(TestCase):
 
         request = http_server.requests[0]
         self.assertEqual(request.method, b"GET")
-        self.assertEqual(request.path, b"/abc")
-        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
+        self.assertEqual(request.path, b"/" + path)
+        self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [hostname])
         request.write(b"result")
         request.finish()
 
@@ -177,8 +154,58 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    def test_http_request(self):
+        agent = ProxyAgent(self.reactor)
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
+
+    def test_https_request(self):
+        agent = ProxyAgent(self.reactor, contextFactory=get_test_https_policy())
+        self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
+
+    def test_http_request_use_proxy_empty_environment(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
+
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "NO_PROXY": "test.com"})
+    def test_http_request_via_uppercase_no_proxy(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
+
+    @patch.dict(
+        os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "test.com,unused.com"}
+    )
+    def test_http_request_via_no_proxy(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
+
+    @patch.dict(
+        os.environ, {"https_proxy": "proxy.com", "no_proxy": "test.com,unused.com"}
+    )
+    def test_https_request_via_no_proxy(self):
+        agent = ProxyAgent(
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            use_proxy=True,
+        )
+        self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
+
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "*"})
+    def test_http_request_via_no_proxy_star(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_direct_connection(agent, b"http", b"test.com", b"")
+
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "*"})
+    def test_https_request_via_no_proxy_star(self):
+        agent = ProxyAgent(
+            self.reactor,
+            contextFactory=get_test_https_policy(),
+            use_proxy=True,
+        )
+        self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
+
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "unused.com"})
     def test_http_request_via_proxy(self):
-        agent = ProxyAgent(self.reactor, http_proxy=b"proxy.com:8888")
+        agent = ProxyAgent(self.reactor, use_proxy=True)
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
         d = agent.request(b"GET", b"http://test.com")
@@ -214,11 +241,27 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
+        """Tests that TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(auth_credentials=None)
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "bob:pinkponies@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_https_request_via_proxy_with_auth(self):
+        """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(auth_credentials="bob:pinkponies")
+
+    def _do_https_request_via_proxy(
+        self,
+        auth_credentials: Optional[str] = None,
+    ):
         agent = ProxyAgent(
             self.reactor,
             contextFactory=get_test_https_policy(),
-            https_proxy=b"proxy.com",
+            use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
@@ -250,6 +293,22 @@ class MatrixFederationAgentTests(TestCase):
         request = proxy_server.requests[0]
         self.assertEqual(request.method, b"CONNECT")
         self.assertEqual(request.path, b"test.com:443")
+
+        # Check whether auth credentials have been supplied to the proxy
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+
+        if auth_credentials is not None:
+            # Compute the correct header value for Proxy-Authorization
+            encoded_credentials = base64.b64encode(b"bob:pinkponies")
+            expected_header_value = b"Basic " + encoded_credentials
+
+            # Validate the header's value
+            self.assertIn(expected_header_value, proxy_auth_header_values)
+        else:
+            # Check that the Proxy-Authorization header has not been supplied to the proxy
+            self.assertIsNone(proxy_auth_header_values)
 
         # tell the proxy server not to close the connection
         proxy_server.persistent = True
@@ -285,6 +344,13 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(request.method, b"GET")
         self.assertEqual(request.path, b"/abc")
         self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
+
+        # Check that the destination server DID NOT receive proxy credentials
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+        self.assertIsNone(proxy_auth_header_values)
+
         request.write(b"result")
         request.finish()
 
@@ -294,6 +360,7 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888"})
     def test_http_request_via_proxy_with_blacklist(self):
         # The blacklist includes the configured proxy IP.
         agent = ProxyAgent(
@@ -301,7 +368,7 @@ class MatrixFederationAgentTests(TestCase):
                 self.reactor, ip_whitelist=None, ip_blacklist=IPSet(["1.0.0.0/8"])
             ),
             self.reactor,
-            http_proxy=b"proxy.com:8888",
+            use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
@@ -338,7 +405,8 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
-    def test_https_request_via_proxy_with_blacklist(self):
+    @patch.dict(os.environ, {"HTTPS_PROXY": "proxy.com"})
+    def test_https_request_via_uppercase_proxy_with_blacklist(self):
         # The blacklist includes the configured proxy IP.
         agent = ProxyAgent(
             BlacklistingReactorWrapper(
@@ -346,7 +414,7 @@ class MatrixFederationAgentTests(TestCase):
             ),
             self.reactor,
             contextFactory=get_test_https_policy(),
-            https_proxy=b"proxy.com",
+            use_proxy=True,
         )
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -280,8 +279,7 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         return batch_size
 
     async def _devices_last_seen_update(self, progress, batch_size):
-        """Background update to insert last seen info into devices table
-        """
+        """Background update to insert last seen info into devices table"""
 
         last_user_id = progress.get("last_user_id", "")
         last_device_id = progress.get("last_device_id", "")
@@ -299,7 +297,6 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             #      times, which is fine.
 
             where_clause, where_args = make_tuple_comparison_clause(
-                self.database_engine,
                 [("user_id", last_user_id), ("device_id", last_device_id)],
             )
 
@@ -363,8 +360,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
 
     @wrap_as_background_process("prune_old_user_ips")
     async def _prune_old_user_ips(self):
-        """Removes entries in user IPs older than the configured period.
-        """
+        """Removes entries in user IPs older than the configured period."""
 
         if self.user_ips_max_age is None:
             # Nothing to do
@@ -440,7 +436,7 @@ class ClientIpStore(ClientIpWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
 
         self.client_ip_last_seen = LruCache(
-            cache_name="client_ip_last_seen", keylen=4, max_size=50000
+            cache_name="client_ip_last_seen", max_size=50000
         )
 
         super().__init__(database, db_conn, hs)
@@ -565,7 +561,11 @@ class ClientIpStore(ClientIpWorkerStore):
         results = {}
 
         for key in self._batch_row_update:
-            uid, access_token, ip, = key
+            (
+                uid,
+                access_token,
+                ip,
+            ) = key
             if uid == user_id:
                 user_agent, _, last_seen = self._batch_row_update[key]
                 results[(access_token, ip)] = (user_agent, last_seen)

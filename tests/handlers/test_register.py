@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
@@ -49,10 +48,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
-        self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value="secret")
-        )
-        self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
         self.lots_of_users = 100
@@ -68,8 +63,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.get_or_create_user(requester, frank.localpart, "Frankie")
         )
         self.assertEquals(result_user_id, user_id)
-        self.assertTrue(result_token is not None)
-        self.assertEquals(result_token, "secret")
+        self.assertIsInstance(result_token, str)
+        self.assertGreater(len(result_token), 20)
 
     def test_if_user_exists(self):
         store = self.hs.get_datastore()
@@ -501,7 +496,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="user"))
 
         # Get an access token.
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = "testtok"
         self.get_success(
             self.store.add_access_token_to_user(
                 user_id=user_id, token=token, device_id=None, valid_until_ms=None
@@ -516,6 +511,37 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         requester = self.get_success(auth.get_user_by_req(request))
 
         self.assertTrue(requester.shadow_banned)
+
+    def test_spam_checker_receives_sso_type(self):
+        """Test rejecting registration based on SSO type"""
+
+        class BanBadIdPUser:
+            def check_registration_for_spam(
+                self, email_threepid, username, request_info, auth_provider_id=None
+            ):
+                # Reject any user coming from CAS and whose username contains profanity
+                if auth_provider_id == "cas" and "flimflob" in username:
+                    return RegistrationBehaviour.DENY
+                return RegistrationBehaviour.ALLOW
+
+        # Configure a spam checker that denies a certain user on a specific IdP
+        spam_checker = self.hs.get_spam_checker()
+        spam_checker.spam_checkers = [BanBadIdPUser()]
+
+        f = self.get_failure(
+            self.handler.register_user(localpart="bobflimflob", auth_provider_id="cas"),
+            SynapseError,
+        )
+        exception = f.value
+
+        # We return 429 from the spam checker for denied registrations
+        self.assertIsInstance(exception, SynapseError)
+        self.assertEqual(exception.code, 429)
+
+        # Check the same username can register using SAML
+        self.get_success(
+            self.handler.register_user(localpart="bobflimflob", auth_provider_id="saml")
+        )
 
     async def get_or_create_user(
         self, requester, localpart, displayname, password_hash=None
@@ -547,7 +573,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = self.hs.get_auth_handler().generate_access_token(user)
 
         if need_register:
             await self.handler.register_with_store(

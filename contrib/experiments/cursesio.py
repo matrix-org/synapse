@@ -63,8 +63,7 @@ class CursesStdIO:
         self.redraw()
 
     def redraw(self):
-        """ method for redisplaying lines
-            based on internal list of lines """
+        """method for redisplaying lines based on internal list of lines"""
 
         self.stdscr.clear()
         self.paintStatus(self.statusText)

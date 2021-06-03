@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -68,16 +67,14 @@ class ExtremPruneTestCase(HomeserverTestCase):
         self.assert_extremities([self.remote_event_1.event_id])
 
     def persist_event(self, event, state=None):
-        """Persist the event, with optional state
-        """
+        """Persist the event, with optional state"""
         context = self.get_success(
             self.state.compute_event_context(event, old_state=state)
         )
         self.get_success(self.persistence.persist_event(event, context))
 
     def assert_extremities(self, expected_extremities):
-        """Assert the current extremities for the room
-        """
+        """Assert the current extremities for the room"""
         extremities = self.get_success(
             self.store.get_prev_events_for_room(self.room_id)
         )

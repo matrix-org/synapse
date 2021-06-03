@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -159,7 +158,9 @@ class PushersRemoveRestServlet(RestServlet):
         self.notifier.on_new_replication_data()
 
         respond_with_html_bytes(
-            request, 200, PushersRemoveRestServlet.SUCCESS_HTML,
+            request,
+            200,
+            PushersRemoveRestServlet.SUCCESS_HTML,
         )
         return None
 

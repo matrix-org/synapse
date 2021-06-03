@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -118,8 +117,7 @@ class ProfileWorkerStore(SQLBaseStore):
             )
 
     async def is_subscribed_remote_profile_for_user(self, user_id):
-        """Check whether we are interested in a remote user's profile.
-        """
+        """Check whether we are interested in a remote user's profile."""
         res = await self.db_pool.simple_select_one_onecol(
             table="group_users",
             keyvalues={"user_id": user_id},
@@ -145,8 +143,7 @@ class ProfileWorkerStore(SQLBaseStore):
     async def get_remote_profile_cache_entries_that_expire(
         self, last_checked: int
     ) -> List[Dict[str, str]]:
-        """Get all users who haven't been checked since `last_checked`
-        """
+        """Get all users who haven't been checked since `last_checked`"""
 
         def _get_remote_profile_cache_entries_that_expire_txn(txn):
             sql = """

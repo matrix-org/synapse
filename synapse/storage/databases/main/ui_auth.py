@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,7 +43,11 @@ class UIAuthWorkerStore(SQLBaseStore):
     """
 
     async def create_ui_auth_session(
-        self, clientdict: JsonDict, uri: str, method: str, description: str,
+        self,
+        clientdict: JsonDict,
+        uri: str,
+        method: str,
+        description: str,
     ) -> UIAuthSessionData:
         """
         Creates a new user interactive authentication session.
@@ -123,7 +126,10 @@ class UIAuthWorkerStore(SQLBaseStore):
         return UIAuthSessionData(session_id, **result)
 
     async def mark_ui_auth_stage_complete(
-        self, session_id: str, stage_type: str, result: Union[str, bool, JsonDict],
+        self,
+        session_id: str,
+        stage_type: str,
+        result: Union[str, bool, JsonDict],
     ):
         """
         Mark a session stage as completed.
@@ -261,10 +267,12 @@ class UIAuthWorkerStore(SQLBaseStore):
         return serverdict.get(key, default)
 
     async def add_user_agent_ip_to_ui_auth_session(
-        self, session_id: str, user_agent: str, ip: str,
+        self,
+        session_id: str,
+        user_agent: str,
+        ip: str,
     ):
-        """Add the given user agent / IP to the tracking table
-        """
+        """Add the given user agent / IP to the tracking table"""
         await self.db_pool.simple_upsert(
             table="ui_auth_sessions_ips",
             keyvalues={"session_id": session_id, "user_agent": user_agent, "ip": ip},
@@ -273,7 +281,8 @@ class UIAuthWorkerStore(SQLBaseStore):
         )
 
     async def get_user_agents_ips_to_ui_auth_session(
-        self, session_id: str,
+        self,
+        session_id: str,
     ) -> List[Tuple[str, str]]:
         """Get the given user agents / IPs used during the ui auth process
 

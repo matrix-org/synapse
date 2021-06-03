@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -34,11 +33,11 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import Collection, JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import JsonDict, RoomAlias, RoomStreamToken, UserID
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +181,7 @@ class ApplicationServicesHandler:
         self,
         stream_key: str,
         new_token: Optional[int],
-        users: Collection[Union[str, UserID]] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.
@@ -215,7 +214,7 @@ class ApplicationServicesHandler:
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
         self._notify_interested_services_ephemeral(
-            services, stream_key, new_token, users
+            services, stream_key, new_token, users or []
         )
 
     @wrap_as_background_process("notify_interested_services_ephemeral")
@@ -290,7 +289,9 @@ class ApplicationServicesHandler:
             if not interested:
                 continue
             presence_events, _ = await presence_source.get_new_events(
-                user=user, service=service, from_key=from_key,
+                user=user,
+                service=service,
+                from_key=from_key,
             )
             time_now = self.clock.time_msec()
             events.extend(

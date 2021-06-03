@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -18,8 +17,7 @@ from ._base import Config
 
 
 class AuthConfig(Config):
-    """Password and login configuration
-    """
+    """Password and login configuration"""
 
     section = "auth"
 
@@ -38,7 +36,9 @@ class AuthConfig(Config):
 
         # User-interactive authentication
         ui_auth = config.get("ui_auth") or {}
-        self.ui_auth_session_timeout = ui_auth.get("session_timeout", 0)
+        self.ui_auth_session_timeout = self.parse_duration(
+            ui_auth.get("session_timeout", 0)
+        )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -94,11 +94,11 @@ class AuthConfig(Config):
               #require_uppercase: true
 
         ui_auth:
-            # The number of milliseconds to allow a user-interactive authentication
-            # session to be active.
+            # The amount of time to allow a user-interactive authentication session
+            # to be active.
             #
             # This defaults to 0, meaning the user is queried for their credentials
-            # before every action, but this can be overridden to alow a single
+            # before every action, but this can be overridden to allow a single
             # validation to be re-used.  This weakens the protections afforded by
             # the user-interactive authentication process, by allowing for multiple
             # (and potentially different) operations to use the same validation session.
@@ -106,5 +106,5 @@ class AuthConfig(Config):
             # Uncomment below to allow for credential validation to last for 15
             # seconds.
             #
-            #session_timeout: 15000
+            #session_timeout: "15s"
         """

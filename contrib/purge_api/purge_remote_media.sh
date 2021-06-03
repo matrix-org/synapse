@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 DOMAIN=yourserver.tld
 # add this user as admin in your home server:

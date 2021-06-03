@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -181,8 +180,7 @@ class RedactionsTestCase(HomeserverTestCase):
         )
 
     def test_redact_event_as_moderator_ratelimit(self):
-        """Tests that the correct ratelimiting is applied to redactions
-        """
+        """Tests that the correct ratelimiting is applied to redactions"""
 
         message_ids = []
         # as a regular user, send messages to redact

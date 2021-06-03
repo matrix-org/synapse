@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -96,7 +95,9 @@ class IgnoredUsersTestCase(unittest.HomeserverTestCase):
         # No ignored_users key.
         self.get_success(
             self.store.add_account_data_for_user(
-                self.user, AccountDataTypes.IGNORED_USER_LIST, {},
+                self.user,
+                AccountDataTypes.IGNORED_USER_LIST,
+                {},
             )
         )
 

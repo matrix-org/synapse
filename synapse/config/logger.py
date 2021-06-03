@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,8 +20,10 @@ import threading
 from string import Template
 
 import yaml
+from zope.interface import implementer
 
 from twisted.logger import (
+    ILogObserver,
     LogBeginner,
     STDLibLogObserver,
     eventAsText,
@@ -30,7 +31,6 @@ from twisted.logger import (
 )
 
 import synapse
-from synapse.app import _base as appbase
 from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
@@ -162,7 +162,10 @@ class LoggingConfig(Config):
         )
 
         logging_group.add_argument(
-            "-f", "--log-file", dest="log_file", help=argparse.SUPPRESS,
+            "-f",
+            "--log-file",
+            dest="log_file",
+            help=argparse.SUPPRESS,
         )
 
     def generate_files(self, config, config_dir_path):
@@ -224,7 +227,8 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
 
     threadlocal = threading.local()
 
-    def _log(event):
+    @implementer(ILogObserver)
+    def _log(event: dict) -> None:
         if "log_text" in event:
             if event["log_text"].startswith("DNSDatagramProtocol starting on "):
                 return
@@ -313,6 +317,8 @@ def setup_logging(
     # Perform one-time logging configuration.
     _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
     # Add a SIGHUP handler to reload the logging configuration, if one is available.
+    from synapse.app import _base as appbase
+
     appbase.register_sighup(_reload_logging_config, log_config_path)
 
     # Log immediately so we can grep backwards.

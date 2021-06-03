@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -22,7 +21,7 @@ import logging
 import sys
 import time
 import traceback
-from typing import Dict, Optional, Set
+from typing import Dict, Iterable, Optional, Set
 
 import yaml
 
@@ -47,6 +46,7 @@ from synapse.storage.databases.main.events_bg_updates import (
 from synapse.storage.databases.main.media_repository import (
     MediaRepositoryBackgroundUpdateStore,
 )
+from synapse.storage.databases.main.pusher import PusherWorkerStore
 from synapse.storage.databases.main.registration import (
     RegistrationBackgroundUpdateStore,
     find_max_generated_user_id_localpart,
@@ -177,6 +177,7 @@ class Store(
     UserDirectoryBackgroundUpdateStore,
     EndToEndKeyBackgroundStore,
     StatsStore,
+    PusherWorkerStore,
 ):
     def execute(self, f, *args, **kwargs):
         return self.db_pool.runInteraction(f.__name__, f, *args, **kwargs)
@@ -293,8 +294,7 @@ class Porter(object):
         return table, already_ported, total_to_port, forward_chunk, backward_chunk
 
     async def get_table_constraints(self) -> Dict[str, Set[str]]:
-        """Returns a map of tables that have foreign key constraints to tables they depend on.
-        """
+        """Returns a map of tables that have foreign key constraints to tables they depend on."""
 
         def _get_constraints(txn):
             # We can pull the information about foreign key constraints out from
@@ -503,7 +503,9 @@ class Porter(object):
                 return
 
     def build_db_store(
-        self, db_config: DatabaseConnectionConfig, allow_outdated_version: bool = False,
+        self,
+        db_config: DatabaseConnectionConfig,
+        allow_outdated_version: bool = False,
     ):
         """Builds and returns a database store using the provided configuration.
 
@@ -629,7 +631,16 @@ class Porter(object):
             await self._setup_state_group_id_seq()
             await self._setup_user_id_seq()
             await self._setup_events_stream_seqs()
-            await self._setup_device_inbox_seq()
+            await self._setup_sequence(
+                "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
+            )
+            await self._setup_sequence(
+                "account_data_sequence",
+                ("room_account_data", "room_tags_revisions", "account_data"),
+            )
+            await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
+            await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
+            await self._setup_auth_chain_sequence()
 
             # Step 3. Get tables.
             self.progress.set_state("Fetching tables")
@@ -730,7 +741,7 @@ class Porter(object):
             return col
 
         outrows = []
-        for i, row in enumerate(rows):
+        for row in rows:
             try:
                 outrows.append(
                     tuple(conv(j, col) for j, col in enumerate(row) if j > 0)
@@ -854,7 +865,7 @@ class Porter(object):
 
         return done, remaining + done
 
-    async def _setup_state_group_id_seq(self):
+    async def _setup_state_group_id_seq(self) -> None:
         curr_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
             table="state_groups", keyvalues={}, retcol="MAX(id)", allow_none=True
         )
@@ -868,7 +879,7 @@ class Porter(object):
 
         await self.postgres_store.db_pool.runInteraction("setup_state_group_id_seq", r)
 
-    async def _setup_user_id_seq(self):
+    async def _setup_user_id_seq(self) -> None:
         curr_id = await self.sqlite_store.db_pool.runInteraction(
             "setup_user_id_seq", find_max_generated_user_id_localpart
         )
@@ -877,11 +888,10 @@ class Porter(object):
             next_id = curr_id + 1
             txn.execute("ALTER SEQUENCE user_id_seq RESTART WITH %s", (next_id,))
 
-        return self.postgres_store.db_pool.runInteraction("setup_user_id_seq", r)
+        await self.postgres_store.db_pool.runInteraction("setup_user_id_seq", r)
 
-    async def _setup_events_stream_seqs(self):
-        """Set the event stream sequences to the correct values.
-        """
+    async def _setup_events_stream_seqs(self) -> None:
+        """Set the event stream sequences to the correct values."""
 
         # We get called before we've ported the events table, so we need to
         # fetch the current positions from the SQLite store.
@@ -903,40 +913,60 @@ class Porter(object):
                     (curr_forward_id + 1,),
                 )
 
-            txn.execute(
-                "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
-                (curr_backward_id + 1,),
+            if curr_backward_id:
+                txn.execute(
+                    "ALTER SEQUENCE events_backfill_stream_seq RESTART WITH %s",
+                    (curr_backward_id + 1,),
+                )
+
+        await self.postgres_store.db_pool.runInteraction(
+            "_setup_events_stream_seqs",
+            _setup_events_stream_seqs_set_pos,
+        )
+
+    async def _setup_sequence(
+        self, sequence_name: str, stream_id_tables: Iterable[str]
+    ) -> None:
+        """Set a sequence to the correct value."""
+        current_stream_ids = []
+        for stream_id_table in stream_id_tables:
+            max_stream_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
+                table=stream_id_table,
+                keyvalues={},
+                retcol="COALESCE(MAX(stream_id), 1)",
+                allow_none=True,
             )
+            current_stream_ids.append(max_stream_id)
 
-        return await self.postgres_store.db_pool.runInteraction(
-            "_setup_events_stream_seqs", _setup_events_stream_seqs_set_pos,
+        next_id = max(current_stream_ids) + 1
+
+        def r(txn):
+            sql = "ALTER SEQUENCE %s RESTART WITH" % (sequence_name,)
+            txn.execute(sql + " %s", (next_id,))
+
+        await self.postgres_store.db_pool.runInteraction(
+            "_setup_%s" % (sequence_name,), r
         )
 
-    async def _setup_device_inbox_seq(self):
-        """Set the device inbox sequence to the correct value.
-        """
-        curr_local_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
-            table="device_inbox",
+    async def _setup_auth_chain_sequence(self) -> None:
+        curr_chain_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
+            table="event_auth_chains",
             keyvalues={},
-            retcol="COALESCE(MAX(stream_id), 1)",
+            retcol="MAX(chain_id)",
             allow_none=True,
         )
-
-        curr_federation_id = await self.sqlite_store.db_pool.simple_select_one_onecol(
-            table="device_federation_outbox",
-            keyvalues={},
-            retcol="COALESCE(MAX(stream_id), 1)",
-            allow_none=True,
-        )
-
-        next_id = max(curr_local_id, curr_federation_id) + 1
 
         def r(txn):
             txn.execute(
-                "ALTER SEQUENCE device_inbox_sequence RESTART WITH %s", (next_id,)
+                "ALTER SEQUENCE event_auth_chain_id RESTART WITH %s",
+                (curr_chain_id + 1,),
             )
 
-        return self.postgres_store.db_pool.runInteraction("_setup_device_inbox_seq", r)
+        if curr_chain_id is not None:
+            await self.postgres_store.db_pool.runInteraction(
+                "_setup_event_auth_chain_id",
+                r,
+            )
 
 
 ##############################################
@@ -945,8 +975,7 @@ class Porter(object):
 
 
 class Progress(object):
-    """Used to report progress of the port
-    """
+    """Used to report progress of the port"""
 
     def __init__(self):
         self.tables = {}
@@ -971,8 +1000,7 @@ class Progress(object):
 
 
 class CursesProgress(Progress):
-    """Reports progress to a curses window
-    """
+    """Reports progress to a curses window"""
 
     def __init__(self, stdscr):
         self.stdscr = stdscr
@@ -997,7 +1025,7 @@ class CursesProgress(Progress):
 
         self.total_processed = 0
         self.total_remaining = 0
-        for table, data in self.tables.items():
+        for data in self.tables.values():
             self.total_processed += data["num_done"] - data["start"]
             self.total_remaining += data["total"] - data["num_done"]
 
@@ -1088,8 +1116,7 @@ class CursesProgress(Progress):
 
 
 class TerminalProgress(Progress):
-    """Just prints progress to the terminal
-    """
+    """Just prints progress to the terminal"""
 
     def update(self, table, num_done):
         super(TerminalProgress, self).update(table, num_done)

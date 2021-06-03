@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -18,7 +17,7 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
-from twisted.web.http import Request
+from twisted.web.server import Request
 
 from synapse.api.errors import SynapseError
 from synapse.http.server import DirectServeJsonResource, set_cors_headers
@@ -34,8 +33,8 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +112,7 @@ class ThumbnailResource(DirectServeJsonResource):
             method,
             m_type,
             thumbnail_infos,
+            media_id,
             media_id,
             url_cache=media_info["url_cache"],
             server_name=None,
@@ -269,6 +269,7 @@ class ThumbnailResource(DirectServeJsonResource):
             method,
             m_type,
             thumbnail_infos,
+            media_id,
             media_info["filesystem_id"],
             url_cache=None,
             server_name=server_name,
@@ -282,6 +283,7 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_method: str,
         desired_type: str,
         thumbnail_infos: List[Dict[str, Any]],
+        media_id: str,
         file_id: str,
         url_cache: Optional[str] = None,
         server_name: Optional[str] = None,
@@ -317,8 +319,59 @@ class ThumbnailResource(DirectServeJsonResource):
                 return
 
             responder = await self.media_storage.fetch_media(file_info)
+            if responder:
+                await respond_with_responder(
+                    request,
+                    responder,
+                    file_info.thumbnail_type,
+                    file_info.thumbnail_length,
+                )
+                return
+
+            # If we can't find the thumbnail we regenerate it. This can happen
+            # if e.g. we've deleted the thumbnails but still have the original
+            # image somewhere.
+            #
+            # Since we have an entry for the thumbnail in the DB we a) know we
+            # have have successfully generated the thumbnail in the past (so we
+            # don't need to worry about repeatedly failing to generate
+            # thumbnails), and b) have already calculated that appropriate
+            # width/height/method so we can just call the "generate exact"
+            # methods.
+
+            # First let's check that we do actually have the original image
+            # still. This will throw a 404 if we don't.
+            # TODO: We should refetch the thumbnails for remote media.
+            await self.media_storage.ensure_media_is_in_local_cache(
+                FileInfo(server_name, file_id, url_cache=url_cache)
+            )
+
+            if server_name:
+                await self.media_repo.generate_remote_exact_thumbnail(
+                    server_name,
+                    file_id=file_id,
+                    media_id=media_id,
+                    t_width=file_info.thumbnail_width,
+                    t_height=file_info.thumbnail_height,
+                    t_method=file_info.thumbnail_method,
+                    t_type=file_info.thumbnail_type,
+                )
+            else:
+                await self.media_repo.generate_local_exact_thumbnail(
+                    media_id=media_id,
+                    t_width=file_info.thumbnail_width,
+                    t_height=file_info.thumbnail_height,
+                    t_method=file_info.thumbnail_method,
+                    t_type=file_info.thumbnail_type,
+                    url_cache=url_cache,
+                )
+
+            responder = await self.media_storage.fetch_media(file_info)
             await respond_with_responder(
-                request, responder, file_info.thumbnail_type, file_info.thumbnail_length
+                request,
+                responder,
+                file_info.thumbnail_type,
+                file_info.thumbnail_length,
             )
         else:
             logger.info("Failed to find any generated thumbnails")

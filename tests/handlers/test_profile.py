@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-from mock import Mock
-
-from twisted.internet import defer
+from unittest.mock import Mock
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
@@ -24,14 +20,12 @@ from synapse.types import UserID
 
 from tests import unittest
 from tests.test_utils import make_awaitable
-from tests.utils import setup_test_homeserver
 
 
-class ProfileTestCase(unittest.TestCase):
+class ProfileTestCase(unittest.HomeserverTestCase):
     """ Tests profile management. """
 
-    @defer.inlineCallbacks
-    def setUp(self):
+    def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
         self.mock_registry = Mock()
 
@@ -42,39 +36,35 @@ class ProfileTestCase(unittest.TestCase):
 
         self.mock_registry.register_query_handler = register_query_handler
 
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
+        hs = self.setup_test_homeserver(
             federation_client=self.mock_federation,
             federation_server=Mock(),
             federation_registry=self.mock_registry,
         )
+        return hs
 
+    def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
         self.frank = UserID.from_string("@1234ABCD:test")
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
-        yield defer.ensureDeferred(self.store.create_profile(self.frank.localpart))
+        self.get_success(self.store.create_profile(self.frank.localpart))
 
         self.handler = hs.get_profile_handler()
-        self.hs = hs
 
-    @defer.inlineCallbacks
     def test_get_my_name(self):
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_profile_displayname(self.frank.localpart, "Frank")
         )
 
-        displayname = yield defer.ensureDeferred(
-            self.handler.get_displayname(self.frank)
-        )
+        displayname = self.get_success(self.handler.get_displayname(self.frank))
 
         self.assertEquals("Frank", displayname)
 
-    @defer.inlineCallbacks
     def test_set_my_name(self):
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.set_displayname(
                 self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
             )
@@ -82,7 +72,7 @@ class ProfileTestCase(unittest.TestCase):
 
         self.assertEquals(
             (
-                yield defer.ensureDeferred(
+                self.get_success(
                     self.store.get_profile_displayname(self.frank.localpart)
                 )
             ),
@@ -90,7 +80,7 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         # Set displayname again
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.set_displayname(
                 self.frank, synapse.types.create_requester(self.frank), "Frank"
             )
@@ -98,7 +88,7 @@ class ProfileTestCase(unittest.TestCase):
 
         self.assertEquals(
             (
-                yield defer.ensureDeferred(
+                self.get_success(
                     self.store.get_profile_displayname(self.frank.localpart)
                 )
             ),
@@ -106,32 +96,27 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         # Set displayname to an empty string
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.set_displayname(
                 self.frank, synapse.types.create_requester(self.frank), ""
             )
         )
 
         self.assertIsNone(
-            (
-                yield defer.ensureDeferred(
-                    self.store.get_profile_displayname(self.frank.localpart)
-                )
-            )
+            (self.get_success(self.store.get_profile_displayname(self.frank.localpart)))
         )
 
-    @defer.inlineCallbacks
     def test_set_my_name_if_disabled(self):
         self.hs.config.enable_set_displayname = False
 
         # Setting displayname for the first time is allowed
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_profile_displayname(self.frank.localpart, "Frank")
         )
 
         self.assertEquals(
             (
-                yield defer.ensureDeferred(
+                self.get_success(
                     self.store.get_profile_displayname(self.frank.localpart)
                 )
             ),
@@ -139,33 +124,27 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         # Setting displayname a second time is forbidden
-        d = defer.ensureDeferred(
+        self.get_failure(
             self.handler.set_displayname(
                 self.frank, synapse.types.create_requester(self.frank), "Frank Jr."
-            )
+            ),
+            SynapseError,
         )
 
-        yield self.assertFailure(d, SynapseError)
-
-    @defer.inlineCallbacks
     def test_set_my_name_noauth(self):
-        d = defer.ensureDeferred(
+        self.get_failure(
             self.handler.set_displayname(
                 self.frank, synapse.types.create_requester(self.bob), "Frank Jr."
-            )
+            ),
+            AuthError,
         )
 
-        yield self.assertFailure(d, AuthError)
-
-    @defer.inlineCallbacks
     def test_get_other_name(self):
         self.mock_federation.make_query.return_value = make_awaitable(
             {"displayname": "Alice"}
         )
 
-        displayname = yield defer.ensureDeferred(
-            self.handler.get_displayname(self.alice)
-        )
+        displayname = self.get_success(self.handler.get_displayname(self.alice))
 
         self.assertEquals(displayname, "Alice")
         self.mock_federation.make_query.assert_called_with(
@@ -175,35 +154,34 @@ class ProfileTestCase(unittest.TestCase):
             ignore_backoff=True,
         )
 
-    @defer.inlineCallbacks
     def test_incoming_fed_query(self):
-        yield defer.ensureDeferred(self.store.create_profile("caroline"))
-        yield defer.ensureDeferred(
-            self.store.set_profile_displayname("caroline", "Caroline")
-        )
+        self.get_success(self.store.create_profile("caroline"))
+        self.get_success(self.store.set_profile_displayname("caroline", "Caroline"))
 
-        response = yield defer.ensureDeferred(
+        response = self.get_success(
             self.query_handlers["profile"](
-                {"user_id": "@caroline:test", "field": "displayname"}
+                {
+                    "user_id": "@caroline:test",
+                    "field": "displayname",
+                    "origin": "servername.tld",
+                }
             )
         )
 
         self.assertEquals({"displayname": "Caroline"}, response)
 
-    @defer.inlineCallbacks
     def test_get_my_avatar(self):
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_profile_avatar_url(
                 self.frank.localpart, "http://my.server/me.png"
             )
         )
-        avatar_url = yield defer.ensureDeferred(self.handler.get_avatar_url(self.frank))
+        avatar_url = self.get_success(self.handler.get_avatar_url(self.frank))
 
         self.assertEquals("http://my.server/me.png", avatar_url)
 
-    @defer.inlineCallbacks
     def test_set_my_avatar(self):
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.set_avatar_url(
                 self.frank,
                 synapse.types.create_requester(self.frank),
@@ -212,16 +190,12 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (
-                yield defer.ensureDeferred(
-                    self.store.get_profile_avatar_url(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
             "http://my.server/pic.gif",
         )
 
         # Set avatar again
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.set_avatar_url(
                 self.frank,
                 synapse.types.create_requester(self.frank),
@@ -230,56 +204,44 @@ class ProfileTestCase(unittest.TestCase):
         )
 
         self.assertEquals(
-            (
-                yield defer.ensureDeferred(
-                    self.store.get_profile_avatar_url(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
             "http://my.server/me.png",
         )
 
         # Set avatar to an empty string
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.set_avatar_url(
-                self.frank, synapse.types.create_requester(self.frank), "",
+                self.frank,
+                synapse.types.create_requester(self.frank),
+                "",
             )
         )
 
         self.assertIsNone(
-            (
-                yield defer.ensureDeferred(
-                    self.store.get_profile_avatar_url(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
         )
 
-    @defer.inlineCallbacks
     def test_set_my_avatar_if_disabled(self):
         self.hs.config.enable_set_avatar_url = False
 
         # Setting displayname for the first time is allowed
-        yield defer.ensureDeferred(
+        self.get_success(
             self.store.set_profile_avatar_url(
                 self.frank.localpart, "http://my.server/me.png"
             )
         )
 
         self.assertEquals(
-            (
-                yield defer.ensureDeferred(
-                    self.store.get_profile_avatar_url(self.frank.localpart)
-                )
-            ),
+            (self.get_success(self.store.get_profile_avatar_url(self.frank.localpart))),
             "http://my.server/me.png",
         )
 
         # Set avatar a second time is forbidden
-        d = defer.ensureDeferred(
+        self.get_failure(
             self.handler.set_avatar_url(
                 self.frank,
                 synapse.types.create_requester(self.frank),
                 "http://my.server/pic.gif",
-            )
+            ),
+            SynapseError,
         )
-
-        yield self.assertFailure(d, SynapseError)

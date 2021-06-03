@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable, Iterable, MutableMapping, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, MutableMapping, Optional, Tuple, Union
 
 import attr
 from typing_extensions import Deque
@@ -13,9 +13,13 @@ from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import (
+    IHostnameResolver,
+    IProtocol,
+    IPullProducer,
+    IPushProducer,
     IReactorPluggableNameResolver,
-    IReactorTCP,
     IResolverSimple,
+    ITransport,
 )
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -44,10 +48,11 @@ class FakeChannel:
     wire).
     """
 
-    site = attr.ib(type=Site)
+    site = attr.ib(type=Union[Site, "FakeSite"])
     _reactor = attr.ib()
     result = attr.ib(type=dict, default=attr.Factory(dict))
-    _producer = None
+    _ip = attr.ib(type=str, default="127.0.0.1")
+    _producer = None  # type: Optional[Union[IPullProducer, IPushProducer]]
 
     @property
     def json_body(self):
@@ -120,10 +125,14 @@ class FakeChannel:
     def getPeer(self):
         # We give an address so that getClientIP returns a non null entry,
         # causing us to record the MAU
-        return address.IPv4Address("TCP", "127.0.0.1", 3423)
+        return address.IPv4Address("TCP", self._ip, 3423)
 
     def getHost(self):
-        return None
+        # this is called by Request.__init__ to configure Request.host.
+        return address.IPv4Address("TCP", "127.0.0.1", 8888)
+
+    def isSecure(self):
+        return False
 
     @property
     def transport(self):
@@ -153,7 +162,11 @@ class FakeChannel:
 
         Any cookines found are added to the given dict
         """
-        for h in self.headers.getRawHeaders("Set-Cookie"):
+        headers = self.headers.getRawHeaders("Set-Cookie")
+        if not headers:
+            return
+
+        for h in headers:
             parts = h.split(";")
             k, v = parts[0].split("=", maxsplit=1)
             cookies[k] = v
@@ -183,7 +196,7 @@ class FakeSite:
 
 def make_request(
     reactor,
-    site: Site,
+    site: Union[Site, FakeSite],
     method,
     path,
     content=b"",
@@ -196,6 +209,7 @@ def make_request(
     custom_headers: Optional[
         Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
     ] = None,
+    client_ip: str = "127.0.0.1",
 ) -> FakeChannel:
     """
     Make a web request using the given method, path and content, and render it
@@ -222,6 +236,9 @@ def make_request(
         await_result: whether to wait for the request to complete rendering. If true,
              will pump the reactor until the the renderer tells the channel the request
              is finished.
+
+        client_ip: The IP to use as the requesting IP. Useful for testing
+            ratelimiting.
 
     Returns:
         channel
@@ -250,7 +267,7 @@ def make_request(
     if isinstance(content, str):
         content = content.encode("utf8")
 
-    channel = FakeChannel(site, reactor)
+    channel = FakeChannel(site, reactor, ip=client_ip)
 
     req = request(channel)
     req.content = BytesIO(content)
@@ -301,8 +318,8 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
         self._tcp_callbacks = {}
         self._udp = []
-        lookups = self.lookups = {}
-        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]()
+        lookups = self.lookups = {}  # type: Dict[str, str]
+        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]
 
         @implementer(IResolverSimple)
         class FakeResolver:
@@ -313,6 +330,9 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
+
+    def installNameResolver(self, resolver: IHostnameResolver) -> IHostnameResolver:
+        raise NotImplementedError()
 
     def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
@@ -342,8 +362,7 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
         self._tcp_callbacks[(host, port)] = callback
 
     def connectTCP(self, host, port, factory, timeout=30, bindAddress=None):
-        """Fake L{IReactorTCP.connectTCP}.
-        """
+        """Fake L{IReactorTCP.connectTCP}."""
 
         conn = super().connectTCP(
             host, port, factory, timeout=timeout, bindAddress=None
@@ -459,6 +478,7 @@ def get_clock():
     return clock, hs_clock
 
 
+@implementer(ITransport)
 @attr.s(cmp=False)
 class FakeTransport:
     """
@@ -583,12 +603,6 @@ class FakeTransport:
         if self.disconnected:
             return
 
-        if getattr(self.other, "transport") is None:
-            # the other has no transport yet; reschedule
-            if self.autoflush:
-                self._reactor.callLater(0.0, self.flush)
-            return
-
         if maxbytes is not None:
             to_write = self.buffer[:maxbytes]
         else:
@@ -611,7 +625,9 @@ class FakeTransport:
             self.disconnected = True
 
 
-def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
+def connect_client(
+    reactor: ThreadedMemoryReactorClock, client_id: int
+) -> Tuple[IProtocol, AccumulatingProtocol]:
     """
     Connect a client to a fake TCP transport.
 

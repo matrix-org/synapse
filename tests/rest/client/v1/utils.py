@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -21,8 +20,7 @@ import re
 import time
 import urllib.parse
 from typing import Any, Dict, Mapping, MutableMapping, Optional
-
-from mock import patch
+from unittest.mock import patch
 
 import attr
 
@@ -132,7 +130,7 @@ class RestHelper:
         src: str,
         targ: str,
         membership: str,
-        extra_data: dict = {},
+        extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
     ) -> None:
@@ -156,7 +154,7 @@ class RestHelper:
             path = path + "?access_token=%s" % tok
 
         data = {"membership": membership}
-        data.update(extra_data)
+        data.update(extra_data or {})
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -166,9 +164,12 @@ class RestHelper:
             json.dumps(data).encode("utf8"),
         )
 
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         self.auth_user_id = temp_id
@@ -184,7 +185,13 @@ class RestHelper:
         )
 
     def send_event(
-        self, room_id, type, content={}, txn_id=None, tok=None, expect_code=200
+        self,
+        room_id,
+        type,
+        content: Optional[dict] = None,
+        txn_id=None,
+        tok=None,
+        expect_code=200,
     ):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
@@ -198,12 +205,15 @@ class RestHelper:
             self.site,
             "PUT",
             path,
-            json.dumps(content).encode("utf8"),
+            json.dumps(content or {}).encode("utf8"),
         )
 
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         return channel.json_body
@@ -251,9 +261,12 @@ class RestHelper:
 
         channel = make_request(self.hs.get_reactor(), self.site, method, path, content)
 
-        assert int(channel.result["code"]) == expect_code, (
-            "Expected: %d, got: %d, resp: %r"
-            % (expect_code, int(channel.result["code"]), channel.result["body"])
+        assert (
+            int(channel.result["code"]) == expect_code
+        ), "Expected: %d, got: %d, resp: %r" % (
+            expect_code,
+            int(channel.result["code"]),
+            channel.result["body"],
         )
 
         return channel.json_body
@@ -447,7 +460,10 @@ class RestHelper:
         return self.complete_oidc_auth(oauth_uri, cookies, user_info_dict)
 
     def complete_oidc_auth(
-        self, oauth_uri: str, cookies: Mapping[str, str], user_info_dict: JsonDict,
+        self,
+        oauth_uri: str,
+        cookies: Mapping[str, str],
+        user_info_dict: JsonDict,
     ) -> FakeChannel:
         """Mock out an OIDC authentication flow
 
@@ -491,7 +507,9 @@ class RestHelper:
             (expected_uri, resp_obj) = expected_requests.pop(0)
             assert uri == expected_uri
             resp = FakeResponse(
-                code=200, phrase=b"OK", body=json.dumps(resp_obj).encode("utf-8"),
+                code=200,
+                phrase=b"OK",
+                body=json.dumps(resp_obj).encode("utf-8"),
             )
             return resp
 
@@ -528,12 +546,29 @@ class RestHelper:
         if client_redirect_url:
             params["redirectUrl"] = client_redirect_url
 
-        # hit the redirect url (which will issue a cookie and state)
+        # hit the redirect url (which should redirect back to the redirect url. This
+        # is the easiest way of figuring out what the Host header ought to be set to
+        # to keep Synapse happy.
         channel = make_request(
             self.hs.get_reactor(),
             self.site,
             "GET",
             "/_matrix/client/r0/login/sso/redirect?" + urllib.parse.urlencode(params),
+        )
+        assert channel.code == 302
+
+        # hit the redirect url again with the right Host header, which should now issue
+        # a cookie and redirect to the SSO provider.
+        location = channel.headers.getRawHeaders("Location")[0]
+        parts = urllib.parse.urlsplit(location)
+        channel = make_request(
+            self.hs.get_reactor(),
+            self.site,
+            "GET",
+            urllib.parse.urlunsplit(("", "") + parts[2:]),
+            custom_headers=[
+                ("Host", parts[1]),
+            ],
         )
 
         assert channel.code == 302

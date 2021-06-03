@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -14,46 +13,30 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import mock
+from unittest import mock
 
 from signedjson import key as key, sign as sign
 
-from twisted.internet import defer
-
-import synapse.handlers.e2e_keys
-import synapse.storage
-from synapse.api import errors
 from synapse.api.constants import RoomEncryptionAlgorithms
+from synapse.api.errors import Codes, SynapseError
 
-from tests import unittest, utils
+from tests import unittest
 
 
-class E2eKeysHandlerTestCase(unittest.TestCase):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.hs = None  # type: synapse.server.HomeServer
-        self.handler = None  # type: synapse.handlers.e2e_keys.E2eKeysHandler
-        self.store = None  # type: synapse.storage.Storage
+class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
+    def make_homeserver(self, reactor, clock):
+        return self.setup_test_homeserver(federation_client=mock.Mock())
 
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.hs = yield utils.setup_test_homeserver(
-            self.addCleanup, federation_client=mock.Mock()
-        )
-        self.handler = synapse.handlers.e2e_keys.E2eKeysHandler(self.hs)
+    def prepare(self, reactor, clock, hs):
+        self.handler = hs.get_e2e_keys_handler()
         self.store = self.hs.get_datastore()
 
-    @defer.inlineCallbacks
     def test_query_local_devices_no_devices(self):
-        """If the user has no devices, we expect an empty list.
-        """
+        """If the user has no devices, we expect an empty list."""
         local_user = "@boris:" + self.hs.hostname
-        res = yield defer.ensureDeferred(
-            self.handler.query_local_devices({local_user: None})
-        )
+        res = self.get_success(self.handler.query_local_devices({local_user: None}))
         self.assertDictEqual(res, {local_user: {}})
 
-    @defer.inlineCallbacks
     def test_reupload_one_time_keys(self):
         """we should be able to re-upload the same keys"""
         local_user = "@boris:" + self.hs.hostname
@@ -64,7 +47,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "alg2:k3": {"key": "key3"},
         }
 
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": keys}
             )
@@ -73,14 +56,13 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
         # we should be able to change the signature without a problem
         keys["alg2:k2"]["signatures"]["k1"] = "sig2"
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
         self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
 
-    @defer.inlineCallbacks
     def test_change_one_time_keys(self):
         """attempts to change one-time-keys should be rejected"""
 
@@ -92,75 +74,66 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "alg2:k3": {"key": "key3"},
         }
 
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
         self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
 
-        try:
-            yield defer.ensureDeferred(
-                self.handler.upload_keys_for_user(
-                    local_user, device_id, {"one_time_keys": {"alg1:k1": "key2"}}
-                )
-            )
-            self.fail("No error when changing string key")
-        except errors.SynapseError:
-            pass
+        # Error when changing string key
+        self.get_failure(
+            self.handler.upload_keys_for_user(
+                local_user, device_id, {"one_time_keys": {"alg1:k1": "key2"}}
+            ),
+            SynapseError,
+        )
 
-        try:
-            yield defer.ensureDeferred(
-                self.handler.upload_keys_for_user(
-                    local_user, device_id, {"one_time_keys": {"alg2:k3": "key2"}}
-                )
-            )
-            self.fail("No error when replacing dict key with string")
-        except errors.SynapseError:
-            pass
+        # Error when replacing dict key with strin
+        self.get_failure(
+            self.handler.upload_keys_for_user(
+                local_user, device_id, {"one_time_keys": {"alg2:k3": "key2"}}
+            ),
+            SynapseError,
+        )
 
-        try:
-            yield defer.ensureDeferred(
-                self.handler.upload_keys_for_user(
-                    local_user,
-                    device_id,
-                    {"one_time_keys": {"alg1:k1": {"key": "key"}}},
-                )
-            )
-            self.fail("No error when replacing string key with dict")
-        except errors.SynapseError:
-            pass
+        # Error when replacing string key with dict
+        self.get_failure(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id,
+                {"one_time_keys": {"alg1:k1": {"key": "key"}}},
+            ),
+            SynapseError,
+        )
 
-        try:
-            yield defer.ensureDeferred(
-                self.handler.upload_keys_for_user(
-                    local_user,
-                    device_id,
-                    {
-                        "one_time_keys": {
-                            "alg2:k2": {"key": "key3", "signatures": {"k1": "sig1"}}
-                        }
-                    },
-                )
-            )
-            self.fail("No error when replacing dict key")
-        except errors.SynapseError:
-            pass
+        # Error when replacing dict key
+        self.get_failure(
+            self.handler.upload_keys_for_user(
+                local_user,
+                device_id,
+                {
+                    "one_time_keys": {
+                        "alg2:k2": {"key": "key3", "signatures": {"k1": "sig1"}}
+                    }
+                },
+            ),
+            SynapseError,
+        )
 
-    @defer.inlineCallbacks
     def test_claim_one_time_key(self):
         local_user = "@boris:" + self.hs.hostname
         device_id = "xyz"
         keys = {"alg1:k1": "key1"}
 
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
         self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1}})
 
-        res2 = yield defer.ensureDeferred(
+        res2 = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
@@ -173,7 +146,6 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             },
         )
 
-    @defer.inlineCallbacks
     def test_fallback_key(self):
         local_user = "@boris:" + self.hs.hostname
         device_id = "xyz"
@@ -181,12 +153,12 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         otk = {"alg1:k2": "key2"}
 
         # we shouldn't have any unused fallback keys yet
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
         self.assertEqual(res, [])
 
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_keys_for_user(
                 local_user,
                 device_id,
@@ -195,14 +167,14 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
 
         # we should now have an unused alg1 key
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
         self.assertEqual(res, ["alg1"])
 
         # claiming an OTK when no OTKs are available should return the fallback
         # key
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
@@ -213,13 +185,13 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
 
         # we shouldn't have any unused fallback keys again
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.store.get_e2e_unused_fallback_key_types(local_user, device_id)
         )
         self.assertEqual(res, [])
 
         # claiming an OTK again should return the same fallback key
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
@@ -231,22 +203,23 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
         # if the user uploads a one-time key, the next claim should fetch the
         # one-time key, and then go back to the fallback
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": otk}
             )
         )
 
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
         )
         self.assertEqual(
-            res, {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
+            res,
+            {"failures": {}, "one_time_keys": {local_user: {device_id: otk}}},
         )
 
-        res = yield defer.ensureDeferred(
+        res = self.get_success(
             self.handler.claim_one_time_keys(
                 {"one_time_keys": {local_user: {device_id: "alg1"}}}, timeout=None
             )
@@ -256,7 +229,6 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             {"failures": {}, "one_time_keys": {local_user: {device_id: fallback_key}}},
         )
 
-    @defer.inlineCallbacks
     def test_replace_master_key(self):
         """uploading a new signing key should make the old signing key unavailable"""
         local_user = "@boris:" + self.hs.hostname
@@ -270,9 +242,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 },
             }
         }
-        yield defer.ensureDeferred(
-            self.handler.upload_signing_keys_for_user(local_user, keys1)
-        )
+        self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys1))
 
         keys2 = {
             "master_key": {
@@ -284,16 +254,13 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 },
             }
         }
-        yield defer.ensureDeferred(
-            self.handler.upload_signing_keys_for_user(local_user, keys2)
-        )
+        self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys2))
 
-        devices = yield defer.ensureDeferred(
+        devices = self.get_success(
             self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
         )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
-    @defer.inlineCallbacks
     def test_reupload_signatures(self):
         """re-uploading a signature should not fail"""
         local_user = "@boris:" + self.hs.hostname
@@ -326,9 +293,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
             "2lonYOM6xYKdEsO+6KrC766xBcHnYnim1x/4LFGF8B0",
         )
-        yield defer.ensureDeferred(
-            self.handler.upload_signing_keys_for_user(local_user, keys1)
-        )
+        self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys1))
 
         # upload two device keys, which will be signed later by the self-signing key
         device_key_1 = {
@@ -358,12 +323,12 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "signatures": {local_user: {"ed25519:def": "base64+signature"}},
         }
 
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, "abc", {"device_keys": device_key_1}
             )
         )
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, "def", {"device_keys": device_key_2}
             )
@@ -372,7 +337,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         # sign the first device key and upload it
         del device_key_1["signatures"]
         sign.sign_json(device_key_1, local_user, signing_key)
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_signatures_for_device_keys(
                 local_user, {local_user: {"abc": device_key_1}}
             )
@@ -383,7 +348,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         # signature for it
         del device_key_2["signatures"]
         sign.sign_json(device_key_2, local_user, signing_key)
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_signatures_for_device_keys(
                 local_user, {local_user: {"abc": device_key_1, "def": device_key_2}}
             )
@@ -391,7 +356,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
 
         device_key_1["signatures"][local_user]["ed25519:abc"] = "base64+signature"
         device_key_2["signatures"][local_user]["ed25519:def"] = "base64+signature"
-        devices = yield defer.ensureDeferred(
+        devices = self.get_success(
             self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
         )
         del devices["device_keys"][local_user]["abc"]["unsigned"]
@@ -399,7 +364,6 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         self.assertDictEqual(devices["device_keys"][local_user]["abc"], device_key_1)
         self.assertDictEqual(devices["device_keys"][local_user]["def"], device_key_2)
 
-    @defer.inlineCallbacks
     def test_self_signing_key_doesnt_show_up_as_device(self):
         """signing keys should be hidden when fetching a user's devices"""
         local_user = "@boris:" + self.hs.hostname
@@ -413,29 +377,22 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
                 },
             }
         }
-        yield defer.ensureDeferred(
-            self.handler.upload_signing_keys_for_user(local_user, keys1)
-        )
+        self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys1))
 
-        res = None
-        try:
-            yield defer.ensureDeferred(
-                self.hs.get_device_handler().check_device_registered(
-                    user_id=local_user,
-                    device_id="nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
-                    initial_device_display_name="new display name",
-                )
-            )
-        except errors.SynapseError as e:
-            res = e.code
+        e = self.get_failure(
+            self.hs.get_device_handler().check_device_registered(
+                user_id=local_user,
+                device_id="nqOvzeuGWT/sRx3h7+MHoInYj3Uk2LD/unI9kDYcHwk",
+                initial_device_display_name="new display name",
+            ),
+            SynapseError,
+        )
+        res = e.value.code
         self.assertEqual(res, 400)
 
-        res = yield defer.ensureDeferred(
-            self.handler.query_local_devices({local_user: None})
-        )
+        res = self.get_success(self.handler.query_local_devices({local_user: None}))
         self.assertDictEqual(res, {local_user: {}})
 
-    @defer.inlineCallbacks
     def test_upload_signatures(self):
         """should check signatures that are uploaded"""
         # set up a user with cross-signing keys and a device.  This user will
@@ -458,7 +415,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "ed25519", "xyz", "OMkooTr76ega06xNvXIGPbgvvxAOzmQncN8VObS7aBA"
         )
 
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"device_keys": device_key}
             )
@@ -501,7 +458,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "user_signing_key": usersigning_key,
             "self_signing_key": selfsigning_key,
         }
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_signing_keys_for_user(local_user, cross_signing_keys)
         )
 
@@ -515,14 +472,14 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
             "usage": ["master"],
             "keys": {"ed25519:" + other_master_pubkey: other_master_pubkey},
         }
-        yield defer.ensureDeferred(
+        self.get_success(
             self.handler.upload_signing_keys_for_user(
                 other_user, {"master_key": other_master_key}
             )
         )
 
         # test various signature failures (see below)
-        ret = yield defer.ensureDeferred(
+        ret = self.get_success(
             self.handler.upload_signatures_for_device_keys(
                 local_user,
                 {
@@ -602,20 +559,16 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         )
 
         user_failures = ret["failures"][local_user]
+        self.assertEqual(user_failures[device_id]["errcode"], Codes.INVALID_SIGNATURE)
         self.assertEqual(
-            user_failures[device_id]["errcode"], errors.Codes.INVALID_SIGNATURE
+            user_failures[master_pubkey]["errcode"], Codes.INVALID_SIGNATURE
         )
-        self.assertEqual(
-            user_failures[master_pubkey]["errcode"], errors.Codes.INVALID_SIGNATURE
-        )
-        self.assertEqual(user_failures["unknown"]["errcode"], errors.Codes.NOT_FOUND)
+        self.assertEqual(user_failures["unknown"]["errcode"], Codes.NOT_FOUND)
 
         other_user_failures = ret["failures"][other_user]
+        self.assertEqual(other_user_failures["unknown"]["errcode"], Codes.NOT_FOUND)
         self.assertEqual(
-            other_user_failures["unknown"]["errcode"], errors.Codes.NOT_FOUND
-        )
-        self.assertEqual(
-            other_user_failures[other_master_pubkey]["errcode"], errors.Codes.UNKNOWN
+            other_user_failures[other_master_pubkey]["errcode"], Codes.UNKNOWN
         )
 
         # test successful signatures
@@ -623,7 +576,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         sign.sign_json(device_key, local_user, selfsigning_signing_key)
         sign.sign_json(master_key, local_user, device_signing_key)
         sign.sign_json(other_master_key, local_user, usersigning_signing_key)
-        ret = yield defer.ensureDeferred(
+        ret = self.get_success(
             self.handler.upload_signatures_for_device_keys(
                 local_user,
                 {
@@ -636,7 +589,7 @@ class E2eKeysHandlerTestCase(unittest.TestCase):
         self.assertEqual(ret["failures"], {})
 
         # fetch the signed keys/devices and make sure that the signatures are there
-        ret = yield defer.ensureDeferred(
+        ret = self.get_success(
             self.handler.query_devices(
                 {"device_keys": {local_user: [], other_user: []}}, 0, local_user
             )

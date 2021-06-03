@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import operator
+from typing import Dict, FrozenSet, List, Optional
 
 from synapse.api.constants import (
     AccountDataTypes,
@@ -21,10 +20,11 @@ from synapse.api.constants import (
     HistoryVisibility,
     Membership,
 )
+from synapse.events import EventBase
 from synapse.events.utils import prune_event
 from synapse.storage import Storage
 from synapse.storage.state import StateFilter
-from synapse.types import get_domain_from_id
+from synapse.types import StateMap, get_domain_from_id
 
 logger = logging.getLogger(__name__)
 
@@ -48,38 +48,39 @@ MEMBERSHIP_PRIORITY = (
 
 async def filter_events_for_client(
     storage: Storage,
-    user_id,
-    events,
-    is_peeking=False,
-    always_include_ids=frozenset(),
-    filter_send_to_client=True,
-):
+    user_id: str,
+    events: List[EventBase],
+    is_peeking: bool = False,
+    always_include_ids: FrozenSet[str] = frozenset(),
+    filter_send_to_client: bool = True,
+) -> List[EventBase]:
     """
     Check which events a user is allowed to see. If the user can see the event but its
     sender asked for their data to be erased, prune the content of the event.
 
     Args:
         storage
-        user_id(str): user id to be checked
-        events(list[synapse.events.EventBase]): sequence of events to be checked
-        is_peeking(bool): should be True if:
+        user_id: user id to be checked
+        events: sequence of events to be checked
+        is_peeking: should be True if:
           * the user is not currently a member of the room, and:
           * the user has not been a member of the room since the given
             events
-        always_include_ids (set(event_id)): set of event ids to specifically
+        always_include_ids: set of event ids to specifically
             include (unless sender is ignored)
-        filter_send_to_client (bool): Whether we're checking an event that's going to be
+        filter_send_to_client: Whether we're checking an event that's going to be
             sent to a client. This might not always be the case since this function can
             also be called to check whether a user can see the state at a given point.
 
     Returns:
-        list[synapse.events.EventBase]
+        The filtered events.
     """
     # Filter out events that have been soft failed so that we don't relay them
     # to clients.
     events = [e for e in events if not e.internal_metadata.is_soft_failed()]
 
     types = ((EventTypes.RoomHistoryVisibility, ""), (EventTypes.Member, user_id))
+
     event_id_to_state = await storage.state.get_state_for_events(
         frozenset(e.event_id for e in events),
         state_filter=StateFilter.from_types(types),
@@ -89,7 +90,7 @@ async def filter_events_for_client(
         AccountDataTypes.IGNORED_USER_LIST, user_id
     )
 
-    ignore_list = frozenset()
+    ignore_list = frozenset()  # type: FrozenSet[str]
     if ignore_dict_content:
         ignored_users_dict = ignore_dict_content.get("ignored_users", {})
         if isinstance(ignored_users_dict, dict):
@@ -106,19 +107,18 @@ async def filter_events_for_client(
                 room_id
             ] = await storage.main.get_retention_policy_for_room(room_id)
 
-    def allowed(event):
+    def allowed(event: EventBase) -> Optional[EventBase]:
         """
         Args:
-            event (synapse.events.EventBase): event to check
+            event: event to check
 
         Returns:
-            None|EventBase:
-               None if the user cannot see this event at all
+           None if the user cannot see this event at all
 
-               a redacted copy of the event if they can only see a redacted
-               version
+           a redacted copy of the event if they can only see a redacted
+           version
 
-               the original event if they can see it as normal.
+           the original event if they can see it as normal.
         """
         # Only run some checks if these events aren't about to be sent to clients. This is
         # because, if this is not the case, we're probably only checking if the users can
@@ -233,7 +233,7 @@ async def filter_events_for_client(
 
         elif visibility == HistoryVisibility.SHARED and is_peeking:
             # if the visibility is shared, users cannot see the event unless
-            # they have *subequently* joined the room (or were members at the
+            # they have *subsequently* joined the room (or were members at the
             # time, of course)
             #
             # XXX: if the user has subsequently joined and then left again,
@@ -251,48 +251,46 @@ async def filter_events_for_client(
 
         return event
 
-    # check each event: gives an iterable[None|EventBase]
+    # Check each event: gives an iterable of None or (a potentially modified)
+    # EventBase.
     filtered_events = map(allowed, events)
 
-    # remove the None entries
-    filtered_events = filter(operator.truth, filtered_events)
-
-    # we turn it into a list before returning it.
-    return list(filtered_events)
+    # Turn it into a list and remove None entries before returning.
+    return [ev for ev in filtered_events if ev]
 
 
 async def filter_events_for_server(
     storage: Storage,
-    server_name,
-    events,
-    redact=True,
-    check_history_visibility_only=False,
-):
+    server_name: str,
+    events: List[EventBase],
+    redact: bool = True,
+    check_history_visibility_only: bool = False,
+) -> List[EventBase]:
     """Filter a list of events based on whether given server is allowed to
     see them.
 
     Args:
         storage
-        server_name (str)
-        events (iterable[FrozenEvent])
-        redact (bool): Whether to return a redacted version of the event, or
+        server_name
+        events
+        redact: Whether to return a redacted version of the event, or
             to filter them out entirely.
-        check_history_visibility_only (bool): Whether to only check the
+        check_history_visibility_only: Whether to only check the
             history visibility, rather than things like if the sender has been
             erased. This is used e.g. during pagination to decide whether to
             backfill or not.
 
     Returns
-        list[FrozenEvent]
+        The filtered events.
     """
 
-    def is_sender_erased(event, erased_senders):
+    def is_sender_erased(event: EventBase, erased_senders: Dict[str, bool]) -> bool:
         if erased_senders and erased_senders[event.sender]:
             logger.info("Sender of %s has been erased, redacting", event.event_id)
             return True
         return False
 
-    def check_event_is_visible(event, state):
+    def check_event_is_visible(event: EventBase, state: StateMap[EventBase]) -> bool:
         history = state.get((EventTypes.RoomHistoryVisibility, ""), None)
         if history:
             visibility = history.content.get(

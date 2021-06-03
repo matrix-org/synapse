@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 Matrix.org Foundation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.rest import admin
@@ -150,8 +149,8 @@ class RoomComplexityTests(unittest.FederatingHomeserverTestCase):
         )
 
         # Artificially raise the complexity
-        self.hs.get_datastore().get_current_state_event_counts = lambda x: make_awaitable(
-            600
+        self.hs.get_datastore().get_current_state_event_counts = (
+            lambda x: make_awaitable(600)
         )
 
         d = handler._remote_join(

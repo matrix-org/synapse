@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,162 +13,10 @@
 # limitations under the License.
 
 """Tests REST events for /profile paths."""
-import json
-
-from mock import Mock
-
-from twisted.internet import defer
-
-import synapse.types
-from synapse.api.errors import AuthError, SynapseError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, profile, room
 
 from tests import unittest
-
-from ....utils import MockHttpResource, setup_test_homeserver
-
-myid = "@1234ABCD:test"
-PATH_PREFIX = "/_matrix/client/r0"
-
-
-class MockHandlerProfileTestCase(unittest.TestCase):
-    """ Tests rest layer of profile management.
-
-    Todo: move these into ProfileTestCase
-    """
-
-    @defer.inlineCallbacks
-    def setUp(self):
-        self.mock_resource = MockHttpResource(prefix=PATH_PREFIX)
-        self.mock_handler = Mock(
-            spec=[
-                "get_displayname",
-                "set_displayname",
-                "get_avatar_url",
-                "set_avatar_url",
-                "check_profile_query_allowed",
-            ]
-        )
-
-        self.mock_handler.get_displayname.return_value = defer.succeed(Mock())
-        self.mock_handler.set_displayname.return_value = defer.succeed(Mock())
-        self.mock_handler.get_avatar_url.return_value = defer.succeed(Mock())
-        self.mock_handler.set_avatar_url.return_value = defer.succeed(Mock())
-        self.mock_handler.check_profile_query_allowed.return_value = defer.succeed(
-            Mock()
-        )
-
-        hs = yield setup_test_homeserver(
-            self.addCleanup,
-            "test",
-            federation_http_client=None,
-            resource_for_client=self.mock_resource,
-            federation=Mock(),
-            federation_client=Mock(),
-            profile_handler=self.mock_handler,
-        )
-
-        async def _get_user_by_req(request=None, allow_guest=False):
-            return synapse.types.create_requester(myid)
-
-        hs.get_auth().get_user_by_req = _get_user_by_req
-
-        profile.register_servlets(hs, self.mock_resource)
-
-    @defer.inlineCallbacks
-    def test_get_my_name(self):
-        mocked_get = self.mock_handler.get_displayname
-        mocked_get.return_value = defer.succeed("Frank")
-
-        (code, response) = yield self.mock_resource.trigger(
-            "GET", "/profile/%s/displayname" % (myid), None
-        )
-
-        self.assertEquals(200, code)
-        self.assertEquals({"displayname": "Frank"}, response)
-        self.assertEquals(mocked_get.call_args[0][0].localpart, "1234ABCD")
-
-    @defer.inlineCallbacks
-    def test_set_my_name(self):
-        mocked_set = self.mock_handler.set_displayname
-        mocked_set.return_value = defer.succeed(())
-
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT", "/profile/%s/displayname" % (myid), b'{"displayname": "Frank Jr."}'
-        )
-
-        self.assertEquals(200, code)
-        self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][2], "Frank Jr.")
-
-    @defer.inlineCallbacks
-    def test_set_my_name_noauth(self):
-        mocked_set = self.mock_handler.set_displayname
-        mocked_set.side_effect = AuthError(400, "message")
-
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            "/profile/%s/displayname" % ("@4567:test"),
-            b'{"displayname": "Frank Jr."}',
-        )
-
-        self.assertTrue(400 <= code < 499, msg="code %d is in the 4xx range" % (code))
-
-    @defer.inlineCallbacks
-    def test_get_other_name(self):
-        mocked_get = self.mock_handler.get_displayname
-        mocked_get.return_value = defer.succeed("Bob")
-
-        (code, response) = yield self.mock_resource.trigger(
-            "GET", "/profile/%s/displayname" % ("@opaque:elsewhere"), None
-        )
-
-        self.assertEquals(200, code)
-        self.assertEquals({"displayname": "Bob"}, response)
-
-    @defer.inlineCallbacks
-    def test_set_other_name(self):
-        mocked_set = self.mock_handler.set_displayname
-        mocked_set.side_effect = SynapseError(400, "message")
-
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            "/profile/%s/displayname" % ("@opaque:elsewhere"),
-            b'{"displayname":"bob"}',
-        )
-
-        self.assertTrue(400 <= code <= 499, msg="code %d is in the 4xx range" % (code))
-
-    @defer.inlineCallbacks
-    def test_get_my_avatar(self):
-        mocked_get = self.mock_handler.get_avatar_url
-        mocked_get.return_value = defer.succeed("http://my.server/me.png")
-
-        (code, response) = yield self.mock_resource.trigger(
-            "GET", "/profile/%s/avatar_url" % (myid), None
-        )
-
-        self.assertEquals(200, code)
-        self.assertEquals({"avatar_url": "http://my.server/me.png"}, response)
-        self.assertEquals(mocked_get.call_args[0][0].localpart, "1234ABCD")
-
-    @defer.inlineCallbacks
-    def test_set_my_avatar(self):
-        mocked_set = self.mock_handler.set_avatar_url
-        mocked_set.return_value = defer.succeed(())
-
-        (code, response) = yield self.mock_resource.trigger(
-            "PUT",
-            "/profile/%s/avatar_url" % (myid),
-            b'{"avatar_url": "http://my.server/pic.gif"}',
-        )
-
-        self.assertEquals(200, code)
-        self.assertEquals(mocked_set.call_args[0][0].localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][1].user.localpart, "1234ABCD")
-        self.assertEquals(mocked_set.call_args[0][2], "http://my.server/pic.gif")
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):
@@ -187,36 +34,121 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.owner = self.register_user("owner", "pass")
         self.owner_tok = self.login("owner", "pass")
+        self.other = self.register_user("other", "pass", displayname="Bob")
+
+    def test_get_displayname(self):
+        res = self._get_displayname()
+        self.assertEqual(res, "owner")
 
     def test_set_displayname(self):
         channel = self.make_request(
             "PUT",
             "/profile/%s/displayname" % (self.owner,),
-            content=json.dumps({"displayname": "test"}),
+            content={"displayname": "test"},
             access_token=self.owner_tok,
         )
         self.assertEqual(channel.code, 200, channel.result)
 
-        res = self.get_displayname()
+        res = self._get_displayname()
         self.assertEqual(res, "test")
+
+    def test_set_displayname_noauth(self):
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/displayname" % (self.owner,),
+            content={"displayname": "test"},
+        )
+        self.assertEqual(channel.code, 401, channel.result)
 
     def test_set_displayname_too_long(self):
         """Attempts to set a stupid displayname should get a 400"""
         channel = self.make_request(
             "PUT",
             "/profile/%s/displayname" % (self.owner,),
-            content=json.dumps({"displayname": "test" * 100}),
+            content={"displayname": "test" * 100},
             access_token=self.owner_tok,
         )
         self.assertEqual(channel.code, 400, channel.result)
 
-        res = self.get_displayname()
+        res = self._get_displayname()
         self.assertEqual(res, "owner")
 
-    def get_displayname(self):
-        channel = self.make_request("GET", "/profile/%s/displayname" % (self.owner,))
+    def test_get_displayname_other(self):
+        res = self._get_displayname(self.other)
+        self.assertEquals(res, "Bob")
+
+    def test_set_displayname_other(self):
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/displayname" % (self.other,),
+            content={"displayname": "test"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 400, channel.result)
+
+    def test_get_avatar_url(self):
+        res = self._get_avatar_url()
+        self.assertIsNone(res)
+
+    def test_set_avatar_url(self):
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "http://my.server/pic.gif"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        res = self._get_avatar_url()
+        self.assertEqual(res, "http://my.server/pic.gif")
+
+    def test_set_avatar_url_noauth(self):
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "http://my.server/pic.gif"},
+        )
+        self.assertEqual(channel.code, 401, channel.result)
+
+    def test_set_avatar_url_too_long(self):
+        """Attempts to set a stupid avatar_url should get a 400"""
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.owner,),
+            content={"avatar_url": "http://my.server/pic.gif" * 100},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 400, channel.result)
+
+        res = self._get_avatar_url()
+        self.assertIsNone(res)
+
+    def test_get_avatar_url_other(self):
+        res = self._get_avatar_url(self.other)
+        self.assertIsNone(res)
+
+    def test_set_avatar_url_other(self):
+        channel = self.make_request(
+            "PUT",
+            "/profile/%s/avatar_url" % (self.other,),
+            content={"avatar_url": "http://my.server/pic.gif"},
+            access_token=self.owner_tok,
+        )
+        self.assertEqual(channel.code, 400, channel.result)
+
+    def _get_displayname(self, name=None):
+        channel = self.make_request(
+            "GET", "/profile/%s/displayname" % (name or self.owner,)
+        )
         self.assertEqual(channel.code, 200, channel.result)
         return channel.json_body["displayname"]
+
+    def _get_avatar_url(self, name=None):
+        channel = self.make_request(
+            "GET", "/profile/%s/avatar_url" % (name or self.owner,)
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        return channel.json_body.get("avatar_url")
 
 
 class ProfilesRestrictedTestCase(unittest.HomeserverTestCase):

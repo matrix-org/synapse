@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,8 +35,7 @@ logger = logging.getLogger(__name__)
 
 
 class ReplicationStreamProtocolFactory(Factory):
-    """Factory for new replication connections.
-    """
+    """Factory for new replication connections."""
 
     def __init__(self, hs):
         self.command_handler = hs.get_tcp_replication()
@@ -181,7 +179,8 @@ class ReplicationStreamer:
                             raise
 
                         logger.debug(
-                            "Sending %d updates", len(updates),
+                            "Sending %d updates",
+                            len(updates),
                         )
 
                         if updates:

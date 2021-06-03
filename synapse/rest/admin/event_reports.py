@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,10 +13,16 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import Codes, NotFoundError, SynapseError
 from synapse.http.servlet import RestServlet, parse_integer, parse_string
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -45,12 +50,12 @@ class EventReportsRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/event_reports$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         start = parse_integer(request, "from", default=0)
@@ -106,26 +111,28 @@ class EventReportDetailRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/event_reports/(?P<report_id>[^/]*)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
-    async def on_GET(self, request, report_id):
+    async def on_GET(
+        self, request: SynapseRequest, report_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         message = (
             "The report_id parameter must be a string representing a positive integer."
         )
         try:
-            report_id = int(report_id)
+            resolved_report_id = int(report_id)
         except ValueError:
             raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
 
-        if report_id < 0:
+        if resolved_report_id < 0:
             raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
 
-        ret = await self.store.get_event_report(report_id)
+        ret = await self.store.get_event_report(resolved_report_id)
         if not ret:
             raise NotFoundError("Event report not found")
 

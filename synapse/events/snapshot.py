@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -341,8 +340,7 @@ def _encode_state_dict(state_dict):
 
 
 def _decode_state_dict(input):
-    """Decodes a state dict encoded using `_encode_state_dict` above
-    """
+    """Decodes a state dict encoded using `_encode_state_dict` above"""
     if input is None:
         return None
 

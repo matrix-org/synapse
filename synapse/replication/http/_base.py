@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@ import logging
 import re
 import urllib
 from inspect import signature
-from typing import Dict, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from prometheus_client import Counter, Gauge
 
@@ -27,6 +26,9 @@ from synapse.http import RequestTimedOutError
 from synapse.logging.opentracing import inject_active_span_byte_dict, trace
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -88,10 +90,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     CACHE = True
     RETRY_ON_TIMEOUT = True
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         if self.CACHE:
             self.response_cache = ResponseCache(
-                hs, "repl." + self.NAME, timeout_ms=30 * 60 * 1000
+                hs.get_clock(), "repl." + self.NAME, timeout_ms=30 * 60 * 1000
             )  # type: ResponseCache[str]
 
         # We reserve `instance_name` as a parameter to sending requests, so we
@@ -156,7 +158,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
     def make_client(cls, hs):
         """Create a client that makes requests.
 
-        Returns a callable that accepts the same parameters as `_serialize_payload`.
+        Returns a callable that accepts the same parameters as
+        `_serialize_payload`, and also accepts an optional `instance_name`
+        parameter to specify which instance to hit (the instance must be in
+        the `instance_map` config).
         """
         clock = hs.get_clock()
         client = hs.get_simple_http_client()
@@ -273,7 +278,10 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         pattern = re.compile("^/_synapse/replication/%s/%s$" % (self.NAME, args))
 
         http_server.register_paths(
-            method, [pattern], self._check_auth_and_handle, self.__class__.__name__,
+            method,
+            [pattern],
+            self._check_auth_and_handle,
+            self.__class__.__name__,
         )
 
     def _check_auth_and_handle(self, request, **kwargs):

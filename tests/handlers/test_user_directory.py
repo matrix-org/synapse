@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,12 +11,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
+from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import user_directory
 from synapse.storage.roommember import ProfileInfo
@@ -46,6 +46,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
         self.handler = hs.get_user_directory_handler()
+        self.event_builder_factory = self.hs.get_event_builder_factory()
+        self.event_creation_handler = self.hs.get_event_creation_handler()
 
     def test_handle_local_profile_change_with_support_user(self):
         support_user_id = "@support:test"
@@ -200,7 +202,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Check that the room has an encryption state event
         event_content = self.helper.get_state(
-            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
@@ -209,7 +213,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Check that the room has an encryption state event
         event_content = self.helper.get_state(
-            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
@@ -227,7 +233,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # Check that the room has an encryption state event
         event_content = self.helper.get_state(
-            room_id=room_id, event_type=EventTypes.RoomEncryption, tok=user_token,
+            room_id=room_id,
+            event_type=EventTypes.RoomEncryption,
+            tok=user_token,
         )
         self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
 
@@ -540,6 +548,100 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         u4 = self.register_user("user4", "pass")
         s = self.get_success(self.handler.search_users(u1, u4, 10))
         self.assertEqual(len(s["results"]), 1)
+
+    @override_config(
+        {
+            "user_directory": {
+                "enabled": True,
+                "search_all_users": True,
+                "prefer_local_users": True,
+            }
+        }
+    )
+    def test_prefer_local_users(self):
+        """Tests that local users are shown higher in search results when
+        user_directory.prefer_local_users is True.
+        """
+        # Create a room and few users to test the directory with
+        searching_user = self.register_user("searcher", "password")
+        searching_user_tok = self.login("searcher", "password")
+
+        room_id = self.helper.create_room_as(
+            searching_user,
+            room_version=RoomVersions.V1.identifier,
+            tok=searching_user_tok,
+        )
+
+        # Create a few local users and join them to the room
+        local_user_1 = self.register_user("user_xxxxx", "password")
+        local_user_2 = self.register_user("user_bbbbb", "password")
+        local_user_3 = self.register_user("user_zzzzz", "password")
+
+        self._add_user_to_room(room_id, RoomVersions.V1, local_user_1)
+        self._add_user_to_room(room_id, RoomVersions.V1, local_user_2)
+        self._add_user_to_room(room_id, RoomVersions.V1, local_user_3)
+
+        # Create a few "remote" users and join them to the room
+        remote_user_1 = "@user_aaaaa:remote_server"
+        remote_user_2 = "@user_yyyyy:remote_server"
+        remote_user_3 = "@user_ccccc:remote_server"
+        self._add_user_to_room(room_id, RoomVersions.V1, remote_user_1)
+        self._add_user_to_room(room_id, RoomVersions.V1, remote_user_2)
+        self._add_user_to_room(room_id, RoomVersions.V1, remote_user_3)
+
+        local_users = [local_user_1, local_user_2, local_user_3]
+        remote_users = [remote_user_1, remote_user_2, remote_user_3]
+
+        # Populate the user directory via background update
+        self._add_background_updates()
+        while not self.get_success(
+            self.store.db_pool.updates.has_completed_background_updates()
+        ):
+            self.get_success(
+                self.store.db_pool.updates.do_next_background_update(100), by=0.1
+            )
+
+        # The local searching user searches for the term "user", which other users have
+        # in their user id
+        results = self.get_success(
+            self.handler.search_users(searching_user, "user", 20)
+        )["results"]
+        received_user_id_ordering = [result["user_id"] for result in results]
+
+        # Typically we'd expect Synapse to return users in lexicographical order,
+        # assuming they have similar User IDs/display names, and profile information.
+
+        # Check that the order of returned results using our module is as we expect,
+        # i.e our local users show up first, despite all users having lexographically mixed
+        # user IDs.
+        [self.assertIn(user, local_users) for user in received_user_id_ordering[:3]]
+        [self.assertIn(user, remote_users) for user in received_user_id_ordering[3:]]
+
+    def _add_user_to_room(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+        user_id: str,
+    ):
+        # Add a user to the room.
+        builder = self.event_builder_factory.for_room_version(
+            room_version,
+            {
+                "type": "m.room.member",
+                "sender": user_id,
+                "state_key": user_id,
+                "room_id": room_id,
+                "content": {"membership": "join"},
+            },
+        )
+
+        event, context = self.get_success(
+            self.event_creation_handler.create_new_client_event(builder)
+        )
+
+        self.get_success(
+            self.hs.get_storage().persistence.persist_event(event, context)
+        )
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):

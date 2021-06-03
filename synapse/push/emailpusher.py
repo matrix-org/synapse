@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +15,16 @@
 import logging
 from typing import TYPE_CHECKING, Dict, List, Optional
 
-from twisted.internet.base import DelayedCall
 from twisted.internet.error import AlreadyCalled, AlreadyCancelled
+from twisted.internet.interfaces import IDelayedCall
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.push import Pusher, PusherConfig, ThrottleParams
+from synapse.push import Pusher, PusherConfig, PusherConfigException, ThrottleParams
 from synapse.push.mailer import Mailer
+from synapse.util.threepids import validate_email
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -66,11 +66,17 @@ class EmailPusher(Pusher):
 
         self.store = self.hs.get_datastore()
         self.email = pusher_config.pushkey
-        self.timed_call = None  # type: Optional[DelayedCall]
+        self.timed_call = None  # type: Optional[IDelayedCall]
         self.throttle_params = {}  # type: Dict[str, ThrottleParams]
         self._inited = False
 
         self._is_processing = False
+
+        # Make sure that the email is valid.
+        try:
+            validate_email(self.email)
+        except ValueError:
+            raise PusherConfigException("Invalid email")
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -116,8 +122,7 @@ class EmailPusher(Pusher):
         self._is_processing = True
 
     def _resume_processing(self) -> None:
-        """Used by tests to resume processing of events after pausing.
-        """
+        """Used by tests to resume processing of events after pausing."""
         assert self._is_processing
         self._is_processing = False
         self._start_processing()
@@ -157,8 +162,10 @@ class EmailPusher(Pusher):
         being run.
         """
         start = 0 if INCLUDE_ALL_UNREAD_NOTIFS else self.last_stream_ordering
-        unprocessed = await self.store.get_unread_push_actions_for_user_in_range_for_email(
-            self.user_id, start, self.max_stream_ordering
+        unprocessed = (
+            await self.store.get_unread_push_actions_for_user_in_range_for_email(
+                self.user_id, start, self.max_stream_ordering
+            )
         )
 
         soonest_due_at = None  # type: Optional[int]
@@ -222,12 +229,14 @@ class EmailPusher(Pusher):
         self, last_stream_ordering: int
     ) -> None:
         self.last_stream_ordering = last_stream_ordering
-        pusher_still_exists = await self.store.update_pusher_last_stream_ordering_and_success(
-            self.app_id,
-            self.email,
-            self.user_id,
-            last_stream_ordering,
-            self.clock.time_msec(),
+        pusher_still_exists = (
+            await self.store.update_pusher_last_stream_ordering_and_success(
+                self.app_id,
+                self.email,
+                self.user_id,
+                last_stream_ordering,
+                self.clock.time_msec(),
+            )
         )
         if not pusher_still_exists:
             # The pusher has been deleted while we were processing, so
@@ -298,7 +307,8 @@ class EmailPusher(Pusher):
                     current_throttle_ms * THROTTLE_MULTIPLIER, THROTTLE_MAX_MS
                 )
         self.throttle_params[room_id] = ThrottleParams(
-            self.clock.time_msec(), new_throttle_ms,
+            self.clock.time_msec(),
+            new_throttle_ms,
         )
         assert self.pusher_id is not None
         await self.store.set_throttle_params(
