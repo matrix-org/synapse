@@ -1,2 +1,0 @@
-Fix a bug that prevented the ip_range_whitelist to work for federation and identity servers.
-Notice that this change will not be applied, if your configuration still uses federation_ip_range_blacklist, due to backwards-compatibility reasons.
