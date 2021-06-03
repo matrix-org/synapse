@@ -40,7 +40,7 @@ THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 logger = logging.getLogger(__name__)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(slots=True)
 class TokenLookupResult:
     """Result of looking up an access token.
 
