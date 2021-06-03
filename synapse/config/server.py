@@ -410,6 +410,11 @@ class ServerConfig(Config):
             ["0.0.0.0", "::"],
             config_path=("federation_ip_range_blacklist",),
         )
+        # The federation_ip_range_whitelist is used to provide
+        # backwards-compatibility, if federation_ip_range_blacklist is set.
+        self.federation_ip_range_whitelist = None
+        if "federation_ip_range_blacklist" not in config:
+            self.federation_ip_range_whitelist = self.ip_range_whitelist
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before

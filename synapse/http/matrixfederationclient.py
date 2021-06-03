@@ -322,7 +322,9 @@ class MatrixFederationHttpClient:
         # We need to use a DNS resolver which filters out blacklisted IP
         # addresses, to prevent DNS rebinding.
         self.reactor = BlacklistingReactorWrapper(
-            hs.get_reactor(), None, hs.config.federation_ip_range_blacklist
+            hs.get_reactor(),
+            hs.config.federation_ip_range_whitelist,
+            hs.config.federation_ip_range_blacklist,
         )  # type: ISynapseReactor
 
         user_agent = hs.version_string
