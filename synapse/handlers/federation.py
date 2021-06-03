@@ -3056,8 +3056,9 @@ class FederationHandler(BaseHandler):
         """
         instance = self.config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:
-            # Limit the number of events sent over federation.
-            for batch in batch_iter(event_and_contexts, 1000):
+            # Limit the number of events sent over federation. We choose 200
+            # here as that is what we default to in `max_request_body_size(..)`
+            for batch in batch_iter(event_and_contexts, 200):
                 result = await self._send_events(
                     instance_name=instance,
                     store=self.store,
