@@ -1880,8 +1880,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         """Calls the endpoint under test. returns the json response object."""
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/org.matrix.msc2432/rooms/%s/aliases"
-            % (self.room_id,),
+            "/_matrix/client/r0/rooms/%s/aliases" % (self.room_id,),
             access_token=access_token,
         )
         self.assertEqual(channel.code, expected_code, channel.result)

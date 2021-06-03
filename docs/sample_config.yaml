@@ -2916,18 +2916,3 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
-
-
-# Enable experimental features in Synapse.
-#
-# Experimental features might break or be removed without a deprecation
-# period.
-#
-experimental_features:
-  # Support for Spaces (MSC1772), it enables the following:
-  #
-  # * The Spaces Summary API (MSC2946).
-  # * Restricting room membership based on space membership (MSC3083).
-  #
-  # Uncomment to disable support for Spaces.
-  #spaces_enabled: false

@@ -463,7 +463,7 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids = frozenset()  # type: FrozenSet[str]
                 if any(e.is_state() for e in recents):
-                    current_state_ids_map = await self.state.get_current_state_ids(
+                    current_state_ids_map = await self.store.get_current_state_ids(
                         room_id
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
@@ -523,7 +523,7 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
-                    current_state_ids_map = await self.state.get_current_state_ids(
+                    current_state_ids_map = await self.store.get_current_state_ids(
                         room_id
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
