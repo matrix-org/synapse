@@ -1202,6 +1202,10 @@ url_preview_accept_language:
 #
 #enable_3pid_lookup: true
 
+# Require users to submit a token during registration
+#
+#registrations_require_token: false
+
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
 #
