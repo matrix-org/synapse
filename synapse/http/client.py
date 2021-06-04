@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -34,6 +33,7 @@ import treq
 from canonicaljson import encode_canonical_json
 from netaddr import AddrFormatError, IPAddress, IPSet
 from prometheus_client import Counter
+from typing_extensions import Protocol
 from zope.interface import implementer, provider
 
 from OpenSSL import SSL
@@ -297,7 +297,7 @@ class SimpleHttpClient:
     def __init__(
         self,
         hs: "HomeServer",
-        treq_args: Dict[str, Any] = {},
+        treq_args: Optional[Dict[str, Any]] = None,
         ip_whitelist: Optional[IPSet] = None,
         ip_blacklist: Optional[IPSet] = None,
         use_proxy: bool = False,
@@ -317,7 +317,7 @@ class SimpleHttpClient:
 
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
-        self._extra_treq_args = treq_args
+        self._extra_treq_args = treq_args or {}
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
@@ -755,6 +755,16 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
+class ByteWriteable(Protocol):
+    """The type of object which must be passed into read_body_with_max_size.
+
+    Typically this is a file object.
+    """
+
+    def write(self, data: bytes) -> int:
+        pass
+
+
 class BodyExceededMaxSize(Exception):
     """The maximum allowed size of the HTTP body was exceeded."""
 
@@ -791,7 +801,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
     transport = None  # type: Optional[ITCPTransport]
 
     def __init__(
-        self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
+        self, stream: ByteWriteable, deferred: defer.Deferred, max_size: Optional[int]
     ):
         self.stream = stream
         self.deferred = deferred
@@ -803,7 +813,12 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
         if self.deferred.called:
             return
 
-        self.stream.write(data)
+        try:
+            self.stream.write(data)
+        except Exception:
+            self.deferred.errback()
+            return
+
         self.length += len(data)
         # The first time the maximum size is exceeded, error and cancel the
         # connection. dataReceived might be called again if data was received
@@ -831,7 +846,7 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
 
 
 def read_body_with_max_size(
-    response: IResponse, stream: BinaryIO, max_size: Optional[int]
+    response: IResponse, stream: ByteWriteable, max_size: Optional[int]
 ) -> defer.Deferred:
     """
     Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.

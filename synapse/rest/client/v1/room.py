@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -909,7 +908,7 @@ class RoomAliasListServlet(RestServlet):
             r"^/_matrix/client/unstable/org\.matrix\.msc2432"
             r"/rooms/(?P<room_id>[^/]*)/aliases"
         ),
-    ]
+    ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1019,6 +1018,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
         )
 
+    # TODO When switching to the stable endpoint, remove the POST handler.
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
@@ -1058,18 +1058,16 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-
-    if hs.config.experimental.spaces_enabled:
-        RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomEventServlet(hs).register(http_server)
+    JoinedRoomsRestServlet(hs).register(http_server)
+    RoomAliasListServlet(hs).register(http_server)
+    SearchRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:
         RoomCreateRestServlet(hs).register(http_server)
         RoomForgetRestServlet(hs).register(http_server)
-        SearchRestServlet(hs).register(http_server)
-        JoinedRoomsRestServlet(hs).register(http_server)
-        RoomEventServlet(hs).register(http_server)
-        RoomAliasListServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):

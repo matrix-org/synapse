@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 import logging
 import string
-from typing import Iterable, List, Optional
+from typing import TYPE_CHECKING, Iterable, List, Optional
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes
 from synapse.api.errors import (
@@ -28,15 +27,19 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.appservice import ApplicationService
-from synapse.types import Requester, RoomAlias, UserID, get_domain_from_id
+from synapse.storage.databases.main.directory import RoomAliasMapping
+from synapse.types import JsonDict, Requester, RoomAlias, UserID, get_domain_from_id
 
 from ._base import BaseHandler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class DirectoryHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.state = hs.get_state_handler()
@@ -61,7 +64,7 @@ class DirectoryHandler(BaseHandler):
         room_id: str,
         servers: Optional[Iterable[str]] = None,
         creator: Optional[str] = None,
-    ):
+    ) -> None:
         # general association creation for both human users and app services
 
         for wchar in string.whitespace:
@@ -75,7 +78,7 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            users = await self.state.get_current_users_in_room(room_id)
+            users = await self.store.get_users_in_room(room_id)
             servers = {get_domain_from_id(u) for u in users}
 
         if not servers:
@@ -105,8 +108,9 @@ class DirectoryHandler(BaseHandler):
         """
 
         user_id = requester.user.to_string()
+        room_alias_str = room_alias.to_string()
 
-        if len(room_alias.to_string()) > MAX_ALIAS_LENGTH:
+        if len(room_alias_str) > MAX_ALIAS_LENGTH:
             raise SynapseError(
                 400,
                 "Can't create aliases longer than %s characters" % MAX_ALIAS_LENGTH,
@@ -115,7 +119,7 @@ class DirectoryHandler(BaseHandler):
 
         service = requester.app_service
         if service:
-            if not service.is_interested_in_alias(room_alias.to_string()):
+            if not service.is_interested_in_alias(room_alias_str):
                 raise SynapseError(
                     400,
                     "This application service has not reserved this kind of alias.",
@@ -139,7 +143,7 @@ class DirectoryHandler(BaseHandler):
                 raise AuthError(403, "This user is not permitted to create this alias")
 
             if not self.config.is_alias_creation_allowed(
-                user_id, room_id, room_alias.to_string()
+                user_id, room_id, room_alias_str
             ):
                 # Lets just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
@@ -212,7 +216,7 @@ class DirectoryHandler(BaseHandler):
 
     async def delete_appservice_association(
         self, service: ApplicationService, room_alias: RoomAlias
-    ):
+    ) -> None:
         if not service.is_interested_in_alias(room_alias.to_string()):
             raise SynapseError(
                 400,
@@ -221,7 +225,7 @@ class DirectoryHandler(BaseHandler):
             )
         await self._delete_association(room_alias)
 
-    async def _delete_association(self, room_alias: RoomAlias):
+    async def _delete_association(self, room_alias: RoomAlias) -> str:
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room alias must be local")
 
@@ -229,17 +233,19 @@ class DirectoryHandler(BaseHandler):
 
         return room_id
 
-    async def get_association(self, room_alias: RoomAlias):
+    async def get_association(self, room_alias: RoomAlias) -> JsonDict:
         room_id = None
         if self.hs.is_mine(room_alias):
-            result = await self.get_association_from_room_alias(room_alias)
+            result = await self.get_association_from_room_alias(
+                room_alias
+            )  # type: Optional[RoomAliasMapping]
 
             if result:
                 room_id = result.room_id
                 servers = result.servers
         else:
             try:
-                result = await self.federation.make_query(
+                fed_result = await self.federation.make_query(
                     destination=room_alias.domain,
                     query_type="directory",
                     args={"room_alias": room_alias.to_string()},
@@ -249,13 +255,13 @@ class DirectoryHandler(BaseHandler):
             except CodeMessageException as e:
                 logging.warning("Error retrieving alias")
                 if e.code == 404:
-                    result = None
+                    fed_result = None
                 else:
                     raise
 
-            if result and "room_id" in result and "servers" in result:
-                room_id = result["room_id"]
-                servers = result["servers"]
+            if fed_result and "room_id" in fed_result and "servers" in fed_result:
+                room_id = fed_result["room_id"]
+                servers = fed_result["servers"]
 
         if not room_id:
             raise SynapseError(
@@ -264,7 +270,7 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND,
             )
 
-        users = await self.state.get_current_users_in_room(room_id)
+        users = await self.store.get_users_in_room(room_id)
         extra_servers = {get_domain_from_id(u) for u in users}
         servers = set(extra_servers) | set(servers)
 
@@ -276,7 +282,7 @@ class DirectoryHandler(BaseHandler):
 
         return {"room_id": room_id, "servers": servers}
 
-    async def on_directory_query(self, args):
+    async def on_directory_query(self, args: JsonDict) -> JsonDict:
         room_alias = RoomAlias.from_string(args["room_alias"])
         if not self.hs.is_mine(room_alias):
             raise SynapseError(400, "Room Alias is not hosted on this homeserver")
@@ -294,7 +300,7 @@ class DirectoryHandler(BaseHandler):
 
     async def _update_canonical_alias(
         self, requester: Requester, user_id: str, room_id: str, room_alias: RoomAlias
-    ):
+    ) -> None:
         """
         Send an updated canonical alias event if the removed alias was set as
         the canonical alias or listed in the alt_aliases field.
@@ -345,7 +351,9 @@ class DirectoryHandler(BaseHandler):
                 ratelimit=False,
             )
 
-    async def get_association_from_room_alias(self, room_alias: RoomAlias):
+    async def get_association_from_room_alias(
+        self, room_alias: RoomAlias
+    ) -> Optional[RoomAliasMapping]:
         result = await self.store.get_association_from_room_alias(room_alias)
         if not result:
             # Query AS to see if it exists
@@ -373,7 +381,7 @@ class DirectoryHandler(BaseHandler):
         # either no interested services, or no service with an exclusive lock
         return True
 
-    async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str):
+    async def _user_can_delete_alias(self, alias: RoomAlias, user_id: str) -> bool:
         """Determine whether a user can delete an alias.
 
         One of the following must be true:
@@ -395,14 +403,13 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             return False
 
-        res = await self.auth.check_can_change_room_list(
+        return await self.auth.check_can_change_room_list(
             room_id, UserID.from_string(user_id)
         )
-        return res
 
     async def edit_published_room_list(
         self, requester: Requester, room_id: str, visibility: str
-    ):
+    ) -> None:
         """Edit the entry of the room in the published room list.
 
         requester
@@ -470,7 +477,7 @@ class DirectoryHandler(BaseHandler):
 
     async def edit_published_appservice_room_list(
         self, appservice_id: str, network_id: str, room_id: str, visibility: str
-    ):
+    ) -> None:
         """Add or remove a room from the appservice/network specific public
         room list.
 
@@ -500,5 +507,4 @@ class DirectoryHandler(BaseHandler):
                 room_id, requester.user.to_string()
             )
 
-        aliases = await self.store.get_aliases_for_room(room_id)
-        return aliases
+        return await self.store.get_aliases_for_room(room_id)

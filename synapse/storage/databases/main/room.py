@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -521,13 +520,11 @@ class RoomWorkerStore(SQLBaseStore):
         )
 
     @cached(max_entries=10000)
-    async def get_ratelimit_for_user(self, user_id):
-        """Check if there are any overrides for ratelimiting for the given
-        user
+    async def get_ratelimit_for_user(self, user_id: str) -> Optional[RatelimitOverride]:
+        """Check if there are any overrides for ratelimiting for the given user
 
         Args:
-            user_id (str)
-
+            user_id: user ID of the user
         Returns:
             RatelimitOverride if there is an override, else None. If the contents
             of RatelimitOverride are None or 0 then ratelimitng has been
@@ -548,6 +545,62 @@ class RoomWorkerStore(SQLBaseStore):
             )
         else:
             return None
+
+    async def set_ratelimit_for_user(
+        self, user_id: str, messages_per_second: int, burst_count: int
+    ) -> None:
+        """Sets whether a user is set an overridden ratelimit.
+        Args:
+            user_id: user ID of the user
+            messages_per_second: The number of actions that can be performed in a second.
+            burst_count: How many actions that can be performed before being limited.
+        """
+
+        def set_ratelimit_txn(txn):
+            self.db_pool.simple_upsert_txn(
+                txn,
+                table="ratelimit_override",
+                keyvalues={"user_id": user_id},
+                values={
+                    "messages_per_second": messages_per_second,
+                    "burst_count": burst_count,
+                },
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_ratelimit_for_user, (user_id,)
+            )
+
+        await self.db_pool.runInteraction("set_ratelimit", set_ratelimit_txn)
+
+    async def delete_ratelimit_for_user(self, user_id: str) -> None:
+        """Delete an overridden ratelimit for a user.
+        Args:
+            user_id: user ID of the user
+        """
+
+        def delete_ratelimit_txn(txn):
+            row = self.db_pool.simple_select_one_txn(
+                txn,
+                table="ratelimit_override",
+                keyvalues={"user_id": user_id},
+                retcols=["user_id"],
+                allow_none=True,
+            )
+
+            if not row:
+                return
+
+            # They are there, delete them.
+            self.db_pool.simple_delete_one_txn(
+                txn, "ratelimit_override", keyvalues={"user_id": user_id}
+            )
+
+            self._invalidate_cache_and_stream(
+                txn, self.get_ratelimit_for_user, (user_id,)
+            )
+
+        await self.db_pool.runInteraction("delete_ratelimit", delete_ratelimit_txn)
 
     @cached()
     async def get_retention_policy_for_room(self, room_id):
@@ -711,14 +764,15 @@ class RoomWorkerStore(SQLBaseStore):
         self,
         server_name: str,
         media_id: str,
-        quarantined_by: str,
+        quarantined_by: Optional[str],
     ) -> int:
-        """quarantines a single local or remote media id
+        """quarantines or unquarantines a single local or remote media id
 
         Args:
             server_name: The name of the server that holds this media
             media_id: The ID of the media to be quarantined
             quarantined_by: The user ID that initiated the quarantine request
+                If it is `None` media will be removed from quarantine
         """
         logger.info("Quarantining media: %s/%s", server_name, media_id)
         is_local = server_name == self.config.server_name
@@ -785,9 +839,9 @@ class RoomWorkerStore(SQLBaseStore):
         txn,
         local_mxcs: List[str],
         remote_mxcs: List[Tuple[str, str]],
-        quarantined_by: str,
+        quarantined_by: Optional[str],
     ) -> int:
-        """Quarantine local and remote media items
+        """Quarantine and unquarantine local and remote media items
 
         Args:
             txn (cursor)
@@ -795,18 +849,27 @@ class RoomWorkerStore(SQLBaseStore):
             remote_mxcs: A list of (remote server, media id) tuples representing
                 remote mxc URLs
             quarantined_by: The ID of the user who initiated the quarantine request
+                If it is `None` media will be removed from quarantine
         Returns:
             The total number of media items quarantined
         """
+
         # Update all the tables to set the quarantined_by flag
-        txn.executemany(
-            """
+        sql = """
             UPDATE local_media_repository
             SET quarantined_by = ?
-            WHERE media_id = ? AND safe_from_quarantine = ?
-        """,
-            ((quarantined_by, media_id, False) for media_id in local_mxcs),
-        )
+            WHERE media_id = ?
+        """
+
+        # set quarantine
+        if quarantined_by is not None:
+            sql += "AND safe_from_quarantine = ?"
+            rows = [(quarantined_by, media_id, False) for media_id in local_mxcs]
+        # remove from quarantine
+        else:
+            rows = [(quarantined_by, media_id) for media_id in local_mxcs]
+
+        txn.executemany(sql, rows)
         # Note that a rowcount of -1 can be used to indicate no rows were affected.
         total_media_quarantined = txn.rowcount if txn.rowcount > 0 else 0
 
@@ -1445,7 +1508,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         room_id: str,
         event_id: str,
         user_id: str,
-        reason: str,
+        reason: Optional[str],
         content: JsonDict,
         received_ts: int,
     ) -> None:

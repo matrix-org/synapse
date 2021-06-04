@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -861,7 +860,7 @@ class EventPushActionsWorkerStore(SQLBaseStore):
                                   not be deleted.
         """
         txn.call_after(
-            self.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+            self.get_unread_event_push_actions_by_room_for_user.invalidate,
             (room_id, user_id),
         )
 

@@ -18,11 +18,6 @@ ARG PYTHON_VERSION=3.8
 ###
 FROM docker.io/python:${PYTHON_VERSION}-slim as builder
 
-LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
-LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'
-LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git'
-LABEL org.opencontainers.image.licenses='Apache-2.0'
-
 # install the OS build deps
 RUN apt-get update && apt-get install -y \
     build-essential \
@@ -66,6 +61,11 @@ RUN pip install --prefix="/install" --no-deps --no-warn-script-location /synapse
 
 FROM docker.io/python:${PYTHON_VERSION}-slim
 
+LABEL org.opencontainers.image.url='https://matrix.org/docs/projects/server/synapse'
+LABEL org.opencontainers.image.documentation='https://github.com/matrix-org/synapse/blob/master/docker/README.md'
+LABEL org.opencontainers.image.source='https://github.com/matrix-org/synapse.git'
+LABEL org.opencontainers.image.licenses='Apache-2.0'
+
 RUN apt-get update && apt-get install -y \
     curl \
     gosu \
@@ -88,5 +88,5 @@ EXPOSE 8008/tcp 8009/tcp 8448/tcp
 
 ENTRYPOINT ["/start.py"]
 
-HEALTHCHECK --interval=1m --timeout=5s \
+HEALTHCHECK --start-period=5s --interval=15s --timeout=5s \
     CMD curl -fSs http://localhost:8008/health || exit 1

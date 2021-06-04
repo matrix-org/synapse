@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector
 # Copyright 2019 Matrix.org Federation C.I.C
@@ -19,10 +18,10 @@ import hashlib
 import hmac
 import inspect
 import logging
+import secrets
 import time
 from typing import Callable, Dict, Iterable, Optional, Tuple, Type, TypeVar, Union
-
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from canonicaljson import json
 
@@ -135,7 +134,7 @@ class TestCase(unittest.TestCase):
     def assertObjectHasAttributes(self, attrs, obj):
         """Asserts that the given object has each of the attributes given, and
         that the value of each matches according to assertEquals."""
-        for (key, value) in attrs.items():
+        for key in attrs.keys():
             if not hasattr(obj, key):
                 raise AssertionError("Expected obj to have a '.%s'" % key)
             try:
@@ -249,6 +248,8 @@ class HomeserverTestCase(TestCase):
             config=self.hs.config.server.listeners[0],
             resource=self.resource,
             server_version_string="1",
+            max_request_body_size=1234,
+            reactor=self.reactor,
         )
 
         from tests.rest.client.v1.utils import RestHelper
@@ -471,7 +472,7 @@ class HomeserverTestCase(TestCase):
         kwargs["config"] = config_obj
 
         async def run_bg_updates():
-            with LoggingContext("run_bg_updates", request="run_bg_updates-1"):
+            with LoggingContext("run_bg_updates"):
                 while not await stor.db_pool.updates.has_completed_background_updates():
                     await stor.db_pool.updates.do_next_background_update(1)
 
@@ -626,7 +627,6 @@ class HomeserverTestCase(TestCase):
             str: The new event's ID.
         """
         event_creator = self.hs.get_event_creation_handler()
-        secrets = self.hs.get_secrets()
         requester = create_requester(user)
 
         event, context = self.get_success(

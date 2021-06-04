@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+
+from typing import Any, Dict
 
 from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent
@@ -66,6 +67,170 @@ class PushRuleEvaluatorTestCase(unittest.TestCase):
 
         # A display name with spaces should work fine.
         self.assertTrue(evaluator.matches(condition, "@user:test", "foo bar"))
+
+    def _assert_matches(
+        self, condition: Dict[str, Any], content: Dict[str, Any], msg=None
+    ) -> None:
+        evaluator = self._get_evaluator(content)
+        self.assertTrue(evaluator.matches(condition, "@user:test", "display_name"), msg)
+
+    def _assert_not_matches(
+        self, condition: Dict[str, Any], content: Dict[str, Any], msg=None
+    ) -> None:
+        evaluator = self._get_evaluator(content)
+        self.assertFalse(
+            evaluator.matches(condition, "@user:test", "display_name"), msg
+        )
+
+    def test_event_match_body(self):
+        """Check that event_match conditions on content.body work as expected"""
+
+        # if the key is `content.body`, the pattern matches substrings.
+
+        # non-wildcards should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.body",
+            "pattern": "foobaz",
+        }
+        self._assert_matches(
+            condition,
+            {"body": "aaa FoobaZ zzz"},
+            "patterns should match and be case-insensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"body": "aa xFoobaZ yy"},
+            "pattern should only match at word boundaries",
+        )
+        self._assert_not_matches(
+            condition,
+            {"body": "aa foobazx yy"},
+            "pattern should only match at word boundaries",
+        )
+
+        # wildcards should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.body",
+            "pattern": "f?o*baz",
+        }
+
+        self._assert_matches(
+            condition,
+            {"body": "aaa FoobarbaZ zzz"},
+            "* should match string and pattern should be case-insensitive",
+        )
+        self._assert_matches(
+            condition, {"body": "aa foobaz yy"}, "* should match 0 characters"
+        )
+        self._assert_not_matches(
+            condition, {"body": "aa fobbaz yy"}, "? should not match 0 characters"
+        )
+        self._assert_not_matches(
+            condition, {"body": "aa fiiobaz yy"}, "? should not match 2 characters"
+        )
+        self._assert_not_matches(
+            condition,
+            {"body": "aa xfooxbaz yy"},
+            "pattern should only match at word boundaries",
+        )
+        self._assert_not_matches(
+            condition,
+            {"body": "aa fooxbazx yy"},
+            "pattern should only match at word boundaries",
+        )
+
+        # test backslashes
+        condition = {
+            "kind": "event_match",
+            "key": "content.body",
+            "pattern": r"f\oobaz",
+        }
+        self._assert_matches(
+            condition,
+            {"body": r"F\oobaz"},
+            "backslash should match itself",
+        )
+        condition = {
+            "kind": "event_match",
+            "key": "content.body",
+            "pattern": r"f\?obaz",
+        }
+        self._assert_matches(
+            condition,
+            {"body": r"F\oobaz"},
+            r"? after \ should match any character",
+        )
+
+    def test_event_match_non_body(self):
+        """Check that event_match conditions on other keys work as expected"""
+
+        # if the key is anything other than 'content.body', the pattern must match the
+        # whole value.
+
+        # non-wildcards should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern": "foobaz",
+        }
+        self._assert_matches(
+            condition,
+            {"value": "FoobaZ"},
+            "patterns should match and be case-insensitive",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "xFoobaZ"},
+            "pattern should only match at the start/end of the value",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "FoobaZz"},
+            "pattern should only match at the start/end of the value",
+        )
+
+        # wildcards should match
+        condition = {
+            "kind": "event_match",
+            "key": "content.value",
+            "pattern": "f?o*baz",
+        }
+        self._assert_matches(
+            condition,
+            {"value": "FoobarbaZ"},
+            "* should match string and pattern should be case-insensitive",
+        )
+        self._assert_matches(
+            condition, {"value": "foobaz"}, "* should match 0 characters"
+        )
+        self._assert_not_matches(
+            condition, {"value": "fobbaz"}, "? should not match 0 characters"
+        )
+        self._assert_not_matches(
+            condition, {"value": "fiiobaz"}, "? should not match 2 characters"
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "xfooxbaz"},
+            "pattern should only match at the start/end of the value",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "fooxbazx"},
+            "pattern should only match at the start/end of the value",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "x\nfooxbaz"},
+            "pattern should not match after a newline",
+        )
+        self._assert_not_matches(
+            condition,
+            {"value": "fooxbaz\nx"},
+            "pattern should not match before a newline",
+        )
 
     def test_no_body(self):
         """Not having a body shouldn't break the evaluator."""

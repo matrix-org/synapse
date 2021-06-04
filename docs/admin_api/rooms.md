@@ -4,6 +4,7 @@
   * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
+- [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
   * [Parameters](#parameters-1)
   * [Response](#response)
@@ -427,7 +428,7 @@ the new room. Users on other servers will be unaffected.
 The API is:
 
 ```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
+DELETE /_synapse/admin/v1/rooms/<room_id>
 ```
 
 with a body of:
@@ -442,7 +443,7 @@ with a body of:
 ```
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [README.rst](README.rst).
+server admin: see [Admin API](../../usage/administration/admin_api).
 
 A response body like the following is returned:
 
@@ -528,6 +529,15 @@ You will have to manually handle, if you so choose, the following:
 * Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
 * Removal of the Content Violation room if desired.
 
+## Deprecated endpoint
+
+The previous deprecated API will be removed in a future release, it was:
+
+```
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+It behaves the same way than the current endpoint except the path and the method.
 
 # Make Room Admin API
 

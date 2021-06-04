@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -50,7 +49,7 @@ import fcntl
 import logging
 import struct
 from inspect import isawaitable
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Collection, List, Optional
 
 from prometheus_client import Counter
 from zope.interface import Interface, implementer
@@ -77,7 +76,6 @@ from synapse.replication.tcp.commands import (
     ServerCommand,
     parse_command_from_line,
 )
-from synapse.types import Collection
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -184,8 +182,9 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.
-        ctx_name = "replication-conn-%s" % self.conn_id
-        self._logging_context = BackgroundProcessLoggingContext(ctx_name, ctx_name)
+        self._logging_context = BackgroundProcessLoggingContext(
+            "replication-conn", self.conn_id
+        )
 
     def connectionMade(self):
         logger.info("[%s] Connection established", self.id())

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Optional
 
 from canonicaljson import json
 
@@ -47,10 +47,15 @@ class RedactionTestCase(unittest.HomeserverTestCase):
         self.depth = 1
 
     def inject_room_member(
-        self, room, user, membership, replaces_state=None, extra_content={}
+        self,
+        room,
+        user,
+        membership,
+        replaces_state=None,
+        extra_content: Optional[dict] = None,
     ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {

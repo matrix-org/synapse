@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -273,21 +272,52 @@ class PresenceStream(Stream):
     NAME = "presence"
     ROW_TYPE = PresenceStreamRow
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         store = hs.get_datastore()
 
-        if hs.config.worker_app is None:
-            # on the master, query the presence handler
+        if hs.get_instance_name() in hs.config.worker.writers.presence:
+            # on the presence writer, query the presence handler
             presence_handler = hs.get_presence_handler()
-            update_function = presence_handler.get_all_presence_updates
+
+            from synapse.handlers.presence import PresenceHandler
+
+            assert isinstance(presence_handler, PresenceHandler)
+
+            update_function = (
+                presence_handler.get_all_presence_updates
+            )  # type: UpdateFunction
         else:
-            # Query master process
+            # Query presence writer process
             update_function = make_http_update_function(hs, self.NAME)
 
         super().__init__(
             hs.get_instance_name(),
             current_token_without_instance(store.get_current_presence_token),
             update_function,
+        )
+
+
+class PresenceFederationStream(Stream):
+    """A stream used to send ad hoc presence updates over federation.
+
+    Streams the remote destination and the user ID of the presence state to
+    send.
+    """
+
+    @attr.s(slots=True, auto_attribs=True)
+    class PresenceFederationStreamRow:
+        destination: str
+        user_id: str
+
+    NAME = "presence_federation"
+    ROW_TYPE = PresenceFederationStreamRow
+
+    def __init__(self, hs: "HomeServer"):
+        federation_queue = hs.get_presence_handler().get_federation_queue()
+        super().__init__(
+            hs.get_instance_name(),
+            federation_queue.get_current_token,
+            federation_queue.get_replication_rows,
         )
 
 

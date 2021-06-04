@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -169,7 +168,7 @@ class RegistrationHandler(BaseHandler):
         user_type: Optional[str] = None,
         default_display_name: Optional[str] = None,
         address: Optional[str] = None,
-        bind_emails: Iterable[str] = [],
+        bind_emails: Optional[Iterable[str]] = None,
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
@@ -204,6 +203,8 @@ class RegistrationHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem registering.
         """
+        bind_emails = bind_emails or []
+
         await self.check_registration_ratelimit(address)
 
         result = await self.spam_checker.check_registration_for_spam(
@@ -721,9 +722,7 @@ class RegistrationHandler(BaseHandler):
         )
         if is_guest:
             assert valid_until_ms is None
-            access_token = self.macaroon_gen.generate_access_token(
-                user_id, ["guest = true"]
-            )
+            access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
             access_token = await self._auth_handler.get_access_token_for_user_id(
                 user_id,

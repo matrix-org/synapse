@@ -103,6 +103,13 @@ CONDITIONAL_REQUIREMENTS["lint"] = [
     "flake8",
 ]
 
+CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
+    # The following are used by the release script
+    "click==7.1.2",
+    "redbaron==0.9.2",
+    "GitPython==3.1.14",
+]
+
 CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 
 # Dependencies which are exclusively required by unit test code. This is
@@ -110,7 +117,7 @@ CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]
 # Tests assume that all optional dependencies are installed.
 #
 # parameterized_class decorator was introduced in parameterized 0.7.0
-CONDITIONAL_REQUIREMENTS["test"] = ["mock>=2.0", "parameterized>=0.7.0"]
+CONDITIONAL_REQUIREMENTS["test"] = ["parameterized>=0.7.0"]
 
 setup(
     name="matrix-synapse",
@@ -123,13 +130,12 @@ setup(
     zip_safe=False,
     long_description=long_description,
     long_description_content_type="text/x-rst",
-    python_requires="~=3.5",
+    python_requires="~=3.6",
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: Communications :: Chat",
         "License :: OSI Approved :: Apache Software License",
         "Programming Language :: Python :: 3 :: Only",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",

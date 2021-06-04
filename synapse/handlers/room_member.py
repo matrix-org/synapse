@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016-2020 The Matrix.org Foundation C.I.C.
 # Copyright 2020 Sorunome
 #
@@ -72,6 +71,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
+        self.event_auth_handler = hs.get_event_auth_handler()
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -210,6 +210,31 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
     async def forget(self, user: UserID, room_id: str) -> None:
         raise NotImplementedError()
 
+    async def ratelimit_multiple_invites(
+        self,
+        requester: Optional[Requester],
+        room_id: Optional[str],
+        n_invites: int,
+        update: bool = True,
+    ):
+        """Ratelimit more than one invite sent by the given requester in the given room.
+
+        Args:
+            requester: The requester sending the invites.
+            room_id: The room the invites are being sent in.
+            n_invites: The amount of invites to ratelimit for.
+            update: Whether to update the ratelimiter's cache.
+
+        Raises:
+            LimitExceededError: The requester can't send that many invites in the room.
+        """
+        await self._invites_per_room_limiter.ratelimit(
+            requester,
+            room_id,
+            update=update,
+            n_actions=n_invites,
+        )
+
     async def ratelimit_invite(
         self,
         requester: Optional[Requester],
@@ -282,9 +307,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
+            prev_member_event = None
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
+
+            # Check if the member should be allowed access via membership in a space.
+            await self.event_auth_handler.check_restricted_join_rules(
+                prev_state_ids, event.room_version, user_id, prev_member_event
+            )
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
@@ -1101,7 +1132,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.distributor = hs.get_distributor()

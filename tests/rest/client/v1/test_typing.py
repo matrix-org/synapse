@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector
 #
@@ -16,7 +15,7 @@
 
 """Tests REST events for /rooms paths."""
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.rest.client.v1 import room
 from synapse.types import UserID

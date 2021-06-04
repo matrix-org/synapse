@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C
 #

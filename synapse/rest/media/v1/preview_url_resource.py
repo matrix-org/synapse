@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -175,7 +174,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             clock=self.clock,
             # don't spider URLs more often than once an hour
             expiry_ms=ONE_HOUR,
-        )
+        )  # type: ExpiringCache[str, ObservableDeferred]
 
         if self._worker_run_media_background_jobs:
             self._cleaner_loop = self.clock.looping_call(

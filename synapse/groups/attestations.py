@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -109,7 +108,9 @@ class GroupAttestationSigning:
 
         assert server_name is not None
         await self.keyring.verify_json_for_server(
-            server_name, attestation, now, "Group attestation"
+            server_name,
+            attestation,
+            now,
         )
 
     def create_attestation(self, group_id: str, user_id: str) -> JsonDict:

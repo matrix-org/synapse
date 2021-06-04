@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +15,8 @@
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Union
+from unittest.mock import Mock
 from urllib.parse import urlencode
-
-from mock import Mock
 
 import pymacaroons
 

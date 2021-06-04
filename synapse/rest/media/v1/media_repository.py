@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
@@ -76,6 +75,8 @@ class MediaRepository:
         self.store = hs.get_datastore()
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
+
+        Thumbnailer.set_limits(self.max_image_pixels)
 
         self.primary_base_path = hs.config.media_store_path  # type: str
         self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
@@ -468,6 +469,9 @@ class MediaRepository:
         return media_info
 
     def _get_thumbnail_requirements(self, media_type):
+        scpos = media_type.find(";")
+        if scpos > 0:
+            media_type = media_type[:scpos]
         return self.thumbnail_requirements.get(media_type, ())
 
     def _generate_thumbnail(

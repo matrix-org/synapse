@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 # Copyright 2019 Matrix.org Foundation C.I.C.
@@ -16,8 +15,7 @@
 # limitations under the License.
 
 import copy
-
-import mock
+from unittest import mock
 
 from synapse.api.errors import SynapseError
 
