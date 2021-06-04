@@ -40,7 +40,7 @@ THIRTY_MINUTES_IN_MS = 30 * 60 * 1000
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True)
+@attr.s(frozen=True, slots=True)
 class TokenLookupResult:
     """Result of looking up an access token.
 
@@ -1098,10 +1098,17 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="update_access_token_last_validated",
         )
 
+    @cached()
     async def mark_access_token_as_used(self, token_id: int) -> None:
         """
         Mark the access token as used, which invalidates the refresh token used
         to obtain it.
+
+        Because get_user_by_access_token is cached, this function might be
+        called multiple times for the same token, effectively doing unnecessary
+        SQL updates. Because updating the `used` field only goes one way (from
+        False to True) it is safe to cache this function as well to avoid this
+        issue.
 
         Args:
             token_id: The ID of the access token to update.

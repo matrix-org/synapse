@@ -253,12 +253,6 @@ class Auth:
             if not user_info.token_used and token_id is not None:
                 await self.store.mark_access_token_as_used(token_id)
 
-                # TODO: this is a temporary fix because if we don't do this, it
-                # will do the update every time because of the cache. This
-                # required unfreezing the TokenLookupResult class, which is not
-                # ideal.
-                user_info.token_used = True
-
             requester = create_requester(
                 user_info.user_id,
                 token_id,
