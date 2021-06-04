@@ -1,1 +1,1 @@
-Mention in `homeserver.yaml` that you may need to configure max upload size in your reverse proxy. Contributed by @aaronraimist.
+Mention in the sample homeserver config that you may need to configure max upload size in your reverse proxy. Contributed by @aaronraimist.
