@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 from collections import namedtuple
 from typing import Dict, List
@@ -21,6 +22,8 @@ from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
+
+logger = logging.Logger(__name__)
 
 DEFAULT_THUMBNAIL_SIZES = [
     {"width": 32, "height": 32, "method": "crop"},
@@ -35,6 +38,9 @@ THUMBNAIL_SIZE_YAML = """\
         #    height: %(height)i
         #    method: %(method)s
 """
+
+HTTP_PROXY_SET_WARNING = """\
+The Synapse config url_preview_ip_range_blacklist will be ignored as %s set."""
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
@@ -181,11 +187,17 @@ class ContentRepositoryConfig(Config):
                 )
 
             if "url_preview_ip_range_blacklist" not in config:
-                raise ConfigError(
-                    "For security, you must specify an explicit target IP address "
-                    "blacklist in url_preview_ip_range_blacklist for url previewing "
-                    "to work"
-                )
+                if "HTTP_PROXY" not in os.environ and "HTTPS_PROXY" not in os.environ:
+                    raise ConfigError(
+                        "For security, you must specify an explicit target IP address "
+                        "blacklist in url_preview_ip_range_blacklist for url previewing "
+                        "to work"
+                    )
+                else:
+                    proxy_var = (
+                        "HTTP_PROXY" if "HTTP_PROXY" in os.environ else "HTTPS_PROXY"
+                    )
+                    logger.warning("".join(HTTP_PROXY_SET_WARNING % proxy_var))
 
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
@@ -287,6 +299,8 @@ class ContentRepositoryConfig(Config):
         #
         # This must be specified if url_preview_enabled is set. It is recommended that
         # you uncomment the following list as a starting point.
+        #
+        # Note: The value is ignored when an HTTP proxy is in use
         #
         #url_preview_ip_range_blacklist:
 %(ip_range_blacklist)s
