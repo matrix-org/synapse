@@ -1,3 +1,12 @@
+Synapse 1.35.1 (2021-06-03)
+===========================
+
+Bugfixes
+--------
+
+- Fix a bug introduced in v1.35.0 where invite-only rooms would be shown to all users in a space, regardless of if the user had access to it. ([\#10109](https://github.com/matrix-org/synapse/issues/10109))
+
+
 Synapse 1.35.0 (2021-06-01)
 ===========================
 
