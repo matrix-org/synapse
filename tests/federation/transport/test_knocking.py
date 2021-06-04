@@ -133,6 +133,16 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
                 )
             )
 
+        # Finally, we expect to see the m.room.create event of the room as part of the
+        # stripped state. We don't need to inject this event though.
+        room_state[EventTypes.Create] = {
+            "content": {
+                "creator": sender,
+                "room_version": RoomVersions.MSC2403.identifier,
+            },
+            "state_key": "",
+        }
+
         return room_state
 
     def check_knock_room_state_against_room_state(
