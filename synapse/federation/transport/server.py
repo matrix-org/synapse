@@ -152,7 +152,9 @@ class Authenticator:
             )
 
         await self.keyring.verify_json_for_server(
-            origin, json_request, now, "Incoming request"
+            origin,
+            json_request,
+            now,
         )
 
         logger.debug("Request from %s", origin)
