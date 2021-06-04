@@ -25,6 +25,7 @@ from synapse.http import get_request_uri
 from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
+    parse_bytes,
     parse_json_object_from_request,
     parse_string,
 )
@@ -437,9 +438,7 @@ class SsoRedirectServlet(RestServlet):
             finish_request(request)
             return
 
-        client_redirect_url = parse_string(
-            request, "redirectUrl", required=True, encoding=None
-        )
+        client_redirect_url = parse_bytes(request, "redirectUrl", required=True)
         sso_url = await self._sso_handler.handle_redirect_request(
             request,
             client_redirect_url,

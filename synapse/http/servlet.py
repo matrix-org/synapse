@@ -15,9 +15,11 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import Iterable, List, Optional, Union, overload
+from typing import Dict, Iterable, List, Optional, Union, overload
 
 from typing_extensions import Literal
+
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -106,6 +108,60 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
         else:
             return default
+
+
+@overload
+def parse_bytes(
+    request: Request,
+    name: str,
+    default: Literal[None] = None,
+    required: Literal[True] = True,
+) -> bytes:
+    ...
+
+
+@overload
+def parse_bytes(
+    request: Request,
+    name: str,
+    default: Optional[bytes] = None,
+    required: bool = False,
+) -> Optional[bytes]:
+    ...
+
+
+def parse_bytes(
+    request: Request,
+    name: str,
+    default: Optional[bytes] = None,
+    required: bool = False,
+) -> Optional[bytes]:
+    """
+    Parse a string parameter as bytes from the request query string.
+
+    Args:
+        request: the twisted HTTP request.
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent,
+            defaults to None. Must be bytes if encoding is None.
+        required: whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+    Returns:
+        Bytes or the default value.
+
+    Raises:
+        SynapseError if the parameter is absent and required.
+    """
+    args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+    name_bytes = name.encode("ascii")
+
+    if name_bytes in args:
+        return args[name_bytes][0]
+    elif required:
+        message = "Missing string query parameter %s" % (name,)
+        raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+
+    return default
 
 
 def parse_string(
