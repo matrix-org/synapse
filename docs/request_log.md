@@ -10,7 +10,7 @@ See the following for how to decode the dense data available from the default lo
 ```
 
 
-| Part  | Explaination | 
+| Part  | Explanation | 
 | ----- | ------------ |
 | AAAA  | Timestamp request was logged (not recieved) |
 | BBBB  | Logger name (`synapse.access.(http\|https).<tag>`, where 'tag' is defined in the `listeners` config section, normally the port) |
@@ -38,7 +38,7 @@ MMMM / NNNN can be greater than IIII if there are multiple slow database queries
 running in parallel.
 
 Some actions can result in multiple identical http requests, which will return
-the same data, but only the first request will report any time in
-`IIII/NNNN/MMMM` - the others will be awaiting the first query to return a
+the same data, but only the first request will report time/transactions in
+`KKKK`/`LLLL`/`MMMM`/`NNNN`/`OOOO` - the others will be awaiting the first query to return a
 response and will simultaneously return with the first request, but with very
 small processing times.
