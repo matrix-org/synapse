@@ -1,0 +1,1 @@
+Try and ensure we only have one copy of an event in memory at a time.
