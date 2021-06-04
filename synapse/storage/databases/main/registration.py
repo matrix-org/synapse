@@ -467,7 +467,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 access_tokens.device_id,
                 access_tokens.valid_until_ms,
                 access_tokens.user_id as token_owner,
-                (CAST(access_tokens.used AS INTEGER) = 1) as token_used
+                access_tokens.used as token_used
             FROM users
             INNER JOIN access_tokens on users.name = COALESCE(puppets_user_id, access_tokens.user_id)
             WHERE token = ?
@@ -1129,7 +1129,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     rt.device_id,
                     rt.next_token_id,
                     (nrt.next_token_id IS NOT NULL) has_next_refresh_token_been_refreshed,
-                    (CAST(at.used AS INTEGER) = 1) has_next_access_token_been_used
+                    at.used has_next_access_token_been_used
                 FROM refresh_tokens rt
                 LEFT JOIN refresh_tokens nrt ON rt.next_token_id = nrt.id
                 LEFT JOIN access_tokens at ON at.refresh_token_id = nrt.id
@@ -1147,8 +1147,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 user_id=row[1],
                 device_id=row[2],
                 next_token_id=row[3],
-                has_next_refresh_token_been_refreshed=bool(row[4]),
-                has_next_access_token_been_used=bool(row[5]),
+                has_next_refresh_token_been_refreshed=row[4],
+                has_next_access_token_been_used=row[5],
             )
 
         return await self.db_pool.runInteraction(
