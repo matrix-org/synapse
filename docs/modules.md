@@ -57,7 +57,7 @@ def ModuleApi.register_web_resource(path: str, resource: IResource)
 
 The path is the full absolute path to register the resource at. For example, if you
 register a resource for the path `/_synapse/client/my_super_module/say_hello`, Synapse
-will serve it at `https://[HS_URL]/_synapse/client/my_super_module/say_hello`. Note
+will serve it at `http(s)://[HS_URL]/_synapse/client/my_super_module/say_hello`. Note
 that Synapse does not allow registering resources for several sub-paths in the `/_matrix`
 namespace (such as anything under `/_matrix/client` for example). It is strongly
 recommended that modules register their web resources under the `/_synapse/client`
@@ -179,6 +179,10 @@ whether the given file can be stored in the homeserver's media store.
 
 ### Example
 
+The example below is a module that implements the spam checker callback
+`user_may_create_room` to deny room creation to user `@evilguy:example.com`, and registers
+a web resource to the path `/_synapse/client/demo/hello` that returns a JSON object.
+
 ```python
 import json
 
@@ -195,7 +199,8 @@ class DemoResource(Resource):
 
     async def render_GET(self, request: Request):
         name = request.args.get(b"name")[0]
-        return json.dumps({"name": name})
+        request.setHeader(b"Content-Type", b"application/json")
+        return json.dumps({"hello": name})
 
 
 class DemoModule:
@@ -216,6 +221,9 @@ class DemoModule:
     def parse_config(config):
         return config
 
-    async def user_may_create_room(self, userid: str) -> bool:
-        pass
+    async def user_may_create_room(self, user: str) -> bool:
+        if user == "@evilguy:example.com":
+            return False
+
+        return True
 ```
