@@ -1,1 +1,1 @@
-Add `inherit_depth` parameter and pipe through the event creation methods.
+Add `depth` parameter to override the normal calculated depth and pipe through the event creation methods.
