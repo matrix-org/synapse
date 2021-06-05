@@ -481,7 +481,7 @@ class EventCreationHandler:
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
-        inherit_depth: bool = False,
+        depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -512,9 +512,10 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
-            inherit_depth: True to inherit the depth from the successor of the most
-                recent event from prev_event_ids. False to progress the depth as normal.
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
@@ -577,7 +578,7 @@ class EventCreationHandler:
             requester=requester,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
-            inherit_depth=inherit_depth,
+            depth=depth,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -740,7 +741,7 @@ class EventCreationHandler:
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         outlier: bool = False,
-        inherit_depth: bool = False,
+        depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -765,8 +766,9 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
-            inherit_depth: True to inherit the depth from the successor of the most
-                recent event from prev_event_ids. False to progress the depth as normal.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             The event, and its stream ordering (if deduplication happened,
@@ -812,7 +814,7 @@ class EventCreationHandler:
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
                 outlier=outlier,
-                inherit_depth=inherit_depth,
+                depth=depth,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -844,7 +846,7 @@ class EventCreationHandler:
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
-        inherit_depth: bool = False,
+        depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -862,8 +864,9 @@ class EventCreationHandler:
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
 
-            inherit_depth: True to inherit the depth from the successor of the most
-                recent event from prev_event_ids. False to progress the depth as normal.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             Tuple of created event, context
@@ -890,7 +893,7 @@ class EventCreationHandler:
         event = await builder.build(
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
-            inherit_depth=inherit_depth,
+            depth=depth,
         )
 
         old_state = None

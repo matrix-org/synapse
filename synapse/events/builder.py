@@ -103,7 +103,7 @@ class EventBuilder:
         self,
         prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]],
-        inherit_depth: bool = False,
+        depth: Optional[int] = None,
     ) -> EventBase:
         """Transform into a fully signed and hashed event
 
@@ -112,8 +112,9 @@ class EventBuilder:
             auth_event_ids: The event IDs to use as the auth events.
                 Should normally be set to None, which will cause them to be calculated
                 based on the room state at the prev_events.
-            inherit_depth: True to inherit the depth from the successor of the most
-                recent event from prev_event_ids. False to progress the depth as normal.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             The signed and hashed event.
@@ -138,44 +139,12 @@ class EventBuilder:
             prev_events = prev_event_ids
 
         (
-            most_recent_prev_event_id,
+            _,
             most_recent_prev_event_depth,
         ) = await self._store.get_max_depth_of(prev_event_ids)
 
-        # We want to insert the historical event after the `prev_event` but before the successor event
-        #
-        # We inherit depth from the successor event instead of the `prev_event`
-        # because events returned from `/messages` are first sorted by `topological_ordering`
-        # which is just the `depth` and then tie-break with `stream_ordering`.
-        #
-        # We mark these inserted historical events as "backfilled" which gives them a
-        # negative `stream_ordering`. If we use the same depth as the `prev_event`,
-        # then our historical event will tie-break and be sorted before the `prev_event`
-        # when it should come after.
-        #
-        # We want to use the successor event depth so they appear after `prev_event` because
-        # it has a larger `depth` but before the successor event because the `stream_ordering`
-        # is negative before the successor event.
-        if inherit_depth:
-            successor_event_ids = await self._store.get_successor_events(
-                [most_recent_prev_event_id]
-            )
-
-            # If we can't find any successor events, then it's a forward extremity of
-            # historical messages and we can just inherit from the previous historical
-            # event which we can already assume has the correct depth where we want
-            # to insert into.
-            if not successor_event_ids:
-                depth = most_recent_prev_event_depth
-            else:
-                (
-                    _,
-                    oldest_successor_depth,
-                ) = await self._store.get_min_depth_of(successor_event_ids)
-
-                depth = oldest_successor_depth
         # Otherwise, progress the depth as normal
-        else:
+        if depth is None:
             depth = most_recent_prev_event_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
