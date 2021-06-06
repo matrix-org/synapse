@@ -281,6 +281,46 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         PATTERNS = "/rooms/(?P<room_id>[^/]*)/bulksend"
         register_txn_path(self, PATTERNS, http_server, with_get=True)
 
+    async def inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
+        (
+            most_recent_prev_event_id,
+            most_recent_prev_event_depth,
+        ) = await self.store.get_max_depth_of(prev_event_ids)
+
+        # We want to insert the historical event after the `prev_event` but before the successor event
+        #
+        # We inherit depth from the successor event instead of the `prev_event`
+        # because events returned from `/messages` are first sorted by `topological_ordering`
+        # which is just the `depth` and then tie-break with `stream_ordering`.
+        #
+        # We mark these inserted historical events as "backfilled" which gives them a
+        # negative `stream_ordering`. If we use the same depth as the `prev_event`,
+        # then our historical event will tie-break and be sorted before the `prev_event`
+        # when it should come after.
+        #
+        # We want to use the successor event depth so they appear after `prev_event` because
+        # it has a larger `depth` but before the successor event because the `stream_ordering`
+        # is negative before the successor event.
+        successor_event_ids = await self.store.get_successor_events(
+            [most_recent_prev_event_id]
+        )
+
+        # If we can't find any successor events, then it's a forward extremity of
+        # historical messages and we can just inherit from the previous historical
+        # event which we can already assume has the correct depth where we want
+        # to insert into.
+        if not successor_event_ids:
+            depth = most_recent_prev_event_depth
+        else:
+            (
+                _,
+                oldest_successor_depth,
+            ) = await self.store.get_min_depth_of(successor_event_ids)
+
+            depth = oldest_successor_depth
+
+        return depth
+
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
@@ -404,6 +444,9 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         # Prepend the insertion event to the start of the chunk
         events_to_create = [insertion_event] + events_to_create
 
+        inherited_depth = await self.inherit_depth_from_prev_ids(prev_events_from_query)
+        logger.info("inherited_depth %s", inherited_depth)
+
         event_ids = []
         prev_event_ids = prev_events_from_query
         events_to_persist = []
@@ -429,7 +472,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 prev_event_ids=event_dict.get("prev_events"),
                 # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
                 auth_event_ids=auth_event_ids,
-                inherit_depth=True,
+                depth=inherited_depth,
             )
             current_state_ids = await context.get_current_state_ids()
             logger.info(
@@ -444,12 +487,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             event_id = event.event_id
 
             event_ids.append(event_id)
-            # We add `event_id` so it references the last message.
-            # We add `prev_events_from_query` so it can find the proper depth
-            # while persisting. I wish we could rely on just `event_id` but
-            # since we are persisting in reverse-chronolical order below,
-            # that event isn't persisted yet.
-            prev_event_ids = [event_id] + prev_events_from_query
+            prev_event_ids = [event_id]
 
         # Persist events in reverse-chronological order so they have the
         # correct stream_ordering as they are backfilled (which decrements).
