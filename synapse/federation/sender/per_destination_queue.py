@@ -251,7 +251,7 @@ class PerDestinationQueue:
                 await self._transaction_transmission_loop()
 
         if delay:
-            self._clock.call_later(_start, random.uniform(0, 5000))
+            self._clock.call_later(random.uniform(0, 5000), _start)
         else:
             _start()
 
