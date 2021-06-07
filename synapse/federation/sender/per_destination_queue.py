@@ -32,7 +32,9 @@ from synapse.handlers.presence import format_user_presence_state
 from synapse.logging import issue9533_logger
 from synapse.logging.opentracing import SynapseTags, set_tag
 from synapse.metrics import sent_transactions_counter
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    wrap_as_background_process,
+)
 from synapse.types import ReadReceipt
 from synapse.util.retryutils import NotRetryingDestination, get_retry_limiter
 
@@ -238,20 +240,20 @@ class PerDestinationQueue:
 
         logger.debug("TX [%s] Starting transaction loop", self._destination)
 
+        next_id = self._transaction_manager._next_txn_id
+
+        @wrap_as_background_process("federation_transaction_transmission_loop")
         async def _start():
-            if delay:
-                next_id = self._transaction_manager._next_txn_id
-                await self._clock.sleep(random.uniform(0, 5000))
-                if next_id != self._transaction_manager._next_txn_id:
-                    return
+            if delay and next_id != self._transaction_manager._next_txn_id:
+                return
 
             if not self.transmission_loop_running:
                 await self._transaction_transmission_loop()
 
-        run_as_background_process(
-            "federation_transaction_transmission_loop",
-            _start,
-        )
+        if delay:
+            self._clock.call_later(_start, random.uniform(0, 5000))
+        else:
+            _start()
 
     async def _transaction_transmission_loop(self) -> None:
         pending_pdus = []  # type: List[EventBase]
