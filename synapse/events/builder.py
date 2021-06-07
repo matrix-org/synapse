@@ -138,13 +138,13 @@ class EventBuilder:
             auth_events = auth_event_ids
             prev_events = prev_event_ids
 
-        (
-            _,
-            most_recent_prev_event_depth,
-        ) = await self._store.get_max_depth_of(prev_event_ids)
-
         # Otherwise, progress the depth as normal
         if depth is None:
+            (
+                _,
+                most_recent_prev_event_depth,
+            ) = await self._store.get_max_depth_of(prev_event_ids)
+
             depth = most_recent_prev_event_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
