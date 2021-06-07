@@ -165,7 +165,7 @@ def parse_bytes(
 
 
 def parse_string(
-    request,
+    request: Request,
     name: Union[bytes, str],
     default: Optional[str] = None,
     required: bool = False,
@@ -225,7 +225,7 @@ def _parse_string_value(
 
 @overload
 def parse_strings_from_args(
-    args: List[str],
+    args: Dict[bytes, List[bytes]],
     name: Union[bytes, str],
     default: Optional[List[str]] = None,
     required: bool = False,
@@ -236,7 +236,7 @@ def parse_strings_from_args(
 
 
 def parse_strings_from_args(
-    args: List[str],
+    args: Dict[bytes, List[bytes]],
     name: Union[bytes, str],
     default: Optional[List[str]] = None,
     required: bool = False,
@@ -291,7 +291,7 @@ def parse_strings_from_args(
 
 
 def parse_string_from_args(
-    args: List[str],
+    args: Dict[bytes, List[bytes]],
     name: Union[bytes, str],
     default: Optional[str] = None,
     required: bool = False,
