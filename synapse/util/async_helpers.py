@@ -15,6 +15,7 @@
 
 import collections
 import inspect
+import itertools
 import logging
 from contextlib import contextmanager
 from typing import (
@@ -188,13 +189,14 @@ def concurrently_execute(
         except StopIteration:
             pass
 
-    # We use `zip` to handle the case where the number of args is less than the
-    # limit, avoiding needlessly spawning unnecessary background tasks.
+    # We use `itertools.islice` to handle the case where the number of args is
+    # less than the limit, avoiding needlessly spawning unnecessary background
+    # tasks.
     return make_deferred_yieldable(
         defer.gatherResults(
             [
                 run_in_background(_concurrently_execute_inner, value)
-                for value, _ in zip(it, range(limit))
+                for value in itertools.islice(it, limit)
             ],
             consumeErrors=True,
         )
