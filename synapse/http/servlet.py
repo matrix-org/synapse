@@ -197,8 +197,9 @@ def parse_string(
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
+    args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
     return parse_string_from_args(
-        request.args, name, default, required, allowed_values, encoding
+        args, name, default, required, allowed_values, encoding
     )
 
 
@@ -422,9 +423,8 @@ class RestServlet:
 
     def register(self, http_server):
         """ Register this servlet with the given HTTP server. """
-        if hasattr(self, "PATTERNS"):
-            patterns = self.PATTERNS
-
+        patterns = getattr(self, "PATTERNS", None)
+        if patterns:
             for method in ("GET", "PUT", "POST", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
                     servlet_classname = self.__class__.__name__
