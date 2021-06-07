@@ -253,11 +253,10 @@ def parse_strings_from_args(
         args: the twisted HTTP request.args list.
         name: the name of the query parameter.
         default: value to use if the parameter is absent, defaults to None.
-        required : whether to raise a 400 SynapseError if the
+        required: whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
-        allowed_values (list[bytes|unicode]): List of allowed values for the
-            string, or None if any value is allowed, defaults to None. Must be
-            the same type as name, if given.
+        allowed_values: List of allowed values for the
+            string, or None if any value is allowed, defaults to None.
         encoding: The encoding to decode the string content with.
 
     Returns:
@@ -281,12 +280,8 @@ def parse_strings_from_args(
         if required:
             message = "Missing string query parameter %r" % (name,)
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
-        else:
 
-            if isinstance(default, bytes):
-                return default.decode(encoding)
-
-            return default
+        return default
 
 
 def parse_string_from_args(
@@ -326,11 +321,14 @@ def parse_string_from_args(
     strings = parse_strings_from_args(
         args,
         name,
-        default=[default],
+        default=[default] if default is not None else None,
         required=required,
         allowed_values=allowed_values,
         encoding=encoding,
     )
+
+    if strings is None:
+        return None
 
     return strings[0]
 
