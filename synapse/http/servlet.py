@@ -229,6 +229,18 @@ def parse_strings_from_args(
     args: Dict[bytes, List[bytes]],
     name: str,
     default: Optional[List[str]] = None,
+    required: Literal[True] = True,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> List[str]:
+    ...
+
+
+@overload
+def parse_strings_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[List[str]] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
