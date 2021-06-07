@@ -425,7 +425,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         # The chunk ID passed in comes from the chunk_id in the
         # "insertion" event from the previous chunk.
         if chunk_id_from_query:
-            last_event_in_chunk = events_to_create[len(events_to_create) - 1]
+            last_event_in_chunk = events_to_create[-1]
             last_event_in_chunk["content"][
                 EventContentFields.MSC2716_CHUNK_ID
             ] = chunk_id_from_query
