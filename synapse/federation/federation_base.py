@@ -54,7 +54,7 @@ class FederationBase:
               * throws a SynapseError if the signature check failed."""
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
-        except Exception as e:
+        except SynapseError as e:
             logger.warning(
                 "Signature check failed for %s: %s",
                 pdu.event_id,
