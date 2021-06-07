@@ -17,12 +17,26 @@
 import itertools
 import logging
 from collections import deque
-from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
+from typing import (
+    Awaitable,
+    Callable,
+    Collection,
+    Deque,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 import attr
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
+from twisted.internet.defer import Deferred
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
@@ -97,17 +111,35 @@ class _EventPersistQueueItem:
     deferred: ObservableDeferred
 
 
-class _EventPeristenceQueue:
+_PersistResult = TypeVar("_PersistResult")
+
+
+class _EventPeristenceQueue(Generic[_PersistResult]):
     """Queues up events so that they can be persisted in bulk with only one
     concurrent transaction per room.
     """
 
-    def __init__(self):
-        self._event_persist_queues = {}
-        self._currently_persisting_rooms = set()
+    def __init__(
+        self,
+        per_item_callback: Callable[
+            [List[Tuple[EventBase, EventContext]], bool],
+            Awaitable[_PersistResult],
+        ],
+    ):
+        """Create a new event persistence queue
 
-    def add_to_queue(self, room_id, events_and_contexts, backfilled):
+        The per_item_callback will be called for each item added via add_to_queue,
+        and its result will be returned via the Deferreds returned from add_to_queue.
+        """
+        self._event_persist_queues: Dict[str, Deque[_EventPersistQueueItem]] = {}
+        self._currently_persisting_rooms: Set[str] = set()
+        self._per_item_callback = per_item_callback
+
+    def add_to_queue(self, room_id, events_and_contexts, backfilled) -> Deferred:
         """Add events to the queue, with the given persist_event options.
+
+        If we are not already processing events in this room, starts off a background
+        process to to so, calling the per_item_callback for each item.
 
         NB: due to the normal usage pattern of this method, it does *not*
         follow the synapse logcontext rules, and leaves the logcontext in
@@ -120,9 +152,9 @@ class _EventPeristenceQueue:
 
         Returns:
             defer.Deferred: a deferred which will resolve once the events are
-            persisted. Runs its callbacks *without* a logcontext. The result
-            is the same as that returned by the callback passed to
-            `handle_queue`.
+            persisted. Runs its callbacks in the sentinel logcontext. The result
+            is the same as that returned by the `_per_item_callback` passed to
+            `__init__`.
         """
         queue = self._event_persist_queues.setdefault(room_id, deque())
         if queue:
@@ -143,14 +175,16 @@ class _EventPeristenceQueue:
             )
         )
 
+        self._handle_queue(room_id)
+
         return deferred.observe()
 
-    def handle_queue(self, room_id, per_item_callback):
+    def _handle_queue(self, room_id):
         """Attempts to handle the queue for a room if not already being handled.
 
-        The given callback will be invoked with for each item in the queue,
+        The queue's callback will be invoked with for each item in the queue,
         of type _EventPersistQueueItem. The per_item_callback will continuously
-        be called with new items, unless the queue becomnes empty. The return
+        be called with new items, unless the queue becomes empty. The return
         value of the function will be given to the deferreds waiting on the item,
         exceptions will be passed to the deferreds as well.
 
@@ -160,7 +194,6 @@ class _EventPeristenceQueue:
         If another callback is currently handling the queue then it will not be
         invoked.
         """
-
         if room_id in self._currently_persisting_rooms:
             return
 
@@ -171,7 +204,9 @@ class _EventPeristenceQueue:
                 queue = self._get_drainining_queue(room_id)
                 for item in queue:
                     try:
-                        ret = await per_item_callback(item)
+                        ret = await self._per_item_callback(
+                            item.events_and_contexts, item.backfilled
+                        )
                     except Exception:
                         with PreserveLoggingContext():
                             item.deferred.errback()
@@ -218,7 +253,7 @@ class EventsPersistenceStorage:
         self._clock = hs.get_clock()
         self._instance_name = hs.get_instance_name()
         self.is_mine_id = hs.is_mine_id
-        self._event_persist_queue = _EventPeristenceQueue()
+        self._event_persist_queue = _EventPeristenceQueue(self._persist_event_batch)
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
     async def persist_events(
@@ -252,9 +287,6 @@ class EventsPersistenceStorage:
             )
             deferreds.append(d)
 
-        for room_id in partitioned:
-            self._maybe_start_persisting(room_id)
-
         # Each deferred returns a map from event ID to existing event ID if the
         # event was deduplicated. (The dict may also include other entries if
         # the event was persisted in a batch with other events).
@@ -264,7 +296,7 @@ class EventsPersistenceStorage:
         ret_vals = await make_deferred_yieldable(
             defer.gatherResults(deferreds, consumeErrors=True)
         )
-        replaced_events = {}
+        replaced_events: Dict[str, str] = {}
         for d in ret_vals:
             replaced_events.update(d)
 
@@ -295,8 +327,6 @@ class EventsPersistenceStorage:
             event.room_id, [(event, context)], backfilled=backfilled
         )
 
-        self._maybe_start_persisting(event.room_id)
-
         # The deferred returns a map from event ID to existing event ID if the
         # event was deduplicated. (The dict may also include other entries if
         # the event was persisted in a batch with other events.)
@@ -312,29 +342,14 @@ class EventsPersistenceStorage:
         pos = PersistedEventPosition(self._instance_name, event_stream_id)
         return event, pos, self.main_store.get_room_max_token()
 
-    def _maybe_start_persisting(self, room_id: str):
-        """Pokes the `_event_persist_queue` to start handling new items in the
-        queue, if not already in progress.
-
-        Causes the deferreds returned by `add_to_queue` to resolve with: a
-        dictionary of event ID to event ID we didn't persist as we already had
-        another event persisted with the same TXN ID.
-        """
-
-        async def persisting_queue(item):
-            with Measure(self._clock, "persist_events"):
-                return await self._persist_events(
-                    item.events_and_contexts, backfilled=item.backfilled
-                )
-
-        self._event_persist_queue.handle_queue(room_id, persisting_queue)
-
-    async def _persist_events(
+    async def _persist_event_batch(
         self,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool = False,
     ) -> Dict[str, str]:
-        """Calculates the change to current state and forward extremities, and
+        """Callback for the _event_persist_queue
+
+        Calculates the change to current state and forward extremities, and
         persists the given events and with those updates.
 
         Returns:
