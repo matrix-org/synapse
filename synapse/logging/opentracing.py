@@ -337,6 +337,7 @@ def ensure_active_span(message, ret=None):
 @contextlib.contextmanager
 def noop_context_manager(*args, **kwargs):
     """Does exactly what it says on the tin"""
+    # TODO: replace with contextlib.nullcontext once we drop support for Python 3.6
     yield
 
 
