@@ -360,7 +360,6 @@ class FederationClient(FederationBase):
         pdus: Collection[EventBase],
         room_version: RoomVersion,
         outlier: bool = False,
-        include_none: bool = False,
     ) -> List[EventBase]:
         """Takes a list of PDUs and checks the signatures and hashes of each
         one. If a PDU fails its signature check then we check if we have it in
@@ -377,8 +376,6 @@ class FederationClient(FederationBase):
             pdu
             room_version
             outlier: Whether the events are outliers or not
-            include_none: Whether to include None in the returned list
-                for events that have failed their checks
 
         Returns:
             A list of PDUs that have valid signatures and hashes.
@@ -397,7 +394,7 @@ class FederationClient(FederationBase):
                 room_version=room_version,
             )
 
-            if valid_pdu or include_none:
+            if valid_pdu:
                 valid_pdus.append(valid_pdu)
 
         await concurrently_execute(_execute, pdus, 10000)
