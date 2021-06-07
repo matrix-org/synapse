@@ -316,6 +316,17 @@ class SyncHandler:
         if context:
             context.tag = sync_type
 
+        # if we have a since token, delete any to-device messages before that token
+        # (since we now know that the device has received them)
+        if since_token is not None:
+            since_stream_id = since_token.to_device_key
+            deleted = await self.store.delete_messages_for_device(
+                sync_config.user.to_string(), sync_config.device_id, since_stream_id
+            )
+            logger.debug(
+                "Deleted %d to-device messages up to %d", deleted, since_stream_id
+            )
+
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
@@ -1231,16 +1242,6 @@ class SyncHandler:
             since_stream_id = int(sync_result_builder.since_token.to_device_key)
 
         if since_stream_id != int(now_token.to_device_key):
-            # We only delete messages when a new message comes in, but that's
-            # fine so long as we delete them at some point.
-
-            deleted = await self.store.delete_messages_for_device(
-                user_id, device_id, since_stream_id
-            )
-            logger.debug(
-                "Deleted %d to-device messages up to %d", deleted, since_stream_id
-            )
-
             messages, stream_id = await self.store.get_new_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
