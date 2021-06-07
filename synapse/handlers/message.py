@@ -481,6 +481,7 @@ class EventCreationHandler:
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
         outlier: bool = False,
+        historical: bool = False,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """
@@ -572,6 +573,8 @@ class EventCreationHandler:
             builder.internal_metadata.txn_id = txn_id
 
         builder.internal_metadata.outlier = outlier
+
+        builder.internal_metadata.historical = historical
 
         event, context = await self.create_new_client_event(
             builder=builder,
@@ -1078,7 +1081,7 @@ class EventCreationHandler:
         # The historical messages also do not have the proper `context.current_state_ids`
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
-        if event.content.get(EventContentFields.MSC2716_HISTORICAL, None) is None:
+        if event.internal_metadata.is_historical():
             await self.action_generator.handle_push_actions_for_event(event, context)
 
         try:
@@ -1373,7 +1376,7 @@ class EventCreationHandler:
         # Mark any `m.historical` messages as backfilled so they don't appear
         # in `/sync` and have the proper decrementing `stream_ordering` as we import
         backfilled = False
-        if event.content.get(EventContentFields.MSC2716_HISTORICAL, None) is not None:
+        if event.internal_metadata.is_historical():
             backfilled = True
 
         # Note that this returns the event that was persisted, which may not be

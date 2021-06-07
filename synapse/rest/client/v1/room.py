@@ -270,6 +270,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 class RoomBatchSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
+        self.hs = hs
         self.store = hs.get_datastore()
         self.state_store = hs.get_storage().state
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -474,6 +475,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 prev_event_ids=event_dict.get("prev_events"),
                 # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
                 auth_event_ids=auth_event_ids,
+                historical=True,
                 depth=inherited_depth,
             )
             logger.debug(
@@ -483,7 +485,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 auth_event_ids,
             )
 
-            # TODO: Should we add the same `hs.is_mine_id(event.sender)` assert check that `create_and_send_nonmember_event` has?
+            assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
+                event.sender,
+            )
 
             events_to_persist.append((event, context))
             event_id = event.event_id
