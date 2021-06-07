@@ -485,21 +485,21 @@ class Notifier:
             end_time = self.clock.time_msec() + timeout
 
             while not result:
-                try:
-                    now = self.clock.time_msec()
-                    if end_time <= now:
-                        break
+                with start_active_span("wait_for_events"):
+                    try:
+                        now = self.clock.time_msec()
+                        if end_time <= now:
+                            break
 
-                    # Now we wait for the _NotifierUserStream to be told there
-                    # is a new token.
-                    listener = user_stream.new_listener(prev_token)
-                    listener.deferred = timeout_deferred(
-                        listener.deferred,
-                        (end_time - now) / 1000.0,
-                        self.hs.get_reactor(),
-                    )
+                        # Now we wait for the _NotifierUserStream to be told there
+                        # is a new token.
+                        listener = user_stream.new_listener(prev_token)
+                        listener.deferred = timeout_deferred(
+                            listener.deferred,
+                            (end_time - now) / 1000.0,
+                            self.hs.get_reactor(),
+                        )
 
-                    with start_active_span("wait_for_events.deferred"):
                         log_kv(
                             {
                                 "wait_for_events": "sleep",
@@ -517,27 +517,27 @@ class Notifier:
                             }
                         )
 
-                    current_token = user_stream.current_token
+                        current_token = user_stream.current_token
 
-                    result = await callback(prev_token, current_token)
-                    log_kv(
-                        {
-                            "wait_for_events": "result",
-                            "result": bool(result),
-                        }
-                    )
-                    if result:
+                        result = await callback(prev_token, current_token)
+                        log_kv(
+                            {
+                                "wait_for_events": "result",
+                                "result": bool(result),
+                            }
+                        )
+                        if result:
+                            break
+
+                        # Update the prev_token to the current_token since nothing
+                        # has happened between the old prev_token and the current_token
+                        prev_token = current_token
+                    except defer.TimeoutError:
+                        log_kv({"wait_for_events": "timeout"})
                         break
-
-                    # Update the prev_token to the current_token since nothing
-                    # has happened between the old prev_token and the current_token
-                    prev_token = current_token
-                except defer.TimeoutError:
-                    log_kv({"wait_for_events": "timeout"})
-                    break
-                except defer.CancelledError:
-                    log_kv({"wait_for_events": "cancelled"})
-                    break
+                    except defer.CancelledError:
+                        log_kv({"wait_for_events": "cancelled"})
+                        break
 
         if result is None:
             # This happened if there was no timeout or if the timeout had

@@ -271,6 +271,12 @@ class SynapseTags:
     # HTTP request tag (used to distinguish full vs incremental syncs, etc)
     REQUEST_TAG = "request_tag"
 
+    # Text description of a database transaction
+    DB_TXN_DESC = "db.txn_desc"
+
+    # Uniqueish ID of a database transaction
+    DB_TXN_ID = "db.txn_id"
+
 
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
@@ -356,10 +362,13 @@ def init_tracer(hs: "HomeServer"):
 
     set_homeserver_whitelist(hs.config.opentracer_whitelist)
 
+    from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
+
     config = JaegerConfig(
         config=hs.config.jaeger_config,
         service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
         scope_manager=LogContextScopeManager(hs.config),
+        metrics_factory=PrometheusMetricsFactory(),
     )
 
     # If we have the rust jaeger reporter available let's use that.

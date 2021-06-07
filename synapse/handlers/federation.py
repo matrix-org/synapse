@@ -178,6 +178,8 @@ class FederationHandler(BaseHandler):
         self.room_queues = {}  # type: Dict[str, List[Tuple[EventBase, str]]]
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
+        self._room_backfill = Linearizer("room_backfill")
+
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
@@ -1041,6 +1043,12 @@ class FederationHandler(BaseHandler):
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
         """
+        with (await self._room_backfill.queue(room_id)):
+            return await self._maybe_backfill_inner(room_id, current_depth, limit)
+
+    async def _maybe_backfill_inner(
+        self, room_id: str, current_depth: int, limit: int
+    ) -> bool:
         extremities = await self.store.get_oldest_events_with_depth_in_room(room_id)
 
         if not extremities:
@@ -3056,8 +3064,9 @@ class FederationHandler(BaseHandler):
         """
         instance = self.config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:
-            # Limit the number of events sent over federation.
-            for batch in batch_iter(event_and_contexts, 1000):
+            # Limit the number of events sent over replication. We choose 200
+            # here as that is what we default to in `max_request_body_size(..)`
+            for batch in batch_iter(event_and_contexts, 200):
                 result = await self._send_events(
                     instance_name=instance,
                     store=self.store,
