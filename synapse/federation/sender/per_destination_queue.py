@@ -14,6 +14,7 @@
 # limitations under the License.
 import datetime
 import logging
+import random
 from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Tuple
 
 import attr
@@ -207,7 +208,7 @@ class PerDestinationQueue:
         self._pending_edus.append(edu)
         self.attempt_new_transaction()
 
-    def attempt_new_transaction(self) -> None:
+    def attempt_new_transaction(self, delay=False) -> None:
         """Try to start a new transaction to this destination
 
         If there is already a transaction in progress to this destination,
@@ -237,9 +238,19 @@ class PerDestinationQueue:
 
         logger.debug("TX [%s] Starting transaction loop", self._destination)
 
+        async def _start():
+            if delay:
+                next_id = self._transaction_manager._next_txn_id
+                await self._clock.sleep(random.uniform(0, 5000))
+                if next_id != self._transaction_manager._next_txn_id:
+                    return
+
+            if not self.transmission_loop_running:
+                await self._transaction_transmission_loop()
+
         run_as_background_process(
             "federation_transaction_transmission_loop",
-            self._transaction_transmission_loop,
+            _start,
         )
 
     async def _transaction_transmission_loop(self) -> None:
