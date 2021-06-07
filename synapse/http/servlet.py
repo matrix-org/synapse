@@ -15,7 +15,7 @@
 """ This module contains base REST classes for constructing REST servlets. """
 
 import logging
-from typing import Dict, Iterable, List, Optional, Union, overload
+from typing import Dict, Iterable, List, Optional, overload
 
 from typing_extensions import Literal
 
@@ -166,7 +166,7 @@ def parse_bytes(
 
 def parse_string(
     request: Request,
-    name: Union[bytes, str],
+    name: str,
     default: Optional[str] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
@@ -226,7 +226,7 @@ def _parse_string_value(
 @overload
 def parse_strings_from_args(
     args: Dict[bytes, List[bytes]],
-    name: Union[bytes, str],
+    name: str,
     default: Optional[List[str]] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
@@ -237,7 +237,7 @@ def parse_strings_from_args(
 
 def parse_strings_from_args(
     args: Dict[bytes, List[bytes]],
-    name: Union[bytes, str],
+    name: str,
     default: Optional[List[str]] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
@@ -267,12 +267,10 @@ def parse_strings_from_args(
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
+    name_bytes = name.encode("ascii")
 
-    if not isinstance(name, bytes):
-        name = name.encode("ascii")
-
-    if name in args:
-        values = args[name]
+    if name_bytes in args:
+        values = args[name_bytes]
 
         return [
             _parse_string_value(value, allowed_values, name=name, encoding=encoding)
@@ -292,7 +290,7 @@ def parse_strings_from_args(
 
 def parse_string_from_args(
     args: Dict[bytes, List[bytes]],
-    name: Union[bytes, str],
+    name: str,
     default: Optional[str] = None,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
