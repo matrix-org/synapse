@@ -439,8 +439,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             "content": {
                 EventContentFields.MSC2716_NEXT_CHUNK_ID: next_chunk_id,
                 EventContentFields.MSC2716_HISTORICAL: True,
-                # TODO: Why is `body` necessary for this to show up in /messages
-                "body": "TODO_REMOVE - INSERTION",
             },
             # Since the insertion event is put at the end of the chunk,
             # copy the origin_server_ts from the last event we're inserting
