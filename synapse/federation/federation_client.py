@@ -56,7 +56,7 @@ from synapse.federation.federation_base import FederationBase, event_from_pdu_js
 from synapse.federation.transport.client import SendJoinResponse
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
-from synapse.util.async_helpers import concurrently_execute, yieldable_gather_results
+from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -383,18 +383,26 @@ class FederationClient(FederationBase):
         Returns:
             A list of PDUs that have valid signatures and hashes.
         """
-        valid_pdus = await yieldable_gather_results(
-            self._check_sigs_and_hash_and_fetch_one,
-            pdus,
-            origin=origin,
-            room_version=room_version,
-            outlier=outlier,
-        )
 
-        if include_none:
-            return valid_pdus
-        else:
-            return [p for p in valid_pdus if p]
+        # We limit how many PDUs we check at once, as if we try to do hundreds
+        # of thousands of PDUs at once we see large memory spikes.
+
+        valid_pdus = []
+
+        async def _execute(pdu: EventBase) -> None:
+            valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
+                pdu=pdu,
+                origin=origin,
+                outlier=outlier,
+                room_version=room_version,
+            )
+
+            if valid_pdu or include_none:
+                valid_pdus.append(valid_pdu)
+
+        await concurrently_execute(_execute, pdus, 10000)
+
+        return valid_pdus
 
     async def _check_sigs_and_hash_and_fetch_one(
         self,
