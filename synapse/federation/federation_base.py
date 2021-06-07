@@ -48,13 +48,10 @@ class FederationBase:
             pdu: the event to be checked
 
         Returns:
-            For each input event, a deferred which:
-              * returns the original event if the checks pass
-              * returns a redacted version of the event (if the signature
+              * the original event if the checks pass
+              * a redacted version of the event (if the signature
                 matched but the hash did not)
-              * throws a SynapseError if the signature check failed.
-            The deferreds run their callbacks in the sentinel
-        """
+              * throws a SynapseError if the signature check failed."""
         try:
             await _check_sigs_on_pdu(self.keyring, room_version, pdu)
         except Exception as e:
@@ -108,17 +105,15 @@ class PduToCheckSig(namedtuple("PduToCheckSig", ["pdu", "sender_domain", "deferr
 
 async def _check_sigs_on_pdu(
     keyring: Keyring, room_version: RoomVersion, pdu: EventBase
-):
+) -> None:
     """Check that the given events are correctly signed
+
+    Raise a SynapseError if the event wasn't correctly signed.
 
     Args:
         keyring: keyring object to do the checks
         room_version: the room version of the PDUs
         pdus: the events to be checked
-
-    Returns:
-        A Deferred for each event in pdus, which will either succeed if
-           the signatures are valid, or fail (with a SynapseError) if not.
     """
 
     # we want to check that the event is signed by:
