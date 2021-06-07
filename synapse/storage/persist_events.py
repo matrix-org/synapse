@@ -16,9 +16,10 @@
 
 import itertools
 import logging
-from collections import deque, namedtuple
+from collections import deque
 from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
+import attr
 from prometheus_client import Counter, Histogram
 
 from twisted.internet import defer
@@ -89,14 +90,17 @@ times_pruned_extremities = Counter(
 )
 
 
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class _EventPersistQueueItem:
+    events_and_contexts: List[Tuple[EventBase, EventContext]]
+    backfilled: bool
+    deferred: ObservableDeferred
+
+
 class _EventPeristenceQueue:
     """Queues up events so that they can be persisted in bulk with only one
     concurrent transaction per room.
     """
-
-    _EventPersistQueueItem = namedtuple(
-        "_EventPersistQueueItem", ("events_and_contexts", "backfilled", "deferred")
-    )
 
     def __init__(self):
         self._event_persist_queues = {}
@@ -132,7 +136,7 @@ class _EventPeristenceQueue:
         deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
 
         queue.append(
-            self._EventPersistQueueItem(
+            _EventPersistQueueItem(
                 events_and_contexts=events_and_contexts,
                 backfilled=backfilled,
                 deferred=deferred,
