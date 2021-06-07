@@ -160,7 +160,7 @@ async def _check_sigs_on_pdu(
     # (ie, the room version uses old-style non-hash event IDs).
     if room_version.event_format == EventFormatVersions.V1 and get_domain_from_id(
         pdu.event_id
-    ):
+    ) != get_domain_from_id(pdu.sender):
         try:
             await keyring.verify_event_for_server(
                 get_domain_from_id(pdu.event_id),
