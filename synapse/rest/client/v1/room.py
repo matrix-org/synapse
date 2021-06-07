@@ -267,7 +267,7 @@ class RoomSendEventRestServlet(TransactionRestServlet):
         )
 
 
-class RoomBulkSendEventRestServlet(TransactionRestServlet):
+class RoomBatchSendEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
         self.store = hs.get_datastore()
@@ -277,8 +277,8 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     def register(self, http_server):
-        # /rooms/$roomid/bulksend
-        PATTERNS = "/rooms/(?P<room_id>[^/]*)/bulksend"
+        # /rooms/$roomid/batchsend
+        PATTERNS = "/rooms/(?P<room_id>[^/]*)/batchsend"
         register_txn_path(self, PATTERNS, http_server, with_get=True)
 
     async def inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
@@ -327,7 +327,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         if not requester.app_service:
             raise AuthError(
                 403,
-                "Only application services can use the /bulksend endpoint",
+                "Only application services can use the /batchsend endpoint",
             )
 
         body = parse_json_object_from_request(request)
@@ -365,7 +365,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
             )
 
             logger.debug(
-                "RoomBulkSendEventRestServlet inserting state_event=%s, auth_event_ids=%s",
+                "RoomBatchSendEventRestServlet inserting state_event=%s, auth_event_ids=%s",
                 state_event,
                 auth_event_ids,
             )
@@ -477,7 +477,7 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 depth=inherited_depth,
             )
             logger.debug(
-                "RoomBulkSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
+                "RoomBatchSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
                 event,
                 prev_event_ids,
                 auth_event_ids,
@@ -1309,7 +1309,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomMembershipRestServlet(hs).register(http_server)
     RoomSendEventRestServlet(hs).register(http_server)
     if msc2716_enabled:
-        RoomBulkSendEventRestServlet(hs).register(http_server)
+        RoomBatchSendEventRestServlet(hs).register(http_server)
     PublicRoomListRestServlet(hs).register(http_server)
     RoomStateRestServlet(hs).register(http_server)
     RoomRedactEventRestServlet(hs).register(http_server)
