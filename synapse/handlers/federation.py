@@ -22,6 +22,7 @@ from collections.abc import Container
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -1364,11 +1365,12 @@ class FederationHandler(BaseHandler):
 
             event_infos.append(_NewEventInfo(event, None, auth))
 
-        await self._auth_and_persist_events(
-            destination,
-            room_id,
-            event_infos,
-        )
+        if event_infos:
+            await self._auth_and_persist_events(
+                destination,
+                room_id,
+                event_infos,
+            )
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """
@@ -2077,7 +2079,7 @@ class FederationHandler(BaseHandler):
         self,
         origin: str,
         room_id: str,
-        event_infos: Iterable[_NewEventInfo],
+        event_infos: Collection[_NewEventInfo],
         backfilled: bool = False,
     ) -> None:
         """Creates the appropriate contexts and persists events. The events
@@ -2087,6 +2089,9 @@ class FederationHandler(BaseHandler):
 
         Notifies about the events where appropriate.
         """
+
+        if not event_infos:
+            return
 
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
@@ -2216,13 +2221,14 @@ class FederationHandler(BaseHandler):
                     raise
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
-        await self.persist_events_and_notify(
-            room_id,
-            [
-                (e, events_to_context[e.event_id])
-                for e in itertools.chain(auth_events, state)
-            ],
-        )
+        if auth_events or state:
+            await self.persist_events_and_notify(
+                room_id,
+                [
+                    (e, events_to_context[e.event_id])
+                    for e in itertools.chain(auth_events, state)
+                ],
+            )
 
         new_event_context = await self.state_handler.compute_event_context(
             event, old_state=state
@@ -3061,7 +3067,13 @@ class FederationHandler(BaseHandler):
                 the same room.
             backfilled: Whether these events are a result of
                 backfilling or not
+
+        Returns:
+            The stream ID after which all events have been persisted.
         """
+        if not event_and_contexts:
+            return self.store.get_current_events_token()
+
         instance = self.config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
