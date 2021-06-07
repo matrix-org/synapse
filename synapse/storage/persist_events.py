@@ -40,6 +40,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, Membership
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.logging import opentracing
 from synapse.logging.context import PreserveLoggingContext, make_deferred_yieldable
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.databases import Databases
@@ -108,6 +109,7 @@ class _EventPersistQueueItem:
     events_and_contexts: List[Tuple[EventBase, EventContext]]
     backfilled: bool
     deferred: ObservableDeferred
+    opentracing_context: Optional[object]
 
 
 _PersistResult = TypeVar("_PersistResult")
@@ -162,12 +164,14 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             end_item = queue[-1]
         else:
             # need to make a new queue item
+            span = opentracing.active_span()
             deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
 
             end_item = _EventPersistQueueItem(
                 events_and_contexts=[],
                 backfilled=backfilled,
                 deferred=deferred,
+                opentracing_context=span.context if span else None,
             )
             queue.append(end_item)
 
@@ -200,9 +204,13 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
                 queue = self._get_drainining_queue(room_id)
                 for item in queue:
                     try:
-                        ret = await self._per_item_callback(
-                            item.events_and_contexts, item.backfilled
-                        )
+                        with opentracing.start_active_span(
+                            "persist_event_batch",
+                            child_of=item.opentracing_context,
+                        ):
+                            ret = await self._per_item_callback(
+                                item.events_and_contexts, item.backfilled
+                            )
                     except Exception:
                         with PreserveLoggingContext():
                             item.deferred.errback()
@@ -252,6 +260,7 @@ class EventsPersistenceStorage:
         self._event_persist_queue = _EventPeristenceQueue(self._persist_event_batch)
         self._state_resolution_handler = hs.get_state_resolution_handler()
 
+    @opentracing.trace
     async def persist_events(
         self,
         events_and_contexts: Iterable[Tuple[EventBase, EventContext]],
@@ -307,6 +316,7 @@ class EventsPersistenceStorage:
             self.main_store.get_room_max_token(),
         )
 
+    @opentracing.trace
     async def persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
     ) -> Tuple[EventBase, PersistedEventPosition, RoomStreamToken]:

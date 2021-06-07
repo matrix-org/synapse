@@ -551,6 +551,10 @@ def start_active_span_from_edu(
 
 
 # Opentracing setters for tags, logs, etc
+@only_if_tracing
+def active_span():
+    """Get the currently active span, if any"""
+    return opentracing.tracer.active_span
 
 
 @ensure_active_span("set a tag")
