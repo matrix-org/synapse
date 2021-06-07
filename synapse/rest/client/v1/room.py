@@ -100,7 +100,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events
-class RoomStateEventRestServlet(TransactionRestServlet):
+class Roomstate_evententRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -359,18 +359,24 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
-        for stateEv in body["state_events_at_start"]:
+        for state_event in body["state_events_at_start"]:
             assert_params_in_dict(
-                stateEv, ["type", "origin_server_ts", "content", "sender"]
+                state_event, ["type", "origin_server_ts", "content", "sender"]
+            )
+
+            logger.debug(
+                "RoomBulkSendEventRestServlet inserting state_event=%s, auth_event_ids=%s",
+                state_event,
+                auth_event_ids,
             )
 
             event_dict = {
-                "type": stateEv["type"],
-                "origin_server_ts": stateEv["origin_server_ts"],
-                "content": stateEv["content"],
+                "type": state_event["type"],
+                "origin_server_ts": state_event["origin_server_ts"],
+                "content": state_event["content"],
                 "room_id": room_id,
-                "sender": stateEv["sender"],
-                "state_key": stateEv["state_key"],
+                "sender": state_event["sender"],
+                "state_key": state_event["state_key"],
             }
 
             # Make the state events float off on their own
@@ -413,7 +419,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
 
             auth_event_ids.append(event_id)
 
-        logger.info("bulk insert events %s", body["events"])
         events_to_create = body["events"]
 
         # If provided, connect the chunk to the last insertion point
@@ -445,7 +450,6 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
         events_to_create = [insertion_event] + events_to_create
 
         inherited_depth = await self.inherit_depth_from_prev_ids(prev_events_from_query)
-        logger.info("inherited_depth %s", inherited_depth)
 
         event_ids = []
         prev_event_ids = prev_events_from_query
@@ -474,11 +478,11 @@ class RoomBulkSendEventRestServlet(TransactionRestServlet):
                 auth_event_ids=auth_event_ids,
                 depth=inherited_depth,
             )
-            current_state_ids = await context.get_current_state_ids()
-            logger.info(
-                "bulksend event=%s current_state_ids=%s",
+            logger.debug(
+                "RoomBulkSendEventRestServlet inserting event=%s, prev_event_ids=%s, auth_event_ids=%s",
                 event,
-                current_state_ids,
+                prev_event_ids,
+                auth_event_ids,
             )
 
             # TODO: Should we add the same `hs.is_mine_id(event.sender)` assert check that `create_and_send_nonmember_event` has?
@@ -1299,7 +1303,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
 def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     msc2716_enabled = hs.config.experimental.msc2716_enabled
 
-    RoomStateEventRestServlet(hs).register(http_server)
+    Roomstate_evententRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
