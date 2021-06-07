@@ -541,6 +541,7 @@ class DatabasePool:
                         },
                     ):
                         r = func(cursor, *args, **kwargs)
+                        opentracing.log_kv({"message": "commit"})
                         conn.commit()
                         return r
                 except self.engine.module.OperationalError as e:
@@ -556,7 +557,8 @@ class DatabasePool:
                     if i < N:
                         i += 1
                         try:
-                            conn.rollback()
+                            with opentracing.start_active_span("db.rollback"):
+                                conn.rollback()
                         except self.engine.module.Error as e1:
                             transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
@@ -569,7 +571,8 @@ class DatabasePool:
                         if i < N:
                             i += 1
                             try:
-                                conn.rollback()
+                                with opentracing.start_active_span("db.rollback"):
+                                    conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
                                     "[TXN EROLL] {%s} %s",
