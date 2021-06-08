@@ -129,7 +129,7 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(
             hs.get_clock(), "state_resp", timeout_ms=30000
-        )  # type: ResponseCache[Tuple[str, str]]
+        )  # type: ResponseCache[Tuple[str, Optional[str]]]
         self._state_ids_resp_cache = ResponseCache(
             hs.get_clock(), "state_ids_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
@@ -406,7 +406,7 @@ class FederationServer(FederationBase):
         )
 
     async def on_room_state_request(
-        self, origin: str, room_id: str, event_id: str
+        self, origin: str, room_id: str, event_id: Optional[str]
     ) -> Tuple[int, Dict[str, Any]]:
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
@@ -463,7 +463,7 @@ class FederationServer(FederationBase):
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
-        self, room_id: str, event_id: str
+        self, room_id: str, event_id: Optional[str]
     ) -> Dict[str, list]:
         if event_id:
             pdus = await self.handler.get_state_for_pdu(
