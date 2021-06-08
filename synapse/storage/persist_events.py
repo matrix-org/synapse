@@ -157,27 +157,25 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             `__init__`.
         """
         queue = self._event_persist_queues.setdefault(room_id, deque())
-        if queue:
-            # if the last item in the queue has the same `backfilled` setting,
-            # we can just add these new events to that item.
+
+        # if the last item in the queue has the same `backfilled` setting,
+        # we can just add these new events to that item.
+        if queue and queue[-1].backfilled == backfilled:
             end_item = queue[-1]
-            if end_item.backfilled == backfilled:
-                end_item.events_and_contexts.extend(events_and_contexts)
-                return end_item.deferred.observe()
+        else:
+            # need to make a new queue item
+            deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
 
-        deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
-
-        queue.append(
-            _EventPersistQueueItem(
-                events_and_contexts=events_and_contexts,
+            end_item = _EventPersistQueueItem(
+                events_and_contexts=[],
                 backfilled=backfilled,
                 deferred=deferred,
             )
-        )
+            queue.append(end_item)
 
+        end_item.events_and_contexts.extend(events_and_contexts)
         self._handle_queue(room_id)
-
-        return deferred.observe()
+        return end_item.deferred.observe()
 
     def _handle_queue(self, room_id):
         """Attempts to handle the queue for a room if not already being handled.
