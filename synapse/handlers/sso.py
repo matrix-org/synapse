@@ -41,7 +41,12 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters, create_requester
+from synapse.types import (
+    JsonDict,
+    UserID,
+    contains_invalid_mxid_characters,
+    create_requester,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
@@ -463,16 +468,22 @@ class SsoHandler:
                 new_user = True
             else:
                 if self._sso_update_profile_information:
-                    attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
+                    attributes = await self._call_attribute_mapper(
+                        sso_to_matrix_id_mapper
+                    )
                     if attributes.display_name:
                         user_id_obj = UserID.from_string(user_id)
-                        profile_display_name = await self._profile_handler.get_displayname(user_id_obj)
+                        profile_display_name = (
+                            await self._profile_handler.get_displayname(user_id_obj)
+                        )
                         if profile_display_name != attributes.display_name:
                             requester = create_requester(
                                 user_id,
                                 authenticated_entity=user_id,
                             )
-                            await self._profile_handler.set_displayname(user_id_obj, requester, attributes.display_name, True)
+                            await self._profile_handler.set_displayname(
+                                user_id_obj, requester, attributes.display_name, True
+                            )
 
         await self._auth_handler.complete_sso_login(
             user_id,
