@@ -333,7 +333,7 @@ class TransportLayerClient:
         return response
 
     @log_function
-    async def send_knock_v2(
+    async def send_knock_v1(
         self,
         destination: str,
         room_id: str,
