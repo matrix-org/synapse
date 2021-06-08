@@ -14,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -69,8 +69,11 @@ class KnockRoomAliasServlet(RestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
+                # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+                args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+
                 remote_room_hosts = parse_strings_from_args(
-                    request.args, "server_name", required=False
+                    args, "server_name", required=False
                 )
             except KeyError:
                 remote_room_hosts = None

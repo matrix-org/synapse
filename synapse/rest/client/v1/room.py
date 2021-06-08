@@ -16,7 +16,7 @@
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
 import logging
 import re
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -278,7 +278,12 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         PATTERNS = "/join/(?P<room_identifier>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(self, request, room_identifier, txn_id=None):
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_identifier: str,
+        txn_id: Optional[str] = None,
+    ):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         try:
@@ -291,16 +296,19 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
+                # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+                args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+
                 remote_room_hosts = parse_strings_from_args(
-                    request.args, "server_name", required=False
+                    args, "server_name", required=False
                 )
             except KeyError:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
+            room_id_obj, remote_room_hosts = await handler.lookup_room_alias(room_alias)
+            room_id = room_id_obj.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
