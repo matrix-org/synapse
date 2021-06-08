@@ -1081,7 +1081,7 @@ class EventCreationHandler:
         # The historical messages also do not have the proper `context.current_state_ids`
         # and `state_groups` because they have `prev_events` that aren't persisted yet
         # (historical messages persisted in reverse-chronological order).
-        if event.internal_metadata.is_historical():
+        if not event.internal_metadata.is_historical():
             await self.action_generator.handle_push_actions_for_event(event, context)
 
         try:
