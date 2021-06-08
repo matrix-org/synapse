@@ -91,6 +91,12 @@ def make_pool(
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
 
+    def _on_new_connection(conn):
+        # Ensure we have a logging context so we can correctly track queries,
+        # etc.
+        with LoggingContext("db.on_new_connection"):
+            engine.on_new_connection(conn)
+
     return adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
