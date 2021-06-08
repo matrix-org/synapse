@@ -14,13 +14,13 @@
 # limitations under the License.
 
 import logging
-from typing import IO, TYPE_CHECKING, Optional
+from typing import IO, TYPE_CHECKING, Dict, List, Optional
 
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.server import DirectServeJsonResource, respond_with_json
-from synapse.http.servlet import parse_bytes
+from synapse.http.servlet import parse_bytes_from_args
 from synapse.http.site import SynapseRequest
 from synapse.rest.media.v1.media_storage import SpamMediaException
 
@@ -61,7 +61,8 @@ class UploadResource(DirectServeJsonResource):
                 errcode=Codes.TOO_LARGE,
             )
 
-        upload_name_bytes = parse_bytes(request, "filename")
+        args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+        upload_name_bytes = parse_bytes_from_args(args, "filename")
         if upload_name_bytes:
             try:
                 upload_name = upload_name_bytes.decode("utf8")  # type: Optional[str]

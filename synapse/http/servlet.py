@@ -111,8 +111,8 @@ def parse_boolean_from_args(args, name, default=None, required=False):
 
 
 @overload
-def parse_bytes(
-    request: Request,
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
     name: str,
     default: Literal[None] = None,
     required: Literal[True] = True,
@@ -121,8 +121,8 @@ def parse_bytes(
 
 
 @overload
-def parse_bytes(
-    request: Request,
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
     name: str,
     default: Optional[bytes] = None,
     required: bool = False,
@@ -130,8 +130,8 @@ def parse_bytes(
     ...
 
 
-def parse_bytes(
-    request: Request,
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
     name: str,
     default: Optional[bytes] = None,
     required: bool = False,
@@ -140,7 +140,7 @@ def parse_bytes(
     Parse a string parameter as bytes from the request query string.
 
     Args:
-        request: the twisted HTTP request.
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
         name: the name of the query parameter.
         default: value to use if the parameter is absent,
             defaults to None. Must be bytes if encoding is None.
@@ -152,7 +152,6 @@ def parse_bytes(
     Raises:
         SynapseError if the parameter is absent and required.
     """
-    args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
     name_bytes = name.encode("ascii")
 
     if name_bytes in args:
@@ -262,7 +261,7 @@ def parse_strings_from_args(
     The content of the query param will be decoded to Unicode using the encoding.
 
     Args:
-        args: the twisted HTTP request.args list.
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
         name: the name of the query parameter.
         default: value to use if the parameter is absent, defaults to None.
         required: whether to raise a 400 SynapseError if the
@@ -311,7 +310,7 @@ def parse_string_from_args(
     The content of the query param will be decoded to Unicode using the encoding.
 
     Args:
-        args: the twisted HTTP request.args list.
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
         name: the name of the query parameter.
         default: value to use if the parameter is absent, defaults to None.
         required: whether to raise a 400 SynapseError if the
