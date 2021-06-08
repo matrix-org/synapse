@@ -168,7 +168,7 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Pattern, Type
+from typing import TYPE_CHECKING, Dict, List, Optional, Pattern, Type
 
 import attr
 
@@ -573,23 +573,22 @@ def set_operation_name(operation_name):
 # Injection and extraction
 
 
-@ensure_active_span("inject the span into a byte dict")
-def inject_active_span_byte_dict(headers, destination, check_destination=True):
+@ensure_active_span("inject the span into a header dict")
+def inject_header_dict(
+    headers: Dict[bytes, List[bytes]],
+    destination: Optional[str] = None,
+    check_destination: bool = True,
+) -> None:
     """
-    Injects a span context into a dict where the headers are encoded as byte
-    strings
+    Injects a span context into a dict of HTTP headers
 
     Args:
-        headers (dict)
-        destination (str): address of entity receiving the span context. If check_destination
-            is true the context will only be injected if the destination matches the
-            opentracing whitelist
+        headers: the dict to inject headers into
+        destination: address of entity receiving the span context. Must be given unless
+            check_destination is False. The context will only be injected if the
+            destination matches the opentracing whitelist
         check_destination (bool): If false, destination will be ignored and the context
             will always be injected.
-        span (opentracing.Span)
-
-    Returns:
-        In-place modification of headers
 
     Note:
         The headers set by the tracer are custom to the tracer implementation which
@@ -598,8 +597,13 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
         here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
-    if check_destination and not whitelisted_homeserver(destination):
-        return
+    if check_destination:
+        if destination is None:
+            raise ValueError(
+                "destination must be given unless check_destination is False"
+            )
+        if not whitelisted_homeserver(destination):
+            return
 
     span = opentracing.tracer.active_span
 
