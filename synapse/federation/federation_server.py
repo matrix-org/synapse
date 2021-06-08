@@ -615,6 +615,13 @@ class FederationServer(FederationBase):
             )
             raise IncompatibleRoomVersionError(room_version=room_version)
 
+        if not KNOWN_ROOM_VERSIONS[room_version].msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
         pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
@@ -641,6 +648,13 @@ class FederationServer(FederationBase):
         logger.debug("on_send_knock_request: content: %s", content)
 
         room_version = await self.store.get_room_version(room_id)
+        if not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
         pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)

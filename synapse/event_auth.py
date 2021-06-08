@@ -289,6 +289,7 @@ def _is_membership_change_allowed(
         {
             "caller_in_room": caller_in_room,
             "caller_invited": caller_invited,
+            "caller_knocked": caller_knocked,
             "target_banned": target_banned,
             "target_in_room": target_in_room,
             "membership": membership,

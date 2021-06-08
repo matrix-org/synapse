@@ -90,6 +90,7 @@ class FederationClient(FederationBase):
         self._clock.looping_call(self._clear_tried_cache, 60 * 1000)
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
+        self._msc2403_enabled = hs.config.experimental.msc2403_enabled
 
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
@@ -620,7 +621,12 @@ class FederationClient(FederationBase):
             SynapseError: if the chosen remote server returns a 300/400 code, or
                 no servers successfully handle the request.
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
+        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+
+        # Allow knocking if the feature is enabled
+        if self._msc2403_enabled:
+            valid_memberships.add(Membership.KNOCK)
+
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -638,6 +644,13 @@ class FederationClient(FederationBase):
             room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
             if not room_version:
                 raise UnsupportedRoomVersionError()
+
+            if not room_version.msc2403_knocking and membership == Membership.KNOCK:
+                raise SynapseError(
+                    400,
+                    "This room version does not support knocking",
+                    errcode=Codes.FORBIDDEN,
+                )
 
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):

@@ -584,7 +584,7 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
         return 200, content
 
 
-class FederationV2SendKnockServlet(BaseFederationServerServlet):
+class FederationV1SendKnockServlet(BaseFederationServerServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
@@ -1595,13 +1595,11 @@ FEDERATION_SERVLET_CLASSES = (
     FederationQueryServlet,
     FederationMakeJoinServlet,
     FederationMakeLeaveServlet,
-    FederationMakeKnockServlet,
     FederationEventServlet,
     FederationV1SendJoinServlet,
     FederationV2SendJoinServlet,
     FederationV1SendLeaveServlet,
     FederationV2SendLeaveServlet,
-    FederationV2SendKnockServlet,
     FederationV1InviteServlet,
     FederationV2InviteServlet,
     FederationGetMissingEventsServlet,
@@ -1655,6 +1653,13 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
 
+
+MSC2403_SERVLET_CLASSES = (
+    FederationV1SendKnockServlet,
+    FederationMakeKnockServlet,
+)
+
+
 DEFAULT_SERVLET_GROUPS = (
     "federation",
     "room_list",
@@ -1696,6 +1701,16 @@ def register_servlets(
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
             ).register(resource)
+
+        # Register msc2403 (knocking) servlets if the feature is enabled
+        if hs.config.experimental.msc2403_enabled:
+            for servletclass in MSC2403_SERVLET_CLASSES:
+                servletclass(
+                    hs=hs,
+                    authenticator=authenticator,
+                    ratelimiter=ratelimiter,
+                    server_name=hs.hostname,
+                ).register(resource)
 
     if "openid" in servlet_groups:
         for servletclass in OPENID_SERVLET_CLASSES:
