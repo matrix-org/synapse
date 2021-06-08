@@ -15,7 +15,9 @@
 import functools
 import logging
 import re
-from typing import Container, List, Mapping, Optional, Sequence, Tuple, Type
+from typing import Container, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+
+from typing_extensions import Literal
 
 import synapse
 from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH
@@ -406,13 +408,18 @@ class FederationSendServlet(BaseFederationServerServlet):
     RATELIMIT = False
 
     # This is when someone is trying to send us a bunch of data.
-    async def on_PUT(self, origin, content, query, transaction_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        transaction_id: str,
+    ) -> Tuple[int, JsonDict]:
         """Called on PUT /send/<transaction_id>/
 
         Args:
-            request (twisted.web.http.Request): The HTTP request.
-            transaction_id (str): The transaction_id associated with this
-                request. This is *not* None.
+            transaction_id: The transaction_id associated with this request. This
+                is *not* None.
 
         Returns:
             Tuple of `(code, response)`, where
@@ -457,7 +464,13 @@ class FederationEventServlet(BaseFederationServerServlet):
     PATH = "/event/(?P<event_id>[^/]*)/?"
 
     # This is when someone asks for a data item for a given server data_id pair.
-    async def on_GET(self, origin, content, query, event_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        event_id: str,
+    ) -> Tuple[int, Union[JsonDict, str]]:
         return await self.handler.on_pdu_request(origin, event_id)
 
 
@@ -465,7 +478,13 @@ class FederationStateV1Servlet(BaseFederationServerServlet):
     PATH = "/state/(?P<room_id>[^/]*)/?"
 
     # This is when someone asks for all data for a given room.
-    async def on_GET(self, origin, content, query, room_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         return await self.handler.on_room_state_request(
             origin,
             room_id,
@@ -476,7 +495,13 @@ class FederationStateV1Servlet(BaseFederationServerServlet):
 class FederationStateIdsServlet(BaseFederationServerServlet):
     PATH = "/state_ids/(?P<room_id>[^/]*)/?"
 
-    async def on_GET(self, origin, content, query, room_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         return await self.handler.on_state_ids_request(
             origin,
             room_id,
@@ -487,7 +512,13 @@ class FederationStateIdsServlet(BaseFederationServerServlet):
 class FederationBackfillServlet(BaseFederationServerServlet):
     PATH = "/backfill/(?P<room_id>[^/]*)/?"
 
-    async def on_GET(self, origin, content, query, room_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         versions = [x.decode("ascii") for x in query[b"v"]]
         limit = parse_integer_from_args(query, "limit", None)
 
@@ -501,7 +532,13 @@ class FederationQueryServlet(BaseFederationServerServlet):
     PATH = "/query/(?P<query_type>[^/]*)"
 
     # This is when we receive a server-server Query
-    async def on_GET(self, origin, content, query, query_type):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        query_type: str,
+    ) -> Tuple[int, JsonDict]:
         args = {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()}
         args["origin"] = origin
         return await self.handler.on_query_request(query_type, args)
@@ -510,20 +547,27 @@ class FederationQueryServlet(BaseFederationServerServlet):
 class FederationMakeJoinServlet(BaseFederationServerServlet):
     PATH = "/make_join/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, _content, query, room_id, user_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         """
         Args:
-            origin (unicode): The authenticated server_name of the calling server
+            origin: The authenticated server_name of the calling server
 
-            _content (None): (GETs don't have bodies)
+            content: (GETs don't have bodies)
 
-            query (dict[bytes, list[bytes]]): Query params from the request.
+            query: Query params from the request.
 
-            **kwargs (dict[unicode, unicode]): the dict mapping keys to path
-                components as specified in the path match regexp.
+            **kwargs: the dict mapping keys to path components as specified in
+                the path match regexp.
 
         Returns:
-            Tuple[int, object]: (response code, response object)
+            Tuple of (response code, response object)
         """
         supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
         if supported_versions is None:
@@ -538,7 +582,14 @@ class FederationMakeJoinServlet(BaseFederationServerServlet):
 class FederationMakeLeaveServlet(BaseFederationServerServlet):
     PATH = "/make_leave/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, room_id, user_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         content = await self.handler.on_make_leave_request(origin, room_id, user_id)
         return 200, content
 
@@ -546,7 +597,14 @@ class FederationMakeLeaveServlet(BaseFederationServerServlet):
 class FederationV1SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, Tuple[int, JsonDict]]:
         content = await self.handler.on_send_leave_request(origin, content)
         return 200, (200, content)
 
@@ -556,7 +614,14 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 
     PREFIX = FEDERATION_V2_PREFIX
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
         content = await self.handler.on_send_leave_request(origin, content)
         return 200, content
 
@@ -564,7 +629,14 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 class FederationMakeKnockServlet(BaseFederationServerServlet):
     PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, room_id, user_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         try:
             # Retrieve the room versions the remote homeserver claims to support
             supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
@@ -580,7 +652,14 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
 class FederationV1SendKnockServlet(BaseFederationServerServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
         content = await self.handler.on_send_knock_request(origin, content, room_id)
         return 200, content
 
@@ -588,14 +667,28 @@ class FederationV1SendKnockServlet(BaseFederationServerServlet):
 class FederationEventAuthServlet(BaseFederationServerServlet):
     PATH = "/event_auth/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, room_id, event_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
         return await self.handler.on_event_auth(origin, room_id, event_id)
 
 
 class FederationV1SendJoinServlet(BaseFederationServerServlet):
     PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, Tuple[int, JsonDict]]:
         # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
         content = await self.handler.on_send_join_request(origin, content)
@@ -607,7 +700,14 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 
     PREFIX = FEDERATION_V2_PREFIX
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
         # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
         content = await self.handler.on_send_join_request(origin, content)
@@ -617,7 +717,14 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
 class FederationV1InviteServlet(BaseFederationServerServlet):
     PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, Tuple[int, JsonDict]]:
         # We don't get a room version, so we have to assume its EITHER v1 or
         # v2. This is "fine" as the only difference between V1 and V2 is the
         # state resolution algorithm, and we don't use that for processing
@@ -636,7 +743,14 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
     PREFIX = FEDERATION_V2_PREFIX
 
-    async def on_PUT(self, origin, content, query, room_id, event_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+        event_id: str,
+    ) -> Tuple[int, JsonDict]:
         # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
 
@@ -658,7 +772,13 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
     PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, room_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         await self.handler.on_exchange_third_party_invite_request(content)
         return 200, {}
 
@@ -666,21 +786,31 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
 class FederationClientKeysQueryServlet(BaseFederationServerServlet):
     PATH = "/user/keys/query"
 
-    async def on_POST(self, origin, content, query):
+    async def on_POST(
+        self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
         return await self.handler.on_query_client_keys(origin, content)
 
 
 class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
     PATH = "/user/devices/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, user_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         return await self.handler.on_query_user_devices(origin, user_id)
 
 
 class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     PATH = "/user/keys/claim"
 
-    async def on_POST(self, origin, content, query):
+    async def on_POST(
+        self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
         response = await self.handler.on_claim_client_keys(origin, content)
         return 200, response
 
@@ -689,7 +819,13 @@ class FederationGetMissingEventsServlet(BaseFederationServerServlet):
     # TODO(paul): Why does this path alone end with "/?" optional?
     PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
 
-    async def on_POST(self, origin, content, query, room_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         limit = int(content.get("limit", 10))
         earliest_events = content.get("earliest_events", [])
         latest_events = content.get("latest_events", [])
@@ -710,7 +846,9 @@ class On3pidBindServlet(BaseFederationServerServlet):
 
     REQUIRE_AUTH = False
 
-    async def on_POST(self, origin, content, query):
+    async def on_POST(
+        self, origin: Optional[str], content: JsonDict, query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
         if "invites" in content:
             last_exception = None
             for invite in content["invites"]:
@@ -756,7 +894,12 @@ class OpenIdUserInfo(BaseFederationServerServlet):
 
     REQUIRE_AUTH = False
 
-    async def on_GET(self, origin, content, query):
+    async def on_GET(
+        self,
+        origin: Optional[str],
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+    ) -> Tuple[int, JsonDict]:
         token = parse_string_from_args(query, "access_token")
         if token is None:
             return (
@@ -823,7 +966,9 @@ class PublicRoomList(BaseFederationServlet):
         self.handler = hs.get_room_list_handler()
         self.allow_access = allow_access
 
-    async def on_GET(self, origin, content, query):
+    async def on_GET(
+        self, origin: str, content: Literal[None], query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
         if not self.allow_access:
             raise FederationDeniedError(origin)
 
@@ -852,7 +997,9 @@ class PublicRoomList(BaseFederationServlet):
         )
         return 200, data
 
-    async def on_POST(self, origin, content, query):
+    async def on_POST(
+        self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
         # This implements MSC2197 (Search Filtering over Federation)
         if not self.allow_access:
             raise FederationDeniedError(origin)
@@ -898,7 +1045,12 @@ class FederationVersionServlet(BaseFederationServlet):
 
     REQUIRE_AUTH = False
 
-    async def on_GET(self, origin, content, query):
+    async def on_GET(
+        self,
+        origin: Optional[str],
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+    ) -> Tuple[int, JsonDict]:
         return (
             200,
             {"server": {"name": "Synapse", "version": get_version_string(synapse)}},
@@ -927,7 +1079,13 @@ class FederationGroupsProfileServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/profile"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -936,7 +1094,13 @@ class FederationGroupsProfileServlet(BaseGroupsServerServlet):
 
         return 200, new_content
 
-    async def on_POST(self, origin, content, query, group_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -951,7 +1115,13 @@ class FederationGroupsProfileServlet(BaseGroupsServerServlet):
 class FederationGroupsSummaryServlet(BaseGroupsServerServlet):
     PATH = "/groups/(?P<group_id>[^/]*)/summary"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -966,7 +1136,13 @@ class FederationGroupsRoomsServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/rooms"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -981,7 +1157,14 @@ class FederationGroupsAddRoomsServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
 
-    async def on_POST(self, origin, content, query, group_id, room_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -992,7 +1175,14 @@ class FederationGroupsAddRoomsServlet(BaseGroupsServerServlet):
 
         return 200, new_content
 
-    async def on_DELETE(self, origin, content, query, group_id, room_id):
+    async def on_DELETE(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1012,7 +1202,15 @@ class FederationGroupsAddRoomsConfigServlet(BaseGroupsServerServlet):
         "/config/(?P<config_key>[^/]*)"
     )
 
-    async def on_POST(self, origin, content, query, group_id, room_id, config_key):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        room_id: str,
+        config_key: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1029,7 +1227,13 @@ class FederationGroupsUsersServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/users"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1044,7 +1248,13 @@ class FederationGroupsInvitedUsersServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/invited_users"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1061,7 +1271,14 @@ class FederationGroupsInviteServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1078,7 +1295,14 @@ class FederationGroupsAcceptInviteServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite"
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         if get_domain_from_id(user_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
 
@@ -1092,7 +1316,14 @@ class FederationGroupsJoinServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join"
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         if get_domain_from_id(user_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
 
@@ -1106,7 +1337,14 @@ class FederationGroupsRemoveUserServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1140,7 +1378,14 @@ class FederationGroupsLocalInviteServlet(BaseGroupsLocalServlet):
 
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "group_id doesn't match origin")
 
@@ -1158,7 +1403,14 @@ class FederationGroupsRemoveLocalUserServlet(BaseGroupsLocalServlet):
 
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, None]:
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
 
@@ -1166,11 +1418,9 @@ class FederationGroupsRemoveLocalUserServlet(BaseGroupsLocalServlet):
             self.handler, GroupsLocalHandler
         ), "Workers cannot handle group removals."
 
-        new_content = await self.handler.user_removed_from_group(
-            group_id, user_id, content
-        )
+        await self.handler.user_removed_from_group(group_id, user_id, content)
 
-        return 200, new_content
+        return 200, None
 
 
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
@@ -1188,7 +1438,14 @@ class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
         super().__init__(hs, authenticator, ratelimiter, server_name)
         self.handler = hs.get_groups_attestation_renewer()
 
-    async def on_POST(self, origin, content, query, group_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         # We don't need to check auth here as we check the attestation signatures
 
         new_content = await self.handler.on_renew_attestation(
@@ -1212,7 +1469,15 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
         "/rooms/(?P<room_id>[^/]*)"
     )
 
-    async def on_POST(self, origin, content, query, group_id, category_id, room_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        category_id: str,
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1240,7 +1505,15 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
 
         return 200, resp
 
-    async def on_DELETE(self, origin, content, query, group_id, category_id, room_id):
+    async def on_DELETE(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        category_id: str,
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1260,7 +1533,13 @@ class FederationGroupsCategoriesServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/categories/?"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1275,7 +1554,14 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
 
-    async def on_GET(self, origin, content, query, group_id, category_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        category_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1286,7 +1572,14 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
 
         return 200, resp
 
-    async def on_POST(self, origin, content, query, group_id, category_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        category_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1308,7 +1601,14 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
 
         return 200, resp
 
-    async def on_DELETE(self, origin, content, query, group_id, category_id):
+    async def on_DELETE(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        category_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1328,7 +1628,13 @@ class FederationGroupsRolesServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/roles/?"
 
-    async def on_GET(self, origin, content, query, group_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1343,7 +1649,14 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
 
-    async def on_GET(self, origin, content, query, group_id, role_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        role_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1352,7 +1665,14 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
 
         return 200, resp
 
-    async def on_POST(self, origin, content, query, group_id, role_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        role_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1376,7 +1696,14 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
 
         return 200, resp
 
-    async def on_DELETE(self, origin, content, query, group_id, role_id):
+    async def on_DELETE(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        role_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1405,7 +1732,15 @@ class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
         "/users/(?P<user_id>[^/]*)"
     )
 
-    async def on_POST(self, origin, content, query, group_id, role_id, user_id):
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        role_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1431,7 +1766,15 @@ class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
 
         return 200, resp
 
-    async def on_DELETE(self, origin, content, query, group_id, role_id, user_id):
+    async def on_DELETE(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+        role_id: str,
+        user_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1451,7 +1794,9 @@ class FederationGroupsBulkPublicisedServlet(BaseGroupsLocalServlet):
 
     PATH = "/get_groups_publicised"
 
-    async def on_POST(self, origin, content, query):
+    async def on_POST(
+        self, origin: str, content: JsonDict, query: Dict[bytes, List[bytes]]
+    ) -> Tuple[int, JsonDict]:
         resp = await self.handler.bulk_get_publicised_groups(
             content["user_ids"], proxy=False
         )
@@ -1464,7 +1809,13 @@ class FederationGroupsSettingJoinPolicyServlet(BaseGroupsServerServlet):
 
     PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy"
 
-    async def on_PUT(self, origin, content, query, group_id):
+    async def on_PUT(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Dict[bytes, List[bytes]],
+        group_id: str,
+    ) -> Tuple[int, JsonDict]:
         requester_user_id = parse_string_from_args(query, "requester_user_id")
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
@@ -1493,7 +1844,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
     async def on_GET(
         self,
         origin: str,
-        content: JsonDict,
+        content: Literal[None],
         query: Mapping[bytes, Sequence[bytes]],
         room_id: str,
     ) -> Tuple[int, JsonDict]:
@@ -1565,7 +1916,13 @@ class RoomComplexityServlet(BaseFederationServlet):
         super().__init__(hs, authenticator, ratelimiter, server_name)
         self._store = self.hs.get_datastore()
 
-    async def on_GET(self, origin, content, query, room_id):
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
         is_public = await self._store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
