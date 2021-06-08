@@ -115,7 +115,7 @@ class SSOConfig(Config):
             #  - https://riot.im/develop
             #  - https://my.custom.client/
             #
-            # Keep a user's profile fields in sync with the values from the SSO ticket 
+            # Keep a user's profile fields in sync with the values from the SSO ticket
             # (currently display_name). The update is performed on every SSO login.
             #
             #update_profile_information: True
