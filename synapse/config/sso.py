@@ -74,7 +74,9 @@ class SSOConfig(Config):
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
-        self.sso_update_profile_information = sso_config.get("update_profile_information") or False
+        self.sso_update_profile_information = (
+            sso_config.get("update_profile_information") or False
+        )
 
         # Attempt to also whitelist the server's login fallback, since that fallback sets
         # the redirect URL to itself (so it can process the login token then return
