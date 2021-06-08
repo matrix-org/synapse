@@ -118,7 +118,7 @@ class SSOConfig(Config):
             # Keep a user's profile fields in sync with the values from the SSO ticket
             # (currently display_name). The update is performed on every SSO login.
             #
-            #update_profile_information: True
+            #update_profile_information: true
             #
 
             # Directory in which Synapse will try to find the template files below.
