@@ -1,5 +1,4 @@
-Purge History API
-=================
+# Purge History API
 
 The purge history API allows server admins to purge historic events from their
 database, reclaiming disk space.
@@ -13,10 +12,12 @@ delete the last message in a room.
 
 The API is:
 
-``POST /_synapse/admin/v1/purge_history/<room_id>[/<event_id>]``
+```
+POST /_synapse/admin/v1/purge_history/<room_id>[/<event_id>]
+```
 
-To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see `README.rst <README.rst>`_.
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: [Admin API](../../usage/administration/admin_api)
 
 By default, events sent by local users are not deleted, as they may represent
 the only copies of this content in existence. (Events sent by remote users are
@@ -24,54 +25,54 @@ deleted.)
 
 Room state data (such as joins, leaves, topic) is always preserved.
 
-To delete local message events as well, set ``delete_local_events`` in the body:
+To delete local message events as well, set `delete_local_events` in the body:
 
-.. code:: json
-
-   {
-       "delete_local_events": true
-   }
+```
+{
+   "delete_local_events": true
+}
+```
 
 The caller must specify the point in the room to purge up to. This can be
 specified by including an event_id in the URI, or by setting a
-``purge_up_to_event_id`` or ``purge_up_to_ts`` in the request body. If an event
+`purge_up_to_event_id` or `purge_up_to_ts` in the request body. If an event
 id is given, that event (and others at the same graph depth) will be retained.
-If ``purge_up_to_ts`` is given, it should be a timestamp since the unix epoch,
+If `purge_up_to_ts` is given, it should be a timestamp since the unix epoch,
 in milliseconds.
 
 The API starts the purge running, and returns immediately with a JSON body with
 a purge id:
 
-.. code:: json
+```json
+{
+    "purge_id": "<opaque id>"
+}
+```
 
-    {
-        "purge_id": "<opaque id>"
-    }
-
-Purge status query
-------------------
+## Purge status query
 
 It is possible to poll for updates on recent purges with a second API;
 
-``GET /_synapse/admin/v1/purge_history_status/<purge_id>``
+```
+GET /_synapse/admin/v1/purge_history_status/<purge_id>
+```
 
-Again, you will need to authenticate by providing an ``access_token`` for a
+Again, you will need to authenticate by providing an `access_token` for a
 server admin.
 
 This API returns a JSON body like the following:
 
-.. code:: json
+```json
+{
+    "status": "active"
+}
+```
 
-    {
-        "status": "active"
-    }
+The status will be one of `active`, `complete`, or `failed`.
 
-The status will be one of ``active``, ``complete``, or ``failed``.
-
-Reclaim disk space (Postgres)
------------------------------
+## Reclaim disk space (Postgres)
 
 To reclaim the disk space and return it to the operating system, you need to run
 `VACUUM FULL;` on the database.
 
-https://www.postgresql.org/docs/current/sql-vacuum.html
+<https://www.postgresql.org/docs/current/sql-vacuum.html>

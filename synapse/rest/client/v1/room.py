@@ -1165,7 +1165,7 @@ class RoomAliasListServlet(RestServlet):
             r"^/_matrix/client/unstable/org\.matrix\.msc2432"
             r"/rooms/(?P<room_id>[^/]*)/aliases"
         ),
-    ]
+    ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
