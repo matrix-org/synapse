@@ -202,10 +202,10 @@ class FederationKnockingTestCase(
         # Note that these checks are not relevant to this test case.
 
         # Have this homeserver auto-approve all event signature checking.
-        def approve_all_signature_checking(_, ev):
-            return [succeed(ev[0])]
+        async def approve_all_signature_checking(_, pdu):
+            return pdu
 
-        homeserver.get_federation_server()._check_sigs_and_hashes = (
+        homeserver.get_federation_server()._check_sigs_and_hash = (
             approve_all_signature_checking
         )
 
