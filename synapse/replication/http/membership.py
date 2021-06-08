@@ -115,7 +115,7 @@ class ReplicationRemoteKnockRestServlet(ReplicationEndpoint):
     PATH_ARGS = ("room_id", "user_id")
 
     def __init__(self, hs):
-        super().__init__(hs)
+        super().__init__(hs: "HomeServer")
 
         self.federation_handler = hs.get_federation_handler()
         self.store = hs.get_datastore()
