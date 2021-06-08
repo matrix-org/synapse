@@ -74,7 +74,7 @@ class SSOConfig(Config):
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
-        self.sso_update_display_name = sso_config.get("update_display_name") or False
+        self.sso_update_profile_information = sso_config.get("update_profile_information") or False
 
         # Attempt to also whitelist the server's login fallback, since that fallback sets
         # the redirect URL to itself (so it can process the login token then return
@@ -113,9 +113,12 @@ class SSOConfig(Config):
             #  - https://riot.im/develop
             #  - https://my.custom.client/
             #
-            # Keep a user's display name in sync with the SSO display name
-            #update_display_name: True
+            # Keep a user's profile fields in sync with the values from the SSO ticket 
+            # (currently display_name). The update is performed on every SSO login.
             #
+            #update_profile_information: True
+            #
+
             # Directory in which Synapse will try to find the template files below.
             # If not set, or the files named below are not found within the template
             # directory, default templates from within the Synapse package will be used.

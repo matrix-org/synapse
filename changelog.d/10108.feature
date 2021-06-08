@@ -1,1 +1,1 @@
-Implemented config option sso.update_display_name to keep user's display name in sync with the SSO display name.
+Implement config option sso.update_profile_information to keep a user's profile fields in sync with the values from the SSO ticket (currently display_name).
