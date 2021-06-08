@@ -15,8 +15,6 @@
 from collections import OrderedDict
 from typing import Dict, List
 
-from twisted.internet.defer import succeed
-
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import builder
