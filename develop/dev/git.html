@@ -283,15 +283,15 @@ when a PR is landed, or as part of our release process.</p>
 that our active branches are ordered thus, from more-stable to less-stable:</p>
 <ul>
 <li><code>master</code> (tracks our last release).</li>
-<li><code>release-vX.Y.Z</code> (the branch where we prepare the next release)<sup
+<li><code>release-vX.Y</code> (the branch where we prepare the next release)<sup
    id="a3"><a href="#f3">3</a></sup>.</li>
 <li>PR branches which are targeting the release.</li>
 <li><code>develop</code> (our &quot;mainline&quot; branch containing our bleeding-edge).</li>
 <li>regular PR branches.</li>
 </ul>
 <p>The corollary is: if you have a bugfix that needs to land in both
-<code>release-vX.Y.Z</code> <em>and</em> <code>develop</code>, then you should base your PR on
-<code>release-vX.Y.Z</code>, get it merged there, and then merge from <code>release-vX.Y.Z</code> to
+<code>release-vX.Y</code> <em>and</em> <code>develop</code>, then you should base your PR on
+<code>release-vX.Y</code>, get it merged there, and then merge from <code>release-vX.Y</code> to
 <code>develop</code>. (If a fix lands in <code>develop</code> and we later need it in a
 release-branch, we can of course cherry-pick it, but landing it in the release
 branch first helps reduce the chance of annoying conflicts.)</p>
@@ -302,7 +302,7 @@ most intuitive name. <a href="#a1">^</a></p>
 <p><b id="f2">[2]</b>: Well, anyone with commit access.<a href="#a2">^</a></p>
 <p><b id="f3">[3]</b>: Very, very occasionally (I think this has happened once in
 the history of Synapse), we've had two releases in flight at once. Obviously,
-<code>release-v1.2.3</code> is more-stable than <code>release-v1.3.0</code>. <a href="#a3">^</a></p>
+<code>release-v1.2</code> is more-stable than <code>release-v1.3</code>. <a href="#a3">^</a></p>
 
                     </main>
 
