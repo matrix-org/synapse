@@ -35,6 +35,4 @@ class ExperimentalConfig(Config):
         self.msc2403_enabled = experimental.get("msc2403_enabled", False)  # type: bool
         if self.msc2403_enabled:
             # Enable the MSC2403 unstable room version
-            KNOWN_ROOM_VERSIONS.update(
-                {RoomVersions.MSC2403.identifier: RoomVersions.MSC2403}
-            )
+            KNOWN_ROOM_VERSIONS[RoomVersions.MSC2403.identifier] = RoomVersions.MSC2403
