@@ -525,10 +525,8 @@ class FederationMakeJoinServlet(BaseFederationServerServlet):
         Returns:
             Tuple[int, object]: (response code, response object)
         """
-        versions = query.get(b"ver")
-        if versions is not None:
-            supported_versions = [v.decode("utf-8") for v in versions]
-        else:
+        supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
+        if supported_versions is None:
             supported_versions = ["1"]
 
         content = await self.handler.on_make_join_request(
@@ -759,14 +757,14 @@ class OpenIdUserInfo(BaseFederationServerServlet):
     REQUIRE_AUTH = False
 
     async def on_GET(self, origin, content, query):
-        token = query.get(b"access_token", [None])[0]
+        token = parse_string_from_args(query, "access_token")
         if token is None:
             return (
                 401,
                 {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
             )
 
-        user_id = await self.handler.on_openid_userinfo(token.decode("ascii"))
+        user_id = await self.handler.on_openid_userinfo(token)
 
         if user_id is None:
             return (
