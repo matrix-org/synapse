@@ -573,42 +573,6 @@ def set_operation_name(operation_name):
 # Injection and extraction
 
 
-@ensure_active_span("inject the span into a header")
-def inject_active_span_twisted_headers(headers, destination, check_destination=True):
-    """
-    Injects a span context into twisted headers in-place
-
-    Args:
-        headers (twisted.web.http_headers.Headers)
-        destination (str): address of entity receiving the span context. If check_destination
-            is true the context will only be injected if the destination matches the
-            opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
-            will always be injected.
-        span (opentracing.Span)
-
-    Returns:
-        In-place modification of headers
-
-    Note:
-        The headers set by the tracer are custom to the tracer implementation which
-        should be unique enough that they don't interfere with any headers set by
-        synapse or twisted. If we're still using jaeger these headers would be those
-        here:
-        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
-    """
-
-    if check_destination and not whitelisted_homeserver(destination):
-        return
-
-    span = opentracing.tracer.active_span
-    carrier = {}  # type: Dict[str, str]
-    opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
-
-    for key, value in carrier.items():
-        headers.addRawHeaders(key, value)
-
-
 @ensure_active_span("inject the span into a byte dict")
 def inject_active_span_byte_dict(headers, destination, check_destination=True):
     """
@@ -644,38 +608,6 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
-
-
-@ensure_active_span("inject the span into a text map")
-def inject_active_span_text_map(carrier, destination, check_destination=True):
-    """
-    Injects a span context into a dict
-
-    Args:
-        carrier (dict)
-        destination (str): address of entity receiving the span context. If check_destination
-            is true the context will only be injected if the destination matches the
-            opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
-            will always be injected.
-
-    Returns:
-        In-place modification of carrier
-
-    Note:
-        The headers set by the tracer are custom to the tracer implementation which
-        should be unique enough that they don't interfere with any headers set by
-        synapse or twisted. If we're still using jaeger these headers would be those
-        here:
-        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
-    """
-
-    if check_destination and not whitelisted_homeserver(destination):
-        return
-
-    opentracing.tracer.inject(
-        opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
-    )
 
 
 @ensure_active_span("get the active span context as a dict", ret={})
