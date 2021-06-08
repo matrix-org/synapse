@@ -91,12 +91,18 @@ def make_pool(
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
 
+    def _on_new_connection(conn):
+        # Ensure we have a logging context so we can correctly track queries,
+        # etc.
+        with LoggingContext("db.on_new_connection"):
+            engine.on_new_connection(
+                LoggingDatabaseConnection(conn, engine, "on_new_connection")
+            )
+
     return adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
-        cp_openfun=lambda conn: engine.on_new_connection(
-            LoggingDatabaseConnection(conn, engine, "on_new_connection")
-        ),
+        cp_openfun=_on_new_connection,
         **db_args,
     )
 
@@ -541,6 +547,7 @@ class DatabasePool:
                         },
                     ):
                         r = func(cursor, *args, **kwargs)
+                        opentracing.log_kv({"message": "commit"})
                         conn.commit()
                         return r
                 except self.engine.module.OperationalError as e:
@@ -556,7 +563,8 @@ class DatabasePool:
                     if i < N:
                         i += 1
                         try:
-                            conn.rollback()
+                            with opentracing.start_active_span("db.rollback"):
+                                conn.rollback()
                         except self.engine.module.Error as e1:
                             transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
@@ -569,7 +577,8 @@ class DatabasePool:
                         if i < N:
                             i += 1
                             try:
-                                conn.rollback()
+                                with opentracing.start_active_span("db.rollback"):
+                                    conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
                                     "[TXN EROLL] {%s} %s",

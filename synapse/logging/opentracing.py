@@ -337,6 +337,7 @@ def ensure_active_span(message, ret=None):
 @contextlib.contextmanager
 def noop_context_manager(*args, **kwargs):
     """Does exactly what it says on the tin"""
+    # TODO: replace with contextlib.nullcontext once we drop support for Python 3.6
     yield
 
 
@@ -362,10 +363,13 @@ def init_tracer(hs: "HomeServer"):
 
     set_homeserver_whitelist(hs.config.opentracer_whitelist)
 
+    from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
+
     config = JaegerConfig(
         config=hs.config.jaeger_config,
         service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
         scope_manager=LogContextScopeManager(hs.config),
+        metrics_factory=PrometheusMetricsFactory(),
     )
 
     # If we have the rust jaeger reporter available let's use that.

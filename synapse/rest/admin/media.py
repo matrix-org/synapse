@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
@@ -37,12 +38,11 @@ class QuarantineMediaInRoom(RestServlet):
     this server.
     """
 
-    PATTERNS = (
-        admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
-        +
+    PATTERNS = [
+        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine"),
         # This path kept around for legacy reasons
-        admin_patterns("/quarantine_media/(?P<room_id>[^/]+)")
-    )
+        *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
+    ]
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -312,7 +312,7 @@ class DeleteMediaByDateSize(RestServlet):
         return 200, {"deleted_media": deleted_media, "total": total}
 
 
-def register_servlets_for_media_repo(hs: "HomeServer", http_server):
+def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) -> None:
     """
     Media repo specific APIs.
     """

@@ -33,8 +33,8 @@ from synapse.http.servlet import (
     parse_boolean_from_args,
     parse_integer_from_args,
     parse_json_object_from_request,
-    parse_list_from_args,
     parse_string_from_args,
+    parse_strings_from_args,
 )
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
@@ -553,7 +553,7 @@ class FederationMakeKnockServlet(BaseFederationServlet):
     async def on_GET(self, origin, content, query, room_id, user_id):
         try:
             # Retrieve the room versions the remote homeserver claims to support
-            supported_versions = parse_list_from_args(query, "ver", encoding="utf-8")
+            supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
         except KeyError:
             raise SynapseError(400, "Missing required query parameter 'ver'")
 

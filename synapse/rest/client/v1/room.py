@@ -36,8 +36,8 @@ from synapse.http.servlet import (
     parse_boolean,
     parse_integer,
     parse_json_object_from_request,
-    parse_list_from_args,
     parse_string,
+    parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
@@ -291,7 +291,9 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
             try:
-                remote_room_hosts = parse_list_from_args(request.args, "server_name")
+                remote_room_hosts = parse_strings_from_args(
+                    request.args, "server_name", required=False
+                )
             except KeyError:
                 remote_room_hosts = None
         elif RoomAlias.is_valid(room_identifier):
@@ -535,7 +537,7 @@ class RoomMessageListRestServlet(RestServlet):
             self.store, request, default_limit=10
         )
         as_client_event = b"raw" not in request.args
-        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(
@@ -650,7 +652,7 @@ class RoomEventContextServlet(RestServlet):
         limit = parse_integer(request, "limit", default=10)
 
         # picking the API shape for symmetry with /messages
-        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(
