@@ -397,6 +397,10 @@ class MultiWriterIdGenerator:
                 # ... persist event ...
         """
 
+        # If we have a list of instance that are allowed to write to this
+        # stream, make sure we're in it.
+        assert not self._writers or self._instance_name in self._writers
+
         return _MultiWriterCtxManager(self)
 
     def get_next_mult(self, n: int):
@@ -405,6 +409,10 @@ class MultiWriterIdGenerator:
             async with stream_id_gen.get_next_mult(5) as stream_ids:
                 # ... persist events ...
         """
+
+        # If we have a list of instance that are allowed to write to this
+        # stream, make sure we're in it.
+        assert not self._writers or self._instance_name in self._writers
 
         return _MultiWriterCtxManager(self, n)
 
@@ -415,6 +423,10 @@ class MultiWriterIdGenerator:
             stream_id = stream_id_gen.get_next(txn)
             # ... persist event ...
         """
+
+        # If we have a list of instance that are allowed to write to this
+        # stream, make sure we're in it.
+        assert not self._writers or self._instance_name in self._writers
 
         next_id = self._load_next_id_txn(txn)
 
