@@ -14,6 +14,8 @@
 import logging
 from typing import Any, Awaitable, Callable, Dict, Generic, Optional, TypeVar
 
+import attr
+
 from twisted.internet import defer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
@@ -28,6 +30,28 @@ KV = TypeVar("KV")
 
 # the type of the result from the operation
 RV = TypeVar("RV")
+
+
+@attr.s(auto_attribs=True)
+class ResponseCacheContext(Generic[KV]):
+    """Information about a missed ResponseCache hit
+
+    This object can be passed into the callback for additional feedback
+    """
+
+    cache_key: KV
+    """The cache key that caused the cache miss
+
+    This should be considered read-only.
+
+    TODO: in attrs 20.1, make it frozen with an on_setattr.
+    """
+
+    should_cache: bool = True
+    """Whether the result should be cached once the request completes.
+
+    This can be modified by the callback if it decides its result should not be cached.
+    """
 
 
 class ResponseCache(Generic[KV]):
@@ -79,7 +103,9 @@ class ResponseCache(Generic[KV]):
             self._metrics.inc_misses()
             return None
 
-    def set(self, key: KV, deferred: defer.Deferred) -> defer.Deferred:
+    def _set(
+        self, context: ResponseCacheContext[KV], deferred: defer.Deferred
+    ) -> defer.Deferred:
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
@@ -90,21 +116,26 @@ class ResponseCache(Generic[KV]):
         You will probably want to make_deferred_yieldable the result.
 
         Args:
-            key: key to get/set in the cache
+            context: Information about the cache miss
             deferred: The deferred which resolves to the result.
 
         Returns:
             A new deferred which resolves to the actual result.
         """
         result = ObservableDeferred(deferred, consumeErrors=True)
+        key = context.cache_key
         self.pending_result_cache[key] = result
 
         def on_complete(r):
-            if self.timeout_sec:
+            # if this cache has a non-zero timeout, and the callback has not cleared
+            # the should_cache bit, we leave it in the cache for now and schedule
+            # its removal later.
+            if self.timeout_sec and context.should_cache:
                 self.clock.call_later(
                     self.timeout_sec, self.pending_result_cache.pop, key, None
                 )
             else:
+                # otherwise, remove the result immediately.
                 self.pending_result_cache.pop(key, None)
             return r
 
@@ -115,7 +146,12 @@ class ResponseCache(Generic[KV]):
         return result.observe()
 
     async def wrap(
-        self, key: KV, callback: Callable[..., Awaitable[RV]], *args: Any, **kwargs: Any
+        self,
+        key: KV,
+        callback: Callable[..., Awaitable[RV]],
+        *args: Any,
+        cache_context: bool = False,
+        **kwargs: Any,
     ) -> RV:
         """Wrap together a *get* and *set* call, taking care of logcontexts
 
@@ -145,6 +181,9 @@ class ResponseCache(Generic[KV]):
 
             *args: positional parameters to pass to the callback, if it is used
 
+            cache_context: if set, the callback will be given a `cache_context` kw arg,
+                which will be a ResponseCacheContext object.
+
             **kwargs: named parameters to pass to the callback, if it is used
 
         Returns:
@@ -155,8 +194,11 @@ class ResponseCache(Generic[KV]):
             logger.debug(
                 "[%s]: no cached result for [%s], calculating new one", self._name, key
             )
+            context = ResponseCacheContext(cache_key=key)
+            if cache_context:
+                kwargs["cache_context"] = context
             d = run_in_background(callback, *args, **kwargs)
-            result = self.set(key, d)
+            result = self._set(context, d)
         elif not isinstance(result, defer.Deferred) or result.called:
             logger.info("[%s]: using completed cached result for [%s]", self._name, key)
         else:
