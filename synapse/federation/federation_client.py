@@ -1,4 +1,5 @@
-# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2015-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -89,6 +90,7 @@ class FederationClient(FederationBase):
         self._clock.looping_call(self._clear_tried_cache, 60 * 1000)
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
+        self._msc2403_enabled = hs.config.experimental.msc2403_enabled
 
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
@@ -620,6 +622,11 @@ class FederationClient(FederationBase):
                 no servers successfully handle the request.
         """
         valid_memberships = {Membership.JOIN, Membership.LEAVE}
+
+        # Allow knocking if the feature is enabled
+        if self._msc2403_enabled:
+            valid_memberships.add(Membership.KNOCK)
+
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -637,6 +644,13 @@ class FederationClient(FederationBase):
             room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
             if not room_version:
                 raise UnsupportedRoomVersionError()
+
+            if not room_version.msc2403_knocking and membership == Membership.KNOCK:
+                raise SynapseError(
+                    400,
+                    "This room version does not support knocking",
+                    errcode=Codes.FORBIDDEN,
+                )
 
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
@@ -945,6 +959,62 @@ class FederationClient(FederationBase):
         # We expect the v1 API to respond with [200, content], so we only return the
         # content.
         return resp[1]
+
+    async def send_knock(self, destinations: List[str], pdu: EventBase) -> JsonDict:
+        """Attempts to send a knock event to given a list of servers. Iterates
+        through the list until one attempt succeeds.
+
+        Doing so will cause the remote server to add the event to the graph,
+        and send the event out to the rest of the federation.
+
+        Args:
+            destinations: A list of candidate homeservers which are likely to be
+                participating in the room.
+            pdu: The event to be sent.
+
+        Returns:
+            The remote homeserver return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
+
+        Raises:
+            SynapseError: If the chosen remote server returns a 3xx/4xx code.
+            RuntimeError: If no servers were reachable.
+        """
+
+        async def send_request(destination: str) -> JsonDict:
+            return await self._do_send_knock(destination, pdu)
+
+        return await self._try_destination_list(
+            "xyz.amorgan.knock/send_knock", destinations, send_request
+        )
+
+    async def _do_send_knock(self, destination: str, pdu: EventBase) -> JsonDict:
+        """Send a knock event to a remote homeserver.
+
+        Args:
+            destination: The homeserver to send to.
+            pdu: The event to send.
+
+        Returns:
+            The remote homeserver can optionally return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
+        """
+        time_now = self._clock.time_msec()
+
+        return await self.transport_layer.send_knock_v1(
+            destination=destination,
+            room_id=pdu.room_id,
+            event_id=pdu.event_id,
+            content=pdu.get_pdu_json(time_now),
+        )
 
     async def get_public_rooms(
         self,

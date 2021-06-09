@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
-
 import logging
 from typing import Dict, Iterable, List, Optional, overload
 

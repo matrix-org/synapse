@@ -1,6 +1,5 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import functools
 import logging
 import re
@@ -35,6 +33,7 @@ from synapse.http.servlet import (
     parse_integer_from_args,
     parse_json_object_from_request,
     parse_string_from_args,
+    parse_strings_from_args,
 )
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
@@ -562,6 +561,34 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_leave_request(origin, content)
+        return 200, content
+
+
+class FederationMakeKnockServlet(BaseFederationServerServlet):
+    PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
+
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
+
+    async def on_GET(self, origin, content, query, room_id, user_id):
+        try:
+            # Retrieve the room versions the remote homeserver claims to support
+            supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
+        except KeyError:
+            raise SynapseError(400, "Missing required query parameter 'ver'")
+
+        content = await self.handler.on_make_knock_request(
+            origin, room_id, user_id, supported_versions=supported_versions
+        )
+        return 200, content
+
+
+class FederationV1SendKnockServlet(BaseFederationServerServlet):
+    PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
+
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        content = await self.handler.on_send_knock_request(origin, content, room_id)
         return 200, content
 
 
@@ -1624,6 +1651,13 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
 
+
+MSC2403_SERVLET_CLASSES = (
+    FederationV1SendKnockServlet,
+    FederationMakeKnockServlet,
+)
+
+
 DEFAULT_SERVLET_GROUPS = (
     "federation",
     "room_list",
@@ -1665,6 +1699,16 @@ def register_servlets(
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
             ).register(resource)
+
+        # Register msc2403 (knocking) servlets if the feature is enabled
+        if hs.config.experimental.msc2403_enabled:
+            for servletclass in MSC2403_SERVLET_CLASSES:
+                servletclass(
+                    hs=hs,
+                    authenticator=authenticator,
+                    ratelimiter=ratelimiter,
+                    server_name=hs.hostname,
+                ).register(resource)
 
     if "openid" in servlet_groups:
         for servletclass in OPENID_SERVLET_CLASSES:

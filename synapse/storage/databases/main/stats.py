@@ -41,6 +41,7 @@ ABSOLUTE_STATS_FIELDS = {
         "current_state_events",
         "joined_members",
         "invited_members",
+        "knocked_members",
         "left_members",
         "banned_members",
         "local_users_in_room",

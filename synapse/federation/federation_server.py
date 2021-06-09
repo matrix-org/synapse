@@ -138,6 +138,8 @@ class FederationServer(FederationBase):
             hs.config.federation.federation_metrics_domains
         )
 
+        self._room_prejoin_state_types = hs.config.api.room_prejoin_state
+
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
     ) -> Tuple[int, Dict[str, Any]]:
@@ -585,6 +587,103 @@ class FederationServer(FederationBase):
 
         await self.handler.on_send_leave_request(origin, pdu)
         return {}
+
+    async def on_make_knock_request(
+        self, origin: str, room_id: str, user_id: str, supported_versions: List[str]
+    ) -> Dict[str, Union[EventBase, str]]:
+        """We've received a /make_knock/ request, so we create a partial knock
+        event for the room and hand that back, along with the room version, to the knocking
+        homeserver. We do *not* persist or process this event until the other server has
+        signed it and sent it back.
+
+        Args:
+            origin: The (verified) server name of the requesting server.
+            room_id: The room to create the knock event in.
+            user_id: The user to create the knock for.
+            supported_versions: The room versions supported by the requesting server.
+
+        Returns:
+            The partial knock event.
+        """
+        origin_host, _ = parse_server_name(origin)
+        await self.check_server_matches_acl(origin_host, room_id)
+
+        room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room version is supported by the remote homeserver
+        if room_version.identifier not in supported_versions:
+            logger.warning(
+                "Room version %s not in %s", room_version.identifier, supported_versions
+            )
+            raise IncompatibleRoomVersionError(room_version=room_version.identifier)
+
+        # Check that this room supports knocking as defined by its room version
+        if not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
+        time_now = self._clock.time_msec()
+        return {
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version.identifier,
+        }
+
+    async def on_send_knock_request(
+        self,
+        origin: str,
+        content: JsonDict,
+        room_id: str,
+    ) -> Dict[str, List[JsonDict]]:
+        """
+        We have received a knock event for a room. Verify and send the event into the room
+        on the knocking homeserver's behalf. Then reply with some stripped state from the
+        room for the knockee.
+
+        Args:
+            origin: The remote homeserver of the knocking user.
+            content: The content of the request.
+            room_id: The ID of the room to knock on.
+
+        Returns:
+            The stripped room state.
+        """
+        logger.debug("on_send_knock_request: content: %s", content)
+
+        room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room supports knocking as defined by its room version
+        if not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        pdu = event_from_pdu_json(content, room_version)
+
+        origin_host, _ = parse_server_name(origin)
+        await self.check_server_matches_acl(origin_host, pdu.room_id)
+
+        logger.debug("on_send_knock_request: pdu sigs: %s", pdu.signatures)
+
+        pdu = await self._check_sigs_and_hash(room_version, pdu)
+
+        # Handle the event, and retrieve the EventContext
+        event_context = await self.handler.on_send_knock_request(origin, pdu)
+
+        # Retrieve stripped state events from the room and send them back to the remote
+        # server. This will allow the remote server's clients to display information
+        # related to the room while the knock request is pending.
+        stripped_room_state = (
+            await self.store.get_stripped_room_state_from_event_context(
+                event_context, self._room_prejoin_state_types
+            )
+        )
+        return {"knock_state_events": stripped_room_state}
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
