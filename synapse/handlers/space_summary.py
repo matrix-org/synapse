@@ -16,7 +16,7 @@ import itertools
 import logging
 import re
 from collections import deque
-from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
@@ -89,7 +89,10 @@ class SpaceSummaryHandler:
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
         # rooms we have already processed
-        processed_rooms = set()  # type: Set[str]
+        processed_rooms: Dict[str, bool] = {}
+
+        # events which are pending knowing if a room is accessible.
+        pending_events: Dict[str, List[JsonDict]] = {}
 
         rooms_result = []  # type: List[JsonDict]
         events_result = []  # type: List[JsonDict]
@@ -123,13 +126,20 @@ class SpaceSummaryHandler:
 
                 if room:
                     rooms_result.append(room)
+
+                # Mark whether this room was accessible or not.
+                processed_rooms[room_id] = bool(room)
             else:
-                fed_rooms, fed_events = await self._summarize_remote_room(
+                fed_rooms, events = await self._summarize_remote_room(
                     queue_entry,
                     suggested_only,
                     max_children,
                     exclude_rooms=processed_rooms,
                 )
+
+                # The queried room may or may not have been returned, but don't process
+                # it again, anyway. (This may be overridden below if it is accessible.)
+                processed_rooms[room_id] = False
 
                 # The results over federation might include rooms that the we,
                 # as the requesting server, are allowed to see, but the requesting
@@ -137,7 +147,6 @@ class SpaceSummaryHandler:
                 #
                 # Filter the returned results to only what is accessible to the user.
                 room_ids = set()
-                events = []
                 for room in fed_rooms:
                     fed_room_id = room.get("room_id")
                     if not fed_room_id or not isinstance(fed_room_id, str):
@@ -181,34 +190,42 @@ class SpaceSummaryHandler:
 
                     # All rooms returned don't need visiting again (even if the user
                     # didn't have access to them).
-                    processed_rooms.add(fed_room_id)
-
-                for event in fed_events:
-                    if event.get("room_id") in room_ids:
-                        events.append(event)
+                    processed_rooms[fed_room_id] = include_room
 
                 logger.debug(
                     "Query of %s returned rooms %s, events %s",
                     room_id,
                     [room.get("room_id") for room in fed_rooms],
-                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in fed_events],
+                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
                 )
 
-            # the room we queried may or may not have been returned, but don't process
-            # it again, anyway.
-            processed_rooms.add(room_id)
+            # There might be events which point to this room which are waiting
+            # to see if it is accessible.
+            room_pending_events = pending_events.pop(room_id, ())
+            if not processed_rooms[room_id]:
+                room_pending_events = ()
 
-            # XXX: is it ok that we blindly iterate through any events returned by
-            #   a remote server, whether or not they actually link to any rooms in our
-            #   tree?
-            for ev in events:
-                events_result.append(ev)
+            # Return the events which reference rooms that were found to be
+            # accessible. Otherwise, queue them until we process those rooms.
+            for ev in itertools.chain(events, room_pending_events):
+                parent_room_id = ev["room_id"]
+                child_room_id = ev["state_key"]
+
+                try:
+                    if (
+                        processed_rooms[parent_room_id]
+                        and processed_rooms[child_room_id]
+                    ):
+                        events_result.append(ev)
+                except KeyError:
+                    # Note that events are pending of the child event since if
+                    # the parent event was not accessible it shouldn't be included
+                    # at all.
+                    pending_events.setdefault(child_room_id, []).append(ev)
 
                 # add the child to the queue. we have already validated
                 # that the vias are a list of server names.
-                room_queue.append(
-                    _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
-                )
+                room_queue.append(_RoomQueueEntry(child_room_id, ev["content"]["via"]))
 
         # Before returning to the client, remove the allowed_spaces key for any
         # rooms.
