@@ -285,7 +285,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             self.__class__.__name__,
         )
 
-    def _check_auth_and_handle(self, request, **kwargs):
+    async def _check_auth_and_handle(self, request, **kwargs):
         """Called on new incoming requests when caching is enabled. Checks
         if there is a cached response for the request and returns that,
         otherwise calls `_handle_request` and caches its response.
@@ -300,8 +300,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         if self.CACHE:
             txn_id = kwargs.pop("txn_id")
 
-            return self.response_cache.wrap(
+            return await self.response_cache.wrap(
                 txn_id, self._handle_request, request, **kwargs
             )
 
-        return self._handle_request(request, **kwargs)
+        return await self._handle_request(request, **kwargs)
