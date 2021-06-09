@@ -327,15 +327,8 @@ differ)::
 
     PASSED (skips=15, successes=1322)
 
-To run a specific test::
-
-    python -m twisted.trial tests.storage.test_redaction
-    python -m twisted.trial tests.handlers.test_presence.PresenceJoinTestCase.test_remote_gets_presence_when_local_user_joins
-
-To see logger output from the app while the tests run, set ``SYNAPSE_TEST_LOG_LEVEL``
-and the resulting logs will be in ``_trial_temp/test.log``::
-
-    SYNAPSE_TEST_LOG_LEVEL=DEBUG python -m twisted.trial tests
+For more tips on running the unit tests, like running a specific test or
+show the logger output of the app, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
 
 
 Running the Integration Tests

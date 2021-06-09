@@ -163,6 +163,8 @@ was broken. They are slower than the linters but will typically catch more error
 ```sh
 source ./env/bin/activate
 trial tests
+# The tests can also be run with this longer command
+python -m twisted.trial tests
 ```
 
 If you wish to only run *some* unit tests, you may specify
@@ -178,6 +180,14 @@ If your tests fail, you may wish to look at the logs:
 ```sh
 less _trial_temp/test.log
 ```
+
+To see always see logger output from the app while the tests run,
+set `SYNAPSE_TEST_LOG_LEVEL` and the resulting logs will be in `_trial_temp/test.log`:
+
+```sh
+SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
+```
+
 
 ## Run the integration tests.
 
