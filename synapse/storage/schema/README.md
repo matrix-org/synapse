@@ -31,9 +31,12 @@ updated. They work as follows:
    `compat_version` is found to be newer than `SCHEMA_VERSION`, Synapse will refuse to
    start.
 
+   Synapse automatically updates this field from
+   `synapse.storage.schema.SCHEMA_COMPAT_VERSION`.
+
  * Whenever a backwards-incompatible change is made to the database format (normally
-   via a `delta` file), `schema_compat_version.compat_version` is also updated so that
-   administrators can not accidentally roll back to a too-old version of Synapse.
+   via a `delta` file), `synapse.storage.schema.SCHEMA_COMPAT_VERSION` is also updated
+   so that administrators can not accidentally roll back to a too-old version of Synapse.
 
 Generally, the goal is to maintain compatibility with at least one or two previous
 releases of Synapse, so any substantial change tends to require multiple releases and a
@@ -48,22 +51,22 @@ might pan out.
     instance, there is no existing code which reads from `room_stats_historical`, so
     our starting point is:
 
-    v1.36.0: `SCHEMA_VERSION=59`, `compat_version=59`
+    v1.36.0: `SCHEMA_VERSION=59`, `SCHEMA_COMPAT_VERSION=59`
 
  2. Next (say in Synapse v1.37.0): remove the code that *writes* to
     `room_stats_historical`, but don’t yet remove the table in case of rollback to
     v1.36.0. Again, we increase `synapse.storage.schema.SCHEMA_VERSION`, but
     because we have not broken compatibility with v1.36, we do not yet update
-    `compat_version`. We now have:
+    `SCHEMA_COMPAT_VERSION`. We now have:
 
-    v1.37.0: `SCHEMA_VERSION=60`, `compat_version=59`.
+    v1.37.0: `SCHEMA_VERSION=60`, `SCHEMA_COMPAT_VERSION=59`.
 
  3. Later (say in Synapse v1.38.0): we can remove the table altogether. This will
-    break compatibility with v1.36.0, so we must update `compat_version` accordingly.
+    break compatibility with v1.36.0, so we must update `SCHEMA_COMPAT_VERSION` accordingly.
     There is no need to update `synapse.storage.schema.SCHEMA_VERSION`, since there is no
     change to the Synapse codebase here. So we end up with:
 
-    v1.38.0: `SCHEMA_VERSION=60`, `compat_version=60`.
+    v1.38.0: `SCHEMA_VERSION=60`, `SCHEMA_COMPAT_VERSION=60`.
 
 If in doubt about whether to update `SCHEMA_VERSION` or not, it is generally best to
 lean towards doing so.

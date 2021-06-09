@@ -25,7 +25,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.engines.postgres import PostgresEngine
-from synapse.storage.schema import SCHEMA_VERSION
+from synapse.storage.schema import SCHEMA_COMPAT_VERSION, SCHEMA_VERSION
 from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
@@ -373,6 +373,18 @@ def _upgrade_existing_database(
 
         assert config is not None
         check_database_before_upgrade(cur, database_engine, config)
+
+    # update schema_compat_version before we run any upgrades, so that if synapse
+    # gets downgraded again, it won't try to run against the upgraded database.
+    if (
+        current_schema_state.compat_version is None
+        or current_schema_state.compat_version < SCHEMA_COMPAT_VERSION
+    ):
+        cur.execute("DELETE FROM schema_compat_version")
+        cur.execute(
+            "INSERT INTO schema_compat_version(compat_version) VALUES (?)",
+            (SCHEMA_COMPAT_VERSION,),
+        )
 
     start_ver = current_schema_state.current_version
 

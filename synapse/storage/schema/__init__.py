@@ -22,3 +22,11 @@ older versions of Synapse).
 See `README.md <synapse/storage/schema/README.md>`_  for more information on how this
 works.
 """
+
+
+SCHEMA_COMPAT_VERSION = 59
+"""Limit on how far the synapse codebase can be rolled back without breaking db compat
+
+This value is stored in the database, and checked on startup. If the value in the
+database is greater than SCHEMA_VERSION, then Synapse will refuse to start.
+"""
