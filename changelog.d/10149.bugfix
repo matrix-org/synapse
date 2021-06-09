@@ -1,0 +1,1 @@
+Fix bug where presence updates would stop working when using a presence writer worker.
