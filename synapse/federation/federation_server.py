@@ -608,14 +608,17 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        if room_version not in supported_versions:
+        room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room version is supported by the remote homeserver
+        if room_version.identifier not in supported_versions:
             logger.warning(
                 "Room version %s not in %s", room_version, supported_versions
             )
             raise IncompatibleRoomVersionError(room_version=room_version)
 
-        if not KNOWN_ROOM_VERSIONS[room_version].msc2403_knocking:
+        # Check that this room supports knocking as defined by its room version
+        if not room_version.msc2403_knocking:
             raise SynapseError(
                 403,
                 "This room version does not support knocking",
@@ -648,6 +651,8 @@ class FederationServer(FederationBase):
         logger.debug("on_send_knock_request: content: %s", content)
 
         room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room supports knocking as defined by its room version
         if not room_version.msc2403_knocking:
             raise SynapseError(
                 403,
