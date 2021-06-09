@@ -68,15 +68,13 @@ class KnockRoomAliasServlet(RestServlet):
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
-            try:
-                # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
-                args: Dict[bytes, List[bytes]] = request.args  # type: ignore
 
-                remote_room_hosts = parse_strings_from_args(
-                    args, "server_name", required=False
-                )
-            except KeyError:
-                remote_room_hosts = None
+            # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+            args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+
+            remote_room_hosts = parse_strings_from_args(
+                args, "server_name", required=False
+            )
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
