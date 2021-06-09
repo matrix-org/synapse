@@ -39,7 +39,9 @@ class ResponseCache(Generic[KV]):
     """
 
     def __init__(self, clock: Clock, name: str, timeout_ms: float = 0):
-        # Requests that haven't finished yet.
+        # This is poorly-named: it includes both complete and incomplete results.
+        # We keep complete results rather than switching to absolute values because
+        # that makes it easier to cache Failure results.
         self.pending_result_cache = {}  # type: Dict[KV, ObservableDeferred]
 
         self.clock = clock
@@ -57,13 +59,10 @@ class ResponseCache(Generic[KV]):
     def get(self, key: KV) -> Optional[defer.Deferred]:
         """Look up the given key.
 
-        Can return either a new Deferred (which also doesn't follow the synapse
-        logcontext rules), or, if the request has completed, the actual
-        result. You will probably want to make_deferred_yieldable the result.
+        Returns a new Deferred (which also doesn't follow the synapse
+        logcontext rules). You will probably want to make_deferred_yieldable the result.
 
-        If there is no entry for the key, returns None. It is worth noting that
-        this means there is no way to distinguish a completed result of None
-        from an absent cache entry.
+        If there is no entry for the key, returns None.
 
         Args:
             key: key to get/set in the cache
@@ -87,9 +86,8 @@ class ResponseCache(Generic[KV]):
         you should wrap normal synapse deferreds with
         synapse.logging.context.run_in_background).
 
-        Can return either a new Deferred (which also doesn't follow the synapse
-        logcontext rules), or, if *deferred* was already complete, the actual
-        result. You will probably want to make_deferred_yieldable the result.
+        Returns a new Deferred (which also doesn't follow the synapse logcontext rules).
+        You will probably want to make_deferred_yieldable the result.
 
         Args:
             key: key to get/set in the cache
@@ -101,7 +99,7 @@ class ResponseCache(Generic[KV]):
         result = ObservableDeferred(deferred, consumeErrors=True)
         self.pending_result_cache[key] = result
 
-        def remove(r):
+        def on_complete(r):
             if self.timeout_sec:
                 self.clock.call_later(
                     self.timeout_sec, self.pending_result_cache.pop, key, None
@@ -110,7 +108,10 @@ class ResponseCache(Generic[KV]):
                 self.pending_result_cache.pop(key, None)
             return r
 
-        result.addBoth(remove)
+        # make sure we do this *after* adding the entry to pending_result_cache,
+        # in case the result is already complete (in which case flipping the order would
+        # leave us with a stuck entry in the cache).
+        result.addBoth(on_complete)
         return result.observe()
 
     async def wrap(
