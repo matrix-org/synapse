@@ -12,13 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from twisted.internet import defer
+
 from synapse.util.caches.response_cache import ResponseCache
 
 from tests.server import get_clock
 from tests.unittest import TestCase
 
 
-class DeferredCacheTestCase(TestCase):
+class ResponseCacheTestCase(TestCase):
     """
     A TestCase class for ResponseCache.
 
@@ -48,7 +50,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.instant_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.instant_return, expected_result)
+        )
 
         self.assertEqual(
             expected_result,
@@ -66,7 +70,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.instant_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.instant_return, expected_result)
+        )
 
         self.assertEqual(
             expected_result,
@@ -80,7 +86,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.instant_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.instant_return, expected_result)
+        )
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
         self.assertEqual(
@@ -99,7 +107,10 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.delayed_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.delayed_return, expected_result)
+        )
+
         self.assertNoResult(wrap_d)
 
         # function wakes up, returns result
@@ -112,7 +123,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.delayed_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.delayed_return, expected_result)
+        )
         self.assertNoResult(wrap_d)
 
         # stop at 1 second to callback cache eviction callLater at that time, then another to set time at 2
