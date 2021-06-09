@@ -613,9 +613,9 @@ class FederationServer(FederationBase):
         # Check that this room version is supported by the remote homeserver
         if room_version.identifier not in supported_versions:
             logger.warning(
-                "Room version %s not in %s", room_version, supported_versions
+                "Room version %s not in %s", room_version.identifier, supported_versions
             )
-            raise IncompatibleRoomVersionError(room_version=room_version)
+            raise IncompatibleRoomVersionError(room_version=room_version.identifier)
 
         # Check that this room supports knocking as defined by its room version
         if not room_version.msc2403_knocking:
@@ -627,7 +627,10 @@ class FederationServer(FederationBase):
 
         pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
         time_now = self._clock.time_msec()
-        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
+        return {
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version.identifier,
+        }
 
     async def on_send_knock_request(
         self,
