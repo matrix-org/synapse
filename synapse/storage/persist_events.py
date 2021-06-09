@@ -18,6 +18,7 @@ import itertools
 import logging
 from collections import deque
 from typing import (
+    Any,
     Awaitable,
     Callable,
     Collection,
@@ -104,12 +105,17 @@ times_pruned_extremities = Counter(
 )
 
 
-@attr.s(auto_attribs=True, frozen=True, slots=True)
+@attr.s(auto_attribs=True, slots=True)
 class _EventPersistQueueItem:
     events_and_contexts: List[Tuple[EventBase, EventContext]]
     backfilled: bool
     deferred: ObservableDeferred
-    opentracing_context: Optional[object]
+
+    parent_opentracing_span_contexts: List = []
+    """A list of opentracing spans waiting for this batch"""
+
+    opentracing_span_context: Any = None
+    """The opentracing span under which the persistence actually happened"""
 
 
 _PersistResult = TypeVar("_PersistResult")
@@ -164,20 +170,36 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             end_item = queue[-1]
         else:
             # need to make a new queue item
-            span = opentracing.active_span()
             deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
 
             end_item = _EventPersistQueueItem(
                 events_and_contexts=[],
                 backfilled=backfilled,
                 deferred=deferred,
-                opentracing_context=span.context if span else None,
             )
             queue.append(end_item)
 
+        # add our events to the queue item
         end_item.events_and_contexts.extend(events_and_contexts)
+
+        # also add our active opentracing span to the item so that we get a link back
+        span = opentracing.active_span()
+        if span:
+            end_item.parent_opentracing_span_contexts.append(span.context)
+
+        # start a processor for the queue, if there isn't one already
         self._handle_queue(room_id)
-        return await make_deferred_yieldable(end_item.deferred.observe())
+
+        # wait for the queue item to complete
+        res = await make_deferred_yieldable(end_item.deferred.observe())
+
+        # add another opentracing span which links to the persist trace.
+        with opentracing.start_active_span_follows_from(
+            "persist_event_batch_complete", (end_item.opentracing_span_context,)
+        ):
+            pass
+
+        return res
 
     def _handle_queue(self, room_id):
         """Attempts to handle the queue for a room if not already being handled.
@@ -204,10 +226,14 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
                 queue = self._get_drainining_queue(room_id)
                 for item in queue:
                     try:
-                        with opentracing.start_active_span(
+                        with opentracing.start_active_span_follows_from(
                             "persist_event_batch",
-                            child_of=item.opentracing_context,
-                        ):
+                            item.parent_opentracing_span_contexts,
+                            inherit_force_tracing=True,
+                        ) as scope:
+                            if scope:
+                                item.opentracing_span_context = scope.span.context
+
                             ret = await self._per_item_callback(
                                 item.events_and_contexts, item.backfilled
                             )

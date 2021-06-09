@@ -168,7 +168,7 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, List, Optional, Pattern, Type
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
 
 import attr
 
@@ -453,12 +453,28 @@ def start_active_span(
     )
 
 
-def start_active_span_follows_from(operation_name, contexts):
+def start_active_span_follows_from(
+    operation_name: str, contexts: Collection, inherit_force_tracing=False
+):
+    """Starts an active opentracing span, with additional references to previous spans
+
+    Args:
+        operation_name: name of the operation represented by the new span
+        contexts: the previous spans to inherit from
+        inherit_force_tracing: if set, and any of the previous contexts have had tracing
+           forced, the new span will also have tracing forced.
+    """
     if opentracing is None:
         return noop_context_manager()
 
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(operation_name, references=references)
+
+    if inherit_force_tracing and any(
+        is_context_forced_tracing(ctx) for ctx in contexts
+    ):
+        force_tracing(scope.span)
+
     return scope
 
 
