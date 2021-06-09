@@ -278,12 +278,18 @@ class SynapseTags:
     DB_TXN_ID = "db.txn_id"
 
 
+class SynapseBaggage:
+    FORCE_TRACING = "synapse-force-tracing"
+
+
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
 _homeserver_whitelist = None  # type: Optional[Pattern[str]]
 
 # Util methods
+
+Sentinel = object()
 
 
 def only_if_tracing(func):
@@ -573,6 +579,33 @@ def log_kv(key_values, timestamp=None):
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
     opentracing.tracer.active_span.set_operation_name(operation_name)
+
+
+@only_if_tracing
+def force_tracing(span=Sentinel) -> None:
+    """Force sampling for the active/given span and its children.
+
+    Args:
+        span: span to force tracing for. By default, the active span.
+    """
+    if span is Sentinel:
+        span = opentracing.tracer.active_span
+    if span is None:
+        logger.error("No active span in force_tracing")
+        return
+
+    span.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+
+    # also set a bit of baggage, so that we have a way of figuring out if
+    # it is enabled later
+    span.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
+
+
+def is_context_forced_tracing(span_context) -> bool:
+    """Check if sampling has been force for the given span context."""
+    if span_context is None:
+        return False
+    return span_context.baggage.get(SynapseBaggage.FORCE_TRACING) is not None
 
 
 # Injection and extraction
