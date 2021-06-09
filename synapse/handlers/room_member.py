@@ -708,8 +708,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     )
 
         elif (
-                self.config.experimental.msc2403_enabled
-                and effective_membership_state == Membership.KNOCK
+            self.config.experimental.msc2403_enabled
+            and effective_membership_state == Membership.KNOCK
         ):
             if not is_host_in_room:
                 # The knock needs to be sent over federation instead
