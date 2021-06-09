@@ -49,7 +49,7 @@ from synapse.types import (
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -310,6 +310,7 @@ class SyncHandler:
             since_token,
             timeout,
             full_state,
+            cache_context=True,
         )
         logger.debug("Returning sync response for %s", user_id)
         return res
@@ -317,9 +318,10 @@ class SyncHandler:
     async def _wait_for_sync_for_user(
         self,
         sync_config: SyncConfig,
-        since_token: Optional[StreamToken] = None,
-        timeout: int = 0,
-        full_state: bool = False,
+        since_token: Optional[StreamToken],
+        timeout: int,
+        full_state: bool,
+        cache_context: ResponseCacheContext[SyncRequestKey],
     ) -> SyncResult:
         if since_token is None:
             sync_type = "initial_sync"
@@ -360,6 +362,17 @@ class SyncHandler:
                 current_sync_callback,
                 from_token=since_token,
             )
+
+            # if nothing has happened in any of the users' rooms since /sync was called,
+            # the resultant next_batch will be the same as since_token (since the result
+            # is generated when wait_for_events is first called, and not regenerated
+            # when wait_for_events times out).
+            #
+            # If that happens, we mustn't cache it, so that when the client comes back
+            # with the same cache token, we don't immediately return the same empty
+            # result, causing a tightloop. (#8518)
+            if result.next_batch == since_token:
+                cache_context.should_cache = False
 
         if result:
             if sync_config.filter_collection.lazy_load_members():
