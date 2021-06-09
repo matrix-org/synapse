@@ -239,7 +239,7 @@ class RedactionTestCase(unittest.HomeserverTestCase):
                 depth: Optional[int] = None,
             ):
                 built_event = await self._base_builder.build(
-                    prev_event_ids, auth_event_ids
+                    prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
                 )
 
                 built_event._event_id = self._event_id
