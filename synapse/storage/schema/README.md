@@ -23,7 +23,7 @@ updated. They work as follows:
 
  * The Synapse codebase defines a constant `synapse.storage.schema.SCHEMA_VERSION`
    which represents the expectations made about the database by that version. For
-   example, as of Synapse v1.33, this is `59`.
+   example, as of Synapse v1.36, this is `59`.
 
  * The database stores a "compatibility version" in
    `schema_compat_version.compat_version` which defines the `SCHEMA_VERSION` of the
@@ -48,22 +48,22 @@ might pan out.
     instance, there is no existing code which reads from `room_stats_historical`, so
     our starting point is:
 
-    v1.33.0: `SCHEMA_VERSION=59`, `compat_version=59`
+    v1.36.0: `SCHEMA_VERSION=59`, `compat_version=59`
 
- 2. Next (say in Synapse v1.34.0): remove the code that *writes* to
+ 2. Next (say in Synapse v1.37.0): remove the code that *writes* to
     `room_stats_historical`, but don’t yet remove the table in case of rollback to
-    v1.33.0. Again, we increase `synapse.storage.schema.SCHEMA_VERSION`, but
-    because we have not broken compatibility with v1.33, we do not yet update
+    v1.36.0. Again, we increase `synapse.storage.schema.SCHEMA_VERSION`, but
+    because we have not broken compatibility with v1.36, we do not yet update
     `compat_version`. We now have:
 
-    v1.34.0: `SCHEMA_VERSION=60`, `compat_version=59`.
+    v1.37.0: `SCHEMA_VERSION=60`, `compat_version=59`.
 
- 3. Later (say in Synapse v1.36.0): we can remove the table altogether. This will
-    break compatibility with v1.33.0, so we must update `compat_version` accordingly.
+ 3. Later (say in Synapse v1.38.0): we can remove the table altogether. This will
+    break compatibility with v1.36.0, so we must update `compat_version` accordingly.
     There is no need to update `synapse.storage.schema.SCHEMA_VERSION`, since there is no
     change to the Synapse codebase here. So we end up with:
 
-    v1.36.0: `SCHEMA_VERSION=60`, `compat_version=60`.
+    v1.38.0: `SCHEMA_VERSION=60`, `compat_version=60`.
 
 If in doubt about whether to update `SCHEMA_VERSION` or not, it is generally best to
 lean towards doing so.
