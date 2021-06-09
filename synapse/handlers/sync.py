@@ -83,12 +83,15 @@ LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
 LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
 
 
+SyncRequestKey = Tuple[Any, ...]
+
+
 @attr.s(slots=True, frozen=True)
 class SyncConfig:
     user = attr.ib(type=UserID)
     filter_collection = attr.ib(type=FilterCollection)
     is_guest = attr.ib(type=bool)
-    request_key = attr.ib(type=Tuple[Any, ...])
+    request_key = attr.ib(type=SyncRequestKey)
     device_id = attr.ib(type=Optional[str])
 
 
@@ -266,9 +269,9 @@ class SyncHandler:
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache = ResponseCache(
+        self.response_cache: ResponseCache[SyncRequestKey] = ResponseCache(
             hs.get_clock(), "sync"
-        )  # type: ResponseCache[Tuple[Any, ...]]
+        )
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
@@ -343,13 +346,13 @@ class SyncHandler:
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
-            result = await self.current_sync_for_user(
+            result: SyncResult = await self.current_sync_for_user(
                 sync_config, since_token, full_state=full_state
             )
         else:
 
-            def current_sync_callback(before_token, after_token):
-                return self.current_sync_for_user(sync_config, since_token)
+            async def current_sync_callback(before_token, after_token) -> SyncResult:
+                return await self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(
                 sync_config.user.to_string(),
