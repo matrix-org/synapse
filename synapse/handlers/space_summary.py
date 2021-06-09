@@ -91,10 +91,6 @@ class SpaceSummaryHandler:
         # rooms we have already processed
         processed_rooms = set()  # type: Set[str]
 
-        # events we have already processed. We don't necessarily have their event ids,
-        # so instead we key on (room id, state key)
-        processed_events = set()  # type: Set[Tuple[str, str]]
-
         rooms_result = []  # type: List[JsonDict]
         events_result = []  # type: List[JsonDict]
 
@@ -206,13 +202,6 @@ class SpaceSummaryHandler:
             #   a remote server, whether or not they actually link to any rooms in our
             #   tree?
             for ev in events:
-                # remote servers might return events we have already processed
-                # (eg, Dendrite returns inward pointers as well as outward ones), so
-                # we need to filter them out, to avoid returning duplicate links to the
-                # client.
-                ev_key = (ev["room_id"], ev["state_key"])
-                if ev_key in processed_events:
-                    continue
                 events_result.append(ev)
 
                 # add the child to the queue. we have already validated
@@ -220,7 +209,6 @@ class SpaceSummaryHandler:
                 room_queue.append(
                     _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
                 )
-                processed_events.add(ev_key)
 
         # Before returning to the client, remove the allowed_spaces key for any
         # rooms.
