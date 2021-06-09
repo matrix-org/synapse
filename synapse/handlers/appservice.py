@@ -87,16 +87,14 @@ class ApplicationServicesHandler:
             self.is_processing = True
             try:
                 limit = 100
-                while True:
+                upper_bound = -1
+                while upper_bound < self.current_max:
                     (
                         upper_bound,
                         events,
                     ) = await self.store.get_new_events_for_appservice(
                         self.current_max, limit
                     )
-
-                    if not events:
-                        break
 
                     events_by_room = {}  # type: Dict[str, List[EventBase]]
                     for event in events:
@@ -153,9 +151,6 @@ class ApplicationServicesHandler:
 
                     await self.store.set_appservice_last_pos(upper_bound)
 
-                    now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
-
                     synapse.metrics.event_processing_positions.labels(
                         "appservice_sender"
                     ).set(upper_bound)
@@ -168,12 +163,16 @@ class ApplicationServicesHandler:
 
                     event_processing_loop_counter.labels("appservice_sender").inc()
 
-                    synapse.metrics.event_processing_lag.labels(
-                        "appservice_sender"
-                    ).set(now - ts)
-                    synapse.metrics.event_processing_last_ts.labels(
-                        "appservice_sender"
-                    ).set(ts)
+                    if events:
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(events[-1].event_id)
+
+                        synapse.metrics.event_processing_lag.labels(
+                            "appservice_sender"
+                        ).set(now - ts)
+                        synapse.metrics.event_processing_last_ts.labels(
+                            "appservice_sender"
+                        ).set(ts)
             finally:
                 self.is_processing = False
 

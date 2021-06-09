@@ -349,4 +349,4 @@ class RegistrationConfig(Config):
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.enable_registration = bool(strtobool(str(args.enable_registration)))
+            self.enable_registration = strtobool(str(args.enable_registration))

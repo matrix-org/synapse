@@ -302,11 +302,18 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         )
 
         # Check that the expected presence updates were sent
-        expected_users = [
+        # We explicitly compare using sets as we expect that calling
+        # module_api.send_local_online_presence_to will create a presence
+        # update that is a duplicate of the specified user's current presence.
+        # These are sent to clients and will be picked up below, thus we use a
+        # set to deduplicate. We're just interested that non-offline updates were
+        # sent out for each user ID.
+        expected_users = {
             self.other_user_id,
             self.presence_receiving_user_one_id,
             self.presence_receiving_user_two_id,
-        ]
+        }
+        found_users = set()
 
         calls = (
             self.hs.get_federation_transport_client().send_transaction.call_args_list
@@ -326,12 +333,12 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                 # EDUs can contain multiple presence updates
                 for presence_update in edu["content"]["push"]:
                     # Check for presence updates that contain the user IDs we're after
-                    expected_users.remove(presence_update["user_id"])
+                    found_users.add(presence_update["user_id"])
 
                     # Ensure that no offline states are being sent out
                     self.assertNotEqual(presence_update["presence"], "offline")
 
-        self.assertEqual(len(expected_users), 0)
+        self.assertEqual(found_users, expected_users)
 
 
 def send_presence_update(

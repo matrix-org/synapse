@@ -48,10 +48,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
-        self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value="secret")
-        )
-        self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
         self.lots_of_users = 100
@@ -67,8 +63,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.get_or_create_user(requester, frank.localpart, "Frankie")
         )
         self.assertEquals(result_user_id, user_id)
-        self.assertTrue(result_token is not None)
-        self.assertEquals(result_token, "secret")
+        self.assertIsInstance(result_token, str)
+        self.assertGreater(len(result_token), 20)
 
     def test_if_user_exists(self):
         store = self.hs.get_datastore()
@@ -500,7 +496,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         user_id = self.get_success(self.handler.register_user(localpart="user"))
 
         # Get an access token.
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = "testtok"
         self.get_success(
             self.store.add_access_token_to_user(
                 user_id=user_id, token=token, device_id=None, valid_until_ms=None
@@ -577,7 +573,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = self.hs.get_auth_handler().generate_access_token(user)
 
         if need_register:
             await self.handler.register_with_store(

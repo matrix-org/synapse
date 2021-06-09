@@ -15,6 +15,7 @@
 import importlib
 import importlib.util
 import itertools
+from types import ModuleType
 from typing import Any, Iterable, Tuple, Type
 
 import jsonschema
@@ -44,8 +45,8 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
 
     # We need to import the module, and then pick the class out of
     # that, so we split based on the last dot.
-    module, clz = modulename.rsplit(".", 1)
-    module = importlib.import_module(module)
+    module_name, clz = modulename.rsplit(".", 1)
+    module = importlib.import_module(module_name)
     provider_class = getattr(module, clz)
 
     # Load the module config. If None, pass an empty dictionary instead
@@ -69,11 +70,11 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
     return provider_class, provider_config
 
 
-def load_python_module(location: str):
+def load_python_module(location: str) -> ModuleType:
     """Load a python module, and return a reference to its global namespace
 
     Args:
-        location (str): path to the module
+        location: path to the module
 
     Returns:
         python module object
