@@ -293,18 +293,6 @@ try installing the failing modules individually::
 
     pip install -e "module-name"
 
-Once this is done, you may wish to run Synapse's unit tests to
-check that everything is installed correctly::
-
-    python -m twisted.trial tests
-
-This should end with a 'PASSED' result (note that exact numbers will
-differ)::
-
-    Ran 1337 tests in 716.064s
-
-    PASSED (skips=15, successes=1322)
-
 We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
 
     ./demo/start.sh
@@ -324,6 +312,30 @@ If you just want to start a single instance of the app and run it directly::
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
+Running the unit tests
+======================
+
+After getting up and running, you may wish to run Synapse's unit tests to
+check that everything is installed correctly::
+
+    python -m twisted.trial tests
+
+This should end with a 'PASSED' result (note that exact numbers will
+differ)::
+
+    Ran 1337 tests in 716.064s
+
+    PASSED (skips=15, successes=1322)
+
+To run a specific test::
+
+    python -m twisted.trial tests.storage.test_redaction
+    python -m twisted.trial tests.handlers.test_presence.PresenceJoinTestCase.test_remote_gets_presence_when_local_user_joins
+
+To see logger output from the app while the tests run, set ``SYNAPSE_TEST_LOG_LEVEL``
+and the resulting logs will be in ``_trial_temp/test.log``::
+
+    SYNAPSE_TEST_LOG_LEVEL=DEBUG python -m twisted.trial tests
 
 
 Running the Integration Tests
