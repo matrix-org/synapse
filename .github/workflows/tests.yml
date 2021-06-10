@@ -305,11 +305,12 @@ jobs:
         with:
           path: synapse
 
-      - name: Run actions/checkout@v2 for complement
-        uses: actions/checkout@v2
-        with:
-          repository: "matrix-org/complement"
-          path: complement
+      # Attempt to check out the same branch of Complement as the PR. If it
+      # doesn't exist, fallback to master.
+      - name: Checkout complement
+        run: |
+          mkdir -p complement
+          (wget -O - https://github.com/matrix-org/complement/archive/$GITHUB_HEAD_REF.tar.gz || wget -O - https://github.com/matrix-org/complement/archive/master.tar.gz) | tar -xz --strip-components=1 -C complement
 
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
