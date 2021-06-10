@@ -6,15 +6,15 @@ Synapse's database schema is stored in the `synapse.storage.schema` module.
 
 Synapse supports splitting its datastore across multiple physical databases (which can
 be useful for large installations), and the schema files are therefore split according
-to the logical database they are apply to.
+to the logical database they apply to.
 
 At the time of writing, the following "logical" databases are supported:
 
 * `state` - used to store Matrix room state (more specifically, `state_groups`,
-  their relationships and contents.)
+  their relationships and contents).
 * `main` - stores everything else.
 
-Addionally, the `common` directory contains schema files for tables which must be
+Additionally, the `common` directory contains schema files for tables which must be
 present on *all* physical databases.
 
 ## Synapse schema versions
