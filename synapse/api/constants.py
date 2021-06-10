@@ -112,8 +112,6 @@ class EventTypes:
 
     SpaceChild = "m.space.child"
     SpaceParent = "m.space.parent"
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
 
 class ToDeviceEventTypes:
@@ -180,7 +178,6 @@ class EventContentFields:
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 
 class RoomEncryptionAlgorithms:
