@@ -308,9 +308,16 @@ jobs:
       # Attempt to check out the same branch of Complement as the PR. If it
       # doesn't exist, fallback to master.
       - name: Checkout complement
+        shell: bash
         run: |
+          # For pull requests we want to use GITHUB_HEAD_REF (the pull request
+          # head branch). Otherwise, we use GITHUB_REF (refs/heads/<branch>).
+          BRANCH_NAME="$GITHUB_HEAD_REF"
+          if [[ -z "$BRANCH_NAME" ]]; then
+            BRANCH_NAME="${GITHUB_REF#refs/heads/}"
+          fi
           mkdir -p complement
-          (wget -O - https://github.com/matrix-org/complement/archive/$GITHUB_HEAD_REF.tar.gz || wget -O - https://github.com/matrix-org/complement/archive/master.tar.gz) | tar -xz --strip-components=1 -C complement
+          (wget -O - https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz || wget -O - https://github.com/matrix-org/complement/archive/master.tar.gz) | tar -xz --strip-components=1 -C complement
 
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
