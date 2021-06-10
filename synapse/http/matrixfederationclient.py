@@ -65,13 +65,9 @@ from synapse.http.client import (
     read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.opentracing import (
-    inject_active_span_byte_dict,
-    set_tag,
-    start_active_span,
-    tags,
-)
+from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
@@ -497,7 +493,7 @@ class MatrixFederationHttpClient:
 
         # Inject the span into the headers
         headers_dict = {}  # type: Dict[bytes, List[bytes]]
-        inject_active_span_byte_dict(headers_dict, request.destination)
+        opentracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 

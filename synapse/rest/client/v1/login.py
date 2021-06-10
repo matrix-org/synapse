@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
 
 from typing_extensions import TypedDict
 
@@ -29,6 +29,7 @@ from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
+    parse_bytes_from_args,
     parse_json_object_from_request,
     parse_string,
 )
@@ -560,9 +561,8 @@ class SsoRedirectServlet(RestServlet):
             finish_request(request)
             return
 
-        client_redirect_url = parse_string(
-            request, "redirectUrl", required=True, encoding=None
-        )
+        args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+        client_redirect_url = parse_bytes_from_args(args, "redirectUrl", required=True)
         sso_url = await self._sso_handler.handle_redirect_request(
             request,
             client_redirect_url,
