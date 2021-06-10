@@ -151,10 +151,11 @@ class ResponseCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        call_count = [0]
+        call_count = 0
 
         async def non_caching(o: str, cache_context: ResponseCacheContext[int]):
-            call_count[0] += 1
+            nonlocal call_count
+            call_count += 1
             await self.clock.sleep(1)
             cache_context.should_cache = should_cache
             return o
@@ -172,7 +173,7 @@ class ResponseCacheTestCase(TestCase):
         self.assertNoResult(wrap2_d)
 
         # and there should have been exactly one call
-        self.assertEqual(call_count[0], 1)
+        self.assertEqual(call_count, 1)
 
         # let the call complete
         self.reactor.advance(1)
