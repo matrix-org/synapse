@@ -410,8 +410,10 @@ class ServerConfig(Config):
             ["0.0.0.0", "::"],
             config_path=("federation_ip_range_blacklist",),
         )
-        # The federation_ip_range_whitelist is used to provide
-        # backwards-compatibility, if federation_ip_range_blacklist is set.
+        # The federation_ip_range_whitelist is used for backwards-compatibility
+        # and will always be None, as it was never set in any configuration files.
+        # If no backwards-compatibility is required, i.e. the configuration file
+        # doesn't set federation_ip_range_blacklist, use ip_range_whitelist instead.
         self.federation_ip_range_whitelist = None
         if "federation_ip_range_blacklist" not in config:
             self.federation_ip_range_whitelist = self.ip_range_whitelist
