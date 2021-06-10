@@ -65,13 +65,9 @@ from synapse.http.client import (
     read_body_with_max_size,
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.opentracing import (
-    inject_active_span_byte_dict,
-    set_tag,
-    start_active_span,
-    tags,
-)
+from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
@@ -205,6 +201,7 @@ async def _handle_response(
     response: IResponse,
     start_ms: int,
     parser: ByteParser[T],
+    max_response_size: Optional[int] = None,
 ) -> T:
     """
     Reads the body of a response with a timeout and sends it to a parser
@@ -216,15 +213,20 @@ async def _handle_response(
         response: response to the request
         start_ms: Timestamp when request was made
         parser: The parser for the response
+        max_response_size: The maximum size to read from the response, if None
+            uses the default.
 
     Returns:
         The parsed response
     """
 
+    if max_response_size is None:
+        max_response_size = MAX_RESPONSE_SIZE
+
     try:
         check_content_type_is(response.headers, parser.CONTENT_TYPE)
 
-        d = read_body_with_max_size(response, parser, MAX_RESPONSE_SIZE)
+        d = read_body_with_max_size(response, parser, max_response_size)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
         length = await make_deferred_yieldable(d)
@@ -491,7 +493,7 @@ class MatrixFederationHttpClient:
 
         # Inject the span into the headers
         headers_dict = {}  # type: Dict[bytes, List[bytes]]
-        inject_active_span_byte_dict(headers_dict, request.destination)
+        opentracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -735,6 +737,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Literal[None] = None,
+        max_response_size: Optional[int] = None,
     ) -> Union[JsonDict, list]:
         ...
 
@@ -752,6 +755,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser[T]] = None,
+        max_response_size: Optional[int] = None,
     ) -> T:
         ...
 
@@ -768,6 +772,7 @@ class MatrixFederationHttpClient:
         backoff_on_404: bool = False,
         try_trailing_slash_on_400: bool = False,
         parser: Optional[ByteParser] = None,
+        max_response_size: Optional[int] = None,
     ):
         """Sends the specified json data using PUT
 
@@ -803,6 +808,8 @@ class MatrixFederationHttpClient:
                 enabled.
             parser: The parser to use to decode the response. Defaults to
                 parsing as JSON.
+            max_response_size: The maximum size to read from the response, if None
+                uses the default.
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The
@@ -853,6 +860,7 @@ class MatrixFederationHttpClient:
             response,
             start_ms,
             parser=parser,
+            max_response_size=max_response_size,
         )
 
         return body

@@ -14,10 +14,9 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
-
 import logging
 import re
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 from urllib import parse as urlparse
 
 from synapse.api.constants import EventTypes, Membership
@@ -38,6 +37,7 @@ from synapse.http.servlet import (
     parse_integer,
     parse_json_object_from_request,
     parse_string,
+    parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
@@ -278,7 +278,12 @@ class JoinRoomAliasServlet(TransactionRestServlet):
         PATTERNS = "/join/(?P<room_identifier>[^/]*)"
         register_txn_path(self, PATTERNS, http_server)
 
-    async def on_POST(self, request, room_identifier, txn_id=None):
+    async def on_POST(
+        self,
+        request: SynapseRequest,
+        room_identifier: str,
+        txn_id: Optional[str] = None,
+    ):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         try:
@@ -290,17 +295,18 @@ class JoinRoomAliasServlet(TransactionRestServlet):
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
-            try:
-                remote_room_hosts = [
-                    x.decode("ascii") for x in request.args[b"server_name"]
-                ]  # type: Optional[List[str]]
-            except Exception:
-                remote_room_hosts = None
+
+            # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+            args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+
+            remote_room_hosts = parse_strings_from_args(
+                args, "server_name", required=False
+            )
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)
-            room_id, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-            room_id = room_id.to_string()
+            room_id_obj, remote_room_hosts = await handler.lookup_room_alias(room_alias)
+            room_id = room_id_obj.to_string()
         else:
             raise SynapseError(
                 400, "%s was not legal room ID or room alias" % (room_identifier,)
@@ -537,7 +543,7 @@ class RoomMessageListRestServlet(RestServlet):
             self.store, request, default_limit=10
         )
         as_client_event = b"raw" not in request.args
-        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(
@@ -652,7 +658,7 @@ class RoomEventContextServlet(RestServlet):
         limit = parse_integer(request, "limit", default=10)
 
         # picking the API shape for symmetry with /messages
-        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
             event_filter = Filter(
@@ -910,7 +916,7 @@ class RoomAliasListServlet(RestServlet):
             r"^/_matrix/client/unstable/org\.matrix\.msc2432"
             r"/rooms/(?P<room_id>[^/]*)/aliases"
         ),
-    ]
+    ] + list(client_patterns("/rooms/(?P<room_id>[^/]*)/aliases$", unstable=False))
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -1060,18 +1066,16 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomRedactEventRestServlet(hs).register(http_server)
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
-
-    if hs.config.experimental.spaces_enabled:
-        RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomEventServlet(hs).register(http_server)
+    JoinedRoomsRestServlet(hs).register(http_server)
+    RoomAliasListServlet(hs).register(http_server)
+    SearchRestServlet(hs).register(http_server)
 
     # Some servlets only get registered for the main process.
     if not is_worker:
         RoomCreateRestServlet(hs).register(http_server)
         RoomForgetRestServlet(hs).register(http_server)
-        SearchRestServlet(hs).register(http_server)
-        JoinedRoomsRestServlet(hs).register(http_server)
-        RoomEventServlet(hs).register(http_server)
-        RoomAliasListServlet(hs).register(http_server)
 
 
 def register_deprecated_servlets(hs, http_server):
