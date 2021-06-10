@@ -399,7 +399,8 @@ class MultiWriterIdGenerator:
 
         # If we have a list of instance that are allowed to write to this
         # stream, make sure we're in it.
-        assert not self._writers or self._instance_name in self._writers
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         return _MultiWriterCtxManager(self)
 
@@ -412,7 +413,8 @@ class MultiWriterIdGenerator:
 
         # If we have a list of instance that are allowed to write to this
         # stream, make sure we're in it.
-        assert not self._writers or self._instance_name in self._writers
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         return _MultiWriterCtxManager(self, n)
 
@@ -426,7 +428,8 @@ class MultiWriterIdGenerator:
 
         # If we have a list of instance that are allowed to write to this
         # stream, make sure we're in it.
-        assert not self._writers or self._instance_name in self._writers
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         next_id = self._load_next_id_txn(txn)
 
