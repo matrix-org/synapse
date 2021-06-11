@@ -2032,12 +2032,14 @@ sso:
     #client_whitelist:
     #  - https://riot.im/develop
     #  - https://my.custom.client/
-    #
     # Keep a user's profile fields in sync with the values from the SSO ticket
     # (currently display_name). The update is performed on every SSO login.
     #
-    #update_profile_information: true
+    # Note that enabling this option will override user profile information from
+    # the SSO ticket, regardless of whether users have opted-out of syncing
+    # that information when first signing in. Defaults to false.
     #
+    #update_profile_information: true
 
     # Directory in which Synapse will try to find the template files below.
     # If not set, or the files named below are not found within the template
