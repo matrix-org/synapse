@@ -1,1 +1,0 @@
-Fix a bug which caused  presence updates to stop working some time after restart, when using a presence writer worker.

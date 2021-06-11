@@ -1,1 +1,0 @@
-Fix a bug where Synapse could send the same presence update to a remote twice.
