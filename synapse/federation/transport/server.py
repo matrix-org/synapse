@@ -567,8 +567,6 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 class FederationMakeKnockServlet(BaseFederationServerServlet):
     PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
-
     async def on_GET(self, origin, content, query, room_id, user_id):
         try:
             # Retrieve the room versions the remote homeserver claims to support
@@ -584,8 +582,6 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
 
 class FederationV1SendKnockServlet(BaseFederationServerServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
-
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_knock_request(origin, content, room_id)

@@ -363,7 +363,7 @@ class SyncKnockTestCase(
         # Knock on a room
         channel = self.make_request(
             "POST",
-            "/_matrix/client/unstable/xyz.amorgan.knock/%s" % (self.room_id,),
+            "/_matrix/client/r0/knock/%s" % (self.room_id,),
             b"{}",
             self.knocker_tok,
         )

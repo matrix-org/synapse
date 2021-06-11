@@ -227,18 +227,7 @@ class TransportLayerClient:
                 "make_membership_event called with membership='%s', must be one of %s"
                 % (membership, ",".join(valid_memberships))
             )
-
-        # Knock currently uses an unstable prefix
-        if membership == Membership.KNOCK:
-            # Create a path in the form of /unstable/xyz.amorgan.knock/make_knock/...
-            path = _create_path(
-                FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
-                "/make_knock/%s/%s",
-                room_id,
-                user_id,
-            )
-        else:
-            path = _create_v1_path("/make_%s/%s/%s", membership, room_id, user_id)
+        path = _create_v1_path("/make_%s/%s/%s", membership, room_id, user_id)
 
         ignore_backoff = False
         retry_on_dns_fail = False
@@ -361,12 +350,7 @@ class TransportLayerClient:
 
             The list of state events may be empty.
         """
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
-            "/send_knock/%s/%s",
-            room_id,
-            event_id,
-        )
+        path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
             destination=destination, path=path, data=content

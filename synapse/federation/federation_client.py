@@ -984,7 +984,7 @@ class FederationClient(FederationBase):
             return await self._do_send_knock(destination, pdu)
 
         return await self._try_destination_list(
-            "xyz.amorgan.knock/send_knock", destinations, send_request
+            "send_knock", destinations, send_request
         )
 
     async def _do_send_knock(self, destination: str, pdu: EventBase) -> JsonDict:
