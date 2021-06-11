@@ -1,1 +1,0 @@
-Fix bug when using workers where pagination requests failed if a remote server returned zero events from `/backfill`. Introduced in 1.35.0.
