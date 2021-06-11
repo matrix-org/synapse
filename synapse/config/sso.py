@@ -117,6 +117,10 @@ class SSOConfig(Config):
             # Keep a user's profile fields in sync with the values from the SSO ticket
             # (currently display_name). The update is performed on every SSO login.
             #
+            # Note that enabling this option will override user profile information from
+            # the SSO ticket, regardless of whether users have opted-out of syncing
+            # that information when first signing in. Defaults to false.
+            #
             #update_profile_information: true
             #
 
