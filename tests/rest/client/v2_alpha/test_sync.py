@@ -333,7 +333,7 @@ class SyncKnockTestCase(
         self.room_id = self.helper.create_room_as(
             self.user_id,
             is_public=False,
-            room_version="xyz.amorgan.knock",
+            room_version="7",
             tok=self.tok,
         )
 
