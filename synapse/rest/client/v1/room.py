@@ -99,7 +99,7 @@ class RoomCreateRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for generic events
-class Roomstate_evententRestServlet(TransactionRestServlet):
+class RoomStateEventRestServlet(TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -1310,7 +1310,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
 def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     msc2716_enabled = hs.config.experimental.msc2716_enabled
 
-    Roomstate_evententRestServlet(hs).register(http_server)
+    RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
     RoomMessageListRestServlet(hs).register(http_server)
