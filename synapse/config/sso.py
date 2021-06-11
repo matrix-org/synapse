@@ -122,7 +122,6 @@ class SSOConfig(Config):
             # that information when first signing in. Defaults to false.
             #
             #update_profile_information: true
-            #
 
             # Directory in which Synapse will try to find the template files below.
             # If not set, or the files named below are not found within the template
