@@ -25,35 +25,35 @@ this document.
         Synapse is installed in a virtualenv in `~/synapse/env` then
         run:
 
-        ``` bash
+        ```bash
         source ~/synapse/env/bin/activate
         ```
 
     2.  If Synapse was installed using pip then upgrade to the latest
         version by running:
 
-        ``` bash
+        ```bash
         pip install --upgrade matrix-synapse
         ```
 
         If Synapse was installed using git then upgrade to the latest
         version by running:
 
-        ``` bash
+        ```bash
         git pull
         pip install --upgrade .
         ```
 
     3.  Restart Synapse:
 
-        ``` bash
+        ```bash
         ./synctl restart
         ```
 
 To check whether your update was successful, you can check the running
 server version with:
 
-``` bash
+```bash
 # you may need to replace 'localhost:8008' if synapse is not configured
 # to listen on port 8008.
 
@@ -71,7 +71,7 @@ process, for example:
 
 -   pip:
 
-    ``` bash
+    ```bash
     source env/bin/activate
     # replace `1.3.0` accordingly:
     pip install matrix-synapse==1.3.0
@@ -79,7 +79,7 @@ process, for example:
 
 -   Debian:
 
-    ``` bash
+    ```bash
     # replace `1.3.0` and `stretch` accordingly:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
@@ -97,7 +97,7 @@ If you have set `room_invite_state_types` to the default value you
 should simply remove it from your configuration file. The default value
 used to be:
 
-``` yaml
+```yaml
 room_invite_state_types:
    - "m.room.join_rules"
    - "m.room.canonical_alias"
@@ -289,34 +289,34 @@ to:
 
 2.  Decrease the schema version in the database:
 
-    ``` sql
+    ```sql
     UPDATE schema_version SET version = 58;
     ```
 
 3.  Delete the ignored users & chain cover data:
 
-    ``` sql
+    ```sql
     DROP TABLE IF EXISTS ignored_users;
     UPDATE rooms SET has_auth_chain_index = false;
     ```
 
     For PostgreSQL run:
 
-    ``` sql
+    ```sql
     TRUNCATE event_auth_chain_links;
     TRUNCATE event_auth_chains;
     ```
 
     For SQLite run:
 
-    ``` sql
+    ```sql
     DELETE FROM event_auth_chain_links;
     DELETE FROM event_auth_chains;
     ```
 
 4.  Mark the deltas as not run (so they will re-run on upgrade).
 
-    ``` sql
+    ```sql
     DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/01ignored_user.py";
     DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/06chain_cover_index.sql";
     ```
@@ -377,7 +377,7 @@ mapping provider performs some normalisation of the
 use the [map_username_to_mxid_localpart]{.title-ref} function provided
 by Synapse. An example is shown below:
 
-``` python
+```python
 from synapse.types import map_username_to_mxid_localpart
 
 class MyMappingProvider:
@@ -549,7 +549,7 @@ are affected can be repaired as follows:
 1.  Run the following sql from a [psql]{.title-ref} or
     [sqlite3]{.title-ref} console:
 
-    ``` sql
+    ```sql
     INSERT INTO background_updates (update_name, progress_json, depends_on) VALUES
        ('populate_stats_process_rooms', '{}', 'current_state_events_membership');
 
@@ -588,7 +588,7 @@ to:
 
 2.  Decrease the schema version in the database:
 
-    ``` sql
+    ```sql
     UPDATE schema_version SET version = 57;
     ```
 
@@ -615,7 +615,7 @@ participating in many rooms.
     [sqlite3]{.title-ref} console. It is safe to run it while Synapse is
     still running.
 
-    ``` sql
+    ```sql
     SELECT MAX(q.v) FROM (
       SELECT (
         SELECT ej.json AS v
@@ -639,7 +639,7 @@ participating in many rooms.
 2.  The easiest workaround for this issue is to manually create a new
     index before upgrading. On PostgreSQL, his can be done as follows:
 
-    ``` sql
+    ```sql
     CREATE INDEX CONCURRENTLY tmp_upgrade_1_12_0_index
     ON state_events(room_id) WHERE type = 'm.room.create';
     ```
@@ -662,7 +662,7 @@ participating in many rooms.
 4.  Once Synapse 1.12.0 has successfully started and is responding to
     HTTP requests, the temporary index can be removed:
 
-    ``` sql
+    ```sql
     DROP INDEX tmp_upgrade_1_12_0_index;
     ```
 
@@ -811,7 +811,7 @@ So to delegate email verification, in `homeserver.yaml`, set
 `account_threepid_delegates.email` to the base URL of an identity
 server. For example:
 
-``` yaml
+```yaml
 account_threepid_delegates:
     email: https://example.com     # Delegate email sending to example.com
 ```
@@ -851,7 +851,7 @@ So to delegate phone number verification, in `homeserver.yaml`, set
 `account_threepid_delegates.msisdn` to the base URL of an identity
 server. For example:
 
-``` yaml
+```yaml
 account_threepid_delegates:
     msisdn: https://example.com     # Delegate sms sending to example.com
 ```
@@ -879,7 +879,7 @@ back to v1.3.1, subject to the following:
     the statistics engine will write errors to the logs, which can be
     avoided by setting the following in `homeserver.yaml`:
 
-    ``` yaml
+    ```yaml
     stats:
       enabled: false
     ```
