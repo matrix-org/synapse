@@ -679,7 +679,7 @@ Internal Changes
 Synapse 1.29.0 (2021-03-08)
 ===========================
 
-Note that synapse now expects an `X-Forwarded-Proto` header when used with a reverse proxy. Please see [UPGRADE.rst](UPGRADE.rst#upgrading-to-v1290) for more details on this change.
+Note that synapse now expects an `X-Forwarded-Proto` header when used with a reverse proxy. Please see the [upgrade notes](docs/upgrading/README.md#upgrading-to-v1290) for more details on this change.
 
 
 No significant changes.
@@ -744,7 +744,7 @@ Synapse 1.28.0 (2021-02-25)
 
 Note that this release drops support for ARMv7 in the official Docker images, due to repeated problems building for ARMv7 (and the associated maintenance burden this entails).
 
-This release also fixes the documentation included in v1.27.0 around the callback URI for SAML2 identity providers. If your server is configured to use single sign-on via a SAML2 IdP, you may need to make configuration changes. Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes.
+This release also fixes the documentation included in v1.27.0 around the callback URI for SAML2 identity providers. If your server is configured to use single sign-on via a SAML2 IdP, you may need to make configuration changes. Please review the [upgrade notes](docs/upgrading/README.md) for more details on these changes.
 
 
 Internal Changes
@@ -843,9 +843,9 @@ Synapse 1.27.0 (2021-02-16)
 
 Note that this release includes a change in Synapse to use Redis as a cache ─ as well as a pub/sub mechanism ─ if Redis support is enabled for workers. No action is needed by server administrators, and we do not expect resource usage of the Redis instance to change dramatically.
 
-This release also changes the callback URI for OpenID Connect (OIDC) and SAML2 identity providers. If your server is configured to use single sign-on via an OIDC/OAuth2 or SAML2 IdP, you may need to make configuration changes. Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes.
+This release also changes the callback URI for OpenID Connect (OIDC) and SAML2 identity providers. If your server is configured to use single sign-on via an OIDC/OAuth2 or SAML2 IdP, you may need to make configuration changes. Please review the [upgrade notes](docs/upgrading/README.md) for more details on these changes.
 
-This release also changes escaping of variables in the HTML templates for SSO or email notifications. If you have customised these templates, please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes.
+This release also changes escaping of variables in the HTML templates for SSO or email notifications. If you have customised these templates, please review the [upgrade notes](docs/upgrading/README.md) for more details on these changes.
 
 
 Bugfixes
@@ -949,7 +949,7 @@ Synapse 1.26.0 (2021-01-27)
 ===========================
 
 This release brings a new schema version for Synapse and rolling back to a previous
-version is not trivial. Please review [UPGRADE.rst](UPGRADE.rst) for more details
+version is not trivial. Please review the [upgrade notes](docs/upgrading/README.md) for more details
 on these changes and for general upgrade guidance.
 
 No significant changes since 1.26.0rc2.
@@ -976,7 +976,7 @@ Synapse 1.26.0rc1 (2021-01-20)
 ==============================
 
 This release brings a new schema version for Synapse and rolling back to a previous
-version is not trivial. Please review [UPGRADE.rst](UPGRADE.rst) for more details
+version is not trivial. Please review the [upgrade notes](docs/upgrading/README.md) for more details
 on these changes and for general upgrade guidance.
 
 Features
@@ -1382,7 +1382,7 @@ Internal Changes
 Synapse 1.23.0 (2020-11-18)
 ===========================
 
-This release changes the way structured logging is configured. See the [upgrade notes](UPGRADE.rst#upgrading-to-v1230) for details.
+This release changes the way structured logging is configured. See the [upgrade notes](docs/upgrading/README.md#upgrading-to-v1230) for details.
 
 **Note**: We are aware of a trivially exploitable denial of service vulnerability in versions of Synapse prior to 1.20.0. Complete details will be disclosed on Monday, November 23rd. If you have not upgraded recently, please do so.
 
@@ -1985,7 +1985,7 @@ No significant changes since 1.19.0rc1.
 Removal warning
 ---------------
 
-As outlined in the [previous release](https://github.com/matrix-org/synapse/releases/tag/v1.18.0), we are no longer publishing Docker images with the `-py3` tag suffix. On top of that, we have also removed the `latest-py3` tag. Please see [the announcement in the upgrade notes for 1.18.0](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180).
+As outlined in the [previous release](https://github.com/matrix-org/synapse/releases/tag/v1.18.0), we are no longer publishing Docker images with the `-py3` tag suffix. On top of that, we have also removed the `latest-py3` tag. Please see [the announcement in the upgrade notes for 1.18.0](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1180).
 
 
 Synapse 1.19.0rc1 (2020-08-13)
@@ -2016,7 +2016,7 @@ Bugfixes
 Updates to the Docker image
 ---------------------------
 
-- We no longer publish Docker images with the `-py3` tag suffix, as [announced in the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#upgrading-to-v1180). ([\#8056](https://github.com/matrix-org/synapse/issues/8056))
+- We no longer publish Docker images with the `-py3` tag suffix, as [announced in the upgrade notes](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1180). ([\#8056](https://github.com/matrix-org/synapse/issues/8056))
 
 
 Improved Documentation
@@ -2574,7 +2574,7 @@ configurations of Synapse:
   to be incomplete or empty if Synapse was upgraded directly from v1.2.1 or
   earlier, to versions between v1.4.0 and v1.12.x.
 
-Please review [UPGRADE.rst](UPGRADE.rst) for more details on these changes
+Please review the [upgrade notes](docs/upgrading/README.md) for more details on these changes
 and for general upgrade guidance.
 
 
@@ -2675,7 +2675,7 @@ Bugfixes
 - Fix bad error handling that would cause Synapse to crash if it's provided with a YAML configuration file that's either empty or doesn't parse into a key-value map. ([\#7341](https://github.com/matrix-org/synapse/issues/7341))
 - Fix incorrect metrics reporting for `renew_attestations` background task. ([\#7344](https://github.com/matrix-org/synapse/issues/7344))
 - Prevent non-federating rooms from appearing in responses to federated `POST /publicRoom` requests when a filter was included. ([\#7367](https://github.com/matrix-org/synapse/issues/7367))
-- Fix a bug which would cause the room durectory to be incorrectly populated if Synapse was upgraded directly from v1.2.1 or earlier to v1.4.0 or later. Note that this fix does not apply retrospectively; see the [upgrade notes](UPGRADE.rst#upgrading-to-v1130) for more information. ([\#7387](https://github.com/matrix-org/synapse/issues/7387))
+- Fix a bug which would cause the room durectory to be incorrectly populated if Synapse was upgraded directly from v1.2.1 or earlier to v1.4.0 or later. Note that this fix does not apply retrospectively; see the [upgrade notes](docs/upgrading/README.md#upgrading-to-v1130) for more information. ([\#7387](https://github.com/matrix-org/synapse/issues/7387))
 - Fix bug in `EventContext.deserialize`. ([\#7393](https://github.com/matrix-org/synapse/issues/7393))
 
 
@@ -2825,7 +2825,7 @@ Synapse 1.12.0 includes a database update which is run as part of the upgrade,
 and which may take some time (several hours in the case of a large
 server). Synapse will not respond to HTTP requests while this update is taking
 place. For imformation on seeing if you are affected, and workaround if you
-are, see the [upgrade notes](UPGRADE.rst#upgrading-to-v1120).
+are, see the [upgrade notes](docs/upgrading/README.md#upgrading-to-v1120).
 
 Security advisory
 -----------------
@@ -3378,7 +3378,7 @@ Bugfixes
 Synapse 1.7.0 (2019-12-13)
 ==========================
 
-This release changes the default settings so that only local authenticated users can query the server's room directory. See the [upgrade notes](UPGRADE.rst#upgrading-to-v170) for details.
+This release changes the default settings so that only local authenticated users can query the server's room directory. See the [upgrade notes](docs/upgrading/README.md#upgrading-to-v170) for details.
 
 Support for SQLite versions before 3.11 is now deprecated. A future release will refuse to start if used with an SQLite version before 3.11.
 
@@ -3742,7 +3742,7 @@ Synapse 1.4.0rc1 (2019-09-26)
 =============================
 
 Note that this release includes significant changes around 3pid
-verification. Administrators are reminded to review the [upgrade notes](UPGRADE.rst#upgrading-to-v140).
+verification. Administrators are reminded to review the [upgrade notes](docs/upgrading/README.md#upgrading-to-v140).
 
 Features
 --------
@@ -4118,7 +4118,7 @@ Synapse 1.1.0 (2019-07-04)
 ==========================
 
 As of v1.1.0, Synapse no longer supports Python 2, nor Postgres version 9.4.
-See the [upgrade notes](UPGRADE.rst#upgrading-to-v110) for more details.
+See the [upgrade notes](docs/upgrading/README.md#upgrading-to-v110) for more details.
 
 This release also deprecates the use of environment variables to configure the
 docker image. See the [docker README](https://github.com/matrix-org/synapse/blob/release-v1.1.0/docker/README.md#legacy-dynamic-configuration-file-support)
@@ -4148,7 +4148,7 @@ Synapse 1.1.0rc1 (2019-07-02)
 =============================
 
 As of v1.1.0, Synapse no longer supports Python 2, nor Postgres version 9.4.
-See the [upgrade notes](UPGRADE.rst#upgrading-to-v110) for more details.
+See the [upgrade notes](docs/upgrading/README.md#upgrading-to-v110) for more details.
 
 Features
 --------
@@ -4920,7 +4920,7 @@ run on Python versions 3.5 or 3.6 (as well as 2.7). Support for Python 3.7
 remains experimental.
 
 We recommend upgrading to Python 3, but make sure to read the [upgrade
-notes](UPGRADE.rst#upgrading-to-v0340) when doing so.
+notes](docs/upgrading/README.md#upgrading-to-v0340) when doing so.
 
 Features
 --------
