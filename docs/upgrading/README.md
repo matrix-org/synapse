@@ -8,9 +8,9 @@ this document.
 -   Check that your versions of Python and PostgreSQL are still
     supported.
 
-    Synapse follows upstream lifecycles for [Python]() and
-    [PostgreSQL](), and removes support for versions which are no longer
-    maintained.
+    Synapse follows upstream lifecycles for [Python](https://endoflife.date/python) and
+    [PostgreSQL](https://endoflife.date/postgresql), and removes support for versions
+    which are no longer maintained.
 
     The website <https://endoflife.date> also offers convenient
     summaries.
@@ -87,8 +87,7 @@ process, for example:
 
 # Upgrading to v1.34.0
 
-`room_invite_state_types` configuration setting
-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\-\--
+## `room_invite_state_types` configuration setting
 
 The `room_invite_state_types` configuration setting has been deprecated
 and replaced with `room_prejoin_state`. See the [sample configuration
@@ -112,7 +111,7 @@ If you have customised this value, you should remove
 
 # Upgrading to v1.33.0
 
-## Account Validity HTML templates can now display a user\'s expiration date
+## Account Validity HTML templates can now display a user's expiration date
 
 This may affect you if you have enabled the account validity feature,
 and have made use of a custom HTML template specified by the
@@ -152,7 +151,7 @@ Instructions for doing so are provided
 
 In line with our [deprecation
 policy](https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md),
-we\'ve dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
+we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.
 
 This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
@@ -160,7 +159,7 @@ SQLite 3.22+.
 
 ## Removal of old List Accounts Admin API
 
-The deprecated v1 \"list accounts\" admin API
+The deprecated v1 "list accounts" admin API
 (`GET /_synapse/admin/v1/users/<user_id>`) has been removed in this
 version.
 
@@ -217,7 +216,7 @@ identity providers:
 -   If your server is configured for single sign-on via an OpenID
     Connect or OAuth2 identity provider, you will need to add
     `[synapse public baseurl]/_synapse/client/oidc/callback` to the list
-    of permitted \"redirect URIs\" at the identity provider.
+    of permitted "redirect URIs" at the identity provider.
 
     See [docs/openid.md](docs/openid.md) for more information on setting
     up OpenID Connect.
@@ -225,22 +224,22 @@ identity providers:
 -   If your server is configured for single sign-on via a SAML2 identity
     provider, you will need to add
     `[synapse public baseurl]/_synapse/client/saml2/authn_response` as a
-    permitted \"ACS location\" (also known as \"allowed callback URLs\")
+    permitted "ACS location" (also known as "allowed callback URLs")
     at the identity provider.
 
-    The \"Issuer\" in the \"AuthnRequest\" to the SAML2 identity
+    The "Issuer" in the "AuthnRequest" to the SAML2 identity
     provider is also updated to
     `[synapse public baseurl]/_synapse/client/saml2/metadata.xml`. If
     your SAML2 identity provider uses this property to validate or
     otherwise identify Synapse, its configuration will need to be
     updated to use the new URL. Alternatively you could create a new,
-    separate \"EntityDescriptor\" in your SAML2 identity provider with
-    the new URLs and leave the URLs in the existing \"EntityDescriptor\"
+    separate "EntityDescriptor" in your SAML2 identity provider with
+    the new URLs and leave the URLs in the existing "EntityDescriptor"
     as they were.
 
 ## Changes to HTML templates
 
-The HTML templates for SSO and email notifications now have [Jinja2\'s
+The HTML templates for SSO and email notifications now have [Jinja2's
 autoescape](https://jinja.palletsprojects.com/en/2.11.x/api/#autoescaping)
 enabled for files ending in `.html`, `.htm`, and `.xml`. If you have
 customised these templates and see issues when viewing them you might
@@ -323,7 +322,7 @@ to:
     ```
 
 5.  Downgrade Synapse by following the instructions for your
-    installation method in the \"Rolling back to older versions\"
+    installation method in the "Rolling back to older versions"
     section above.
 
 # Upgrading to v1.25.0
@@ -365,8 +364,8 @@ you may need to customise `ip_range_blacklist` or `ip_range_whitelist`.
 This release allows the OpenID Connect mapping provider to perform
 normalisation of the localpart of the Matrix ID. This allows for the
 mapping provider to specify different algorithms, instead of the
-\[default
-way\](<https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets>).
+[default
+way](<https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets>).
 
 If your Synapse configuration uses a custom mapping provider
 ([oidc_config.user_mapping_provider.module]{.title-ref} is specified and
@@ -462,7 +461,7 @@ Additionally, note that the [Synapse worker documentation](https://github.com/ma
 :   state that the `/_synapse/client/password_reset/email/submit_token`
     endpoint can be handled
 
-by all workers. If you make use of Synapse\'s worker feature, please
+by all workers. If you make use of Synapse's worker feature, please
 update your reverse proxy configuration to reflect this change.
 
 ## New HTML templates
@@ -594,7 +593,7 @@ to:
     ```
 
 3.  Downgrade Synapse by following the instructions for your
-    installation method in the \"Rolling back to older versions\"
+    installation method in the "Rolling back to older versions"
     section above.
 
 # Upgrading to v1.12.0
@@ -738,12 +737,12 @@ with their account, for a number of reasons:
     recovery.
 -   in the case of email, to receive notifications of missed messages.
 
-Before an email address or phone number can be added to a user\'s
+Before an email address or phone number can be added to a user's
 account, or before such an address is used to carry out a
 password-reset, Synapse must confirm the operation with the owner of the
 email address or phone number. It does this by sending an email or text
 giving the user a link or token to confirm receipt. This process is
-known as \'3pid verification\'. (\'3pid\', or \'threepid\', stands for
+known as '3pid verification'. ('3pid', or 'threepid', stands for
 third-party identifier, and we use it to refer to external identifiers
 such as email addresses and phone numbers.)
 
@@ -868,7 +867,7 @@ release.
 If you encounter problems with v1.4.0, it should be possible to roll
 back to v1.3.1, subject to the following:
 
--   The \'room statistics\' engine was heavily reworked in this release
+-   The 'room statistics' engine was heavily reworked in this release
     (see [#5971](https://github.com/matrix-org/synapse/pull/5971)),
     including significant changes to the database schema, which are not
     easily reverted. This will cause the room statistics engine to stop
@@ -878,14 +877,14 @@ back to v1.3.1, subject to the following:
     versions of Synapse, they will be used to populate the room
     directory), so there should be no loss of functionality. However,
     the statistics engine will write errors to the logs, which can be
-    avoided by setting the following in \`homeserver.yaml\`:
+    avoided by setting the following in `homeserver.yaml`:
 
     ``` yaml
     stats:
       enabled: false
     ```
 
-    Don\'t forget to re-enable it when you upgrade again, in preparation
+    Don't forget to re-enable it when you upgrade again, in preparation
     for its use in the room directory!
 
 # Upgrading to v1.2.0
@@ -911,7 +910,7 @@ If you use current versions of the Matrix.org-distributed Debian
 packages or Docker images, action is not required.
 
 If you install Synapse in a Python virtual environment, please see
-\"Upgrading to v0.34.0\" for notes on setting up a new virtualenv under
+"Upgrading to v0.34.0" for notes on setting up a new virtualenv under
 Python 3.
 
 ## Minimum PostgreSQL Version
@@ -972,11 +971,11 @@ identity server for password resets, set
 See the [sample configuration file](docs/sample_config.yaml) for more
 details on these settings.
 
-New email templates \-\-\-\-\-\-\-\-\-\-\-\-\-\--Some new templates have
-been added to the default template directory for the purpose of the
-homeserver sending its own password reset emails. If you have configured
-a custom `template_dir` in your Synapse config, these files will need to
-be added.
+## New email templates
+
+Some new templates have been added to the default template directory for the purpose of
+the homeserver sending its own password reset emails. If you have configured a
+custom `template_dir` in your Synapse config, these files will need to be added.
 
 `password_reset.html` and `password_reset.txt` are HTML and plain text
 templates respectively that contain the contents of what will be emailed
@@ -1069,10 +1068,10 @@ For more information on configuring TLS certificates see the
 2.  This release removes the `riot.im` from the default list of trusted
     identity servers.
 
-    If `riot.im` is in your homeserver\'s list of
+    If `riot.im` is in your homeserver's list of
     `trusted_third_party_id_servers`, you should remove it. It was added
     in case a hypothetical future identity server was put there. If you
-    don\'t remove it, users may be unable to deactivate their accounts.
+    don't remove it, users may be unable to deactivate their accounts.
 
 3.  This release no longer installs the (unmaintained) Matrix Console
     web client as part of the default installation. It is possible to
@@ -1108,7 +1107,7 @@ community.
 # Upgrading to v0.15.0
 
 If you want to use the new URL previewing API
-(/\_matrix/media/r0/preview_url) then you have to explicitly enable it
+(`/_matrix/media/r0/preview_url`) then you have to explicitly enable it
 in the config and update your dependencies dependencies. See README.rst
 for details.
 
@@ -1196,9 +1195,9 @@ first need to upgrade the database by running:
 
     python scripts/upgrade_db_to_v0.6.0.py <db> <server_name> <signing_key>
 
-Where [\<db>]{.title-ref} is the location of the database,
-[\<server_name>]{.title-ref} is the server name as specified in the
-synapse configuration, and [\<signing_key>]{.title-ref} is the location
+Where [<db>]{.title-ref} is the location of the database,
+[<server_name>]{.title-ref} is the server name as specified in the
+synapse configuration, and [<signing_key>]{.title-ref} is the location
 of the signing key as specified in the synapse configuration.
 
 This may take some time to complete. Failures of signatures and content
@@ -1224,7 +1223,7 @@ in the webclient package by running:
 This release completely changes the database schema and so requires
 upgrading it before starting the new version of the homeserver.
 
-The script \"database-prepare-for-0.5.0.sh\" should be used to upgrade
+The script "database-prepare-for-0.5.0.sh" should be used to upgrade
 the database. This will save all user information, such as logins and
 profiles, but will otherwise purge the database. This includes messages,
 which rooms the home server was a member of and room alias mappings.
@@ -1237,7 +1236,7 @@ to resolve any resulting conflicts during the upgrade process.
 Before running the command the homeserver should be first completely
 shutdown. To run it, simply specify the location of the database, e.g.:
 
-> ./scripts/database-prepare-for-0.5.0.sh \"homeserver.db\"
+> ./scripts/database-prepare-for-0.5.0.sh "homeserver.db"
 
 Once this has successfully completed it will be safe to restart the
 homeserver. You may notice that the homeserver takes a few seconds
@@ -1308,16 +1307,16 @@ See the README.rst for more information.
 
 Also note that some config options have been renamed, including:
 
--   \"host\" to \"server-name\"
--   \"database\" to \"database-path\"
--   \"port\" to \"bind-port\" and \"unsecure-port\"
+-   "host" to "server-name"
+-   "database" to "database-path"
+-   "port" to "bind-port" and "unsecure-port"
 
 # Upgrading to v0.0.1
 
 This release completely changes the database schema and so requires
 upgrading it before starting the new version of the homeserver.
 
-The script \"database-prepare-for-0.0.1.sh\" should be used to upgrade
+The script "database-prepare-for-0.0.1.sh" should be used to upgrade
 the database. This will save all user information, such as logins and
 profiles, but will otherwise purge the database. This includes messages,
 which rooms the home server was a member of and room alias mappings.
@@ -1325,7 +1324,7 @@ which rooms the home server was a member of and room alias mappings.
 Before running the command the homeserver should be first completely
 shutdown. To run it, simply specify the location of the database, e.g.:
 
-> ./scripts/database-prepare-for-0.0.1.sh \"homeserver.db\"
+> ./scripts/database-prepare-for-0.0.1.sh "homeserver.db"
 
 Once this has successfully completed it will be safe to restart the
 homeserver. You may notice that the homeserver takes a few seconds
