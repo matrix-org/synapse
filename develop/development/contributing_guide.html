@@ -318,8 +318,11 @@ another module instead of <code>tests</code> - or a test class or a method:</p>
 <pre><code class="language-sh">source ./env/bin/activate
 trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
 </code></pre>
-<p>If your tests fail, you may wish to look at the logs:</p>
+<p>If your tests fail, you may wish to look at the logs (the default log level is <code>ERROR</code>):</p>
 <pre><code class="language-sh">less _trial_temp/test.log
+</code></pre>
+<p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>:</p>
+<pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 </code></pre>
 <h2 id="run-the-integration-tests"><a class="header" href="#run-the-integration-tests">Run the integration tests.</a></h2>
 <p>The integration tests are a more comprehensive suite of tests. They
