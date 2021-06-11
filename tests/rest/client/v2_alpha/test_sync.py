@@ -371,7 +371,7 @@ class SyncKnockTestCase(
 
         # We expect to see the knock event in the stripped room state later
         self.expected_room_state[EventTypes.Member] = {
-            "content": {"membership": "xyz.amorgan.knock", "displayname": "knocker"},
+            "content": {"membership": "knock", "displayname": "knocker"},
             "state_key": "@knocker:test",
         }
 
@@ -384,7 +384,7 @@ class SyncKnockTestCase(
         self.assertEqual(channel.code, 200, channel.json_body)
 
         # Extract the stripped room state events from /sync
-        knock_entry = channel.json_body["rooms"]["xyz.amorgan.knock"]
+        knock_entry = channel.json_body["rooms"]["knock"]
         room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
 
         # Validate that the knock membership event came last
