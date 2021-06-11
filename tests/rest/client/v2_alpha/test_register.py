@@ -210,6 +210,18 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         username = "kermit"
         device_id = "frogfone"
         token = "abcd"
+        self.get_success(
+            self.hs.get_datastore().db_pool.simple_insert(
+                "registration_tokens",
+                {
+                    "token": token,
+                    "total_uses": None,
+                    "pending": None,
+                    "completed": 0,
+                    "expiry_time": None,
+                },
+            )
+        )
         params = {
             "username": username,
             "password": "monkey",

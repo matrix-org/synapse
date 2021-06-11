@@ -243,6 +243,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self._enabled = bool(hs.config.registrations_require_token)
+        self.store = hs.get_datastore()
 
     def is_enabled(self) -> bool:
         return self._enabled
@@ -250,9 +251,10 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         if "token" not in authdict:
             raise LoginError(400, "Missing token", Codes.MISSING_PARAM)
+        if not isinstance(authdict["token"], str):
+            raise LoginError(400, "Token must be a string", Codes.INVALID_PARAM)
 
-        valid_tokens = ["abcd"]
-        if authdict["token"] in valid_tokens:
+        if await self.store.registration_token_is_valid(authdict["token"]):
             return True
         else:
             raise LoginError(
