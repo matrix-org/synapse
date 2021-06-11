@@ -4,7 +4,7 @@ Synapse 1.36.0rc2 (2021-06-11)
 Bugfixes
 --------
 
-- Fix a bug which caused  presence updates to stop working some time after restart, when using a presence writer worker. ([\#10149](https://github.com/matrix-org/synapse/issues/10149))
+- Fix a bug which caused  presence updates to stop working some time after a restart, when using a presence writer worker. Broke in v1.33.0. ([\#10149](https://github.com/matrix-org/synapse/issues/10149))
 - Fix a bug when using federation sender worker where it would send out more presence updates than necessary, leading to high resource usage. Broke in v1.33.0. ([\#10163](https://github.com/matrix-org/synapse/issues/10163))
 - Fix a bug where Synapse could send the same presence update to a remote twice. ([\#10165](https://github.com/matrix-org/synapse/issues/10165))
 
