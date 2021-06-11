@@ -397,7 +397,7 @@ class MultiWriterIdGenerator:
                 # ... persist event ...
         """
 
-        # If we have a list of instance that are allowed to write to this
+        # If we have a list of instances that are allowed to write to this
         # stream, make sure we're in it.
         if self._writers and self._instance_name not in self._writers:
             raise Exception("Tried to allocate stream ID on non-writer")
@@ -411,7 +411,7 @@ class MultiWriterIdGenerator:
                 # ... persist events ...
         """
 
-        # If we have a list of instance that are allowed to write to this
+        # If we have a list of instances that are allowed to write to this
         # stream, make sure we're in it.
         if self._writers and self._instance_name not in self._writers:
             raise Exception("Tried to allocate stream ID on non-writer")
@@ -426,7 +426,7 @@ class MultiWriterIdGenerator:
             # ... persist event ...
         """
 
-        # If we have a list of instance that are allowed to write to this
+        # If we have a list of instances that are allowed to write to this
         # stream, make sure we're in it.
         if self._writers and self._instance_name not in self._writers:
             raise Exception("Tried to allocate stream ID on non-writer")

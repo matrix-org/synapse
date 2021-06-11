@@ -1,1 +1,1 @@
-Fix bug where presence updates would stop working when using a presence writer worker.
+Fix a bug which caused  presence updates to stop working some time after restart, when using a presence writer worker.
