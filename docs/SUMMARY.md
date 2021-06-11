@@ -69,6 +69,7 @@
   - [Git Usage](dev/git.md)
   - [Testing]()
   - [OpenTracing](opentracing.md)
+  - [Database Schemas](development/database_schema.md)
   - [Synapse Architecture]()
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
