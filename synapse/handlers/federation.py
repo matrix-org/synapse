@@ -102,7 +102,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-soft_failed_event_counter = Counter("synapse_handlers_federation_soft_failed_event", "")
+soft_failed_event_counter = Counter("synapse_federation_soft_failed_events_total", "")
 
 
 @attr.s(slots=True)
