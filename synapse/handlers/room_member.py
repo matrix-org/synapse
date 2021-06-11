@@ -707,10 +707,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                         knock.event_id, txn_id, requester, content
                     )
 
-        elif (
-            self.config.experimental.msc2403_enabled
-            and effective_membership_state == Membership.KNOCK
-        ):
+        elif effective_membership_state == Membership.KNOCK:
             if not is_host_in_room:
                 # The knock needs to be sent over federation instead
                 remote_room_hosts.append(get_domain_from_id(room_id))

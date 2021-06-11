@@ -47,7 +47,6 @@ class TransportLayerClient:
     def __init__(self, hs):
         self.server_name = hs.hostname
         self.client = hs.get_federation_http_client()
-        self._msc2403_enabled = hs.config.experimental.msc2403_enabled
 
     @log_function
     def get_room_state_ids(self, destination, room_id, event_id):
@@ -221,11 +220,7 @@ class TransportLayerClient:
             Fails with ``FederationDeniedError`` if the remote destination
             is not in our federation whitelist
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
-
-        # Allow knocking if the feature is enabled
-        if self._msc2403_enabled:
-            valid_memberships.add(Membership.KNOCK)
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
 
         if membership not in valid_memberships:
             raise RuntimeError(

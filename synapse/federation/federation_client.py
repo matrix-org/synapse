@@ -90,7 +90,6 @@ class FederationClient(FederationBase):
         self._clock.looping_call(self._clear_tried_cache, 60 * 1000)
         self.state = hs.get_state_handler()
         self.transport_layer = hs.get_federation_transport_client()
-        self._msc2403_enabled = hs.config.experimental.msc2403_enabled
 
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
@@ -621,11 +620,7 @@ class FederationClient(FederationBase):
             SynapseError: if the chosen remote server returns a 300/400 code, or
                 no servers successfully handle the request.
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
-
-        # Allow knocking if the feature is enabled
-        if self._msc2403_enabled:
-            valid_memberships.add(Membership.KNOCK)
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
 
         if membership not in valid_memberships:
             raise RuntimeError(
