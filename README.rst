@@ -318,7 +318,7 @@ Running the unit tests
 After getting up and running, you may wish to run Synapse's unit tests to
 check that everything is installed correctly::
 
-    python -m twisted.trial tests
+    trial tests
 
 This should end with a 'PASSED' result (note that exact numbers will
 differ)::
@@ -328,7 +328,7 @@ differ)::
     PASSED (skips=15, successes=1322)
 
 For more tips on running the unit tests, like running a specific test or
-show the logger output of the app, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
+to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
 
 
 Running the Integration Tests
