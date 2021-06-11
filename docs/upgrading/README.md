@@ -16,7 +16,7 @@ this document.
     summaries.
 
 -   If Synapse was installed using [prebuilt
-    packages](INSTALL.md#prebuilt-packages), you will need to follow the
+    packages](../setup/INSTALL.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
 -   If Synapse was installed from source, then:
@@ -199,7 +199,7 @@ by the client.
 
 Synapse also requires the [Host]{.title-ref} header to be preserved.
 
-See the [reverse proxy documentation](docs/reverse_proxy.md), where the
+See the [reverse proxy documentation](../reverse_proxy.md), where the
 example configurations have been updated to show how to set these
 headers.
 
@@ -218,7 +218,7 @@ identity providers:
     `[synapse public baseurl]/_synapse/client/oidc/callback` to the list
     of permitted "redirect URIs" at the identity provider.
 
-    See [docs/openid.md](docs/openid.md) for more information on setting
+    See the [OpenID docs](../openid.md) for more information on setting
     up OpenID Connect.
 
 -   If your server is configured for single sign-on via a SAML2 identity
@@ -419,7 +419,7 @@ This release deprecates use of the `structured: true` logging
 configuration for structured logging. If your logging configuration
 contains `structured: true` then it should be modified based on the
 [structured logging
-documentation](https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md).
+documentation](../structured_logging.md).
 
 The `structured` and `drains` logging options are now deprecated and
 should be replaced by standard logging configuration of `handlers` and
@@ -520,7 +520,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[docs/workers.md](docs/workers.md) for more details.
+[workers](../workers.md) for more details.
 
 # Upgrading to v1.14.0
 
@@ -671,7 +671,7 @@ participating in many rooms.
 Synapse will now log a warning on start up if used with a PostgreSQL
 database that has a non-recommended locale set.
 
-See [docs/postgres.md](docs/postgres.md) for details.
+See [Postgres](../postgres.md) for details.
 
 # Upgrading to v1.8.0
 
@@ -891,7 +891,7 @@ back to v1.3.1, subject to the following:
 
 Some counter metrics have been renamed, with the old names deprecated.
 See [the metrics
-documentation](docs/metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
+documentation](../metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
 for details.
 
 # Upgrading to v1.1.0
@@ -927,7 +927,7 @@ more details on upgrading your database.
 Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
 certificates are correctly configured. See the
-[FAQ](docs/MSC1711_certificates_FAQ.md) for more information.
+[FAQ](../MSC1711_certificates_FAQ.md) for more information.
 
 Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.
@@ -990,10 +990,10 @@ sent to them.
 Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
 verified by a root CA. Information on how to do so can be found at [the
-ACME docs](docs/ACME.md).
+ACME docs](../ACME.md).
 
 For more information on configuring TLS certificates see the
-[FAQ](docs/MSC1711_certificates_FAQ.md).
+[FAQ](../MSC1711_certificates_FAQ.md).
 
 # Upgrading to v0.34.0
 
