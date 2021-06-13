@@ -23,7 +23,8 @@ from prometheus_client import Counter, Gauge
 
 from synapse.api.errors import HttpResponseException, SynapseError
 from synapse.http import RequestTimedOutError
-from synapse.logging.opentracing import inject_active_span_byte_dict, trace
+from synapse.logging import opentracing
+from synapse.logging.opentracing import trace
 from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
@@ -235,7 +236,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                     # Add an authorization header, if configured.
                     if replication_secret:
                         headers[b"Authorization"] = [b"Bearer " + replication_secret]
-                    inject_active_span_byte_dict(headers, None, check_destination=False)
+                    opentracing.inject_header_dict(headers, check_destination=False)
                     try:
                         result = await request_func(uri, data, headers=headers)
                         break

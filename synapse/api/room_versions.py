@@ -56,7 +56,7 @@ class RoomVersion:
     state_res = attr.ib(type=int)  # one of the StateResolutionVersions
     enforce_key_validity = attr.ib(type=bool)
 
-    # Before MSC2261/MSC2432, m.room.aliases had special auth rules and redaction rules
+    # Before MSC2432, m.room.aliases had special auth rules and redaction rules
     special_case_aliases_auth = attr.ib(type=bool)
     # Strictly enforce canonicaljson, do not allow:
     # * Integers outside the range of [-2 ^ 53 + 1, 2 ^ 53 - 1]
@@ -70,6 +70,9 @@ class RoomVersion:
     msc2176_redaction_rules = attr.ib(type=bool)
     # MSC3083: Support the 'restricted' join_rule.
     msc3083_join_rules = attr.ib(type=bool)
+    # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
+    # m.room.membership event with membership 'knock'.
+    msc2403_knocking = attr.ib(type=bool)
 
 
 class RoomVersions:
@@ -84,6 +87,7 @@ class RoomVersions:
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     V2 = RoomVersion(
         "2",
@@ -96,6 +100,7 @@ class RoomVersions:
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     V3 = RoomVersion(
         "3",
@@ -108,6 +113,7 @@ class RoomVersions:
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     V4 = RoomVersion(
         "4",
@@ -120,6 +126,7 @@ class RoomVersions:
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     V5 = RoomVersion(
         "5",
@@ -132,6 +139,7 @@ class RoomVersions:
         limit_notifications_power_levels=False,
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     V6 = RoomVersion(
         "6",
@@ -144,6 +152,7 @@ class RoomVersions:
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -156,6 +165,7 @@ class RoomVersions:
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=True,
         msc3083_join_rules=False,
+        msc2403_knocking=False,
     )
     MSC3083 = RoomVersion(
         "org.matrix.msc3083",
@@ -168,6 +178,20 @@ class RoomVersions:
         limit_notifications_power_levels=True,
         msc2176_redaction_rules=False,
         msc3083_join_rules=True,
+        msc2403_knocking=False,
+    )
+    MSC2403 = RoomVersion(
+        "xyz.amorgan.knock",
+        RoomDisposition.UNSTABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=False,
+        msc2403_knocking=True,
     )
 
 
@@ -183,4 +207,5 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.MSC2176,
         RoomVersions.MSC3083,
     )
+    # Note that we do not include MSC2043 here unless it is enabled in the config.
 }  # type: Dict[str, RoomVersion]

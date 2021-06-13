@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.35.0 where invite-only rooms would be shown to users in a space who were not invited.

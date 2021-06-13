@@ -204,11 +204,12 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
 
         with BackgroundProcessLoggingContext(desc, count) as context:
             try:
-                ctx = noop_context_manager()
                 if bg_start_span:
                     ctx = start_active_span(
-                        desc, tags={SynapseTags.REQUEST_ID: str(context)}
+                        f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
                     )
+                else:
+                    ctx = noop_context_manager()
                 with ctx:
                     return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
