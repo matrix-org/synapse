@@ -397,25 +397,21 @@ class ServerConfig(Config):
         self.ip_range_whitelist = generate_ip_set(
             config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
         )
-
         # The federation_ip_range_blacklist is used for backwards-compatibility
-        # and only applies to federation and identity servers. If it is not given,
-        # default to ip_range_blacklist.
-        federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", ip_range_blacklist
-        )
-        # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist = generate_ip_set(
-            federation_ip_range_blacklist,
-            ["0.0.0.0", "::"],
-            config_path=("federation_ip_range_blacklist",),
-        )
-        # The federation_ip_range_whitelist is used for backwards-compatibility
-        # and will always be None, as it was never set in any configuration files.
-        # If no backwards-compatibility is required, i.e. the configuration file
-        # doesn't set federation_ip_range_blacklist, use ip_range_whitelist instead.
-        self.federation_ip_range_whitelist = None
-        if "federation_ip_range_blacklist" not in config:
+        # and only applies to federation and identity servers.
+        if "federation_ip_range_blacklist" in config:
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist = generate_ip_set(
+                config["federation_ip_range_blacklist"],
+                ["0.0.0.0", "::"],
+                config_path=("federation_ip_range_blacklist",),
+            )
+            # 'federation_ip_range_whitelist' was never a supported configuration option.
+            self.federation_ip_range_whitelist = None
+        else:
+            # No backwards-compatiblity requrired, as federation_ip_range_blacklist
+            # is not given. Default to ip_range_blacklist and ip_range_whitelist.
+            self.federation_ip_range_blacklist = self.ip_range_blacklist
             self.federation_ip_range_whitelist = self.ip_range_whitelist
 
         # (undocumented) option for torturing the worker-mode replication a bit,
