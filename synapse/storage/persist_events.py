@@ -288,7 +288,7 @@ class EventsPersistenceStorage:
         # the event was deduplicated. (The dict may also include other entries if
         # the event was persisted in a batch with other events).
         #
-        # Since we use `concurrently_execute` we need to merge the returned list
+        # Since we use `yieldable_gather_results` we need to merge the returned list
         # of dicts into one.
         replaced_events: Dict[str, str] = {}
         for d in ret_vals:
