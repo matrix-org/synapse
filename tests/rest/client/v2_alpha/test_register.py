@@ -229,8 +229,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "device_id": device_id,
         }
 
-        # Request without params to get flows and session
-        channel = self.make_request(b"POST", self.url, b"{}")
+        # Request without auth to get flows and session
+        channel = self.make_request(b"POST", self.url, json.dumps(params))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         flows = channel.json_body["flows"]
         # Synapse adds a dummy stage to differentiate flows where otherwise one
@@ -280,15 +280,32 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
     @unittest.override_config({"registrations_require_token": True})
     def test_POST_registration_token_invalid(self):
-        token = "1234"
         params = {
-            "auth": {
-                "type": LoginType.REGISTRATION_TOKEN,
-                "token": token,
-            }
+            "username": "kermit",
+            "password": "monkey",
         }
-        request_data = json.dumps(params)
-        channel = self.make_request(b"POST", self.url, request_data)
+        # Request without auth to get session
+        channel = self.make_request(b"POST", self.url, json.dumps(params))
+        session = channel.json_body["session"]
+
+        # Test with token param missing (invalid)
+        params["auth"] = {
+            "type": LoginType.REGISTRATION_TOKEN,
+            "session": session,
+        }
+        channel = self.make_request(b"POST", self.url, json.dumps(params))
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEquals(channel.json_body["errcode"], Codes.MISSING_PARAM)
+
+        # Test with non-string (invalid)
+        params["auth"]["token"] = 1234
+        channel = self.make_request(b"POST", self.url, json.dumps(params))
+        self.assertEquals(channel.result["code"], b"401", channel.result)
+        self.assertEquals(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Test with unknown token (invalid)
+        params["auth"]["token"] = "1234"
+        channel = self.make_request(b"POST", self.url, json.dumps(params))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
 
