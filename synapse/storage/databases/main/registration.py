@@ -1789,6 +1789,25 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         # Otherwise, the token is valid
         return True
 
+    async def use_registration_token(self, token: str) -> None:
+        """Increment the completed registrations counter for a token.
+
+        Args:
+            token: The registration token to be 'used'
+        """
+        res = await self.db_pool.simple_select_one(
+            "registration_tokens",
+            keyvalues={"token": token},
+            retcols=["pending", "completed", "expiry_time"],
+            desc="use_registration_token",
+        )
+        await self.db_pool.simple_update_one(
+            "registration_tokens",
+            keyvalues={"token": token},
+            updatevalues={"completed": res["completed"] + 1},
+            desc="use_registration_token",
+        )
+
 
 def find_max_generated_user_id_localpart(cur: Cursor) -> int:
     """

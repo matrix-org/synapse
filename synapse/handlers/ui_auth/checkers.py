@@ -255,6 +255,13 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             raise LoginError(400, "Token must be a string", Codes.INVALID_PARAM)
 
         if await self.store.registration_token_is_valid(authdict["token"]):
+            # Store the token in the UIA session, so that once registration
+            # is complete `completed` can be incremented.
+            await self.store.set_ui_auth_session_data(
+                authdict["session"],
+                "registration_token",
+                authdict["token"],
+            )
             return True
         else:
             raise LoginError(

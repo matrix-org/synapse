@@ -210,8 +210,9 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         username = "kermit"
         device_id = "frogfone"
         token = "abcd"
+        store = self.hs.get_datastore()
         self.get_success(
-            self.hs.get_datastore().db_pool.simple_insert(
+            store.db_pool.simple_insert(
                 "registration_tokens",
                 {
                     "token": token,
@@ -266,6 +267,16 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         }
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertDictContainsSubset(det_data, channel.json_body)
+
+        # Check the `completed` counter has been incremented.
+        completed = self.get_success(
+            store.db_pool.simple_select_one_onecol(
+                "registration_tokens",
+                keyvalues={"token": token},
+                retcol="completed",
+            )
+        )
+        self.assertEquals(completed, 1)
 
     @unittest.override_config({"registrations_require_token": True})
     def test_POST_registration_token_invalid(self):
