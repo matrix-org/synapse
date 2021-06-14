@@ -216,7 +216,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
                 "registration_tokens",
                 {
                     "token": token,
-                    "total_uses": None,
+                    "uses_allowed": None,
                     "pending": None,
                     "completed": 0,
                     "expiry_time": None,

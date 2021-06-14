@@ -1769,7 +1769,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         res = await self.db_pool.simple_select_one(
             "registration_tokens",
             keyvalues={"token": token},
-            retcols=["total_uses", "pending", "completed", "expiry_time"],
+            retcols=["uses_allowed", "pending", "completed", "expiry_time"],
             allow_none=True,
         )
 
@@ -1783,7 +1783,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             return False
 
         # Check if the token has been used up
-        if res["total_uses"] and res["pending"] + res["completed"] >= res["total_uses"]:
+        if res["uses_allowed"] and res["pending"] + res["completed"] >= res["uses_allowed"]:
             return False
 
         # Otherwise, the token is valid
