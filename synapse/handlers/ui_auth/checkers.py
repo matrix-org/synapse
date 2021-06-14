@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, LoginError, SynapseError
+from synapse.api.errors import Codes, LoginError, StoreError, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util import json_decoder
 
@@ -253,14 +253,35 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             raise LoginError(400, "Missing token", Codes.MISSING_PARAM)
         if not isinstance(authdict["token"], str):
             raise LoginError(400, "Token must be a string", Codes.INVALID_PARAM)
+        if "session" not in authdict:
+            raise SynapseError(400, "Missing UIA session", Codes.MISSING_PARAM)
+        session = authdict["session"]
 
-        if await self.store.registration_token_is_valid(authdict["token"]):
+        # If the LoginType.REGISTRATION_TOKEN stage has already been completed,
+        # return early to avoid incrementing `pending` again.
+        # TODO: check stored token matches provided token?
+        try:
+            stored_token = await self.store.get_ui_auth_session_data(
+                session,
+                "registration_token",
+                None,
+            )
+        except StoreError:
+            raise SynapseError(400, "Unknown session ID: {}".format(session))
+        if stored_token:
+            return True
+
+        token = authdict["token"]
+        if await self.store.registration_token_is_valid(token):
+            # Increment pending counter, so that if token has limited uses it
+            # can't be used up by someone else in the meantime.
+            await self.store.set_registration_token_pending(token)
             # Store the token in the UIA session, so that once registration
             # is complete `completed` can be incremented.
             await self.store.set_ui_auth_session_data(
-                authdict["session"],
+                session,
                 "registration_token",
-                authdict["token"],
+                token,
             )
             return True
         else:

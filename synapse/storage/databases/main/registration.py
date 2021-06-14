@@ -1789,6 +1789,25 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         # Otherwise, the token is valid
         return True
 
+    async def set_registration_token_pending(self, token: str) -> None:
+        """Increment the pending registrations counter for a token.
+
+        Args:
+            token: The registration token pending use
+        """
+        pending = await self.db_pool.simple_select_one_onecol(
+            "registration_tokens",
+            keyvalues={"token": token},
+            retcol="pending",
+            desc="set_registration_token_pending",
+        )
+        await self.db_pool.simple_update_one(
+            "registration_tokens",
+            keyvalues={"token": token},
+            updatevalues={"pending": pending + 1},
+            desc="set_registration_token_pending",
+        )
+
     async def use_registration_token(self, token: str) -> None:
         """Increment the completed registrations counter for a token.
 
@@ -1798,13 +1817,16 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         res = await self.db_pool.simple_select_one(
             "registration_tokens",
             keyvalues={"token": token},
-            retcols=["pending", "completed", "expiry_time"],
+            retcols=["pending", "completed"],
             desc="use_registration_token",
         )
         await self.db_pool.simple_update_one(
             "registration_tokens",
             keyvalues={"token": token},
-            updatevalues={"completed": res["completed"] + 1},
+            updatevalues={
+                "completed": res["completed"] + 1,
+                "pending": res["pending"] - 1,
+            },
             desc="use_registration_token",
         )
 
