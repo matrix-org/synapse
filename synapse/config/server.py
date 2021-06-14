@@ -684,6 +684,9 @@ class ServerConfig(Config):
             False,
         )
 
+        # Disable sending read receipts from this homeserver
+        self.send_read_receipts = config.get("send_read_receipts", True)
+
         # List of users trialing the new experimental default push rules. This setting is
         # not included in the sample configuration file on purpose as it's a temporary
         # hack, so that some users can trial the new defaults without impacting every
@@ -1186,6 +1189,12 @@ class ServerConfig(Config):
         # Defaults to `28d`. Set to `null` to disable clearing out of old rows.
         #
         #user_ips_max_age: 14d
+
+        # Read receipt sending policy at the server level.
+        #
+        # Defaults to `true`. Uncomment to disable sending read receipts.
+        #
+        #send_read_receipts: false
 
         # Message retention policy at the server level.
         #
