@@ -152,6 +152,7 @@ class ReceiptsHandler(BaseHandler):
 class ReceiptEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
+        self._should_send_read_receipts = hs.should_send_read_receipts()
 
     async def get_new_events(
         self, from_key: int, room_ids: List[str], **kwargs
@@ -162,7 +163,7 @@ class ReceiptEventSource:
         if from_key == to_key:
             return [], to_key
 
-        if not self.hs.should_send_read_receipts():
+        if not self._should_send_read_receipts:
             return [], to_key
 
         events = await self.store.get_linearized_receipts_for_rooms(
@@ -187,7 +188,7 @@ class ReceiptEventSource:
         if from_key == to_key:
             return [], to_key
 
-        if not self.hs.should_send_read_receipts():
+        if not self._should_send_read_receipts:
             return [], to_key
 
         # Fetch all read receipts for all rooms, up to a limit of 100. This is ordered
