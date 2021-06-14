@@ -111,6 +111,9 @@ class ReceiptsHandler(BaseHandler):
             # no new receipts
             return False
 
+        if not self.hs.should_send_read_receipts():
+            return False
+
         affected_room_ids = list({r.room_id for r in receipts})
 
         self.notifier.on_new_event("receipt_key", max_batch_id, rooms=affected_room_ids)
@@ -139,6 +142,9 @@ class ReceiptsHandler(BaseHandler):
         if not is_new:
             return
 
+        if not self.hs.should_send_read_receipts():
+            return
+
         if self.federation_sender:
             await self.federation_sender.send_read_receipt(receipt)
 
@@ -154,6 +160,9 @@ class ReceiptEventSource:
         to_key = self.get_current_key()
 
         if from_key == to_key:
+            return [], to_key
+
+        if not self.hs.should_send_read_receipts():
             return [], to_key
 
         events = await self.store.get_linearized_receipts_for_rooms(
@@ -176,6 +185,9 @@ class ReceiptEventSource:
         to_key = self.get_current_key()
 
         if from_key == to_key:
+            return [], to_key
+
+        if not self.hs.should_send_read_receipts():
             return [], to_key
 
         # Fetch all read receipts for all rooms, up to a limit of 100. This is ordered
