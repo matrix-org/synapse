@@ -448,6 +448,12 @@ limit_remote_rooms:
 #
 #user_ips_max_age: 14d
 
+# Read receipt sending policy at the server level.
+#
+# Defaults to `true`. Uncomment to disable sending read receipts.
+#
+#send_read_receipts: false
+
 # Message retention policy at the server level.
 #
 # Room admins and mods can define a retention period for their rooms using the
