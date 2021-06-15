@@ -180,9 +180,9 @@ class RoomVersions:
         msc3083_join_rules=True,
         msc2403_knocking=False,
     )
-    MSC2403 = RoomVersion(
-        "xyz.amorgan.knock",
-        RoomDisposition.UNSTABLE,
+    V7 = RoomVersion(
+        "7",
+        RoomDisposition.STABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
@@ -206,6 +206,7 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V6,
         RoomVersions.MSC2176,
         RoomVersions.MSC3083,
+        RoomVersions.V7,
     )
     # Note that we do not include MSC2043 here unless it is enabled in the config.
 }  # type: Dict[str, RoomVersion]

@@ -39,12 +39,10 @@ logger = logging.getLogger(__name__)
 
 class KnockRoomAliasServlet(RestServlet):
     """
-    POST /xyz.amorgan.knock/{roomIdOrAlias}
+    POST /knock/{roomIdOrAlias}
     """
 
-    PATTERNS = client_patterns(
-        "/xyz.amorgan.knock/(?P<room_identifier>[^/]*)", releases=()
-    )
+    PATTERNS = client_patterns("/knock/(?P<room_identifier>[^/]*)")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()

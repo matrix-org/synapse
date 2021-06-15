@@ -41,7 +41,7 @@ class Membership:
 
     INVITE = "invite"
     JOIN = "join"
-    KNOCK = "xyz.amorgan.knock"
+    KNOCK = "knock"
     LEAVE = "leave"
     BAN = "ban"
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
@@ -58,7 +58,7 @@ class PresenceState:
 
 class JoinRules:
     PUBLIC = "public"
-    KNOCK = "xyz.amorgan.knock"
+    KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
     # As defined for MSC3083.
