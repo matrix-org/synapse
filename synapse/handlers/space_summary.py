@@ -129,7 +129,7 @@ class SpaceSummaryHandler:
                 if room:
                     rooms_result.append(room)
 
-                # Mark whether this room was accessible or not.
+                # Track whether this room is returned to the user or not.
                 processed_rooms[room_id] = bool(room)
             else:
                 fed_rooms, events = await self._summarize_remote_room(
