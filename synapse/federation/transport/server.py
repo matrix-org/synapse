@@ -567,8 +567,6 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
 class FederationMakeKnockServlet(BaseFederationServerServlet):
     PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
-
     async def on_GET(self, origin, content, query, room_id, user_id):
         try:
             # Retrieve the room versions the remote homeserver claims to support
@@ -584,8 +582,6 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
 
 class FederationV1SendKnockServlet(BaseFederationServerServlet):
     PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
-
-    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
         content = await self.handler.on_send_knock_request(origin, content, room_id)
@@ -1610,6 +1606,8 @@ FEDERATION_SERVLET_CLASSES = (
     FederationVersionServlet,
     RoomComplexityServlet,
     FederationSpaceSummaryServlet,
+    FederationV1SendKnockServlet,
+    FederationMakeKnockServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
 
 OPENID_SERVLET_CLASSES = (
@@ -1650,12 +1648,6 @@ GROUP_LOCAL_SERVLET_CLASSES = (
 GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
-
-
-MSC2403_SERVLET_CLASSES = (
-    FederationV1SendKnockServlet,
-    FederationMakeKnockServlet,
-)
 
 
 DEFAULT_SERVLET_GROUPS = (
@@ -1699,16 +1691,6 @@ def register_servlets(
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
             ).register(resource)
-
-        # Register msc2403 (knocking) servlets if the feature is enabled
-        if hs.config.experimental.msc2403_enabled:
-            for servletclass in MSC2403_SERVLET_CLASSES:
-                servletclass(
-                    hs=hs,
-                    authenticator=authenticator,
-                    ratelimiter=ratelimiter,
-                    server_name=hs.hostname,
-                ).register(resource)
 
     if "openid" in servlet_groups:
         for servletclass in OPENID_SERVLET_CLASSES:
