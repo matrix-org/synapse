@@ -181,6 +181,8 @@ class EventContentFields:
 
 
 class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
     SPACE = "m.space"
 
 

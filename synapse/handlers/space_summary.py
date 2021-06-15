@@ -88,10 +88,12 @@ class SpaceSummaryHandler:
         # the queue of rooms to process
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
-        # rooms we have already processed
+        # A map of rooms that have been processed to whether that room was
+        # returned to the requesting user.
         processed_rooms: Dict[str, bool] = {}
 
-        # events which are pending knowing if a room is accessible.
+        # A map of room ID to a list of events which are pending the processing
+        # of that room.
         pending_events: Dict[str, List[JsonDict]] = {}
 
         rooms_result = []  # type: List[JsonDict]
@@ -203,10 +205,13 @@ class SpaceSummaryHandler:
             # to see if it is accessible.
             room_pending_events = pending_events.pop(room_id, ())
             if not processed_rooms[room_id]:
+                # If the room was not accessible, we don't need to include these
+                # events in the results.
                 room_pending_events = ()
 
-            # Return the events which reference rooms that were found to be
-            # accessible. Otherwise, queue them until we process those rooms.
+            # Any events which reference rooms that are known to be accessible
+            # should be included in the result. Events which reference rooms which
+            # have not yet been processed should be queued.
             for ev in itertools.chain(events, room_pending_events):
                 parent_room_id = ev["room_id"]
                 child_room_id = ev["state_key"]
@@ -218,9 +223,9 @@ class SpaceSummaryHandler:
                     ):
                         events_result.append(ev)
                 except KeyError:
-                    # Note that events are pending of the child event since if
-                    # the parent event was not accessible it shouldn't be included
-                    # at all.
+                    # Note that events are pending processing of the child room.
+                    # If the parent room was not accessible the event shouldn't
+                    # be included at all.
                     pending_events.setdefault(child_room_id, []).append(ev)
 
                 # add the child to the queue. we have already validated
@@ -324,7 +329,8 @@ class SpaceSummaryHandler:
 
         Returns:
             A tuple of:
-                An iterable of a single value of the room.
+                The room information, if it the room should be returned to the
+                user. None, otherwise.
 
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
