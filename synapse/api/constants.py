@@ -182,7 +182,6 @@ class EventContentFields:
 
 class RoomTypes:
     SPACE = "m.space"
-    MSC1772_SPACE = "org.matrix.msc1772.space"
 
 
 class RoomEncryptionAlgorithms:

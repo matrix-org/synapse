@@ -336,7 +336,7 @@ class SpaceSummaryHandler:
 
         # If the the room is a space, check if there are any children.
         events_result = []  # type: List[JsonDict]
-        if room_entry.get("room_type") in (RoomTypes.SPACE, RoomTypes.MSC1772_SPACE):
+        if room_entry.get("room_type") == RoomTypes.SPACE:
 
             # look for child rooms/spaces.
             child_events = await self._get_child_events(room_id)
