@@ -2713,7 +2713,7 @@ release of Synapse.</p>
 <h2 id="running-a-demo-federation-of-synapses"><a class="header" href="#running-a-demo-federation-of-synapses">Running a demo federation of Synapses</a></h2>
 <p>If you want to get up and running quickly with a trio of homeservers in a
 private federation, there is a script in the <code>demo</code> directory. This is mainly
-useful just for development purposes. See <a href="../demo/README">demo/README</a>.</p>
+useful just for development purposes. See <a href="https://github.com/matrix-org/synapse/tree/develop/demo/">demo/README</a>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="configuration-1"><a class="header" href="#configuration-1">Configuration</a></h1>
 <p>This section contains information on tweaking Synapse via the various options in the configuration file. A configuration
 file should have been generated when you <a href="usage/configuration/../../setup/installation.html">installed Synapse</a>.</p>
@@ -6415,7 +6415,7 @@ usually returned as part of the <a href="https://matrix.org/docs/spec/client_ser
 <h3 id="default-openid-mapping-provider"><a class="header" href="#default-openid-mapping-provider">Default OpenID Mapping Provider</a></h3>
 <p>Synapse has a built-in OpenID mapping provider if a custom provider isn't
 specified in the config. It is located at
-<a href="../synapse/handlers/oidc.py"><code>synapse.handlers.oidc.JinjaOidcMappingProvider</code></a>.</p>
+<a href="https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/oidc.py"><code>synapse.handlers.oidc.JinjaOidcMappingProvider</code></a>.</p>
 <h2 id="saml-mapping-providers"><a class="header" href="#saml-mapping-providers">SAML Mapping Providers</a></h2>
 <p>The SAML mapping provider can be customized by editing the
 <code>saml2_config.user_mapping_provider.module</code> config option.</p>
@@ -6529,7 +6529,7 @@ complete registration using methods from the <code>ModuleApi</code>.</p>
 <h3 id="default-saml-mapping-provider"><a class="header" href="#default-saml-mapping-provider">Default SAML Mapping Provider</a></h3>
 <p>Synapse has a built-in SAML mapping provider if a custom provider isn't
 specified in the config. It is located at
-<a href="../synapse/handlers/saml.py"><code>synapse.handlers.saml.DefaultSamlMappingProvider</code></a>.</p>
+<a href="https://github.com/matrix-org/synapse/blob/develop/synapse/handlers/saml.py"><code>synapse.handlers.saml.DefaultSamlMappingProvider</code></a>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="password-auth-provider-modules"><a class="header" href="#password-auth-provider-modules">Password auth provider modules</a></h1>
 <p>Password auth providers offer a way for server administrators to
 integrate their Synapse installation with an existing authentication
@@ -6850,8 +6850,8 @@ database and shows a success page.</p>
 <p>To enable this, first create templates for the policy and success pages.
 These should be stored on the local filesystem.</p>
 <p>These templates use the <a href="http://jinja.pocoo.org">Jinja2</a> templating language,
-and <a href="privacy_policy_templates">docs/privacy_policy_templates</a> gives
-examples of the sort of thing that can be done.</p>
+and <a href="https://github.com/matrix-org/synapse/tree/develop/docs/privacy_policy_templates/">docs/privacy_policy_templates</a>
+gives examples of the sort of thing that can be done.</p>
 <p>Note that the templates must be stored under a name giving the language of the
 template - currently this must always be <code>en</code> (for &quot;English&quot;);
 internationalisation support is intended for the future.</p>
@@ -7155,7 +7155,7 @@ clients.</p>
 <h2 id="server-configuration"><a class="header" href="#server-configuration">Server configuration</a></h2>
 <p>Support for this feature can be enabled and configured in the
 <code>retention</code> section of the Synapse configuration file (see the
-<a href="https://github.com/matrix-org/synapse/blob/v1.7.3/docs/sample_config.yaml#L332-L393">sample file</a>).</p>
+<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample file</a>).</p>
 <p>To enable support for message retention policies, set the setting
 <code>enabled</code> in this section to <code>true</code>.</p>
 <h3 id="default-policy"><a class="header" href="#default-policy">Default policy</a></h3>
@@ -7180,7 +7180,7 @@ expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
 Synapse will use a default configuration, which is described in the
-<a href="https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml#L332-L393">sample configuration file</a>.</p>
+<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample configuration file</a>.</p>
 <p>Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
 <code>purge_jobs</code> sub-section in the <code>retention</code> section of the configuration
@@ -7392,7 +7392,7 @@ presence to (for those users that the receiving user is considered interested in
 It does not include state for users who are currently offline, and it can only be
 called on workers that support sending federation. Additionally, this method must
 only be called from the process that has been configured to write to the
-the <a href="https://github.com/matrix-org/synapse/blob/master/docs/workers.md#stream-writers">presence stream</a>.
+the <a href="workers.html#stream-writers">presence stream</a>.
 By default, this is the main process, but another worker can be configured to do
 so.</p>
 <h3 id="module-structure"><a class="header" href="#module-structure">Module structure</a></h3>
@@ -7582,7 +7582,7 @@ similar to the one running <code>matrix.org</code>.</p>
 workers only work with PostgreSQL-based Synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.</p>
-<p>See also https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability
+<p>See also <a href="https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability">Matrix.org blog post</a>
 for a higher level overview.</p>
 <h2 id="main-processworker-communication"><a class="header" href="#main-processworker-communication">Main process/worker communication</a></h2>
 <p>The processes communicate with each other via a Synapse-specific protocol called
@@ -8026,13 +8026,15 @@ managing workers. It provides a <code>matrix-synapse</code> service for the mast
 well as a <code>matrix-synapse-worker@</code> service template for any workers you
 require. Additionally, to group the required services, it sets up a
 <code>matrix-synapse.target</code>.</p>
-<p>See the folder <a href="systemd-with-workers/system">system</a> for the systemd unit files.</p>
-<p>The folder <a href="systemd-with-workers/workers">workers</a> contains an example configuration for the
-<code>federation_reader</code> worker.</p>
+<p>See the folder <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/">system</a>
+for the systemd unit files.</p>
+<p>The folder <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/">workers</a>
+contains an example configuration for the <code>federation_reader</code> worker.</p>
 <h2 id="synapse-configuration-files"><a class="header" href="#synapse-configuration-files">Synapse configuration files</a></h2>
 <p>See <a href="systemd-with-workers/../workers.html">workers.md</a> for information on how to set up the
 configuration files and reverse-proxy correctly. You can find an example worker
-config in the <a href="systemd-with-workers/workers">workers</a> folder.</p>
+config in the <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/">workers</a>
+folder.</p>
 <p>Systemd manages daemonization itself, so ensure that none of the configuration
 files set either <code>daemonize</code> or <code>worker_daemonize</code>.</p>
 <p>The config files of all workers are expected to be located in
@@ -8042,8 +8044,8 @@ the provided <code>*.service</code> files accordingly.</p>
 <h2 id="set-up"><a class="header" href="#set-up">Set up</a></h2>
 <ol>
 <li>Adjust synapse configuration files as above.</li>
-<li>Copy the <code>*.service</code> and <code>*.target</code> files in <a href="systemd-with-workers/system">system</a> to
-<code>/etc/systemd/system</code>.</li>
+<li>Copy the <code>*.service</code> and <code>*.target</code> files in <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/">system</a>
+to <code>/etc/systemd/system</code>.</li>
 <li>Run <code>systemctl daemon-reload</code> to tell systemd to load the new unit files.</li>
 <li>Run <code>systemctl enable matrix-synapse.service</code>. This will configure the
 synapse master process to be started as part of the <code>matrix-synapse.target</code>
@@ -8157,14 +8159,14 @@ being deleted.</p>
 <pre><code>POST /_synapse/admin/v1/delete_group/&lt;group_id&gt;
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="show-reported-events"><a class="header" href="#show-reported-events">Show reported events</a></h1>
 <p>This API returns information about reported events.</p>
 <p>The api is:</p>
 <pre><code>GET /_synapse/admin/v1/event_reports?from=0&amp;limit=10
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;event_reports&quot;: [
@@ -8242,7 +8244,7 @@ have a canonical alias set.</li>
 <pre><code>GET /_synapse/admin/v1/event_reports/&lt;report_id&gt;
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-jsonc">{
     &quot;event_id&quot;: &quot;$bNUFCwGzWca1meCGkjp-zwslF-GfVcXukvRLI1_FaVY&quot;,
@@ -8348,7 +8350,7 @@ However, it only shows media from unencrypted events or rooms.</p>
 <pre><code>GET /_synapse/admin/v1/room/&lt;room_id&gt;/media
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>The API returns a JSON body like the following:</p>
 <pre><code class="language-json">{
   &quot;local&quot;: [
@@ -8545,7 +8547,7 @@ All cached media that was last accessed before this timestamp will be removed.</
 <li><code>deleted</code>: integer - The number of media items successfully deleted</li>
 </ul>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="purge-history-api"><a class="header" href="#purge-history-api">Purge History API</a></h1>
@@ -8560,7 +8562,7 @@ delete the last message in a room.</p>
 <pre><code>POST /_synapse/admin/v1/purge_history/&lt;room_id&gt;[/&lt;event_id&gt;]
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>By default, events sent by local users are not deleted, as they may represent
 the only copies of this content in existence. (Events sent by remote users are
 deleted.)</p>
@@ -8692,7 +8694,7 @@ invite users.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>Response:</p>
 <pre><code>{
   &quot;room_id&quot;: &quot;!636q39766251:server.com&quot;
@@ -9091,7 +9093,7 @@ the new room. Users on other servers will be unaffected.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;kicked_users&quot;: [
@@ -9455,7 +9457,7 @@ possibility to filter them by time and user.</p>
 <pre><code>GET /_synapse/admin/v1/statistics/users/media
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code>
-for a server admin: see <a href="admin_api/../../usage/administration/admin_api">Admin API</a>.</p>
+for a server admin: see <a href="admin_api/../usage/administration/admin_api">Admin API</a>.</p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;users&quot;: [
@@ -9531,7 +9533,7 @@ about the user and their local media. Objects contain the following fields:
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;displayname&quot;: &quot;User&quot;,
@@ -9586,7 +9588,7 @@ specific <code>user_id</code>.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>URL parameters:</p>
 <ul>
 <li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
@@ -9627,7 +9629,7 @@ By default, the response is ordered by ascending user ID.</p>
 <pre><code>GET /_synapse/admin/v2/users?from=0&amp;limit=10&amp;guests=false
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;users&quot;: [
@@ -9748,7 +9750,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <p>See also: <a href="https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid">Client Server
 API Whois</a>.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;,
@@ -9791,7 +9793,7 @@ were sent, but hidden from users joining the room afterwards.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>The erase parameter is optional and defaults to <code>false</code>.
 An empty body may be passed for backwards compatibility.</p>
 <p>The following actions are performed when deactivating an user:</p>
@@ -9825,7 +9827,7 @@ is set to <code>true</code>:</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>The parameter <code>new_password</code> is required.
 The parameter <code>logout_devices</code> is optional and defaults to <code>true</code>.</p>
 <h2 id="get-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#get-whether-a-user-is-a-server-administrator-or-not">Get whether a user is a server administrator or not</a></h2>
@@ -9833,7 +9835,7 @@ The parameter <code>logout_devices</code> is optional and defaults to <code>true
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/admin
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;admin&quot;: true
@@ -9850,14 +9852,14 @@ server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <h2 id="list-room-memberships-of-a-user"><a class="header" href="#list-room-memberships-of-a-user">List room memberships of a user</a></h2>
 <p>Gets a list of all <code>room_id</code> that a specific <code>user_id</code> is member.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/joined_rooms
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">    {
         &quot;joined_rooms&quot;: [
@@ -9890,7 +9892,7 @@ The newest media is on top. You can change the order with parameters
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/media
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;media&quot;: [
@@ -10041,7 +10043,7 @@ same.</p>
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;devices&quot;: [
@@ -10103,7 +10105,7 @@ any access token associated with them.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -10120,7 +10122,7 @@ server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices/&lt;device_id&gt;
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;device_id&quot;: &quot;&lt;device_id&gt;&quot;,
@@ -10158,7 +10160,7 @@ devices was last seen. (May be a few minutes out of date, for efficiency reasons
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -10180,7 +10182,7 @@ and invalidates any access token associated with it.</p>
 {}
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -10194,7 +10196,7 @@ server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/pushers
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;pushers&quot;: [
@@ -10291,7 +10293,7 @@ A shadow-banned user will be unable to contact anyone on the server.</p>
 <pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -10307,7 +10309,7 @@ There are specific APIs to set, get and delete a ratelimit.</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;messages_per_second&quot;: 0,
@@ -10336,7 +10338,7 @@ being limited.</li>
 <pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;messages_per_second&quot;: 0,
@@ -10370,7 +10372,7 @@ being limited.</li>
 <pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="admin_api/../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="admin_api/../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <pre><code class="language-json">{}
 </code></pre>
@@ -10509,8 +10511,7 @@ and required <a href="https://github.com/matrix-org/synapse/tree/master/contrib/
 </li>
 </ol>
 <h2 id="monitoring-workers"><a class="header" href="#monitoring-workers">Monitoring workers</a></h2>
-<p>To monitor a Synapse installation using
-<a href="https://github.com/matrix-org/synapse/blob/master/docs/workers.md">workers</a>,
+<p>To monitor a Synapse installation using <a href="workers.html">workers</a>,
 every worker needs to be monitored independently, in addition to
 the main homeserver process. This is because workers don't send
 their metrics to the main homeserver process, but expose them

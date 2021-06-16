@@ -224,7 +224,7 @@ clients.</p>
 <h2 id="server-configuration"><a class="header" href="#server-configuration">Server configuration</a></h2>
 <p>Support for this feature can be enabled and configured in the
 <code>retention</code> section of the Synapse configuration file (see the
-<a href="https://github.com/matrix-org/synapse/blob/v1.7.3/docs/sample_config.yaml#L332-L393">sample file</a>).</p>
+<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample file</a>).</p>
 <p>To enable support for message retention policies, set the setting
 <code>enabled</code> in this section to <code>true</code>.</p>
 <h3 id="default-policy"><a class="header" href="#default-policy">Default policy</a></h3>
@@ -249,7 +249,7 @@ expired events from the database. They are only run if support for
 message retention policies is enabled in the server's configuration. If
 no configuration for purge jobs is configured by the server admin,
 Synapse will use a default configuration, which is described in the
-<a href="https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml#L332-L393">sample configuration file</a>.</p>
+<a href="https://github.com/matrix-org/synapse/blob/v1.36.0/docs/sample_config.yaml#L451-L518">sample configuration file</a>.</p>
 <p>Some server admins might want a finer control on when events are removed
 depending on an event's room's policy. This can be done by setting the
 <code>purge_jobs</code> sub-section in the <code>retention</code> section of the configuration

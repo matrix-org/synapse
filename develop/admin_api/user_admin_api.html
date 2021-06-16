@@ -189,7 +189,7 @@
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;displayname&quot;: &quot;User&quot;,
@@ -244,7 +244,7 @@ specific <code>user_id</code>.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>URL parameters:</p>
 <ul>
 <li><code>user_id</code>: fully-qualified user id: for example, <code>@user:server.com</code>.</li>
@@ -285,7 +285,7 @@ By default, the response is ordered by ascending user ID.</p>
 <pre><code>GET /_synapse/admin/v2/users?from=0&amp;limit=10&amp;guests=false
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;users&quot;: [
@@ -406,7 +406,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <p>See also: <a href="https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid">Client Server
 API Whois</a>.</p>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>It returns a JSON body like the following:</p>
 <pre><code class="language-json">{
     &quot;user_id&quot;: &quot;&lt;user_id&gt;&quot;,
@@ -449,7 +449,7 @@ were sent, but hidden from users joining the room afterwards.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>The erase parameter is optional and defaults to <code>false</code>.
 An empty body may be passed for backwards compatibility.</p>
 <p>The following actions are performed when deactivating an user:</p>
@@ -483,7 +483,7 @@ is set to <code>true</code>:</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>The parameter <code>new_password</code> is required.
 The parameter <code>logout_devices</code> is optional and defaults to <code>true</code>.</p>
 <h2 id="get-whether-a-user-is-a-server-administrator-or-not"><a class="header" href="#get-whether-a-user-is-a-server-administrator-or-not">Get whether a user is a server administrator or not</a></h2>
@@ -491,7 +491,7 @@ The parameter <code>logout_devices</code> is optional and defaults to <code>true
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/admin
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
     &quot;admin&quot;: true
@@ -508,14 +508,14 @@ server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <h2 id="list-room-memberships-of-a-user"><a class="header" href="#list-room-memberships-of-a-user">List room memberships of a user</a></h2>
 <p>Gets a list of all <code>room_id</code> that a specific <code>user_id</code> is member.</p>
 <p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/joined_rooms
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">    {
         &quot;joined_rooms&quot;: [
@@ -548,7 +548,7 @@ The newest media is on top. You can change the order with parameters
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/media
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;media&quot;: [
@@ -699,7 +699,7 @@ same.</p>
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;devices&quot;: [
@@ -761,7 +761,7 @@ any access token associated with them.</p>
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -778,7 +778,7 @@ server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
 <pre><code>GET /_synapse/admin/v2/users/&lt;user_id&gt;/devices/&lt;device_id&gt;
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;device_id&quot;: &quot;&lt;device_id&gt;&quot;,
@@ -816,7 +816,7 @@ devices was last seen. (May be a few minutes out of date, for efficiency reasons
 }
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -838,7 +838,7 @@ and invalidates any access token associated with it.</p>
 {}
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -852,7 +852,7 @@ server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/pushers
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;pushers&quot;: [
@@ -949,7 +949,7 @@ A shadow-banned user will be unable to contact anyone on the server.</p>
 <pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/shadow_ban
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
@@ -965,7 +965,7 @@ There are specific APIs to set, get and delete a ratelimit.</p>
 <pre><code>GET /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;messages_per_second&quot;: 0,
@@ -994,7 +994,7 @@ being limited.</li>
 <pre><code>POST /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;messages_per_second&quot;: 0,
@@ -1028,7 +1028,7 @@ being limited.</li>
 <pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/override_ratelimit
 </code></pre>
 <p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
-server admin: <a href="../../usage/administration/admin_api">Admin API</a></p>
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
 <p>An empty JSON dict is returned.</p>
 <pre><code class="language-json">{}
 </code></pre>
