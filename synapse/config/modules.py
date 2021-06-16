@@ -34,8 +34,7 @@ class ModulesConfig(Config):
         return """
             ## Modules ##
 
-            # Server admins can expand Synapse's functionalities by using external modules
-            # to complement certain operations.
+            # Server admins can expand Synapse's functionality with external modules.
             #
             # See https://matrix-org.github.io/synapse/develop/modules.html for more
             # documentation on how to configure or create custom modules for Synapse.

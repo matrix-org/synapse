@@ -84,7 +84,7 @@ class ModuleApi:
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.
 
-        This function must be called in the __init__ method of the modules using it.
+        This function should be called during initialisation of the module.
 
         If multiple modules register a resource for the same path, the module that
         appears the highest in the configuration file takes priority.

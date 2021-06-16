@@ -1,6 +1,6 @@
 # Modules
 
-Synapse supports extending its functionalities by configuring external modules.
+Synapse supports extending its functionality by configuring external modules.
 
 ## Using modules
 
@@ -78,7 +78,7 @@ Modules can use Synapse's module API to register callbacks. Callbacks are functi
 Synapse will call when performing specific actions. Callbacks can be either asynchronous
 or synchronous, and are split in categories. A single module may implement callbacks from
 multiple categories, and is under no obligation to implement all callbacks from the
-category(ies) it registers callbacks for.
+categories it registers callbacks for.
 
 #### Spam checker callbacks
 
