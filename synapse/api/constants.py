@@ -41,7 +41,7 @@ class Membership:
 
     INVITE = "invite"
     JOIN = "join"
-    KNOCK = "xyz.amorgan.knock"
+    KNOCK = "knock"
     LEAVE = "leave"
     BAN = "ban"
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
@@ -58,7 +58,7 @@ class PresenceState:
 
 class JoinRules:
     PUBLIC = "public"
-    KNOCK = "xyz.amorgan.knock"
+    KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
     # As defined for MSC3083.
@@ -112,8 +112,6 @@ class EventTypes:
 
     SpaceChild = "m.space.child"
     SpaceParent = "m.space.parent"
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
     MSC2716_INSERTION = "org.matrix.msc2716.insertion"
     MSC2716_MARKER = "org.matrix.msc2716.marker"
@@ -183,7 +181,6 @@ class EventContentFields:
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
     # Used on normal messages to indicate they were historically imported after the fact
     MSC2716_HISTORICAL = "org.matrix.msc2716.historical"

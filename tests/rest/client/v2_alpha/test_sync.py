@@ -333,7 +333,7 @@ class SyncKnockTestCase(
         self.room_id = self.helper.create_room_as(
             self.user_id,
             is_public=False,
-            room_version="xyz.amorgan.knock",
+            room_version="7",
             tok=self.tok,
         )
 
@@ -363,7 +363,7 @@ class SyncKnockTestCase(
         # Knock on a room
         channel = self.make_request(
             "POST",
-            "/_matrix/client/unstable/xyz.amorgan.knock/%s" % (self.room_id,),
+            "/_matrix/client/r0/knock/%s" % (self.room_id,),
             b"{}",
             self.knocker_tok,
         )
@@ -371,7 +371,7 @@ class SyncKnockTestCase(
 
         # We expect to see the knock event in the stripped room state later
         self.expected_room_state[EventTypes.Member] = {
-            "content": {"membership": "xyz.amorgan.knock", "displayname": "knocker"},
+            "content": {"membership": "knock", "displayname": "knocker"},
             "state_key": "@knocker:test",
         }
 
@@ -384,7 +384,7 @@ class SyncKnockTestCase(
         self.assertEqual(channel.code, 200, channel.json_body)
 
         # Extract the stripped room state events from /sync
-        knock_entry = channel.json_body["rooms"]["xyz.amorgan.knock"]
+        knock_entry = channel.json_body["rooms"]["knock"]
         room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
 
         # Validate that the knock membership event came last
