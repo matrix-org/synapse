@@ -50,7 +50,7 @@ class PresenceStore(SQLBaseStore):
                 instance_name=self._instance_name,
                 tables=[("presence_stream", "instance_name", "stream_id")],
                 sequence_name="presence_stream_sequence",
-                writers=hs.config.worker.writers.to_device,
+                writers=hs.config.worker.writers.presence,
             )
         else:
             self._presence_id_gen = StreamIdGenerator(

@@ -133,11 +133,16 @@ class Measure:
         self.start = self.clock.time()
         self._logging_context.__enter__()
         in_flight.register((self.name,), self._update_in_flight)
+
+        logger.debug("Entering block %s", self.name)
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.start is None:
             raise RuntimeError("Measure() block exited without being entered")
+
+        logger.debug("Exiting block %s", self.name)
 
         duration = self.clock.time() - self.start
         usage = self.get_resource_usage()

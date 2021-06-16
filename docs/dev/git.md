@@ -122,15 +122,15 @@ So, what counts as a more- or less-stable branch? A little reflection will show
 that our active branches are ordered thus, from more-stable to less-stable:
 
  * `master` (tracks our last release).
- * `release-vX.Y.Z` (the branch where we prepare the next release)<sup
+ * `release-vX.Y` (the branch where we prepare the next release)<sup
    id="a3">[3](#f3)</sup>.
  * PR branches which are targeting the release.
  * `develop` (our "mainline" branch containing our bleeding-edge).
  * regular PR branches.
 
 The corollary is: if you have a bugfix that needs to land in both
-`release-vX.Y.Z` *and* `develop`, then you should base your PR on
-`release-vX.Y.Z`, get it merged there, and then merge from `release-vX.Y.Z` to
+`release-vX.Y` *and* `develop`, then you should base your PR on
+`release-vX.Y`, get it merged there, and then merge from `release-vX.Y` to
 `develop`. (If a fix lands in `develop` and we later need it in a
 release-branch, we can of course cherry-pick it, but landing it in the release
 branch first helps reduce the chance of annoying conflicts.)
@@ -145,4 +145,4 @@ most intuitive name. [^](#a1)
 
 <b id="f3">[3]</b>: Very, very occasionally (I think this has happened once in
 the history of Synapse), we've had two releases in flight at once. Obviously,
-`release-v1.2.3` is more-stable than `release-v1.3.0`. [^](#a3)
+`release-v1.2` is more-stable than `release-v1.3`. [^](#a3)

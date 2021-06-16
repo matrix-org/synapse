@@ -971,6 +971,10 @@ media_store_path: "DATADIR/media_store"
 
 # The largest allowed upload size in bytes
 #
+# If you are using a reverse proxy you may also need to set this value in
+# your reverse proxy's config. Notably Nginx has a small max body size by default.
+# See https://matrix-org.github.io/synapse/develop/reverse_proxy.html.
+#
 #max_upload_size: 50M
 
 # Maximum number of pixels that will be thumbnailed
@@ -2330,6 +2334,10 @@ ui_auth:
     # validation to be re-used.  This weakens the protections afforded by
     # the user-interactive authentication process, by allowing for multiple
     # (and potentially different) operations to use the same validation session.
+    #
+    # This is ignored for potentially "dangerous" operations (including
+    # deactivating an account, modifying an account password, and
+    # adding a 3PID).
     #
     # Uncomment below to allow for credential validation to last for 15
     # seconds.
