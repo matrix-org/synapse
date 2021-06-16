@@ -103,6 +103,10 @@ class AuthConfig(Config):
             # the user-interactive authentication process, by allowing for multiple
             # (and potentially different) operations to use the same validation session.
             #
+            # This is ignored for potentially "dangerous" operations (including
+            # deactivating an account, modifying an account password, and
+            # adding a 3PID).
+            #
             # Uncomment below to allow for credential validation to last for 15
             # seconds.
             #
