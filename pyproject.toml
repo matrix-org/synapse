@@ -35,7 +35,7 @@
         showcontent = true
 
 [tool.black]
-target-version = ['py34']
+target-version = ['py36']
 exclude = '''
 
 (

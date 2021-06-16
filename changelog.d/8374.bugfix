@@ -1,1 +1,0 @@
-Fix theoretical race condition where events are not sent down `/sync` if the synchrotron worker is restarted without restarting other workers.

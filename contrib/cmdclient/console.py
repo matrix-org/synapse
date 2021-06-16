@@ -24,6 +24,7 @@ import sys
 import time
 import urllib
 from http import TwistedHttpClient
+from typing import Optional
 
 import nacl.encoding
 import nacl.signing
@@ -92,7 +93,7 @@ class SynapseCmd(cmd.Cmd):
         return self.config["user"].split(":")[1]
 
     def do_config(self, line):
-        """ Show the config for this client: "config"
+        """Show the config for this client: "config"
         Edit a key value mapping: "config key value" e.g. "config token 1234"
         Config variables:
             user: The username to auth with.
@@ -360,7 +361,7 @@ class SynapseCmd(cmd.Cmd):
             print(e)
 
     def do_topic(self, line):
-        """"topic [set|get] <roomid> [<newtopic>]"
+        """ "topic [set|get] <roomid> [<newtopic>]"
         Set the topic for a room: topic set <roomid> <newtopic>
         Get the topic for a room: topic get <roomid>
         """
@@ -690,7 +691,7 @@ class SynapseCmd(cmd.Cmd):
         self._do_presence_state(2, line)
 
     def _parse(self, line, keys, force_keys=False):
-        """ Parses the given line.
+        """Parses the given line.
 
         Args:
             line : The line to parse
@@ -718,10 +719,10 @@ class SynapseCmd(cmd.Cmd):
         method,
         path,
         data=None,
-        query_params={"access_token": None},
+        query_params: Optional[dict] = None,
         alt_text=None,
     ):
-        """ Runs an HTTP request and pretty prints the output.
+        """Runs an HTTP request and pretty prints the output.
 
         Args:
             method: HTTP method
@@ -729,6 +730,8 @@ class SynapseCmd(cmd.Cmd):
             data: Raw JSON data if any
             query_params: dict of query parameters to add to the url
         """
+        query_params = query_params or {"access_token": None}
+
         url = self._url() + path
         if "access_token" in query_params:
             query_params["access_token"] = self._tok()

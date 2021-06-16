@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,6 +39,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                                     // containing the event
                 "event_format_version": .., // 1,2,3 etc: the event format version
                 "internal_metadata": { .. serialized internal_metadata .. },
+                "outlier": true|false,
                 "rejected_reason": ..,   // The event.rejected_reason field
                 "context": { .. serialized event context .. },
             }],
@@ -62,7 +62,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.clock = hs.get_clock()
-        self.federation_handler = hs.get_handlers().federation_handler
+        self.federation_handler = hs.get_federation_handler()
 
     @staticmethod
     async def _serialize_payload(store, room_id, event_and_contexts, backfilled):
@@ -84,6 +84,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                     "room_version": event.room_version.identifier,
                     "event_format_version": event.format_version,
                     "internal_metadata": event.internal_metadata.get_dict(),
+                    "outlier": event.internal_metadata.is_outlier(),
                     "rejected_reason": event.rejected_reason,
                     "context": serialized_context,
                 }
@@ -116,6 +117,7 @@ class ReplicationFederationSendEventsRestServlet(ReplicationEndpoint):
                 event = make_event_from_dict(
                     event_dict, room_ver, internal_metadata, rejected_reason
                 )
+                event.internal_metadata.outlier = event_payload["outlier"]
 
                 context = EventContext.deserialize(
                     self.storage, event_payload["context"]
@@ -213,8 +215,9 @@ class ReplicationGetQueryRestServlet(ReplicationEndpoint):
             content = parse_json_object_from_request(request)
 
             args = content["args"]
+            args["origin"] = content["origin"]
 
-        logger.info("Got %r query", query_type)
+        logger.info("Got %r query from %s", query_type, args["origin"])
 
         result = await self.registry.on_query(query_type, args)
 
@@ -254,20 +257,20 @@ class ReplicationCleanRoomRestServlet(ReplicationEndpoint):
         return 200, {}
 
 
-class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
+class ReplicationStoreRoomOnOutlierMembershipRestServlet(ReplicationEndpoint):
     """Called to clean up any data in DB for a given room, ready for the
     server to join the room.
 
     Request format:
 
-        POST /_synapse/replication/store_room_on_invite/:room_id/:txn_id
+        POST /_synapse/replication/store_room_on_outlier_membership/:room_id/:txn_id
 
         {
             "room_version": "1",
         }
     """
 
-    NAME = "store_room_on_invite"
+    NAME = "store_room_on_outlier_membership"
     PATH_ARGS = ("room_id",)
 
     def __init__(self, hs):
@@ -282,7 +285,7 @@ class ReplicationStoreRoomOnInviteRestServlet(ReplicationEndpoint):
     async def _handle_request(self, request, room_id):
         content = parse_json_object_from_request(request)
         room_version = KNOWN_ROOM_VERSIONS[content["room_version"]]
-        await self.store.maybe_store_room_on_invite(room_id, room_version)
+        await self.store.maybe_store_room_on_outlier_membership(room_id, room_version)
         return 200, {}
 
 
@@ -291,4 +294,4 @@ def register_servlets(hs, http_server):
     ReplicationFederationSendEduRestServlet(hs).register(http_server)
     ReplicationGetQueryRestServlet(hs).register(http_server)
     ReplicationCleanRoomRestServlet(hs).register(http_server)
-    ReplicationStoreRoomOnInviteRestServlet(hs).register(http_server)
+    ReplicationStoreRoomOnOutlierMembershipRestServlet(hs).register(http_server)

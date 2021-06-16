@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -99,7 +98,7 @@ class RoomDirectoryConfig(Config):
         #
         # Options for the rules include:
         #
-        #   user_id: Matches agaisnt the creator of the alias
+        #   user_id: Matches against the creator of the alias
         #   room_id: Matches against the room ID being published
         #   alias: Matches against any current local or canonical aliases
         #            associated with the room
@@ -123,7 +122,7 @@ class RoomDirectoryConfig(Config):
             alias (str)
 
         Returns:
-            boolean: True if user is allowed to crate the alias
+            boolean: True if user is allowed to create the alias
         """
         for rule in self._alias_creation_rules:
             if rule.matches(user_id, room_id, [alias]):
@@ -180,7 +179,7 @@ class _RoomDirectoryRule:
             self._alias_regex = glob_to_regex(alias)
             self._room_id_regex = glob_to_regex(room_id)
         except Exception as e:
-            raise ConfigError("Failed to parse glob into regex: %s", e)
+            raise ConfigError("Failed to parse glob into regex") from e
 
     def matches(self, user_id, room_id, aliases):
         """Tests if this rule matches the given user_id, room_id and aliases.

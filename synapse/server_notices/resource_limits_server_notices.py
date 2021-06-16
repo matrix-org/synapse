@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import List, Tuple
+from typing import TYPE_CHECKING, List, Tuple
 
 from synapse.api.constants import (
     EventTypes,
@@ -24,24 +23,24 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError, ResourceLimitError, SynapseError
 from synapse.server_notices.server_notices_manager import SERVER_NOTICE_ROOM_TAG
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class ResourceLimitsServerNotices:
-    """ Keeps track of whether the server has reached it's resource limit and
+    """Keeps track of whether the server has reached it's resource limit and
     ensures that the client is kept up to date.
     """
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer):
-        """
+    def __init__(self, hs: "HomeServer"):
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastore()
         self._auth = hs.get_auth()
         self._config = hs.config
         self._resouce_limited = False
+        self._account_data_handler = hs.get_account_data_handler()
         self._message_handler = hs.get_message_handler()
         self._state = hs.get_state_handler()
 
@@ -177,7 +176,7 @@ class ResourceLimitsServerNotices:
                 # tag already present, nothing to do here
                 need_to_set_tag = False
         if need_to_set_tag:
-            max_id = await self._store.add_tag_to_room(
+            max_id = await self._account_data_handler.add_tag_to_room(
                 user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
             )
             self._notifier.on_new_event("account_data_key", max_id, users=[user_id])

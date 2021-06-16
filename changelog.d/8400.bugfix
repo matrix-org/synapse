@@ -1,1 +1,0 @@
-Fix incorrect handling of timeouts on outgoing HTTP requests.

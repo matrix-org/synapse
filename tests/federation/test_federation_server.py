@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Matrix.org Federation C.I.C
 #
@@ -46,12 +45,11 @@ class FederationServerTests(unittest.FederatingHomeserverTestCase):
 
         "/get_missing_events/(?P<room_id>[^/]*)/?"
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/federation/v1/get_missing_events/%s" % (room_1,),
             query_content,
         )
-        self.render(request)
         self.assertEquals(400, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_JSON")
 
@@ -76,6 +74,25 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertFalse(server_matches_acl_event("[1:2::]", e))
         self.assertTrue(server_matches_acl_event("1:2:3:4", e))
 
+    def test_wildcard_matching(self):
+        e = _create_acl_event({"allow": ["good*.com"]})
+        self.assertTrue(
+            server_matches_acl_event("good.com", e),
+            "* matches 0 characters",
+        )
+        self.assertTrue(
+            server_matches_acl_event("GOOD.COM", e),
+            "pattern is case-insensitive",
+        )
+        self.assertTrue(
+            server_matches_acl_event("good.aa.com", e),
+            "* matches several characters, including '.'",
+        )
+        self.assertFalse(
+            server_matches_acl_event("ishgood.com", e),
+            "pattern does not allow prefixes",
+        )
+
 
 class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
@@ -96,10 +113,9 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
         self.inject_room_member(room_1, "@user:other.example.com", "join")
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         self.assertEqual(
@@ -129,10 +145,9 @@ class StateQueryTests(unittest.FederatingHomeserverTestCase):
 
         room_1 = self.helper.create_room_as(u1, tok=u1_token)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/_matrix/federation/v1/state/%s" % (room_1,)
         )
-        self.render(request)
         self.assertEquals(403, channel.code, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_FORBIDDEN")
 

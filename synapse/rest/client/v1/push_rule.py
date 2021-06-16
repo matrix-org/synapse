@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -154,9 +153,6 @@ class PushRuleRestServlet(RestServlet):
             return 200, result
         else:
             raise UnrecognizedRequestError()
-
-    def on_OPTIONS(self, request, path):
-        return 200, {}
 
     def notify_user(self, user_id):
         stream_id = self.store.get_max_push_rules_stream_id()

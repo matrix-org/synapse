@@ -12,12 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
 from synapse.rest.client.v1 import directory, login, profile, room
 from synapse.rest.client.v2_alpha import room_upgrade_rest_servlet
+from synapse.types import UserID
 
 from tests import unittest
 
@@ -31,12 +32,7 @@ class _ShadowBannedBase(unittest.HomeserverTestCase):
         self.store = self.hs.get_datastore()
 
         self.get_success(
-            self.store.db_pool.simple_update(
-                table="users",
-                keyvalues={"name": self.banned_user_id},
-                updatevalues={"shadow_banned": True},
-                desc="shadow_ban",
-            )
+            self.store.set_shadow_banned(UserID.from_string(self.banned_user_id), True)
         )
 
         self.other_user_id = self.register_user("otheruser", "pass")
@@ -78,7 +74,7 @@ class RoomTestCase(_ShadowBannedBase):
 
     def test_invite_3pid(self):
         """Ensure that a 3PID invite does not attempt to contact the identity server."""
-        identity_handler = self.hs.get_handlers().identity_handler
+        identity_handler = self.hs.get_identity_handler()
         identity_handler.lookup_3pid = Mock(
             side_effect=AssertionError("This should not get called")
         )
@@ -89,13 +85,12 @@ class RoomTestCase(_ShadowBannedBase):
         )
 
         # Inviting the user completes successfully.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/rooms/%s/invite" % (room_id,),
             {"id_server": "test", "medium": "email", "address": "test@test.test"},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
 
         # This should have raised an error earlier, but double check this wasn't called.
@@ -104,13 +99,12 @@ class RoomTestCase(_ShadowBannedBase):
     def test_create_room(self):
         """Invitations during a room creation should be discarded, but the room still gets created."""
         # The room creation is successful.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/createRoom",
             {"visibility": "public", "invite": [self.other_user_id]},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         room_id = channel.json_body["room_id"]
 
@@ -160,13 +154,12 @@ class RoomTestCase(_ShadowBannedBase):
             self.banned_user_id, tok=self.banned_access_token
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/%s/upgrade" % (room_id,),
             {"new_version": "6"},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         # A new room_id should be returned.
         self.assertIn("replacement_room", channel.json_body)
@@ -186,13 +179,12 @@ class RoomTestCase(_ShadowBannedBase):
             self.banned_user_id, tok=self.banned_access_token
         )
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (room_id, self.banned_user_id),
             {"typing": True, "timeout": 30000},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # There should be no typing events.
@@ -202,13 +194,12 @@ class RoomTestCase(_ShadowBannedBase):
         # The other user can join and send typing events.
         self.helper.join(room_id, self.other_user_id, tok=self.other_access_token)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/typing/%s" % (room_id, self.other_user_id),
             {"typing": True, "timeout": 30000},
             access_token=self.other_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code)
 
         # These appear in the room.
@@ -249,21 +240,19 @@ class ProfileTestCase(_ShadowBannedBase):
         )
 
         # The update should succeed.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/profile/%s/displayname" % (self.banned_user_id,),
             {"displayname": new_display_name},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertEqual(channel.json_body, {})
 
         # The user's display name should be updated.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET", "/profile/%s/displayname" % (self.banned_user_id,)
         )
-        self.render(request)
         self.assertEqual(channel.code, 200, channel.result)
         self.assertEqual(channel.json_body["displayname"], new_display_name)
 
@@ -271,7 +260,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(
@@ -289,14 +281,13 @@ class ProfileTestCase(_ShadowBannedBase):
         )
 
         # The update should succeed.
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/_matrix/client/r0/rooms/%s/state/m.room.member/%s"
             % (room_id, self.banned_user_id),
             {"membership": "join", "displayname": new_display_name},
             access_token=self.banned_access_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.result)
         self.assertIn("event_id", channel.json_body)
 
@@ -304,7 +295,10 @@ class ProfileTestCase(_ShadowBannedBase):
         message_handler = self.hs.get_message_handler()
         event = self.get_success(
             message_handler.get_room_data(
-                self.banned_user_id, room_id, "m.room.member", self.banned_user_id,
+                self.banned_user_id,
+                room_id,
+                "m.room.member",
+                self.banned_user_id,
             )
         )
         self.assertEqual(

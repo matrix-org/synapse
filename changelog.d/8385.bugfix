@@ -1,1 +1,0 @@
-Fix a bug which could cause errors in rooms with malformed membership events, on servers using sqlite.

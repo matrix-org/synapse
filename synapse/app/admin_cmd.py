@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -37,7 +36,6 @@ from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.groups import SlavedGroupServerStore
-from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
@@ -55,7 +53,6 @@ class AdminCmdSlavedStore(
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedFilteringStore,
-    SlavedPresenceStore,
     SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
@@ -71,12 +68,6 @@ class AdminCmdSlavedStore(
 class AdminCmdServer(HomeServer):
     DATASTORE_CLASS = AdminCmdSlavedStore
 
-    def _listen_http(self, listener_config):
-        pass
-
-    def start_listening(self, listeners):
-        pass
-
 
 async def export_data_command(hs, args):
     """Export data for a user.
@@ -89,7 +80,7 @@ async def export_data_command(hs, args):
     user_id = args.user_id
     directory = args.output_directory
 
-    res = await hs.get_handlers().admin_handler.export_user_data(
+    res = await hs.get_admin_handler().export_user_data(
         user_id, FileExfiltrationWriter(user_id, directory=directory)
     )
     print(res)
@@ -208,8 +199,11 @@ def start(config_options):
 
     # Explicitly disable background processes
     config.update_user_directory = False
+    config.run_background_tasks = False
     config.start_pushers = False
+    config.pusher_shard_config.instances = []
     config.send_federation = False
+    config.federation_shard_config.instances = []
 
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
@@ -230,7 +224,7 @@ def start(config_options):
 
     async def run():
         with LoggingContext("command"):
-            _base.start(ss, [])
+            _base.start(ss)
             await args.func(ss, args)
 
     _base.start_worker_reactor(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,13 +14,25 @@
 
 """Contains *incomplete* type hints for txredisapi.
 """
+from typing import Any, List, Optional, Type, Union
 
-from typing import List, Optional, Union
+from twisted.internet import protocol
 
-class RedisProtocol:
+class RedisProtocol(protocol.Protocol):
     def publish(self, channel: str, message: bytes): ...
+    async def ping(self) -> None: ...
+    async def set(
+        self,
+        key: str,
+        value: Any,
+        expire: Optional[int] = None,
+        pexpire: Optional[int] = None,
+        only_if_not_exists: bool = False,
+        only_if_exists: bool = False,
+    ) -> None: ...
+    async def get(self, key: str) -> Any: ...
 
-class SubscriberProtocol:
+class SubscriberProtocol(RedisProtocol):
     def __init__(self, *args, **kwargs): ...
     password: Optional[str]
     def subscribe(self, channels: Union[str, List[str]]): ...
@@ -40,5 +51,26 @@ def lazyConnection(
     convertNumbers: bool = ...,
 ) -> RedisProtocol: ...
 
-class SubscriberFactory:
-    def buildProtocol(self, addr): ...
+class ConnectionHandler: ...
+
+class RedisFactory(protocol.ReconnectingClientFactory):
+    continueTrying: bool
+    handler: RedisProtocol
+    pool: List[RedisProtocol]
+    replyTimeout: Optional[int]
+    def __init__(
+        self,
+        uuid: str,
+        dbid: Optional[int],
+        poolsize: int,
+        isLazy: bool = False,
+        handler: Type = ConnectionHandler,
+        charset: str = "utf-8",
+        password: Optional[str] = None,
+        replyTimeout: Optional[int] = None,
+        convertNumbers: Optional[int] = True,
+    ): ...
+    def buildProtocol(self, addr) -> RedisProtocol: ...
+
+class SubscriberFactory(RedisFactory):
+    def __init__(self): ...

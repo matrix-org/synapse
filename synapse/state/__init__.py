@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -20,8 +19,10 @@ from typing import (
     Any,
     Awaitable,
     Callable,
+    Collection,
     DefaultDict,
     Dict,
+    FrozenSet,
     Iterable,
     List,
     Optional,
@@ -46,7 +47,7 @@ from synapse.logging.utils import log_function
 from synapse.state import v1, v2
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import Collection, StateMap
+from synapse.types import StateMap
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import Measure, measure_func
@@ -212,10 +213,15 @@ class StateHandler:
         return ret.state
 
     async def get_current_users_in_room(
-        self, room_id: str, latest_event_ids: Optional[List[str]] = None
+        self, room_id: str, latest_event_ids: List[str]
     ) -> Dict[str, ProfileInfo]:
         """
         Get the users who are currently in a room.
+
+        Note: This is much slower than using the equivalent method
+        `DataStore.get_users_in_room` or `DataStore.get_users_in_room_with_profiles`,
+        so this should only be used when wanting the users at a particular point
+        in the room.
 
         Args:
             room_id: The ID of the room.
@@ -223,8 +229,7 @@ class StateHandler:
         Returns:
             Dictionary of user IDs to their profileinfo.
         """
-        if not latest_event_ids:
-            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+
         assert latest_event_ids is not None
 
         logger.debug("calling resolve_state_groups from get_current_users_in_room")
@@ -310,6 +315,7 @@ class StateHandler:
             state_group_before_event = None
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
+            entry = None
 
         else:
             # otherwise, we'll need to resolve the state across the prev_events.
@@ -340,9 +346,13 @@ class StateHandler:
                 current_state_ids=state_ids_before_event,
             )
 
-            # XXX: can we update the state cache entry for the new state group? or
-            # could we set a flag on resolve_state_groups_for_events to tell it to
-            # always make a state group?
+            # Assign the new state group to the cached state entry.
+            #
+            # Note that this can race in that we could generate multiple state
+            # groups for the same state entry, but that is just inefficient
+            # rather than dangerous.
+            if entry and entry.state_group is None:
+                entry.state_group = state_group_before_event
 
         #
         # now if it's not a state event, we're done
@@ -393,7 +403,7 @@ class StateHandler:
     async def resolve_state_groups_for_events(
         self, room_id: str, event_ids: Iterable[str]
     ) -> _StateCacheEntry:
-        """ Given a list of event_ids this method fetches the state at each
+        """Given a list of event_ids this method fetches the state at each
         event, resolves conflicts between them and returns them.
 
         Args:
@@ -510,7 +520,7 @@ class StateResolutionHandler:
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             iterable=True,
             reset_expiry_on_get=True,
-        )
+        )  # type: ExpiringCache[FrozenSet[int], _StateCacheEntry]
 
         #
         # stuff for tracking time spent on state-res by room
@@ -531,7 +541,7 @@ class StateResolutionHandler:
         state_groups_ids: Dict[int, StateMap[str]],
         event_map: Optional[Dict[str, EventBase]],
         state_res_store: "StateResolutionStore",
-    ):
+    ) -> _StateCacheEntry:
         """Resolves conflicts between a set of state groups
 
         Always generates a new state group (unless we hit the cache), so should
@@ -547,7 +557,7 @@ class StateResolutionHandler:
             event_map:
                 a dict from event_id to event, for any events that we happen to
                 have in flight (eg, those currently being persisted). This will be
-                used as a starting point fof finding the state we need; any missing
+                used as a starting point for finding the state we need; any missing
                 events will be requested via state_res_store.
 
                 If None, all events will be fetched via state_res_store.
@@ -565,7 +575,9 @@ class StateResolutionHandler:
                 return cache
 
             logger.info(
-                "Resolving state for %s with groups %s", room_id, list(group_names),
+                "Resolving state for %s with groups %s",
+                room_id,
+                list(group_names),
             )
 
             state_groups_histogram.observe(len(state_groups_ids))
@@ -610,7 +622,7 @@ class StateResolutionHandler:
             event_map:
                 a dict from event_id to event, for any events that we happen to
                 have in flight (eg, those currently being persisted). This will be
-                used as a starting point fof finding the state we need; any missing
+                used as a starting point for finding the state we need; any missing
                 events will be requested via state_map_factory.
 
                 If None, all events will be fetched via state_res_store.
@@ -651,11 +663,15 @@ class StateResolutionHandler:
             return
 
         self._report_biggest(
-            lambda i: i.cpu_time, "CPU time", _biggest_room_by_cpu_counter,
+            lambda i: i.cpu_time,
+            "CPU time",
+            _biggest_room_by_cpu_counter,
         )
 
         self._report_biggest(
-            lambda i: i.db_time, "DB time", _biggest_room_by_db_counter,
+            lambda i: i.db_time,
+            "DB time",
+            _biggest_room_by_db_counter,
         )
 
         self._state_res_metrics.clear()
@@ -783,7 +799,7 @@ class StateResolutionStore:
         )
 
     def get_auth_chain_difference(
-        self, state_sets: List[Set[str]]
+        self, room_id: str, state_sets: List[Set[str]]
     ) -> Awaitable[Set[str]]:
         """Given sets of state events figure out the auth chain difference (as
         per state res v2 algorithm).
@@ -796,4 +812,4 @@ class StateResolutionStore:
             An awaitable that resolves to a set of event IDs.
         """
 
-        return self.store.get_auth_chain_difference(state_sets)
+        return self.store.get_auth_chain_difference(room_id, state_sets)

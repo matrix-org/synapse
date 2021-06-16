@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,15 +19,12 @@ from tests import unittest
 
 
 class HealthCheckTests(unittest.HomeserverTestCase):
-    def setUp(self):
-        super().setUp()
-
+    def create_test_resource(self):
         # replace the JsonResource with a HealthResource.
-        self.resource = HealthResource()
+        return HealthResource()
 
     def test_health(self):
-        request, channel = self.make_request("GET", "/health", shorthand=False)
-        self.render(request)
+        channel = self.make_request("GET", "/health", shorthand=False)
 
-        self.assertEqual(request.code, 200)
+        self.assertEqual(channel.code, 200)
         self.assertEqual(channel.result["body"], b"OK")

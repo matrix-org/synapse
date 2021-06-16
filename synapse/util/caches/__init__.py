@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019, 2020 The Matrix.org Foundation C.I.C.
 #
@@ -16,7 +15,7 @@
 
 import logging
 from sys import intern
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Sized
 
 import attr
 from prometheus_client.core import Gauge
@@ -25,14 +24,24 @@ from synapse.config.cache import add_resizable_cache
 
 logger = logging.getLogger(__name__)
 
-caches_by_name = {}
-collectors_by_name = {}  # type: Dict
+
+# Whether to track estimated memory usage of the LruCaches.
+TRACK_MEMORY_USAGE = False
+
+
+caches_by_name = {}  # type: Dict[str, Sized]
+collectors_by_name = {}  # type: Dict[str, CacheMetric]
 
 cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])
 cache_evicted = Gauge("synapse_util_caches_cache:evicted_size", "", ["name"])
 cache_total = Gauge("synapse_util_caches_cache:total", "", ["name"])
 cache_max_size = Gauge("synapse_util_caches_cache_max_size", "", ["name"])
+cache_memory_usage = Gauge(
+    "synapse_util_caches_cache_size_bytes",
+    "Estimated memory usage of the caches",
+    ["name"],
+)
 
 response_cache_size = Gauge("synapse_util_caches_response_cache:size", "", ["name"])
 response_cache_hits = Gauge("synapse_util_caches_response_cache:hits", "", ["name"])
@@ -53,6 +62,7 @@ class CacheMetric:
     hits = attr.ib(default=0)
     misses = attr.ib(default=0)
     evicted_size = attr.ib(default=0)
+    memory_usage = attr.ib(default=None)
 
     def inc_hits(self):
         self.hits += 1
@@ -62,6 +72,19 @@ class CacheMetric:
 
     def inc_evictions(self, size=1):
         self.evicted_size += size
+
+    def inc_memory_usage(self, memory: int):
+        if self.memory_usage is None:
+            self.memory_usage = 0
+
+        self.memory_usage += memory
+
+    def dec_memory_usage(self, memory: int):
+        self.memory_usage -= memory
+
+    def clear_memory_usage(self):
+        if self.memory_usage is not None:
+            self.memory_usage = 0
 
     def describe(self):
         return []
@@ -82,6 +105,13 @@ class CacheMetric:
                 cache_total.labels(self._cache_name).set(self.hits + self.misses)
                 if getattr(self._cache, "max_size", None):
                     cache_max_size.labels(self._cache_name).set(self._cache.max_size)
+
+                if TRACK_MEMORY_USAGE:
+                    # self.memory_usage can be None if nothing has been inserted
+                    # into the cache yet.
+                    cache_memory_usage.labels(self._cache_name).set(
+                        self.memory_usage or 0
+                    )
             if self._collect_callback:
                 self._collect_callback()
         except Exception as e:
@@ -92,7 +122,7 @@ class CacheMetric:
 def register_cache(
     cache_type: str,
     cache_name: str,
-    cache,
+    cache: Sized,
     collect_callback: Optional[Callable] = None,
     resizable: bool = True,
     resize_callback: Optional[Callable] = None,
@@ -100,12 +130,15 @@ def register_cache(
     """Register a cache object for metric collection and resizing.
 
     Args:
-        cache_type
+        cache_type: a string indicating the "type" of the cache. This is used
+            only for deduplication so isn't too important provided it's constant.
         cache_name: name of the cache
-        cache: cache itself
+        cache: cache itself, which must implement __len__(), and may optionally implement
+             a max_size property
         collect_callback: If given, a function which is called during metric
             collection to update additional metrics.
-        resizable: Whether this cache supports being resized.
+        resizable: Whether this cache supports being resized, in which case either
+            resize_callback must be provided, or the cache must support set_max_size().
         resize_callback: A function which can be called to resize the cache.
 
     Returns:
@@ -113,7 +146,7 @@ def register_cache(
     """
     if resizable:
         if not resize_callback:
-            resize_callback = getattr(cache, "set_cache_factor")
+            resize_callback = cache.set_cache_factor  # type: ignore
         add_resizable_cache(cache_name, resize_callback)
 
     metric = CacheMetric(cache, cache_type, cache_name, collect_callback)
@@ -146,8 +179,7 @@ KNOWN_KEYS = {
 
 
 def intern_string(string):
-    """Takes a (potentially) unicode string and interns it if it's ascii
-    """
+    """Takes a (potentially) unicode string and interns it if it's ascii"""
     if string is None:
         return None
 
@@ -158,8 +190,7 @@ def intern_string(string):
 
 
 def intern_dict(dictionary):
-    """Takes a dictionary and interns well known keys and their values
-    """
+    """Takes a dictionary and interns well known keys and their values"""
     return {
         KNOWN_KEYS.get(key, key): _intern_known_values(key, value)
         for key, value in dictionary.items()

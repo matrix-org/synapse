@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -42,14 +41,13 @@ class ClientDirectoryServer(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
+        self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_alias):
         room_alias = RoomAlias.from_string(room_alias)
 
-        dir_handler = self.handlers.directory_handler
-        res = await dir_handler.get_association(room_alias)
+        res = await self.directory_handler.get_association(room_alias)
 
         return 200, res
 
@@ -79,19 +77,19 @@ class ClientDirectoryServer(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
 
-        await self.handlers.directory_handler.create_association(
+        await self.directory_handler.create_association(
             requester, room_alias, room_id, servers
         )
 
         return 200, {}
 
     async def on_DELETE(self, request, room_alias):
-        dir_handler = self.handlers.directory_handler
-
         try:
             service = self.auth.get_appservice_by_req(request)
             room_alias = RoomAlias.from_string(room_alias)
-            await dir_handler.delete_appservice_association(service, room_alias)
+            await self.directory_handler.delete_appservice_association(
+                service, room_alias
+            )
             logger.info(
                 "Application service at %s deleted alias %s",
                 service.url,
@@ -107,7 +105,7 @@ class ClientDirectoryServer(RestServlet):
 
         room_alias = RoomAlias.from_string(room_alias)
 
-        await dir_handler.delete_association(requester, room_alias)
+        await self.directory_handler.delete_association(requester, room_alias)
 
         logger.info(
             "User %s deleted alias %s", user.to_string(), room_alias.to_string()
@@ -122,7 +120,7 @@ class ClientDirectoryListServer(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
+        self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, room_id):
@@ -138,7 +136,7 @@ class ClientDirectoryListServer(RestServlet):
         content = parse_json_object_from_request(request)
         visibility = content.get("visibility", "public")
 
-        await self.handlers.directory_handler.edit_published_room_list(
+        await self.directory_handler.edit_published_room_list(
             requester, room_id, visibility
         )
 
@@ -147,7 +145,7 @@ class ClientDirectoryListServer(RestServlet):
     async def on_DELETE(self, request, room_id):
         requester = await self.auth.get_user_by_req(request)
 
-        await self.handlers.directory_handler.edit_published_room_list(
+        await self.directory_handler.edit_published_room_list(
             requester, room_id, "private"
         )
 
@@ -162,7 +160,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
     def __init__(self, hs):
         super().__init__()
         self.store = hs.get_datastore()
-        self.handlers = hs.get_handlers()
+        self.directory_handler = hs.get_directory_handler()
         self.auth = hs.get_auth()
 
     def on_PUT(self, request, network_id, room_id):
@@ -180,7 +178,7 @@ class ClientAppserviceDirectoryListServer(RestServlet):
                 403, "Only appservices can edit the appservice published room list"
             )
 
-        await self.handlers.directory_handler.edit_published_appservice_room_list(
+        await self.directory_handler.edit_published_appservice_room_list(
             requester.app_service.id, network_id, room_id, visibility
         )
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet.defer import succeed
 
 from synapse.api.errors import FederationError
 from synapse.events import make_event_from_dict
 from synapse.logging.context import LoggingContext
-from synapse.types import Requester, UserID
+from synapse.types import UserID, create_requester
 from synapse.util import Clock
 from synapse.util.retryutils import NotRetryingDestination
 
@@ -37,13 +36,13 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
         self.hs_clock = Clock(self.reactor)
         self.homeserver = setup_test_homeserver(
             self.addCleanup,
-            http_client=self.http_client,
+            federation_http_client=self.http_client,
             clock=self.hs_clock,
             reactor=self.reactor,
         )
 
         user_id = UserID("us", "test")
-        our_user = Requester(user_id, None, False, False, None, None)
+        our_user = create_requester(user_id)
         room_creator = self.homeserver.get_room_creation_handler()
         self.room_id = self.get_success(
             room_creator.create_room(
@@ -75,9 +74,11 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        self.handler = self.homeserver.get_handlers().federation_handler
-        self.handler.do_auth = lambda origin, event, context, auth_events: succeed(
-            context
+        self.handler = self.homeserver.get_federation_handler()
+        self.handler._check_event_auth = (
+            lambda origin, event, context, state, auth_events, backfilled: succeed(
+                context
+            )
         )
         self.client = self.homeserver.get_federation_client()
         self.client._check_sigs_and_hash_and_fetch = lambda dest, pdus, **k: succeed(
@@ -134,7 +135,7 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
-        with LoggingContext(request="lying_event"):
+        with LoggingContext("test-context"):
             failure = self.get_failure(
                 self.handler.on_receive_pdu(
                     "test.serv", lying_event, sent_to_us_directly=True

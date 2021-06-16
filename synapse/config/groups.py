@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,5 +31,5 @@ class GroupsConfig(Config):
         # If enabled, non server admins can only create groups with local parts
         # starting with this prefix
         #
-        #group_creation_prefix: "unofficial/"
+        #group_creation_prefix: "unofficial_"
         """

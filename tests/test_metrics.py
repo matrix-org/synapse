@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
@@ -15,13 +14,13 @@
 # limitations under the License.
 
 from synapse.metrics import REGISTRY, InFlightGauge, generate_latest
-from synapse.util.caches.descriptors import Cache
+from synapse.util.caches.deferred_cache import DeferredCache
 
 from tests import unittest
 
 
 def get_sample_labels_value(sample):
-    """ Extract the labels and values of a sample.
+    """Extract the labels and values of a sample.
 
     prometheus_client 0.5 changed the sample type to a named tuple with more
     members than the plain tuple had in 0.4 and earlier. This function can
@@ -138,7 +137,7 @@ class CacheMetricsTests(unittest.HomeserverTestCase):
         Caches produce metrics reflecting their state when scraped.
         """
         CACHE_NAME = "cache_metrics_test_fgjkbdfg"
-        cache = Cache(CACHE_NAME, max_entries=777)
+        cache = DeferredCache(CACHE_NAME, max_entries=777)
 
         items = {
             x.split(b"{")[0].decode("ascii"): x.split(b" ")[1].decode("ascii")

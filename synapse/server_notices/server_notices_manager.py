@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,10 +34,12 @@ class ServerNoticesManager:
 
         self._store = hs.get_datastore()
         self._config = hs.config
+        self._account_data_handler = hs.get_account_data_handler()
         self._room_creation_handler = hs.get_room_creation_handler()
         self._room_member_handler = hs.get_room_member_handler()
         self._event_creation_handler = hs.get_event_creation_handler()
         self._is_mine_id = hs.is_mine_id
+        self._server_name = hs.hostname
 
         self._notifier = hs.get_notifier()
         self.server_notices_mxid = self._config.server_notices_mxid
@@ -56,7 +57,7 @@ class ServerNoticesManager:
         user_id: str,
         event_content: dict,
         type: str = EventTypes.Message,
-        state_key: Optional[bool] = None,
+        state_key: Optional[str] = None,
     ) -> EventBase:
         """Send a notice to the given user
 
@@ -72,7 +73,9 @@ class ServerNoticesManager:
         await self.maybe_invite_user_to_room(user_id, room_id)
 
         system_mxid = self._config.server_notices_mxid
-        requester = create_requester(system_mxid)
+        requester = create_requester(
+            system_mxid, authenticated_entity=self._server_name
+        )
 
         logger.info("Sending server notice to %s", user_id)
 
@@ -119,7 +122,7 @@ class ServerNoticesManager:
             # manages to invite the system user to a room, that doesn't make it
             # the server notices room.
             user_ids = await self._store.get_users_in_room(room.room_id)
-            if self.server_notices_mxid in user_ids:
+            if len(user_ids) <= 2 and self.server_notices_mxid in user_ids:
                 # we found a room which our user shares with the system notice
                 # user
                 logger.info(
@@ -145,7 +148,9 @@ class ServerNoticesManager:
                 "avatar_url": self._config.server_notices_mxid_avatar_url,
             }
 
-        requester = create_requester(self.server_notices_mxid)
+        requester = create_requester(
+            self.server_notices_mxid, authenticated_entity=self._server_name
+        )
         info, _ = await self._room_creation_handler.create_room(
             requester,
             config={
@@ -158,7 +163,7 @@ class ServerNoticesManager:
         )
         room_id = info["room_id"]
 
-        max_id = await self._store.add_tag_to_room(
+        max_id = await self._account_data_handler.add_tag_to_room(
             user_id, room_id, SERVER_NOTICE_ROOM_TAG, {}
         )
         self._notifier.on_new_event("account_data_key", max_id, users=[user_id])
@@ -174,7 +179,9 @@ class ServerNoticesManager:
             user_id: The ID of the user to invite.
             room_id: The ID of the room to invite the user to.
         """
-        requester = create_requester(self.server_notices_mxid)
+        requester = create_requester(
+            self.server_notices_mxid, authenticated_entity=self._server_name
+        )
 
         # Check whether the user has already joined or been invited to this room. If
         # that's the case, there is no need to re-invite them.

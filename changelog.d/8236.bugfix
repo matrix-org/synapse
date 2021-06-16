@@ -1,1 +1,0 @@
-Fix a longstanding bug where files that could not be thumbnailed would result in an Internal Server Error.

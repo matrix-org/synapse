@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014, 2015 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +16,7 @@ import os
 from collections import namedtuple
 from typing import Dict, List
 
+from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
@@ -51,7 +51,7 @@ MediaStorageProviderConfig = namedtuple(
 
 
 def parse_thumbnail_requirements(thumbnail_sizes):
-    """ Takes a list of dictionaries with "width", "height", and "method" keys
+    """Takes a list of dictionaries with "width", "height", and "method" keys
     and creates a map from image media types to the thumbnail size, thumbnailing
     method, and thumbnail media type to precalculate
 
@@ -70,6 +70,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         jpeg_thumbnail = ThumbnailRequirement(width, height, method, "image/jpeg")
         png_thumbnail = ThumbnailRequirement(width, height, method, "image/png")
         requirements.setdefault("image/jpeg", []).append(jpeg_thumbnail)
+        requirements.setdefault("image/jpg", []).append(jpeg_thumbnail)
         requirements.setdefault("image/webp", []).append(jpeg_thumbnail)
         requirements.setdefault("image/gif", []).append(png_thumbnail)
         requirements.setdefault("image/png", []).append(png_thumbnail)
@@ -100,7 +101,7 @@ class ContentRepositoryConfig(Config):
             "media_instance_running_background_jobs",
         )
 
-        self.max_upload_size = self.parse_size(config.get("max_upload_size", "10M"))
+        self.max_upload_size = self.parse_size(config.get("max_upload_size", "50M"))
         self.max_image_pixels = self.parse_size(config.get("max_image_pixels", "32M"))
         self.max_spider_size = self.parse_size(config.get("max_spider_size", "10M"))
 
@@ -142,7 +143,7 @@ class ContentRepositoryConfig(Config):
         # them to be started.
         self.media_storage_providers = []  # type: List[tuple]
 
-        for provider_config in storage_providers:
+        for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to
             # expose FileStorageProviderBackend
             if provider_config["module"] == "file_system":
@@ -151,7 +152,9 @@ class ContentRepositoryConfig(Config):
                     ".FileStorageProviderBackend"
                 )
 
-            provider_class, parsed_config = load_module(provider_config)
+            provider_class, parsed_config = load_module(
+                provider_config, ("media_storage_providers", "<item %i>" % i)
+            )
 
             wrapper_config = MediaStorageProviderConfig(
                 provider_config.get("store_local", False),
@@ -173,7 +176,9 @@ class ContentRepositoryConfig(Config):
                 check_requirements("url_preview")
 
             except DependencyException as e:
-                raise ConfigError(e.message)
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
             if "url_preview_ip_range_blacklist" not in config:
                 raise ConfigError(
@@ -182,19 +187,17 @@ class ContentRepositoryConfig(Config):
                     "to work"
                 )
 
-            # netaddr is a dependency for url_preview
-            from netaddr import IPSet
-
-            self.url_preview_ip_range_blacklist = IPSet(
-                config["url_preview_ip_range_blacklist"]
-            )
-
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
-            self.url_preview_ip_range_blacklist.update(["0.0.0.0", "::"])
+            self.url_preview_ip_range_blacklist = generate_ip_set(
+                config["url_preview_ip_range_blacklist"],
+                ["0.0.0.0", "::"],
+                config_path=("url_preview_ip_range_blacklist",),
+            )
 
-            self.url_preview_ip_range_whitelist = IPSet(
-                config.get("url_preview_ip_range_whitelist", ())
+            self.url_preview_ip_range_whitelist = generate_ip_set(
+                config.get("url_preview_ip_range_whitelist", ()),
+                config_path=("url_preview_ip_range_whitelist",),
             )
 
             self.url_preview_url_blacklist = config.get("url_preview_url_blacklist", ())
@@ -205,13 +208,16 @@ class ContentRepositoryConfig(Config):
 
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
-        uploads_path = os.path.join(data_dir_path, "uploads")
 
         formatted_thumbnail_sizes = "".join(
             THUMBNAIL_SIZE_YAML % s for s in DEFAULT_THUMBNAIL_SIZES
         )
         # strip final NL
         formatted_thumbnail_sizes = formatted_thumbnail_sizes[:-1]
+
+        ip_range_blacklist = "\n".join(
+            "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
+        )
 
         return (
             r"""
@@ -242,7 +248,11 @@ class ContentRepositoryConfig(Config):
 
         # The largest allowed upload size in bytes
         #
-        #max_upload_size: 10M
+        # If you are using a reverse proxy you may also need to set this value in
+        # your reverse proxy's config. Notably Nginx has a small max body size by default.
+        # See https://matrix-org.github.io/synapse/develop/reverse_proxy.html.
+        #
+        #max_upload_size: 50M
 
         # Maximum number of pixels that will be thumbnailed
         #
@@ -283,15 +293,7 @@ class ContentRepositoryConfig(Config):
         # you uncomment the following list as a starting point.
         #
         #url_preview_ip_range_blacklist:
-        #  - '127.0.0.0/8'
-        #  - '10.0.0.0/8'
-        #  - '172.16.0.0/12'
-        #  - '192.168.0.0/16'
-        #  - '100.64.0.0/10'
-        #  - '169.254.0.0/16'
-        #  - '::1/128'
-        #  - 'fe80::/64'
-        #  - 'fc00::/7'
+%(ip_range_blacklist)s
 
         # List of IP address CIDR ranges that the URL preview spider is allowed
         # to access even if they are specified in url_preview_ip_range_blacklist.

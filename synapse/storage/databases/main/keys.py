@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd.
 #
@@ -22,6 +21,7 @@ from signedjson.key import decode_verify_key_bytes
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.keys import FetchKeyResult
+from synapse.storage.types import Cursor
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.iterutils import batch_iter
 
@@ -32,8 +32,7 @@ db_binary_type = memoryview
 
 
 class KeyStore(SQLBaseStore):
-    """Persistence for signature verification keys
-    """
+    """Persistence for signature verification keys"""
 
     @cached()
     def _get_server_verify_key(self, server_name_and_key_id):
@@ -44,7 +43,7 @@ class KeyStore(SQLBaseStore):
     )
     async def get_server_verify_keys(
         self, server_name_and_key_ids: Iterable[Tuple[str, str]]
-    ) -> Dict[Tuple[str, str], Optional[FetchKeyResult]]:
+    ) -> Dict[Tuple[str, str], FetchKeyResult]:
         """
         Args:
             server_name_and_key_ids:
@@ -56,7 +55,7 @@ class KeyStore(SQLBaseStore):
         """
         keys = {}
 
-        def _get_keys(txn, batch):
+        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str], ...]) -> None:
             """Processes a batch of keys to fetch, and adds the result to `keys`."""
 
             # batch_iter always returns tuples so it's safe to do len(batch)
@@ -77,13 +76,12 @@ class KeyStore(SQLBaseStore):
                     # `ts_valid_until_ms`.
                     ts_valid_until_ms = 0
 
-                res = FetchKeyResult(
+                keys[(server_name, key_id)] = FetchKeyResult(
                     verify_key=decode_verify_key_bytes(key_id, bytes(key_bytes)),
                     valid_until_ts=ts_valid_until_ms,
                 )
-                keys[(server_name, key_id)] = res
 
-        def _txn(txn):
+        def _txn(txn: Cursor) -> Dict[Tuple[str, str], FetchKeyResult]:
             for batch in batch_iter(server_name_and_key_ids, 50):
                 _get_keys(txn, batch)
             return keys
@@ -122,9 +120,7 @@ class KeyStore(SQLBaseStore):
             # param, which is itself the 2-tuple (server_name, key_id).
             invalidations.append((server_name, key_id))
 
-        await self.db_pool.runInteraction(
-            "store_server_verify_keys",
-            self.db_pool.simple_upsert_many_txn,
+        await self.db_pool.simple_upsert_many(
             table="server_signature_keys",
             key_names=("server_name", "key_id"),
             key_values=key_values,
@@ -135,6 +131,7 @@ class KeyStore(SQLBaseStore):
                 "verify_key",
             ),
             value_values=value_values,
+            desc="store_server_verify_keys",
         )
 
         invalidate = self._get_server_verify_key.invalidate
@@ -156,7 +153,7 @@ class KeyStore(SQLBaseStore):
         (server_name, key_id, from_server) triplet if one already existed.
         Args:
             server_name: The name of the server.
-            key_id: The identifer of the key this JSON is for.
+            key_id: The identifier of the key this JSON is for.
             from_server: The server this JSON was fetched from.
             ts_now_ms: The time now in milliseconds.
             ts_valid_until_ms: The time when this json stops being valid.
@@ -183,7 +180,7 @@ class KeyStore(SQLBaseStore):
     async def get_server_keys_json(
         self, server_keys: Iterable[Tuple[str, Optional[str], Optional[str]]]
     ) -> Dict[Tuple[str, Optional[str], Optional[str]], List[dict]]:
-        """Retrive the key json for a list of server_keys and key ids.
+        """Retrieve the key json for a list of server_keys and key ids.
         If no keys are found for a given server, key_id and source then
         that server, key_id, and source triplet entry will be an empty list.
         The JSON is returned as a byte array so that it can be efficiently

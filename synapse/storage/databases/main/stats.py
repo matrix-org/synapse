@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018, 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -15,16 +14,20 @@
 # limitations under the License.
 
 import logging
-from collections import Counter
+from enum import Enum
 from itertools import chain
 from typing import Any, Dict, List, Optional, Tuple
+
+from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
 from synapse.api.constants import EventTypes, Membership
+from synapse.api.errors import StoreError
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine
+from synapse.types import JsonDict
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
@@ -38,6 +41,7 @@ ABSOLUTE_STATS_FIELDS = {
         "current_state_events",
         "joined_members",
         "invited_members",
+        "knocked_members",
         "left_members",
         "banned_members",
         "local_users_in_room",
@@ -57,6 +61,42 @@ TYPE_TO_TABLE = {"room": ("room_stats", "room_id"), "user": ("user_stats", "user
 
 # these are the tables (& ID columns) which contain our actual subjects
 TYPE_TO_ORIGIN_TABLE = {"room": ("rooms", "room_id"), "user": ("users", "name")}
+
+
+class UserSortOrder(Enum):
+    """
+    Enum to define the sorting method used when returning users
+    with get_users_paginate in __init__.py
+    and get_users_media_usage_paginate in stats.py
+
+    When moves this to __init__.py gets `builtins.ImportError` with
+    `most likely due to a circular import`
+
+    MEDIA_LENGTH = ordered by size of uploaded media.
+    MEDIA_COUNT = ordered by number of uploaded media.
+    USER_ID = ordered alphabetically by `user_id`.
+    NAME = ordered alphabetically by `user_id`. This is for compatibility reasons,
+    as the user_id is returned in the name field in the response in list users admin API.
+    DISPLAYNAME = ordered alphabetically by `displayname`
+    GUEST = ordered by `is_guest`
+    ADMIN = ordered by `admin`
+    DEACTIVATED = ordered by `deactivated`
+    USER_TYPE = ordered alphabetically by `user_type`
+    AVATAR_URL = ordered alphabetically by `avatar_url`
+    SHADOW_BANNED = ordered by `shadow_banned`
+    """
+
+    MEDIA_LENGTH = "media_length"
+    MEDIA_COUNT = "media_count"
+    USER_ID = "user_id"
+    NAME = "name"
+    DISPLAYNAME = "displayname"
+    GUEST = "is_guest"
+    ADMIN = "admin"
+    DEACTIVATED = "deactivated"
+    USER_TYPE = "user_type"
+    AVATAR_URL = "avatar_url"
+    SHADOW_BANNED = "shadow_banned"
 
 
 class StatsStore(StateDeltasStore):
@@ -299,7 +339,9 @@ class StatsStore(StateDeltasStore):
         return slice_list
 
     @cached()
-    async def get_earliest_token_for_stats(self, stats_type: str, id: str) -> int:
+    async def get_earliest_token_for_stats(
+        self, stats_type: str, id: str
+    ) -> Optional[int]:
         """
         Fetch the "earliest token". This is used by the room stats delta
         processor to ignore deltas that have been processed between the
@@ -319,7 +361,7 @@ class StatsStore(StateDeltasStore):
         )
 
     async def bulk_update_stats_delta(
-        self, ts: int, updates: Dict[str, Dict[str, Dict[str, Counter]]], stream_id: int
+        self, ts: int, updates: Dict[str, Dict[str, Counter[str]]], stream_id: int
     ) -> None:
         """Bulk update stats tables for a given stream_id and updates the stats
         incremental position.
@@ -645,7 +687,7 @@ class StatsStore(StateDeltasStore):
 
     async def get_changes_room_total_events_and_bytes(
         self, min_pos: int, max_pos: int
-    ) -> Dict[str, Dict[str, int]]:
+    ) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
         """Fetches the counts of events in the given range of stream IDs.
 
         Args:
@@ -663,18 +705,19 @@ class StatsStore(StateDeltasStore):
             max_pos,
         )
 
-    def get_changes_room_total_events_and_bytes_txn(self, txn, low_pos, high_pos):
+    def get_changes_room_total_events_and_bytes_txn(
+        self, txn, low_pos: int, high_pos: int
+    ) -> Tuple[Dict[str, Dict[str, int]], Dict[str, Dict[str, int]]]:
         """Gets the total_events and total_event_bytes counts for rooms and
         senders, in a range of stream_orderings (including backfilled events).
 
         Args:
             txn
-            low_pos (int): Low stream ordering
-            high_pos (int): High stream ordering
+            low_pos: Low stream ordering
+            high_pos: High stream ordering
 
         Returns:
-            tuple[dict[str, dict[str, int]], dict[str, dict[str, int]]]: The
-            room and user deltas for total_events/total_event_bytes in the
+            The room and user deltas for total_events/total_event_bytes in the
             format of `stats_id` -> fields
         """
 
@@ -881,4 +924,113 @@ class StatsStore(StateDeltasStore):
             fields={},
             complete_with_stream_id=pos,
             absolute_field_overrides={"joined_rooms": joined_rooms},
+        )
+
+    async def get_users_media_usage_paginate(
+        self,
+        start: int,
+        limit: int,
+        from_ts: Optional[int] = None,
+        until_ts: Optional[int] = None,
+        order_by: Optional[UserSortOrder] = UserSortOrder.USER_ID.value,
+        direction: Optional[str] = "f",
+        search_term: Optional[str] = None,
+    ) -> Tuple[List[JsonDict], Dict[str, int]]:
+        """Function to retrieve a paginated list of users and their uploaded local media
+        (size and number). This will return a json list of users and the
+        total number of users matching the filter criteria.
+
+        Args:
+            start: offset to begin the query from
+            limit: number of rows to retrieve
+            from_ts: request only media that are created later than this timestamp (ms)
+            until_ts: request only media that are created earlier than this timestamp (ms)
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
+            search_term: a string to filter user names by
+        Returns:
+            A list of user dicts and an integer representing the total number of
+            users that exist given this query
+        """
+
+        def get_users_media_usage_paginate_txn(txn):
+            filters = []
+            args = [self.hs.config.server_name]
+
+            if search_term:
+                filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")
+                args.extend(["@%" + search_term + "%:%", "%" + search_term + "%"])
+
+            if from_ts:
+                filters.append("created_ts >= ?")
+                args.extend([from_ts])
+            if until_ts:
+                filters.append("created_ts <= ?")
+                args.extend([until_ts])
+
+            # Set ordering
+            if UserSortOrder(order_by) == UserSortOrder.MEDIA_LENGTH:
+                order_by_column = "media_length"
+            elif UserSortOrder(order_by) == UserSortOrder.MEDIA_COUNT:
+                order_by_column = "media_count"
+            elif UserSortOrder(order_by) == UserSortOrder.USER_ID:
+                order_by_column = "lmr.user_id"
+            elif UserSortOrder(order_by) == UserSortOrder.DISPLAYNAME:
+                order_by_column = "displayname"
+            else:
+                raise StoreError(
+                    500, "Incorrect value for order_by provided: %s" % order_by
+                )
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
+
+            where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
+
+            sql_base = """
+                FROM local_media_repository as lmr
+                LEFT JOIN profiles AS p ON lmr.user_id = '@' || p.user_id || ':' || ?
+                {}
+                GROUP BY lmr.user_id, displayname
+            """.format(
+                where_clause
+            )
+
+            # SQLite does not support SELECT COUNT(*) OVER()
+            sql = """
+                SELECT COUNT(*) FROM (
+                    SELECT lmr.user_id
+                    {sql_base}
+                ) AS count_user_ids
+            """.format(
+                sql_base=sql_base,
+            )
+            txn.execute(sql, args)
+            count = txn.fetchone()[0]
+
+            sql = """
+                SELECT
+                    lmr.user_id,
+                    displayname,
+                    COUNT(lmr.user_id) as media_count,
+                    SUM(media_length) as media_length
+                    {sql_base}
+                ORDER BY {order_by_column} {order}
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
+            )
+
+            args += [limit, start]
+            txn.execute(sql, args)
+            users = self.db_pool.cursor_to_dict(txn)
+
+            return users, count
+
+        return await self.db_pool.runInteraction(
+            "get_users_media_usage_paginate_txn", get_users_media_usage_paginate_txn
         )

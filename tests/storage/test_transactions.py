@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.storage.databases.main.transactions import DestinationRetryTimings
 from synapse.util.retryutils import MAX_RETRY_INTERVAL
 
 from tests.unittest import HomeserverTestCase
@@ -37,8 +37,11 @@ class TransactionStoreTestCase(HomeserverTestCase):
         d = self.store.get_destination_retry_timings("example.com")
         r = self.get_success(d)
 
-        self.assert_dict(
-            {"retry_last_ts": 50, "retry_interval": 100, "failure_ts": 1000}, r
+        self.assertEqual(
+            DestinationRetryTimings(
+                retry_last_ts=50, retry_interval=100, failure_ts=1000
+            ),
+            r,
         )
 
     def test_initial_set_transactions(self):

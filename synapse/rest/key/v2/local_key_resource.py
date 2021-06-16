@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -49,11 +48,6 @@ class LocalKey(Resource):
                     "key": # base64 encoded NACL verification key.
                 }
             },
-            "tls_fingerprints": [ # Fingerprints of the TLS certs this server uses.
-                {
-                    "sha256": # base64 encoded sha256 fingerprint of the X509 cert
-                },
-            ],
             "signatures": {
                 "this.server.example.com": {
                    "algorithm:version": # NACL signature for this server
@@ -66,7 +60,7 @@ class LocalKey(Resource):
 
     def __init__(self, hs):
         self.config = hs.config
-        self.clock = hs.clock
+        self.clock = hs.get_clock()
         self.update_response_body(self.clock.time_msec())
         Resource.__init__(self)
 
@@ -90,14 +84,11 @@ class LocalKey(Resource):
                 "expired_ts": key.expired_ts,
             }
 
-        tls_fingerprints = self.config.tls_fingerprints
-
         json_object = {
             "valid_until_ts": self.valid_until_ts,
             "server_name": self.config.server_name,
             "verify_keys": verify_keys,
             "old_verify_keys": old_verify_keys,
-            "tls_fingerprints": tls_fingerprints,
         }
         for key in self.config.signing_key:
             json_object = sign_json(json_object, self.config.server_name, key)

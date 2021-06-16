@@ -1,1 +1,0 @@
-Fix a bug which cause the logging system to report errors, if `DEBUG` was enabled and no `context` filter was applied.

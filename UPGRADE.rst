@@ -5,6 +5,16 @@ Before upgrading check if any special steps are required to upgrade from the
 version you currently have installed to the current version of Synapse. The extra
 instructions that may be required are listed later in this document.
 
+* Check that your versions of Python and PostgreSQL are still supported.
+
+  Synapse follows upstream lifecycles for `Python`_ and `PostgreSQL`_, and
+  removes support for versions which are no longer maintained.
+
+  The website https://endoflife.date also offers convenient summaries.
+
+  .. _Python: https://devguide.python.org/devcycle/#end-of-life-branches
+  .. _PostgreSQL: https://www.postgresql.org/support/versioning/
+
 * If Synapse was installed using `prebuilt packages
   <INSTALL.md#prebuilt-packages>`_, you will need to follow the normal process
   for upgrading those packages.
@@ -74,6 +84,349 @@ for example:
      # replace `1.3.0` and `stretch` accordingly:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
+
+Upgrading to v1.34.0
+====================
+
+``room_invite_state_types`` configuration setting
+-----------------------------------------------
+
+The ``room_invite_state_types`` configuration setting has been deprecated and
+replaced with ``room_prejoin_state``. See the `sample configuration file <https://github.com/matrix-org/synapse/blob/v1.34.0/docs/sample_config.yaml#L1515>`_.
+
+If you have set ``room_invite_state_types`` to the default value you should simply
+remove it from your configuration file. The default value used to be:
+
+.. code:: yaml
+
+   room_invite_state_types:
+      - "m.room.join_rules"
+      - "m.room.canonical_alias"
+      - "m.room.avatar"
+      - "m.room.encryption"
+      - "m.room.name"
+
+If you have customised this value, you should remove ``room_invite_state_types`` and
+configure ``room_prejoin_state`` instead.
+
+
+
+Upgrading to v1.33.0
+====================
+
+Account Validity HTML templates can now display a user's expiration date
+------------------------------------------------------------------------
+
+This may affect you if you have enabled the account validity feature, and have made use of a
+custom HTML template specified by the ``account_validity.template_dir`` or ``account_validity.account_renewed_html_path``
+Synapse config options.
+
+The template can now accept an ``expiration_ts`` variable, which represents the unix timestamp in milliseconds for the
+future date of which their account has been renewed until. See the
+`default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`_
+for an example of usage.
+
+ALso note that a new HTML template, ``account_previously_renewed.html``, has been added. This is is shown to users
+when they attempt to renew their account with a valid renewal token that has already been used before. The default
+template contents can been found
+`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_,
+and can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see
+upon attempting to use a valid renewal token more than once.
+
+
+Upgrading to v1.32.0
+====================
+
+Regression causing connected Prometheus instances to become overwhelmed
+-----------------------------------------------------------------------
+
+This release introduces `a regression <https://github.com/matrix-org/synapse/issues/9853>`_
+that can overwhelm connected Prometheus instances. This issue is not present in
+Synapse v1.32.0rc1.
+
+If you have been affected, please downgrade to 1.31.0. You then may need to
+remove excess writeahead logs in order for Prometheus to recover. Instructions
+for doing so are provided
+`here <https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183>`_.
+
+Dropping support for old Python, Postgres and SQLite versions
+-------------------------------------------------------------
+
+In line with our `deprecation policy <https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md>`_,
+we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no longer supported upstream.
+
+This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or SQLite 3.22+.
+
+Removal of old List Accounts Admin API
+--------------------------------------
+
+The deprecated v1 "list accounts" admin API (``GET /_synapse/admin/v1/users/<user_id>``) has been removed in this version.
+
+The `v2 list accounts API <https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts>`_
+has been available since Synapse 1.7.0 (2019-12-13), and is accessible under ``GET /_synapse/admin/v2/users``.
+
+The deprecation of the old endpoint was announced with Synapse 1.28.0 (released on 2021-02-25).
+
+Application Services must use type ``m.login.application_service`` when registering users
+-----------------------------------------------------------------------------------------
+
+In compliance with the
+`Application Service spec <https://matrix.org/docs/spec/application_service/r0.1.2#server-admin-style-permissions>`_,
+Application Services are now required to use the ``m.login.application_service`` type when registering users via the
+``/_matrix/client/r0/register`` endpoint. This behaviour was deprecated in Synapse v1.30.0.
+
+Please ensure your Application Services are up to date.
+
+Upgrading to v1.29.0
+====================
+
+Requirement for X-Forwarded-Proto header
+----------------------------------------
+
+When using Synapse with a reverse proxy (in particular, when using the
+`x_forwarded` option on an HTTP listener), Synapse now expects to receive an
+`X-Forwarded-Proto` header on incoming HTTP requests. If it is not set, Synapse
+will log a warning on each received request.
+
+To avoid the warning, administrators using a reverse proxy should ensure that
+the reverse proxy sets `X-Forwarded-Proto` header to `https` or `http` to
+indicate the protocol used by the client.
+
+Synapse also requires the `Host` header to be preserved.
+
+See the `reverse proxy documentation <docs/reverse_proxy.md>`_, where the
+example configurations have been updated to show how to set these headers.
+
+(Users of `Caddy <https://caddyserver.com/>`_ are unaffected, since we believe it
+sets `X-Forwarded-Proto` by default.)
+
+Upgrading to v1.27.0
+====================
+
+Changes to callback URI for OAuth2 / OpenID Connect and SAML2
+-------------------------------------------------------------
+
+This version changes the URI used for callbacks from OAuth2 and SAML2 identity providers:
+
+* If your server is configured for single sign-on via an OpenID Connect or OAuth2 identity
+  provider, you will need to add ``[synapse public baseurl]/_synapse/client/oidc/callback``
+  to the list of permitted "redirect URIs" at the identity provider.
+
+  See `docs/openid.md <docs/openid.md>`_ for more information on setting up OpenID
+  Connect.
+
+* If your server is configured for single sign-on via a SAML2 identity provider, you will
+  need to add ``[synapse public baseurl]/_synapse/client/saml2/authn_response`` as a permitted
+  "ACS location" (also known as "allowed callback URLs") at the identity provider.
+
+  The "Issuer" in the "AuthnRequest" to the SAML2 identity provider is also updated to
+  ``[synapse public baseurl]/_synapse/client/saml2/metadata.xml``. If your SAML2 identity
+  provider uses this property to validate or otherwise identify Synapse, its configuration
+  will need to be updated to use the new URL. Alternatively you could create a new, separate
+  "EntityDescriptor" in your SAML2 identity provider with the new URLs and leave the URLs in
+  the existing "EntityDescriptor" as they were.
+
+Changes to HTML templates
+-------------------------
+
+The HTML templates for SSO and email notifications now have `Jinja2's autoescape <https://jinja.palletsprojects.com/en/2.11.x/api/#autoescaping>`_
+enabled for files ending in ``.html``, ``.htm``, and ``.xml``. If you have customised
+these templates and see issues when viewing them you might need to update them.
+It is expected that most configurations will need no changes.
+
+If you have customised the templates *names* for these templates, it is recommended
+to verify they end in ``.html`` to ensure autoescape is enabled.
+
+The above applies to the following templates:
+
+* ``add_threepid.html``
+* ``add_threepid_failure.html``
+* ``add_threepid_success.html``
+* ``notice_expiry.html``
+* ``notice_expiry.html``
+* ``notif_mail.html`` (which, by default, includes ``room.html`` and ``notif.html``)
+* ``password_reset.html``
+* ``password_reset_confirmation.html``
+* ``password_reset_failure.html``
+* ``password_reset_success.html``
+* ``registration.html``
+* ``registration_failure.html``
+* ``registration_success.html``
+* ``sso_account_deactivated.html``
+* ``sso_auth_bad_user.html``
+* ``sso_auth_confirm.html``
+* ``sso_auth_success.html``
+* ``sso_error.html``
+* ``sso_login_idp_picker.html``
+* ``sso_redirect_confirm.html``
+
+Upgrading to v1.26.0
+====================
+
+Rolling back to v1.25.0 after a failed upgrade
+----------------------------------------------
+
+v1.26.0 includes a lot of large changes. If something problematic occurs, you
+may want to roll-back to a previous version of Synapse. Because v1.26.0 also
+includes a new database schema version, reverting that version is also required
+alongside the generic rollback instructions mentioned above. In short, to roll
+back to v1.25.0 you need to:
+
+1. Stop the server
+2. Decrease the schema version in the database:
+
+   .. code:: sql
+
+      UPDATE schema_version SET version = 58;
+
+3. Delete the ignored users & chain cover data:
+
+   .. code:: sql
+
+      DROP TABLE IF EXISTS ignored_users;
+      UPDATE rooms SET has_auth_chain_index = false;
+
+   For PostgreSQL run:
+
+   .. code:: sql
+
+      TRUNCATE event_auth_chain_links;
+      TRUNCATE event_auth_chains;
+
+   For SQLite run:
+
+   .. code:: sql
+
+      DELETE FROM event_auth_chain_links;
+      DELETE FROM event_auth_chains;
+
+4. Mark the deltas as not run (so they will re-run on upgrade).
+
+   .. code:: sql
+
+      DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/01ignored_user.py";
+      DELETE FROM applied_schema_deltas WHERE version = 59 AND file = "59/06chain_cover_index.sql";
+
+5. Downgrade Synapse by following the instructions for your installation method
+   in the "Rolling back to older versions" section above.
+
+Upgrading to v1.25.0
+====================
+
+Last release supporting Python 3.5
+----------------------------------
+
+This is the last release of Synapse which guarantees support with Python 3.5,
+which passed its upstream End of Life date several months ago.
+
+We will attempt to maintain support through March 2021, but without guarantees.
+
+In the future, Synapse will follow upstream schedules for ending support of
+older versions of Python and PostgreSQL. Please upgrade to at least Python 3.6
+and PostgreSQL 9.6 as soon as possible.
+
+Blacklisting IP ranges
+----------------------
+
+Synapse v1.25.0 includes new settings, ``ip_range_blacklist`` and
+``ip_range_whitelist``, for controlling outgoing requests from Synapse for federation,
+identity servers, push, and for checking key validity for third-party invite events.
+The previous setting, ``federation_ip_range_blacklist``, is deprecated. The new
+``ip_range_blacklist`` defaults to private IP ranges if it is not defined.
+
+If you have never customised ``federation_ip_range_blacklist`` it is recommended
+that you remove that setting.
+
+If you have customised ``federation_ip_range_blacklist`` you should update the
+setting name to ``ip_range_blacklist``.
+
+If you have a custom push server that is reached via private IP space you may
+need to customise ``ip_range_blacklist`` or ``ip_range_whitelist``.
+
+Upgrading to v1.24.0
+====================
+
+Custom OpenID Connect mapping provider breaking change
+------------------------------------------------------
+
+This release allows the OpenID Connect mapping provider to perform normalisation
+of the localpart of the Matrix ID. This allows for the mapping provider to
+specify different algorithms, instead of the [default way](https://matrix.org/docs/spec/appendices#mapping-from-other-character-sets).
+
+If your Synapse configuration uses a custom mapping provider
+(`oidc_config.user_mapping_provider.module` is specified and not equal to
+`synapse.handlers.oidc_handler.JinjaOidcMappingProvider`) then you *must* ensure
+that `map_user_attributes` of the mapping provider performs some normalisation
+of the `localpart` returned. To match previous behaviour you can use the
+`map_username_to_mxid_localpart` function provided by Synapse. An example is
+shown below:
+
+.. code-block:: python
+
+  from synapse.types import map_username_to_mxid_localpart
+
+  class MyMappingProvider:
+      def map_user_attributes(self, userinfo, token):
+          # ... your custom logic ...
+          sso_user_id = ...
+          localpart = map_username_to_mxid_localpart(sso_user_id)
+
+          return {"localpart": localpart}
+
+Removal historical Synapse Admin API
+------------------------------------
+
+Historically, the Synapse Admin API has been accessible under:
+
+* ``/_matrix/client/api/v1/admin``
+* ``/_matrix/client/unstable/admin``
+* ``/_matrix/client/r0/admin``
+* ``/_synapse/admin/v1``
+
+The endpoints with ``/_matrix/client/*`` prefixes have been removed as of v1.24.0.
+The Admin API is now only accessible under:
+
+* ``/_synapse/admin/v1``
+
+The only exception is the `/admin/whois` endpoint, which is
+`also available via the client-server API <https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid>`_.
+
+The deprecation of the old endpoints was announced with Synapse 1.20.0 (released
+on 2020-09-22) and makes it easier for homeserver admins to lock down external
+access to the Admin API endpoints.
+
+Upgrading to v1.23.0
+====================
+
+Structured logging configuration breaking changes
+-------------------------------------------------
+
+This release deprecates use of the ``structured: true`` logging configuration for
+structured logging. If your logging configuration contains ``structured: true``
+then it should be modified based on the `structured logging documentation
+<https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md>`_.
+
+The ``structured`` and ``drains`` logging options are now deprecated and should
+be replaced by standard logging configuration of ``handlers`` and ``formatters``.
+
+A future will release of Synapse will make using ``structured: true`` an error.
+
+Upgrading to v1.22.0
+====================
+
+ThirdPartyEventRules breaking changes
+-------------------------------------
+
+This release introduces a backwards-incompatible change to modules making use of
+``ThirdPartyEventRules`` in Synapse. If you make use of a module defined under the
+``third_party_event_rules`` config option, please make sure it is updated to handle
+the below change:
+
+The ``http_client`` argument is no longer passed to modules as they are initialised. Instead,
+modules are expected to make use of the ``http_client`` property on the ``ModuleApi`` class.
+Modules are now passed a ``module_api`` argument during initialisation, which is an instance of
+``ModuleApi``. ``ModuleApi`` instances have a ``http_client`` property which acts the same as
+the ``http_client`` argument previously passed to ``ThirdPartyEventRules`` modules.
 
 Upgrading to v1.21.0
 ====================

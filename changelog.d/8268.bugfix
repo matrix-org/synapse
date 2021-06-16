@@ -1,1 +1,0 @@
-Fix stack overflow when stderr is redirected to the logging system, and the logging system encounters an error.

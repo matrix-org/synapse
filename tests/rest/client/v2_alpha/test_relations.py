@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +15,7 @@
 import itertools
 import json
 import urllib
+from typing import Optional
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
@@ -39,6 +39,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         # We need to enable msc1849 support for aggregations
         config = self.default_config()
         config["experimental_msc1849_support_enabled"] = True
+
+        # We enable frozen dicts as relations/edits change event contents, so we
+        # want to test that we don't modify the events in the caches.
+        config["use_frozen_dicts"] = True
+
         return self.setup_test_homeserver(config=config)
 
     def prepare(self, reactor, clock, hs):
@@ -60,12 +65,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         event_id = channel.json_body["event_id"]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/event/%s" % (self.room, event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assert_dict(
@@ -84,14 +88,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_deny_membership(self):
-        """Test that we deny relations on membership events
-        """
+        """Test that we deny relations on membership events"""
         channel = self._send_relation(RelationTypes.ANNOTATION, EventTypes.Member)
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_deny_double_react(self):
-        """Test that we deny relations on membership events
-        """
+        """Test that we deny relations on membership events"""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", key="a")
         self.assertEquals(200, channel.code, channel.json_body)
 
@@ -99,8 +101,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_basic_paginate_relations(self):
-        """Tests that calling pagination API correctly the latest relations.
-        """
+        """Tests that calling pagination API correctly the latest relations."""
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction")
         self.assertEquals(200, channel.code, channel.json_body)
 
@@ -108,13 +109,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         annotation_id = channel.json_body["event_id"]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/relations/%s?limit=1"
             % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # We expect to get back a single pagination result, which is the full
@@ -154,13 +154,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             if prev_token:
                 from_token = "&from=" + prev_token
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
                 "/_matrix/client/unstable/rooms/%s/relations/%s?limit=1%s"
                 % (self.room, self.parent_id, from_token),
                 access_token=self.user_token,
             )
-            self.render(request)
             self.assertEquals(200, channel.code, channel.json_body)
 
             found_event_ids.extend(e["event_id"] for e in channel.json_body["chunk"])
@@ -177,8 +176,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(found_event_ids, expected_event_ids)
 
     def test_aggregation_pagination_groups(self):
-        """Test that we can paginate annotation groups correctly.
-        """
+        """Test that we can paginate annotation groups correctly."""
 
         # We need to create ten separate users to send each reaction.
         access_tokens = [self.user_token, self.user2_token]
@@ -213,13 +211,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             if prev_token:
                 from_token = "&from=" + prev_token
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
                 "/_matrix/client/unstable/rooms/%s/aggregations/%s?limit=1%s"
                 % (self.room, self.parent_id, from_token),
                 access_token=self.user_token,
             )
-            self.render(request)
             self.assertEquals(200, channel.code, channel.json_body)
 
             self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
@@ -244,8 +241,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(sent_groups, found_groups)
 
     def test_aggregation_pagination_within_group(self):
-        """Test that we can paginate within an annotation group.
-        """
+        """Test that we can paginate within an annotation group."""
 
         # We need to create ten separate users to send each reaction.
         access_tokens = [self.user_token, self.user2_token]
@@ -283,7 +279,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             if prev_token:
                 from_token = "&from=" + prev_token
 
-            request, channel = self.make_request(
+            channel = self.make_request(
                 "GET",
                 "/_matrix/client/unstable/rooms/%s"
                 "/aggregations/%s/%s/m.reaction/%s?limit=1%s"
@@ -296,7 +292,6 @@ class RelationsTestCase(unittest.HomeserverTestCase):
                 ),
                 access_token=self.user_token,
             )
-            self.render(request)
             self.assertEquals(200, channel.code, channel.json_body)
 
             self.assertEqual(len(channel.json_body["chunk"]), 1, channel.json_body)
@@ -316,8 +311,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(found_event_ids, expected_event_ids)
 
     def test_aggregation(self):
-        """Test that annotations get correctly aggregated.
-        """
+        """Test that annotations get correctly aggregated."""
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
@@ -330,13 +324,12 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "b")
         self.assertEquals(200, channel.code, channel.json_body)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/aggregations/%s"
             % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(
@@ -350,8 +343,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_aggregation_redactions(self):
-        """Test that annotations get correctly aggregated after a redaction.
-        """
+        """Test that annotations get correctly aggregated after a redaction."""
 
         channel = self._send_relation(RelationTypes.ANNOTATION, "m.reaction", "a")
         self.assertEquals(200, channel.code, channel.json_body)
@@ -363,22 +355,20 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Now lets redact one of the 'a' reactions
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/r0/rooms/%s/redact/%s" % (self.room, to_redact_event_id),
             access_token=self.user_token,
             content={},
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/aggregations/%s"
             % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(
@@ -387,16 +377,14 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_aggregation_must_be_annotation(self):
-        """Test that aggregations must be annotations.
-        """
+        """Test that aggregations must be annotations."""
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/aggregations/%s/%s?limit=1"
             % (self.room, self.parent_id, RelationTypes.REPLACE),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(400, channel.code, channel.json_body)
 
     def test_aggregation_get_event(self):
@@ -423,12 +411,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
         reply_2 = channel.json_body["event_id"]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(
@@ -447,8 +434,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_edit(self):
-        """Test that a simple edit works.
-        """
+        """Test that a simple edit works."""
 
         new_body = {"msgtype": "m.text", "body": "I've been edited!"}
         channel = self._send_relation(
@@ -460,12 +446,11 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         edit_event_id = channel.json_body["event_id"]
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(channel.json_body["content"], new_body)
@@ -518,16 +503,72 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(200, channel.code, channel.json_body)
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/rooms/%s/event/%s" % (self.room, self.parent_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertEquals(channel.json_body["content"], new_body)
 
+        relations_dict = channel.json_body["unsigned"].get("m.relations")
+        self.assertIn(RelationTypes.REPLACE, relations_dict)
+
+        m_replace_dict = relations_dict[RelationTypes.REPLACE]
+        for key in ["event_id", "sender", "origin_server_ts"]:
+            self.assertIn(key, m_replace_dict)
+
+        self.assert_dict(
+            {"event_id": edit_event_id, "sender": self.user_id}, m_replace_dict
+        )
+
+    def test_edit_reply(self):
+        """Test that editing a reply works."""
+
+        # Create a reply to edit.
+        channel = self._send_relation(
+            RelationTypes.REFERENCE,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "A reply!"},
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+        reply = channel.json_body["event_id"]
+
+        new_body = {"msgtype": "m.text", "body": "I've been edited!"}
+        channel = self._send_relation(
+            RelationTypes.REPLACE,
+            "m.room.message",
+            content={"msgtype": "m.text", "body": "foo", "m.new_content": new_body},
+            parent_id=reply,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        edit_event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/rooms/%s/event/%s" % (self.room, reply),
+            access_token=self.user_token,
+        )
+        self.assertEquals(200, channel.code, channel.json_body)
+
+        # We expect to see the new body in the dict, as well as the reference
+        # metadata sill intact.
+        self.assertDictContainsSubset(new_body, channel.json_body["content"])
+        self.assertDictContainsSubset(
+            {
+                "m.relates_to": {
+                    "event_id": self.parent_id,
+                    "key": None,
+                    "rel_type": "m.reference",
+                }
+            },
+            channel.json_body["content"],
+        )
+
+        # We expect that the edit relation appears in the unsigned relations
+        # section.
         relations_dict = channel.json_body["unsigned"].get("m.relations")
         self.assertIn(RelationTypes.REPLACE, relations_dict)
 
@@ -561,37 +602,34 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Check the relation is returned
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
             % (self.room, original_event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertIn("chunk", channel.json_body)
         self.assertEquals(len(channel.json_body["chunk"]), 1)
 
         # Redact the original event
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/redact/%s/%s"
             % (self.room, original_event_id, "test_relations_redaction_redacts_edits"),
             access_token=self.user_token,
             content="{}",
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Try to check for remaining m.replace relations
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/relations/%s/m.replace/m.room.message"
             % (self.room, original_event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Check that no relations are returned
@@ -613,7 +651,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Redact the original
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT",
             "/rooms/%s/redact/%s/%s"
             % (
@@ -624,17 +662,15 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             access_token=self.user_token,
             content="{}",
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         # Check that aggregations returns zero
-        request, channel = self.make_request(
+        channel = self.make_request(
             "GET",
             "/_matrix/client/unstable/rooms/%s/aggregations/%s/m.annotation/m.reaction"
             % (self.room, original_event_id),
             access_token=self.user_token,
         )
-        self.render(request)
         self.assertEquals(200, channel.code, channel.json_body)
 
         self.assertIn("chunk", channel.json_body)
@@ -645,7 +681,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         relation_type,
         event_type,
         key=None,
-        content={},
+        content: Optional[dict] = None,
         access_token=None,
         parent_id=None,
     ):
@@ -673,14 +709,13 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         original_id = parent_id if parent_id else self.parent_id
 
-        request, channel = self.make_request(
+        channel = self.make_request(
             "POST",
             "/_matrix/client/unstable/rooms/%s/send_relation/%s/%s/%s%s"
             % (self.room, original_id, relation_type, event_type, query),
-            json.dumps(content).encode("utf-8"),
+            json.dumps(content or {}).encode("utf-8"),
             access_token=access_token,
         )
-        self.render(request)
         return channel
 
     def _create_user(self, localpart):

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -141,15 +140,23 @@ class RdataCommand(Command):
 
 
 class PositionCommand(Command):
-    """Sent by the server to tell the client the stream position without
-    needing to send an RDATA.
+    """Sent by an instance to tell others the stream position without needing to
+    send an RDATA.
+
+    Two tokens are sent, the new position and the last position sent by the
+    instance (in an RDATA or other POSITION). The tokens are chosen so that *no*
+    rows were written by the instance between the `prev_token` and `new_token`.
+    (If an instance hasn't sent a position before then the new position can be
+    used for both.)
 
     Format::
 
-        POSITION <stream_name> <instance_name> <token>
+        POSITION <stream_name> <instance_name> <prev_token> <new_token>
 
-    On receipt of a POSITION command clients should check if they have missed
-    any updates, and if so then fetch them out of band.
+    On receipt of a POSITION command instances should check if they have missed
+    any updates, and if so then fetch them out of band. Instances can check this
+    by comparing their view of the current token for the sending instance with
+    the included `prev_token`.
 
     The `<instance_name>` is the process that sent the command and is the source
     of the stream.
@@ -157,18 +164,26 @@ class PositionCommand(Command):
 
     NAME = "POSITION"
 
-    def __init__(self, stream_name, instance_name, token):
+    def __init__(self, stream_name, instance_name, prev_token, new_token):
         self.stream_name = stream_name
         self.instance_name = instance_name
-        self.token = token
+        self.prev_token = prev_token
+        self.new_token = new_token
 
     @classmethod
     def from_line(cls, line):
-        stream_name, instance_name, token = line.split(" ", 2)
-        return cls(stream_name, instance_name, int(token))
+        stream_name, instance_name, prev_token, new_token = line.split(" ", 3)
+        return cls(stream_name, instance_name, int(prev_token), int(new_token))
 
     def to_line(self):
-        return " ".join((self.stream_name, self.instance_name, str(self.token)))
+        return " ".join(
+            (
+                self.stream_name,
+                self.instance_name,
+                str(self.prev_token),
+                str(self.new_token),
+            )
+        )
 
 
 class ErrorCommand(_SimpleCommand):
@@ -180,8 +195,7 @@ class ErrorCommand(_SimpleCommand):
 
 
 class PingCommand(_SimpleCommand):
-    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)
-    """
+    """Sent by either side as a keep alive. The data is arbitrary (often timestamp)"""
 
     NAME = "PING"
 
@@ -297,42 +311,17 @@ class FederationAckCommand(Command):
 
     NAME = "FEDERATION_ACK"
 
-    def __init__(self, instance_name, token):
+    def __init__(self, instance_name: str, token: int):
         self.instance_name = instance_name
         self.token = token
 
     @classmethod
-    def from_line(cls, line):
+    def from_line(cls, line: str) -> "FederationAckCommand":
         instance_name, token = line.split(" ")
         return cls(instance_name, int(token))
 
-    def to_line(self):
+    def to_line(self) -> str:
         return "%s %s" % (self.instance_name, self.token)
-
-
-class RemovePusherCommand(Command):
-    """Sent by the client to request the master remove the given pusher.
-
-    Format::
-
-        REMOVE_PUSHER <app_id> <push_key> <user_id>
-    """
-
-    NAME = "REMOVE_PUSHER"
-
-    def __init__(self, app_id, push_key, user_id):
-        self.user_id = user_id
-        self.app_id = app_id
-        self.push_key = push_key
-
-    @classmethod
-    def from_line(cls, line):
-        app_id, push_key, user_id = line.split(" ", 2)
-
-        return cls(app_id, push_key, user_id)
-
-    def to_line(self):
-        return " ".join((self.app_id, self.push_key, self.user_id))
 
 
 class UserIpCommand(Command):
@@ -401,7 +390,6 @@ _COMMANDS = (
     ReplicateCommand,
     UserSyncCommand,
     FederationAckCommand,
-    RemovePusherCommand,
     UserIpCommand,
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
@@ -428,7 +416,6 @@ VALID_CLIENT_COMMANDS = (
     UserSyncCommand.NAME,
     ClearUserSyncsCommand.NAME,
     FederationAckCommand.NAME,
-    RemovePusherCommand.NAME,
     UserIpCommand.NAME,
     ErrorCommand.NAME,
     RemoteServerUpCommand.NAME,

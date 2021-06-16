@@ -1,1 +1,0 @@
-Include `guest_access` in the fields that are checked for null bytes when updating `room_stats_state`. Broke in v1.7.2.

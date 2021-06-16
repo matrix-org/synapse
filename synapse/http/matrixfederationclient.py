@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,27 +11,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import abc
 import cgi
+import codecs
 import logging
 import random
 import sys
-import urllib
-from io import BytesIO
+import typing
+import urllib.parse
+from io import BytesIO, StringIO
+from typing import (
+    Callable,
+    Dict,
+    Generic,
+    List,
+    Optional,
+    Tuple,
+    TypeVar,
+    Union,
+    overload,
+)
 
 import attr
 import treq
 from canonicaljson import encode_canonical_json
 from prometheus_client import Counter
 from signedjson.sign import sign_json
-from zope.interface import implementer
+from typing_extensions import Literal
 
-from twisted.internet import defer, protocol
+from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
-from twisted.internet.interfaces import IReactorPluggableNameResolver, IReactorTime
+from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import _EPSILON, Cooperator
-from twisted.web._newclient import ResponseDone
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IResponse
+from twisted.web.iweb import IBodyProducer, IResponse
 
 import synapse.metrics
 import synapse.util.retryutils
@@ -45,15 +56,19 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.http import QuieterFileBodyProducer
-from synapse.http.client import BlacklistingAgentWrapper, IPBlacklistingResolver
-from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
-from synapse.logging.context import make_deferred_yieldable
-from synapse.logging.opentracing import (
-    inject_active_span_byte_dict,
-    set_tag,
-    start_active_span,
-    tags,
+from synapse.http.client import (
+    BlacklistingAgentWrapper,
+    BlacklistingReactorWrapper,
+    BodyExceededMaxSize,
+    ByteWriteable,
+    encode_query_args,
+    read_body_with_max_size,
 )
+from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
+from synapse.logging import opentracing
+from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.types import ISynapseReactor, JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
@@ -67,6 +82,9 @@ incoming_responses_counter = Counter(
     "synapse_http_matrixfederationclient_responses", "", ["method", "code"]
 )
 
+# a federation response can be rather large (eg a big state_ids is 50M or so), so we
+# need a generous limit here.
+MAX_RESPONSE_SIZE = 100 * 1024 * 1024
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
@@ -76,47 +94,65 @@ MAXINT = sys.maxsize
 _next_id = 1
 
 
+QueryArgs = Dict[str, Union[str, List[str]]]
+
+
+T = TypeVar("T")
+
+
+class ByteParser(ByteWriteable, Generic[T], abc.ABC):
+    """A `ByteWriteable` that has an additional `finish` function that returns
+    the parsed data.
+    """
+
+    CONTENT_TYPE = abc.abstractproperty()  # type: str  # type: ignore
+    """The expected content type of the response, e.g. `application/json`. If
+    the content type doesn't match we fail the request.
+    """
+
+    @abc.abstractmethod
+    def finish(self) -> T:
+        """Called when response has finished streaming and the parser should
+        return the final result (or error).
+        """
+        pass
+
+
 @attr.s(slots=True, frozen=True)
 class MatrixFederationRequest:
-    method = attr.ib()
+    method = attr.ib(type=str)
     """HTTP method
-    :type: str
     """
 
-    path = attr.ib()
+    path = attr.ib(type=str)
     """HTTP path
-    :type: str
     """
 
-    destination = attr.ib()
+    destination = attr.ib(type=str)
     """The remote server to send the HTTP request to.
-    :type: str"""
+    """
 
-    json = attr.ib(default=None)
+    json = attr.ib(default=None, type=Optional[JsonDict])
     """JSON to send in the body.
-    :type: dict|None
     """
 
-    json_callback = attr.ib(default=None)
+    json_callback = attr.ib(default=None, type=Optional[Callable[[], JsonDict]])
     """A callback to generate the JSON.
-    :type: func|None
     """
 
-    query = attr.ib(default=None)
+    query = attr.ib(default=None, type=Optional[dict])
     """Query arguments.
-    :type: dict|None
     """
 
-    txn_id = attr.ib(default=None)
+    txn_id = attr.ib(default=None, type=Optional[str])
     """Unique ID for this request (for logging)
-    :type: str|None
     """
 
     uri = attr.ib(init=False, type=bytes)
     """The URI of this request
     """
 
-    def __attrs_post_init__(self):
+    def __attrs_post_init__(self) -> None:
         global _next_id
         txn_id = "%s-O-%s" % (self.method, _next_id)
         _next_id = (_next_id + 1) % (MAXINT - 1)
@@ -136,21 +172,39 @@ class MatrixFederationRequest:
         )
         object.__setattr__(self, "uri", uri)
 
-    def get_json(self):
+    def get_json(self) -> Optional[JsonDict]:
         if self.json_callback:
             return self.json_callback()
         return self.json
 
 
-async def _handle_json_response(
+class JsonParser(ByteParser[Union[JsonDict, list]]):
+    """A parser that buffers the response and tries to parse it as JSON."""
+
+    CONTENT_TYPE = "application/json"
+
+    def __init__(self):
+        self._buffer = StringIO()
+        self._binary_wrapper = BinaryIOWrapper(self._buffer)
+
+    def write(self, data: bytes) -> int:
+        return self._binary_wrapper.write(data)
+
+    def finish(self) -> Union[JsonDict, list]:
+        return json_decoder.decode(self._buffer.getvalue())
+
+
+async def _handle_response(
     reactor: IReactorTime,
     timeout_sec: float,
     request: MatrixFederationRequest,
     response: IResponse,
     start_ms: int,
-):
+    parser: ByteParser[T],
+    max_response_size: Optional[int] = None,
+) -> T:
     """
-    Reads the JSON body of a response, with a timeout
+    Reads the body of a response with a timeout and sends it to a parser
 
     Args:
         reactor: twisted reactor, for the timeout
@@ -158,19 +212,47 @@ async def _handle_json_response(
         request: the request that triggered the response
         response: response to the request
         start_ms: Timestamp when request was made
+        parser: The parser for the response
+        max_response_size: The maximum size to read from the response, if None
+            uses the default.
 
     Returns:
-        dict: parsed JSON response
+        The parsed response
     """
-    try:
-        check_content_type_is_json(response.headers)
 
-        # Use the custom JSON decoder (partially re-implements treq.json_content).
-        d = treq.text_content(response, encoding="utf-8")
-        d.addCallback(json_decoder.decode)
+    if max_response_size is None:
+        max_response_size = MAX_RESPONSE_SIZE
+
+    try:
+        check_content_type_is(response.headers, parser.CONTENT_TYPE)
+
+        d = read_body_with_max_size(response, parser, max_response_size)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
-        body = await make_deferred_yieldable(d)
+        length = await make_deferred_yieldable(d)
+
+        value = parser.finish()
+    except BodyExceededMaxSize as e:
+        # The response was too big.
+        logger.warning(
+            "{%s} [%s] JSON response exceeded max size %i - %s %s",
+            request.txn_id,
+            request.destination,
+            MAX_RESPONSE_SIZE,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=False) from e
+    except ValueError as e:
+        # The content was invalid.
+        logger.warning(
+            "{%s} [%s] Failed to parse response - %s %s",
+            request.txn_id,
+            request.destination,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=False) from e
     except defer.TimeoutError as e:
         logger.warning(
             "{%s} [%s] Timed out reading response - %s %s",
@@ -194,16 +276,29 @@ async def _handle_json_response(
     time_taken_secs = reactor.seconds() - start_ms / 1000
 
     logger.info(
-        "{%s} [%s] Completed request: %d %s in %.2f secs - %s %s",
+        "{%s} [%s] Completed request: %d %s in %.2f secs, got %d bytes - %s %s",
         request.txn_id,
         request.destination,
         response.code,
         response.phrase.decode("ascii", errors="replace"),
         time_taken_secs,
+        length,
         request.method,
         request.uri.decode("ascii"),
     )
-    return body
+    return value
+
+
+class BinaryIOWrapper:
+    """A wrapper for a TextIO which converts from bytes on the fly."""
+
+    def __init__(self, file: typing.TextIO, encoding="utf-8", errors="strict"):
+        self.decoder = codecs.getincrementaldecoder(encoding)(errors)
+        self.file = file
+
+    def write(self, b: Union[bytes, bytearray]) -> int:
+        self.file.write(self.decoder.decode(b))
+        return len(b)
 
 
 class MatrixFederationHttpClient:
@@ -220,38 +315,30 @@ class MatrixFederationHttpClient:
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
-        real_reactor = hs.get_reactor()
-
         # We need to use a DNS resolver which filters out blacklisted IP
         # addresses, to prevent DNS rebinding.
-        nameResolver = IPBlacklistingResolver(
-            real_reactor, None, hs.config.federation_ip_range_blacklist
-        )
-
-        @implementer(IReactorPluggableNameResolver)
-        class Reactor:
-            def __getattr__(_self, attr):
-                if attr == "nameResolver":
-                    return nameResolver
-                else:
-                    return getattr(real_reactor, attr)
-
-        self.reactor = Reactor()
+        self.reactor = BlacklistingReactorWrapper(
+            hs.get_reactor(),
+            hs.config.federation_ip_range_whitelist,
+            hs.config.federation_ip_range_blacklist,
+        )  # type: ISynapseReactor
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
             user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
-        self.agent = MatrixFederationAgent(
-            self.reactor, tls_client_options_factory, user_agent
+        federation_agent = MatrixFederationAgent(
+            self.reactor,
+            tls_client_options_factory,
+            user_agent,
+            hs.config.federation_ip_range_blacklist,
         )
 
         # Use a BlacklistingAgentWrapper to prevent circumventing the IP
         # blacklist via IP literals in server names
         self.agent = BlacklistingAgentWrapper(
-            self.agent,
-            self.reactor,
+            federation_agent,
             ip_blacklist=hs.config.federation_ip_range_blacklist,
         )
 
@@ -266,27 +353,29 @@ class MatrixFederationHttpClient:
         self._cooperator = Cooperator(scheduler=schedule)
 
     async def _send_request_with_optional_trailing_slash(
-        self, request, try_trailing_slash_on_400=False, **send_request_args
-    ):
+        self,
+        request: MatrixFederationRequest,
+        try_trailing_slash_on_400: bool = False,
+        **send_request_args,
+    ) -> IResponse:
         """Wrapper for _send_request which can optionally retry the request
         upon receiving a combination of a 400 HTTP response code and a
         'M_UNRECOGNIZED' errcode. This is a workaround for Synapse <= v0.99.3
         due to #3622.
 
         Args:
-            request (MatrixFederationRequest): details of request to be sent
-            try_trailing_slash_on_400 (bool): Whether on receiving a 400
+            request: details of request to be sent
+            try_trailing_slash_on_400: Whether on receiving a 400
                 'M_UNRECOGNIZED' from the server to retry the request with a
                 trailing slash appended to the request path.
-            send_request_args (Dict): A dictionary of arguments to pass to
-                `_send_request()`.
+            send_request_args: A dictionary of arguments to pass to `_send_request()`.
 
         Raises:
             HttpResponseException: If we get an HTTP response code >= 300
                 (except 429).
 
         Returns:
-            Dict: Parsed JSON response body.
+            Parsed JSON response body.
         """
         try:
             response = await self._send_request(request, **send_request_args)
@@ -313,24 +402,26 @@ class MatrixFederationHttpClient:
 
     async def _send_request(
         self,
-        request,
-        retry_on_dns_fail=True,
-        timeout=None,
-        long_retries=False,
-        ignore_backoff=False,
-        backoff_on_404=False,
-    ):
+        request: MatrixFederationRequest,
+        retry_on_dns_fail: bool = True,
+        timeout: Optional[int] = None,
+        long_retries: bool = False,
+        ignore_backoff: bool = False,
+        backoff_on_404: bool = False,
+    ) -> IResponse:
         """
         Sends a request to the given server.
 
         Args:
-            request (MatrixFederationRequest): details of request to be sent
+            request: details of request to be sent
 
-            timeout (int|None): number of milliseconds to wait for the response headers
+            retry_on_dns_fail: true if the request should be retied on DNS failures
+
+            timeout: number of milliseconds to wait for the response headers
                 (including connecting to the server), *for each attempt*.
                 60s by default.
 
-            long_retries (bool): whether to use the long retry algorithm.
+            long_retries: whether to use the long retry algorithm.
 
                 The regular retry algorithm makes 4 attempts, with intervals
                 [0.5s, 1s, 2s].
@@ -346,14 +437,13 @@ class MatrixFederationHttpClient:
                 NB: the long retry algorithm takes over 20 minutes to complete, with
                 a default timeout of 60s!
 
-            ignore_backoff (bool): true to ignore the historical backoff data
+            ignore_backoff: true to ignore the historical backoff data
                 and try the request anyway.
 
-            backoff_on_404 (bool): Back off if we get a 404
+            backoff_on_404: Back off if we get a 404
 
         Returns:
-            twisted.web.client.Response: resolves with the HTTP
-            response object on success.
+            Resolves with the HTTP response object on success.
 
         Raises:
             HttpResponseException: If we get an HTTP response code >= 300
@@ -404,8 +494,8 @@ class MatrixFederationHttpClient:
         )
 
         # Inject the span into the headers
-        headers_dict = {}
-        inject_active_span_byte_dict(headers_dict, request.destination)
+        headers_dict = {}  # type: Dict[bytes, List[bytes]]
+        opentracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
 
@@ -435,7 +525,7 @@ class MatrixFederationHttpClient:
                         data = encode_canonical_json(json)
                         producer = QuieterFileBodyProducer(
                             BytesIO(data), cooperator=self._cooperator
-                        )
+                        )  # type: Optional[IBodyProducer]
                     else:
                         producer = None
                         auth_headers = self.build_auth_headers(
@@ -524,14 +614,17 @@ class MatrixFederationHttpClient:
                             )
                             body = None
 
-                        e = HttpResponseException(response.code, response_phrase, body)
+                        exc = HttpResponseException(
+                            response.code, response_phrase, body
+                        )
 
-                        # Retry if the error is a 429 (Too Many Requests),
-                        # otherwise just raise a standard HttpResponseException
-                        if response.code == 429:
-                            raise RequestSendFailed(e, can_retry=True) from e
+                        # Retry if the error is a 5xx or a 429 (Too Many
+                        # Requests), otherwise just raise a standard
+                        # `HttpResponseException`
+                        if 500 <= response.code < 600 or response.code == 429:
+                            raise RequestSendFailed(exc, can_retry=True) from exc
                         else:
-                            raise e
+                            raise exc
 
                     break
                 except RequestSendFailed as e:
@@ -582,22 +675,27 @@ class MatrixFederationHttpClient:
         return response
 
     def build_auth_headers(
-        self, destination, method, url_bytes, content=None, destination_is=None
-    ):
+        self,
+        destination: Optional[bytes],
+        method: bytes,
+        url_bytes: bytes,
+        content: Optional[JsonDict] = None,
+        destination_is: Optional[bytes] = None,
+    ) -> List[bytes]:
         """
         Builds the Authorization headers for a federation request
         Args:
-            destination (bytes|None): The desination homeserver of the request.
+            destination: The destination homeserver of the request.
                 May be None if the destination is an identity server, in which case
                 destination_is must be non-None.
-            method (bytes): The HTTP method of the request
-            url_bytes (bytes): The URI path of the request
-            content (object): The body of the request
-            destination_is (bytes): As 'destination', but if the destination is an
+            method: The HTTP method of the request
+            url_bytes: The URI path of the request
+            content: The body of the request
+            destination_is: As 'destination', but if the destination is an
                 identity server
 
         Returns:
-            list[bytes]: a list of headers to be added as "Authorization:" headers
+            A list of headers to be added as "Authorization:" headers
         """
         request = {
             "method": method.decode("ascii"),
@@ -627,35 +725,72 @@ class MatrixFederationHttpClient:
             )
         return auth_headers
 
+    @overload
     async def put_json(
         self,
-        destination,
-        path,
-        args={},
-        data={},
-        json_data_callback=None,
-        long_retries=False,
-        timeout=None,
-        ignore_backoff=False,
-        backoff_on_404=False,
-        try_trailing_slash_on_400=False,
+        destination: str,
+        path: str,
+        args: Optional[QueryArgs] = None,
+        data: Optional[JsonDict] = None,
+        json_data_callback: Optional[Callable[[], JsonDict]] = None,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        backoff_on_404: bool = False,
+        try_trailing_slash_on_400: bool = False,
+        parser: Literal[None] = None,
+        max_response_size: Optional[int] = None,
+    ) -> Union[JsonDict, list]:
+        ...
+
+    @overload
+    async def put_json(
+        self,
+        destination: str,
+        path: str,
+        args: Optional[QueryArgs] = None,
+        data: Optional[JsonDict] = None,
+        json_data_callback: Optional[Callable[[], JsonDict]] = None,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        backoff_on_404: bool = False,
+        try_trailing_slash_on_400: bool = False,
+        parser: Optional[ByteParser[T]] = None,
+        max_response_size: Optional[int] = None,
+    ) -> T:
+        ...
+
+    async def put_json(
+        self,
+        destination: str,
+        path: str,
+        args: Optional[QueryArgs] = None,
+        data: Optional[JsonDict] = None,
+        json_data_callback: Optional[Callable[[], JsonDict]] = None,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        backoff_on_404: bool = False,
+        try_trailing_slash_on_400: bool = False,
+        parser: Optional[ByteParser] = None,
+        max_response_size: Optional[int] = None,
     ):
-        """ Sends the specifed json data using PUT
+        """Sends the specified json data using PUT
 
         Args:
-            destination (str): The remote server to send the HTTP request
-                to.
-            path (str): The HTTP path.
-            args (dict): query params
-            data (dict): A dict containing the data that will be used as
+            destination: The remote server to send the HTTP request to.
+            path: The HTTP path.
+            args: query params
+            data: A dict containing the data that will be used as
                 the request body. This will be encoded as JSON.
-            json_data_callback (callable): A callable returning the dict to
+            json_data_callback: A callable returning the dict to
                 use as the request body.
 
-            long_retries (bool): whether to use the long retry algorithm. See
+            long_retries: whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response.
+            timeout: number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
 
                 Note that we may make several attempts to send the request; this
@@ -663,19 +798,23 @@ class MatrixFederationHttpClient:
                 *each* attempt (including connection time) as well as the time spent
                 reading the response body after a 200 response.
 
-            ignore_backoff (bool): true to ignore the historical backoff data
+            ignore_backoff: true to ignore the historical backoff data
                 and try the request anyway.
-            backoff_on_404 (bool): True if we should count a 404 response as
+            backoff_on_404: True if we should count a 404 response as
                 a failure of the server (and should therefore back off future
                 requests).
-            try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
+            try_trailing_slash_on_400: True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end
                 of the request. Workaround for #3622 in Synapse <= v0.99.3. This
                 will be attempted before backing off if backing off has been
                 enabled.
+            parser: The parser to use to decode the response. Defaults to
+                parsing as JSON.
+            max_response_size: The maximum size to read from the response, if None
+                uses the default.
 
         Returns:
-            dict|list: Succeeds when we get a 2xx HTTP response. The
+            Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -713,37 +852,45 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms
+        if parser is None:
+            parser = JsonParser()
+
+        body = await _handle_response(
+            self.reactor,
+            _sec_timeout,
+            request,
+            response,
+            start_ms,
+            parser=parser,
+            max_response_size=max_response_size,
         )
 
         return body
 
     async def post_json(
         self,
-        destination,
-        path,
-        data={},
-        long_retries=False,
-        timeout=None,
-        ignore_backoff=False,
-        args={},
-    ):
-        """ Sends the specifed json data using POST
+        destination: str,
+        path: str,
+        data: Optional[JsonDict] = None,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        args: Optional[QueryArgs] = None,
+    ) -> Union[JsonDict, list]:
+        """Sends the specified json data using POST
 
         Args:
-            destination (str): The remote server to send the HTTP request
-                to.
+            destination: The remote server to send the HTTP request to.
 
-            path (str): The HTTP path.
+            path: The HTTP path.
 
-            data (dict): A dict containing the data that will be used as
+            data: A dict containing the data that will be used as
                 the request body. This will be encoded as JSON.
 
-            long_retries (bool): whether to use the long retry algorithm. See
+            long_retries: whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response.
+            timeout: number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
 
                 Note that we may make several attempts to send the request; this
@@ -751,10 +898,10 @@ class MatrixFederationHttpClient:
                 *each* attempt (including connection time) as well as the time spent
                 reading the response body after a 200 response.
 
-            ignore_backoff (bool): true to ignore the historical backoff data and
+            ignore_backoff: true to ignore the historical backoff data and
                 try the request anyway.
 
-            args (dict): query params
+            args: query params
         Returns:
             dict|list: Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
@@ -788,33 +935,32 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms,
+        body = await _handle_response(
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
         return body
 
     async def get_json(
         self,
-        destination,
-        path,
-        args=None,
-        retry_on_dns_fail=True,
-        timeout=None,
-        ignore_backoff=False,
-        try_trailing_slash_on_400=False,
-    ):
-        """ GETs some json from the given host homeserver and path
+        destination: str,
+        path: str,
+        args: Optional[QueryArgs] = None,
+        retry_on_dns_fail: bool = True,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        try_trailing_slash_on_400: bool = False,
+    ) -> Union[JsonDict, list]:
+        """GETs some json from the given host homeserver and path
 
         Args:
-            destination (str): The remote server to send the HTTP request
-                to.
+            destination: The remote server to send the HTTP request to.
 
-            path (str): The HTTP path.
+            path: The HTTP path.
 
-            args (dict|None): A dictionary used to create query strings, defaults to
+            args: A dictionary used to create query strings, defaults to
                 None.
 
-            timeout (int|None): number of milliseconds to wait for the response.
+            timeout: number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
 
                 Note that we may make several attempts to send the request; this
@@ -822,14 +968,14 @@ class MatrixFederationHttpClient:
                 *each* attempt (including connection time) as well as the time spent
                 reading the response body after a 200 response.
 
-            ignore_backoff (bool): true to ignore the historical backoff data
+            ignore_backoff: true to ignore the historical backoff data
                 and try the request anyway.
 
-            try_trailing_slash_on_400 (bool): True if on a 400 M_UNRECOGNIZED
+            try_trailing_slash_on_400: True if on a 400 M_UNRECOGNIZED
                 response we should try appending a trailing slash to the end of
                 the request. Workaround for #3622 in Synapse <= v0.99.3.
         Returns:
-            dict|list: Succeeds when we get a 2xx HTTP response. The
+            Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -862,32 +1008,31 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms
+        body = await _handle_response(
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
 
         return body
 
     async def delete_json(
         self,
-        destination,
-        path,
-        long_retries=False,
-        timeout=None,
-        ignore_backoff=False,
-        args={},
-    ):
+        destination: str,
+        path: str,
+        long_retries: bool = False,
+        timeout: Optional[int] = None,
+        ignore_backoff: bool = False,
+        args: Optional[QueryArgs] = None,
+    ) -> Union[JsonDict, list]:
         """Send a DELETE request to the remote expecting some json response
 
         Args:
-            destination (str): The remote server to send the HTTP request
-                to.
-            path (str): The HTTP path.
+            destination: The remote server to send the HTTP request to.
+            path: The HTTP path.
 
-            long_retries (bool): whether to use the long retry algorithm. See
+            long_retries: whether to use the long retry algorithm. See
                 docs on _send_request for details.
 
-            timeout (int|None): number of milliseconds to wait for the response.
+            timeout: number of milliseconds to wait for the response.
                 self._default_timeout (60s) by default.
 
                 Note that we may make several attempts to send the request; this
@@ -895,12 +1040,12 @@ class MatrixFederationHttpClient:
                 *each* attempt (including connection time) as well as the time spent
                 reading the response body after a 200 response.
 
-            ignore_backoff (bool): true to ignore the historical backoff data and
+            ignore_backoff: true to ignore the historical backoff data and
                 try the request anyway.
 
-            args (dict): query params
+            args: query params
         Returns:
-            dict|list: Succeeds when we get a 2xx HTTP response. The
+            Succeeds when we get a 2xx HTTP response. The
             result will be the decoded JSON body.
 
         Raises:
@@ -931,32 +1076,32 @@ class MatrixFederationHttpClient:
         else:
             _sec_timeout = self.default_timeout
 
-        body = await _handle_json_response(
-            self.reactor, _sec_timeout, request, response, start_ms
+        body = await _handle_response(
+            self.reactor, _sec_timeout, request, response, start_ms, parser=JsonParser()
         )
         return body
 
     async def get_file(
         self,
-        destination,
-        path,
+        destination: str,
+        path: str,
         output_stream,
-        args={},
-        retry_on_dns_fail=True,
-        max_size=None,
-        ignore_backoff=False,
-    ):
+        args: Optional[QueryArgs] = None,
+        retry_on_dns_fail: bool = True,
+        max_size: Optional[int] = None,
+        ignore_backoff: bool = False,
+    ) -> Tuple[int, Dict[bytes, List[bytes]]]:
         """GETs a file from a given homeserver
         Args:
-            destination (str): The remote server to send the HTTP request to.
-            path (str): The HTTP path to GET.
-            output_stream (file): File to write the response body to.
-            args (dict): Optional dictionary used to create the query string.
-            ignore_backoff (bool): true to ignore the historical backoff data
+            destination: The remote server to send the HTTP request to.
+            path: The HTTP path to GET.
+            output_stream: File to write the response body to.
+            args: Optional dictionary used to create the query string.
+            ignore_backoff: true to ignore the historical backoff data
                 and try the request anyway.
 
         Returns:
-            tuple[int, dict]: Resolves with an (int,dict) tuple of
+            Resolves with an (int,dict) tuple of
             the file length and a dict of the response headers.
 
         Raises:
@@ -980,9 +1125,18 @@ class MatrixFederationHttpClient:
         headers = dict(response.headers.getAllRawHeaders())
 
         try:
-            d = _readBodyToFile(response, output_stream, max_size)
+            d = read_body_with_max_size(response, output_stream, max_size)
             d.addTimeout(self.default_timeout, self.reactor)
             length = await make_deferred_yieldable(d)
+        except BodyExceededMaxSize:
+            msg = "Requested file is too large > %r bytes" % (max_size,)
+            logger.warning(
+                "{%s} [%s] %s",
+                request.txn_id,
+                request.destination,
+                msg,
+            )
+            raise SynapseError(502, msg, Codes.TOO_LARGE)
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",
@@ -1004,40 +1158,6 @@ class MatrixFederationHttpClient:
         return (length, headers)
 
 
-class _ReadBodyToFileProtocol(protocol.Protocol):
-    def __init__(self, stream, deferred, max_size):
-        self.stream = stream
-        self.deferred = deferred
-        self.length = 0
-        self.max_size = max_size
-
-    def dataReceived(self, data):
-        self.stream.write(data)
-        self.length += len(data)
-        if self.max_size is not None and self.length >= self.max_size:
-            self.deferred.errback(
-                SynapseError(
-                    502,
-                    "Requested file is too large > %r bytes" % (self.max_size,),
-                    Codes.TOO_LARGE,
-                )
-            )
-            self.deferred = defer.Deferred()
-            self.transport.loseConnection()
-
-    def connectionLost(self, reason):
-        if reason.check(ResponseDone):
-            self.deferred.callback(self.length)
-        else:
-            self.deferred.errback(reason)
-
-
-def _readBodyToFile(response, stream, max_size):
-    d = defer.Deferred()
-    response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
-    return d
-
-
 def _flatten_response_never_received(e):
     if hasattr(e, "reasons"):
         reasons = ", ".join(
@@ -1049,41 +1169,31 @@ def _flatten_response_never_received(e):
         return repr(e)
 
 
-def check_content_type_is_json(headers):
+def check_content_type_is(headers: Headers, expected_content_type: str) -> None:
     """
     Check that a set of HTTP headers have a Content-Type header, and that it
-    is application/json.
+    is the expected value..
 
     Args:
-        headers (twisted.web.http_headers.Headers): headers to check
+        headers: headers to check
 
     Raises:
-        RequestSendFailed: if the Content-Type header is missing or isn't JSON
+        RequestSendFailed: if the Content-Type header is missing or doesn't match
 
     """
-    c_type = headers.getRawHeaders(b"Content-Type")
-    if c_type is None:
-        raise RequestSendFailed(RuntimeError("No Content-Type header"), can_retry=False)
-
-    c_type = c_type[0].decode("ascii")  # only the first header
-    val, options = cgi.parse_header(c_type)
-    if val != "application/json":
+    content_type_headers = headers.getRawHeaders(b"Content-Type")
+    if content_type_headers is None:
         raise RequestSendFailed(
-            RuntimeError("Content-Type not application/json: was '%s'" % c_type),
+            RuntimeError("No Content-Type header received from remote server"),
             can_retry=False,
         )
 
-
-def encode_query_args(args):
-    if args is None:
-        return b""
-
-    encoded_args = {}
-    for k, vs in args.items():
-        if isinstance(vs, str):
-            vs = [vs]
-        encoded_args[k] = [v.encode("UTF-8") for v in vs]
-
-    query_bytes = urllib.parse.urlencode(encoded_args, True)
-
-    return query_bytes.encode("utf8")
+    c_type = content_type_headers[0].decode("ascii")  # only the first header
+    val, options = cgi.parse_header(c_type)
+    if val != expected_content_type:
+        raise RequestSendFailed(
+            RuntimeError(
+                f"Remote server sent Content-Type header of '{c_type}', not '{expected_content_type}'",
+            ),
+            can_retry=False,
+        )

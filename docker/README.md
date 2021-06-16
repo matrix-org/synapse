@@ -2,26 +2,28 @@
 
 This Docker image will run Synapse as a single process. By default it uses a
 sqlite database; for production use you should connect it to a separate
-postgres database.
+postgres database. The image also does *not* provide a TURN server.
 
-The image also does *not* provide a TURN server.
+This image should work on all platforms that are supported by Docker upstream.
+Note that Docker's WS1-backend Linux Containers on Windows
+platform is [experimental](https://github.com/docker/for-win/issues/6470) and
+is not supported by this image.
 
 ## Volumes
 
-By default, the image expects a single volume, located at ``/data``, that will hold:
+By default, the image expects a single volume, located at `/data`, that will hold:
 
 * configuration files;
-* temporary files during uploads;
 * uploaded media and thumbnails;
 * the SQLite database if you do not configure postgres;
 * the appservices configuration.
 
 You are free to use separate volumes depending on storage endpoints at your
-disposal. For instance, ``/data/media`` could be stored on a large but low
+disposal. For instance, `/data/media` could be stored on a large but low
 performance hdd storage while other files could be stored on high performance
 endpoints.
 
-In order to setup an application service, simply create an ``appservices``
+In order to setup an application service, simply create an `appservices`
 directory in the data volume and write the application service Yaml
 configuration file there. Multiple application services are supported.
 
@@ -54,6 +56,8 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
 * `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
   anonymous statistics reporting.
+* `SYNAPSE_HTTP_PORT`: the port Synapse should listen on for http traffic.
+      Defaults to `8008`.
 * `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
   and event signing key) will be stored. Defaults to `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
@@ -74,6 +78,8 @@ docker run -d --name synapse \
     matrixdotorg/synapse:latest
 ```
 
+(assuming 8008 is the port Synapse is configured to listen on for http traffic.)
+
 You can then check that it has started correctly with:
 
 ```
@@ -83,7 +89,7 @@ docker logs synapse
 If all is well, you should now be able to connect to http://localhost:8008 and
 see a confirmation message.
 
-The following environment variables are supported in run mode:
+The following environment variables are supported in `run` mode:
 
 * `SYNAPSE_CONFIG_DIR`: where additional config files are stored. Defaults to
   `/data`.
@@ -93,6 +99,20 @@ The following environment variables are supported in run mode:
    Defaults to `synapse.app.homeserver`, which is suitable for non-worker mode.
 * `UID`, `GID`: the user and group id to run Synapse as. Defaults to `991`, `991`.
 * `TZ`: the [timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) the container will run with. Defaults to `UTC`.
+
+For more complex setups (e.g. for workers) you can also pass your args directly to synapse using `run` mode. For example like this:
+
+```
+docker run -d --name synapse \
+    --mount type=volume,src=synapse-data,dst=/data \
+    -p 8008:8008 \
+    matrixdotorg/synapse:latest run \
+    -m synapse.app.generic_worker \
+    --config-path=/data/homeserver.yaml \
+    --config-path=/data/generic_worker.yaml
+```
+
+If you do not provide `-m`, the value of the `SYNAPSE_WORKER` environment variable is used. If you do not provide at least one `--config-path` or `-c`, the value of the `SYNAPSE_CONFIG_PATH` environment variable is used instead.
 
 ## Generating an (admin) user
 
@@ -171,6 +191,16 @@ whilst running the above `docker run` commands.
 ```
    --no-healthcheck
 ```
+
+## Disabling the healthcheck in docker-compose file
+
+If you wish to disable the healthcheck via docker-compose, append the following to your service configuration.
+
+```
+  healthcheck:
+    disable: true
+```
+
 ## Setting custom healthcheck on docker run
 
 If you wish to point the healthcheck at a different port with docker command, add the following
@@ -182,12 +212,18 @@ If you wish to point the healthcheck at a different port with docker command, ad
 ## Setting the healthcheck in docker-compose file
 
 You can add the following to set a custom healthcheck in a docker compose file.
-You will need version >2.1 for this to work. 
+You will need docker-compose version >2.1 for this to work. 
 
 ```
 healthcheck:
   test: ["CMD", "curl", "-fSs", "http://localhost:8008/health"]
-  interval: 1m
-  timeout: 10s
+  interval: 15s
+  timeout: 5s
   retries: 3
+  start_period: 5s
 ```
+
+## Using jemalloc
+
+Jemalloc is embedded in the image and will be used instead of the default allocator.
+You can read about jemalloc by reading the Synapse [README](../README.rst).

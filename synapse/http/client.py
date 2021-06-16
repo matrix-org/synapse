@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -14,9 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import urllib
+import urllib.parse
 from io import BytesIO
 from typing import (
+    TYPE_CHECKING,
     Any,
     BinaryIO,
     Dict,
@@ -31,17 +31,23 @@ from typing import (
 
 import treq
 from canonicaljson import encode_canonical_json
-from netaddr import IPAddress
+from netaddr import AddrFormatError, IPAddress, IPSet
 from prometheus_client import Counter
+from typing_extensions import Protocol
 from zope.interface import implementer, provider
 
 from OpenSSL import SSL
 from OpenSSL.SSL import VERIFY_NONE
 from twisted.internet import defer, error as twisted_error, protocol, ssl
+from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.interfaces import (
+    IAddress,
+    IHostResolution,
     IReactorPluggableNameResolver,
     IResolutionReceiver,
+    ITCPTransport,
 )
+from twisted.internet.protocol import connectionDone
 from twisted.internet.task import Cooperator
 from twisted.python.failure import Failure
 from twisted.web._newclient import ResponseDone
@@ -53,15 +59,25 @@ from twisted.web.client import (
 )
 from twisted.web.http import PotentialDataLoss
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IResponse
+from twisted.web.iweb import (
+    UNKNOWN_LENGTH,
+    IAgent,
+    IBodyProducer,
+    IPolicyForHTTPS,
+    IResponse,
+)
 
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.http import QuieterFileBodyProducer, RequestTimedOutError, redact_uri
 from synapse.http.proxyagent import ProxyAgent
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
+from synapse.types import ISynapseReactor
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +100,19 @@ QueryParamValue = Union[str, bytes, Iterable[Union[str, bytes]]]
 QueryParams = Union[Mapping[str, QueryParamValue], Mapping[bytes, QueryParamValue]]
 
 
-def check_against_blacklist(ip_address, ip_whitelist, ip_blacklist):
+def check_against_blacklist(
+    ip_address: IPAddress, ip_whitelist: Optional[IPSet], ip_blacklist: IPSet
+) -> bool:
     """
+    Compares an IP address to allowed and disallowed IP sets.
+
     Args:
-        ip_address (netaddr.IPAddress)
-        ip_whitelist (netaddr.IPSet)
-        ip_blacklist (netaddr.IPSet)
+        ip_address: The IP address to check
+        ip_whitelist: Allowed IP addresses.
+        ip_blacklist: Disallowed IP addresses.
+
+    Returns:
+        True if the IP address is in the blacklist and not in the whitelist.
     """
     if ip_address in ip_blacklist:
         if ip_whitelist is None or ip_address not in ip_whitelist:
@@ -112,34 +135,42 @@ def _make_scheduler(reactor):
     return _scheduler
 
 
-class IPBlacklistingResolver:
+class _IPBlacklistingResolver:
     """
     A proxy for reactor.nameResolver which only produces non-blacklisted IP
     addresses, preventing DNS rebinding attacks on URL preview.
     """
 
-    def __init__(self, reactor, ip_whitelist, ip_blacklist):
+    def __init__(
+        self,
+        reactor: IReactorPluggableNameResolver,
+        ip_whitelist: Optional[IPSet],
+        ip_blacklist: IPSet,
+    ):
         """
         Args:
-            reactor (twisted.internet.reactor)
-            ip_whitelist (netaddr.IPSet)
-            ip_blacklist (netaddr.IPSet)
+            reactor: The twisted reactor.
+            ip_whitelist: IP addresses to allow.
+            ip_blacklist: IP addresses to disallow.
         """
         self._reactor = reactor
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
 
-    def resolveHostName(self, recv, hostname, portNumber=0):
+    def resolveHostName(
+        self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
+    ) -> IResolutionReceiver:
+        addresses = []  # type: List[IAddress]
 
-        r = recv()
-        addresses = []
-
-        def _callback():
-            r.resolutionBegan(None)
-
+        def _callback() -> None:
             has_bad_ip = False
-            for i in addresses:
-                ip_address = IPAddress(i.host)
+            for address in addresses:
+                # We only expect IPv4 and IPv6 addresses since only A/AAAA lookups
+                # should go through this path.
+                if not isinstance(address, (IPv4Address, IPv6Address)):
+                    continue
+
+                ip_address = IPAddress(address.host)
 
                 if check_against_blacklist(
                     ip_address, self._ip_whitelist, self._ip_blacklist
@@ -154,29 +185,58 @@ class IPBlacklistingResolver:
             # request, but all we can really do from here is claim that there were no
             # valid results.
             if not has_bad_ip:
-                for i in addresses:
-                    r.addressResolved(i)
-            r.resolutionComplete()
+                for address in addresses:
+                    recv.addressResolved(address)
+            recv.resolutionComplete()
 
         @provider(IResolutionReceiver)
         class EndpointReceiver:
             @staticmethod
-            def resolutionBegan(resolutionInProgress):
-                pass
+            def resolutionBegan(resolutionInProgress: IHostResolution) -> None:
+                recv.resolutionBegan(resolutionInProgress)
 
             @staticmethod
-            def addressResolved(address):
+            def addressResolved(address: IAddress) -> None:
                 addresses.append(address)
 
             @staticmethod
-            def resolutionComplete():
+            def resolutionComplete() -> None:
                 _callback()
 
         self._reactor.nameResolver.resolveHostName(
             EndpointReceiver, hostname, portNumber=portNumber
         )
 
-        return r
+        return recv
+
+
+@implementer(ISynapseReactor)
+class BlacklistingReactorWrapper:
+    """
+    A Reactor wrapper which will prevent DNS resolution to blacklisted IP
+    addresses, to prevent DNS rebinding.
+    """
+
+    def __init__(
+        self,
+        reactor: IReactorPluggableNameResolver,
+        ip_whitelist: Optional[IPSet],
+        ip_blacklist: IPSet,
+    ):
+        self._reactor = reactor
+
+        # We need to use a DNS resolver which filters out blacklisted IP
+        # addresses, to prevent DNS rebinding.
+        self._nameResolver = _IPBlacklistingResolver(
+            self._reactor, ip_whitelist, ip_blacklist
+        )
+
+    def __getattr__(self, attr: str) -> Any:
+        # Passthrough to the real reactor except for the DNS resolver.
+        if attr == "nameResolver":
+            return self._nameResolver
+        else:
+            return getattr(self._reactor, attr)
 
 
 class BlacklistingAgentWrapper(Agent):
@@ -185,33 +245,43 @@ class BlacklistingAgentWrapper(Agent):
     directly (without an IP address lookup).
     """
 
-    def __init__(self, agent, reactor, ip_whitelist=None, ip_blacklist=None):
+    def __init__(
+        self,
+        agent: IAgent,
+        ip_whitelist: Optional[IPSet] = None,
+        ip_blacklist: Optional[IPSet] = None,
+    ):
         """
         Args:
-            agent (twisted.web.client.Agent): The Agent to wrap.
-            reactor (twisted.internet.reactor)
-            ip_whitelist (netaddr.IPSet)
-            ip_blacklist (netaddr.IPSet)
+            agent: The Agent to wrap.
+            ip_whitelist: IP addresses to allow.
+            ip_blacklist: IP addresses to disallow.
         """
         self._agent = agent
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
 
-    def request(self, method, uri, headers=None, bodyProducer=None):
+    def request(
+        self,
+        method: bytes,
+        uri: bytes,
+        headers: Optional[Headers] = None,
+        bodyProducer: Optional[IBodyProducer] = None,
+    ) -> defer.Deferred:
         h = urllib.parse.urlparse(uri.decode("ascii"))
 
         try:
             ip_address = IPAddress(h.hostname)
-
+        except AddrFormatError:
+            # Not an IP
+            pass
+        else:
             if check_against_blacklist(
                 ip_address, self._ip_whitelist, self._ip_blacklist
             ):
                 logger.info("Blocking access to %s due to blacklist" % (ip_address,))
                 e = SynapseError(403, "IP address blocked by IP blacklist entry")
                 return defer.fail(Failure(e))
-        except Exception:
-            # Not an IP
-            pass
 
         return self._agent.request(
             method, uri, headers=headers, bodyProducer=bodyProducer
@@ -226,29 +296,28 @@ class SimpleHttpClient:
 
     def __init__(
         self,
-        hs,
-        treq_args={},
-        ip_whitelist=None,
-        ip_blacklist=None,
-        http_proxy=None,
-        https_proxy=None,
+        hs: "HomeServer",
+        treq_args: Optional[Dict[str, Any]] = None,
+        ip_whitelist: Optional[IPSet] = None,
+        ip_blacklist: Optional[IPSet] = None,
+        use_proxy: bool = False,
     ):
         """
         Args:
-            hs (synapse.server.HomeServer)
-            treq_args (dict): Extra keyword arguments to be given to treq.request.
-            ip_blacklist (netaddr.IPSet): The IP addresses that are blacklisted that
+            hs
+            treq_args: Extra keyword arguments to be given to treq.request.
+            ip_blacklist: The IP addresses that are blacklisted that
                 we may not request.
-            ip_whitelist (netaddr.IPSet): The whitelisted IP addresses, that we can
+            ip_whitelist: The whitelisted IP addresses, that we can
                request if it were otherwise caught in a blacklist.
-            http_proxy (bytes): proxy server to use for http connections. host[:port]
-            https_proxy (bytes): proxy server to use for https connections. host[:port]
+            use_proxy: Whether proxy settings should be discovered and used
+                from conventional environment variables.
         """
         self.hs = hs
 
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
-        self._extra_treq_args = treq_args
+        self._extra_treq_args = treq_args or {}
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
@@ -262,22 +331,11 @@ class SimpleHttpClient:
         self.user_agent = self.user_agent.encode("ascii")
 
         if self._ip_blacklist:
-            real_reactor = hs.get_reactor()
             # If we have an IP blacklist, we need to use a DNS resolver which
             # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            nameResolver = IPBlacklistingResolver(
-                real_reactor, self._ip_whitelist, self._ip_blacklist
-            )
-
-            @implementer(IReactorPluggableNameResolver)
-            class Reactor:
-                def __getattr__(_self, attr):
-                    if attr == "nameResolver":
-                        return nameResolver
-                    else:
-                        return getattr(real_reactor, attr)
-
-            self.reactor = Reactor()
+            self.reactor = BlacklistingReactorWrapper(
+                hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
+            )  # type: ISynapseReactor
         else:
             self.reactor = hs.get_reactor()
 
@@ -293,12 +351,12 @@ class SimpleHttpClient:
 
         self.agent = ProxyAgent(
             self.reactor,
+            hs.get_reactor(),
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
-            http_proxy=http_proxy,
-            https_proxy=https_proxy,
-        )
+            use_proxy=use_proxy,
+        )  # type: IAgent
 
         if self._ip_blacklist:
             # If we have an IP blacklist, we then install the blacklisting Agent
@@ -306,7 +364,6 @@ class SimpleHttpClient:
             # by the DNS resolution.
             self.agent = BlacklistingAgentWrapper(
                 self.agent,
-                self.reactor,
                 ip_whitelist=self._ip_whitelist,
                 ip_blacklist=self._ip_blacklist,
             )
@@ -350,7 +407,8 @@ class SimpleHttpClient:
                 body_producer = None
                 if data is not None:
                     body_producer = QuieterFileBodyProducer(
-                        BytesIO(data), cooperator=self._cooperator,
+                        BytesIO(data),
+                        cooperator=self._cooperator,
                     )
 
                 request_deferred = treq.request(
@@ -359,13 +417,18 @@ class SimpleHttpClient:
                     agent=self.agent,
                     data=body_producer,
                     headers=headers,
-                    **self._extra_treq_args
+                    # Avoid buffering the body in treq since we do not reuse
+                    # response bodies.
+                    unbuffered=True,
+                    **self._extra_treq_args,
                 )  # type: defer.Deferred
 
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
                 request_deferred = timeout_deferred(
-                    request_deferred, 60, self.hs.get_reactor(),
+                    request_deferred,
+                    60,
+                    self.hs.get_reactor(),
                 )
 
                 # turn timeouts into RequestTimedOutErrors
@@ -397,7 +460,7 @@ class SimpleHttpClient:
     async def post_urlencoded_get_json(
         self,
         uri: str,
-        args: Mapping[str, Union[str, List[str]]] = {},
+        args: Optional[Mapping[str, Union[str, List[str]]]] = None,
         headers: Optional[RawHeaders] = None,
     ) -> Any:
         """
@@ -422,9 +485,7 @@ class SimpleHttpClient:
         # TODO: Do we ever want to log message contents?
         logger.debug("post_urlencoded_get_json args: %s", args)
 
-        query_bytes = urllib.parse.urlencode(encode_urlencode_args(args), True).encode(
-            "utf8"
-        )
+        query_bytes = encode_query_args(args)
 
         actual_headers = {
             b"Content-Type": [b"application/x-www-form-urlencoded"],
@@ -432,7 +493,7 @@ class SimpleHttpClient:
             b"Accept": [b"application/json"],
         }
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request(
             "POST", uri, headers=Headers(actual_headers), data=query_bytes
@@ -479,7 +540,7 @@ class SimpleHttpClient:
             b"Accept": [b"application/json"],
         }
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request(
             "POST", uri, headers=Headers(actual_headers), data=json_str
@@ -495,7 +556,10 @@ class SimpleHttpClient:
             )
 
     async def get_json(
-        self, uri: str, args: QueryParams = {}, headers: Optional[RawHeaders] = None,
+        self,
+        uri: str,
+        args: Optional[QueryParams] = None,
+        headers: Optional[RawHeaders] = None,
     ) -> Any:
         """Gets some json from the given URI.
 
@@ -516,7 +580,7 @@ class SimpleHttpClient:
         """
         actual_headers = {b"Accept": [b"application/json"]}
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         body = await self.get_raw(uri, args, headers=headers)
         return json_decoder.decode(body.decode("utf-8"))
@@ -525,8 +589,8 @@ class SimpleHttpClient:
         self,
         uri: str,
         json_body: Any,
-        args: QueryParams = {},
-        headers: RawHeaders = None,
+        args: Optional[QueryParams] = None,
+        headers: Optional[RawHeaders] = None,
     ) -> Any:
         """Puts some json to the given URI.
 
@@ -546,9 +610,9 @@ class SimpleHttpClient:
 
             ValueError: if the response was not JSON
         """
-        if len(args):
-            query_bytes = urllib.parse.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_bytes)
+        if args:
+            query_str = urllib.parse.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_str)
 
         json_str = encode_canonical_json(json_body)
 
@@ -558,7 +622,7 @@ class SimpleHttpClient:
             b"Accept": [b"application/json"],
         }
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request(
             "PUT", uri, headers=Headers(actual_headers), data=json_str
@@ -574,7 +638,10 @@ class SimpleHttpClient:
             )
 
     async def get_raw(
-        self, uri: str, args: QueryParams = {}, headers: Optional[RawHeaders] = None
+        self,
+        uri: str,
+        args: Optional[QueryParams] = None,
+        headers: Optional[RawHeaders] = None,
     ) -> bytes:
         """Gets raw text from the given URI.
 
@@ -592,13 +659,13 @@ class SimpleHttpClient:
 
             HttpResponseException on a non-2xx HTTP response.
         """
-        if len(args):
-            query_bytes = urllib.parse.urlencode(args, True)
-            uri = "%s?%s" % (uri, query_bytes)
+        if args:
+            query_str = urllib.parse.urlencode(args, True)
+            uri = "%s?%s" % (uri, query_str)
 
         actual_headers = {b"User-Agent": [self.user_agent]}
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request("GET", uri, headers=Headers(actual_headers))
 
@@ -641,22 +708,11 @@ class SimpleHttpClient:
 
         actual_headers = {b"User-Agent": [self.user_agent]}
         if headers:
-            actual_headers.update(headers)
+            actual_headers.update(headers)  # type: ignore
 
         response = await self.request("GET", url, headers=Headers(actual_headers))
 
         resp_headers = dict(response.headers.getAllRawHeaders())
-
-        if (
-            b"Content-Length" in resp_headers
-            and int(resp_headers[b"Content-Length"][0]) > max_size
-        ):
-            logger.warning("Requested URL is too large > %r bytes" % (self.max_size,))
-            raise SynapseError(
-                502,
-                "Requested file is too large > %r bytes" % (self.max_size,),
-                Codes.TOO_LARGE,
-            )
 
         if response.code > 299:
             logger.warning("Got %d when downloading %s" % (response.code, url))
@@ -668,11 +724,14 @@ class SimpleHttpClient:
 
         try:
             length = await make_deferred_yieldable(
-                _readBodyToFile(response, output_stream, max_size)
+                read_body_with_max_size(response, output_stream, max_size)
             )
-        except SynapseError:
-            # This can happen e.g. because the body is too large.
-            raise
+        except BodyExceededMaxSize:
+            raise SynapseError(
+                502,
+                "Requested file is too large > %r bytes" % (max_size,),
+                Codes.TOO_LARGE,
+            )
         except Exception as e:
             raise SynapseError(502, ("Failed to download remote body: %s" % e)) from e
 
@@ -696,32 +755,86 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
-# XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
-# The two should be factored out.
+class ByteWriteable(Protocol):
+    """The type of object which must be passed into read_body_with_max_size.
+
+    Typically this is a file object.
+    """
+
+    def write(self, data: bytes) -> int:
+        pass
 
 
-class _ReadBodyToFileProtocol(protocol.Protocol):
-    def __init__(self, stream, deferred, max_size):
+class BodyExceededMaxSize(Exception):
+    """The maximum allowed size of the HTTP body was exceeded."""
+
+
+class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which immediately errors upon receiving data."""
+
+    transport = None  # type: Optional[ITCPTransport]
+
+    def __init__(self, deferred: defer.Deferred):
+        self.deferred = deferred
+
+    def _maybe_fail(self):
+        """
+        Report a max size exceed error and disconnect the first time this is called.
+        """
+        if not self.deferred.called:
+            self.deferred.errback(BodyExceededMaxSize())
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
+            assert self.transport is not None
+            self.transport.abortConnection()
+
+    def dataReceived(self, data: bytes) -> None:
+        self._maybe_fail()
+
+    def connectionLost(self, reason: Failure = connectionDone) -> None:
+        self._maybe_fail()
+
+
+class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
+    """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
+
+    transport = None  # type: Optional[ITCPTransport]
+
+    def __init__(
+        self, stream: ByteWriteable, deferred: defer.Deferred, max_size: Optional[int]
+    ):
         self.stream = stream
         self.deferred = deferred
         self.length = 0
         self.max_size = max_size
 
-    def dataReceived(self, data):
-        self.stream.write(data)
-        self.length += len(data)
-        if self.max_size is not None and self.length >= self.max_size:
-            self.deferred.errback(
-                SynapseError(
-                    502,
-                    "Requested file is too large > %r bytes" % (self.max_size,),
-                    Codes.TOO_LARGE,
-                )
-            )
-            self.deferred = defer.Deferred()
-            self.transport.loseConnection()
+    def dataReceived(self, data: bytes) -> None:
+        # If the deferred was called, bail early.
+        if self.deferred.called:
+            return
 
-    def connectionLost(self, reason):
+        try:
+            self.stream.write(data)
+        except Exception:
+            self.deferred.errback()
+            return
+
+        self.length += len(data)
+        # The first time the maximum size is exceeded, error and cancel the
+        # connection. dataReceived might be called again if data was received
+        # in the meantime.
+        if self.max_size is not None and self.length >= self.max_size:
+            self.deferred.errback(BodyExceededMaxSize())
+            # Close the connection (forcefully) since all the data will get
+            # discarded anyway.
+            assert self.transport is not None
+            self.transport.abortConnection()
+
+    def connectionLost(self, reason: Failure = connectionDone) -> None:
+        # If the maximum size was already exceeded, there's nothing to do.
+        if self.deferred.called:
+            return
+
         if reason.check(ResponseDone):
             self.deferred.callback(self.length)
         elif reason.check(PotentialDataLoss):
@@ -732,37 +845,61 @@ class _ReadBodyToFileProtocol(protocol.Protocol):
             self.deferred.errback(reason)
 
 
-# XXX: FIXME: This is horribly copy-pasted from matrixfederationclient.
-# The two should be factored out.
+def read_body_with_max_size(
+    response: IResponse, stream: ByteWriteable, max_size: Optional[int]
+) -> defer.Deferred:
+    """
+    Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
 
+    If the maximum file size is reached, the returned Deferred will resolve to a
+    Failure with a BodyExceededMaxSize exception.
 
-def _readBodyToFile(response, stream, max_size):
+    Args:
+        response: The HTTP response to read from.
+        stream: The file-object to write to.
+        max_size: The maximum file size to allow.
+
+    Returns:
+        A Deferred which resolves to the length of the read body.
+    """
     d = defer.Deferred()
-    response.deliverBody(_ReadBodyToFileProtocol(stream, d, max_size))
+
+    # If the Content-Length header gives a size larger than the maximum allowed
+    # size, do not bother downloading the body.
+    if max_size is not None and response.length != UNKNOWN_LENGTH:
+        if response.length > max_size:
+            response.deliverBody(_DiscardBodyWithMaxSizeProtocol(d))
+            return d
+
+    response.deliverBody(_ReadBodyWithMaxSizeProtocol(stream, d, max_size))
     return d
 
 
-def encode_urlencode_args(args):
-    return {k: encode_urlencode_arg(v) for k, v in args.items()}
+def encode_query_args(args: Optional[Mapping[str, Union[str, List[str]]]]) -> bytes:
+    """
+    Encodes a map of query arguments to bytes which can be appended to a URL.
+
+    Args:
+        args: The query arguments, a mapping of string to string or list of strings.
+
+    Returns:
+        The query arguments encoded as bytes.
+    """
+    if args is None:
+        return b""
+
+    encoded_args = {}
+    for k, vs in args.items():
+        if isinstance(vs, str):
+            vs = [vs]
+        encoded_args[k] = [v.encode("utf8") for v in vs]
+
+    query_str = urllib.parse.urlencode(encoded_args, True)
+
+    return query_str.encode("utf8")
 
 
-def encode_urlencode_arg(arg):
-    if isinstance(arg, str):
-        return arg.encode("utf-8")
-    elif isinstance(arg, list):
-        return [encode_urlencode_arg(i) for i in arg]
-    else:
-        return arg
-
-
-def _print_ex(e):
-    if hasattr(e, "reasons") and e.reasons:
-        for ex in e.reasons:
-            _print_ex(ex)
-    else:
-        logger.exception(e)
-
-
+@implementer(IPolicyForHTTPS)
 class InsecureInterceptableContextFactory(ssl.ContextFactory):
     """
     Factory for PyOpenSSL SSL contexts which accepts any certificate for any domain.

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -27,17 +26,25 @@ from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
     EventTypes,
+    HistoryVisibility,
     JoinRules,
     Membership,
     RoomCreationPreset,
     RoomEncryptionAlgorithms,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+)
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
-from synapse.http.endpoint import parse_and_validate_server_name
+from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
 from synapse.types import (
     JsonDict,
@@ -54,6 +61,7 @@ from synapse.types import (
 from synapse.util import stringutils
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.visibility import filter_events_for_client
 
 from ._base import BaseHandler
@@ -81,21 +89,21 @@ class RoomCreationHandler(BaseHandler):
         self._presets_dict = {
             RoomCreationPreset.PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": False,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
             },
             RoomCreationPreset.TRUSTED_PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": True,
                 "guest_can_join": True,
                 "power_level_content_override": {"invite": 0},
             },
             RoomCreationPreset.PUBLIC_CHAT: {
                 "join_rules": JoinRules.PUBLIC,
-                "history_visibility": "shared",
+                "history_visibility": HistoryVisibility.SHARED,
                 "original_invitees_have_ops": False,
                 "guest_can_join": False,
                 "power_level_content_override": {},
@@ -119,8 +127,8 @@ class RoomCreationHandler(BaseHandler):
         # succession, only process the first attempt and return its result to
         # subsequent requests
         self._upgrade_response_cache = ResponseCache(
-            hs, "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
-        )
+            hs.get_clock(), "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
+        )  # type: ResponseCache[Tuple[str, str]]
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
@@ -185,13 +193,16 @@ class RoomCreationHandler(BaseHandler):
             ShadowBanError if the requester is shadow-banned.
         """
         user_id = requester.user.to_string()
+        assert self.hs.is_mine_id(user_id), "User must be our own: %s" % (user_id,)
 
         # start by allocating a new room id
         r = await self.store.get_room(old_room_id)
         if r is None:
             raise NotFoundError("Unknown room id %s" % (old_room_id,))
         new_room_id = await self._generate_room_id(
-            creator_id=user_id, is_public=r["is_public"], room_version=new_version,
+            creator_id=user_id,
+            is_public=r["is_public"],
+            room_version=new_version,
         )
 
         logger.info("Creating new room %s to replace %s", new_room_id, old_room_id)
@@ -213,7 +224,6 @@ class RoomCreationHandler(BaseHandler):
                     "replacement_room": new_room_id,
                 },
             },
-            token_id=requester.access_token_id,
         )
         old_room_version = await self.store.get_room_version_id(old_room_id)
         await self.auth.check_from_context(
@@ -229,8 +239,10 @@ class RoomCreationHandler(BaseHandler):
         )
 
         # now send the tombstone
-        await self.event_creation_handler.send_nonmember_event(
-            requester, tombstone_event, tombstone_context
+        await self.event_creation_handler.handle_new_client_event(
+            requester=requester,
+            event=tombstone_event,
+            context=tombstone_context,
         )
 
         old_room_state = await tombstone_context.get_current_state_ids()
@@ -251,7 +263,10 @@ class RoomCreationHandler(BaseHandler):
         # finally, shut down the PLs in the old room, and update them in the new
         # room.
         await self._update_upgraded_room_pls(
-            requester, old_room_id, new_room_id, old_room_state,
+            requester,
+            old_room_id,
+            new_room_id,
+            old_room_state,
         )
 
         return new_room_id
@@ -358,13 +373,13 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        if not self.spam_checker.user_may_create_room(user_id):
+        if not await self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
 
         creation_content = {
             "room_version": new_room_version.identifier,
             "predecessor": {"room_id": old_room_id, "event_id": tombstone_event_id},
-        }
+        }  # type: JsonDict
 
         # Check if old room was non-federatable
 
@@ -419,17 +434,20 @@ class RoomCreationHandler(BaseHandler):
 
         # Copy over user power levels now as this will not be possible with >100PL users once
         # the room has been created
-
         # Calculate the minimum power level needed to clone the room
         event_power_levels = power_levels.get("events", {})
-        state_default = power_levels.get("state_default", 0)
-        ban = power_levels.get("ban")
+        state_default = power_levels.get("state_default", 50)
+        ban = power_levels.get("ban", 50)
         needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
+        # Get the user's current power level, this matches the logic in get_user_power_level,
+        # but without the entire state map.
+        user_power_levels = power_levels.setdefault("users", {})
+        users_default = power_levels.get("users_default", 0)
+        current_power_level = user_power_levels.get(user_id, users_default)
         # Raise the requester's power level in the new room if necessary
-        current_power_level = power_levels["users"][user_id]
         if current_power_level < needed_power_level:
-            power_levels["users"][user_id] = needed_power_level
+            user_power_levels[user_id] = needed_power_level
 
         await self._send_events_for_new_room(
             requester,
@@ -440,6 +458,7 @@ class RoomCreationHandler(BaseHandler):
             invite_list=[],
             initial_state=initial_state,
             creation_content=creation_content,
+            ratelimit=False,
         )
 
         # Transfer membership events
@@ -560,7 +579,7 @@ class RoomCreationHandler(BaseHandler):
         ratelimit: bool = True,
         creator_join_profile: Optional[JsonDict] = None,
     ) -> Tuple[dict, int]:
-        """ Creates a new room.
+        """Creates a new room.
 
         Args:
             requester:
@@ -587,7 +606,7 @@ class RoomCreationHandler(BaseHandler):
         """
         user_id = requester.user.to_string()
 
-        await self.auth.check_auth_blocking(user_id)
+        await self.auth.check_auth_blocking(requester=requester)
 
         if (
             self._server_notices_mxid is not None
@@ -608,7 +627,7 @@ class RoomCreationHandler(BaseHandler):
                 403, "You are not permitted to create rooms", Codes.FORBIDDEN
             )
 
-        if not is_requester_admin and not self.spam_checker.user_may_create_room(
+        if not is_requester_admin and not await self.spam_checker.user_may_create_room(
             user_id
         ):
             raise SynapseError(403, "You are not permitted to create rooms")
@@ -660,6 +679,19 @@ class RoomCreationHandler(BaseHandler):
             invite_3pid_list = []
             invite_list = []
 
+        if invite_list or invite_3pid_list:
+            try:
+                # If there are invites in the request, see if the ratelimiting settings
+                # allow that number of invites to be sent from the current user.
+                await self.room_member_handler.ratelimit_multiple_invites(
+                    requester,
+                    room_id=None,
+                    n_invites=len(invite_list) + len(invite_3pid_list),
+                    update=False,
+                )
+            except LimitExceededError:
+                raise SynapseError(400, "Cannot invite so many users at once")
+
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
         power_level_content_override = config.get("power_level_content_override")
@@ -678,10 +710,21 @@ class RoomCreationHandler(BaseHandler):
         is_public = visibility == "public"
 
         room_id = await self._generate_room_id(
-            creator_id=user_id, is_public=is_public, room_version=room_version,
+            creator_id=user_id,
+            is_public=is_public,
+            room_version=room_version,
         )
 
-        directory_handler = self.hs.get_handlers().directory_handler
+        # Check whether this visibility value is blocked by a third party module
+        allowed_by_third_party_rules = await (
+            self.third_party_event_rules.check_visibility_can_be_modified(
+                room_id, visibility
+            )
+        )
+        if not allowed_by_third_party_rules:
+            raise SynapseError(403, "Room visibility value not allowed.")
+
+        directory_handler = self.hs.get_directory_handler()
         if room_alias:
             await directory_handler.create_association(
                 requester=requester,
@@ -726,6 +769,7 @@ class RoomCreationHandler(BaseHandler):
             room_alias=room_alias,
             power_level_content_override=power_level_content_override,
             creator_join_profile=creator_join_profile,
+            ratelimit=ratelimit,
         )
 
         if "name" in config:
@@ -762,22 +806,29 @@ class RoomCreationHandler(BaseHandler):
                 ratelimit=False,
             )
 
-        for invitee in invite_list:
+        # we avoid dropping the lock between invites, as otherwise joins can
+        # start coming in and making the createRoom slow.
+        #
+        # we also don't need to check the requester's shadow-ban here, as we
+        # have already done so above (and potentially emptied invite_list).
+        with (await self.room_member_handler.member_linearizer.queue((room_id,))):
             content = {}
             is_direct = config.get("is_direct", None)
             if is_direct:
                 content["is_direct"] = is_direct
 
-            # Note that update_membership with an action of "invite" can raise a
-            # ShadowBanError, but this was handled above by emptying invite_list.
-            _, last_stream_id = await self.room_member_handler.update_membership(
-                requester,
-                UserID.from_string(invitee),
-                room_id,
-                "invite",
-                ratelimit=False,
-                content=content,
-            )
+            for invitee in invite_list:
+                (
+                    _,
+                    last_stream_id,
+                ) = await self.room_member_handler.update_membership_locked(
+                    requester,
+                    UserID.from_string(invitee),
+                    room_id,
+                    "invite",
+                    ratelimit=False,
+                    content=content,
+                )
 
         for invite_3pid in invite_3pid_list:
             id_server = invite_3pid["id_server"]
@@ -802,7 +853,7 @@ class RoomCreationHandler(BaseHandler):
         if room_alias:
             result["room_alias"] = room_alias.to_string()
 
-        # Always wait for room creation to progate before returning
+        # Always wait for room creation to propagate before returning
         await self._replication.wait_for_stream_position(
             self.hs.config.worker.events_shard_config.get_instance(room_id),
             "events",
@@ -822,6 +873,7 @@ class RoomCreationHandler(BaseHandler):
         room_alias: Optional[RoomAlias] = None,
         power_level_content_override: Optional[JsonDict] = None,
         creator_join_profile: Optional[JsonDict] = None,
+        ratelimit: bool = True,
     ) -> int:
         """Sends the initial events into a new room.
 
@@ -853,7 +905,10 @@ class RoomCreationHandler(BaseHandler):
                 _,
                 last_stream_id,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                creator, event, ratelimit=False, ignore_shadow_ban=True,
+                creator,
+                event,
+                ratelimit=False,
+                ignore_shadow_ban=True,
             )
             return last_stream_id
 
@@ -868,7 +923,7 @@ class RoomCreationHandler(BaseHandler):
             creator.user,
             room_id,
             "join",
-            ratelimit=False,
+            ratelimit=ratelimit,
             content=creator_join_profile,
         )
 
@@ -953,7 +1008,10 @@ class RoomCreationHandler(BaseHandler):
         return last_sent_stream_id
 
     async def _generate_room_id(
-        self, creator_id: str, is_public: bool, room_version: RoomVersion,
+        self,
+        creator_id: str,
+        is_public: bool,
+        room_version: RoomVersion,
     ):
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
@@ -977,41 +1035,51 @@ class RoomCreationHandler(BaseHandler):
 class RoomContextHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
+        self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
     async def get_event_context(
         self,
-        user: UserID,
+        requester: Requester,
         room_id: str,
         event_id: str,
         limit: int,
         event_filter: Optional[Filter],
+        use_admin_priviledge: bool = False,
     ) -> Optional[JsonDict]:
         """Retrieves events, pagination tokens and state around a given event
         in a room.
 
         Args:
-            user
+            requester
             room_id
             event_id
             limit: The maximum number of events to return in total
                 (excluding state).
             event_filter: the filter to apply to the events returned
                 (excluding the target event_id)
-
+            use_admin_priviledge: if `True`, return all events, regardless
+                of whether `user` has access to them. To be used **ONLY**
+                from the admin API.
         Returns:
             dict, or None if the event isn't found
         """
+        user = requester.user
+        if use_admin_priviledge:
+            await assert_user_is_admin(self.auth, requester.user)
+
         before_limit = math.floor(limit / 2.0)
         after_limit = limit - before_limit
 
         users = await self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
-        def filter_evts(events):
-            return filter_events_for_client(
+        async def filter_evts(events):
+            if use_admin_priviledge:
+                return events
+            return await filter_events_for_client(
                 self.storage, user.to_string(), events, is_peeking=is_peeking
             )
 
@@ -1241,7 +1309,9 @@ class RoomShutdownHandler:
                     400, "User must be our own: %s" % (new_room_user_id,)
                 )
 
-            room_creator_requester = create_requester(new_room_user_id)
+            room_creator_requester = create_requester(
+                new_room_user_id, authenticated_entity=requester_user_id
+            )
 
             info, stream_id = await self._room_creation_handler.create_room(
                 room_creator_requester,
@@ -1259,7 +1329,7 @@ class RoomShutdownHandler:
             )
 
             # We now wait for the create room to come back in via replication so
-            # that we can assume that all the joins/invites have propogated before
+            # that we can assume that all the joins/invites have propagated before
             # we try and auto join below.
             await self._replication.wait_for_stream_position(
                 self.hs.config.worker.events_shard_config.get_instance(new_room_id),
@@ -1270,7 +1340,7 @@ class RoomShutdownHandler:
             new_room_id = None
             logger.info("Shutting down room %r", room_id)
 
-        users = await self.state.get_current_users_in_room(room_id)
+        users = await self.store.get_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
         for user_id in users:
@@ -1281,7 +1351,9 @@ class RoomShutdownHandler:
 
             try:
                 # Kick users from room
-                target_requester = create_requester(user_id)
+                target_requester = create_requester(
+                    user_id, authenticated_entity=requester_user_id
+                )
                 _, stream_id = await self.room_member_handler.update_membership(
                     requester=target_requester,
                     target=target_requester.user,

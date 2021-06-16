@@ -1,1 +1,0 @@
-Refactor notifier code to correctly use the max event stream position.

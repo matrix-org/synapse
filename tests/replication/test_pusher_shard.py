@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -27,8 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
-    """Checks pusher sharding works
-    """
+    """Checks pusher sharding works"""
 
     servlets = [
         admin.register_servlets_for_client_rest_resource,
@@ -55,7 +52,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         user_dict = self.get_success(
             self.hs.get_datastore().get_user_by_access_token(access_token)
         )
-        token_id = user_dict["token_id"]
+        token_id = user_dict.token_id
 
         self.get_success(
             self.hs.get_pusherpool().add_pusher(
@@ -67,7 +64,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
                 device_display_name="pushy push",
                 pushkey="a@example.com",
                 lang=None,
-                data={"url": "https://push.example.com/push"},
+                data={"url": "https://push.example.com/_matrix/push/v1/notify"},
             )
         )
 
@@ -88,17 +85,16 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         return event_id
 
     def test_send_push_single_worker(self):
-        """Test that registration works when using a pusher worker.
-        """
+        """Test that registration works when using a pusher worker."""
         http_client_mock = Mock(spec_set=["post_json_get_json"])
-        http_client_mock.post_json_get_json.side_effect = lambda *_, **__: defer.succeed(
-            {}
+        http_client_mock.post_json_get_json.side_effect = (
+            lambda *_, **__: defer.succeed({})
         )
 
         self.make_worker_hs(
             "synapse.app.pusher",
-            {"start_pushers": True},
-            proxied_http_client=http_client_mock,
+            {"start_pushers": False},
+            proxied_blacklisted_http_client=http_client_mock,
         )
 
         event_id = self._create_pusher_and_send_msg("user")
@@ -109,7 +105,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         http_client_mock.post_json_get_json.assert_called_once()
         self.assertEqual(
             http_client_mock.post_json_get_json.call_args[0][0],
-            "https://push.example.com/push",
+            "https://push.example.com/_matrix/push/v1/notify",
         )
         self.assertEqual(
             event_id,
@@ -119,11 +115,10 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         )
 
     def test_send_push_multiple_workers(self):
-        """Test that registration works when using sharded pusher workers.
-        """
+        """Test that registration works when using sharded pusher workers."""
         http_client_mock1 = Mock(spec_set=["post_json_get_json"])
-        http_client_mock1.post_json_get_json.side_effect = lambda *_, **__: defer.succeed(
-            {}
+        http_client_mock1.post_json_get_json.side_effect = (
+            lambda *_, **__: defer.succeed({})
         )
 
         self.make_worker_hs(
@@ -133,12 +128,12 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
                 "worker_name": "pusher1",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
-            proxied_http_client=http_client_mock1,
+            proxied_blacklisted_http_client=http_client_mock1,
         )
 
         http_client_mock2 = Mock(spec_set=["post_json_get_json"])
-        http_client_mock2.post_json_get_json.side_effect = lambda *_, **__: defer.succeed(
-            {}
+        http_client_mock2.post_json_get_json.side_effect = (
+            lambda *_, **__: defer.succeed({})
         )
 
         self.make_worker_hs(
@@ -148,7 +143,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
                 "worker_name": "pusher2",
                 "pusher_instances": ["pusher1", "pusher2"],
             },
-            proxied_http_client=http_client_mock2,
+            proxied_blacklisted_http_client=http_client_mock2,
         )
 
         # We choose a user name that we know should go to pusher1.
@@ -161,7 +156,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         http_client_mock2.post_json_get_json.assert_not_called()
         self.assertEqual(
             http_client_mock1.post_json_get_json.call_args[0][0],
-            "https://push.example.com/push",
+            "https://push.example.com/_matrix/push/v1/notify",
         )
         self.assertEqual(
             event_id,
@@ -183,7 +178,7 @@ class PusherShardTestCase(BaseMultiWorkerStreamTestCase):
         http_client_mock2.post_json_get_json.assert_called_once()
         self.assertEqual(
             http_client_mock2.post_json_get_json.call_args[0][0],
-            "https://push.example.com/push",
+            "https://push.example.com/_matrix/push/v1/notify",
         )
         self.assertEqual(
             event_id,

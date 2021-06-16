@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -59,13 +58,14 @@ class ProfileDisplaynameRestServlet(RestServlet):
         try:
             new_name = content["displayname"]
         except Exception:
-            return 400, "Unable to parse name"
+            raise SynapseError(
+                code=400,
+                msg="Unable to parse name",
+                errcode=Codes.BAD_JSON,
+            )
 
         await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
-        return 200, {}
-
-    def on_OPTIONS(self, request, user_id):
         return 200, {}
 
 
@@ -114,9 +114,6 @@ class ProfileAvatarURLRestServlet(RestServlet):
             user, requester, new_avatar_url, is_admin
         )
 
-        return 200, {}
-
-    def on_OPTIONS(self, request, user_id):
         return 200, {}
 
 

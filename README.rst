@@ -1,10 +1,6 @@
-================
-Synapse |shield|
-================
-
-.. |shield| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
-  :alt: (get support on #synapse:matrix.org)
-  :target: https://matrix.to/#/#synapse:matrix.org
+=========================================================
+Synapse |support| |development| |license| |pypi| |python|
+=========================================================
 
 .. contents::
 
@@ -153,21 +149,45 @@ For details on having Synapse manage your federation TLS certificates
 automatically, please see `<docs/ACME.md>`_.
 
 
-Security Note
+Security note
 =============
 
-Matrix serves raw user generated data in some APIs - specifically the `content
-repository endpoints <https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+Matrix serves raw, user-supplied data in some APIs -- specifically the `content
+repository endpoints`_.
 
-Whilst we have tried to mitigate against possible XSS attacks (e.g.
-https://github.com/matrix-org/synapse/pull/1021) we recommend running
-matrix homeservers on a dedicated domain name, to limit any malicious user generated
-content served to web browsers a matrix API from being able to attack webapps hosted
-on the same domain.  This is particularly true of sharing a matrix webclient and
-server on the same domain.
+.. _content repository endpoints: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid
 
-See https://github.com/vector-im/riot-web/issues/1977 and
-https://developer.github.com/changes/2014-04-25-user-content-security for more details.
+Whilst we make a reasonable effort to mitigate against XSS attacks (for
+instance, by using `CSP`_), a Matrix homeserver should not be hosted on a
+domain hosting other web applications. This especially applies to sharing
+the domain with Matrix web clients and other sensitive applications like
+webmail. See
+https://developer.github.com/changes/2014-04-25-user-content-security for more
+information.
+
+.. _CSP: https://github.com/matrix-org/synapse/pull/1021
+
+Ideally, the homeserver should not simply be on a different subdomain, but on
+a completely different `registered domain`_ (also known as top-level site or
+eTLD+1). This is because `some attacks`_ are still possible as long as the two
+applications share the same registered domain.
+
+.. _registered domain: https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-2.3
+
+.. _some attacks: https://en.wikipedia.org/wiki/Session_fixation#Attacks_using_cross-subdomain_cookie
+
+To illustrate this with an example, if your Element Web or other sensitive web
+application is hosted on ``A.example1.com``, you should ideally host Synapse on
+``example2.com``. Some amount of protection is offered by hosting on
+``B.example1.com`` instead, so this is also acceptable in some scenarios.
+However, you should *not* host your Synapse on ``A.example1.com``.
+
+Note that all of the above refers exclusively to the domain used in Synapse's
+``public_baseurl`` setting. In particular, it has no bearing on the domain
+mentioned in MXIDs hosted on that server.
+
+Following this advice ensures that even if an XSS is found in Synapse, the
+impact to other applications will be minimal.
 
 
 Upgrading an existing Synapse
@@ -187,8 +207,9 @@ Using a reverse proxy with Synapse
 It is recommended to put a reverse proxy such as
 `nginx <https://nginx.org/en/docs/http/ngx_http_proxy_module.html>`_,
 `Apache <https://httpd.apache.org/docs/current/mod/mod_proxy_http.html>`_,
-`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_ or
-`HAProxy <https://www.haproxy.org/>`_ in front of Synapse. One advantage of
+`Caddy <https://caddyserver.com/docs/quick-starts/reverse-proxy>`_,
+`HAProxy <https://www.haproxy.org/>`_ or
+`relayd <https://man.openbsd.org/relayd.8>`_ in front of Synapse. One advantage of
 doing so is that it means that you can expose the default https port (443) to
 Matrix clients without needing to run Synapse with root privileges.
 
@@ -247,6 +268,8 @@ Then update the ``users`` table in the database::
 Synapse Development
 ===================
 
+Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_
+
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
 `Installing from source <INSTALL.md#installing-from-source>`_.
@@ -260,23 +283,53 @@ directory of your choice::
 Synapse has a number of external dependencies, that are easiest
 to install using pip and a virtualenv::
 
-    virtualenv -p python3 env
-    source env/bin/activate
-    python -m pip install --no-use-pep517 -e ".[all]"
+    python3 -m venv ./env
+    source ./env/bin/activate
+    pip install -e ".[all,test]"
 
 This will run a process of downloading and installing all the needed
-dependencies into a virtual env.
+dependencies into a virtual env. If any dependencies fail to install,
+try installing the failing modules individually::
 
-Once this is done, you may wish to run Synapse's unit tests, to
-check that everything is installed as it should be::
+    pip install -e "module-name"
 
-    python -m twisted.trial tests
+We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
 
-This should end with a 'PASSED' result::
+    ./demo/start.sh
 
-    Ran 143 tests in 0.601s
+(to stop, you can use `./demo/stop.sh`)
 
-    PASSED (successes=143)
+If you just want to start a single instance of the app and run it directly::
+
+    # Create the homeserver.yaml config once
+    python -m synapse.app.homeserver \
+      --server-name my.domain.name \
+      --config-path homeserver.yaml \
+      --generate-config \
+      --report-stats=[yes|no]
+
+    # Start the app
+    python -m synapse.app.homeserver --config-path homeserver.yaml
+
+
+Running the unit tests
+======================
+
+After getting up and running, you may wish to run Synapse's unit tests to
+check that everything is installed correctly::
+
+    trial tests
+
+This should end with a 'PASSED' result (note that exact numbers will
+differ)::
+
+    Ran 1337 tests in 716.064s
+
+    PASSED (skips=15, successes=1322)
+
+For more tips on running the unit tests, like running a specific test or
+to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
+
 
 Running the Integration Tests
 =============================
@@ -290,18 +343,14 @@ Testing with SyTest is recommended for verifying that changes related to the
 Client-Server API are functioning correctly. See the `installation instructions
 <https://github.com/matrix-org/sytest#installing>`_ for details.
 
-Building Internal API Documentation
-===================================
 
-Before building internal API documentation install sphinx and
-sphinxcontrib-napoleon::
+Platform dependencies
+=====================
 
-    pip install sphinx
-    pip install sphinxcontrib-napoleon
+Synapse uses a number of platform dependencies such as Python and PostgreSQL,
+and aims to follow supported upstream versions. See the
+`<docs/deprecation_policy.md>`_ document for more details.
 
-Building internal API documentation::
-
-    python setup.py build_sphinx
 
 Troubleshooting
 ===============
@@ -373,12 +422,17 @@ massive excess of outgoing federation requests (see `discussion
 indicate that your server is also issuing far more outgoing federation
 requests than can be accounted for by your users' activity, this is a
 likely cause. The misbehavior can be worked around by setting
-``use_presence: false`` in the Synapse config file.
+the following in the Synapse config file:
+
+.. code-block:: yaml
+
+   presence:
+       enabled: false
 
 People can't accept room invitations from me
 --------------------------------------------
 
-The typical failure mode here is that you send an invitation to someone 
+The typical failure mode here is that you send an invitation to someone
 to join a room or direct chat, but when they go to accept it, they get an
 error (typically along the lines of "Invalid signature"). They might see
 something like the following in their logs::
@@ -387,3 +441,23 @@ something like the following in their logs::
 
 This is normally caused by a misconfiguration in your reverse-proxy. See
 `<docs/reverse_proxy.md>`_ and double-check that your settings are correct.
+
+.. |support| image:: https://img.shields.io/matrix/synapse:matrix.org?label=support&logo=matrix
+  :alt: (get support on #synapse:matrix.org)
+  :target: https://matrix.to/#/#synapse:matrix.org
+
+.. |development| image:: https://img.shields.io/matrix/synapse-dev:matrix.org?label=development&logo=matrix
+  :alt: (discuss development on #synapse-dev:matrix.org)
+  :target: https://matrix.to/#/#synapse-dev:matrix.org
+
+.. |license| image:: https://img.shields.io/github/license/matrix-org/synapse
+  :alt: (check license in LICENSE file)
+  :target: LICENSE
+
+.. |pypi| image:: https://img.shields.io/pypi/v/matrix-synapse
+  :alt: (latest version released on PyPi)
+  :target: https://pypi.org/project/matrix-synapse
+
+.. |python| image:: https://img.shields.io/pypi/pyversions/matrix-synapse
+  :alt: (supported python versions)
+  :target: https://pypi.org/project/matrix-synapse

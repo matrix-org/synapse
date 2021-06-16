@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +14,7 @@
 
 
 from collections import OrderedDict
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -56,6 +54,7 @@ class SQLBaseStoreTestCase(unittest.TestCase):
         engine = create_engine(sqlite_config)
         fake_engine = Mock(wraps=engine)
         fake_engine.can_native_upsert = False
+        fake_engine.in_transaction.return_value = False
 
         db = DatabasePool(Mock(), Mock(config=sqlite_config), fake_engine)
         db._db_pool = self.db_pool

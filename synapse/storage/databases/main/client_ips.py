@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,12 +13,13 @@
 # limitations under the License.
 
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool, make_tuple_comparison_clause
-from synapse.util.caches.descriptors import Cache
+from synapse.types import UserID
+from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +279,7 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         return batch_size
 
     async def _devices_last_seen_update(self, progress, batch_size):
-        """Background update to insert last seen info into devices table
-        """
+        """Background update to insert last seen info into devices table"""
 
         last_user_id = progress.get("last_user_id", "")
         last_device_id = progress.get("last_device_id", "")
@@ -298,7 +297,6 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             #      times, which is fine.
 
             where_clause, where_args = make_tuple_comparison_clause(
-                self.database_engine,
                 [("user_id", last_user_id), ("device_id", last_device_id)],
             )
 
@@ -351,185 +349,18 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
         return updated
 
 
-class ClientIpStore(ClientIpBackgroundUpdateStore):
+class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
-
-        self.client_ip_last_seen = Cache(
-            name="client_ip_last_seen", keylen=4, max_entries=50000
-        )
-
         super().__init__(database, db_conn, hs)
 
         self.user_ips_max_age = hs.config.user_ips_max_age
 
-        # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
-        self._batch_row_update = {}
-
-        self._client_ip_looper = self._clock.looping_call(
-            self._update_client_ips_batch, 5 * 1000
-        )
-        self.hs.get_reactor().addSystemEventTrigger(
-            "before", "shutdown", self._update_client_ips_batch
-        )
-
-        if self.user_ips_max_age:
+        if hs.config.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
-
-    async def insert_client_ip(
-        self, user_id, access_token, ip, user_agent, device_id, now=None
-    ):
-        if not now:
-            now = int(self._clock.time_msec())
-        key = (user_id, access_token, ip)
-
-        try:
-            last_seen = self.client_ip_last_seen.get(key)
-        except KeyError:
-            last_seen = None
-        await self.populate_monthly_active_users(user_id)
-        # Rate-limited inserts
-        if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
-            return
-
-        self.client_ip_last_seen.prefill(key, now)
-
-        self._batch_row_update[key] = (user_agent, device_id, now)
-
-    @wrap_as_background_process("update_client_ips")
-    async def _update_client_ips_batch(self) -> None:
-
-        # If the DB pool has already terminated, don't try updating
-        if not self.db_pool.is_running():
-            return
-
-        to_update = self._batch_row_update
-        self._batch_row_update = {}
-
-        await self.db_pool.runInteraction(
-            "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
-        )
-
-    def _update_client_ips_batch_txn(self, txn, to_update):
-        if "user_ips" in self.db_pool._unsafe_to_upsert_tables or (
-            not self.database_engine.can_native_upsert
-        ):
-            self.database_engine.lock_table(txn, "user_ips")
-
-        for entry in to_update.items():
-            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
-
-            try:
-                self.db_pool.simple_upsert_txn(
-                    txn,
-                    table="user_ips",
-                    keyvalues={
-                        "user_id": user_id,
-                        "access_token": access_token,
-                        "ip": ip,
-                    },
-                    values={
-                        "user_agent": user_agent,
-                        "device_id": device_id,
-                        "last_seen": last_seen,
-                    },
-                    lock=False,
-                )
-
-                # Technically an access token might not be associated with
-                # a device so we need to check.
-                if device_id:
-                    # this is always an update rather than an upsert: the row should
-                    # already exist, and if it doesn't, that may be because it has been
-                    # deleted, and we don't want to re-create it.
-                    self.db_pool.simple_update_txn(
-                        txn,
-                        table="devices",
-                        keyvalues={"user_id": user_id, "device_id": device_id},
-                        updatevalues={
-                            "user_agent": user_agent,
-                            "last_seen": last_seen,
-                            "ip": ip,
-                        },
-                    )
-            except Exception as e:
-                # Failed to upsert, log and continue
-                logger.error("Failed to insert client IP %r: %r", entry, e)
-
-    async def get_last_client_ip_by_device(
-        self, user_id: str, device_id: Optional[str]
-    ) -> Dict[Tuple[str, str], dict]:
-        """For each device_id listed, give the user_ip it was last seen on
-
-        Args:
-            user_id: The user to fetch devices for.
-            device_id: If None fetches all devices for the user
-
-        Returns:
-            A dictionary mapping a tuple of (user_id, device_id) to dicts, with
-            keys giving the column names from the devices table.
-        """
-
-        keyvalues = {"user_id": user_id}
-        if device_id is not None:
-            keyvalues["device_id"] = device_id
-
-        res = await self.db_pool.simple_select_list(
-            table="devices",
-            keyvalues=keyvalues,
-            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
-        )
-
-        ret = {(d["user_id"], d["device_id"]): d for d in res}
-        for key in self._batch_row_update:
-            uid, access_token, ip = key
-            if uid == user_id:
-                user_agent, did, last_seen = self._batch_row_update[key]
-                if not device_id or did == device_id:
-                    ret[(user_id, device_id)] = {
-                        "user_id": user_id,
-                        "access_token": access_token,
-                        "ip": ip,
-                        "user_agent": user_agent,
-                        "device_id": did,
-                        "last_seen": last_seen,
-                    }
-        return ret
-
-    async def get_user_ip_and_agents(self, user):
-        user_id = user.to_string()
-        results = {}
-
-        for key in self._batch_row_update:
-            uid, access_token, ip, = key
-            if uid == user_id:
-                user_agent, _, last_seen = self._batch_row_update[key]
-                results[(access_token, ip)] = (user_agent, last_seen)
-
-        rows = await self.db_pool.simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": user_id},
-            retcols=["access_token", "ip", "user_agent", "last_seen"],
-            desc="get_user_ip_and_agents",
-        )
-
-        results.update(
-            ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
-            for row in rows
-        )
-        return [
-            {
-                "access_token": access_token,
-                "ip": ip,
-                "user_agent": user_agent,
-                "last_seen": last_seen,
-            }
-            for (access_token, ip), (user_agent, last_seen) in results.items()
-        ]
 
     @wrap_as_background_process("prune_old_user_ips")
     async def _prune_old_user_ips(self):
-        """Removes entries in user IPs older than the configured period.
-        """
+        """Removes entries in user IPs older than the configured period."""
 
         if self.user_ips_max_age is None:
             # Nothing to do
@@ -571,3 +402,191 @@ class ClientIpStore(ClientIpBackgroundUpdateStore):
         await self.db_pool.runInteraction(
             "_prune_old_user_ips", _prune_old_user_ips_txn
         )
+
+    async def get_last_client_ip_by_device(
+        self, user_id: str, device_id: Optional[str]
+    ) -> Dict[Tuple[str, str], dict]:
+        """For each device_id listed, give the user_ip it was last seen on.
+
+        The result might be slightly out of date as client IPs are inserted in batches.
+
+        Args:
+            user_id: The user to fetch devices for.
+            device_id: If None fetches all devices for the user
+
+        Returns:
+            A dictionary mapping a tuple of (user_id, device_id) to dicts, with
+            keys giving the column names from the devices table.
+        """
+
+        keyvalues = {"user_id": user_id}
+        if device_id is not None:
+            keyvalues["device_id"] = device_id
+
+        res = await self.db_pool.simple_select_list(
+            table="devices",
+            keyvalues=keyvalues,
+            retcols=("user_id", "ip", "user_agent", "device_id", "last_seen"),
+        )
+
+        return {(d["user_id"], d["device_id"]): d for d in res}
+
+
+class ClientIpStore(ClientIpWorkerStore):
+    def __init__(self, database: DatabasePool, db_conn, hs):
+
+        self.client_ip_last_seen = LruCache(
+            cache_name="client_ip_last_seen", max_size=50000
+        )
+
+        super().__init__(database, db_conn, hs)
+
+        # (user_id, access_token, ip,) -> (user_agent, device_id, last_seen)
+        self._batch_row_update = {}
+
+        self._client_ip_looper = self._clock.looping_call(
+            self._update_client_ips_batch, 5 * 1000
+        )
+        self.hs.get_reactor().addSystemEventTrigger(
+            "before", "shutdown", self._update_client_ips_batch
+        )
+
+    async def insert_client_ip(
+        self, user_id, access_token, ip, user_agent, device_id, now=None
+    ):
+        if not now:
+            now = int(self._clock.time_msec())
+        key = (user_id, access_token, ip)
+
+        try:
+            last_seen = self.client_ip_last_seen.get(key)
+        except KeyError:
+            last_seen = None
+        await self.populate_monthly_active_users(user_id)
+        # Rate-limited inserts
+        if last_seen is not None and (now - last_seen) < LAST_SEEN_GRANULARITY:
+            return
+
+        self.client_ip_last_seen.set(key, now)
+
+        self._batch_row_update[key] = (user_agent, device_id, now)
+
+    @wrap_as_background_process("update_client_ips")
+    async def _update_client_ips_batch(self) -> None:
+
+        # If the DB pool has already terminated, don't try updating
+        if not self.db_pool.is_running():
+            return
+
+        to_update = self._batch_row_update
+        self._batch_row_update = {}
+
+        await self.db_pool.runInteraction(
+            "_update_client_ips_batch", self._update_client_ips_batch_txn, to_update
+        )
+
+    def _update_client_ips_batch_txn(self, txn, to_update):
+        if "user_ips" in self.db_pool._unsafe_to_upsert_tables or (
+            not self.database_engine.can_native_upsert
+        ):
+            self.database_engine.lock_table(txn, "user_ips")
+
+        for entry in to_update.items():
+            (user_id, access_token, ip), (user_agent, device_id, last_seen) = entry
+
+            self.db_pool.simple_upsert_txn(
+                txn,
+                table="user_ips",
+                keyvalues={"user_id": user_id, "access_token": access_token, "ip": ip},
+                values={
+                    "user_agent": user_agent,
+                    "device_id": device_id,
+                    "last_seen": last_seen,
+                },
+                lock=False,
+            )
+
+            # Technically an access token might not be associated with
+            # a device so we need to check.
+            if device_id:
+                # this is always an update rather than an upsert: the row should
+                # already exist, and if it doesn't, that may be because it has been
+                # deleted, and we don't want to re-create it.
+                self.db_pool.simple_update_txn(
+                    txn,
+                    table="devices",
+                    keyvalues={"user_id": user_id, "device_id": device_id},
+                    updatevalues={
+                        "user_agent": user_agent,
+                        "last_seen": last_seen,
+                        "ip": ip,
+                    },
+                )
+
+    async def get_last_client_ip_by_device(
+        self, user_id: str, device_id: Optional[str]
+    ) -> Dict[Tuple[str, str], dict]:
+        """For each device_id listed, give the user_ip it was last seen on
+
+        Args:
+            user_id: The user to fetch devices for.
+            device_id: If None fetches all devices for the user
+
+        Returns:
+            A dictionary mapping a tuple of (user_id, device_id) to dicts, with
+            keys giving the column names from the devices table.
+        """
+        ret = await super().get_last_client_ip_by_device(user_id, device_id)
+
+        # Update what is retrieved from the database with data which is pending insertion.
+        for key in self._batch_row_update:
+            uid, access_token, ip = key
+            if uid == user_id:
+                user_agent, did, last_seen = self._batch_row_update[key]
+                if not device_id or did == device_id:
+                    ret[(user_id, device_id)] = {
+                        "user_id": user_id,
+                        "access_token": access_token,
+                        "ip": ip,
+                        "user_agent": user_agent,
+                        "device_id": did,
+                        "last_seen": last_seen,
+                    }
+        return ret
+
+    async def get_user_ip_and_agents(
+        self, user: UserID
+    ) -> List[Dict[str, Union[str, int]]]:
+        user_id = user.to_string()
+        results = {}
+
+        for key in self._batch_row_update:
+            (
+                uid,
+                access_token,
+                ip,
+            ) = key
+            if uid == user_id:
+                user_agent, _, last_seen = self._batch_row_update[key]
+                results[(access_token, ip)] = (user_agent, last_seen)
+
+        rows = await self.db_pool.simple_select_list(
+            table="user_ips",
+            keyvalues={"user_id": user_id},
+            retcols=["access_token", "ip", "user_agent", "last_seen"],
+            desc="get_user_ip_and_agents",
+        )
+
+        results.update(
+            ((row["access_token"], row["ip"]), (row["user_agent"], row["last_seen"]))
+            for row in rows
+        )
+        return [
+            {
+                "access_token": access_token,
+                "ip": ip,
+                "user_agent": user_agent,
+                "last_seen": last_seen,
+            }
+            for (access_token, ip), (user_agent, last_seen) in results.items()
+        ]

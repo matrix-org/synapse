@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,15 +14,15 @@
 import heapq
 import logging
 import threading
-from collections import deque
+from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Set, Union
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
-from typing_extensions import Deque
 
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 logger = logging.getLogger(__name__)
@@ -54,7 +53,7 @@ def _load_current_id(db_conn, table, column, step=1):
     """
     # debug logging for https://github.com/matrix-org/synapse/issues/7968
     logger.info("initialising stream generator for %s(%s)", table, column)
-    cur = db_conn.cursor()
+    cur = db_conn.cursor(txn_name="_load_current_id")
     if step == 1:
         cur.execute("SELECT MAX(%s) FROM %s" % (column, table))
     else:
@@ -91,7 +90,14 @@ class StreamIdGenerator:
             # ... persist event ...
     """
 
-    def __init__(self, db_conn, table, column, extra_tables=[], step=1):
+    def __init__(
+        self,
+        db_conn,
+        table,
+        column,
+        extra_tables: Iterable[Tuple[str, str]] = (),
+        step=1,
+    ):
         assert step != 0
         self._lock = threading.Lock()
         self._step = step
@@ -100,7 +106,13 @@ class StreamIdGenerator:
             self._current = (max if step > 0 else min)(
                 self._current, _load_current_id(db_conn, table, column, step)
             )
-        self._unfinished_ids = deque()  # type: Deque[int]
+
+        # We use this as an ordered set, as we want to efficiently append items,
+        # remove items and get the first item. Since we insert IDs in order, the
+        # insertion ordering will ensure its in the correct ordering.
+        #
+        # The key and values are the same, but we never look at the values.
+        self._unfinished_ids = OrderedDict()  # type: OrderedDict[int, int]
 
     def get_next(self):
         """
@@ -112,7 +124,7 @@ class StreamIdGenerator:
             self._current += self._step
             next_id = self._current
 
-            self._unfinished_ids.append(next_id)
+            self._unfinished_ids[next_id] = next_id
 
         @contextmanager
         def manager():
@@ -120,7 +132,7 @@ class StreamIdGenerator:
                 yield next_id
             finally:
                 with self._lock:
-                    self._unfinished_ids.remove(next_id)
+                    self._unfinished_ids.pop(next_id)
 
         return _AsyncCtxManagerWrapper(manager())
 
@@ -139,7 +151,7 @@ class StreamIdGenerator:
             self._current += n * self._step
 
             for next_id in next_ids:
-                self._unfinished_ids.append(next_id)
+                self._unfinished_ids[next_id] = next_id
 
         @contextmanager
         def manager():
@@ -148,20 +160,20 @@ class StreamIdGenerator:
             finally:
                 with self._lock:
                     for next_id in next_ids:
-                        self._unfinished_ids.remove(next_id)
+                        self._unfinished_ids.pop(next_id)
 
         return _AsyncCtxManagerWrapper(manager())
 
-    def get_current_token(self):
+    def get_current_token(self) -> int:
         """Returns the maximum stream id such that all stream ids less than or
         equal to it have been successfully persisted.
 
         Returns:
-            int
+            The maximum stream id.
         """
         with self._lock:
             if self._unfinished_ids:
-                return self._unfinished_ids[0] - self._step
+                return next(iter(self._unfinished_ids)) - self._step
 
             return self._current
 
@@ -185,11 +197,12 @@ class MultiWriterIdGenerator:
     Args:
         db_conn
         db
-        stream_name: A name for the stream.
+        stream_name: A name for the stream, for use in the `stream_positions`
+            table. (Does not need to be the same as the replication stream name)
         instance_name: The name of this instance.
-        table: Database table associated with stream.
-        instance_column: Column that stores the row's writer's instance name
-        id_column: Column that stores the stream ID.
+        tables: List of tables associated with the stream. Tuple of table
+            name, column name that stores the writer's instance name, and
+            column name that stores the stream ID.
         sequence_name: The name of the postgres sequence used to generate new
             IDs.
         writers: A list of known writers to use to populate current positions
@@ -205,9 +218,7 @@ class MultiWriterIdGenerator:
         db: DatabasePool,
         stream_name: str,
         instance_name: str,
-        table: str,
-        instance_column: str,
-        id_column: str,
+        tables: List[Tuple[str, str, str]],
         sequence_name: str,
         writers: List[str],
         positive: bool = True,
@@ -240,7 +251,7 @@ class MultiWriterIdGenerator:
         # and b) noting that if we have seen a run of persisted positions
         # without gaps (e.g. 5, 6, 7) then we can skip forward (e.g. to 7).
         #
-        # Note: There is no guarentee that the IDs generated by the sequence
+        # Note: There is no guarantee that the IDs generated by the sequence
         # will be gapless; gaps can form when e.g. a transaction was rolled
         # back. This means that sometimes we won't be able to skip forward the
         # position even though everything has been persisted. However, since
@@ -259,17 +270,24 @@ class MultiWriterIdGenerator:
         self._sequence_gen = PostgresSequenceGenerator(sequence_name)
 
         # We check that the table and sequence haven't diverged.
-        self._sequence_gen.check_consistency(
-            db_conn, table=table, id_column=id_column, positive=positive
-        )
+        for table, _, id_column in tables:
+            self._sequence_gen.check_consistency(
+                db_conn,
+                table=table,
+                id_column=id_column,
+                stream_name=stream_name,
+                positive=positive,
+            )
 
         # This goes and fills out the above state from the database.
-        self._load_current_ids(db_conn, table, instance_column, id_column)
+        self._load_current_ids(db_conn, tables)
 
     def _load_current_ids(
-        self, db_conn, table: str, instance_column: str, id_column: str
+        self,
+        db_conn,
+        tables: List[Tuple[str, str, str]],
     ):
-        cur = db_conn.cursor()
+        cur = db_conn.cursor(txn_name="_load_current_ids")
 
         # Load the current positions of all writers for the stream.
         if self._writers:
@@ -283,15 +301,12 @@ class MultiWriterIdGenerator:
                     stream_name = ?
                     AND instance_name != ALL(?)
             """
-            sql = self._db.engine.convert_param_style(sql)
             cur.execute(sql, (self._stream_name, self._writers))
 
             sql = """
                 SELECT instance_name, stream_id FROM stream_positions
                 WHERE stream_name = ?
             """
-            sql = self._db.engine.convert_param_style(sql)
-
             cur.execute(sql, (self._stream_name,))
 
             self._current_positions = {
@@ -308,17 +323,22 @@ class MultiWriterIdGenerator:
             # We add a GREATEST here to ensure that the result is always
             # positive. (This can be a problem for e.g. backfill streams where
             # the server has never backfilled).
-            sql = """
-                SELECT GREATEST(COALESCE(%(agg)s(%(id)s), 1), 1)
-                FROM %(table)s
-            """ % {
-                "id": id_column,
-                "table": table,
-                "agg": "MAX" if self._positive else "-MIN",
-            }
-            cur.execute(sql)
-            (stream_id,) = cur.fetchone()
-            self._persisted_upto_position = stream_id
+            max_stream_id = 1
+            for table, _, id_column in tables:
+                sql = """
+                    SELECT GREATEST(COALESCE(%(agg)s(%(id)s), 1), 1)
+                    FROM %(table)s
+                """ % {
+                    "id": id_column,
+                    "table": table,
+                    "agg": "MAX" if self._positive else "-MIN",
+                }
+                cur.execute(sql)
+                (stream_id,) = cur.fetchone()
+
+                max_stream_id = max(max_stream_id, stream_id)
+
+            self._persisted_upto_position = max_stream_id
         else:
             # If we have a min_stream_id then we pull out everything greater
             # than it from the DB so that we can prefill
@@ -331,22 +351,31 @@ class MultiWriterIdGenerator:
             # stream positions table before restart (or the stream position
             # table otherwise got out of date).
 
-            sql = """
-                SELECT %(instance)s, %(id)s FROM %(table)s
-                WHERE ? %(cmp)s %(id)s
-            """ % {
-                "id": id_column,
-                "table": table,
-                "instance": instance_column,
-                "cmp": "<=" if self._positive else ">=",
-            }
-            sql = self._db.engine.convert_param_style(sql)
-            cur.execute(sql, (min_stream_id,))
-
             self._persisted_upto_position = min_stream_id
 
+            rows = []
+            for table, instance_column, id_column in tables:
+                sql = """
+                    SELECT %(instance)s, %(id)s FROM %(table)s
+                    WHERE ? %(cmp)s %(id)s
+                """ % {
+                    "id": id_column,
+                    "table": table,
+                    "instance": instance_column,
+                    "cmp": "<=" if self._positive else ">=",
+                }
+                cur.execute(sql, (min_stream_id * self._return_factor,))
+
+                rows.extend(cur)
+
+            # Sort so that we handle rows in order for each instance.
+            rows.sort()
+
             with self._lock:
-                for (instance, stream_id,) in cur:
+                for (
+                    instance,
+                    stream_id,
+                ) in rows:
                     stream_id = self._return_factor * stream_id
                     self._add_persisted_position(stream_id)
 
@@ -368,6 +397,11 @@ class MultiWriterIdGenerator:
                 # ... persist event ...
         """
 
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
+
         return _MultiWriterCtxManager(self)
 
     def get_next_mult(self, n: int):
@@ -376,6 +410,11 @@ class MultiWriterIdGenerator:
             async with stream_id_gen.get_next_mult(5) as stream_ids:
                 # ... persist events ...
         """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         return _MultiWriterCtxManager(self, n)
 
@@ -386,6 +425,11 @@ class MultiWriterIdGenerator:
             stream_id = stream_id_gen.get_next(txn)
             # ... persist event ...
         """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         next_id = self._load_next_id_txn(txn)
 
@@ -400,7 +444,7 @@ class MultiWriterIdGenerator:
         # bother, as nothing will read it).
         #
         # We only do this on the success path so that the persisted current
-        # position points to a persited row with the correct instance name.
+        # position points to a persisted row with the correct instance name.
         if self._writers:
             txn.call_after(
                 run_as_background_process,
@@ -463,8 +507,7 @@ class MultiWriterIdGenerator:
         return self.get_persisted_upto_position()
 
     def get_current_token_for_writer(self, instance_name: str) -> int:
-        """Returns the position of the given writer.
-        """
+        """Returns the position of the given writer."""
 
         # If we don't have an entry for the given instance name, we assume it's a
         # new writer.
@@ -491,7 +534,7 @@ class MultiWriterIdGenerator:
             }
 
     def advance(self, instance_name: str, new_id: int):
-        """Advance the postion of the named writer to the given ID, if greater
+        """Advance the position of the named writer to the given ID, if greater
         than existing entry.
         """
 
@@ -527,6 +570,16 @@ class MultiWriterIdGenerator:
 
         heapq.heappush(self._known_persisted_positions, new_id)
 
+        # If we're a writer and we don't have any active writes we update our
+        # current position to the latest position seen. This allows the instance
+        # to report a recent position when asked, rather than a potentially old
+        # one (if this instance hasn't written anything for a while).
+        our_current_position = self._current_positions.get(self._instance_name)
+        if our_current_position and not self._unfinished_ids:
+            self._current_positions[self._instance_name] = max(
+                our_current_position, new_id
+            )
+
         # We move the current min position up if the minimum current positions
         # of all instances is higher (since by definition all positions less
         # that that have been persisted).
@@ -552,9 +605,8 @@ class MultiWriterIdGenerator:
                 # do.
                 break
 
-    def _update_stream_positions_table_txn(self, txn):
-        """Update the `stream_positions` table with newly persisted position.
-        """
+    def _update_stream_positions_table_txn(self, txn: Cursor):
+        """Update the `stream_positions` table with newly persisted position."""
 
         if not self._writers:
             return
@@ -594,28 +646,23 @@ class _AsyncCtxManagerWrapper:
 
 @attr.s(slots=True)
 class _MultiWriterCtxManager:
-    """Async context manager returned by MultiWriterIdGenerator
-    """
+    """Async context manager returned by MultiWriterIdGenerator"""
 
     id_gen = attr.ib(type=MultiWriterIdGenerator)
     multiple_ids = attr.ib(type=Optional[int], default=None)
     stream_ids = attr.ib(type=List[int], factory=list)
 
     async def __aenter__(self) -> Union[int, List[int]]:
+        # It's safe to run this in autocommit mode as fetching values from a
+        # sequence ignores transaction semantics anyway.
         self.stream_ids = await self.id_gen._db.runInteraction(
             "_load_next_mult_id",
             self.id_gen._load_next_mult_id_txn,
             self.multiple_ids or 1,
+            db_autocommit=True,
         )
 
-        # Assert the fetched ID is actually greater than any ID we've already
-        # seen. If not, then the sequence and table have got out of sync
-        # somehow.
         with self.id_gen._lock:
-            assert max(self.id_gen._current_positions.values(), default=0) < min(
-                self.stream_ids
-            )
-
             self.id_gen._unfinished_ids.update(self.stream_ids)
 
         if self.multiple_ids is None:
@@ -636,10 +683,16 @@ class _MultiWriterCtxManager:
         #
         # We only do this on the success path so that the persisted current
         # position points to a persisted row with the correct instance name.
+        #
+        # We do this in autocommit mode as a) the upsert works correctly outside
+        # transactions and b) reduces the amount of time the rows are locked
+        # for. If we don't do this then we'll often hit serialization errors due
+        # to the fact we default to REPEATABLE READ isolation levels.
         if self.id_gen._writers:
             await self.id_gen._db.runInteraction(
                 "MultiWriterIdGenerator._update_table",
                 self.id_gen._update_stream_positions_table_txn,
+                db_autocommit=True,
             )
 
         return False

@@ -1,7 +1,5 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +12,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import functools
 import logging
 import re
-from typing import Optional, Tuple, Type
+from typing import Container, Mapping, Optional, Sequence, Tuple, Type
 
 import synapse
+from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import (
@@ -28,23 +26,27 @@ from synapse.api.urls import (
     FEDERATION_V1_PREFIX,
     FEDERATION_V2_PREFIX,
 )
-from synapse.http.endpoint import parse_and_validate_server_name
-from synapse.http.server import JsonResource
+from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
     parse_boolean_from_args,
     parse_integer_from_args,
     parse_json_object_from_request,
     parse_string_from_args,
+    parse_strings_from_args,
 )
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    SynapseTags,
     start_active_span,
     start_active_span_from_request,
     tags,
     whitelisted_homeserver,
 )
 from synapse.server import HomeServer
-from synapse.types import ThirdPartyInstanceID, get_domain_from_id
+from synapse.types import JsonDict, ThirdPartyInstanceID, get_domain_from_id
+from synapse.util.ratelimitutils import FederationRateLimiter
+from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.util.versionstring import get_version_string
 
 logger = logging.getLogger(__name__)
@@ -144,22 +146,24 @@ class Authenticator:
         ):
             raise FederationDeniedError(origin)
 
-        if not json_request["signatures"]:
+        if origin is None or not json_request["signatures"]:
             raise NoAuthenticationError(
                 401, "Missing Authorization headers", Codes.UNAUTHORIZED
             )
 
         await self.keyring.verify_json_for_server(
-            origin, json_request, now, "Incoming request"
+            origin,
+            json_request,
+            now,
         )
 
         logger.debug("Request from %s", origin)
-        request.authenticated_entity = origin
+        request.requester = origin
 
         # If we get a valid signed request from the other side, its probably
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
-        if retry_timings and retry_timings["retry_last_ts"]:
+        if retry_timings and retry_timings.retry_last_ts:
             run_in_background(self._reset_retry_timings, origin)
 
         return origin
@@ -271,10 +275,17 @@ class BaseFederationServlet:
 
     RATELIMIT = True  # Whether to rate limit requests or not
 
-    def __init__(self, handler, authenticator, ratelimiter, server_name):
-        self.handler = handler
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        self.hs = hs
         self.authenticator = authenticator
         self.ratelimiter = ratelimiter
+        self.server_name = server_name
 
     def _wrap(self, func):
         authenticator = self.authenticator
@@ -313,7 +324,7 @@ class BaseFederationServlet:
                 raise
 
             request_tags = {
-                "request_id": request.get_request_id(),
+                SynapseTags.REQUEST_ID: request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
                 tags.HTTP_METHOD: request.get_method(),
                 tags.HTTP_URL: request.get_redacted_uri(),
@@ -364,24 +375,40 @@ class BaseFederationServlet:
                 continue
 
             server.register_paths(
-                method, (pattern,), self._wrap(code), self.__class__.__name__,
+                method,
+                (pattern,),
+                self._wrap(code),
+                self.__class__.__name__,
             )
 
 
-class FederationSendServlet(BaseFederationServlet):
+class BaseFederationServerServlet(BaseFederationServlet):
+    """Abstract base class for federation servlet classes which provides a federation server handler.
+
+    See BaseFederationServlet for more information.
+    """
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_federation_server()
+
+
+class FederationSendServlet(BaseFederationServerServlet):
     PATH = "/send/(?P<transaction_id>[^/]*)/?"
 
     # We ratelimit manually in the handler as we queue up the requests and we
     # don't want to fill up the ratelimiter with blocked requests.
     RATELIMIT = False
 
-    def __init__(self, handler, server_name, **kwargs):
-        super().__init__(handler, server_name=server_name, **kwargs)
-        self.server_name = server_name
-
     # This is when someone is trying to send us a bunch of data.
     async def on_PUT(self, origin, content, query, transaction_id):
-        """ Called on PUT /send/<transaction_id>/
+        """Called on PUT /send/<transaction_id>/
 
         Args:
             request (twisted.web.http.Request): The HTTP request.
@@ -420,18 +447,14 @@ class FederationSendServlet(BaseFederationServlet):
             logger.exception(e)
             return 400, {"error": "Invalid transaction"}
 
-        try:
-            code, response = await self.handler.on_incoming_transaction(
-                origin, transaction_data
-            )
-        except Exception:
-            logger.exception("on_incoming_transaction failed")
-            raise
+        code, response = await self.handler.on_incoming_transaction(
+            origin, transaction_data
+        )
 
         return code, response
 
 
-class FederationEventServlet(BaseFederationServlet):
+class FederationEventServlet(BaseFederationServerServlet):
     PATH = "/event/(?P<event_id>[^/]*)/?"
 
     # This is when someone asks for a data item for a given server data_id pair.
@@ -439,19 +462,19 @@ class FederationEventServlet(BaseFederationServlet):
         return await self.handler.on_pdu_request(origin, event_id)
 
 
-class FederationStateV1Servlet(BaseFederationServlet):
-    PATH = "/state/(?P<context>[^/]*)/?"
+class FederationStateV1Servlet(BaseFederationServerServlet):
+    PATH = "/state/(?P<room_id>[^/]*)/?"
 
-    # This is when someone asks for all data for a given context.
-    async def on_GET(self, origin, content, query, context):
-        return await self.handler.on_context_state_request(
+    # This is when someone asks for all data for a given room.
+    async def on_GET(self, origin, content, query, room_id):
+        return await self.handler.on_room_state_request(
             origin,
-            context,
+            room_id,
             parse_string_from_args(query, "event_id", None, required=False),
         )
 
 
-class FederationStateIdsServlet(BaseFederationServlet):
+class FederationStateIdsServlet(BaseFederationServerServlet):
     PATH = "/state_ids/(?P<room_id>[^/]*)/?"
 
     async def on_GET(self, origin, content, query, room_id):
@@ -462,34 +485,33 @@ class FederationStateIdsServlet(BaseFederationServlet):
         )
 
 
-class FederationBackfillServlet(BaseFederationServlet):
-    PATH = "/backfill/(?P<context>[^/]*)/?"
+class FederationBackfillServlet(BaseFederationServerServlet):
+    PATH = "/backfill/(?P<room_id>[^/]*)/?"
 
-    async def on_GET(self, origin, content, query, context):
+    async def on_GET(self, origin, content, query, room_id):
         versions = [x.decode("ascii") for x in query[b"v"]]
         limit = parse_integer_from_args(query, "limit", None)
 
         if not limit:
             return 400, {"error": "Did not include limit param"}
 
-        return await self.handler.on_backfill_request(origin, context, versions, limit)
+        return await self.handler.on_backfill_request(origin, room_id, versions, limit)
 
 
-class FederationQueryServlet(BaseFederationServlet):
+class FederationQueryServlet(BaseFederationServerServlet):
     PATH = "/query/(?P<query_type>[^/]*)"
 
     # This is when we receive a server-server Query
     async def on_GET(self, origin, content, query, query_type):
-        return await self.handler.on_query_request(
-            query_type,
-            {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()},
-        )
+        args = {k.decode("utf8"): v[0].decode("utf-8") for k, v in query.items()}
+        args["origin"] = origin
+        return await self.handler.on_query_request(query_type, args)
 
 
-class FederationMakeJoinServlet(BaseFederationServlet):
-    PATH = "/make_join/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
+class FederationMakeJoinServlet(BaseFederationServerServlet):
+    PATH = "/make_join/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, _content, query, context, user_id):
+    async def on_GET(self, origin, _content, query, room_id, user_id):
         """
         Args:
             origin (unicode): The authenticated server_name of the calling server
@@ -511,70 +533,94 @@ class FederationMakeJoinServlet(BaseFederationServlet):
             supported_versions = ["1"]
 
         content = await self.handler.on_make_join_request(
-            origin, context, user_id, supported_versions=supported_versions
+            origin, room_id, user_id, supported_versions=supported_versions
         )
         return 200, content
 
 
-class FederationMakeLeaveServlet(BaseFederationServlet):
-    PATH = "/make_leave/(?P<context>[^/]*)/(?P<user_id>[^/]*)"
+class FederationMakeLeaveServlet(BaseFederationServerServlet):
+    PATH = "/make_leave/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, context, user_id):
-        content = await self.handler.on_make_leave_request(origin, context, user_id)
+    async def on_GET(self, origin, content, query, room_id, user_id):
+        content = await self.handler.on_make_leave_request(origin, room_id, user_id)
         return 200, content
 
 
-class FederationV1SendLeaveServlet(BaseFederationServlet):
+class FederationV1SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
-        content = await self.handler.on_send_leave_request(origin, content, room_id)
+        content = await self.handler.on_send_leave_request(origin, content)
         return 200, (200, content)
 
 
-class FederationV2SendLeaveServlet(BaseFederationServlet):
+class FederationV2SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     PREFIX = FEDERATION_V2_PREFIX
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
-        content = await self.handler.on_send_leave_request(origin, content, room_id)
+        content = await self.handler.on_send_leave_request(origin, content)
         return 200, content
 
 
-class FederationEventAuthServlet(BaseFederationServlet):
-    PATH = "/event_auth/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+class FederationMakeKnockServlet(BaseFederationServerServlet):
+    PATH = "/make_knock/(?P<room_id>[^/]*)/(?P<user_id>[^/]*)"
 
-    async def on_GET(self, origin, content, query, context, event_id):
-        return await self.handler.on_event_auth(origin, context, event_id)
+    async def on_GET(self, origin, content, query, room_id, user_id):
+        try:
+            # Retrieve the room versions the remote homeserver claims to support
+            supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
+        except KeyError:
+            raise SynapseError(400, "Missing required query parameter 'ver'")
+
+        content = await self.handler.on_make_knock_request(
+            origin, room_id, user_id, supported_versions=supported_versions
+        )
+        return 200, content
 
 
-class FederationV1SendJoinServlet(BaseFederationServlet):
-    PATH = "/send_join/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+class FederationV1SendKnockServlet(BaseFederationServerServlet):
+    PATH = "/send_knock/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, context, event_id):
-        # TODO(paul): assert that context/event_id parsed from path actually
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        content = await self.handler.on_send_knock_request(origin, content, room_id)
+        return 200, content
+
+
+class FederationEventAuthServlet(BaseFederationServerServlet):
+    PATH = "/event_auth/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+
+    async def on_GET(self, origin, content, query, room_id, event_id):
+        return await self.handler.on_event_auth(origin, room_id, event_id)
+
+
+class FederationV1SendJoinServlet(BaseFederationServerServlet):
+    PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
+
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
-        content = await self.handler.on_send_join_request(origin, content, context)
+        content = await self.handler.on_send_join_request(origin, content)
         return 200, (200, content)
 
 
-class FederationV2SendJoinServlet(BaseFederationServlet):
-    PATH = "/send_join/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+class FederationV2SendJoinServlet(BaseFederationServerServlet):
+    PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     PREFIX = FEDERATION_V2_PREFIX
 
-    async def on_PUT(self, origin, content, query, context, event_id):
-        # TODO(paul): assert that context/event_id parsed from path actually
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
-        content = await self.handler.on_send_join_request(origin, content, context)
+        content = await self.handler.on_send_join_request(origin, content)
         return 200, content
 
 
-class FederationV1InviteServlet(BaseFederationServlet):
-    PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+class FederationV1InviteServlet(BaseFederationServerServlet):
+    PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
-    async def on_PUT(self, origin, content, query, context, event_id):
+    async def on_PUT(self, origin, content, query, room_id, event_id):
         # We don't get a room version, so we have to assume its EITHER v1 or
         # v2. This is "fine" as the only difference between V1 and V2 is the
         # state resolution algorithm, and we don't use that for processing
@@ -588,13 +634,13 @@ class FederationV1InviteServlet(BaseFederationServlet):
         return 200, (200, content)
 
 
-class FederationV2InviteServlet(BaseFederationServlet):
-    PATH = "/invite/(?P<context>[^/]*)/(?P<event_id>[^/]*)"
+class FederationV2InviteServlet(BaseFederationServerServlet):
+    PATH = "/invite/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     PREFIX = FEDERATION_V2_PREFIX
 
-    async def on_PUT(self, origin, content, query, context, event_id):
-        # TODO(paul): assert that context/event_id parsed from path actually
+    async def on_PUT(self, origin, content, query, room_id, event_id):
+        # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
 
         room_version = content["room_version"]
@@ -612,31 +658,29 @@ class FederationV2InviteServlet(BaseFederationServlet):
         return 200, content
 
 
-class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
+class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
     PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id):
-        content = await self.handler.on_exchange_third_party_invite_request(
-            room_id, content
-        )
-        return 200, content
+        await self.handler.on_exchange_third_party_invite_request(content)
+        return 200, {}
 
 
-class FederationClientKeysQueryServlet(BaseFederationServlet):
+class FederationClientKeysQueryServlet(BaseFederationServerServlet):
     PATH = "/user/keys/query"
 
     async def on_POST(self, origin, content, query):
         return await self.handler.on_query_client_keys(origin, content)
 
 
-class FederationUserDevicesQueryServlet(BaseFederationServlet):
+class FederationUserDevicesQueryServlet(BaseFederationServerServlet):
     PATH = "/user/devices/(?P<user_id>[^/]*)"
 
     async def on_GET(self, origin, content, query, user_id):
         return await self.handler.on_query_user_devices(origin, user_id)
 
 
-class FederationClientKeysClaimServlet(BaseFederationServlet):
+class FederationClientKeysClaimServlet(BaseFederationServerServlet):
     PATH = "/user/keys/claim"
 
     async def on_POST(self, origin, content, query):
@@ -644,7 +688,7 @@ class FederationClientKeysClaimServlet(BaseFederationServlet):
         return 200, response
 
 
-class FederationGetMissingEventsServlet(BaseFederationServlet):
+class FederationGetMissingEventsServlet(BaseFederationServerServlet):
     # TODO(paul): Why does this path alone end with "/?" optional?
     PATH = "/get_missing_events/(?P<room_id>[^/]*)/?"
 
@@ -664,7 +708,7 @@ class FederationGetMissingEventsServlet(BaseFederationServlet):
         return 200, content
 
 
-class On3pidBindServlet(BaseFederationServlet):
+class On3pidBindServlet(BaseFederationServerServlet):
     PATH = "/3pid/onbind"
 
     REQUIRE_AUTH = False
@@ -694,7 +738,7 @@ class On3pidBindServlet(BaseFederationServlet):
         return 200, {}
 
 
-class OpenIdUserInfo(BaseFederationServlet):
+class OpenIdUserInfo(BaseFederationServerServlet):
     """
     Exchange a bearer token for information about a user.
 
@@ -770,8 +814,16 @@ class PublicRoomList(BaseFederationServlet):
 
     PATH = "/publicRooms"
 
-    def __init__(self, handler, authenticator, ratelimiter, server_name, allow_access):
-        super().__init__(handler, authenticator, ratelimiter, server_name)
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+        allow_access: bool,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_room_list_handler()
         self.allow_access = allow_access
 
     async def on_GET(self, origin, content, query):
@@ -856,9 +908,25 @@ class FederationVersionServlet(BaseFederationServlet):
         )
 
 
-class FederationGroupsProfileServlet(BaseFederationServlet):
-    """Get/set the basic profile of a group on behalf of a user
+class BaseGroupsServerServlet(BaseFederationServlet):
+    """Abstract base class for federation servlet classes which provides a groups server handler.
+
+    See BaseFederationServlet for more information.
     """
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_groups_server_handler()
+
+
+class FederationGroupsProfileServlet(BaseGroupsServerServlet):
+    """Get/set the basic profile of a group on behalf of a user"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/profile"
 
@@ -883,7 +951,7 @@ class FederationGroupsProfileServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsSummaryServlet(BaseFederationServlet):
+class FederationGroupsSummaryServlet(BaseGroupsServerServlet):
     PATH = "/groups/(?P<group_id>[^/]*)/summary"
 
     async def on_GET(self, origin, content, query, group_id):
@@ -896,9 +964,8 @@ class FederationGroupsSummaryServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsRoomsServlet(BaseFederationServlet):
-    """Get the rooms in a group on behalf of a user
-    """
+class FederationGroupsRoomsServlet(BaseGroupsServerServlet):
+    """Get the rooms in a group on behalf of a user"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/rooms"
 
@@ -912,9 +979,8 @@ class FederationGroupsRoomsServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsAddRoomsServlet(BaseFederationServlet):
-    """Add/remove room from group
-    """
+class FederationGroupsAddRoomsServlet(BaseGroupsServerServlet):
+    """Add/remove room from group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
 
@@ -941,9 +1007,8 @@ class FederationGroupsAddRoomsServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
-    """Update room config in group
-    """
+class FederationGroupsAddRoomsConfigServlet(BaseGroupsServerServlet):
+    """Update room config in group"""
 
     PATH = (
         "/groups/(?P<group_id>[^/]*)/room/(?P<room_id>[^/]*)"
@@ -962,9 +1027,8 @@ class FederationGroupsAddRoomsConfigServlet(BaseFederationServlet):
         return 200, result
 
 
-class FederationGroupsUsersServlet(BaseFederationServlet):
-    """Get the users in a group on behalf of a user
-    """
+class FederationGroupsUsersServlet(BaseGroupsServerServlet):
+    """Get the users in a group on behalf of a user"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users"
 
@@ -978,9 +1042,8 @@ class FederationGroupsUsersServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
-    """Get the users that have been invited to a group
-    """
+class FederationGroupsInvitedUsersServlet(BaseGroupsServerServlet):
+    """Get the users that have been invited to a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/invited_users"
 
@@ -996,9 +1059,8 @@ class FederationGroupsInvitedUsersServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsInviteServlet(BaseFederationServlet):
-    """Ask a group server to invite someone to the group
-    """
+class FederationGroupsInviteServlet(BaseGroupsServerServlet):
+    """Ask a group server to invite someone to the group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
@@ -1014,9 +1076,8 @@ class FederationGroupsInviteServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
-    """Accept an invitation from the group server
-    """
+class FederationGroupsAcceptInviteServlet(BaseGroupsServerServlet):
+    """Accept an invitation from the group server"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/accept_invite"
 
@@ -1029,9 +1090,8 @@ class FederationGroupsAcceptInviteServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsJoinServlet(BaseFederationServlet):
-    """Attempt to join a group
-    """
+class FederationGroupsJoinServlet(BaseGroupsServerServlet):
+    """Attempt to join a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/join"
 
@@ -1044,9 +1104,8 @@ class FederationGroupsJoinServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsRemoveUserServlet(BaseFederationServlet):
-    """Leave or kick a user from the group
-    """
+class FederationGroupsRemoveUserServlet(BaseGroupsServerServlet):
+    """Leave or kick a user from the group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
@@ -1062,9 +1121,25 @@ class FederationGroupsRemoveUserServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsLocalInviteServlet(BaseFederationServlet):
-    """A group server has invited a local user
+class BaseGroupsLocalServlet(BaseFederationServlet):
+    """Abstract base class for federation servlet classes which provides a groups local handler.
+
+    See BaseFederationServlet for more information.
     """
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_groups_local_handler()
+
+
+class FederationGroupsLocalInviteServlet(BaseGroupsLocalServlet):
+    """A group server has invited a local user"""
 
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/invite"
 
@@ -1072,20 +1147,27 @@ class FederationGroupsLocalInviteServlet(BaseFederationServlet):
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "group_id doesn't match origin")
 
+        assert isinstance(
+            self.handler, GroupsLocalHandler
+        ), "Workers cannot handle group invites."
+
         new_content = await self.handler.on_invite(group_id, user_id, content)
 
         return 200, new_content
 
 
-class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
-    """A group server has removed a local user
-    """
+class FederationGroupsRemoveLocalUserServlet(BaseGroupsLocalServlet):
+    """A group server has removed a local user"""
 
     PATH = "/groups/local/(?P<group_id>[^/]*)/users/(?P<user_id>[^/]*)/remove"
 
     async def on_POST(self, origin, content, query, group_id, user_id):
         if get_domain_from_id(group_id) != origin:
             raise SynapseError(403, "user_id doesn't match origin")
+
+        assert isinstance(
+            self.handler, GroupsLocalHandler
+        ), "Workers cannot handle group removals."
 
         new_content = await self.handler.user_removed_from_group(
             group_id, user_id, content
@@ -1095,10 +1177,19 @@ class FederationGroupsRemoveLocalUserServlet(BaseFederationServlet):
 
 
 class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
-    """A group or user's server renews their attestation
-    """
+    """A group or user's server renews their attestation"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/renew_attestation/(?P<user_id>[^/]*)"
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_groups_attestation_renewer()
 
     async def on_POST(self, origin, content, query, group_id, user_id):
         # We don't need to check auth here as we check the attestation signatures
@@ -1110,7 +1201,7 @@ class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
         return 200, new_content
 
 
-class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
+class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
     """Add/remove a room from the group summary, with optional category.
 
     Matches both:
@@ -1130,7 +1221,17 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         if category_id == "":
-            raise SynapseError(400, "category_id cannot be empty string")
+            raise SynapseError(
+                400, "category_id cannot be empty string", Codes.INVALID_PARAM
+            )
+
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
 
         resp = await self.handler.update_group_summary_room(
             group_id,
@@ -1157,9 +1258,8 @@ class FederationGroupsSummaryRoomsServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsCategoriesServlet(BaseFederationServlet):
-    """Get all categories for a group
-    """
+class FederationGroupsCategoriesServlet(BaseGroupsServerServlet):
+    """Get all categories for a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/categories/?"
 
@@ -1173,9 +1273,8 @@ class FederationGroupsCategoriesServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsCategoryServlet(BaseFederationServlet):
-    """Add/remove/get a category in a group
-    """
+class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
+    """Add/remove/get a category in a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/categories/(?P<category_id>[^/]+)"
 
@@ -1198,6 +1297,14 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
         if category_id == "":
             raise SynapseError(400, "category_id cannot be empty string")
 
+        if len(category_id) > MAX_GROUP_CATEGORYID_LENGTH:
+            raise SynapseError(
+                400,
+                "category_id may not be longer than %s characters"
+                % (MAX_GROUP_CATEGORYID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
+
         resp = await self.handler.upsert_group_category(
             group_id, requester_user_id, category_id, content
         )
@@ -1219,9 +1326,8 @@ class FederationGroupsCategoryServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsRolesServlet(BaseFederationServlet):
-    """Get roles in a group
-    """
+class FederationGroupsRolesServlet(BaseGroupsServerServlet):
+    """Get roles in a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/roles/?"
 
@@ -1235,9 +1341,8 @@ class FederationGroupsRolesServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsRoleServlet(BaseFederationServlet):
-    """Add/remove/get a role in a group
-    """
+class FederationGroupsRoleServlet(BaseGroupsServerServlet):
+    """Add/remove/get a role in a group"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/roles/(?P<role_id>[^/]+)"
 
@@ -1256,7 +1361,17 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
         if role_id == "":
-            raise SynapseError(400, "role_id cannot be empty string")
+            raise SynapseError(
+                400, "role_id cannot be empty string", Codes.INVALID_PARAM
+            )
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
 
         resp = await self.handler.update_group_role(
             group_id, requester_user_id, role_id, content
@@ -1279,7 +1394,7 @@ class FederationGroupsRoleServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
+class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
     """Add/remove a user from the group summary, with optional role.
 
     Matches both:
@@ -1300,6 +1415,14 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
 
         if role_id == "":
             raise SynapseError(400, "role_id cannot be empty string")
+
+        if len(role_id) > MAX_GROUP_ROLEID_LENGTH:
+            raise SynapseError(
+                400,
+                "role_id may not be longer than %s characters"
+                % (MAX_GROUP_ROLEID_LENGTH,),
+                Codes.INVALID_PARAM,
+            )
 
         resp = await self.handler.update_group_summary_user(
             group_id,
@@ -1326,9 +1449,8 @@ class FederationGroupsSummaryUsersServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
-    """Get roles in a group
-    """
+class FederationGroupsBulkPublicisedServlet(BaseGroupsLocalServlet):
+    """Get roles in a group"""
 
     PATH = "/get_groups_publicised"
 
@@ -1340,9 +1462,8 @@ class FederationGroupsBulkPublicisedServlet(BaseFederationServlet):
         return 200, resp
 
 
-class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
-    """Sets whether a group is joinable without an invite or knock
-    """
+class FederationGroupsSettingJoinPolicyServlet(BaseGroupsServerServlet):
+    """Sets whether a group is joinable without an invite or knock"""
 
     PATH = "/groups/(?P<group_id>[^/]*)/settings/m.join_policy"
 
@@ -1358,6 +1479,76 @@ class FederationGroupsSettingJoinPolicyServlet(BaseFederationServlet):
         return 200, new_content
 
 
+class FederationSpaceSummaryServlet(BaseFederationServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
+    PATH = "/spaces/(?P<room_id>[^/]*)"
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_space_summary_handler()
+
+    async def on_GET(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
+        max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
+
+        exclude_rooms = []
+        if b"exclude_rooms" in query:
+            try:
+                exclude_rooms = [
+                    room_id.decode("ascii") for room_id in query[b"exclude_rooms"]
+                ]
+            except Exception:
+                raise SynapseError(
+                    400, "Bad query parameter for exclude_rooms", Codes.INVALID_PARAM
+                )
+
+        return 200, await self.handler.federation_space_summary(
+            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
+        )
+
+    # TODO When switching to the stable endpoint, remove the POST handler.
+    async def on_POST(
+        self,
+        origin: str,
+        content: JsonDict,
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        suggested_only = content.get("suggested_only", False)
+        if not isinstance(suggested_only, bool):
+            raise SynapseError(
+                400, "'suggested_only' must be a boolean", Codes.BAD_JSON
+            )
+
+        exclude_rooms = content.get("exclude_rooms", [])
+        if not isinstance(exclude_rooms, list) or any(
+            not isinstance(x, str) for x in exclude_rooms
+        ):
+            raise SynapseError(400, "bad value for 'exclude_rooms'", Codes.BAD_JSON)
+
+        max_rooms_per_space = content.get("max_rooms_per_space")
+        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
+            raise SynapseError(
+                400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
+            )
+
+        return 200, await self.handler.federation_space_summary(
+            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
+        )
+
+
 class RoomComplexityServlet(BaseFederationServlet):
     """
     Indicates to other servers how complex (and therefore likely
@@ -1367,16 +1558,25 @@ class RoomComplexityServlet(BaseFederationServlet):
     PATH = "/rooms/(?P<room_id>[^/]*)/complexity"
     PREFIX = FEDERATION_UNSTABLE_PREFIX
 
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self._store = self.hs.get_datastore()
+
     async def on_GET(self, origin, content, query, room_id):
-
-        store = self.handler.hs.get_datastore()
-
-        is_public = await store.is_room_world_readable_or_publicly_joinable(room_id)
+        is_public = await self._store.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
 
         if not is_public:
             raise SynapseError(404, "Room not found", errcode=Codes.INVALID_PARAM)
 
-        complexity = await store.get_room_complexity(room_id)
+        complexity = await self._store.get_room_complexity(room_id)
         return 200, complexity
 
 
@@ -1405,6 +1605,9 @@ FEDERATION_SERVLET_CLASSES = (
     On3pidBindServlet,
     FederationVersionServlet,
     RoomComplexityServlet,
+    FederationSpaceSummaryServlet,
+    FederationV1SendKnockServlet,
+    FederationMakeKnockServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
 
 OPENID_SERVLET_CLASSES = (
@@ -1446,6 +1649,7 @@ GROUP_ATTESTATION_SERVLET_CLASSES = (
     FederationGroupsRenewAttestaionServlet,
 )  # type: Tuple[Type[BaseFederationServlet], ...]
 
+
 DEFAULT_SERVLET_GROUPS = (
     "federation",
     "room_list",
@@ -1456,18 +1660,24 @@ DEFAULT_SERVLET_GROUPS = (
 )
 
 
-def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=None):
+def register_servlets(
+    hs: HomeServer,
+    resource: HttpServer,
+    authenticator: Authenticator,
+    ratelimiter: FederationRateLimiter,
+    servlet_groups: Optional[Container[str]] = None,
+):
     """Initialize and register servlet classes.
 
     Will by default register all servlets. For custom behaviour, pass in
     a list of servlet_groups to register.
 
     Args:
-        hs (synapse.server.HomeServer): homeserver
-        resource (TransportLayerServer): resource class to register to
-        authenticator (Authenticator): authenticator to use
-        ratelimiter (util.ratelimitutils.FederationRateLimiter): ratelimiter to use
-        servlet_groups (list[str], optional): List of servlet groups to register.
+        hs: homeserver
+        resource: resource class to register to
+        authenticator: authenticator to use
+        ratelimiter: ratelimiter to use
+        servlet_groups: List of servlet groups to register.
             Defaults to ``DEFAULT_SERVLET_GROUPS``.
     """
     if not servlet_groups:
@@ -1476,7 +1686,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
     if "federation" in servlet_groups:
         for servletclass in FEDERATION_SERVLET_CLASSES:
             servletclass(
-                handler=hs.get_federation_server(),
+                hs=hs,
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
@@ -1485,7 +1695,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
     if "openid" in servlet_groups:
         for servletclass in OPENID_SERVLET_CLASSES:
             servletclass(
-                handler=hs.get_federation_server(),
+                hs=hs,
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
@@ -1494,7 +1704,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
     if "room_list" in servlet_groups:
         for servletclass in ROOM_LIST_CLASSES:
             servletclass(
-                handler=hs.get_room_list_handler(),
+                hs=hs,
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
@@ -1504,7 +1714,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
     if "group_server" in servlet_groups:
         for servletclass in GROUP_SERVER_SERVLET_CLASSES:
             servletclass(
-                handler=hs.get_groups_server_handler(),
+                hs=hs,
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
@@ -1513,7 +1723,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
     if "group_local" in servlet_groups:
         for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
             servletclass(
-                handler=hs.get_groups_local_handler(),
+                hs=hs,
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,
@@ -1522,7 +1732,7 @@ def register_servlets(hs, resource, authenticator, ratelimiter, servlet_groups=N
     if "group_attestation" in servlet_groups:
         for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
             servletclass(
-                handler=hs.get_groups_attestation_renewer(),
+                hs=hs,
                 authenticator=authenticator,
                 ratelimiter=ratelimiter,
                 server_name=hs.hostname,

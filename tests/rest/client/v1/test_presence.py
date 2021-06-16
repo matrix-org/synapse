@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
+from synapse.handlers.presence import PresenceHandler
 from synapse.rest.client.v1 import presence
 from synapse.types import UserID
 
@@ -33,12 +33,15 @@ class PresenceTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        hs = self.setup_test_homeserver(
-            "red", http_client=None, federation_client=Mock()
-        )
+        presence_handler = Mock(spec=PresenceHandler)
+        presence_handler.set_state.return_value = defer.succeed(None)
 
-        hs.presence_handler = Mock()
-        hs.presence_handler.set_state.return_value = defer.succeed(None)
+        hs = self.setup_test_homeserver(
+            "red",
+            federation_http_client=None,
+            federation_client=Mock(),
+            presence_handler=presence_handler,
+        )
 
         return hs
 
@@ -50,26 +53,24 @@ class PresenceTestCase(unittest.HomeserverTestCase):
         self.hs.config.use_presence = True
 
         body = {"presence": "here", "status_msg": "beep boop"}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", "/presence/%s/status" % (self.user_id,), body
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200)
-        self.assertEqual(self.hs.presence_handler.set_state.call_count, 1)
+        self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 1)
 
+    @unittest.override_config({"use_presence": False})
     def test_put_presence_disabled(self):
         """
         PUT to the status endpoint with use_presence disabled will NOT call
         set_state on the presence handler.
         """
-        self.hs.config.use_presence = False
 
         body = {"presence": "here", "status_msg": "beep boop"}
-        request, channel = self.make_request(
+        channel = self.make_request(
             "PUT", "/presence/%s/status" % (self.user_id,), body
         )
-        self.render(request)
 
         self.assertEqual(channel.code, 200)
-        self.assertEqual(self.hs.presence_handler.set_state.call_count, 0)
+        self.assertEqual(self.hs.get_presence_handler().set_state.call_count, 0)

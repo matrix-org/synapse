@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -66,9 +65,6 @@ class EventStreamRestServlet(RestServlet):
         )
 
         return 200, chunk
-
-    def on_OPTIONS(self, request):
-        return 200, {}
 
 
 class EventRestServlet(RestServlet):

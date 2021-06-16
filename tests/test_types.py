@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -57,6 +56,10 @@ class RoomAliasTestCase(unittest.HomeserverTestCase):
         room = RoomAlias("channel", "my.domain")
 
         self.assertEquals(room.to_string(), "#channel:my.domain")
+
+    def test_validate(self):
+        id_string = "#test:domain,test"
+        self.assertFalse(RoomAlias.is_valid(id_string))
 
 
 class GroupIDTestCase(unittest.TestCase):

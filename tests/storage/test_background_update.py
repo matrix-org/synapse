@@ -1,4 +1,4 @@
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.storage.background_updates import BackgroundUpdater
 
@@ -67,7 +67,9 @@ class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
         async def update(progress, count):
             self.assertEqual(progress, {"my_key": 2})
             self.assertAlmostEqual(
-                count, target_background_update_duration_ms / duration_ms, places=0,
+                count,
+                target_background_update_duration_ms / duration_ms,
+                places=0,
             )
             await self.updates._end_background_update("test_update")
             return count
