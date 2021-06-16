@@ -23,13 +23,28 @@ custom code on your Synapse homeserver. Server admins are encouraged to verify t
 provenance of the modules they use on their homeserver and make sure the modules aren't
 running malicious code on their instance.
 
+Also note that we are currently in the process of migrating module interfaces to this
+system. While some interfaces might be compatible with it, others still require
+configuring modules in another part of Synapse's configuration file. Currently, only the
+spam checker interface is compatible with this new system.
+
 ## Writing a module
 
 A module is a Python class that uses Synapse's module API to interact with the
 homeserver. It can register callbacks that Synapse will call on specific operations, as
 well as web resources to attach to Synapse's web server.
 
-A module must implement the following static method:
+When instantiated, a module is given its parsed configuration as well as an instance of
+the `synapse.module_api.ModuleApi` class. The configuration is a dictionary, and is
+either the output of the module's `parse_config` static method (see below), or the
+configuration associated with the module in Synapse's configuration file.
+
+See the documentation for the `ModuleApi` class
+[here](https://github.com/matrix-org/synapse/blob/master/synapse/module_api/__init__.py).
+
+### Handling the module's configuration
+
+A module can implement the following static method:
 
 ```python
 @staticmethod
@@ -38,13 +53,9 @@ def parse_config(config: dict) -> dict
 
 This method is given a dictionary resulting from parsing the YAML configuration for the
 module. It may modify it (for example by parsing durations expressed as strings (e.g.
-"5d") into milliseconds, etc.), and return the modified dictionary. If no change is
-necessary, this method should just return `config`.
-
-When instantiated, a module is given its parsed configuration (i.e. the output of
-`parse_config`) as well as an instance of the `synapse.module_api.ModuleApi` class.
-
-See the documentation for the `ModuleApi` class [here](/synapse/module_api/__init__.py).
+"5d") into milliseconds, etc.), and return the modified dictionary. It may also verify
+that the configuration is correct, and raise an instance of
+`synapse.module_api.errors.ConfigError` if not.
 
 ### Registering a web resource
 
@@ -75,10 +86,10 @@ Modules **must** register their web resources in their `__init__` method.
 ### Registering a callback
 
 Modules can use Synapse's module API to register callbacks. Callbacks are functions that
-Synapse will call when performing specific actions. Callbacks can be either asynchronous
-or synchronous, and are split in categories. A single module may implement callbacks from
-multiple categories, and is under no obligation to implement all callbacks from the
-categories it registers callbacks for.
+Synapse will call when performing specific actions. Callbacks must be asynchronous, and
+are split in categories. A single module may implement callbacks from multiple categories,
+and is under no obligation to implement all callbacks from the categories it registers
+callbacks for.
 
 #### Spam checker callbacks
 
@@ -177,6 +188,24 @@ def check_media_file_for_spam(
 Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.
 
+### Porting an existing module that uses the old interface
+
+In order to port a module that uses Synapse's old module interface, its author needs to:
+
+* ensure the module's callbacks are all asynchronous.
+* register their callbacks using one or more of the `register_[...]_callbacks` methods
+  from the `ModuleApi` class in the module's `__init__` method (see [this section](#registering-a-web-resource)
+  for more info).
+
+Additionally, if the module is packaged with an additional web resource, the module
+should register this resource in its `__init__` method using the `register_web_resource`
+method from the `ModuleApi` class (see [this section](#registering-a-web-resource) for
+more info).
+
+The module's author should also update any example in the module's configuration to only
+use the new `modules` section in Synapse's configuration file (see [this section](#using-modules)
+for more info).
+
 ### Example
 
 The example below is a module that implements the spam checker callback
@@ -197,7 +226,7 @@ class DemoResource(Resource):
         super(DemoResource, self).__init__()
         self.config = config
 
-    async def render_GET(self, request: Request):
+    def render_GET(self, request: Request):
         name = request.args.get(b"name")[0]
         request.setHeader(b"Content-Type", b"application/json")
         return json.dumps({"hello": name})

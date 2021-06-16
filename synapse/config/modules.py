@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Any, Dict, List, Tuple
 
 from synapse.config._base import Config, ConfigError
 from synapse.util.module_loader import load_module
@@ -20,7 +21,7 @@ class ModulesConfig(Config):
     section = "modules"
 
     def read_config(self, config: dict, **kwargs):
-        self.loaded_modules = []
+        self.loaded_modules: List[Tuple[Any, Dict]] = []
 
         configured_modules = config.get("modules") or []
         for i, module in enumerate(configured_modules):

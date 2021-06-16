@@ -40,7 +40,6 @@ from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
-from synapse.api.errors import SynapseError
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.appservice.api import ApplicationServiceApi
@@ -277,14 +276,19 @@ class HomeServer(metaclass=abc.ABCMeta):
                 listeners have been started.
         """
         if self._module_web_resources_consumed:
-            raise SynapseError(
-                500,
+            raise RuntimeError(
                 "Tried to register a web resource from a module after startup",
             )
 
         # Don't register a resource that's already been registered.
         if path not in self._module_web_resources.keys():
             self._module_web_resources[path] = resource
+        else:
+            logger.warning(
+                "Module tried to register a web resource for path %s but another module"
+                " has already registered a resource for this path.",
+                path,
+            )
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.
@@ -678,7 +682,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
+        return SpamChecker()
 
     @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:

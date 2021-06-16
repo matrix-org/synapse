@@ -34,8 +34,7 @@
 
 ## Modules ##
 
-# Server admins can expand Synapse's functionalities by using external modules
-# to complement certain operations.
+# Server admins can expand Synapse's functionality with external modules.
 #
 # See https://matrix-org.github.io/synapse/develop/modules.html for more
 # documentation on how to configure or create custom modules for Synapse.
@@ -2584,19 +2583,6 @@ push:
   # of unread messages.
   #
   #group_unread_count_by_room: false
-
-
-# Spam checkers are third-party modules that can block specific actions
-# of local users, such as creating rooms and registering undesirable
-# usernames, as well as remote users by redacting incoming events.
-#
-spam_checker:
-   #- module: "my_custom_project.SuperSpamChecker"
-   #  config:
-   #    example_option: 'things'
-   #- module: "some_other_project.BadEventStopper"
-   #  config:
-   #    example_stop_events_from: ['@bad:example.com']
 
 
 ## Rooms ##

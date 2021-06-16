@@ -59,22 +59,8 @@ class ModuleApi:
 
         self._spam_checker = hs.get_spam_checker()
 
-    @property
-    def http_client(self):
-        """Allows making outbound HTTP requests to remote resources.
-
-        An instance of synapse.http.client.SimpleHttpClient
-        """
-        return self._http_client
-
-    @property
-    def public_room_list_manager(self):
-        """Allows adding to, removing from and checking the status of rooms in the
-        public room list.
-
-        An instance of synapse.module_api.PublicRoomListManager
-        """
-        return self._public_room_list_manager
+    #################################################################################
+    # The following methods should only be called during the module's initialisation.
 
     @property
     def register_spam_checker_callbacks(self):
@@ -94,6 +80,26 @@ class ModuleApi:
             resource: The resource to attach to this path.
         """
         self._hs.register_module_web_resource(path, resource)
+
+    #########################################################################
+    # The following methods can be called by the module at any point in time.
+
+    @property
+    def http_client(self):
+        """Allows making outbound HTTP requests to remote resources.
+
+        An instance of synapse.http.client.SimpleHttpClient
+        """
+        return self._http_client
+
+    @property
+    def public_room_list_manager(self):
+        """Allows adding to, removing from and checking the status of rooms in the
+        public room list.
+
+        An instance of synapse.module_api.PublicRoomListManager
+        """
+        return self._public_room_list_manager
 
     def get_user_by_req(self, req, allow_guest=False):
         """Check the access_token provided for a request

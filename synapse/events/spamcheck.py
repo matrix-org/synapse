@@ -18,6 +18,7 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Collection,
     Dict,
@@ -28,7 +29,6 @@ from typing import (
     cast,
 )
 
-from synapse.api.errors import SynapseError
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
@@ -41,19 +41,22 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[["synapse.events.EventBase"], Union[bool, str]]
-USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], bool]
-USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], bool]
-USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], bool]
-USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], bool]
-CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[Dict[str, str]], bool]
+CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
+    ["synapse.events.EventBase"],
+    Awaitable[Union[bool, str]],
+]
+USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
+USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
+USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
+USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
+CHECK_USERNAME_FOR_SPAM_CALLBACK = Callable[[Dict[str, str]], Awaitable[bool]]
 LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
         Optional[dict],
         Optional[str],
         Collection[Tuple[str, str]],
     ],
-    RegistrationBehaviour,
+    Awaitable[RegistrationBehaviour],
 ]
 CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
     [
@@ -62,9 +65,12 @@ CHECK_REGISTRATION_FOR_SPAM_CALLBACK = Callable[
         Collection[Tuple[str, str]],
         Optional[str],
     ],
-    RegistrationBehaviour,
+    Awaitable[RegistrationBehaviour],
 ]
-CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[[ReadableFileWrapper, FileInfo], bool]
+CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK = Callable[
+    [ReadableFileWrapper, FileInfo],
+    Awaitable[bool],
+]
 
 
 def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
@@ -96,19 +102,25 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
     }
 
     for spam_checker in spam_checkers:
-        # Get the properties (attributes and methods) of the module and filter it
-        # down to the supported method names.
-        props = dir(spam_checker)
-        supported_hooks = list(spam_checker_methods.intersection(props))
+        # Methods on legacy spam checkers might not be async, so we wrap them around a
+        # wrapper that will call maybe_awaitable on the result.
+        def async_wrapper(f: Callable) -> Callable[..., Awaitable]:
+            def run(*args, **kwargs):
+                return maybe_awaitable(f(*args, **kwargs))
+
+            return run
 
         # Register the hooks through the module API.
-        hooks = {hook: getattr(spam_checker, hook) for hook in supported_hooks}
+        hooks = {
+            hook: async_wrapper(getattr(spam_checker, hook, None))
+            for hook in spam_checker_methods
+        }
 
         api.register_spam_checker_callbacks(**hooks)
 
 
 class SpamChecker:
-    def __init__(self, hs: "synapse.server.HomeServer"):
+    def __init__(self):
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
@@ -188,8 +200,8 @@ class SpamChecker:
                     email_threepid: Optional[dict],
                     username: Optional[str],
                     request_info: Collection[Tuple[str, str]],
-                    auth_provider_id: Optional[str] = None,
-                ) -> RegistrationBehaviour:
+                    auth_provider_id: Optional[str],
+                ) -> Awaitable[RegistrationBehaviour]:
                     return legacy_checker(
                         email_threepid,
                         username,
@@ -198,8 +210,7 @@ class SpamChecker:
 
                 self._check_registration_for_spam_callbacks.append(wrapper)
             else:
-                raise SynapseError(
-                    500,
+                raise RuntimeError(
                     "Bad signature for callback check_registration_for_spam",
                 )
 
