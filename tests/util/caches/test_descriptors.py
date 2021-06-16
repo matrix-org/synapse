@@ -622,17 +622,17 @@ class CacheDecoratorTestCase(unittest.HomeserverTestCase):
         self.assertEquals(callcount2[0], 1)
 
         a.func2.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.pop.call_count, 1)
+        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 1)
 
         yield a.func2("foo")
         a.func2.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.pop.call_count, 2)
+        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 2)
 
         self.assertEquals(callcount[0], 1)
         self.assertEquals(callcount2[0], 2)
 
         a.func.invalidate(("foo",))
-        self.assertEquals(a.func2.cache.cache.pop.call_count, 3)
+        self.assertEquals(a.func2.cache.cache.del_multi.call_count, 3)
         yield a.func("foo")
 
         self.assertEquals(callcount[0], 2)
@@ -666,18 +666,20 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         with LoggingContext("c1") as c1:
             obj = Cls()
             obj.mock.return_value = {10: "fish", 20: "chips"}
+
+            # start the lookup off
             d1 = obj.list_fn([10, 20], 2)
             self.assertEqual(current_context(), SENTINEL_CONTEXT)
             r = yield d1
             self.assertEqual(current_context(), c1)
-            obj.mock.assert_called_once_with([10, 20], 2)
+            obj.mock.assert_called_once_with((10, 20), 2)
             self.assertEqual(r, {10: "fish", 20: "chips"})
             obj.mock.reset_mock()
 
             # a call with different params should call the mock again
             obj.mock.return_value = {30: "peas"}
             r = yield obj.list_fn([20, 30], 2)
-            obj.mock.assert_called_once_with([30], 2)
+            obj.mock.assert_called_once_with((30,), 2)
             self.assertEqual(r, {20: "chips", 30: "peas"})
             obj.mock.reset_mock()
 
@@ -691,6 +693,15 @@ class CachedListDescriptorTestCase(unittest.TestCase):
             r = yield obj.list_fn([10, 20, 30], 2)
             obj.mock.assert_not_called()
             self.assertEqual(r, {10: "fish", 20: "chips", 30: "peas"})
+
+            # we should also be able to use a (single-use) iterable, and should
+            # deduplicate the keys
+            obj.mock.reset_mock()
+            obj.mock.return_value = {40: "gravy"}
+            iterable = (x for x in [10, 40, 40])
+            r = yield obj.list_fn(iterable, 2)
+            obj.mock.assert_called_once_with((40,), 2)
+            self.assertEqual(r, {10: "fish", 40: "gravy"})
 
     @defer.inlineCallbacks
     def test_invalidate(self):
@@ -717,7 +728,7 @@ class CachedListDescriptorTestCase(unittest.TestCase):
         # cache miss
         obj.mock.return_value = {10: "fish", 20: "chips"}
         r1 = yield obj.list_fn([10, 20], 2, on_invalidate=invalidate0)
-        obj.mock.assert_called_once_with([10, 20], 2)
+        obj.mock.assert_called_once_with((10, 20), 2)
         self.assertEqual(r1, {10: "fish", 20: "chips"})
         obj.mock.reset_mock()
 

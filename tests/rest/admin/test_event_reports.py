@@ -64,7 +64,7 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
                 user_tok=self.admin_user_tok,
             )
         for _ in range(5):
-            self._create_event_and_report(
+            self._create_event_and_report_without_parameters(
                 room_id=self.room_id2,
                 user_tok=self.admin_user_tok,
             )
@@ -374,6 +374,19 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
             json.dumps({"score": -100, "reason": "this makes me sad"}),
+            access_token=user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    def _create_event_and_report_without_parameters(self, room_id, user_tok):
+        """Create and report an event, but omit reason and score"""
+        resp = self.helper.send(room_id, tok=user_tok)
+        event_id = resp["event_id"]
+
+        channel = self.make_request(
+            "POST",
+            "rooms/%s/report/%s" % (room_id, event_id),
+            json.dumps({}),
             access_token=user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
