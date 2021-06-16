@@ -86,9 +86,8 @@ class DeleteDevicesRestServlet(RestServlet):
             request,
             body,
             "remove device(s) from your account",
-            # It is frequently that users might want to call this multiple times
-            # in a row while cleaning up devices, so allow a single UI auth
-            # session to be re-used.
+            # Users might call this multiple times in a row while cleaning up
+            # devices, allow a single UI auth session to be re-used.
             can_skip_ui_auth=True,
         )
 
@@ -139,9 +138,8 @@ class DeviceRestServlet(RestServlet):
             request,
             body,
             "remove a device from your account",
-            # It is frequently that users might want to call this multiple times
-            # in a row while cleaning up devices, so allow a single UI auth
-            # session to be re-used.
+            # Users might call this multiple times in a row while cleaning up
+            # devices, allow a single UI auth session to be re-used.
             can_skip_ui_auth=True,
         )
 
