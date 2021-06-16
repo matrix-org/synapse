@@ -205,8 +205,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(channel.result["code"], b"200", channel.result)
 
-    @unittest.override_config({"registrations_require_token": True})
-    def test_POST_registrations_require_token(self):
+    @override_config({"registration_requires_token": True})
+    def test_POST_registration_requires_token(self):
         username = "kermit"
         device_id = "frogfone"
         token = "abcd"
@@ -279,7 +279,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(res["completed"], 1)
         self.assertEquals(res["pending"], 0)
 
-    @unittest.override_config({"registrations_require_token": True})
+    @override_config({"registration_requires_token": True})
     def test_POST_registration_token_invalid(self):
         params = {
             "username": "kermit",
@@ -310,7 +310,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
 
-    @unittest.override_config({"registrations_require_token": True})
+    @override_config({"registration_requires_token": True})
     def test_POST_registration_token_limit_uses(self):
         token = "abcd"
         store = self.hs.get_datastore()
@@ -382,8 +382,8 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
 
-    @unittest.override_config({"registrations_require_token": True})
-    def test_registration_token_expiry(self):
+    @override_config({"registration_requires_token": True})
+    def test_POST_registration_token_expiry(self):
         token = "abcd"
         now = self.hs.get_clock().time_msec()
         store = self.hs.get_datastore()
