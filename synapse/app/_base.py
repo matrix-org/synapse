@@ -143,12 +143,21 @@ def start_reactor(
 
 def quit_with_error(error_string: str) -> NoReturn:
     message_lines = error_string.split("\n")
-    line_length = max(len(line) for line in message_lines if len(line) < 80) + 2
+    line_length = min(max(len(line) for line in message_lines), 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
+
+
+def handle_startup_exception(e: Exception) -> NoReturn:
+    # Exceptions that occur between setting up the logging and forking or starting
+    # the reactor are written to the logs, followed by a summary to stderr.
+    logger.exception("Exception during startup")
+    quit_with_error(
+        f"Error during initialisation:\n   {e}\nThere may be more information in the logs."
+    )
 
 
 def redirect_stdio_to_logs() -> None:

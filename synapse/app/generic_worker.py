@@ -33,6 +33,7 @@ from synapse.api.urls import (
 )
 from synapse.app import _base
 from synapse.app._base import (
+    handle_startup_exception,
     max_request_body_size,
     redirect_stdio_to_logs,
     register_start,
@@ -469,11 +470,14 @@ def start(config_options):
 
     setup_logging(hs, config, use_worker_options=True)
 
-    hs.setup()
+    try:
+        hs.setup()
 
-    # Ensure the replication streamer is always started in case we write to any
-    # streams. Will no-op if no streams can be written to by this worker.
-    hs.get_replication_streamer()
+        # Ensure the replication streamer is always started in case we write to any
+        # streams. Will no-op if no streams can be written to by this worker.
+        hs.get_replication_streamer()
+    except Exception as e:
+        handle_startup_exception(e)
 
     register_start(_base.start, hs)
 

@@ -37,10 +37,10 @@ from synapse.api.urls import (
 )
 from synapse.app import _base
 from synapse.app._base import (
+    handle_startup_exception,
     listen_ssl,
     listen_tcp,
     max_request_body_size,
-    quit_with_error,
     redirect_stdio_to_logs,
     register_start,
 )
@@ -70,8 +70,6 @@ from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import IncorrectDatabaseSetup
-from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
 from synapse.util.versionstring import get_version_string
@@ -359,10 +357,8 @@ def setup(config_options):
 
     try:
         hs.setup()
-    except IncorrectDatabaseSetup as e:
-        quit_with_error(str(e))
-    except UpgradeDatabaseException as e:
-        quit_with_error("Failed to upgrade database: %s" % (e,))
+    except Exception as e:
+        handle_startup_exception(e)
 
     async def do_acme() -> bool:
         """
