@@ -267,6 +267,32 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
 
 class RoomBatchSendEventRestServlet(TransactionRestServlet):
+    """
+    API endpoint which can insert a chunk of events historically back in time
+    next to the given `prev_event`.
+
+    `chunk_id` comes from `next_chunk_id `in the response of the batch send
+    endpoint and is derived from the "insertion" events added to each chunk.
+    It's not required for the first batch send.
+
+    `state_events_at_start` is used to define the historical state events
+    needed to auth the events like join events. These events will float
+    outside of the normal DAG as outlier's and won't be visible in the chat
+    history which also allows us to insert multiple chunks without having a bunch
+    of `@mxid joined the room` noise between each chunk.
+
+    `events` is chronological chunk/list of events you want to insert.
+    There is a reverse-chronological constraint on chunks so once you insert
+    some messages, you can only insert older ones after that.
+    tldr; Insert chunks from your most recent history -> oldest history.
+
+    POST /_matrix/client/r0/rooms/<roomID>/batchsend?prev_event=<eventID>&chunk_id=<chunkID>
+    {
+        "events": [ ... ],
+        "state_events_at_start": [ ... ]
+    }
+    """
+
     def __init__(self, hs):
         super().__init__(hs)
         self.hs = hs
