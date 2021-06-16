@@ -1795,17 +1795,23 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         Args:
             token: The registration token pending use
         """
-        pending = await self.db_pool.simple_select_one_onecol(
-            "registration_tokens",
-            keyvalues={"token": token},
-            retcol="pending",
-            desc="set_registration_token_pending",
-        )
-        await self.db_pool.simple_update_one(
-            "registration_tokens",
-            keyvalues={"token": token},
-            updatevalues={"pending": pending + 1},
-            desc="set_registration_token_pending",
+
+        def _set_registration_token_pending_txn(txn):
+            pending = self.db_pool.simple_select_one_onecol_txn(
+                txn,
+                "registration_tokens",
+                keyvalues={"token": token},
+                retcol="pending",
+            )
+            self.db_pool.simple_update_one_txn(
+                txn,
+                "registration_tokens",
+                keyvalues={"token": token},
+                updatevalues={"pending": pending + 1},
+            )
+
+        return await self.db_pool.runInteraction(
+            "set_registration_token_pending", _set_registration_token_pending_txn
         )
 
     async def use_registration_token(self, token: str) -> None:
@@ -1814,20 +1820,28 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         Args:
             token: The registration token to be 'used'
         """
-        res = await self.db_pool.simple_select_one(
-            "registration_tokens",
-            keyvalues={"token": token},
-            retcols=["pending", "completed"],
-            desc="use_registration_token",
-        )
-        await self.db_pool.simple_update_one(
-            "registration_tokens",
-            keyvalues={"token": token},
-            updatevalues={
-                "completed": res["completed"] + 1,
-                "pending": res["pending"] - 1,
-            },
-            desc="use_registration_token",
+
+        def _use_registration_token_txn(txn):
+            res = self.db_pool.simple_select_one_txn(
+                txn,
+                "registration_tokens",
+                keyvalues={"token": token},
+                retcols=["pending", "completed"],
+            )
+
+            # Decrement pending and increment completed
+            self.db_pool.simple_update_one_txn(
+                txn,
+                "registration_tokens",
+                keyvalues={"token": token},
+                updatevalues={
+                    "completed": res["completed"] + 1,
+                    "pending": res["pending"] - 1,
+                },
+            )
+
+        return await self.db_pool.runInteraction(
+            "use_registration_token", _use_registration_token_txn
         )
 
 
