@@ -578,6 +578,26 @@ class EventCreationHandler:
 
         builder.internal_metadata.historical = historical
 
+        # Strip down the auth_event_ids to only what we need to auth the event.
+        # For example, we don't need extra m.room.member that don't match event.sender
+        if auth_event_ids is not None:
+            temp_event = await builder.build(
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                depth=depth,
+            )
+            auth_events = await self.store.get_events_as_list(auth_event_ids)
+            # Create a StateMap[str]
+            auth_event_state_map = {
+                (e.type, e.state_key): e.event_id for e in auth_events
+            }
+            # Actually strip down and use the necessary auth events
+            auth_event_ids = self.auth.compute_auth_events(
+                event=temp_event,
+                current_state_ids=auth_event_state_map,
+                for_verification=False,
+            )
+
         event, context = await self.create_new_client_event(
             builder=builder,
             requester=requester,

@@ -498,7 +498,6 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 requester,
                 event_dict,
                 prev_event_ids=event_dict.get("prev_events"),
-                # TODO: Do we need to use `self.auth.compute_auth_events(...)` to filter the `auth_event_ids`?
                 auth_event_ids=auth_event_ids,
                 historical=True,
                 depth=inherited_depth,
