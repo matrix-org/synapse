@@ -160,9 +160,12 @@ class KeyQueryServlet(RestServlet):
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
+        device_id = requester.device_id
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = await self.e2e_keys_handler.query_devices(body, timeout, user_id)
+        result = await self.e2e_keys_handler.query_devices(
+            body, timeout, user_id, device_id
+        )
         return 200, result
 
 

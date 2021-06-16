@@ -45,7 +45,7 @@ class RoomListHandler(BaseHandler):
 
         self.response_cache = ResponseCache(
             hs.get_clock(), "room_list"
-        )  # type: ResponseCache[Tuple[Optional[int], Optional[str], ThirdPartyInstanceID]]
+        )  # type: ResponseCache[Tuple[Optional[int], Optional[str], Optional[ThirdPartyInstanceID]]]
         self.remote_response_cache = ResponseCache(
             hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000
         )  # type: ResponseCache[Tuple[str, Optional[int], Optional[str], bool, Optional[str]]]
@@ -55,7 +55,7 @@ class RoomListHandler(BaseHandler):
         limit: Optional[int] = None,
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
-        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
         from_federation: bool = False,
     ) -> JsonDict:
         """Generate a local public room list.
@@ -112,7 +112,7 @@ class RoomListHandler(BaseHandler):
         limit: Optional[int] = None,
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
-        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
         from_federation: bool = False,
     ) -> JsonDict:
         """Generate a public room list.
@@ -170,6 +170,7 @@ class RoomListHandler(BaseHandler):
                 "world_readable": room["history_visibility"]
                 == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
+                "join_rule": room["join_rules"],
             }
 
             # Filter out Nones – rather omit the field altogether
