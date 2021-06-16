@@ -26,7 +26,9 @@ from typing import Awaitable, Callable, Iterable
 from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
 
+import twisted
 from twisted.internet import defer, error, reactor
+from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
@@ -147,6 +149,21 @@ def quit_with_error(error_string: str) -> NoReturn:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
+
+
+def redirect_stdio_to_logs() -> None:
+    streams = [("stdout", LogLevel.info), ("stderr", LogLevel.error)]
+
+    for (stream, level) in streams:
+        oldStream = getattr(sys, stream)
+        loggingFile = LoggingFile(
+            logger=twisted.logger.Logger(namespace=stream),
+            level=level,
+            encoding=getattr(oldStream, "encoding", None),
+        )
+        setattr(sys, stream, loggingFile)
+
+    print("Redirected stdout/stderr to logs")
 
 
 def register_start(cb: Callable[..., Awaitable], *args, **kwargs) -> None:

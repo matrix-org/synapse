@@ -32,7 +32,11 @@ from synapse.api.urls import (
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
-from synapse.app._base import max_request_body_size, register_start
+from synapse.app._base import (
+    max_request_body_size,
+    redirect_stdio_to_logs,
+    register_start,
+)
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
@@ -472,6 +476,10 @@ def start(config_options):
     hs.get_replication_streamer()
 
     register_start(_base.start, hs)
+
+    # redirect stdio to the logs, if configured.
+    if not hs.config.no_redirect_stdio:
+        redirect_stdio_to_logs()
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

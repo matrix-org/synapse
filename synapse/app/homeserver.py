@@ -41,6 +41,7 @@ from synapse.app._base import (
     listen_tcp,
     max_request_body_size,
     quit_with_error,
+    redirect_stdio_to_logs,
     register_start,
 )
 from synapse.config._base import ConfigError
@@ -500,6 +501,11 @@ def main():
         # check base requirements
         check_requirements()
         hs = setup(sys.argv[1:])
+
+        # redirect stdio to the logs, if configured.
+        if not hs.config.no_redirect_stdio:
+            redirect_stdio_to_logs()
+
         run(hs)
 
 
