@@ -1013,6 +1013,54 @@ class JWTTestCase(unittest.HomeserverTestCase):
             channel.json_body["error"], "JWT validation failed: Invalid audience"
         )
 
+    def test_login_default_sub(self):
+        """Test reading user ID from the default subject claim."""
+        channel = self.jwt_login({"sub": "kermit"})
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.json_body["user_id"], "@kermit:test")
+
+    @override_config(
+        {
+            "jwt_config": {
+                "jwt_enabled": True,
+                "secret": jwt_secret,
+                "algorithm": jwt_algorithm,
+                "subject_claim": "username",
+            }
+        }
+    )
+    def test_login_custom_sub(self):
+        """Test reading user ID from a custom subject claim."""
+        channel = self.jwt_login({"username": "frog"})
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.json_body["user_id"], "@frog:test")
+
+    def test_login_no_normalize_id(self):
+        """Test mapping user ID to Matrix ID without normalization"""
+        channel = self.jwt_login({"sub": "#kermit"})
+        self.assertEqual(channel.result["code"], b"400", channel.result)
+        self.assertEqual(channel.json_body["errcode"], "M_INVALID_USERNAME")
+        self.assertEqual(
+            channel.json_body["error"],
+            "User ID can only contain characters a-z, 0-9, or '=_-./'",
+        )
+
+    @override_config(
+        {
+            "jwt_config": {
+                "jwt_enabled": True,
+                "secret": jwt_secret,
+                "algorithm": jwt_algorithm,
+                "normalize_user_id": True,
+            }
+        }
+    )
+    def test_login_normalize_id(self):
+        """Test mapping user ID to Matrix ID with normalization"""
+        channel = self.jwt_login({"sub": "#kermit"})
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+        self.assertEqual(channel.json_body["user_id"], "@=23kermit:test")
+
     def test_login_no_token(self):
         params = {"type": "org.matrix.login.jwt"}
         channel = self.make_request(b"POST", LOGIN_URL, params)

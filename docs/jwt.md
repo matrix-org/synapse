@@ -22,8 +22,9 @@ will be removed in a future version of Synapse.
 
 The `token` field should include the JSON web token with the following claims:
 
-* The `sub` (subject) claim is required and should encode the local part of the
-  user ID.
+* A claim that encodes the local part of the user ID is required. By default,
+  the `sub` (subject) claim is used, or a custom claim can be set in the
+  configuration file.
 * The expiration time (`exp`), not before time (`nbf`), and issued at (`iat`)
   claims are optional, but validated if present.
 * The issuer (`iss`) claim is optional, but required and validated if configured.
