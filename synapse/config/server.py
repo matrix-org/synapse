@@ -1192,7 +1192,11 @@ class ServerConfig(Config):
 
         # Read receipt sending policy at the server level.
         #
-        # Defaults to `true`. Uncomment to disable sending read receipts.
+        # Homeserver administrators may wish to disable the sending and receiving of read
+        # receipts to and from local users for organisational policy, local law, or just
+        # for privacy reasons.
+        #
+        # Defaults to `true`. Uncomment to disable sending and receiving read receipts.
         #
         #send_read_receipts: false
 
