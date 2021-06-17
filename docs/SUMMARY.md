@@ -61,6 +61,7 @@
       - [Server Version](admin_api/version_api.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
+    - [Request log format](usage/administration/request_log.md)
     - [Scripts]()
 
 # Development
