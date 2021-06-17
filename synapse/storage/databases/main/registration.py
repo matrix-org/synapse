@@ -1828,12 +1828,16 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         """
 
         def _use_registration_token_txn(txn):
-            res = self.db_pool.simple_select_one_txn(
+            # Normally, res is Optional[Dict[str, Any]].
+            # Override type because the return type is only optional if
+            # allow_none is True, and we don't want mypy throwing errors
+            # about None not being indexable.
+            res: Dict[str, Any] = self.db_pool.simple_select_one_txn(
                 txn,
                 "registration_tokens",
                 keyvalues={"token": token},
                 retcols=["pending", "completed"],
-            )
+            )  # type: ignore
 
             # Decrement pending and increment completed
             self.db_pool.simple_update_one_txn(
