@@ -37,22 +37,22 @@ class TestSpamChecker:
     def parse_config(config):
         return config
 
-    def check_registration_for_spam(self, email_threepid, username, request_info):
+    async def check_registration_for_spam(self, email_threepid, username, request_info):
         pass
 
 
 class DenyAll(TestSpamChecker):
-    def check_registration_for_spam(self, email_threepid, username, request_info):
+    async def check_registration_for_spam(self, email_threepid, username, request_info):
         return RegistrationBehaviour.DENY
 
 
 class BanAll(TestSpamChecker):
-    def check_registration_for_spam(self, email_threepid, username, request_info):
+    async def check_registration_for_spam(self, email_threepid, username, request_info):
         return RegistrationBehaviour.SHADOW_BAN
 
 
 class BanBadIdPUser(TestSpamChecker):
-    def check_registration_for_spam(
+    async def check_registration_for_spam(
         self, email_threepid, username, request_info, auth_provider_id=None
     ):
         # Reject any user coming from CAS and whose username contains profanity
