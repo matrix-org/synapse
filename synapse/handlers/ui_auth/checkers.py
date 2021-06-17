@@ -250,16 +250,19 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:
         if "token" not in authdict:
-            raise LoginError(400, "Missing token", Codes.MISSING_PARAM)
+            raise LoginError(400, "Missing registration token", Codes.MISSING_PARAM)
         if not isinstance(authdict["token"], str):
-            raise LoginError(400, "Token must be a string", Codes.INVALID_PARAM)
+            raise LoginError(
+                400, "Registration token must be a string", Codes.INVALID_PARAM
+            )
         if "session" not in authdict:
             raise SynapseError(400, "Missing UIA session", Codes.MISSING_PARAM)
+
         session = authdict["session"]
+        token = authdict["token"]
 
         # If the LoginType.REGISTRATION_TOKEN stage has already been completed,
         # return early to avoid incrementing `pending` again.
-        # TODO: check stored token matches provided token?
         try:
             stored_token = await self.store.get_ui_auth_session_data(
                 session,
@@ -268,10 +271,15 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             )
         except StoreError:
             raise SynapseError(400, "Unknown session ID: {}".format(session))
-        if stored_token:
-            return True
 
-        token = authdict["token"]
+        if stored_token:
+            if token != stored_token:
+                raise SynapseError(
+                    400, "Registration token has changed", Codes.INVALID_PARAM
+                )
+            else:
+                return True
+
         if await self.store.registration_token_is_valid(token):
             # Increment pending counter, so that if token has limited uses it
             # can't be used up by someone else in the meantime.
