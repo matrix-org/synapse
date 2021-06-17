@@ -289,8 +289,7 @@ async def start(hs: "synapse.server.HomeServer"):
     """
     Start a Synapse server or worker.
 
-    Should be called once the reactor is running and (if we're using ACME) the
-    TLS certificates are in place.
+    Should be called once the reactor is running.
 
     Will start the main HTTP listeners and do some other startup tasks, and then
     notify systemd.
