@@ -44,9 +44,6 @@ class ReadMarkerHandler(BaseHandler):
         """
 
         with await self.read_marker_linearizer.queue((room_id, user_id)):
-            if not self.hs.should_send_read_receipts():
-                return
-
             existing_read_marker = await self.store.get_account_data_for_room_and_type(
                 user_id, room_id, "m.fully_read"
             )
