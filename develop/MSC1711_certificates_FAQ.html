@@ -274,15 +274,6 @@ valid certificate after this point will no longer be able to federate with
 <p>In this case, your <code>server_name</code> points to the host where your Synapse is
 running. There is no need to create a <code>.well-known</code> URI or an SRV record, but
 you will need to give Synapse a valid, signed, certificate.</p>
-<p>The easiest way to do that is with Synapse's built-in ACME (Let's Encrypt)
-support. Full details are in <a href="./ACME.html">ACME.md</a> but, in a nutshell:</p>
-<ol>
-<li>Allow Synapse to listen on port 80 with <code>authbind</code>, or forward it from a
-reverse proxy.</li>
-<li>Enable acme support in <code>homeserver.yaml</code>.</li>
-<li>Move your old certificates out of the way.</li>
-<li>Restart Synapse.</li>
-</ol>
 <h3 id="if-you-do-have-an-srv-record-currently"><a class="header" href="#if-you-do-have-an-srv-record-currently">If you do have an SRV record currently</a></h3>
 <p>If you are using an SRV record, your matrix domain (<code>server_name</code>) may not
 point to the same host that your Synapse is running on (the 'target
@@ -296,19 +287,9 @@ an SRV record which looks like:</p>
 <p>In this situation, you have three choices for how to proceed:</p>
 <h4 id="option-1-give-synapse-a-certificate-for-your-matrix-domain"><a class="header" href="#option-1-give-synapse-a-certificate-for-your-matrix-domain">Option 1: give Synapse a certificate for your matrix domain</a></h4>
 <p>Synapse 1.0 will expect your server to present a TLS certificate for your
-<code>server_name</code> (<code>example.com</code> in the above example). You can achieve this by
-doing one of the following:</p>
-<ul>
-<li>
-<p>Acquire a certificate for the <code>server_name</code> yourself (for example, using
-<code>certbot</code>), and give it and the key to Synapse via <code>tls_certificate_path</code>
-and <code>tls_private_key_path</code>, or:</p>
-</li>
-<li>
-<p>Use Synapse's <a href="./ACME.html">ACME support</a>, and forward port 80 on the
-<code>server_name</code> domain to your Synapse instance.</p>
-</li>
-</ul>
+<code>server_name</code> (<code>example.com</code> in the above example). You can achieve this by acquiring a
+certificate for the <code>server_name</code> yourself (for example, using <code>certbot</code>), and giving it
+and the key to Synapse via <code>tls_certificate_path</code> and <code>tls_private_key_path</code>.</p>
 <h4 id="option-2-run-synapse-behind-a-reverse-proxy"><a class="header" href="#option-2-run-synapse-behind-a-reverse-proxy">Option 2: run Synapse behind a reverse proxy</a></h4>
 <p>If you have an existing reverse proxy set up with correct TLS certificates for
 your domain, you can simply route all traffic through the reverse proxy by
@@ -327,10 +308,9 @@ with Synapse 0.34 and earlier.</p>
 </li>
 <li>
 <p>Give Synapse a certificate corresponding to the target domain
-(<code>customer.example.net</code> in the above example). You can either use Synapse's
-built-in <a href="./ACME.html">ACME support</a> for this (via the <code>domain</code> parameter in
-the <code>acme</code> section), or acquire a certificate yourself and give it to
-Synapse via <code>tls_certificate_path</code> and <code>tls_private_key_path</code>.</p>
+(<code>customer.example.net</code> in the above example). You can do this by acquire a 
+certificate for the target domain and giving it to Synapse via <code>tls_certificate_path</code>
+and <code>tls_private_key_path</code>.</p>
 </li>
 <li>
 <p>Restart Synapse to ensure the new certificate is loaded.</p>

@@ -525,10 +525,7 @@ each line). The relevant lines are like this:</li>
 <li>
 <p>You will also need to uncomment the <code>tls_certificate_path</code> and
 <code>tls_private_key_path</code> lines under the <code>TLS</code> section. You will need to manage
-provisioning of these certificates yourself — Synapse had built-in ACME
-support, but the ACMEv1 protocol Synapse implements is deprecated, not
-allowed by LetsEncrypt for new sites, and will break for existing sites in
-late 2020. See <a href="setup/docs/ACME.html">ACME.md</a>.</p>
+provisioning of these certificates yourself.</p>
 <p>If you are using your own certificate, be sure to use a <code>.pem</code> file that
 includes the full certificate chain including any intermediate certificates
 (for instance, if using certbot, use <code>fullchain.pem</code> as your certificate, not
@@ -2458,15 +2455,6 @@ valid certificate after this point will no longer be able to federate with
 <p>In this case, your <code>server_name</code> points to the host where your Synapse is
 running. There is no need to create a <code>.well-known</code> URI or an SRV record, but
 you will need to give Synapse a valid, signed, certificate.</p>
-<p>The easiest way to do that is with Synapse's built-in ACME (Let's Encrypt)
-support. Full details are in <a href="./ACME.html">ACME.md</a> but, in a nutshell:</p>
-<ol>
-<li>Allow Synapse to listen on port 80 with <code>authbind</code>, or forward it from a
-reverse proxy.</li>
-<li>Enable acme support in <code>homeserver.yaml</code>.</li>
-<li>Move your old certificates out of the way.</li>
-<li>Restart Synapse.</li>
-</ol>
 <h3 id="if-you-do-have-an-srv-record-currently"><a class="header" href="#if-you-do-have-an-srv-record-currently">If you do have an SRV record currently</a></h3>
 <p>If you are using an SRV record, your matrix domain (<code>server_name</code>) may not
 point to the same host that your Synapse is running on (the 'target
@@ -2480,19 +2468,9 @@ an SRV record which looks like:</p>
 <p>In this situation, you have three choices for how to proceed:</p>
 <h4 id="option-1-give-synapse-a-certificate-for-your-matrix-domain"><a class="header" href="#option-1-give-synapse-a-certificate-for-your-matrix-domain">Option 1: give Synapse a certificate for your matrix domain</a></h4>
 <p>Synapse 1.0 will expect your server to present a TLS certificate for your
-<code>server_name</code> (<code>example.com</code> in the above example). You can achieve this by
-doing one of the following:</p>
-<ul>
-<li>
-<p>Acquire a certificate for the <code>server_name</code> yourself (for example, using
-<code>certbot</code>), and give it and the key to Synapse via <code>tls_certificate_path</code>
-and <code>tls_private_key_path</code>, or:</p>
-</li>
-<li>
-<p>Use Synapse's <a href="./ACME.html">ACME support</a>, and forward port 80 on the
-<code>server_name</code> domain to your Synapse instance.</p>
-</li>
-</ul>
+<code>server_name</code> (<code>example.com</code> in the above example). You can achieve this by acquiring a
+certificate for the <code>server_name</code> yourself (for example, using <code>certbot</code>), and giving it
+and the key to Synapse via <code>tls_certificate_path</code> and <code>tls_private_key_path</code>.</p>
 <h4 id="option-2-run-synapse-behind-a-reverse-proxy"><a class="header" href="#option-2-run-synapse-behind-a-reverse-proxy">Option 2: run Synapse behind a reverse proxy</a></h4>
 <p>If you have an existing reverse proxy set up with correct TLS certificates for
 your domain, you can simply route all traffic through the reverse proxy by
@@ -2511,10 +2489,9 @@ with Synapse 0.34 and earlier.</p>
 </li>
 <li>
 <p>Give Synapse a certificate corresponding to the target domain
-(<code>customer.example.net</code> in the above example). You can either use Synapse's
-built-in <a href="./ACME.html">ACME support</a> for this (via the <code>domain</code> parameter in
-the <code>acme</code> section), or acquire a certificate yourself and give it to
-Synapse via <code>tls_certificate_path</code> and <code>tls_private_key_path</code>.</p>
+(<code>customer.example.net</code> in the above example). You can do this by acquire a 
+certificate for the target domain and giving it to Synapse via <code>tls_certificate_path</code>
+and <code>tls_private_key_path</code>.</p>
 </li>
 <li>
 <p>Restart Synapse to ensure the new certificate is loaded.</p>
@@ -3279,13 +3256,9 @@ retention:
 # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
 # certificate, signed by a recognised Certificate Authority.
 #
-# See 'ACME support' below to enable auto-provisioning this certificate via
-# Let's Encrypt.
-#
-# If supplying your own, be sure to use a `.pem` file that includes the
-# full certificate chain including any intermediate certificates (for
-# instance, if using certbot, use `fullchain.pem` as your certificate,
-# not `cert.pem`).
+# Be sure to use a `.pem` file that includes the full certificate chain including
+# any intermediate certificates (for instance, if using certbot, use
+# `fullchain.pem` as your certificate, not `cert.pem`).
 #
 #tls_certificate_path: &quot;CONFDIR/SERVERNAME.tls.crt&quot;
 
@@ -3335,80 +3308,6 @@ retention:
 #  - myCA1.pem
 #  - myCA2.pem
 #  - myCA3.pem
-
-# ACME support: This will configure Synapse to request a valid TLS certificate
-# for your configured `server_name` via Let's Encrypt.
-#
-# Note that ACME v1 is now deprecated, and Synapse currently doesn't support
-# ACME v2. This means that this feature currently won't work with installs set
-# up after November 2019. For more info, and alternative solutions, see
-# https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
-#
-# Note that provisioning a certificate in this way requires port 80 to be
-# routed to Synapse so that it can complete the http-01 ACME challenge.
-# By default, if you enable ACME support, Synapse will attempt to listen on
-# port 80 for incoming http-01 challenges - however, this will likely fail
-# with 'Permission denied' or a similar error.
-#
-# There are a couple of potential solutions to this:
-#
-#  * If you already have an Apache, Nginx, or similar listening on port 80,
-#    you can configure Synapse to use an alternate port, and have your web
-#    server forward the requests. For example, assuming you set 'port: 8009'
-#    below, on Apache, you would write:
-#
-#    ProxyPass /.well-known/acme-challenge http://localhost:8009/.well-known/acme-challenge
-#
-#  * Alternatively, you can use something like `authbind` to give Synapse
-#    permission to listen on port 80.
-#
-acme:
-    # ACME support is disabled by default. Set this to `true` and uncomment
-    # tls_certificate_path and tls_private_key_path above to enable it.
-    #
-    enabled: false
-
-    # Endpoint to use to request certificates. If you only want to test,
-    # use Let's Encrypt's staging url:
-    #     https://acme-staging.api.letsencrypt.org/directory
-    #
-    #url: https://acme-v01.api.letsencrypt.org/directory
-
-    # Port number to listen on for the HTTP-01 challenge. Change this if
-    # you are forwarding connections through Apache/Nginx/etc.
-    #
-    port: 80
-
-    # Local addresses to listen on for incoming connections.
-    # Again, you may want to change this if you are forwarding connections
-    # through Apache/Nginx/etc.
-    #
-    bind_addresses: ['::', '0.0.0.0']
-
-    # How many days remaining on a certificate before it is renewed.
-    #
-    reprovision_threshold: 30
-
-    # The domain that the certificate should be for. Normally this
-    # should be the same as your Matrix domain (i.e., 'server_name'), but,
-    # by putting a file at 'https://&lt;server_name&gt;/.well-known/matrix/server',
-    # you can delegate incoming traffic to another server. If you do that,
-    # you should give the target of the delegation here.
-    #
-    # For example: if your 'server_name' is 'example.com', but
-    # 'https://example.com/.well-known/matrix/server' delegates to
-    # 'matrix.example.com', you should put 'matrix.example.com' here.
-    #
-    # If not set, defaults to your 'server_name'.
-    #
-    domain: matrix.example.com
-
-    # file to use for the account key. This will be generated if it doesn't
-    # exist.
-    #
-    # If unspecified, we will use CONFDIR/client.key.
-    #
-    account_key_file: DATADIR/acme_account.key
 
 
 ## Federation ##
