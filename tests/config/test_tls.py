@@ -84,11 +84,7 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         self.assertEqual(len(warnings), 1)
         self.assertEqual(
             warnings[0]["message"],
-            (
-                "Self-signed TLS certificates will not be accepted by "
-                "Synapse 1.0. Please either provide a valid certificate, "
-                "or use Synapse's ACME support to provision one."
-            ),
+            "Self-signed TLS certificates will not be accepted by Synapse 1.0.",
         )
 
     def test_tls_client_minimum_default(self):
@@ -201,48 +197,6 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
         self.assertEqual(options & SSL.OP_NO_TLSv1, 0)
         self.assertEqual(options & SSL.OP_NO_TLSv1_1, 0)
         self.assertEqual(options & SSL.OP_NO_TLSv1_2, 0)
-
-    def test_acme_disabled_in_generated_config_no_acme_domain_provied(self):
-        """
-        Checks acme is disabled by default.
-        """
-        conf = TestConfig()
-        conf.read_config(
-            yaml.safe_load(
-                TestConfig().generate_config(
-                    "/config_dir_path",
-                    "my_super_secure_server",
-                    "/data_dir_path",
-                    tls_certificate_path="/tls_cert_path",
-                    tls_private_key_path="tls_private_key",
-                    acme_domain=None,  # This is the acme_domain
-                )
-            ),
-            "/config_dir_path",
-        )
-
-        self.assertFalse(conf.acme_enabled)
-
-    def test_acme_enabled_in_generated_config_domain_provided(self):
-        """
-        Checks acme is enabled if the acme_domain arg is set to some string.
-        """
-        conf = TestConfig()
-        conf.read_config(
-            yaml.safe_load(
-                TestConfig().generate_config(
-                    "/config_dir_path",
-                    "my_super_secure_server",
-                    "/data_dir_path",
-                    tls_certificate_path="/tls_cert_path",
-                    tls_private_key_path="tls_private_key",
-                    acme_domain="my_supe_secure_server",  # This is the acme_domain
-                )
-            ),
-            "/config_dir_path",
-        )
-
-        self.assertTrue(conf.acme_enabled)
 
     def test_whitelist_idna_failure(self):
         """

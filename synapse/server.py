@@ -66,7 +66,6 @@ from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionR
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
-from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
@@ -493,10 +492,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_e2e_room_keys_handler(self) -> E2eRoomKeysHandler:
         return E2eRoomKeysHandler(self)
-
-    @cache_in_self
-    def get_acme_handler(self) -> AcmeHandler:
-        return AcmeHandler(self)
 
     @cache_in_self
     def get_admin_handler(self) -> AdminHandler:
