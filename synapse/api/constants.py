@@ -65,6 +65,12 @@ class JoinRules:
     MSC3083_RESTRICTED = "restricted"
 
 
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
+
+
 class LoginType:
     PASSWORD = "m.login.password"
     EMAIL_IDENTITY = "m.login.email.identity"
