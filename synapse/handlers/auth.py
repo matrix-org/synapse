@@ -1321,7 +1321,7 @@ class AuthHandler(BaseHandler):
     def generate_refresh_token(self, for_user: UserID) -> str:
         """Generates an opaque string, for use as a refresh token"""
 
-        # we use the following format for access tokens:
+        # we use the following format for refresh tokens:
         #    syr_<base64 local part>_<random string>_<base62 crc check>
 
         b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))

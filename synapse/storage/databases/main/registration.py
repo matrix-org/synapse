@@ -54,6 +54,8 @@ class TokenLookupResult:
         token_owner: The "owner" of the token. This is either the same as the
             user, or a server admin who is logged in as the user.
         token_used: True if this token was used at least once in a request.
+            This field can be out of date since `get_user_by_access_token` is
+            cached.
     """
 
     user_id = attr.ib(type=str)

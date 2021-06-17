@@ -119,6 +119,11 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        # The `access_token_lifetime` applies for tokens that can be renewed
+        # using a refresh token, as per MSC2918. This behaviour can be disabled
+        # by setting it to `None` (`null` in the YAML config). Since it is
+        # incompatible with the `session_lifetime` mechanism, it is set to
+        # `None` by default if a `session_lifetime` is set.
         access_token_lifetime = config.get(
             "access_token_lifetime", "5m" if session_lifetime is None else None
         )
