@@ -27,7 +27,7 @@ from tests.utils import TestHomeServer, default_config
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
-    """ Test the "simple" SQL generating methods in SQLBaseStore. """
+    """Test the "simple" SQL generating methods in SQLBaseStore."""
 
     def setUp(self):
         self.db_pool = Mock(spec=["runInteraction"])
