@@ -168,7 +168,7 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, List, Optional, Pattern, Type
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
 
 import attr
 
@@ -278,12 +278,18 @@ class SynapseTags:
     DB_TXN_ID = "db.txn_id"
 
 
+class SynapseBaggage:
+    FORCE_TRACING = "synapse-force-tracing"
+
+
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
 _homeserver_whitelist = None  # type: Optional[Pattern[str]]
 
 # Util methods
+
+Sentinel = object()
 
 
 def only_if_tracing(func):
@@ -447,12 +453,28 @@ def start_active_span(
     )
 
 
-def start_active_span_follows_from(operation_name, contexts):
+def start_active_span_follows_from(
+    operation_name: str, contexts: Collection, inherit_force_tracing=False
+):
+    """Starts an active opentracing span, with additional references to previous spans
+
+    Args:
+        operation_name: name of the operation represented by the new span
+        contexts: the previous spans to inherit from
+        inherit_force_tracing: if set, and any of the previous contexts have had tracing
+           forced, the new span will also have tracing forced.
+    """
     if opentracing is None:
         return noop_context_manager()
 
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(operation_name, references=references)
+
+    if inherit_force_tracing and any(
+        is_context_forced_tracing(ctx) for ctx in contexts
+    ):
+        force_tracing(scope.span)
+
     return scope
 
 
@@ -551,6 +573,10 @@ def start_active_span_from_edu(
 
 
 # Opentracing setters for tags, logs, etc
+@only_if_tracing
+def active_span():
+    """Get the currently active span, if any"""
+    return opentracing.tracer.active_span
 
 
 @ensure_active_span("set a tag")
@@ -569,6 +595,33 @@ def log_kv(key_values, timestamp=None):
 def set_operation_name(operation_name):
     """Sets the operation name of the active span"""
     opentracing.tracer.active_span.set_operation_name(operation_name)
+
+
+@only_if_tracing
+def force_tracing(span=Sentinel) -> None:
+    """Force sampling for the active/given span and its children.
+
+    Args:
+        span: span to force tracing for. By default, the active span.
+    """
+    if span is Sentinel:
+        span = opentracing.tracer.active_span
+    if span is None:
+        logger.error("No active span in force_tracing")
+        return
+
+    span.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+
+    # also set a bit of baggage, so that we have a way of figuring out if
+    # it is enabled later
+    span.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
+
+
+def is_context_forced_tracing(span_context) -> bool:
+    """Check if sampling has been force for the given span context."""
+    if span_context is None:
+        return False
+    return span_context.baggage.get(SynapseBaggage.FORCE_TRACING) is not None
 
 
 # Injection and extraction
