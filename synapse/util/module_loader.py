@@ -55,7 +55,9 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
         try:
             provider_config = provider_class.parse_config(module_config)
         except jsonschema.ValidationError as e:
-            raise json_error_to_config_error(e, itertools.chain(config_path, ("config",)))
+            raise json_error_to_config_error(
+                e, itertools.chain(config_path, ("config",))
+            )
         except ConfigError as e:
             raise _wrap_config_error(
                 "Failed to parse config for module %r" % (modulename,),

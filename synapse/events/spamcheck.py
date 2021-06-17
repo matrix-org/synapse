@@ -234,7 +234,7 @@ class SpamChecker:
             will be used as the error message returned to the user.
         """
         for callback in self._check_event_for_spam_callbacks:
-            res = await maybe_awaitable(callback(event))  # type: Union[bool, str]
+            res = await callback(event)  # type: Union[bool, str]
             if res:
                 return res
 
@@ -256,10 +256,7 @@ class SpamChecker:
             True if the user may send an invite, otherwise False
         """
         for callback in self._user_may_invite_callbacks:
-            if (
-                await maybe_awaitable(callback(inviter_userid, invitee_userid, room_id))
-                is False
-            ):
+            if await callback(inviter_userid, invitee_userid, room_id) is False:
                 return False
 
         return True
@@ -276,7 +273,7 @@ class SpamChecker:
             True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
-            if await maybe_awaitable(callback(userid)) is False:
+            if await callback(userid) is False:
                 return False
 
         return True
@@ -296,7 +293,7 @@ class SpamChecker:
             True if the user may create a room alias, otherwise False
         """
         for callback in self._user_may_create_room_alias_callbacks:
-            if await maybe_awaitable(callback(userid, room_alias)) is False:
+            if await callback(userid, room_alias) is False:
                 return False
 
         return True
@@ -314,7 +311,7 @@ class SpamChecker:
             True if the user may publish the room, otherwise False
         """
         for callback in self._user_may_publish_room_callbacks:
-            if await maybe_awaitable(callback(userid, room_id)) is False:
+            if await callback(userid, room_id) is False:
                 return False
 
         return True
@@ -337,7 +334,7 @@ class SpamChecker:
         for callback in self._check_username_for_spam_callbacks:
             # Make a copy of the user profile object to ensure the spam checker cannot
             # modify it.
-            if await maybe_awaitable(callback(user_profile.copy())):
+            if await callback(user_profile.copy()):
                 return True
 
         return False
@@ -365,7 +362,7 @@ class SpamChecker:
         """
 
         for callback in self._check_registration_for_spam_callbacks:
-            behaviour = await maybe_awaitable(
+            behaviour = await (
                 callback(email_threepid, username, request_info, auth_provider_id)
             )
             assert isinstance(behaviour, RegistrationBehaviour)
@@ -409,7 +406,7 @@ class SpamChecker:
         """
 
         for callback in self._check_media_file_for_spam_callbacks:
-            spam = await maybe_awaitable(callback(file_wrapper, file_info))
+            spam = await callback(file_wrapper, file_info)
             if spam:
                 return True
 
