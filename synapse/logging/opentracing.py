@@ -842,6 +842,11 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
     else:
         scope = start_active_span(request_name)
 
+    # include the trace id in the response headers.
+    request.responseHeaders.addRawHeader(
+        "Synapse-Trace-Id", f"{scope.span.context.trace_id:x}"
+    )
+
     with scope:
         try:
             yield

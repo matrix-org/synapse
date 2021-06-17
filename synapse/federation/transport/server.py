@@ -344,6 +344,12 @@ class BaseFederationServlet:
                     "incoming-federation-request", tags=request_tags
                 )
 
+            if hasattr(scope, "span"):
+                # include the trace id in the response headers.
+                request.responseHeaders.addRawHeader(
+                    "Synapse-Trace-Id", f"{scope.span.context.trace_id:x}"
+                )
+
             with scope:
                 if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:
