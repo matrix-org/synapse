@@ -1985,7 +1985,11 @@ No significant changes since 1.19.0rc1.
 Removal warning
 ---------------
 
-As outlined in the [previous release](https://github.com/matrix-org/synapse/releases/tag/v1.18.0), we are no longer publishing Docker images with the `-py3` tag suffix. On top of that, we have also removed the `latest-py3` tag. Please see [the announcement in the upgrade notes for 1.18.0](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md#upgrading-to-v1180).
+As outlined in the [previous release](https://github.
+com/matrix-org/synapse/releases/tag/v1.18.0), we are no longer publishing Docker 
+images with the `-py3` tag suffix. On top of that, we have also removed the 
+`latest-py3` tag. Please see [the announcement in the upgrade notes for 1.18.0]
+(https://github.com/matrix-org/synapse/blob/develop/docs/upgrading/README.md#upgrading-to-v1180).
 
 
 Synapse 1.19.0rc1 (2020-08-13)
