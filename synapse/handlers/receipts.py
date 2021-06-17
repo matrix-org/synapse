@@ -142,9 +142,6 @@ class ReceiptsHandler(BaseHandler):
         if not is_new:
             return
 
-        if not self.hs.should_send_read_receipts():
-            return
-
         if self.federation_sender:
             await self.federation_sender.send_read_receipt(receipt)
 
