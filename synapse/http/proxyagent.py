@@ -253,9 +253,8 @@ def _http_proxy_endpoint(
     """Parses an http proxy setting and returns an endpoint for the proxy
 
     Args:
-        proxy: the proxy setting in the form: [<username>:<password>@]<host>[:<port>]
-            Note that compared to other apps, this function currently lacks support
-            for specifying a protocol schema (i.e. protocol://...).
+        proxy: the proxy setting in the form: [<username>:<password>@][scheme://]<host>[:<port>]
+            This currently supports http:// and https:// proxies. a hostname without scheme is assumed to be http.
 
         reactor: reactor to be used to connect to the proxy
 
@@ -311,12 +310,12 @@ def parse_proxy(
     proxy: bytes, default_scheme: bytes = b"http", default_port: int = 1080
 ) -> Tuple[bytes, bytes, int]:
     """
-    Parse the hostname and port from a proxy connection byte string.
+    Parse the scheme, hostname and port from a proxy connection byte string.
 
     Args:
-        proxy: The proxy connection string. Must be in the form 'host[:port]'.
-        default_scheme: The default scheme to return if one is not found in `proxy`.
-        default_port: The default port to return if one is not found in `proxy`.
+        proxy: The proxy connection string. Must be in the form '[scheme://]host[:port]'.
+        default_scheme: The default scheme to return if one is not found in `proxy`. Defaults to http
+        default_port: The default port to return if one is not found in `proxy`. Defaults to 1080
 
     Returns:
         A tuple containing the scheme, hostname and port.
