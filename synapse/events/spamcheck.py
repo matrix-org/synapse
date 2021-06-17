@@ -119,6 +119,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
             # arguments for check_registration_for_spam, so we can't just pass run,
             # instead we use another wrapper with the right number of arguments.
             if f.__name__ == "check_registration_for_spam":
+
                 def wrap_legacy_registration_checker(
                     email_threepid: Optional[dict],
                     username: Optional[str],
