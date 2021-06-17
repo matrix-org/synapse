@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -34,8 +33,8 @@ from ._base import (
 )
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 

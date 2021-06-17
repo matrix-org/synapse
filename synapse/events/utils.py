@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +21,7 @@ from synapse.api.constants import EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.util.async_helpers import yieldable_gather_results
+from synapse.util.frozenutils import unfreeze
 
 from . import EventBase
 
@@ -53,6 +53,8 @@ def prune_event(event: EventBase) -> EventBase:
     pruned_event.internal_metadata.stream_ordering = (
         event.internal_metadata.stream_ordering
     )
+
+    pruned_event.internal_metadata.outlier = event.internal_metadata.outlier
 
     # Mark the event as redacted
     pruned_event.internal_metadata.redacted = True
@@ -240,6 +242,7 @@ def format_event_for_client_v1(d):
         "replaces_state",
         "prev_content",
         "invite_room_state",
+        "knock_room_state",
     )
     for key in copy_keys:
         if key in d["unsigned"]:
@@ -276,7 +279,7 @@ def serialize_event(
     event_format=format_event_for_client_v1,
     token_id=None,
     only_event_fields=None,
-    is_invite=False,
+    include_stripped_room_state=False,
 ):
     """Serialize event for clients
 
@@ -287,8 +290,10 @@ def serialize_event(
         event_format
         token_id
         only_event_fields
-        is_invite (bool): Whether this is an invite that is being sent to the
-            invitee
+        include_stripped_room_state (bool): Some events can have stripped room state
+            stored in the `unsigned` field. This is required for invite and knock
+            functionality. If this option is False, that state will be removed from the
+            event before it is returned. Otherwise, it will be kept.
 
     Returns:
         dict
@@ -320,11 +325,13 @@ def serialize_event(
             if txn_id is not None:
                 d["unsigned"]["transaction_id"] = txn_id
 
-    # If this is an invite for somebody else, then we don't care about the
-    # invite_room_state as that's meant solely for the invitee. Other clients
-    # will already have the state since they're in the room.
-    if not is_invite:
+    # invite_room_state and knock_room_state are a list of stripped room state events
+    # that are meant to provide metadata about a room to an invitee/knocker. They are
+    # intended to only be included in specific circumstances, such as down sync, and
+    # should not be included in any other case.
+    if not include_stripped_room_state:
         d["unsigned"].pop("invite_room_state", None)
+        d["unsigned"].pop("knock_room_state", None)
 
     if as_client_event:
         d = event_format(d)
@@ -400,10 +407,19 @@ class EventClientSerializer:
                 # If there is an edit replace the content, preserving existing
                 # relations.
 
+                # Ensure we take copies of the edit content, otherwise we risk modifying
+                # the original event.
+                edit_content = edit.content.copy()
+
+                # Unfreeze the event content if necessary, so that we may modify it below
+                edit_content = unfreeze(edit_content)
+                serialized_event["content"] = edit_content.get("m.new_content", {})
+
+                # Check for existing relations
                 relations = event.content.get("m.relates_to")
-                serialized_event["content"] = edit.content.get("m.new_content", {})
                 if relations:
-                    serialized_event["content"]["m.relates_to"] = relations
+                    # Keep the relations, ensuring we use a dict copy of the original
+                    serialized_event["content"]["m.relates_to"] = relations.copy()
                 else:
                     serialized_event["content"].pop("m.relates_to", None)
 

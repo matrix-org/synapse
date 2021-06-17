@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
@@ -35,6 +34,7 @@ from synapse.api.errors import (
 from synapse.config._base import ConfigError
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.types import UserID
 from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import random_string
@@ -57,7 +57,7 @@ from .thumbnailer import Thumbnailer, ThumbnailError
 from .upload_resource import UploadResource
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +75,8 @@ class MediaRepository:
         self.store = hs.get_datastore()
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
+
+        Thumbnailer.set_limits(self.max_image_pixels)
 
         self.primary_base_path = hs.config.media_store_path  # type: str
         self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
@@ -145,7 +147,7 @@ class MediaRepository:
         upload_name: Optional[str],
         content: IO,
         content_length: int,
-        auth_user: str,
+        auth_user: UserID,
     ) -> str:
         """Store uploaded content for a local user and return the mxc URL
 
@@ -467,6 +469,9 @@ class MediaRepository:
         return media_info
 
     def _get_thumbnail_requirements(self, media_type):
+        scpos = media_type.find(";")
+        if scpos > 0:
+            media_type = media_type[:scpos]
         return self.thumbnail_requirements.get(media_type, ())
 
     def _generate_thumbnail(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,25 +14,37 @@
 import enum
 import logging
 import threading
-from collections import namedtuple
-from typing import Any
+from typing import Any, Dict, Generic, Iterable, Optional, Set, TypeVar
+
+import attr
 
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
 
 
-class DictionaryEntry(namedtuple("DictionaryEntry", ("full", "known_absent", "value"))):
+# The type of the cache keys.
+KT = TypeVar("KT")
+# The type of the dictionary keys.
+DKT = TypeVar("DKT")
+
+
+@attr.s(slots=True)
+class DictionaryEntry:
     """Returned when getting an entry from the cache
 
     Attributes:
-        full (bool): Whether the cache has the full or dict or just some keys.
+        full: Whether the cache has the full or dict or just some keys.
             If not full then not all requested keys will necessarily be present
             in `value`
-        known_absent (set): Keys that were looked up in the dict and were not
+        known_absent: Keys that were looked up in the dict and were not
             there.
-        value (dict): The full or partial dict value
+        value: The full or partial dict value
     """
+
+    full = attr.ib(type=bool)
+    known_absent = attr.ib()
+    value = attr.ib()
 
     def __len__(self):
         return len(self.value)
@@ -45,21 +56,21 @@ class _Sentinel(enum.Enum):
     sentinel = object()
 
 
-class DictionaryCache:
+class DictionaryCache(Generic[KT, DKT]):
     """Caches key -> dictionary lookups, supporting caching partial dicts, i.e.
     fetching a subset of dictionary keys for a particular key.
     """
 
-    def __init__(self, name, max_entries=1000):
+    def __init__(self, name: str, max_entries: int = 1000):
         self.cache = LruCache(
             max_size=max_entries, cache_name=name, size_callback=len
-        )  # type: LruCache[Any, DictionaryEntry]
+        )  # type: LruCache[KT, DictionaryEntry]
 
         self.name = name
         self.sequence = 0
-        self.thread = None
+        self.thread = None  # type: Optional[threading.Thread]
 
-    def check_thread(self):
+    def check_thread(self) -> None:
         expected_thread = self.thread
         if expected_thread is None:
             self.thread = threading.current_thread()
@@ -69,12 +80,14 @@ class DictionaryCache:
                     "Cache objects can only be accessed from the main thread"
                 )
 
-    def get(self, key, dict_keys=None):
+    def get(
+        self, key: KT, dict_keys: Optional[Iterable[DKT]] = None
+    ) -> DictionaryEntry:
         """Fetch an entry out of the cache
 
         Args:
             key
-            dict_key(list): If given a set of keys then return only those keys
+            dict_key: If given a set of keys then return only those keys
                 that exist in the cache.
 
         Returns:
@@ -95,7 +108,7 @@ class DictionaryCache:
 
         return DictionaryEntry(False, set(), {})
 
-    def invalidate(self, key):
+    def invalidate(self, key: KT) -> None:
         self.check_thread()
 
         # Increment the sequence number so that any SELECT statements that
@@ -103,19 +116,25 @@ class DictionaryCache:
         self.sequence += 1
         self.cache.pop(key, None)
 
-    def invalidate_all(self):
+    def invalidate_all(self) -> None:
         self.check_thread()
         self.sequence += 1
         self.cache.clear()
 
-    def update(self, sequence, key, value, fetched_keys=None):
+    def update(
+        self,
+        sequence: int,
+        key: KT,
+        value: Dict[DKT, Any],
+        fetched_keys: Optional[Set[DKT]] = None,
+    ) -> None:
         """Updates the entry in the cache
 
         Args:
             sequence
-            key (K)
-            value (dict[X,Y]): The value to update the cache with.
-            fetched_keys (None|set[X]): All of the dictionary keys which were
+            key
+            value: The value to update the cache with.
+            fetched_keys: All of the dictionary keys which were
                 fetched from the database.
 
                 If None, this is the complete value for key K. Otherwise, it
@@ -131,7 +150,9 @@ class DictionaryCache:
             else:
                 self._update_or_insert(key, value, fetched_keys)
 
-    def _update_or_insert(self, key, value, known_absent):
+    def _update_or_insert(
+        self, key: KT, value: Dict[DKT, Any], known_absent: Set[DKT]
+    ) -> None:
         # We pop and reinsert as we need to tell the cache the size may have
         # changed
 
@@ -140,5 +161,5 @@ class DictionaryCache:
         entry.known_absent.update(known_absent)
         self.cache[key] = entry
 
-    def _insert(self, key, value, known_absent):
+    def _insert(self, key: KT, value: Dict[DKT, Any], known_absent: Set[DKT]) -> None:
         self.cache[key] = DictionaryEntry(True, known_absent, value)

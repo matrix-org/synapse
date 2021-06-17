@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -312,16 +311,16 @@ class FederationAckCommand(Command):
 
     NAME = "FEDERATION_ACK"
 
-    def __init__(self, instance_name, token):
+    def __init__(self, instance_name: str, token: int):
         self.instance_name = instance_name
         self.token = token
 
     @classmethod
-    def from_line(cls, line):
+    def from_line(cls, line: str) -> "FederationAckCommand":
         instance_name, token = line.split(" ")
         return cls(instance_name, int(token))
 
-    def to_line(self):
+    def to_line(self) -> str:
         return "%s %s" % (self.instance_name, self.token)
 
 

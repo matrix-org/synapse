@@ -10,7 +10,7 @@ GET /_synapse/admin/v1/statistics/users/media
 ```
 
 To use it, you will need to authenticate by providing an `access_token`
-for a server admin: see [README.rst](README.rst).
+for a server admin: see [Admin API](../usage/administration/admin_api).
 
 A response body like the following is returned:
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,7 +16,7 @@ import logging
 import threading
 from collections import OrderedDict
 from contextlib import contextmanager
-from typing import Dict, List, Optional, Set, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 
@@ -91,7 +90,14 @@ class StreamIdGenerator:
             # ... persist event ...
     """
 
-    def __init__(self, db_conn, table, column, extra_tables=[], step=1):
+    def __init__(
+        self,
+        db_conn,
+        table,
+        column,
+        extra_tables: Iterable[Tuple[str, str]] = (),
+        step=1,
+    ):
         assert step != 0
         self._lock = threading.Lock()
         self._step = step
@@ -391,6 +397,11 @@ class MultiWriterIdGenerator:
                 # ... persist event ...
         """
 
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
+
         return _MultiWriterCtxManager(self)
 
     def get_next_mult(self, n: int):
@@ -399,6 +410,11 @@ class MultiWriterIdGenerator:
             async with stream_id_gen.get_next_mult(5) as stream_ids:
                 # ... persist events ...
         """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         return _MultiWriterCtxManager(self, n)
 
@@ -409,6 +425,11 @@ class MultiWriterIdGenerator:
             stream_id = stream_id_gen.get_next(txn)
             # ... persist event ...
         """
+
+        # If we have a list of instances that are allowed to write to this
+        # stream, make sure we're in it.
+        if self._writers and self._instance_name not in self._writers:
+            raise Exception("Tried to allocate stream ID on non-writer")
 
         next_id = self._load_next_id_txn(txn)
 

@@ -1,7 +1,7 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+# Copyrignt 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,10 +16,11 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Tuple
 
 from canonicaljson import encode_canonical_json
 
+from twisted.internet import defer
 from twisted.internet.interfaces import IDelayedCall
 
 from synapse import event_auth
@@ -44,14 +45,15 @@ from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
-from synapse.logging.context import run_in_background
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.state import StateFilter
 from synapse.types import Requester, RoomAlias, StreamToken, UserID, create_requester
-from synapse.util import json_decoder, json_encoder
-from synapse.util.async_helpers import Linearizer
+from synapse.util import json_decoder, json_encoder, log_failure
+from synapse.util.async_helpers import Linearizer, unwrapFirstError
+from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.metrics import measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -67,7 +69,7 @@ logger = logging.getLogger(__name__)
 class MessageHandler:
     """Contains some read only APIs to get state about a room"""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
@@ -92,7 +94,7 @@ class MessageHandler:
         room_id: str,
         event_type: str,
         state_key: str,
-    ) -> dict:
+    ) -> Optional[EventBase]:
         """Get data from a room.
 
         Args:
@@ -116,6 +118,10 @@ class MessageHandler:
             data = await self.state.get_current_state(room_id, event_type, state_key)
         elif membership == Membership.LEAVE:
             key = (event_type, state_key)
+            # If the membership is not JOIN, then the event ID should exist.
+            assert (
+                membership_event_id is not None
+            ), "check_user_in_room_or_world_readable returned invalid data"
             room_state = await self.state_store.get_state_for_events(
                 [membership_event_id], StateFilter.from_types([key])
             )
@@ -137,7 +143,7 @@ class MessageHandler:
         self,
         user_id: str,
         room_id: str,
-        state_filter: StateFilter = StateFilter.all(),
+        state_filter: Optional[StateFilter] = None,
         at_token: Optional[StreamToken] = None,
         is_guest: bool = False,
     ) -> List[dict]:
@@ -164,6 +170,8 @@ class MessageHandler:
             AuthError (403) if the user doesn't have permission to view
             members of this room.
         """
+        state_filter = state_filter or StateFilter.all()
+
         if at_token:
             # FIXME this claims to get the state at a stream position, but
             # get_recent_events_for_room operates by topo ordering. This therefore
@@ -185,10 +193,12 @@ class MessageHandler:
 
             event = last_events[0]
             if visible_events:
-                room_state = await self.state_store.get_state_for_events(
+                room_state_events = await self.state_store.get_state_for_events(
                     [event.event_id], state_filter=state_filter
                 )
-                room_state = room_state[event.event_id]
+                room_state = room_state_events[
+                    event.event_id
+                ]  # type: Mapping[Any, EventBase]
             else:
                 raise AuthError(
                     403,
@@ -209,10 +219,14 @@ class MessageHandler:
                 )
                 room_state = await self.store.get_events(state_ids.values())
             elif membership == Membership.LEAVE:
-                room_state = await self.state_store.get_state_for_events(
+                # If the membership is not JOIN, then the event ID should exist.
+                assert (
+                    membership_event_id is not None
+                ), "check_user_in_room_or_world_readable returned invalid data"
+                room_state_events = await self.state_store.get_state_for_events(
                     [membership_event_id], state_filter=state_filter
                 )
-                room_state = room_state[membership_event_id]
+                room_state = room_state_events[membership_event_id]
 
         now = self.clock.time_msec()
         events = await self._event_serializer.serialize_events(
@@ -247,7 +261,7 @@ class MessageHandler:
                     "Getting joined members after leaving is not implemented"
                 )
 
-        users_with_profile = await self.state.get_current_users_in_room(room_id)
+        users_with_profile = await self.store.get_users_in_room_with_profiles(room_id)
 
         # If this is an AS, double check that they are allowed to see the members.
         # This can either be because the AS user is in the room or because there
@@ -385,13 +399,14 @@ class EventCreationHandler:
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 
-        self.room_invite_state_types = self.hs.config.room_invite_state_types
+        self.room_prejoin_state_types = self.hs.config.api.room_prejoin_state
 
-        self.membership_types_to_include_profile_data_in = (
-            {Membership.JOIN, Membership.INVITE}
-            if self.hs.config.include_profile_data_on_invite
-            else {Membership.JOIN}
-        )
+        self.membership_types_to_include_profile_data_in = {
+            Membership.JOIN,
+            Membership.KNOCK,
+        }
+        if self.hs.config.include_profile_data_on_invite:
+            self.membership_types_to_include_profile_data_in.add(Membership.INVITE)
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
@@ -445,6 +460,19 @@ class EventCreationHandler:
         self._ephemeral_events_enabled = hs.config.enable_ephemeral_messages
 
         self._external_cache = hs.get_external_cache()
+
+        # Stores the state groups we've recently added to the joined hosts
+        # external cache. Note that the timeout must be significantly less than
+        # the TTL on the external cache.
+        self._external_cache_joined_hosts_updates = (
+            None
+        )  # type: Optional[ExpiringCache]
+        if self._external_cache.is_enabled():
+            self._external_cache_joined_hosts_updates = ExpiringCache(
+                "_external_cache_joined_hosts_updates",
+                self.clock,
+                expiry_ms=30 * 60 * 1000,
+            )
 
     async def create_event(
         self,
@@ -874,7 +902,7 @@ class EventCreationHandler:
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-        extra_users: List[UserID] = [],
+        extra_users: Optional[List[UserID]] = None,
         ignore_shadow_ban: bool = False,
     ) -> EventBase:
         """Processes a new event.
@@ -902,6 +930,7 @@ class EventCreationHandler:
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
+        extra_users = extra_users or []
 
         # we don't apply shadow-banning to membership events here. Invites are blocked
         # higher up the stack, and we allow shadow-banned users to send join and leave
@@ -934,8 +963,8 @@ class EventCreationHandler:
             room_version = await self.store.get_room_version_id(event.room_id)
 
         if event.internal_metadata.is_out_of_band_membership():
-            # the only sort of out-of-band-membership events we expect to see here
-            # are invite rejections we have generated ourselves.
+            # the only sort of out-of-band-membership events we expect to see here are
+            # invite rejections and rescinded knocks that we have generated ourselves.
             assert event.type == EventTypes.Member
             assert event.content["membership"] == Membership.LEAVE
         else:
@@ -953,9 +982,43 @@ class EventCreationHandler:
             logger.exception("Failed to encode content: %r", event.content)
             raise
 
-        await self.action_generator.handle_push_actions_for_event(event, context)
+        # We now persist the event (and update the cache in parallel, since we
+        # don't want to block on it).
+        result = await make_deferred_yieldable(
+            defer.gatherResults(
+                [
+                    run_in_background(
+                        self._persist_event,
+                        requester=requester,
+                        event=event,
+                        context=context,
+                        ratelimit=ratelimit,
+                        extra_users=extra_users,
+                    ),
+                    run_in_background(
+                        self.cache_joined_hosts_for_event, event, context
+                    ).addErrback(log_failure, "cache_joined_hosts_for_event failed"),
+                ],
+                consumeErrors=True,
+            )
+        ).addErrback(unwrapFirstError)
 
-        await self.cache_joined_hosts_for_event(event)
+        return result[0]
+
+    async def _persist_event(
+        self,
+        requester: Requester,
+        event: EventBase,
+        context: EventContext,
+        ratelimit: bool = True,
+        extra_users: Optional[List[UserID]] = None,
+    ) -> EventBase:
+        """Actually persists the event. Should only be called by
+        `handle_new_client_event`, and see its docstring for documentation of
+        the arguments.
+        """
+
+        await self.action_generator.handle_push_actions_for_event(event, context)
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -996,13 +1059,18 @@ class EventCreationHandler:
             await self.store.remove_push_actions_from_staging(event.event_id)
             raise
 
-    async def cache_joined_hosts_for_event(self, event: EventBase) -> None:
+    async def cache_joined_hosts_for_event(
+        self, event: EventBase, context: EventContext
+    ) -> None:
         """Precalculate the joined hosts at the event, when using Redis, so that
         external federation senders don't have to recalculate it themselves.
         """
 
         if not self._external_cache.is_enabled():
             return
+
+        # If external cache is enabled we should always have this.
+        assert self._external_cache_joined_hosts_updates is not None
 
         # We actually store two mappings, event ID -> prev state group,
         # state group -> joined hosts, which is much more space efficient
@@ -1011,28 +1079,36 @@ class EventCreationHandler:
         # Note: We have to cache event ID -> prev state group, as we don't
         # store that in the DB.
         #
-        # Note: We always set the state group -> joined hosts cache, even if
-        # we already set it, so that the expiry time is reset.
+        # Note: We set the state group -> joined hosts cache if it hasn't been
+        # set for a while, so that the expiry time is reset.
 
         state_entry = await self.state.resolve_state_groups_for_events(
             event.room_id, event_ids=event.prev_event_ids()
         )
 
         if state_entry.state_group:
-            joined_hosts = await self.store.get_joined_hosts(event.room_id, state_entry)
-
             await self._external_cache.set(
                 "event_to_prev_state_group",
                 event.event_id,
                 state_entry.state_group,
                 expiry_ms=60 * 60 * 1000,
             )
+
+            if state_entry.state_group in self._external_cache_joined_hosts_updates:
+                return
+
+            joined_hosts = await self.store.get_joined_hosts(event.room_id, state_entry)
+
+            # Note that the expiry times must be larger than the expiry time in
+            # _external_cache_joined_hosts_updates.
             await self._external_cache.set(
                 "get_joined_hosts",
                 str(state_entry.state_group),
                 list(joined_hosts),
                 expiry_ms=60 * 60 * 1000,
             )
+
+            self._external_cache_joined_hosts_updates[state_entry.state_group] = None
 
     async def _validate_canonical_alias(
         self, directory_handler, room_alias_str: str, expected_room_id: str
@@ -1071,7 +1147,7 @@ class EventCreationHandler:
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-        extra_users: List[UserID] = [],
+        extra_users: Optional[List[UserID]] = None,
     ) -> EventBase:
         """Called when we have fully built the event, have already
         calculated the push actions for the event, and checked auth.
@@ -1083,6 +1159,8 @@ class EventCreationHandler:
             it was de-duplicated (e.g. because we had already persisted an
             event with the same transaction ID.)
         """
+        extra_users = extra_users or []
+
         assert self.storage.persistence is not None
         assert self._events_shard_config.should_handle(
             self._instance_name, event.room_id
@@ -1163,7 +1241,7 @@ class EventCreationHandler:
                     "invite_room_state"
                 ] = await self.store.get_stripped_room_state_from_event_context(
                     context,
-                    self.room_invite_state_types,
+                    self.room_prejoin_state_types,
                     membership_user_id=event.sender,
                 )
 
@@ -1180,6 +1258,14 @@ class EventCreationHandler:
 
                     # TODO: Make sure the signatures actually are correct.
                     event.signatures.update(returned_invite.signatures)
+
+            if event.content["membership"] == Membership.KNOCK:
+                event.unsigned[
+                    "knock_room_state"
+                ] = await self.store.get_stripped_room_state_from_event_context(
+                    context,
+                    self.room_prejoin_state_types,
+                )
 
         if event.type == EventTypes.Redaction:
             original_event = await self.store.get_event(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 import logging
 import os
 from binascii import unhexlify
-from typing import Tuple
+from typing import Optional, Tuple
 
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
@@ -32,7 +31,7 @@ from tests.server import FakeChannel, FakeSite, FakeTransport, make_request
 
 logger = logging.getLogger(__name__)
 
-test_server_connection_factory = None
+test_server_connection_factory = None  # type: Optional[TestServerTLSConnectionFactory]
 
 
 class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):

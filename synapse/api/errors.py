@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -450,7 +449,7 @@ class IncompatibleRoomVersionError(SynapseError):
         super().__init__(
             code=400,
             msg="Your homeserver does not support the features required to "
-            "join this room",
+            "interact with this room",
             errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
         )
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,13 +17,15 @@ import re
 import threading
 from typing import Callable, Dict
 
+from synapse.python_dependencies import DependencyException, check_requirements
+
 from ._base import Config, ConfigError
 
 # The prefix for all cache factor-related environment variables
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 
 # Map from canonicalised cache name to cache.
-_CACHES = {}
+_CACHES = {}  # type: Dict[str, Callable[[float], None]]
 
 # a lock on the contents of _CACHES
 _CACHES_LOCK = threading.Lock()
@@ -59,7 +60,9 @@ def _canonicalise_cache_name(cache_name: str) -> str:
     return cache_name.lower()
 
 
-def add_resizable_cache(cache_name: str, cache_resize_callback: Callable):
+def add_resizable_cache(
+    cache_name: str, cache_resize_callback: Callable[[float], None]
+):
     """Register a cache that's size can dynamically change
 
     Args:
@@ -187,6 +190,15 @@ class CacheConfig(Config):
                     "caches.per_cache_factors.%s must be a number" % (cache,)
                 )
             self.cache_factors[cache] = factor
+
+        self.track_memory_usage = cache_config.get("track_memory_usage", False)
+        if self.track_memory_usage:
+            try:
+                check_requirements("cache_memory")
+            except DependencyException as e:
+                raise ConfigError(
+                    e.message  # noqa: B306, DependencyException.message is a property
+                )
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()

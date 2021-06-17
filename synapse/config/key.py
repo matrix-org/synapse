@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -404,7 +403,11 @@ def _parse_key_servers(key_servers, federation_verify_certificates):
     try:
         jsonschema.validate(key_servers, TRUSTED_KEY_SERVERS_SCHEMA)
     except jsonschema.ValidationError as e:
-        raise ConfigError("Unable to parse 'trusted_key_servers': " + e.message)
+        raise ConfigError(
+            "Unable to parse 'trusted_key_servers': {}".format(
+                e.message  # noqa: B306, jsonschema.ValidationError.message is a valid attribute
+            )
+        )
 
     for server in key_servers:
         server_name = server["server_name"]

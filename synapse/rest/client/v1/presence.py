@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,9 +35,14 @@ class PresenceStatusRestServlet(RestServlet):
         self.clock = hs.get_clock()
         self.auth = hs.get_auth()
 
+        self._use_presence = hs.config.server.use_presence
+
     async def on_GET(self, request, user_id):
         requester = await self.auth.get_user_by_req(request)
         user = UserID.from_string(user_id)
+
+        if not self._use_presence:
+            return 200, {"presence": "offline"}
 
         if requester.user != user:
             allowed = await self.presence_handler.is_visible(
@@ -81,7 +85,7 @@ class PresenceStatusRestServlet(RestServlet):
         except Exception:
             raise SynapseError(400, "Unable to parse state")
 
-        if self.hs.config.use_presence:
+        if self._use_presence:
             await self.presence_handler.set_state(user, state)
 
         return 200, {}

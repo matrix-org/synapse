@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,7 +57,7 @@ class ServerNoticesManager:
         user_id: str,
         event_content: dict,
         type: str = EventTypes.Message,
-        state_key: Optional[bool] = None,
+        state_key: Optional[str] = None,
     ) -> EventBase:
         """Send a notice to the given user
 

@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,7 +24,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -231,6 +231,8 @@ class StatsHandler:
                     room_stats_delta["left_members"] -= 1
                 elif prev_membership == Membership.BAN:
                     room_stats_delta["banned_members"] -= 1
+                elif prev_membership == Membership.KNOCK:
+                    room_stats_delta["knocked_members"] -= 1
                 else:
                     raise ValueError(
                         "%r is not a valid prev_membership" % (prev_membership,)
@@ -252,6 +254,8 @@ class StatsHandler:
                     room_stats_delta["left_members"] += 1
                 elif membership == Membership.BAN:
                     room_stats_delta["banned_members"] += 1
+                elif membership == Membership.KNOCK:
+                    room_stats_delta["knocked_members"] += 1
                 else:
                     raise ValueError("%r is not a valid membership" % (membership,))
 

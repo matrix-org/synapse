@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -20,6 +19,7 @@ from typing import Any, Dict, List, Optional, Pattern, Tuple, Union
 
 from synapse.events import EventBase
 from synapse.types import UserID
+from synapse.util import glob_to_regex, re_word_boundary
 from synapse.util.caches.lrucache import LruCache
 
 logger = logging.getLogger(__name__)
@@ -184,7 +184,7 @@ class PushRuleEvaluatorForEvent:
         r = regex_cache.get((display_name, False, True), None)
         if not r:
             r1 = re.escape(display_name)
-            r1 = _re_word_boundary(r1)
+            r1 = re_word_boundary(r1)
             r = re.compile(r1, flags=re.IGNORECASE)
             regex_cache[(display_name, False, True)] = r
 
@@ -213,62 +213,12 @@ def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:
     try:
         r = regex_cache.get((glob, True, word_boundary), None)
         if not r:
-            r = _glob_to_re(glob, word_boundary)
+            r = glob_to_regex(glob, word_boundary)
             regex_cache[(glob, True, word_boundary)] = r
         return bool(r.search(value))
     except re.error:
         logger.warning("Failed to parse glob to regex: %r", glob)
         return False
-
-
-def _glob_to_re(glob: str, word_boundary: bool) -> Pattern:
-    """Generates regex for a given glob.
-
-    Args:
-        glob
-        word_boundary: Whether to match against word boundaries or entire string.
-    """
-    if IS_GLOB.search(glob):
-        r = re.escape(glob)
-
-        r = r.replace(r"\*", ".*?")
-        r = r.replace(r"\?", ".")
-
-        # handle [abc], [a-z] and [!a-z] style ranges.
-        r = GLOB_REGEX.sub(
-            lambda x: (
-                "[%s%s]" % (x.group(1) and "^" or "", x.group(2).replace(r"\\\-", "-"))
-            ),
-            r,
-        )
-        if word_boundary:
-            r = _re_word_boundary(r)
-
-            return re.compile(r, flags=re.IGNORECASE)
-        else:
-            r = "^" + r + "$"
-
-            return re.compile(r, flags=re.IGNORECASE)
-    elif word_boundary:
-        r = re.escape(glob)
-        r = _re_word_boundary(r)
-
-        return re.compile(r, flags=re.IGNORECASE)
-    else:
-        r = "^" + re.escape(glob) + "$"
-        return re.compile(r, flags=re.IGNORECASE)
-
-
-def _re_word_boundary(r: str) -> str:
-    """
-    Adds word boundary characters to the start and end of an
-    expression to require that the match occur as a whole word,
-    but do so respecting the fact that strings starting or ending
-    with non-word characters will change word boundaries.
-    """
-    # we can't use \b as it chokes on unicode. however \W seems to be okay
-    # as shorthand for [^0-9A-Za-z_].
-    return r"(^|\W)%s(\W|$)" % (r,)
 
 
 def _flatten_dict(

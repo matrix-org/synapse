@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -31,7 +30,7 @@ from synapse.push import Pusher, PusherConfig, PusherConfigException
 from . import push_rule_evaluator, push_tools
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +289,7 @@ class HttpPusher(Pusher):
         if rejected is False:
             return False
 
-        if isinstance(rejected, list) or isinstance(rejected, tuple):
+        if isinstance(rejected, (list, tuple)):
             for pk in rejected:
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it

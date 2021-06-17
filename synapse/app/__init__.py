@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,7 +21,9 @@ logger = logging.getLogger(__name__)
 try:
     python_dependencies.check_requirements()
 except python_dependencies.DependencyException as e:
-    sys.stderr.writelines(e.message)
+    sys.stderr.writelines(
+        e.message  # noqa: B306, DependencyException.message is a property
+    )
     sys.exit(1)
 
 

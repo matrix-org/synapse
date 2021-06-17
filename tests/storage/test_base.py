@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +14,7 @@
 
 
 from collections import OrderedDict
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -29,7 +27,7 @@ from tests.utils import TestHomeServer, default_config
 
 
 class SQLBaseStoreTestCase(unittest.TestCase):
-    """ Test the "simple" SQL generating methods in SQLBaseStore. """
+    """Test the "simple" SQL generating methods in SQLBaseStore."""
 
     def setUp(self):
         self.db_pool = Mock(spec=["runInteraction"])

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -86,7 +85,7 @@ class IdTokenServlet(RestServlet):
                 "access_token": token,
                 "token_type": "Bearer",
                 "matrix_server_name": self.server_name,
-                "expires_in": self.EXPIRES_MS / 1000,
+                "expires_in": self.EXPIRES_MS // 1000,
             },
         )
 

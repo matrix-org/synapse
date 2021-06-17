@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,7 +45,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import JsonDict, get_domain_from_id
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +108,9 @@ class GroupAttestationSigning:
 
         assert server_name is not None
         await self.keyring.verify_json_for_server(
-            server_name, attestation, now, "Group attestation"
+            server_name,
+            attestation,
+            now,
         )
 
     def create_attestation(self, group_id: str, user_id: str) -> JsonDict:

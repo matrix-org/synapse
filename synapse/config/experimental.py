@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -27,3 +26,6 @@ class ExperimentalConfig(Config):
 
         # MSC2858 (multiple SSO identity providers)
         self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
+
+        # MSC3026 (busy presence state)
+        self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool

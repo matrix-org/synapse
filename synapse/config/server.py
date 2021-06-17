@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -20,13 +19,14 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
 import attr
 import yaml
 from netaddr import AddrFormatError, IPNetwork, IPSet
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
@@ -235,10 +235,27 @@ class ServerConfig(Config):
         self.print_pidfile = config.get("print_pidfile")
         self.user_agent_suffix = config.get("user_agent_suffix")
         self.use_frozen_dicts = config.get("use_frozen_dicts", False)
+
         self.public_baseurl = config.get("public_baseurl")
+        if self.public_baseurl is not None:
+            if self.public_baseurl[-1] != "/":
+                self.public_baseurl += "/"
 
         # Whether to enable user presence.
-        self.use_presence = config.get("use_presence", True)
+        presence_config = config.get("presence") or {}
+        self.use_presence = presence_config.get("enabled")
+        if self.use_presence is None:
+            self.use_presence = config.get("use_presence", True)
+
+        # Custom presence router module
+        self.presence_router_module_class = None
+        self.presence_router_config = None
+        presence_router_config = presence_config.get("presence_router")
+        if presence_router_config:
+            (
+                self.presence_router_module_class,
+                self.presence_router_config,
+            ) = load_module(presence_router_config, ("presence", "presence_router"))
 
         # Whether to update the user directory or not. This should be set to
         # false only if we are updating the user directory in a worker
@@ -380,23 +397,22 @@ class ServerConfig(Config):
         self.ip_range_whitelist = generate_ip_set(
             config.get("ip_range_whitelist", ()), config_path=("ip_range_whitelist",)
         )
-
         # The federation_ip_range_blacklist is used for backwards-compatibility
-        # and only applies to federation and identity servers. If it is not given,
-        # default to ip_range_blacklist.
-        federation_ip_range_blacklist = config.get(
-            "federation_ip_range_blacklist", ip_range_blacklist
-        )
-        # Always blacklist 0.0.0.0, ::
-        self.federation_ip_range_blacklist = generate_ip_set(
-            federation_ip_range_blacklist,
-            ["0.0.0.0", "::"],
-            config_path=("federation_ip_range_blacklist",),
-        )
-
-        if self.public_baseurl is not None:
-            if self.public_baseurl[-1] != "/":
-                self.public_baseurl += "/"
+        # and only applies to federation and identity servers.
+        if "federation_ip_range_blacklist" in config:
+            # Always blacklist 0.0.0.0, ::
+            self.federation_ip_range_blacklist = generate_ip_set(
+                config["federation_ip_range_blacklist"],
+                ["0.0.0.0", "::"],
+                config_path=("federation_ip_range_blacklist",),
+            )
+            # 'federation_ip_range_whitelist' was never a supported configuration option.
+            self.federation_ip_range_whitelist = None
+        else:
+            # No backwards-compatiblity requrired, as federation_ip_range_blacklist
+            # is not given. Default to ip_range_blacklist and ip_range_whitelist.
+            self.federation_ip_range_blacklist = self.ip_range_blacklist
+            self.federation_ip_range_whitelist = self.ip_range_whitelist
 
         # (undocumented) option for torturing the worker-mode replication a bit,
         # for testing. The value defines the number of milliseconds to pause before
@@ -559,6 +575,7 @@ class ServerConfig(Config):
             _warn_if_webclient_configured(self.listeners)
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
+        self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
 
         @attr.s
         class LimitRemoteRoomsConfig:
@@ -834,9 +851,28 @@ class ServerConfig(Config):
         #
         #soft_file_limit: 0
 
-        # Set to false to disable presence tracking on this homeserver.
+        # Presence tracking allows users to see the state (e.g online/offline)
+        # of other local and remote users.
         #
-        #use_presence: false
+        presence:
+          # Uncomment to disable presence tracking on this homeserver. This option
+          # replaces the previous top-level 'use_presence' option.
+          #
+          #enabled: false
+
+          # Presence routers are third-party modules that can specify additional logic
+          # to where presence updates from users are routed.
+          #
+          presence_router:
+            # The custom module's class. Uncomment to use a custom presence router module.
+            #
+            #module: "my_custom_router.PresenceRouter"
+
+            # Configuration options of the custom module. Refer to your module's
+            # documentation for available options.
+            #
+            #config:
+            #  example_option: 'something'
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
@@ -884,6 +920,16 @@ class ServerConfig(Config):
         # The GC threshold parameters to pass to `gc.set_threshold`, if defined
         #
         #gc_thresholds: [700, 10, 10]
+
+        # The minimum time in seconds between each GC for a generation, regardless of
+        # the GC thresholds. This ensures that we don't do GC too frequently.
+        #
+        # A value of `[1s, 10s, 30s]` indicates that a second must pass between consecutive
+        # generation 0 GCs, etc.
+        #
+        # Defaults to `[1s, 10s, 30s]`.
+        #
+        #gc_min_interval: [0.5s, 30s, 1m]
 
         # Set the limit on the returned events in the timeline in the get
         # and sync operations. The default value is 100. -1 means no upper limit.
@@ -1272,6 +1318,24 @@ class ServerConfig(Config):
             type=int,
             help="Turn on the twisted telnet manhole service on the given port.",
         )
+
+    def read_gc_intervals(self, durations) -> Optional[Tuple[float, float, float]]:
+        """Reads the three durations for the GC min interval option, returning seconds."""
+        if durations is None:
+            return None
+
+        try:
+            if len(durations) != 3:
+                raise ValueError()
+            return (
+                self.parse_duration(durations[0]) / 1000,
+                self.parse_duration(durations[1]) / 1000,
+                self.parse_duration(durations[2]) / 1000,
+            )
+        except Exception:
+            raise ConfigError(
+                "Value of `gc_min_interval` must be a list of three durations if set"
+            )
 
 
 def is_threepid_reserved(reserved_threepids, threepid):

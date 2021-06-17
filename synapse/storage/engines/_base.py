@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -39,14 +38,6 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
     def can_native_upsert(self) -> bool:
         """
         Do we support native UPSERTs?
-        """
-        ...
-
-    @property
-    @abc.abstractmethod
-    def supports_tuple_comparison(self) -> bool:
-        """
-        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
         """
         ...
 

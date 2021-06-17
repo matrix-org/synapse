@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -34,11 +33,11 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import Collection, JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import JsonDict, RoomAlias, RoomStreamToken, UserID
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -88,16 +87,14 @@ class ApplicationServicesHandler:
             self.is_processing = True
             try:
                 limit = 100
-                while True:
+                upper_bound = -1
+                while upper_bound < self.current_max:
                     (
                         upper_bound,
                         events,
                     ) = await self.store.get_new_events_for_appservice(
                         self.current_max, limit
                     )
-
-                    if not events:
-                        break
 
                     events_by_room = {}  # type: Dict[str, List[EventBase]]
                     for event in events:
@@ -154,9 +151,6 @@ class ApplicationServicesHandler:
 
                     await self.store.set_appservice_last_pos(upper_bound)
 
-                    now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
-
                     synapse.metrics.event_processing_positions.labels(
                         "appservice_sender"
                     ).set(upper_bound)
@@ -169,12 +163,16 @@ class ApplicationServicesHandler:
 
                     event_processing_loop_counter.labels("appservice_sender").inc()
 
-                    synapse.metrics.event_processing_lag.labels(
-                        "appservice_sender"
-                    ).set(now - ts)
-                    synapse.metrics.event_processing_last_ts.labels(
-                        "appservice_sender"
-                    ).set(ts)
+                    if events:
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(events[-1].event_id)
+
+                        synapse.metrics.event_processing_lag.labels(
+                            "appservice_sender"
+                        ).set(now - ts)
+                        synapse.metrics.event_processing_last_ts.labels(
+                            "appservice_sender"
+                        ).set(ts)
             finally:
                 self.is_processing = False
 
@@ -182,7 +180,7 @@ class ApplicationServicesHandler:
         self,
         stream_key: str,
         new_token: Optional[int],
-        users: Collection[Union[str, UserID]] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.
@@ -215,7 +213,7 @@ class ApplicationServicesHandler:
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
         self._notify_interested_services_ephemeral(
-            services, stream_key, new_token, users
+            services, stream_key, new_token, users or []
         )
 
     @wrap_as_background_process("notify_interested_services_ephemeral")

@@ -1,21 +1,22 @@
 from typing import Any, Iterable, List, Optional
 
 from synapse.config import (
+    account_validity,
     api,
     appservice,
     auth,
     captcha,
     cas,
-    consent_config,
+    consent,
     database,
     emailconfig,
     experimental,
     groups,
-    jwt_config,
+    jwt,
     key,
     logger,
     metrics,
-    oidc_config,
+    oidc,
     password_auth_providers,
     push,
     ratelimiting,
@@ -23,9 +24,9 @@ from synapse.config import (
     registration,
     repository,
     room_directory,
-    saml2_config,
+    saml2,
     server,
-    server_notices_config,
+    server_notices,
     spam_checker,
     sso,
     stats,
@@ -59,15 +60,16 @@ class RootConfig:
     captcha: captcha.CaptchaConfig
     voip: voip.VoipConfig
     registration: registration.RegistrationConfig
+    account_validity: account_validity.AccountValidityConfig
     metrics: metrics.MetricsConfig
     api: api.ApiConfig
     appservice: appservice.AppServiceConfig
     key: key.KeyConfig
-    saml2: saml2_config.SAML2Config
+    saml2: saml2.SAML2Config
     cas: cas.CasConfig
     sso: sso.SSOConfig
-    oidc: oidc_config.OIDCConfig
-    jwt: jwt_config.JWTConfig
+    oidc: oidc.OIDCConfig
+    jwt: jwt.JWTConfig
     auth: auth.AuthConfig
     email: emailconfig.EmailConfig
     worker: workers.WorkerConfig
@@ -76,9 +78,9 @@ class RootConfig:
     spamchecker: spam_checker.SpamCheckerConfig
     groups: groups.GroupsConfig
     userdirectory: user_directory.UserDirectoryConfig
-    consent: consent_config.ConsentConfig
+    consent: consent.ConsentConfig
     stats: stats.StatsConfig
-    servernotices: server_notices_config.ServerNoticesConfig
+    servernotices: server_notices.ServerNoticesConfig
     roomdirectory: room_directory.RoomDirectoryConfig
     thirdpartyrules: third_party_event_rules.ThirdPartyRulesConfig
     tracer: tracer.TracerConfig
@@ -109,7 +111,6 @@ class RootConfig:
         database_conf: Optional[Any] = ...,
         tls_certificate_path: Optional[str] = ...,
         tls_private_key_path: Optional[str] = ...,
-        acme_domain: Optional[str] = ...,
     ): ...
     @classmethod
     def load_or_generate_config(cls, description: Any, argv: Any): ...
@@ -152,3 +153,5 @@ class ShardedWorkerHandlingConfig:
 
 class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
     def get_instance(self, key: str) -> str: ...
+
+def read_file(file_path: Any, config_path: Iterable[str]) -> str: ...
