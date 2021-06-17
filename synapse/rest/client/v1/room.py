@@ -286,12 +286,19 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
     some messages, you can only insert older ones after that.
     tldr; Insert chunks from your most recent history -> oldest history.
 
-    POST /_matrix/client/r0/rooms/<roomID>/batchsend?prev_event=<eventID>&chunk_id=<chunkID>
+    POST /_matrix/client/unstable/org.matrix.msc2716/rooms/<roomID>/batch_send?prev_event=<eventID>&chunk_id=<chunkID>
     {
         "events": [ ... ],
         "state_events_at_start": [ ... ]
     }
     """
+
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/org.matrix.msc2716"
+            "/rooms/(?P<room_id>[^/]*)/batch_send$"
+        ),
+    )
 
     def __init__(self, hs):
         super().__init__(hs)
@@ -301,11 +308,6 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
-
-    def register(self, http_server):
-        # /rooms/$roomid/batchsend
-        PATTERNS = "/rooms/(?P<room_id>[^/]*)/batchsend"
-        register_txn_path(self, PATTERNS, http_server, with_get=True)
 
     async def inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
         (
