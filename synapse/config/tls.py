@@ -288,8 +288,6 @@ class TlsConfig(Config):
     def read_tls_certificate(self) -> crypto.X509:
         """Reads the TLS certificate from the configured file, and returns it
 
-        Also checks if it is self-signed, and warns if so
-
         Returns:
             The certificate
         """
