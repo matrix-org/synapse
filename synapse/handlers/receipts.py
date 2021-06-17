@@ -111,9 +111,6 @@ class ReceiptsHandler(BaseHandler):
             # no new receipts
             return False
 
-        if not self.hs.config.send_read_receipts:
-            return False
-
         affected_room_ids = list({r.room_id for r in receipts})
 
         self.notifier.on_new_event("receipt_key", max_batch_id, rooms=affected_room_ids)
