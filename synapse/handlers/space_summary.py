@@ -402,10 +402,7 @@ class SpaceSummaryHandler:
             return (), ()
 
         return res.rooms, tuple(
-            ev.data
-            for ev in res.events
-            if ev.event_type == EventTypes.MSC1772_SPACE_CHILD
-            or ev.event_type == EventTypes.SpaceChild
+            ev.data for ev in res.events if ev.event_type == EventTypes.SpaceChild
         )
 
     async def _is_room_accessible(
@@ -514,11 +511,6 @@ class SpaceSummaryHandler:
             current_state_ids[(EventTypes.Create, "")]
         )
 
-        # TODO: update once MSC1772 lands
-        room_type = create_event.content.get(EventContentFields.ROOM_TYPE)
-        if not room_type:
-            room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
-
         room_version = await self._store.get_room_version(room_id)
         allowed_spaces = None
         if await self._event_auth_handler.has_restricted_join_rules(
@@ -540,7 +532,7 @@ class SpaceSummaryHandler:
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
-            "room_type": room_type,
+            "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
             "allowed_spaces": allowed_spaces,
         }
 
@@ -569,9 +561,7 @@ class SpaceSummaryHandler:
             [
                 event_id
                 for key, event_id in current_state_ids.items()
-                # TODO: update once MSC1772 has been FCP for a period of time.
-                if key[0] == EventTypes.MSC1772_SPACE_CHILD
-                or key[0] == EventTypes.SpaceChild
+                if key[0] == EventTypes.SpaceChild
             ]
         )
 

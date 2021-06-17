@@ -33,6 +33,7 @@ from typing import (
 )
 
 import attr
+from prometheus_client import Counter
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
@@ -100,6 +101,11 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+soft_failed_event_counter = Counter(
+    "synapse_federation_soft_failed_events_total",
+    "Events received over federation that we marked as soft_failed",
+)
 
 
 @attr.s(slots=True)
@@ -2003,8 +2009,7 @@ class FederationHandler(BaseHandler):
         """
         if get_domain_from_id(user_id) != origin:
             logger.info(
-                "Get /xyz.amorgan.knock/make_knock request for user %r"
-                "from different origin %s, ignoring",
+                "Get /make_knock request for user %r from different origin %s, ignoring",
                 user_id,
                 origin,
             )
@@ -2071,8 +2076,7 @@ class FederationHandler(BaseHandler):
 
         if get_domain_from_id(event.sender) != origin:
             logger.info(
-                "Got /xyz.amorgan.knock/send_knock request for user %r "
-                "from different origin %s",
+                "Got /send_knock request for user %r from different origin %s",
                 event.sender,
                 origin,
             )
@@ -2498,6 +2502,7 @@ class FederationHandler(BaseHandler):
             event_auth.check(room_version_obj, event, auth_events=current_auth_events)
         except AuthError as e:
             logger.warning("Soft-failing %r because %s", event, e)
+            soft_failed_event_counter.inc()
             event.internal_metadata.soft_failed = True
 
     async def on_get_missing_events(
