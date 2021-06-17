@@ -1783,7 +1783,10 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
             return False
 
         # Check if the token has been used up
-        if res["uses_allowed"] and res["pending"] + res["completed"] >= res["uses_allowed"]:
+        if (
+            res["uses_allowed"]
+            and res["pending"] + res["completed"] >= res["uses_allowed"]
+        ):
             return False
 
         # Otherwise, the token is valid
@@ -1815,7 +1818,10 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
         )
 
     async def use_registration_token(self, token: str) -> None:
-        """Increment the completed registrations counter for a token.
+        """Complete a use of the given registration token.
+
+        The `pending` counter will be decremented, and the `completed`
+        counter will be incremented.
 
         Args:
             token: The registration token to be 'used'

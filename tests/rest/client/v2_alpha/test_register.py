@@ -342,7 +342,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
             "session": session1,
         }
         self.make_request(b"POST", self.url, json.dumps(params1))
-        # Repeat request to make sure pending isn't set increased again
+        # Repeat request to make sure pending isn't increased again
         self.make_request(b"POST", self.url, json.dumps(params1))
         pending = self.get_success(
             store.db_pool.simple_select_one_onecol(
