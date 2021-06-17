@@ -16,7 +16,6 @@
 import os
 
 import idna
-import yaml
 
 from OpenSSL import SSL
 
