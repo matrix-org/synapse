@@ -297,18 +297,21 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", self.url, json.dumps(params))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.MISSING_PARAM)
+        self.assertEquals(channel.json_body["completed"], [])
 
         # Test with non-string (invalid)
         params["auth"]["token"] = 1234
         channel = self.make_request(b"POST", self.url, json.dumps(params))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.INVALID_PARAM)
+        self.assertEquals(channel.json_body["completed"], [])
 
         # Test with unknown token (invalid)
         params["auth"]["token"] = "1234"
         channel = self.make_request(b"POST", self.url, json.dumps(params))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
+        self.assertEquals(channel.json_body["completed"], [])
 
     @override_config({"registration_requires_token": True})
     def test_POST_registration_token_limit_uses(self):
@@ -362,6 +365,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", self.url, json.dumps(params2))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
+        self.assertEquals(channel.json_body["completed"], [])
 
         # Complete registration with session1
         params1["auth"]["type"] = LoginType.DUMMY
@@ -381,6 +385,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", self.url, json.dumps(params2))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
+        self.assertEquals(channel.json_body["completed"], [])
 
     @override_config({"registration_requires_token": True})
     def test_POST_registration_token_expiry(self):
@@ -414,6 +419,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(b"POST", self.url, json.dumps(params))
         self.assertEquals(channel.result["code"], b"401", channel.result)
         self.assertEquals(channel.json_body["errcode"], Codes.UNAUTHORIZED)
+        self.assertEquals(channel.json_body["completed"], [])
 
         # Update token so it expires tomorrow
         self.get_success(
