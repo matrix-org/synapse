@@ -111,13 +111,13 @@ class EventAuthHandler:
         self, state_ids: StateMap[str]
     ) -> Collection[str]:
         """
-        Generate a list of rooms which membership in allow access to a room.
+        Generate a list of rooms in which membership allows access to a room.
 
         Args:
-            state_ids: The state of the room as it currently is.
+            state_ids: The current state of the room the user wishes to join
 
         Returns:
-            A collection of room IDs which provide membership to the room.
+            A collection of room IDs. Membership in any of the rooms in the list grants the ability to join the target room.
         """
         # If there's no join rule, then it defaults to invite (so this doesn't apply).
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
