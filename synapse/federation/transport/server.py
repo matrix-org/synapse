@@ -35,6 +35,7 @@ from synapse.http.servlet import (
     parse_string_from_args,
     parse_strings_from_args,
 )
+from synapse.logging import opentracing
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
     SynapseTags,
@@ -344,13 +345,9 @@ class BaseFederationServlet:
                     "incoming-federation-request", tags=request_tags
                 )
 
-            if hasattr(scope, "span"):
-                # include the trace id in the response headers.
-                request.responseHeaders.addRawHeader(
-                    "Synapse-Trace-Id", f"{scope.span.context.trace_id:x}"
-                )
-
             with scope:
+                opentracing.inject_response_headers(request.responseHeaders)
+
                 if origin and self.RATELIMIT:
                     with ratelimiter.ratelimit(origin) as d:
                         await d
