@@ -111,7 +111,7 @@ class ReceiptsHandler(BaseHandler):
             # no new receipts
             return False
 
-        if not self.hs.should_send_read_receipts():
+        if not self.hs.config.send_read_receipts:
             return False
 
         affected_room_ids = list({r.room_id for r in receipts})
@@ -149,7 +149,7 @@ class ReceiptsHandler(BaseHandler):
 class ReceiptEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self._should_send_read_receipts = hs.should_send_read_receipts()
+        self._should_send_read_receipts = hs.config.send_read_receipts
 
     async def get_new_events(
         self, from_key: int, room_ids: List[str], **kwargs

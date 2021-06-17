@@ -789,7 +789,3 @@ class HomeServer(metaclass=abc.ABCMeta):
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
         return self.config.send_federation
-
-    def should_send_read_receipts(self) -> bool:
-        "Should this server be sending read receipts onwards?"
-        return self.config.send_read_receipts
