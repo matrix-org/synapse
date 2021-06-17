@@ -299,12 +299,6 @@ class TlsConfig(Config):
         cert_pem = self.read_file(cert_path, "tls_certificate_path")
         cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
 
-        # Check if it is self-signed, and issue a warning if so.
-        if cert.get_issuer() == cert.get_subject():
-            warnings.warn(
-                "Self-signed TLS certificates will not be accepted by Synapse 1.0."
-            )
-
         return cert
 
     def read_tls_private_key(self) -> crypto.PKey:
