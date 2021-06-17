@@ -454,7 +454,7 @@ class RestServlet:
     """
 
     def register(self, http_server):
-        """ Register this servlet with the given HTTP server. """
+        """Register this servlet with the given HTTP server."""
         patterns = getattr(self, "PATTERNS", None)
         if patterns:
             for method in ("GET", "PUT", "POST", "DELETE"):

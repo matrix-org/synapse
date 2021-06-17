@@ -284,14 +284,14 @@ class RoomAlias(DomainSpecificString):
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomID(DomainSpecificString):
-    """Structure representing a room id. """
+    """Structure representing a room id."""
 
     SIGIL = "!"
 
 
 @attr.s(slots=True, frozen=True, repr=False)
 class EventID(DomainSpecificString):
-    """Structure representing an event id. """
+    """Structure representing an event id."""
 
     SIGIL = "$"
 

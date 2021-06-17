@@ -1961,7 +1961,7 @@ class FederationHandler(BaseHandler):
         return event
 
     async def on_send_leave_request(self, origin: str, pdu: EventBase) -> None:
-        """ We have received a leave event for a room. Fully process it."""
+        """We have received a leave event for a room. Fully process it."""
         event = pdu
 
         logger.debug(
