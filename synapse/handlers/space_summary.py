@@ -445,14 +445,13 @@ class SpaceSummaryHandler:
             member_event_id = state_ids.get((EventTypes.Member, requester), None)
 
             # If they're in the room they can see info on it.
-            member_event = None
             if member_event_id:
                 member_event = await self._store.get_event(member_event_id)
                 if member_event.membership in (Membership.JOIN, Membership.INVITE):
                     return True
 
             # Otherwise, check if they should be allowed access via membership in a space.
-            if self._event_auth_handler.has_restricted_join_rules(
+            if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
                 allowed_rooms = (
