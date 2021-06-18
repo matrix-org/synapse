@@ -15,6 +15,7 @@
 
 import inspect
 import logging
+import functools
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -104,48 +105,41 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
     for spam_checker in spam_checkers:
         # Methods on legacy spam checkers might not be async, so we wrap them around a
         # wrapper that will call maybe_awaitable on the result.
-        def async_wrapper(f: Callable) -> Optional[Callable[..., Awaitable]]:
+        def async_wrapper(f: Optional[Callable]) -> Optional[Callable[..., Awaitable]]:
             # f might be None if the callback isn't implemented by the module. In this
             # case we don't want to register a callback at all so we return None.
             if f is None:
                 return None
 
-            def run(*args, **kwargs):
-                return maybe_awaitable(f(*args, **kwargs))
-
-            wrapper = run
-
-            # register_spam_checker_callbacks does additional checks on the number of
-            # arguments for check_registration_for_spam, so we can't just pass run,
-            # instead we use another wrapper with the right number of arguments.
             if f.__name__ == "check_registration_for_spam":
-
-                def wrap_legacy_registration_checker(
-                    email_threepid: Optional[dict],
-                    username: Optional[str],
-                    request_info: Collection[Tuple[str, str]],
-                ):
-                    return run(email_threepid, username, request_info)
-
-                def wrap_registration_checker(
-                    email_threepid: Optional[dict],
-                    username: Optional[str],
-                    request_info: Collection[Tuple[str, str]],
-                    auth_provider_id: Optional[str],
-                ):
-                    return run(email_threepid, username, request_info, auth_provider_id)
-
                 checker_args = inspect.signature(f)
-                if len(checker_args.parameters) == 4:
-                    wrapper = wrap_registration_checker
-                elif len(checker_args.parameters) == 3:
-                    wrapper = wrap_legacy_registration_checker
-                else:
+                if len(checker_args.parameters) == 3:
+                    # Backwards compatibility; some modules might implement a hook that
+                    # doesn't expect a 4th argument. In this case, wrap it in a function
+                    # that gives it only 3 arguments and drops the auth_provider_id on
+                    # the floor.
+                    def wrapper(
+                        email_threepid: Optional[dict],
+                        username: Optional[str],
+                        request_info: Collection[Tuple[str, str]],
+                        auth_provider_id: Optional[str],
+                    ) -> Union[Awaitable[RegistrationBehaviour], RegistrationBehaviour]:
+                        return f(
+                            email_threepid,
+                            username,
+                            request_info,
+                        )
+
+                    f = wrapper
+                elif len(checker_args.parameters) != 4:
                     raise RuntimeError(
                         "Bad signature for callback check_registration_for_spam",
                     )
 
-            return wrapper
+            def run(*args, **kwargs):
+                return maybe_awaitable(f(*args, **kwargs))
+
+            return run
 
         # Register the hooks through the module API.
         hooks = {
@@ -181,15 +175,12 @@ class SpamChecker:
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
         user_may_create_room_alias: Optional[
-            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
+            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
         ] = None,
         user_may_publish_room: Optional[USER_MAY_PUBLISH_ROOM_CALLBACK] = None,
         check_username_for_spam: Optional[CHECK_USERNAME_FOR_SPAM_CALLBACK] = None,
         check_registration_for_spam: Optional[
-            Union[
-                LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-                CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-            ]
+            CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
     ):
@@ -205,7 +196,7 @@ class SpamChecker:
 
         if user_may_create_room_alias is not None:
             self._user_may_create_room_alias_callbacks.append(
-                user_may_create_room_alias
+                user_may_create_room_alias,
             )
 
         if user_may_publish_room is not None:
@@ -215,41 +206,9 @@ class SpamChecker:
             self._check_username_for_spam_callbacks.append(check_username_for_spam)
 
         if check_registration_for_spam is not None:
-            checker_args = inspect.signature(check_registration_for_spam)
-            if len(checker_args.parameters) == 4:
-                # Let mypy know that at this point we're pretty sure which side of the
-                # Union we're on.
-                checker = cast(
-                    CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-                    check_registration_for_spam,
-                )
-                self._check_registration_for_spam_callbacks.append(checker)
-            elif len(checker_args.parameters) == 3:
-                # Backwards compatibility; some modules might implement a hook that
-                # doesn't expect a 4th argument. In this case, wrap it in a function that
-                # gives it only 3 arguments and drops the auth_provider_id on the floor.
-                legacy_checker = cast(
-                    LEGACY_CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
-                    check_registration_for_spam,
-                )
-
-                def wrapper(
-                    email_threepid: Optional[dict],
-                    username: Optional[str],
-                    request_info: Collection[Tuple[str, str]],
-                    auth_provider_id: Optional[str],
-                ) -> Awaitable[RegistrationBehaviour]:
-                    return legacy_checker(
-                        email_threepid,
-                        username,
-                        request_info,
-                    )
-
-                self._check_registration_for_spam_callbacks.append(wrapper)
-            else:
-                raise RuntimeError(
-                    "Bad signature for callback check_registration_for_spam",
-                )
+            self._check_registration_for_spam_callbacks.append(
+                check_registration_for_spam,
+            )
 
         if check_media_file_for_spam is not None:
             self._check_media_file_for_spam_callbacks.append(check_media_file_for_spam)
