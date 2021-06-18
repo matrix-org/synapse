@@ -1,11 +1,3 @@
-Unreleased
-==========
-
-The spam checker interface is now deprecated in favour of a new generic module system and
-will be removed in Synapse 1.40 (planned for mid-August 2021). See the
-[upgrade notes](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#deprecation-of-the-current-spam-checker-interface)
-for more info.
-
 Synapse 1.36.0 (2021-06-15)
 ===========================
 
