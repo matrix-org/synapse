@@ -28,7 +28,7 @@ from .. import unittest
 
 
 class RegistrationTestCase(unittest.HomeserverTestCase):
-    """ Tests the RegistrationHandler. """
+    """Tests the RegistrationHandler."""
 
     def make_homeserver(self, reactor, clock):
         hs_config = self.default_config()

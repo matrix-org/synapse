@@ -160,14 +160,14 @@ class SpaceSummaryHandler:
 
                     # Check if the user is a member of any of the allowed spaces
                     # from the response.
-                    allowed_spaces = room.get("allowed_spaces")
+                    allowed_rooms = room.get("allowed_spaces")
                     if (
                         not include_room
-                        and allowed_spaces
-                        and isinstance(allowed_spaces, list)
+                        and allowed_rooms
+                        and isinstance(allowed_rooms, list)
                     ):
                         include_room = await self._event_auth_handler.is_user_in_rooms(
-                            allowed_spaces, requester
+                            allowed_rooms, requester
                         )
 
                     # Finally, if this isn't the requested room, check ourselves
@@ -455,11 +455,11 @@ class SpaceSummaryHandler:
             if self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
-                allowed_spaces = (
-                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 if await self._event_auth_handler.is_user_in_rooms(
-                    allowed_spaces, requester
+                    allowed_rooms, requester
                 ):
                     return True
 
@@ -475,10 +475,10 @@ class SpaceSummaryHandler:
             if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
-                allowed_spaces = (
-                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
-                for space_id in allowed_spaces:
+                for space_id in allowed_rooms:
                     if await self._auth.check_host_in_room(space_id, origin):
                         return True
 
@@ -512,11 +512,11 @@ class SpaceSummaryHandler:
         )
 
         room_version = await self._store.get_room_version(room_id)
-        allowed_spaces = None
+        allowed_rooms = None
         if await self._event_auth_handler.has_restricted_join_rules(
             current_state_ids, room_version
         ):
-            allowed_spaces = await self._event_auth_handler.get_spaces_that_allow_join(
+            allowed_rooms = await self._event_auth_handler.get_rooms_that_allow_join(
                 current_state_ids
             )
 
@@ -533,7 +533,7 @@ class SpaceSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
-            "allowed_spaces": allowed_spaces,
+            "allowed_spaces": allowed_rooms,
         }
 
         # Filter out Nones – rather omit the field altogether

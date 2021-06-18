@@ -49,7 +49,7 @@ from synapse.types import (
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -83,12 +83,15 @@ LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
 LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
 
 
+SyncRequestKey = Tuple[Any, ...]
+
+
 @attr.s(slots=True, frozen=True)
 class SyncConfig:
     user = attr.ib(type=UserID)
     filter_collection = attr.ib(type=FilterCollection)
     is_guest = attr.ib(type=bool)
-    request_key = attr.ib(type=Tuple[Any, ...])
+    request_key = attr.ib(type=SyncRequestKey)
     device_id = attr.ib(type=Optional[str])
 
 
@@ -266,9 +269,9 @@ class SyncHandler:
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache = ResponseCache(
+        self.response_cache: ResponseCache[SyncRequestKey] = ResponseCache(
             hs.get_clock(), "sync"
-        )  # type: ResponseCache[Tuple[Any, ...]]
+        )
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
@@ -307,6 +310,7 @@ class SyncHandler:
             since_token,
             timeout,
             full_state,
+            cache_context=True,
         )
         logger.debug("Returning sync response for %s", user_id)
         return res
@@ -314,9 +318,10 @@ class SyncHandler:
     async def _wait_for_sync_for_user(
         self,
         sync_config: SyncConfig,
-        since_token: Optional[StreamToken] = None,
-        timeout: int = 0,
-        full_state: bool = False,
+        since_token: Optional[StreamToken],
+        timeout: int,
+        full_state: bool,
+        cache_context: ResponseCacheContext[SyncRequestKey],
     ) -> SyncResult:
         if since_token is None:
             sync_type = "initial_sync"
@@ -343,13 +348,13 @@ class SyncHandler:
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
-            result = await self.current_sync_for_user(
+            result: SyncResult = await self.current_sync_for_user(
                 sync_config, since_token, full_state=full_state
             )
         else:
 
-            def current_sync_callback(before_token, after_token):
-                return self.current_sync_for_user(sync_config, since_token)
+            async def current_sync_callback(before_token, after_token) -> SyncResult:
+                return await self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(
                 sync_config.user.to_string(),
@@ -357,6 +362,17 @@ class SyncHandler:
                 current_sync_callback,
                 from_token=since_token,
             )
+
+            # if nothing has happened in any of the users' rooms since /sync was called,
+            # the resultant next_batch will be the same as since_token (since the result
+            # is generated when wait_for_events is first called, and not regenerated
+            # when wait_for_events times out).
+            #
+            # If that happens, we mustn't cache it, so that when the client comes back
+            # with the same cache token, we don't immediately return the same empty
+            # result, causing a tightloop. (#8518)
+            if result.next_batch == since_token:
+                cache_context.should_cache = False
 
         if result:
             if sync_config.filter_collection.lazy_load_members():
