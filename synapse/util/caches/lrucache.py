@@ -212,6 +212,10 @@ class _TimedListNode(_ListNode[P]):
         return super().move_after(root, clock)
 
 
+# Whether to insert new cache entries to the global list. We only add to it if
+# time based eviction is enabled.
+USE_GLOBAL_LIST = False
+
 # A linked list of all cache entries, allowing efficient time based eviction.
 GLOBAL_ROOT = _ListNode[_CacheEntry]()
 
@@ -279,6 +283,9 @@ def setup_expire_lru_cache_entries(hs: "HomeServer"):
         "Expiring LRU caches after %d seconds", hs.config.caches.expiry_time_msec / 1000
     )
 
+    global USE_GLOBAL_LIST
+    USE_GLOBAL_LIST = True
+
     clock = hs.get_clock()
     clock.looping_call(
         _expire_old_entries, 30 * 1000, clock, hs.config.caches.expiry_time_msec / 1000
@@ -308,9 +315,13 @@ class _Node:
     ):
         self_ref = weakref.ref(self, lambda _: self.drop_from_lists())
         self.list_node = _ListNode.insert_after(self_ref, root, clock)
-        self.global_list_node = _TimedListNode.insert_after(
-            self_ref, GLOBAL_ROOT, clock
-        )
+        self.global_list_node = None
+        if USE_GLOBAL_LIST:
+            self.global_list_node = _TimedListNode.insert_after(
+                self_ref, GLOBAL_ROOT, clock
+            )
+        else:
+            self.global_list_node = None
 
         # We store a weak reference to the cache object so that this _Node can
         # remove itself from the cache. If the cache is dropped we ensure we
@@ -339,11 +350,13 @@ class _Node:
                 _get_size_of(key)
                 + _get_size_of(value)
                 + _get_size_of(self.list_node, recurse=False)
-                + _get_size_of(self.global_list_node, recurse=False)
                 + _get_size_of(self.callbacks, recurse=False)
                 + _get_size_of(self, recurse=False)
             )
             self.memory += _get_size_of(self.memory, recurse=False)
+
+            if self.global_list_node:
+                self.memory += _get_size_of(self.global_list_node, recurse=False)
 
     def add_callbacks(self, callbacks: Collection[Callable[[], None]]) -> None:
         """Add to stored list of callbacks, removing duplicates."""
@@ -382,7 +395,9 @@ class _Node:
     def drop_from_lists(self) -> None:
         """Remove this node from the cache lists."""
         self.list_node.remove_from_list()
-        self.global_list_node.remove_from_list()
+
+        if self.global_list_node:
+            self.global_list_node.remove_from_list()
 
 
 class LruCache(Generic[KT, VT]):
@@ -521,7 +536,8 @@ class LruCache(Generic[KT, VT]):
 
         def move_node_to_front(node: _Node):
             node.list_node.move_after(list_root, real_clock)
-            node.global_list_node.move_after(GLOBAL_ROOT, real_clock)
+            if node.global_list_node:
+                node.global_list_node.move_after(GLOBAL_ROOT, real_clock)
 
         def delete_node(node: _Node) -> int:
             node.drop_from_lists()
