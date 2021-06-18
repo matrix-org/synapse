@@ -265,6 +265,8 @@ class SyncRestServlet(RestServlet):
             response["rooms"]["join"] = joined
         if invited:
             response["rooms"]["invite"] = invited
+        if knocked:
+            response["rooms"]["knock"] = knocked
         if archived:
             response["rooms"]["leave"] = archived
 
