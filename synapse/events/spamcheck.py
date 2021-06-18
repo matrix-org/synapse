@@ -26,7 +26,6 @@ from typing import (
     Optional,
     Tuple,
     Union,
-    cast,
 )
 
 from synapse.rest.media.v1._base import FileInfo
