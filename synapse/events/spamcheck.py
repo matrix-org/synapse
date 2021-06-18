@@ -26,6 +26,7 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 from synapse.rest.media.v1._base import FileInfo
@@ -122,6 +123,11 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                         request_info: Collection[Tuple[str, str]],
                         auth_provider_id: Optional[str],
                     ) -> Union[Awaitable[RegistrationBehaviour], RegistrationBehaviour]:
+                        # We've already made sure f is not None above, but mypy doesn't
+                        # do well across function boundaries so we need to tell it f is
+                        # definitely not None.
+                        assert f is not None
+
                         return f(
                             email_threepid,
                             username,
@@ -135,6 +141,11 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                     )
 
             def run(*args, **kwargs):
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
                 return maybe_awaitable(f(*args, **kwargs))
 
             return run
