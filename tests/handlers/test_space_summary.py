@@ -11,13 +11,14 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any, Optional
+from typing import Any, Iterable, Optional, Tuple
 from unittest import mock
 
 from synapse.handlers.space_summary import _child_events_comparison_key
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.server import HomeServer
+from synapse.types import JsonDict
 
 from tests import unittest
 
@@ -95,6 +96,32 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.hs = hs
         self.handler = self.hs.get_space_summary_handler()
 
+    def _add_child(self, space_id: str, room_id: str, token: str) -> None:
+        """Add a child room to a space."""
+        self.helper.send_state(
+            space_id,
+            event_type="m.space.child",
+            body={"via": [self.hs.hostname]},
+            tok=token,
+            state_key=room_id,
+        )
+
+    def _assert_rooms(self, result: JsonDict, rooms: Iterable[str]) -> None:
+        """Assert that the expected room IDs are in the response."""
+        self.assertCountEqual(
+            [room.get("room_id") for room in result["rooms"]], rooms
+        )
+
+    def _assert_events(self, result: JsonDict, events: Iterable[Tuple[str, str]]) -> None:
+        """Assert that the expected parent / child room IDs are in the response."""
+        self.assertCountEqual(
+            [
+                (event.get("room_id"), event.get("state_key"))
+                for event in result["events"]
+            ],
+            events,
+        )
+
     def test_simple_space(self):
         """Test a simple space with a single room."""
         user = self.register_user("user", "pass")
@@ -102,24 +129,10 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
         space = self.helper.create_room_as(user, tok=token)
         room = self.helper.create_room_as(user, tok=token)
-        self.helper.send_state(
-            space,
-            event_type="m.space.child",
-            body={"via": [self.hs.hostname]},
-            tok=token,
-            state_key=room,
-        )
+        self._add_child(space, room, token)
 
         result = self.get_success(self.handler.get_space_summary(user, space))
         # The result should have the space and the room in it, along with a link
         # from space -> room.
-        self.assertCountEqual(
-            [room.get("room_id") for room in result["rooms"]], [space, room]
-        )
-        self.assertCountEqual(
-            [
-                (event.get("room_id"), event.get("state_key"))
-                for event in result["events"]
-            ],
-            [(space, room)],
-        )
+        self._assert_rooms(result, [space, room])
+        self._assert_events(result, [(space, room)])
