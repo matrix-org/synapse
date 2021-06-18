@@ -377,6 +377,33 @@ class UsernameAvailabilityRestServlet(RestServlet):
             return 200, {"available": True}
 
 
+class RegistrationTokenValidityRestServlet(RestServlet):
+    PATTERNS = client_patterns(
+        "/org.matrix.msc3231/register/{}/validity".format(LoginType.REGISTRATION_TOKEN),
+        unstable=True,
+    )
+
+    def __init__(self, hs):
+        """
+        Args:
+            hs (synapse.server.HomeServer): server
+        """
+        super().__init__()
+        self.hs = hs
+        self.store = hs.get_datastore()
+
+    async def on_GET(self, request):
+        if not self.hs.config.enable_registration:
+            raise SynapseError(
+                403, "Registration has been disabled", errcode=Codes.FORBIDDEN
+            )
+
+        token = parse_string(request, "token", required=True)
+        valid = await self.store.registration_token_is_valid(token)
+
+        return 200, {"valid": valid}
+
+
 class RegisterRestServlet(RestServlet):
     PATTERNS = client_patterns("/register$")
 
@@ -838,4 +865,5 @@ def register_servlets(hs, http_server):
     MsisdnRegisterRequestTokenRestServlet(hs).register(http_server)
     UsernameAvailabilityRestServlet(hs).register(http_server)
     RegistrationSubmitTokenServlet(hs).register(http_server)
+    RegistrationTokenValidityRestServlet(hs).register(http_server)
     RegisterRestServlet(hs).register(http_server)
