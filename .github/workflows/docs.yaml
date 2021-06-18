@@ -37,9 +37,15 @@ jobs:
       - name: Get the current Synapse version
         id: vars
         # The $GITHUB_REF value for a branch looks like `refs/heads/release-v1.2`. We do some
-        # bash magic to remove the "refs/heads/release-v" bit from this, to end up with
-        # "1.2" - our major/minor version number.
-        run: echo ::set-output name=synapse-version::${GITHUB_REF#refs/heads/release-v}
+        # bash magic to remove the "refs/heads/release-v" bit from this, to end up with "1.2",
+        # our major/minor version number, and set this to a var called `branch-version`.
+        #
+        # We then use some python to get Synapse's full version string, which may look
+        # like "1.2.3rc4". We set this to a var called `synapse-version`. We use this
+        # to determine if this release is still an RC, and if so block deployment.
+        run: |
+          echo ::set-output name=branch-version::${GITHUB_REF#refs/heads/release-v}
+          echo ::set-output name=synapse-version::`python3 -c 'import synapse; print(synapse.__version__)'`
 
       # Deploy to the version-specific directory
       - name: Deploy release-specific documentation
@@ -55,4 +61,4 @@ jobs:
           keep_files: true
           publish_dir: ./book
           # The resulting documentation will end up in a directory named `vX.Y`.
-          destination_dir: ./v${{ steps.vars.outputs.synapse-version }}
+          destination_dir: ./v${{ steps.vars.outputs.branch-version }}
