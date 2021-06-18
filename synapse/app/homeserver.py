@@ -367,55 +367,7 @@ def setup(config_options):
     except UpgradeDatabaseException as e:
         quit_with_error("Failed to upgrade database: %s" % (e,))
 
-    async def do_acme() -> bool:
-        """
-        Reprovision an ACME certificate, if it's required.
-
-        Returns:
-            Whether the cert has been updated.
-        """
-        acme = hs.get_acme_handler()
-
-        # Check how long the certificate is active for.
-        cert_days_remaining = hs.config.is_disk_cert_valid(allow_self_signed=False)
-
-        # We want to reprovision if cert_days_remaining is None (meaning no
-        # certificate exists), or the days remaining number it returns
-        # is less than our re-registration threshold.
-        provision = False
-
-        if (
-            cert_days_remaining is None
-            or cert_days_remaining < hs.config.acme_reprovision_threshold
-        ):
-            provision = True
-
-        if provision:
-            await acme.provision_certificate()
-
-        return provision
-
-    async def reprovision_acme():
-        """
-        Provision a certificate from ACME, if required, and reload the TLS
-        certificate if it's renewed.
-        """
-        reprovisioned = await do_acme()
-        if reprovisioned:
-            _base.refresh_certificate(hs)
-
     async def start():
-        # Run the ACME provisioning code, if it's enabled.
-        if hs.config.acme_enabled:
-            acme = hs.get_acme_handler()
-            # Start up the webservices which we will respond to ACME
-            # challenges with, and then provision.
-            await acme.start_listening()
-            await do_acme()
-
-            # Check if it needs to be reprovisioned every day.
-            hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
-
         # Load the OIDC provider metadatas, if OIDC is enabled.
         if hs.config.oidc_enabled:
             oidc = hs.get_oidc_handler()

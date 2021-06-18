@@ -113,7 +113,6 @@ class RootConfig:
         database_conf: Optional[Any] = ...,
         tls_certificate_path: Optional[str] = ...,
         tls_private_key_path: Optional[str] = ...,
-        acme_domain: Optional[str] = ...,
     ): ...
     @classmethod
     def load_or_generate_config(cls, description: Any, argv: Any): ...
