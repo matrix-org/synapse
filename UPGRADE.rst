@@ -96,7 +96,7 @@ Authors of spam checker modules can refer to `this documentation <https://matrix
 to update their modules. Synapse administrators can refer to `this documentation <https://matrix-org.github.io/synapse/develop/modules.html#using-modules>`_
 to update their configuration once the modules they are using have been updated.
 
-Support for the current spam checker interface will be removed in August 2021.
+We will remove support for the current spam checker interface in August 2021.
 
 More module interfaces will be ported over to this new generic system in future versions
 of Synapse.
