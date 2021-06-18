@@ -97,6 +97,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.hs = hs
         self.handler = self.hs.get_space_summary_handler()
 
+        self.user = self.register_user("user", "pass")
+        self.token = self.login("user", "pass")
+
     def _add_child(self, space_id: str, room_id: str, token: str) -> None:
         """Add a child room to a space."""
         self.helper.send_state(
@@ -125,14 +128,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_simple_space(self):
         """Test a simple space with a single room."""
-        user = self.register_user("user", "pass")
-        token = self.login("user", "pass")
+        space = self.helper.create_room_as(self.user, tok=self.token)
+        room = self.helper.create_room_as(self.user, tok=self.token)
+        self._add_child(space, room, self.token)
 
-        space = self.helper.create_room_as(user, tok=token)
-        room = self.helper.create_room_as(user, tok=token)
-        self._add_child(space, room, token)
-
-        result = self.get_success(self.handler.get_space_summary(user, space))
+        result = self.get_success(self.handler.get_space_summary(self.user, space))
         # The result should have the space and the room in it, along with a link
         # from space -> room.
         self._assert_rooms(result, [space, room])
@@ -140,12 +140,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_visibility(self):
         """A user not in a space cannot inspect it."""
-        user = self.register_user("user", "pass")
-        token = self.login("user", "pass")
-
-        space = self.helper.create_room_as(user, tok=token)
-        room = self.helper.create_room_as(user, tok=token)
-        self._add_child(space, room, token)
+        space = self.helper.create_room_as(self.user, tok=self.token)
+        room = self.helper.create_room_as(self.user, tok=self.token)
+        self._add_child(space, room, self.token)
 
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
@@ -158,5 +155,24 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_space_summary(user2, space))
 
         # The result should only has the space, but includes the link to the room.
+        self._assert_rooms(result, [space])
+        self._assert_events(result, [(space, room)])
+
+    def test_world_readable(self):
+        """A world-readable room is visible to everyone."""
+        space = self.helper.create_room_as(self.user, tok=self.token)
+        room = self.helper.create_room_as(self.user, tok=self.token)
+        self._add_child(space, room, self.token)
+        self.helper.send_state(
+            space,
+            event_type="m.room.history_visibility",
+            body={"history_visibility": "world_readable"},
+            tok=self.token,
+        )
+
+        user2 = self.register_user("user2", "pass")
+
+        # The space should be visible, as well as the link to the room.
+        result = self.get_success(self.handler.get_space_summary(user2, space))
         self._assert_rooms(result, [space])
         self._assert_events(result, [(space, room)])
