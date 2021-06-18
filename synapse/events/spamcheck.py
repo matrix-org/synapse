@@ -183,12 +183,12 @@ class SpamChecker:
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
         user_may_create_room_alias: Optional[
-            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK,
+            USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
         user_may_publish_room: Optional[USER_MAY_PUBLISH_ROOM_CALLBACK] = None,
         check_username_for_spam: Optional[CHECK_USERNAME_FOR_SPAM_CALLBACK] = None,
         check_registration_for_spam: Optional[
-            CHECK_REGISTRATION_FOR_SPAM_CALLBACK,
+            CHECK_REGISTRATION_FOR_SPAM_CALLBACK
         ] = None,
         check_media_file_for_spam: Optional[CHECK_MEDIA_FILE_FOR_SPAM_CALLBACK] = None,
     ):
