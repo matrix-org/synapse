@@ -15,6 +15,9 @@ from typing import Any, Optional
 from unittest import mock
 
 from synapse.handlers.space_summary import _child_events_comparison_key
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, room
+from synapse.server import HomeServer
 
 from tests import unittest
 
@@ -79,3 +82,44 @@ class TestSpaceSummarySort(unittest.TestCase):
 
         ev1 = _create_event("!abc:test", "a" * 51)
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
+
+
+class SpaceSummaryTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs: HomeServer):
+        self.hs = hs
+        self.handler = self.hs.get_space_summary_handler()
+
+    def test_simple_space(self):
+        """Test a simple space with a single room."""
+        user = self.register_user("user", "pass")
+        token = self.login("user", "pass")
+
+        space = self.helper.create_room_as(user, tok=token)
+        room = self.helper.create_room_as(user, tok=token)
+        self.helper.send_state(
+            space,
+            event_type="m.space.child",
+            body={"via": [self.hs.hostname]},
+            tok=token,
+            state_key=room,
+        )
+
+        result = self.get_success(self.handler.get_space_summary(user, space))
+        # The result should have the space and the room in it, along with a link
+        # from space -> room.
+        self.assertCountEqual(
+            [room.get("room_id") for room in result["rooms"]], [space, room]
+        )
+        self.assertCountEqual(
+            [
+                (event.get("room_id"), event.get("state_key"))
+                for event in result["events"]
+            ],
+            [(space, room)],
+        )
