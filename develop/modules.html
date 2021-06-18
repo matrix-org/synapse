@@ -253,32 +253,32 @@ module API's <code>register_spam_checker_callbacks</code> method. The callback f
 to <code>register_spam_checker_callbacks</code> as keyword arguments, with the callback name as the
 argument name and the function as its value. This is demonstrated in the example below.</p>
 <p>The available spam checker callbacks are:</p>
-<pre><code class="language-python">def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
+<pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
 <p>Called when receiving an event from a client or via federation. The module can return
 either a <code>bool</code> to indicate whether the event must be rejected because of spam, or a <code>str</code>
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.</p>
-<pre><code class="language-python">def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; bool
+<pre><code class="language-python">async def user_may_invite(inviter: str, invitee: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (i.e. <code>@alice:example.com</code>).</p>
-<pre><code class="language-python">def user_may_create_room(user: str) -&gt; bool
+<pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.</p>
-<pre><code class="language-python">def user_may_create_room_alias(user: str, room_alias: &quot;synapse.types.RoomAlias&quot;) -&gt; bool
+<pre><code class="language-python">async def user_may_create_room_alias(user: str, room_alias: &quot;synapse.types.RoomAlias&quot;) -&gt; bool
 </code></pre>
 <p>Called when trying to associate an alias with an existing room. The module must return a
 <code>bool</code> indicating whether the given user (represented by their Matrix user ID) is allowed
 to set the given alias.</p>
-<pre><code class="language-python">def user_may_publish_room(user: str, room_id: str) -&gt; bool
+<pre><code class="language-python">async def user_may_publish_room(user: str, room_id: str) -&gt; bool
 </code></pre>
 <p>Called when trying to publish a room to the homeserver's public rooms directory. The
 module must return a <code>bool</code> indicating whether the given user (represented by their
 Matrix user ID) is allowed to publish the given room.</p>
-<pre><code class="language-python">def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
+<pre><code class="language-python">async def check_username_for_spam(user_profile: Dict[str, str]) -&gt; bool
 </code></pre>
 <p>Called when computing search results in the user directory. The module must return a
 <code>bool</code> indicating whether the given user profile can appear in search results. The profile
@@ -290,7 +290,7 @@ is represented as a dictionary with the following keys:</p>
 </ul>
 <p>The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.</p>
-<pre><code class="language-python">def check_registration_for_spam(
+<pre><code class="language-python">async def check_registration_for_spam(
     email_threepid: Optional[dict],
     username: Optional[str],
     request_info: Collection[Tuple[str, str]],
@@ -310,7 +310,7 @@ second item is an IP address. These user agents and IP addresses are the ones th
 used during the registration process.</li>
 <li><code>auth_provider_id</code>: The identifier of the SSO authentication provider, if any.</li>
 </ul>
-<pre><code class="language-python">def check_media_file_for_spam(
+<pre><code class="language-python">async def check_media_file_for_spam(
     file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
     file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;
 ) -&gt; bool
