@@ -16,7 +16,12 @@ from unittest.mock import Mock
 
 from twisted.internet import defer
 
-from synapse.api.constants import EventTypes, LimitBlockingTypes, ServerNoticeMsgType
+from synapse.api.constants import (
+    EventTypes,
+    LimitBlockingTypes,
+    Membership,
+    ServerNoticeMsgType,
+)
 from synapse.api.errors import ResourceLimitError
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -322,7 +327,9 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         # Scan the events in the room to search for a message from the server notices
         # user.
-        events = channel.json_body["rooms"]["join"][room_id]["timeline"]["events"]
+        events = channel.json_body["rooms"][Membership.JOIN][room_id]["timeline"][
+            "events"
+        ]
         notice_in_room = False
         for event in events:
             if (
@@ -366,7 +373,7 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             # invite to a system notices room, but it doesn't matter which user we're
             # using so we use the last one because it saves us an extra sync.
             if "rooms" in channel.json_body:
-                invites = channel.json_body["rooms"]["invite"]
+                invites = channel.json_body["rooms"][Membership.INVITE]
 
         # Make sure we have an invite to process.
         self.assertEqual(len(invites), 1, invites)

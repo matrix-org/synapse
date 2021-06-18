@@ -262,20 +262,20 @@ class SyncRestServlet(RestServlet):
             ] = sync_result.device_unused_fallback_key_types
 
         if joined:
-            response["rooms"]["join"] = joined
+            response["rooms"][Membership.JOIN] = joined
         if invited:
-            response["rooms"]["invite"] = invited
+            response["rooms"][Membership.INVITE] = invited
         if knocked:
-            response["rooms"]["knock"] = knocked
+            response["rooms"][Membership.KNOCK] = knocked
         if archived:
-            response["rooms"]["leave"] = archived
+            response["rooms"][Membership.LEAVE] = archived
 
         if sync_result.groups.join:
-            response["groups"]["join"] = sync_result.groups.join
+            response["groups"][Membership.JOIN] = sync_result.groups.join
         if sync_result.groups.invite:
-            response["groups"]["invite"] = sync_result.groups.invite
+            response["groups"][Membership.INVITE] = sync_result.groups.invite
         if sync_result.groups.leave:
-            response["groups"]["leave"] = sync_result.groups.leave
+            response["groups"][Membership.LEAVE] = sync_result.groups.leave
 
         return response
 
