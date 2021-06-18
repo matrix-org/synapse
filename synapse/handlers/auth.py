@@ -810,7 +810,7 @@ class AuthHandler(BaseHandler):
             or existing_token.has_next_refresh_token_been_refreshed
         ):
             raise SynapseError(
-                401, "refresh token isn't valid anymore", Codes.UNKNOWN_TOKEN
+                403, "refresh token isn't valid anymore", Codes.FORBIDDEN
             )
 
         (
