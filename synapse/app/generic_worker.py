@@ -354,6 +354,10 @@ class GenericWorkerServer(HomeServer):
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
+        # Attach additional resources registered by modules.
+        resources.update(self._module_web_resources)
+        self._module_web_resources_consumed = True
+
         root_resource = create_resource_tree(resources, OptionsResource())
 
         _base.listen_tcp(

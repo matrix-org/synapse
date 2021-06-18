@@ -1,3 +1,7 @@
+**Note: this page of the Synapse documentation is now deprecated. For up to date
+documentation on setting up or writing a spam checker module, please see
+[this page](https://matrix-org.github.io/synapse/develop/modules.html).**
+
 # Handling spam in Synapse
 
 Synapse has support to customize spam checking behavior. It can plug into a
