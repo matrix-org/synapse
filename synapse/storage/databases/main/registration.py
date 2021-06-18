@@ -477,8 +477,15 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         txn.execute(sql, (token,))
         rows = self.db_pool.cursor_to_dict(txn)
+
         if rows:
-            return TokenLookupResult(**rows[0])
+            row = rows[0]
+
+            # This field is nullable, ensure it comes out as a boolean
+            if row["token_used"] is None:
+                row["token_used"] = False
+
+            return TokenLookupResult(**row)
 
         return None
 
@@ -1157,7 +1164,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 device_id=row[2],
                 next_token_id=row[3],
                 has_next_refresh_token_been_refreshed=row[4],
-                has_next_access_token_been_used=row[5],
+                # This column is nullable, ensure it's a boolean
+                has_next_access_token_been_used=(row[5] or False),
             )
 
         return await self.db_pool.runInteraction(
@@ -1435,6 +1443,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 "puppets_user_id": puppets_user_id,
                 "last_validated": now,
                 "refresh_token_id": refresh_token_id,
+                "used": False,
             },
             desc="add_access_token_to_user",
         )

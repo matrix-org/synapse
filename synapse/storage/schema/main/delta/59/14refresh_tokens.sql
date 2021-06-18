@@ -28,3 +28,7 @@ CREATE TABLE refresh_tokens (
 -- Add a reference to the refresh token generated alongside each access token
 ALTER TABLE "access_tokens"
   ADD COLUMN refresh_token_id BIGINT REFERENCES refresh_tokens (id) ON DELETE CASCADE;
+
+-- Add a flag whether the token was already used or not
+ALTER TABLE "access_tokens"
+  ADD COLUMN used BOOLEAN;
