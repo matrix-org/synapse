@@ -15,7 +15,6 @@
 
 import inspect
 import logging
-import functools
 from typing import (
     TYPE_CHECKING,
     Any,
