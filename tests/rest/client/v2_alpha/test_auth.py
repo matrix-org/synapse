@@ -704,7 +704,7 @@ class RefreshAuthTests(unittest.HomeserverTestCase):
             {"refresh_token": login_response.json_body["refresh_token"]},
         )
         self.assertEqual(
-            fourth_refresh_response.code, 401, fourth_refresh_response.result
+            fourth_refresh_response.code, 403, fourth_refresh_response.result
         )
 
         # But refreshing from the last valid refresh token still works
