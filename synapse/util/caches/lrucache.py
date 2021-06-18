@@ -17,6 +17,7 @@ import threading
 import weakref
 from functools import wraps
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -33,10 +34,16 @@ from typing import (
 
 from typing_extensions import Literal, Protocol
 
+from twisted.internet import reactor
+
 from synapse.config import cache as cache_config
-from synapse.util import caches
+from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -127,11 +134,11 @@ class _ListNode(Generic[P]):
 
     @staticmethod
     def insert_after(
-        cache_entry: "weakref.ReferenceType[P]", root: "_ListNode"
+        cache_entry: "weakref.ReferenceType[P]", root: "_ListNode", clock: Clock
     ) -> "_ListNode":
         """Create a new list node that is placed after the given root node."""
         node = _ListNode(cache_entry)
-        node.move_after(root)
+        node.move_after(root, clock)
         return node
 
     def remove_from_list(self):
@@ -151,7 +158,7 @@ class _ListNode(Generic[P]):
         self.next_node = None
         self.prev_node = None
 
-    def move_after(self, root: "_ListNode"):
+    def move_after(self, root: "_ListNode", clock: Clock):
         """Move this node from its current location in the list to after the
         given node.
         """
@@ -180,7 +187,93 @@ class _ListNode(Generic[P]):
         return self.cache_entry()
 
 
+class _TimedListNode(_ListNode[P]):
+    """A `_ListNode` that tracks last access time."""
+
+    __slots__ = ["last_access_ts_secs"]
+
+    def __init__(
+        self, clock: Clock, cache_entry: Optional["weakref.ReferenceType[P]"]
+    ) -> None:
+        super().__init__(cache_entry=cache_entry)
+
+        self.last_access_ts_secs = int(clock.time())
+
+    @staticmethod
+    def insert_after(
+        cache_entry: "weakref.ReferenceType[P]", root: "_ListNode", clock: Clock
+    ) -> "_TimedListNode":
+        node = _TimedListNode(clock, cache_entry)
+        node.move_after(root, clock)
+        return node
+
+    def move_after(self, root: "_ListNode", clock: Clock):
+        self.last_access_ts_secs = int(clock.time())
+        return super().move_after(root, clock)
+
+
+# A linked list of all cache entries, allowing efficient time based eviction.
 GLOBAL_ROOT = _ListNode[_CacheEntry]()
+
+
+@wrap_as_background_process("LruCache._expire_old_entries")
+async def _expire_old_entries(clock: Clock, expiry_seconds: int):
+    """Walks the global cache list to find cache entries that haven't been
+    accessed in the given number of seconds.
+    """
+
+    now = int(clock.time())
+    node = GLOBAL_ROOT.prev_node
+    assert node is not None
+
+    i = 0
+    orphaned_nodes = 0
+
+    logger.debug("Searching for stale caches")
+
+    while node is not GLOBAL_ROOT:
+        # Only the root node isn't a `_TimedListNode`.
+        assert isinstance(node, _TimedListNode)
+
+        if node.last_access_ts_secs > now - expiry_seconds:
+            break
+
+        cache_entry = node.get_cache_entry()
+        current_node = node
+        node = node.prev_node
+        if cache_entry:
+            cache_entry.drop_from_cache()
+        else:
+            # The cache entry has been dropped without being cleared out of this
+            # list. This can happen if the `LruCache` has been dropped without
+            # being cleared up properly.
+            orphaned_nodes += 1
+            current_node.remove_from_list()
+
+        assert node is not None
+
+        # If we do lots of work at once we yield to allow other stuff to happen.
+        if (i + 1) % 10000 == 0:
+            logger.debug("Waiting during drop")
+            await clock.sleep(0)
+            logger.debug("Waking during drop")
+
+        # If we've yielded then our current node may have been evicted, so we
+        # need to check that its still valid.
+        if node.prev_node is None:
+            break
+
+        i += 1
+
+    logger.info("Dropped %d items from caches, (orphaned: %d)", i, orphaned_nodes)
+
+
+def expire_lru_cache_entries_after(hs: "HomeServer", expiry_ts_seconds: int):
+    """Start a background job that expires all cache entries if they have not
+    been accessed for the given number of seconds.
+    """
+    clock = hs.get_clock()
+    clock.looping_call(_expire_old_entries, 30 * 1000, clock, expiry_ts_seconds)
 
 
 class _Node:
@@ -201,11 +294,14 @@ class _Node:
         key,
         value,
         cache: "LruCache",
+        clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
     ):
         self_ref = weakref.ref(self, lambda _: self.drop_from_lists())
-        self.list_node = _ListNode.insert_after(self_ref, root)
-        self.global_list_node = _ListNode.insert_after(self_ref, GLOBAL_ROOT)
+        self.list_node = _ListNode.insert_after(self_ref, root, clock)
+        self.global_list_node = _TimedListNode.insert_after(
+            self_ref, GLOBAL_ROOT, clock
+        )
 
         # We store a weak reference to the cache object so that this _Node can
         # remove itself from the cache. If the cache is dropped we ensure we
@@ -293,6 +389,7 @@ class LruCache(Generic[KT, VT]):
         size_callback: Optional[Callable] = None,
         metrics_collection_callback: Optional[Callable[[], None]] = None,
         apply_cache_factor_from_config: bool = True,
+        clock: Optional[Clock] = None,
     ):
         """
         Args:
@@ -318,6 +415,13 @@ class LruCache(Generic[KT, VT]):
             apply_cache_factor_from_config (bool): If true, `max_size` will be
                 multiplied by a cache factor derived from the homeserver config
         """
+        # Default `clock` to something sensible. Note that we rename it to
+        # `real_clock` so that mypy doesn't think its still `Optional`.
+        if clock is None:
+            real_clock = Clock(reactor)
+        else:
+            real_clock = clock
+
         cache = cache_type()
         self.cache = cache  # Used for introspection.
         self.apply_cache_factor_from_config = apply_cache_factor_from_config
@@ -395,7 +499,7 @@ class LruCache(Generic[KT, VT]):
         self.len = synchronized(cache_len)
 
         def add_node(key, value, callbacks: Collection[Callable[[], None]] = ()):
-            node = _Node(list_root, key, value, self, callbacks)
+            node = _Node(list_root, key, value, self, real_clock, callbacks)
             cache[key] = node
 
             if size_callback:
@@ -405,8 +509,8 @@ class LruCache(Generic[KT, VT]):
                 metrics.inc_memory_usage(node.memory)
 
         def move_node_to_front(node: _Node):
-            node.list_node.move_after(list_root)
-            node.global_list_node.move_after(GLOBAL_ROOT)
+            node.list_node.move_after(list_root, real_clock)
+            node.global_list_node.move_after(GLOBAL_ROOT, real_clock)
 
         def delete_node(node: _Node) -> int:
             node.drop_from_lists()
