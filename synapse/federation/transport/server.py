@@ -15,7 +15,17 @@
 import functools
 import logging
 import re
-from typing import Container, Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
+from typing import (
+    Container,
+    Dict,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    Type,
+    Union,
+)
 
 from typing_extensions import Literal
 
@@ -573,10 +583,10 @@ class FederationMakeJoinServlet(BaseFederationServerServlet):
         if supported_versions is None:
             supported_versions = ["1"]
 
-        content = await self.handler.on_make_join_request(
+        result = await self.handler.on_make_join_request(
             origin, room_id, user_id, supported_versions=supported_versions
         )
-        return 200, content
+        return 200, result
 
 
 class FederationMakeLeaveServlet(BaseFederationServerServlet):
@@ -590,8 +600,8 @@ class FederationMakeLeaveServlet(BaseFederationServerServlet):
         room_id: str,
         user_id: str,
     ) -> Tuple[int, JsonDict]:
-        content = await self.handler.on_make_leave_request(origin, room_id, user_id)
-        return 200, content
+        result = await self.handler.on_make_leave_request(origin, room_id, user_id)
+        return 200, result
 
 
 class FederationV1SendLeaveServlet(BaseFederationServerServlet):
@@ -605,8 +615,8 @@ class FederationV1SendLeaveServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, Tuple[int, JsonDict]]:
-        content = await self.handler.on_send_leave_request(origin, content)
-        return 200, (200, content)
+        result = await self.handler.on_send_leave_request(origin, content)
+        return 200, (200, result)
 
 
 class FederationV2SendLeaveServlet(BaseFederationServerServlet):
@@ -622,8 +632,8 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, JsonDict]:
-        content = await self.handler.on_send_leave_request(origin, content)
-        return 200, content
+        result = await self.handler.on_send_leave_request(origin, content)
+        return 200, result
 
 
 class FederationMakeKnockServlet(BaseFederationServerServlet):
@@ -643,10 +653,10 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
         except KeyError:
             raise SynapseError(400, "Missing required query parameter 'ver'")
 
-        content = await self.handler.on_make_knock_request(
+        result = await self.handler.on_make_knock_request(
             origin, room_id, user_id, supported_versions=supported_versions
         )
-        return 200, content
+        return 200, result
 
 
 class FederationV1SendKnockServlet(BaseFederationServerServlet):
@@ -660,8 +670,8 @@ class FederationV1SendKnockServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, JsonDict]:
-        content = await self.handler.on_send_knock_request(origin, content, room_id)
-        return 200, content
+        result = await self.handler.on_send_knock_request(origin, content, room_id)
+        return 200, result
 
 
 class FederationEventAuthServlet(BaseFederationServerServlet):
@@ -691,8 +701,8 @@ class FederationV1SendJoinServlet(BaseFederationServerServlet):
     ) -> Tuple[int, Tuple[int, JsonDict]]:
         # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
-        content = await self.handler.on_send_join_request(origin, content)
-        return 200, (200, content)
+        result = await self.handler.on_send_join_request(origin, content)
+        return 200, (200, result)
 
 
 class FederationV2SendJoinServlet(BaseFederationServerServlet):
@@ -710,8 +720,8 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
     ) -> Tuple[int, JsonDict]:
         # TODO(paul): assert that room_id/event_id parsed from path actually
         #   match those given in content
-        content = await self.handler.on_send_join_request(origin, content)
-        return 200, content
+        result = await self.handler.on_send_join_request(origin, content)
+        return 200, result
 
 
 class FederationV1InviteServlet(BaseFederationServerServlet):
@@ -729,13 +739,13 @@ class FederationV1InviteServlet(BaseFederationServerServlet):
         # v2. This is "fine" as the only difference between V1 and V2 is the
         # state resolution algorithm, and we don't use that for processing
         # invites
-        content = await self.handler.on_invite_request(
+        result = await self.handler.on_invite_request(
             origin, content, room_version_id=RoomVersions.V1.identifier
         )
 
         # V1 federation API is defined to return a content of `[200, {...}]`
         # due to a historical bug.
-        return 200, (200, content)
+        return 200, (200, result)
 
 
 class FederationV2InviteServlet(BaseFederationServerServlet):
@@ -763,10 +773,10 @@ class FederationV2InviteServlet(BaseFederationServerServlet):
 
         event.setdefault("unsigned", {})["invite_room_state"] = invite_room_state
 
-        content = await self.handler.on_invite_request(
+        result = await self.handler.on_invite_request(
             origin, event, room_version_id=room_version
         )
-        return 200, content
+        return 200, result
 
 
 class FederationThirdPartyInviteExchangeServlet(BaseFederationServerServlet):
@@ -830,7 +840,7 @@ class FederationGetMissingEventsServlet(BaseFederationServerServlet):
         earliest_events = content.get("earliest_events", [])
         latest_events = content.get("latest_events", [])
 
-        content = await self.handler.on_get_missing_events(
+        result = await self.handler.on_get_missing_events(
             origin,
             room_id=room_id,
             earliest_events=earliest_events,
@@ -838,7 +848,7 @@ class FederationGetMissingEventsServlet(BaseFederationServerServlet):
             limit=limit,
         )
 
-        return 200, content
+        return 200, result
 
 
 class On3pidBindServlet(BaseFederationServerServlet):
