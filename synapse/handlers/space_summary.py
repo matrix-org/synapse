@@ -452,7 +452,7 @@ class SpaceSummaryHandler:
                     return True
 
             # Otherwise, check if they should be allowed access via membership in a space.
-            if self._event_auth_handler.has_restricted_join_rules(
+            if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
                 allowed_rooms = (
