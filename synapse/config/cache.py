@@ -145,6 +145,12 @@ class CacheConfig(Config):
            #
            per_cache_factors:
              #get_users_who_share_room_with_user: 2.0
+
+            # Controls how long an entry can be in a cache without having been
+            # accessed before being evicted. Defaults to None, which means
+            # entries are never evicted based on time.
+            #
+            #expiry_time: 30m
         """
 
     def read_config(self, config, **kwargs):
@@ -199,6 +205,12 @@ class CacheConfig(Config):
                 raise ConfigError(
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
+
+        expiry_time = cache_config.get("expiry_time", None)
+        if expiry_time:
+            self.expiry_time_msec = self.parse_duration(expiry_time)
+        else:
+            self.expiry_time_msec = None
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()

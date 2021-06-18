@@ -5,6 +5,7 @@ from synapse.config import (
     api,
     appservice,
     auth,
+    cache,
     captcha,
     cas,
     consent,
@@ -87,6 +88,7 @@ class RootConfig:
     tracer: tracer.TracerConfig
     redis: redis.RedisConfig
     modules: modules.ModulesConfig
+    caches: cache.CacheConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...

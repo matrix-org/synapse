@@ -703,6 +703,12 @@ caches:
    per_cache_factors:
      #get_users_who_share_room_with_user: 2.0
 
+    # Controls how long an entry can be in a cache without having been
+    # accessed before being evicted. Defaults to None, which means
+    # entries are never evicted based on time.
+    #
+    #expiry_time: 30m
+
 
 ## Database ##
 

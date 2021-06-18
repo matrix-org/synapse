@@ -268,12 +268,21 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int):
     logger.info("Dropped %d items from caches, (orphaned: %d)", i, orphaned_nodes)
 
 
-def expire_lru_cache_entries_after(hs: "HomeServer", expiry_ts_seconds: int):
+def setup_expire_lru_cache_entries(hs: "HomeServer"):
     """Start a background job that expires all cache entries if they have not
     been accessed for the given number of seconds.
     """
+    if not hs.config.caches.expiry_time_msec:
+        return
+
+    logger.info(
+        "Expiring LRU caches after %d seconds", hs.config.caches.expiry_time_msec / 1000
+    )
+
     clock = hs.get_clock()
-    clock.looping_call(_expire_old_entries, 30 * 1000, clock, expiry_ts_seconds)
+    clock.looping_call(
+        _expire_old_entries, 30 * 1000, clock, hs.config.caches.expiry_time_msec / 1000
+    )
 
 
 class _Node:
