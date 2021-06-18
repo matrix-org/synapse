@@ -37,7 +37,7 @@ jobs:
       - name: Get the current Synapse version
         id: vars
         # The $GITHUB_REF value for a branch looks like `refs/heads/release-v1.2`. We do some
-        # bash magic to remove the "refs/heads/release-v" bit from this, to end up with "1.2",
+        # shell magic to remove the "refs/heads/release-v" bit from this, to end up with "1.2",
         # our major/minor version number, and set this to a var called `branch-version`.
         #
         # We then use some python to get Synapse's full version string, which may look
