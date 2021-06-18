@@ -154,7 +154,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.helper.join(space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, space))
 
-        # The result should only has the space, but includes the link to the room.
+        # The result should only have the space, but includes the link to the room.
         self._assert_rooms(result, [space])
         self._assert_events(result, [(space, room)])
 
