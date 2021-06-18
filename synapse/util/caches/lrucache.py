@@ -338,6 +338,8 @@ class _Node:
             self.memory = (
                 _get_size_of(key)
                 + _get_size_of(value)
+                + _get_size_of(self.list_node, recurse=False)
+                + _get_size_of(self.global_list_node, recurse=False)
                 + _get_size_of(self.callbacks, recurse=False)
                 + _get_size_of(self, recurse=False)
             )
