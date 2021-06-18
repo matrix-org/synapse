@@ -178,3 +178,46 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
         self._assert_rooms(result, [self.space])
         self._assert_events(result, [(self.space, self.room)])
+
+    def test_complex_space(self):
+        """
+        Create a "complex" space to see how it handles things like loops and subspaces.
+        """
+        # Create an inaccessible room.
+        user2 = self.register_user("user2", "pass")
+        token2 = self.login("user2", "pass")
+        room2 = self.helper.create_room_as(user2, tok=token2)
+        # This is a bit odd as "user" is adding a room they don't know about, but
+        # it works for the tests.
+        self._add_child(self.space, room2, self.token)
+
+        # Create a subspace under the space with an additional room in it.
+        subspace = self.helper.create_room_as(
+            self.user,
+            tok=self.token,
+            extra_content={
+                "creation_content": {EventContentFields.ROOM_TYPE: RoomTypes.SPACE}
+            },
+        )
+        subroom = self.helper.create_room_as(self.user, tok=self.token)
+        self._add_child(self.space, subspace, token=self.token)
+        self._add_child(subspace, subroom, token=self.token)
+        # Also add the two rooms from the space into this subspace (causing loops).
+        self._add_child(subspace, self.room, token=self.token)
+        self._add_child(subspace, room2, self.token)
+
+        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+
+        # The result should include each room a single time and each link.
+        self._assert_rooms(result, [self.space, self.room, subspace, subroom])
+        self._assert_events(
+            result,
+            [
+                (self.space, self.room),
+                (self.space, room2),
+                (self.space, subspace),
+                (subspace, subroom),
+                (subspace, self.room),
+                (subspace, room2),
+            ],
+        )
