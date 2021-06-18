@@ -101,7 +101,7 @@ argument name and the function as its value. This is demonstrated in the example
 The available spam checker callbacks are:
 
 ```python
-def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
+async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
 ```
 
 Called when receiving an event from a client or via federation. The module can return
@@ -110,7 +110,7 @@ to indicate the event must be rejected because of spam and to give a rejection r
 forward to clients.
 
 ```python
-def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
+async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 ```
 
 Called when processing an invitation. The module must return a `bool` indicating whether
@@ -118,14 +118,14 @@ the inviter can invite the invitee to the given room. Both inviter and invitee a
 represented by their Matrix user ID (i.e. `@alice:example.com`).
 
 ```python
-def user_may_create_room(user: str) -> bool
+async def user_may_create_room(user: str) -> bool
 ```
 
 Called when processing a room creation request. The module must return a `bool` indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.
 
 ```python
-def user_may_create_room_alias(user: str, room_alias: "synapse.types.RoomAlias") -> bool
+async def user_may_create_room_alias(user: str, room_alias: "synapse.types.RoomAlias") -> bool
 ```
 
 Called when trying to associate an alias with an existing room. The module must return a
@@ -133,7 +133,7 @@ Called when trying to associate an alias with an existing room. The module must 
 to set the given alias.
 
 ```python
-def user_may_publish_room(user: str, room_id: str) -> bool
+async def user_may_publish_room(user: str, room_id: str) -> bool
 ```
 
 Called when trying to publish a room to the homeserver's public rooms directory. The
@@ -141,7 +141,7 @@ module must return a `bool` indicating whether the given user (represented by th
 Matrix user ID) is allowed to publish the given room.
 
 ```python
-def check_username_for_spam(user_profile: Dict[str, str]) -> bool
+async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
 ```
 
 Called when computing search results in the user directory. The module must return a
@@ -156,7 +156,7 @@ The module is given a copy of the original dictionary, so modifying it from with
 module cannot modify a user's profile when included in user directory search results.
 
 ```python
-def check_registration_for_spam(
+async def check_registration_for_spam(
     email_threepid: Optional[dict],
     username: Optional[str],
     request_info: Collection[Tuple[str, str]],
@@ -179,7 +179,7 @@ The arguments passed to this callback are:
 * `auth_provider_id`: The identifier of the SSO authentication provider, if any.
 
 ```python
-def check_media_file_for_spam(
+async def check_media_file_for_spam(
     file_wrapper: "synapse.rest.media.v1.media_storage.ReadableFileWrapper",
     file_info: "synapse.rest.media.v1._base.FileInfo"
 ) -> bool
