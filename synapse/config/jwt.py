@@ -35,7 +35,7 @@ class JWTConfig(Config):
             # that the claims exist on the JWT.
             self.jwt_secret = jwt_config.get("secret")
             self.jwt_jwks_uri = jwt_config.get("jwks_uri")
-            self.jwt_subject_claim = jwt_config.get("subject_claim")
+            self.jwt_subject_claim = jwt_config.get("subject_claim", "sub")
             self.jwt_normalize_user_id = jwt_config.get("normalize_user_id", False)
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
