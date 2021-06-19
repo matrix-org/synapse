@@ -14,6 +14,7 @@
 
 from ._base import Config, ConfigError
 
+MISSING_SECRET = "Either 'secret' or 'jwks_uri' is required in jwt_config."
 MISSING_JWT = """Missing jwt library. This is required for jwt login.
 
     Install by running:
@@ -38,6 +39,9 @@ class JWTConfig(Config):
             self.jwt_normalize_user_id = jwt_config.get("normalize_user_id", False)
             self.jwt_issuer = jwt_config.get("issuer")
             self.jwt_audiences = jwt_config.get("audiences")
+
+            if not self.jwt_secret and not self.jwt_jwks_uri:
+                raise ConfigError(MISSING_SECRET)
 
             try:
                 import jwt
