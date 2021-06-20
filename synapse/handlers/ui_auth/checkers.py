@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any
 from twisted.web.client import PartialDownloadError
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import Codes, LoginError, StoreError, SynapseError
+from synapse.api.errors import Codes, LoginError, SynapseError
 from synapse.config.emailconfig import ThreepidBehaviour
 from synapse.util import json_decoder
 
@@ -242,6 +242,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
+        self.hs = hs
         self._enabled = bool(hs.config.registration_requires_token)
         self.store = hs.get_datastore()
 
@@ -258,20 +259,19 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
         if "session" not in authdict:
             raise SynapseError(400, "Missing UIA session", Codes.MISSING_PARAM)
 
+        # Import here to avoid a cyclic dependency
+        from synapse.handlers.ui_auth import UIAuthSessionDataConstants
+
+        # Retrieve the auth handler here to avoid a cyclic dependency
+        auth_handler = self.hs.get_auth_handler()
         session = authdict["session"]
         token = authdict["token"]
 
         # If the LoginType.REGISTRATION_TOKEN stage has already been completed,
         # return early to avoid incrementing `pending` again.
-        try:
-            stored_token = await self.store.get_ui_auth_session_data(
-                session,
-                "registration_token",
-                None,
-            )
-        except StoreError:
-            raise SynapseError(400, "Unknown session ID: {}".format(session))
-
+        stored_token = await auth_handler.get_session_data(
+            session, UIAuthSessionDataConstants.REGISTRATION_TOKEN
+        )
         if stored_token:
             if token != stored_token:
                 raise SynapseError(
@@ -286,9 +286,9 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
             await self.store.set_registration_token_pending(token)
             # Store the token in the UIA session, so that once registration
             # is complete `completed` can be incremented.
-            await self.store.set_ui_auth_session_data(
+            await auth_handler.set_session_data(
                 session,
-                "registration_token",
+                UIAuthSessionDataConstants.REGISTRATION_TOKEN,
                 token,
             )
             return True

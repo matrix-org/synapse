@@ -699,7 +699,7 @@ class RegisterRestServlet(RestServlet):
             # Check if a token was used to authenticate registration
             registration_token = await self.auth_handler.get_session_data(
                 session_id,
-                "registration_token",
+                UIAuthSessionDataConstants.REGISTRATION_TOKEN,
             )
             if registration_token:
                 # Increment the `completed` counter for the token
