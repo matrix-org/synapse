@@ -125,17 +125,15 @@ class _ListNode(Generic[P]):
         "next_node",
     ]
 
-    def __init__(
-        self, cache_entry: Optional["weakref.ReferenceType[P]"] = None
-    ) -> None:
+    def __init__(self, cache_entry: Optional[P] = None) -> None:
         self.cache_entry = cache_entry
         self.prev_node: Optional[_ListNode[P]] = self
         self.next_node: Optional[_ListNode[P]] = self
 
     @staticmethod
     def insert_after(
-        cache_entry: "weakref.ReferenceType[P]", root: "_ListNode", clock: Clock
-    ) -> "_ListNode":
+        cache_entry: P, root: "_ListNode[P]", clock: Clock
+    ) -> "_ListNode[P]":
         """Create a new list node that is placed after the given root node."""
         node = _ListNode(cache_entry)
         node.move_after(root, clock)
@@ -158,17 +156,28 @@ class _ListNode(Generic[P]):
         self.next_node = None
         self.prev_node = None
 
+        self.cache_entry = None
+
     def move_after(self, root: "_ListNode", clock: Clock):
         """Move this node from its current location in the list to after the
         given node.
         """
-        self.remove_from_list()
+        # We assert that both this node and the root node is still "alive".
+        assert self.prev_node
+        assert self.next_node
+        assert root.prev_node
+        assert root.next_node
 
+        # Remove self from the list
+        prev_node = self.prev_node
+        next_node = self.next_node
+
+        prev_node.next_node = next_node
+        next_node.prev_node = prev_node
+
+        # Insert self back into the list, after root
         prev_node = root
         next_node = root.next_node
-
-        assert prev_node is not None
-        assert next_node is not None
 
         self.prev_node = prev_node
         self.next_node = next_node
@@ -180,11 +189,7 @@ class _ListNode(Generic[P]):
         """Get the cache entry, returns None if this is the root node (i.e.
         cache_entry is None) or if the entry has been dropped.
         """
-
-        if not self.cache_entry:
-            return None
-
-        return self.cache_entry()
+        return self.cache_entry
 
 
 class _TimedListNode(_ListNode[P]):
@@ -192,17 +197,15 @@ class _TimedListNode(_ListNode[P]):
 
     __slots__ = ["last_access_ts_secs"]
 
-    def __init__(
-        self, clock: Clock, cache_entry: Optional["weakref.ReferenceType[P]"]
-    ) -> None:
+    def __init__(self, clock: Clock, cache_entry: Optional[P]) -> None:
         super().__init__(cache_entry=cache_entry)
 
         self.last_access_ts_secs = int(clock.time())
 
     @staticmethod
     def insert_after(
-        cache_entry: "weakref.ReferenceType[P]", root: "_ListNode", clock: Clock
-    ) -> "_TimedListNode":
+        cache_entry: P, root: "_ListNode[P]", clock: Clock
+    ) -> "_TimedListNode[P]":
         node = _TimedListNode(clock, cache_entry)
         node.move_after(root, clock)
         return node
@@ -309,16 +312,15 @@ class _Node:
         root: "_ListNode[_Node]",
         key,
         value,
-        cache: "LruCache",
+        cache: "weakref.ReferenceType[LruCache]",
         clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
     ):
-        self_ref = weakref.ref(self, lambda _: self.drop_from_lists())
-        self.list_node = _ListNode.insert_after(self_ref, root, clock)
+        self.list_node = _ListNode.insert_after(self, root, clock)
         self.global_list_node = None
         if USE_GLOBAL_LIST:
             self.global_list_node = _TimedListNode.insert_after(
-                self_ref, GLOBAL_ROOT, clock
+                self, GLOBAL_ROOT, clock
             )
         else:
             self.global_list_node = None
@@ -326,7 +328,7 @@ class _Node:
         # We store a weak reference to the cache object so that this _Node can
         # remove itself from the cache. If the cache is dropped we ensure we
         # remove our entries in the lists.
-        self.cache = weakref.ref(cache, lambda _: self.drop_from_lists())
+        self.cache = cache
 
         self.key = key
         self.value = value
@@ -357,6 +359,7 @@ class _Node:
 
             if self.global_list_node:
                 self.memory += _get_size_of(self.global_list_node, recurse=False)
+                self.memory += _get_size_of(self.global_list_node.last_access_ts_secs)
 
     def add_callbacks(self, callbacks: Collection[Callable[[], None]]) -> None:
         """Add to stored list of callbacks, removing duplicates."""
@@ -479,6 +482,10 @@ class LruCache(Generic[KT, VT]):
         # this is exposed for access from outside this class
         self.metrics = metrics
 
+        # We create a single weakref to self here, so that all `_Node` can share
+        # a single reference (as weakrefs are surprisingly large).
+        weak_ref_to_self = weakref.ref(self)
+
         list_root = _ListNode[_Node]()
 
         lock = threading.Lock()
@@ -525,7 +532,7 @@ class LruCache(Generic[KT, VT]):
         self.len = synchronized(cache_len)
 
         def add_node(key, value, callbacks: Collection[Callable[[], None]] = ()):
-            node = _Node(list_root, key, value, self, real_clock, callbacks)
+            node = _Node(list_root, key, value, weak_ref_to_self, real_clock, callbacks)
             cache[key] = node
 
             if size_callback:
@@ -743,3 +750,8 @@ class LruCache(Generic[KT, VT]):
                 self._on_resize()
             return True
         return False
+
+    def __del__(self) -> None:
+        # We're about to be deleted, so we make sure to clear up all the nodes
+        # and run callbacks, etc.
+        self.clear()
