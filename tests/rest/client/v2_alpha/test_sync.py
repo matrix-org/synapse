@@ -558,3 +558,53 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Store the next batch for the next request.
         self.next_batch = channel.json_body["next_batch"]
+
+
+class SyncCacheTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def test_noop_sync_does_not_tightloop(self):
+        """If the sync times out, we shouldn't cache the result
+
+        Essentially a regression test for #8518.
+        """
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        # we should immediately get an initial sync response
+        channel = self.make_request("GET", "/sync", access_token=self.tok)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # now, make an incremental sync request, with a timeout
+        next_batch = channel.json_body["next_batch"]
+        channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}&timeout=10000",
+            access_token=self.tok,
+            await_result=False,
+        )
+        # that should block for 10 seconds
+        with self.assertRaises(TimedOutException):
+            channel.await_result(timeout_ms=9900)
+        channel.await_result(timeout_ms=200)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # we expect the next_batch in the result to be the same as before
+        self.assertEqual(channel.json_body["next_batch"], next_batch)
+
+        # another incremental sync should also block.
+        channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}&timeout=10000",
+            access_token=self.tok,
+            await_result=False,
+        )
+        # that should block for 10 seconds
+        with self.assertRaises(TimedOutException):
+            channel.await_result(timeout_ms=9900)
+        channel.await_result(timeout_ms=200)
+        self.assertEqual(channel.code, 200, channel.json_body)
