@@ -34,7 +34,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -540,7 +540,7 @@ class FederationServer(FederationBase):
     async def on_send_join_request(
         self, origin: str, content: JsonDict
     ) -> Dict[str, Any]:
-        context = await self._on_send_membership_event(origin, content)
+        context = await self._on_send_membership_event(origin, content, Membership.JOIN)
 
         prev_state_ids = await context.get_prev_state_ids()
         state_ids = list(prev_state_ids.values())
@@ -567,7 +567,7 @@ class FederationServer(FederationBase):
 
     async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
-        await self._on_send_membership_event(origin, content)
+        await self._on_send_membership_event(origin, content, Membership.LEAVE)
         return {}
 
     async def on_make_knock_request(
@@ -668,11 +668,17 @@ class FederationServer(FederationBase):
         return {"knock_state_events": stripped_room_state}
 
     async def _on_send_membership_event(
-        self, origin: str, content: JsonDict
+        self, origin: str, content: JsonDict, membership_type: str
     ) -> EventContext:
         assert_params_in_dict(content, ["room_id"])
         room_version = await self.store.get_room_version(content["room_id"])
         event = event_from_pdu_json(content, room_version)
+
+        if event.type != EventTypes.Member or not event.is_state():
+            raise SynapseError(400, "Not an m.room.member event", Codes.BAD_JSON)
+
+        if event.content.get("membership") != membership_type:
+            raise SynapseError(400, "Not a %s event" % membership_type, Codes.BAD_JSON)
 
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, event.room_id)
