@@ -115,13 +115,14 @@ class SSOConfig(Config):
             #  - https://riot.im/develop
             #  - https://my.custom.client/
 
-            # Keep a user's profile fields in sync with information from the identity provider. Currently only
-            # overriding the displayname is supported. Fields are checked on every SSO login, and are updated
+            # Uncomment to keep a user's profile fields in sync with information from
+            # the identity provider. Currently only syncing the displayname is
+            # supported. Fields are checked on every SSO login, and are updated
             # if necessary.
             #
-            # Note that enabling this option will override user profile information from
-            # the SSO ticket, regardless of whether users have opted-out of syncing
-            # that information when first signing in. Defaults to false.
+            # Note that enabling this option will override user profile information,
+            # regardless of whether users have opted-out of syncing that
+            # information when first signing in. Defaults to false.
             #
             #update_profile_information: true
 
