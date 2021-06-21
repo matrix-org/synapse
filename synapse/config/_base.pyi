@@ -11,6 +11,7 @@ from synapse.config import (
     database,
     emailconfig,
     experimental,
+    federation,
     groups,
     jwt,
     key,
@@ -87,6 +88,7 @@ class RootConfig:
     tracer: tracer.TracerConfig
     redis: redis.RedisConfig
     modules: modules.ModulesConfig
+    federation: federation.FederationConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...
