@@ -637,29 +637,9 @@ class FederationServer(FederationBase):
         Returns:
             The stripped room state.
         """
-        logger.debug("on_send_knock_request: content: %s", content)
-
-        room_version = await self.store.get_room_version(room_id)
-
-        # Check that this room supports knocking as defined by its room version
-        if not room_version.msc2403_knocking:
-            raise SynapseError(
-                403,
-                "This room version does not support knocking",
-                errcode=Codes.FORBIDDEN,
-            )
-
-        pdu = event_from_pdu_json(content, room_version)
-
-        origin_host, _ = parse_server_name(origin)
-        await self.check_server_matches_acl(origin_host, pdu.room_id)
-
-        logger.debug("on_send_knock_request: pdu sigs: %s", pdu.signatures)
-
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-        # Handle the event, and retrieve the EventContext
-        event_context = await self.handler.on_send_membership_event(origin, pdu)
+        event_context = await self._on_send_membership_event(
+            origin, content, Membership.KNOCK, room_id
+        )
 
         # Retrieve stripped state events from the room and send them back to the remote
         # server. This will allow the remote server's clients to display information
@@ -674,7 +654,10 @@ class FederationServer(FederationBase):
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
     ) -> EventContext:
-        """Handle an on_send_{join,leave} request
+        """Handle an on_send_{join,leave,knock} request
+
+        Does some preliminary validation before passing the request on to the
+        federation handler.
 
         Args:
             origin: The (authenticated) requesting server
@@ -700,6 +683,14 @@ class FederationServer(FederationBase):
             )
 
         room_version = await self.store.get_room_version(room_id)
+
+        if membership_type == Membership.KNOCK and not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
         event = event_from_pdu_json(content, room_version)
 
         if event.type != EventTypes.Member or not event.is_state():
@@ -714,6 +705,7 @@ class FederationServer(FederationBase):
         logger.debug("_on_send_membership_event: pdu sigs: %s", event.signatures)
 
         event = await self._check_sigs_and_hash(room_version, event)
+
         return await self.handler.on_send_membership_event(origin, event)
 
     async def on_event_auth(
