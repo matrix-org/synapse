@@ -221,3 +221,64 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 (subspace, room2),
             ],
         )
+
+    def test_fed_complex(self):
+        """
+        Return data over federation and ensure that it is handled properly.
+        """
+        fed_hostname = self.hs.hostname + "2"
+        subspace = "#subspace:" + fed_hostname
+        subroom = "#subroom:" + fed_hostname
+
+        async def summarize_remote_room(
+            _self, room, suggested_only, max_children, exclude_rooms
+        ):
+            # Return some good data, and some bad data:
+            #
+            # * Event *back* to the root room.
+            # * Unrelated events / rooms
+            # * Multiple levels of events (in a not-useful order, e.g. grandchild
+            #   events before child events).
+
+            # Note that these entries are brief, but should contain enough info.
+            rooms = [
+                {
+                    "room_id": subspace,
+                    "world_readable": True,
+                    "room_type": RoomTypes.SPACE,
+                },
+                {
+                    "room_id": subroom,
+                    "world_readable": True,
+                },
+            ]
+            event_content = {"via": [fed_hostname]}
+            events = [
+                {
+                    "room_id": subspace,
+                    "state_key": subroom,
+                    "content": event_content,
+                },
+            ]
+            return rooms, events
+
+        # Add a room to the space which is on another server.
+        self._add_child(self.space, subspace, self.token)
+
+        with mock.patch(
+            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            new=summarize_remote_room,
+        ):
+            result = self.get_success(
+                self.handler.get_space_summary(self.user, self.space)
+            )
+
+        self._assert_rooms(result, [self.space, self.room, subspace, subroom])
+        self._assert_events(
+            result,
+            [
+                (self.space, self.room),
+                (self.space, subspace),
+                (subspace, subroom),
+            ],
+        )
