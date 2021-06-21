@@ -2086,8 +2086,6 @@ class FederationHandler(BaseHandler):
 
         context = await self.state_handler.compute_event_context(event)
 
-        await self._auth_and_persist_event(origin, event, context)
-
         event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
@@ -2096,6 +2094,8 @@ class FederationHandler(BaseHandler):
             raise SynapseError(
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
             )
+
+        await self._auth_and_persist_event(origin, event, context)
 
         return context
 

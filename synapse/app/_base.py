@@ -26,7 +26,9 @@ from typing import TYPE_CHECKING, Awaitable, Callable, Iterable
 from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
 
+import twisted
 from twisted.internet import defer, error, reactor
+from twisted.logger import LoggingFile, LogLevel
 from twisted.protocols.tls import TLSMemoryBIOFactory
 
 import synapse
@@ -143,12 +145,36 @@ def start_reactor(
 
 def quit_with_error(error_string: str) -> NoReturn:
     message_lines = error_string.split("\n")
-    line_length = max(len(line) for line in message_lines if len(line) < 80) + 2
+    line_length = min(max(len(line) for line in message_lines), 80) + 2
     sys.stderr.write("*" * line_length + "\n")
     for line in message_lines:
         sys.stderr.write(" %s\n" % (line.rstrip(),))
     sys.stderr.write("*" * line_length + "\n")
     sys.exit(1)
+
+
+def handle_startup_exception(e: Exception) -> NoReturn:
+    # Exceptions that occur between setting up the logging and forking or starting
+    # the reactor are written to the logs, followed by a summary to stderr.
+    logger.exception("Exception during startup")
+    quit_with_error(
+        f"Error during initialisation:\n   {e}\nThere may be more information in the logs."
+    )
+
+
+def redirect_stdio_to_logs() -> None:
+    streams = [("stdout", LogLevel.info), ("stderr", LogLevel.error)]
+
+    for (stream, level) in streams:
+        oldStream = getattr(sys, stream)
+        loggingFile = LoggingFile(
+            logger=twisted.logger.Logger(namespace=stream),
+            level=level,
+            encoding=getattr(oldStream, "encoding", None),
+        )
+        setattr(sys, stream, loggingFile)
+
+    print("Redirected stdout/stderr to logs")
 
 
 def register_start(cb: Callable[..., Awaitable], *args, **kwargs) -> None:
