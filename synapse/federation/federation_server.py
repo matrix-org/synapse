@@ -538,13 +538,15 @@ class FederationServer(FederationBase):
         return {"event": ret_pdu.get_pdu_json(time_now)}
 
     async def on_send_join_request(
-        self, origin: str, content: JsonDict
+        self, origin: str, content: JsonDict, room_id: str
     ) -> Dict[str, Any]:
-        context = await self._on_send_membership_event(origin, content, Membership.JOIN)
+        context = await self._on_send_membership_event(
+            origin, content, Membership.JOIN, room_id
+        )
 
         prev_state_ids = await context.get_prev_state_ids()
         state_ids = list(prev_state_ids.values())
-        auth_chain = await self.store.get_auth_chain(content["room_id"], state_ids)
+        auth_chain = await self.store.get_auth_chain(room_id, state_ids)
         state = await self.store.get_events(state_ids)
 
         time_now = self._clock.time_msec()
@@ -565,9 +567,11 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
+    async def on_send_leave_request(
+        self, origin: str, content: JsonDict, room_id: str
+    ) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
-        await self._on_send_membership_event(origin, content, Membership.LEAVE)
+        await self._on_send_membership_event(origin, content, Membership.LEAVE, room_id)
         return {}
 
     async def on_make_knock_request(
@@ -668,10 +672,34 @@ class FederationServer(FederationBase):
         return {"knock_state_events": stripped_room_state}
 
     async def _on_send_membership_event(
-        self, origin: str, content: JsonDict, membership_type: str
+        self, origin: str, content: JsonDict, membership_type: str, room_id: str
     ) -> EventContext:
+        """Handle an on_send_{join,leave} request
+
+        Args:
+            origin: The (authenticated) requesting server
+            content: The body of the send_* request - a complete membership event
+            membership_type: The expected membership type (join or leave, depending
+                on the endpoint)
+            room_id: The room_id from the request, to be validated against the room_id
+                in the event
+
+        Returns:
+            The context of the event after inserting it into the room graph.
+
+        Raises:
+            SynapseError if there is a problem with the request, including things like
+               the room_id not matching or the event not being authorized.
+        """
         assert_params_in_dict(content, ["room_id"])
-        room_version = await self.store.get_room_version(content["room_id"])
+        if content["room_id"] != room_id:
+            raise SynapseError(
+                400,
+                "Room ID in body does not match that in request path",
+                Codes.BAD_JSON,
+            )
+
+        room_version = await self.store.get_room_version(room_id)
         event = event_from_pdu_json(content, room_version)
 
         if event.type != EventTypes.Member or not event.is_state():
