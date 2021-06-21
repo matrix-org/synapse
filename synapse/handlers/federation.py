@@ -1980,6 +1980,13 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
+        # Send this event on behalf of the other server.
+        #
+        # The remote server isn't a full participant in the room at this point, so
+        # may not have an up-to-date list of the other homeservers participating in
+        # the room, so we send it on their behalf.
+        event.internal_metadata.send_on_behalf_of = origin
+
         context = await self.state_handler.compute_event_context(event)
         await self._auth_and_persist_event(origin, event, context)
 
