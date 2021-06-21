@@ -585,7 +585,7 @@ class FederationServer(FederationBase):
 
         pdu = await self._check_sigs_and_hash(room_version, pdu)
 
-        await self.handler.on_send_leave_request(origin, pdu)
+        await self.handler.on_send_membership_event(origin, pdu)
         return {}
 
     async def on_make_knock_request(
@@ -673,7 +673,7 @@ class FederationServer(FederationBase):
         pdu = await self._check_sigs_and_hash(room_version, pdu)
 
         # Handle the event, and retrieve the EventContext
-        event_context = await self.handler.on_send_knock_request(origin, pdu)
+        event_context = await self.handler.on_send_membership_event(origin, pdu)
 
         # Retrieve stripped state events from the room and send them back to the remote
         # server. This will allow the remote server's clients to display information
