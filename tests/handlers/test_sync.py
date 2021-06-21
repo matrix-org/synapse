@@ -22,7 +22,7 @@ import tests.utils
 
 
 class SyncTestCase(tests.unittest.HomeserverTestCase):
-    """ Tests Sync Handler. """
+    """Tests Sync Handler."""
 
     def prepare(self, reactor, clock, hs):
         self.hs = hs

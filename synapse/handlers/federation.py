@@ -1,6 +1,5 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,6 +21,7 @@ from collections.abc import Container
 from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -33,6 +33,7 @@ from typing import (
 )
 
 import attr
+from prometheus_client import Counter
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
@@ -100,6 +101,11 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+soft_failed_event_counter = Counter(
+    "synapse_federation_soft_failed_events_total",
+    "Events received over federation that we marked as soft_failed",
+)
 
 
 @attr.s(slots=True)
@@ -177,6 +183,8 @@ class FederationHandler(BaseHandler):
         # For each room, a list of (pdu, origin) tuples.
         self.room_queues = {}  # type: Dict[str, List[Tuple[EventBase, str]]]
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
+
+        self._room_backfill = Linearizer("room_backfill")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
@@ -1041,6 +1049,12 @@ class FederationHandler(BaseHandler):
                 return. This is used as part of the heuristic to decide if we
                 should back paginate.
         """
+        with (await self._room_backfill.queue(room_id)):
+            return await self._maybe_backfill_inner(room_id, current_depth, limit)
+
+    async def _maybe_backfill_inner(
+        self, room_id: str, current_depth: int, limit: int
+    ) -> bool:
         extremities = await self.store.get_oldest_events_with_depth_in_room(room_id)
 
         if not extremities:
@@ -1356,11 +1370,12 @@ class FederationHandler(BaseHandler):
 
             event_infos.append(_NewEventInfo(event, None, auth))
 
-        await self._auth_and_persist_events(
-            destination,
-            room_id,
-            event_infos,
-        )
+        if event_infos:
+            await self._auth_and_persist_events(
+                destination,
+                room_id,
+                event_infos,
+            )
 
     def _sanity_check_event(self, ev: EventBase) -> None:
         """
@@ -1539,6 +1554,77 @@ class FederationHandler(BaseHandler):
             # have. Hence we fire off the background task, but don't wait for it.
 
             run_in_background(self._handle_queued_pdus, room_queue)
+
+    @log_function
+    async def do_knock(
+        self,
+        target_hosts: List[str],
+        room_id: str,
+        knockee: str,
+        content: JsonDict,
+    ) -> Tuple[str, int]:
+        """Sends the knock to the remote server.
+
+        This first triggers a make_knock request that returns a partial
+        event that we can fill out and sign. This is then sent to the
+        remote server via send_knock.
+
+        Knock events must be signed by the knockee's server before distributing.
+
+        Args:
+            target_hosts: A list of hosts that we want to try knocking through.
+            room_id: The ID of the room to knock on.
+            knockee: The ID of the user who is knocking.
+            content: The content of the knock event.
+
+        Returns:
+            A tuple of (event ID, stream ID).
+
+        Raises:
+            SynapseError: If the chosen remote server returns a 3xx/4xx code.
+            RuntimeError: If no servers were reachable.
+        """
+        logger.debug("Knocking on room %s on behalf of user %s", room_id, knockee)
+
+        # Inform the remote server of the room versions we support
+        supported_room_versions = list(KNOWN_ROOM_VERSIONS.keys())
+
+        # Ask the remote server to create a valid knock event for us. Once received,
+        # we sign the event
+        params = {"ver": supported_room_versions}  # type: Dict[str, Iterable[str]]
+        origin, event, event_format_version = await self._make_and_verify_event(
+            target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
+        )
+
+        # Record the room ID and its version so that we have a record of the room
+        await self._maybe_store_room_on_outlier_membership(
+            room_id=event.room_id, room_version=event_format_version
+        )
+
+        # Initially try the host that we successfully called /make_knock on
+        try:
+            target_hosts.remove(origin)
+            target_hosts.insert(0, origin)
+        except ValueError:
+            pass
+
+        # Send the signed event back to the room, and potentially receive some
+        # further information about the room in the form of partial state events
+        stripped_room_state = await self.federation_client.send_knock(
+            target_hosts, event
+        )
+
+        # Store any stripped room state events in the "unsigned" key of the event.
+        # This is a bit of a hack and is cribbing off of invites. Basically we
+        # store the room state here and retrieve it again when this event appears
+        # in the invitee's sync stream. It is stripped out for all other local users.
+        event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
+
+        context = await self.state_handler.compute_event_context(event)
+        stream_id = await self.persist_events_and_notify(
+            event.room_id, [(event, context)]
+        )
+        return event.event_id, stream_id
 
     async def _handle_queued_pdus(
         self, room_queue: List[Tuple[EventBase, str]]
@@ -1875,7 +1961,7 @@ class FederationHandler(BaseHandler):
         return event
 
     async def on_send_leave_request(self, origin: str, pdu: EventBase) -> None:
-        """ We have received a leave event for a room. Fully process it."""
+        """We have received a leave event for a room. Fully process it."""
         event = pdu
 
         logger.debug(
@@ -1904,6 +1990,114 @@ class FederationHandler(BaseHandler):
         )
 
         return None
+
+    @log_function
+    async def on_make_knock_request(
+        self, origin: str, room_id: str, user_id: str
+    ) -> EventBase:
+        """We've received a make_knock request, so we create a partial
+        knock event for the room and return that. We do *not* persist or
+        process it until the other server has signed it and sent it back.
+
+        Args:
+            origin: The (verified) server name of the requesting server.
+            room_id: The room to create the knock event in.
+            user_id: The user to create the knock for.
+
+        Returns:
+            The partial knock event.
+        """
+        if get_domain_from_id(user_id) != origin:
+            logger.info(
+                "Get /make_knock request for user %r from different origin %s, ignoring",
+                user_id,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
+        room_version = await self.store.get_room_version_id(room_id)
+
+        builder = self.event_builder_factory.new(
+            room_version,
+            {
+                "type": EventTypes.Member,
+                "content": {"membership": Membership.KNOCK},
+                "room_id": room_id,
+                "sender": user_id,
+                "state_key": user_id,
+            },
+        )
+
+        event, context = await self.event_creation_handler.create_new_client_event(
+            builder=builder
+        )
+
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not event_allowed:
+            logger.warning("Creation of knock %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+
+        try:
+            # The remote hasn't signed it yet, obviously. We'll do the full checks
+            # when we get the event back in `on_send_knock_request`
+            await self.auth.check_from_context(
+                room_version, event, context, do_sig_check=False
+            )
+        except AuthError as e:
+            logger.warning("Failed to create new knock %r because %s", event, e)
+            raise e
+
+        return event
+
+    @log_function
+    async def on_send_knock_request(
+        self, origin: str, event: EventBase
+    ) -> EventContext:
+        """
+        We have received a knock event for a room. Verify that event and send it into the room
+        on the knocking homeserver's behalf.
+
+        Args:
+            origin: The remote homeserver of the knocking user.
+            event: The knocking member event that has been signed by the remote homeserver.
+
+        Returns:
+            The context of the event after inserting it into the room graph.
+        """
+        logger.debug(
+            "on_send_knock_request: Got event: %s, signatures: %s",
+            event.event_id,
+            event.signatures,
+        )
+
+        if get_domain_from_id(event.sender) != origin:
+            logger.info(
+                "Got /send_knock request for user %r from different origin %s",
+                event.sender,
+                origin,
+            )
+            raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
+
+        event.internal_metadata.outlier = False
+
+        context = await self.state_handler.compute_event_context(event)
+
+        event_allowed = await self.third_party_event_rules.check_event_allowed(
+            event, context
+        )
+        if not event_allowed:
+            logger.info("Sending of knock %s forbidden by third-party rules", event)
+            raise SynapseError(
+                403, "This event is not allowed in this context", Codes.FORBIDDEN
+            )
+
+        await self._auth_and_persist_event(origin, event, context)
+
+        return context
 
     async def get_state_for_pdu(self, room_id: str, event_id: str) -> List[EventBase]:
         """Returns the state at the event. i.e. not including said event."""
@@ -2069,7 +2263,7 @@ class FederationHandler(BaseHandler):
         self,
         origin: str,
         room_id: str,
-        event_infos: Iterable[_NewEventInfo],
+        event_infos: Collection[_NewEventInfo],
         backfilled: bool = False,
     ) -> None:
         """Creates the appropriate contexts and persists events. The events
@@ -2079,6 +2273,9 @@ class FederationHandler(BaseHandler):
 
         Notifies about the events where appropriate.
         """
+
+        if not event_infos:
+            return
 
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
@@ -2208,13 +2405,14 @@ class FederationHandler(BaseHandler):
                     raise
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
-        await self.persist_events_and_notify(
-            room_id,
-            [
-                (e, events_to_context[e.event_id])
-                for e in itertools.chain(auth_events, state)
-            ],
-        )
+        if auth_events or state:
+            await self.persist_events_and_notify(
+                room_id,
+                [
+                    (e, events_to_context[e.event_id])
+                    for e in itertools.chain(auth_events, state)
+                ],
+            )
 
         new_event_context = await self.state_handler.compute_event_context(
             event, old_state=state
@@ -2225,7 +2423,11 @@ class FederationHandler(BaseHandler):
         )
 
     async def _check_for_soft_fail(
-        self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
+        self,
+        event: EventBase,
+        state: Optional[Iterable[EventBase]],
+        backfilled: bool,
+        origin: str,
     ) -> None:
         """Checks if we should soft fail the event; if so, marks the event as
         such.
@@ -2234,6 +2436,7 @@ class FederationHandler(BaseHandler):
             event
             state: The state at the event if we don't have all the event's prev events
             backfilled: Whether the event is from backfill
+            origin: The host the event originates from.
         """
         # For new (non-backfilled and non-outlier) events we check if the event
         # passes auth based on the current state. If it doesn't then we
@@ -2303,7 +2506,18 @@ class FederationHandler(BaseHandler):
         try:
             event_auth.check(room_version_obj, event, auth_events=current_auth_events)
         except AuthError as e:
-            logger.warning("Soft-failing %r because %s", event, e)
+            logger.warning(
+                "Soft-failing %r (from %s) because %s",
+                event,
+                e,
+                origin,
+                extra={
+                    "room_id": event.room_id,
+                    "mxid": event.sender,
+                    "hs": origin,
+                },
+            )
+            soft_failed_event_counter.inc()
             event.internal_metadata.soft_failed = True
 
     async def on_get_missing_events(
@@ -2415,7 +2629,7 @@ class FederationHandler(BaseHandler):
             context.rejected = RejectedReason.AUTH_ERROR
 
         if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled)
+            await self._check_for_soft_fail(event, state, backfilled, origin=origin)
 
         if event.type == EventTypes.GuestAccess and not context.rejected:
             await self.maybe_kick_guest_users(event)
@@ -3053,11 +3267,18 @@ class FederationHandler(BaseHandler):
                 the same room.
             backfilled: Whether these events are a result of
                 backfilling or not
+
+        Returns:
+            The stream ID after which all events have been persisted.
         """
+        if not event_and_contexts:
+            return self.store.get_current_events_token()
+
         instance = self.config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:
-            # Limit the number of events sent over federation.
-            for batch in batch_iter(event_and_contexts, 1000):
+            # Limit the number of events sent over replication. We choose 200
+            # here as that is what we default to in `max_request_body_size(..)`
+            for batch in batch_iter(event_and_contexts, 200):
                 result = await self._send_events(
                     instance_name=instance,
                     store=self.store,

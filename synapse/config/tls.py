@@ -14,7 +14,6 @@
 
 import logging
 import os
-import warnings
 from datetime import datetime
 from typing import List, Optional, Pattern
 
@@ -26,44 +25,11 @@ from synapse.util import glob_to_regex
 
 logger = logging.getLogger(__name__)
 
-ACME_SUPPORT_ENABLED_WARN = """\
-This server uses Synapse's built-in ACME support. Note that ACME v1 has been
-deprecated by Let's Encrypt, and that Synapse doesn't currently support ACME v2,
-which means that this feature will not work with Synapse installs set up after
-November 2019, and that it may stop working on June 2020 for installs set up
-before that date.
-
-For more info and alternative solutions, see
-https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
---------------------------------------------------------------------------------"""
-
 
 class TlsConfig(Config):
     section = "tls"
 
     def read_config(self, config: dict, config_dir_path: str, **kwargs):
-
-        acme_config = config.get("acme", None)
-        if acme_config is None:
-            acme_config = {}
-
-        self.acme_enabled = acme_config.get("enabled", False)
-
-        if self.acme_enabled:
-            logger.warning(ACME_SUPPORT_ENABLED_WARN)
-
-        # hyperlink complains on py2 if this is not a Unicode
-        self.acme_url = str(
-            acme_config.get("url", "https://acme-v01.api.letsencrypt.org/directory")
-        )
-        self.acme_port = acme_config.get("port", 80)
-        self.acme_bind_addresses = acme_config.get("bind_addresses", ["::", "0.0.0.0"])
-        self.acme_reprovision_threshold = acme_config.get("reprovision_threshold", 30)
-        self.acme_domain = acme_config.get("domain", config.get("server_name"))
-
-        self.acme_account_key_file = self.abspath(
-            acme_config.get("account_key_file", config_dir_path + "/client.key")
-        )
 
         self.tls_certificate_file = self.abspath(config.get("tls_certificate_path"))
         self.tls_private_key_file = self.abspath(config.get("tls_private_key_path"))
@@ -229,11 +195,9 @@ class TlsConfig(Config):
         data_dir_path,
         tls_certificate_path,
         tls_private_key_path,
-        acme_domain,
         **kwargs,
     ):
-        """If the acme_domain is specified acme will be enabled.
-        If the TLS paths are not specified the default will be certs in the
+        """If the TLS paths are not specified the default will be certs in the
         config directory"""
 
         base_key_name = os.path.join(config_dir_path, server_name)
@@ -243,28 +207,15 @@ class TlsConfig(Config):
                 "Please specify both a cert path and a key path or neither."
             )
 
-        tls_enabled = (
-            "" if tls_certificate_path and tls_private_key_path or acme_domain else "#"
-        )
+        tls_enabled = "" if tls_certificate_path and tls_private_key_path else "#"
 
         if not tls_certificate_path:
             tls_certificate_path = base_key_name + ".tls.crt"
         if not tls_private_key_path:
             tls_private_key_path = base_key_name + ".tls.key"
 
-        acme_enabled = bool(acme_domain)
-        acme_domain = "matrix.example.com"
-
-        default_acme_account_file = os.path.join(data_dir_path, "acme_account.key")
-
-        # this is to avoid the max line length. Sorrynotsorry
-        proxypassline = (
-            "ProxyPass /.well-known/acme-challenge "
-            "http://localhost:8009/.well-known/acme-challenge"
-        )
-
         # flake8 doesn't recognise that variables are used in the below string
-        _ = tls_enabled, proxypassline, acme_enabled, default_acme_account_file
+        _ = tls_enabled
 
         return (
             """\
@@ -274,13 +225,9 @@ class TlsConfig(Config):
         # This certificate, as of Synapse 1.0, will need to be a valid and verifiable
         # certificate, signed by a recognised Certificate Authority.
         #
-        # See 'ACME support' below to enable auto-provisioning this certificate via
-        # Let's Encrypt.
-        #
-        # If supplying your own, be sure to use a `.pem` file that includes the
-        # full certificate chain including any intermediate certificates (for
-        # instance, if using certbot, use `fullchain.pem` as your certificate,
-        # not `cert.pem`).
+        # Be sure to use a `.pem` file that includes the full certificate chain including
+        # any intermediate certificates (for instance, if using certbot, use
+        # `fullchain.pem` as your certificate, not `cert.pem`).
         #
         %(tls_enabled)stls_certificate_path: "%(tls_certificate_path)s"
 
@@ -330,80 +277,6 @@ class TlsConfig(Config):
         #  - myCA1.pem
         #  - myCA2.pem
         #  - myCA3.pem
-
-        # ACME support: This will configure Synapse to request a valid TLS certificate
-        # for your configured `server_name` via Let's Encrypt.
-        #
-        # Note that ACME v1 is now deprecated, and Synapse currently doesn't support
-        # ACME v2. This means that this feature currently won't work with installs set
-        # up after November 2019. For more info, and alternative solutions, see
-        # https://github.com/matrix-org/synapse/blob/master/docs/ACME.md#deprecation-of-acme-v1
-        #
-        # Note that provisioning a certificate in this way requires port 80 to be
-        # routed to Synapse so that it can complete the http-01 ACME challenge.
-        # By default, if you enable ACME support, Synapse will attempt to listen on
-        # port 80 for incoming http-01 challenges - however, this will likely fail
-        # with 'Permission denied' or a similar error.
-        #
-        # There are a couple of potential solutions to this:
-        #
-        #  * If you already have an Apache, Nginx, or similar listening on port 80,
-        #    you can configure Synapse to use an alternate port, and have your web
-        #    server forward the requests. For example, assuming you set 'port: 8009'
-        #    below, on Apache, you would write:
-        #
-        #    %(proxypassline)s
-        #
-        #  * Alternatively, you can use something like `authbind` to give Synapse
-        #    permission to listen on port 80.
-        #
-        acme:
-            # ACME support is disabled by default. Set this to `true` and uncomment
-            # tls_certificate_path and tls_private_key_path above to enable it.
-            #
-            enabled: %(acme_enabled)s
-
-            # Endpoint to use to request certificates. If you only want to test,
-            # use Let's Encrypt's staging url:
-            #     https://acme-staging.api.letsencrypt.org/directory
-            #
-            #url: https://acme-v01.api.letsencrypt.org/directory
-
-            # Port number to listen on for the HTTP-01 challenge. Change this if
-            # you are forwarding connections through Apache/Nginx/etc.
-            #
-            port: 80
-
-            # Local addresses to listen on for incoming connections.
-            # Again, you may want to change this if you are forwarding connections
-            # through Apache/Nginx/etc.
-            #
-            bind_addresses: ['::', '0.0.0.0']
-
-            # How many days remaining on a certificate before it is renewed.
-            #
-            reprovision_threshold: 30
-
-            # The domain that the certificate should be for. Normally this
-            # should be the same as your Matrix domain (i.e., 'server_name'), but,
-            # by putting a file at 'https://<server_name>/.well-known/matrix/server',
-            # you can delegate incoming traffic to another server. If you do that,
-            # you should give the target of the delegation here.
-            #
-            # For example: if your 'server_name' is 'example.com', but
-            # 'https://example.com/.well-known/matrix/server' delegates to
-            # 'matrix.example.com', you should put 'matrix.example.com' here.
-            #
-            # If not set, defaults to your 'server_name'.
-            #
-            domain: %(acme_domain)s
-
-            # file to use for the account key. This will be generated if it doesn't
-            # exist.
-            #
-            # If unspecified, we will use CONFDIR/client.key.
-            #
-            account_key_file: %(default_acme_account_file)s
         """
             # Lowercase the string representation of boolean values
             % {
@@ -415,8 +288,6 @@ class TlsConfig(Config):
     def read_tls_certificate(self) -> crypto.X509:
         """Reads the TLS certificate from the configured file, and returns it
 
-        Also checks if it is self-signed, and warns if so
-
         Returns:
             The certificate
         """
@@ -424,16 +295,6 @@ class TlsConfig(Config):
         logger.info("Loading TLS certificate from %s", cert_path)
         cert_pem = self.read_file(cert_path, "tls_certificate_path")
         cert = crypto.load_certificate(crypto.FILETYPE_PEM, cert_pem)
-
-        # Check if it is self-signed, and issue a warning if so.
-        if cert.get_issuer() == cert.get_subject():
-            warnings.warn(
-                (
-                    "Self-signed TLS certificates will not be accepted by Synapse 1.0. "
-                    "Please either provide a valid certificate, or use Synapse's ACME "
-                    "support to provision one."
-                )
-            )
 
         return cert
 

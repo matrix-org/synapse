@@ -65,6 +65,12 @@ class JoinRules:
     MSC3083_RESTRICTED = "restricted"
 
 
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
+
+
 class LoginType:
     PASSWORD = "m.login.password"
     EMAIL_IDENTITY = "m.login.email.identity"
@@ -112,8 +118,6 @@ class EventTypes:
 
     SpaceChild = "m.space.child"
     SpaceParent = "m.space.parent"
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
 
 
 class ToDeviceEventTypes:
@@ -180,7 +184,6 @@ class EventContentFields:
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
 
 
 class RoomEncryptionAlgorithms:
