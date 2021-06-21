@@ -259,9 +259,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
         finally:
             threadlocal.active = False
 
-    logBeginner.beginLoggingTo([_log], redirectStandardIO=not config.no_redirect_stdio)
-    if not config.no_redirect_stdio:
-        print("Redirected stdout/stderr to logs")
+    logBeginner.beginLoggingTo([_log], redirectStandardIO=False)
 
 
 def _load_logging_config(log_config_path: str) -> None:

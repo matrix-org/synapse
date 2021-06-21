@@ -23,7 +23,7 @@ from tests import unittest
 
 
 class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
-    """ Tests event streaming (GET /events). """
+    """Tests event streaming (GET /events)."""
 
     servlets = [
         events.register_servlets,

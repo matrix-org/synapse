@@ -1961,7 +1961,7 @@ class FederationHandler(BaseHandler):
         return event
 
     async def on_send_leave_request(self, origin: str, pdu: EventBase) -> None:
-        """ We have received a leave event for a room. Fully process it."""
+        """We have received a leave event for a room. Fully process it."""
         event = pdu
 
         logger.debug(
@@ -2086,8 +2086,6 @@ class FederationHandler(BaseHandler):
 
         context = await self.state_handler.compute_event_context(event)
 
-        await self._auth_and_persist_event(origin, event, context)
-
         event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
@@ -2096,6 +2094,8 @@ class FederationHandler(BaseHandler):
             raise SynapseError(
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
             )
+
+        await self._auth_and_persist_event(origin, event, context)
 
         return context
 
@@ -2423,7 +2423,11 @@ class FederationHandler(BaseHandler):
         )
 
     async def _check_for_soft_fail(
-        self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
+        self,
+        event: EventBase,
+        state: Optional[Iterable[EventBase]],
+        backfilled: bool,
+        origin: str,
     ) -> None:
         """Checks if we should soft fail the event; if so, marks the event as
         such.
@@ -2432,6 +2436,7 @@ class FederationHandler(BaseHandler):
             event
             state: The state at the event if we don't have all the event's prev events
             backfilled: Whether the event is from backfill
+            origin: The host the event originates from.
         """
         # For new (non-backfilled and non-outlier) events we check if the event
         # passes auth based on the current state. If it doesn't then we
@@ -2501,7 +2506,17 @@ class FederationHandler(BaseHandler):
         try:
             event_auth.check(room_version_obj, event, auth_events=current_auth_events)
         except AuthError as e:
-            logger.warning("Soft-failing %r because %s", event, e)
+            logger.warning(
+                "Soft-failing %r (from %s) because %s",
+                event,
+                e,
+                origin,
+                extra={
+                    "room_id": event.room_id,
+                    "mxid": event.sender,
+                    "hs": origin,
+                },
+            )
             soft_failed_event_counter.inc()
             event.internal_metadata.soft_failed = True
 
@@ -2614,7 +2629,7 @@ class FederationHandler(BaseHandler):
             context.rejected = RejectedReason.AUTH_ERROR
 
         if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled)
+            await self._check_for_soft_fail(event, state, backfilled, origin=origin)
 
         if event.type == EventTypes.GuestAccess and not context.rejected:
             await self.maybe_kick_guest_users(event)

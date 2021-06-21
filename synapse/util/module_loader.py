@@ -51,21 +51,26 @@ def load_module(provider: dict, config_path: Iterable[str]) -> Tuple[Type, Any]:
 
     # Load the module config. If None, pass an empty dictionary instead
     module_config = provider.get("config") or {}
-    try:
-        provider_config = provider_class.parse_config(module_config)
-    except jsonschema.ValidationError as e:
-        raise json_error_to_config_error(e, itertools.chain(config_path, ("config",)))
-    except ConfigError as e:
-        raise _wrap_config_error(
-            "Failed to parse config for module %r" % (modulename,),
-            prefix=itertools.chain(config_path, ("config",)),
-            e=e,
-        )
-    except Exception as e:
-        raise ConfigError(
-            "Failed to parse config for module %r" % (modulename,),
-            path=itertools.chain(config_path, ("config",)),
-        ) from e
+    if hasattr(provider_class, "parse_config"):
+        try:
+            provider_config = provider_class.parse_config(module_config)
+        except jsonschema.ValidationError as e:
+            raise json_error_to_config_error(
+                e, itertools.chain(config_path, ("config",))
+            )
+        except ConfigError as e:
+            raise _wrap_config_error(
+                "Failed to parse config for module %r" % (modulename,),
+                prefix=itertools.chain(config_path, ("config",)),
+                e=e,
+            )
+        except Exception as e:
+            raise ConfigError(
+                "Failed to parse config for module %r" % (modulename,),
+                path=itertools.chain(config_path, ("config",)),
+            ) from e
+    else:
+        provider_config = module_config
 
     return provider_class, provider_config
 
