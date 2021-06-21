@@ -552,11 +552,17 @@ class FederationServer(FederationBase):
 
         pdu = await self._check_sigs_and_hash(room_version, pdu)
 
-        res_pdus = await self.handler.on_send_join_request(origin, pdu)
+        context = await self.handler.on_send_membership_event(origin, pdu)
+
+        prev_state_ids = await context.get_prev_state_ids()
+        state_ids = list(prev_state_ids.values())
+        auth_chain = await self.store.get_auth_chain(pdu.room_id, state_ids)
+        state = await self.store.get_events(state_ids)
+
         time_now = self._clock.time_msec()
         return {
-            "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
+            "state": [p.get_pdu_json(time_now) for p in state.values()],
+            "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
         }
 
     async def on_make_leave_request(

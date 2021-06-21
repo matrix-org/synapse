@@ -1711,19 +1711,6 @@ class FederationHandler(BaseHandler):
 
         return event
 
-    async def on_send_join_request(self, origin: str, pdu: EventBase) -> JsonDict:
-        """We have received a join event for a room. Fully process it and
-        respond with the current state and auth chains.
-        """
-        context = await self.on_send_membership_event(origin, pdu)
-        prev_state_ids = await context.get_prev_state_ids()
-        state_ids = list(prev_state_ids.values())
-
-        auth_chain = await self.store.get_auth_chain(pdu.room_id, state_ids)
-        state = await self.store.get_events(state_ids)
-
-        return {"state": list(state.values()), "auth_chain": auth_chain}
-
     async def on_invite_request(
         self, origin: str, event: EventBase, room_version: RoomVersion
     ) -> EventBase:
