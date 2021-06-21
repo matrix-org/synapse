@@ -46,6 +46,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
@@ -539,24 +540,11 @@ class FederationServer(FederationBase):
     async def on_send_join_request(
         self, origin: str, content: JsonDict
     ) -> Dict[str, Any]:
-        logger.debug("on_send_join_request: content: %s", content)
-
-        assert_params_in_dict(content, ["room_id"])
-        room_version = await self.store.get_room_version(content["room_id"])
-        pdu = event_from_pdu_json(content, room_version)
-
-        origin_host, _ = parse_server_name(origin)
-        await self.check_server_matches_acl(origin_host, pdu.room_id)
-
-        logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
-
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-        context = await self.handler.on_send_membership_event(origin, pdu)
+        context = await self._on_send_membership_event(origin, content)
 
         prev_state_ids = await context.get_prev_state_ids()
         state_ids = list(prev_state_ids.values())
-        auth_chain = await self.store.get_auth_chain(pdu.room_id, state_ids)
+        auth_chain = await self.store.get_auth_chain(content["room_id"], state_ids)
         state = await self.store.get_events(state_ids)
 
         time_now = self._clock.time_msec()
@@ -579,19 +567,7 @@ class FederationServer(FederationBase):
 
     async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
-
-        assert_params_in_dict(content, ["room_id"])
-        room_version = await self.store.get_room_version(content["room_id"])
-        pdu = event_from_pdu_json(content, room_version)
-
-        origin_host, _ = parse_server_name(origin)
-        await self.check_server_matches_acl(origin_host, pdu.room_id)
-
-        logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
-
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-        await self.handler.on_send_membership_event(origin, pdu)
+        await self._on_send_membership_event(origin, content)
         return {}
 
     async def on_make_knock_request(
@@ -690,6 +666,21 @@ class FederationServer(FederationBase):
             )
         )
         return {"knock_state_events": stripped_room_state}
+
+    async def _on_send_membership_event(
+        self, origin: str, content: JsonDict
+    ) -> EventContext:
+        assert_params_in_dict(content, ["room_id"])
+        room_version = await self.store.get_room_version(content["room_id"])
+        event = event_from_pdu_json(content, room_version)
+
+        origin_host, _ = parse_server_name(origin)
+        await self.check_server_matches_acl(origin_host, event.room_id)
+
+        logger.debug("_on_send_membership_event: pdu sigs: %s", event.signatures)
+
+        event = await self._check_sigs_and_hash(room_version, event)
+        return await self.handler.on_send_membership_event(origin, event)
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
