@@ -1,1 +1,1 @@
-Fix performance of responding to user key requests over federation. Introduced in v1.34.0.
+Fix performance of responding to user key requests over federation. Introduced in v1.34.0rc1.
