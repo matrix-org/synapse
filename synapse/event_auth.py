@@ -282,7 +282,6 @@ def _is_membership_change_allowed(
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
 
-    # FIXME (erikj): What should we do here as the default?
     ban_level = _get_named_level(auth_events, "ban", 50)
 
     logger.debug(
@@ -342,16 +341,43 @@ def _is_membership_change_allowed(
         # * They are not banned.
         # * They are accepting a previously sent invitation.
         # * They are already joined (it's a NOOP).
-        # * The room is public or restricted.
+        # * The room is public.
+        # * The room is restricted and the user meets the allows rules.
         if event.user_id != target_user_id:
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
-        elif join_rule == JoinRules.PUBLIC or (
+        elif join_rule == JoinRules.PUBLIC:
+            pass
+        elif (
             room_version.msc3083_join_rules
             and join_rule == JoinRules.MSC3083_RESTRICTED
         ):
-            pass
+            # This is the same as public, but the must be signed by a server
+            # whose users could issue invites.
+            #
+            # Note that if the caller is in the room or invited, then they do
+            # not need to meet the allow rules.
+            if not caller_in_room and not caller_invited:
+                # Find the servers of any users who could issue invites.
+                authorised_users = get_users_which_can_issue_invite(auth_events)
+                # Attempt to pull out the domain from each authorised user.
+                authorised_servers = set()
+                for user in authorised_users:
+                    try:
+                        authorised_servers.add(UserID.from_string(user).domain)
+                    except SynapseError:
+                        pass
+
+                # Ensure one of the signatures is from one of the authorised servers.
+                # Note that it was previously checked that the signatures are
+                # valid.
+                for signing_server in event.signatures:
+                    if signing_server in authorised_servers:
+                        break
+                else:
+                    # No valid servers were found!
+                    raise AuthError(403, "Join event signed by invalid server.")
         elif join_rule == JoinRules.INVITE or (
             room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
         ):
@@ -635,6 +661,47 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
             return 100
         else:
             return 0
+
+
+def get_users_which_can_issue_invite(auth_events: StateMap[EventBase]) -> List[str]:
+    """
+    Return the list of users which can issue invites.
+
+    This is done by exploring the joined users and comparing their power levels
+    to the necessyar power level to issue an invite.
+
+    Args:
+        auth_events: state in force at this point in the room
+
+    Returns:
+        The users which can issue invites.
+    """
+    invite_level = _get_named_level(auth_events, "invite", 50)
+    users_default_level = _get_named_level(auth_events, "users_default", 0)
+    power_level_event = _get_power_level_event(auth_events)
+
+    # Custom power-levels for users.
+    if power_level_event:
+        users = power_level_event.content.get("users", {})
+    else:
+        users = {}
+
+    result = []
+
+    # Check which members are able to invite by ensuring they're joined and have
+    # the necessary power level.
+    for (event_type, state_key), event in auth_events.items():
+        if event_type != EventTypes.Member:
+            continue
+
+        if event.membership != Membership.JOIN:
+            continue
+
+        # Check if the user has a custom power level.
+        if users.get(state_key, users_default_level) >= invite_level:
+            result.append(state_key)
+
+    return result
 
 
 def _get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:

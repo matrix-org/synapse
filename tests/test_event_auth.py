@@ -350,7 +350,9 @@ class EventAuthTestCase(unittest.TestCase):
         """
         Test joining a restricted room from MSC3083.
 
-        This is pretty much the same test as public.
+        This is similar to the public test, but has some additional checks on
+        signatures. This fakes the signatures by simply adding them to the object,
+        not generating valid signatures.
         """
         creator = "@creator:example.com"
         pleb = "@joiner:example.com"
@@ -358,6 +360,7 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events = {
             ("m.room.create", ""): _create_event(creator),
             ("m.room.member", creator): _join_event(creator),
+            ("m.room.power_levels", ""): _power_levels_event(creator, {"invite": 0}),
             ("m.room.join_rules", ""): _join_rules_event(creator, "restricted"),
         }
 
@@ -371,12 +374,40 @@ class EventAuthTestCase(unittest.TestCase):
             )
 
         # Check join.
+        event = _join_event(pleb)
+        event.signatures["example.com"] = {}
         event_auth.check(
             RoomVersions.MSC3083,
-            _join_event(pleb),
+            event,
             auth_events,
             do_sig_check=False,
         )
+
+        # Check server from specific user.
+        pl_auth_events = auth_events.copy()
+        pl_auth_events[("m.room.power_levels", "")] = _power_levels_event(
+            creator, {"invite": 100, "users": {"@other:foo.test": 150}}
+        )
+        pl_auth_events[("m.room.member", "@other:foo.test")] = _join_event(
+            "@other:foo.test"
+        )
+        event = _join_event(pleb)
+        event.signatures["foo.test"] = {}
+        event_auth.check(
+            RoomVersions.MSC3083,
+            event,
+            pl_auth_events,
+            do_sig_check=False,
+        )
+
+        # Missing signature.
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.MSC3083,
+                _join_event(pleb),
+                auth_events,
+                do_sig_check=False,
+            )
 
         # A user cannot be force-joined to a room.
         with self.assertRaises(AuthError):
@@ -399,9 +430,11 @@ class EventAuthTestCase(unittest.TestCase):
 
         # A user who left can re-join.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
+        event = _join_event(pleb)
+        event.signatures["example.com"] = {}
         event_auth.check(
             RoomVersions.MSC3083,
-            _join_event(pleb),
+            event,
             auth_events,
             do_sig_check=False,
         )
