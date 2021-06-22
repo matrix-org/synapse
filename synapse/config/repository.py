@@ -40,7 +40,7 @@ THUMBNAIL_SIZE_YAML = """\
 """
 
 HTTP_PROXY_SET_WARNING = """\
-The Synapse config url_preview_ip_range_blacklist will be ignored as %s set."""
+The Synapse config url_preview_ip_range_blacklist will be ignored as an HTTP(s) proxy is configured."""
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
@@ -186,18 +186,17 @@ class ContentRepositoryConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
+            proxies = ["HTTP_PROXY", "HTTPS_PROXY"]
             if "url_preview_ip_range_blacklist" not in config:
-                if "HTTP_PROXY" not in os.environ and "HTTPS_PROXY" not in os.environ:
+                if not any(proxy in os.environ for proxy in proxies):
                     raise ConfigError(
                         "For security, you must specify an explicit target IP address "
                         "blacklist in url_preview_ip_range_blacklist for url previewing "
                         "to work"
                     )
-                else:
-                    proxy_var = (
-                        "HTTP_PROXY" if "HTTP_PROXY" in os.environ else "HTTPS_PROXY"
-                    )
-                    logger.warning("".join(HTTP_PROXY_SET_WARNING % proxy_var))
+            else:
+                if any(proxy in os.environ for proxy in proxies):
+                    logger.warning("".join(HTTP_PROXY_SET_WARNING))
 
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.

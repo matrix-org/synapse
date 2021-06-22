@@ -1,1 +1,1 @@
-Fixed the interaction between `*ip_range_blacklist` setting and outbound HTTP proxies to reduce confusion.
+Add some clarification to the sample config file. Contributed by @Kentokamoto
