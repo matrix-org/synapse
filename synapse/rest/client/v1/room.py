@@ -468,8 +468,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 EventContentFields.MSC2716_NEXT_CHUNK_ID: next_chunk_id,
                 EventContentFields.MSC2716_HISTORICAL: True,
             },
-            # Since the insertion event is put at the end of the chunk,
-            # copy the origin_server_ts from the last event we're inserting
+            # Since the insertion event is put at the start of the chunk,
+            # where the oldest event is, copy the origin_server_ts from
+            # the first event we're inserting
             "origin_server_ts": events_to_create[0]["origin_server_ts"],
         }
         # Prepend the insertion event to the start of the chunk
