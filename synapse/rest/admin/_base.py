@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import re
+from typing import Iterable, Pattern
 
 from synapse.api.auth import Auth
 from synapse.api.errors import AuthError
@@ -20,7 +21,7 @@ from synapse.http.site import SynapseRequest
 from synapse.types import UserID
 
 
-def admin_patterns(path_regex: str, version: str = "v1"):
+def admin_patterns(path_regex: str, version: str = "v1") -> Iterable[Pattern]:
     """Returns the list of patterns for an admin endpoint
 
     Args:

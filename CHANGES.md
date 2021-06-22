@@ -1,3 +1,88 @@
+Synapse 1.36.0 (2021-06-15)
+===========================
+
+No significant changes.
+
+
+Synapse 1.36.0rc2 (2021-06-11)
+==============================
+
+Bugfixes
+--------
+
+- Fix a bug which caused  presence updates to stop working some time after a restart, when using a presence writer worker. Broke in v1.33.0. ([\#10149](https://github.com/matrix-org/synapse/issues/10149))
+- Fix a bug when using federation sender worker where it would send out more presence updates than necessary, leading to high resource usage. Broke in v1.33.0. ([\#10163](https://github.com/matrix-org/synapse/issues/10163))
+- Fix a bug where Synapse could send the same presence update to a remote twice. ([\#10165](https://github.com/matrix-org/synapse/issues/10165))
+
+
+Synapse 1.36.0rc1 (2021-06-08)
+==============================
+
+Features
+--------
+
+- Add new endpoint `/_matrix/client/r0/rooms/{roomId}/aliases` from Client-Server API r0.6.1 (previously [MSC2432](https://github.com/matrix-org/matrix-doc/pull/2432)). ([\#9224](https://github.com/matrix-org/synapse/issues/9224))
+- Improve performance of incoming federation transactions in large rooms. ([\#9953](https://github.com/matrix-org/synapse/issues/9953), [\#9973](https://github.com/matrix-org/synapse/issues/9973))
+- Rewrite logic around verifying JSON object and fetching server keys to be more performant and use less memory. ([\#10035](https://github.com/matrix-org/synapse/issues/10035))
+- Add new admin APIs for unprotecting local media from quarantine. Contributed by @dklimpel. ([\#10040](https://github.com/matrix-org/synapse/issues/10040))
+- Add new admin APIs to remove media by media ID from quarantine. Contributed by @dklimpel. ([\#10044](https://github.com/matrix-org/synapse/issues/10044))
+- Make reason and score parameters optional for reporting content. Implements [MSC2414](https://github.com/matrix-org/matrix-doc/pull/2414). Contributed by Callum Brown. ([\#10077](https://github.com/matrix-org/synapse/issues/10077))
+- Add support for routing more requests to workers. ([\#10084](https://github.com/matrix-org/synapse/issues/10084))
+- Report OpenTracing spans for database activity. ([\#10113](https://github.com/matrix-org/synapse/issues/10113), [\#10136](https://github.com/matrix-org/synapse/issues/10136), [\#10141](https://github.com/matrix-org/synapse/issues/10141))
+- Significantly reduce memory usage of joining large remote rooms. ([\#10117](https://github.com/matrix-org/synapse/issues/10117))
+
+
+Bugfixes
+--------
+
+- Fixed a bug causing replication requests to fail when receiving a lot of events via federation. ([\#10082](https://github.com/matrix-org/synapse/issues/10082))
+- Fix a bug in the `force_tracing_for_users` option introduced in Synapse v1.35 which meant that the OpenTracing spans produced were missing most tags. ([\#10092](https://github.com/matrix-org/synapse/issues/10092))
+- Fixed a bug that could cause Synapse to stop notifying application services. Contributed by Willem Mulder. ([\#10107](https://github.com/matrix-org/synapse/issues/10107))
+- Fix bug where the server would attempt to fetch the same history in the room from a remote server multiple times in parallel. ([\#10116](https://github.com/matrix-org/synapse/issues/10116))
+- Fix a bug introduced in Synapse 1.33.0 which caused replication requests to fail when receiving a lot of very large events via federation. ([\#10118](https://github.com/matrix-org/synapse/issues/10118))
+- Fix bug when using workers where pagination requests failed if a remote server returned zero events from `/backfill`. Introduced in 1.35.0. ([\#10133](https://github.com/matrix-org/synapse/issues/10133))
+
+
+Improved Documentation
+----------------------
+
+- Clarify security note regarding hosting Synapse on the same domain as other web applications. ([\#9221](https://github.com/matrix-org/synapse/issues/9221))
+- Update CAPTCHA documentation to mention turning off the verify origin feature. Contributed by @aaronraimist. ([\#10046](https://github.com/matrix-org/synapse/issues/10046))
+- Tweak wording of database recommendation in `INSTALL.md`. Contributed by @aaronraimist. ([\#10057](https://github.com/matrix-org/synapse/issues/10057))
+- Add initial infrastructure for rendering Synapse documentation with mdbook. ([\#10086](https://github.com/matrix-org/synapse/issues/10086))
+- Convert the remaining Admin API documentation files to markdown. ([\#10089](https://github.com/matrix-org/synapse/issues/10089))
+- Make a link in docs use HTTPS. Contributed by @RhnSharma. ([\#10130](https://github.com/matrix-org/synapse/issues/10130))
+- Fix broken link in Docker docs. ([\#10132](https://github.com/matrix-org/synapse/issues/10132))
+
+
+Deprecations and Removals
+-------------------------
+
+- Remove the experimental `spaces_enabled` flag. The spaces features are always available now. ([\#10063](https://github.com/matrix-org/synapse/issues/10063))
+
+
+Internal Changes
+----------------
+
+- Tell CircleCI to build Docker images from `main` branch. ([\#9906](https://github.com/matrix-org/synapse/issues/9906))
+- Simplify naming convention for release branches to only include the major and minor version numbers. ([\#10013](https://github.com/matrix-org/synapse/issues/10013))
+- Add `parse_strings_from_args` for parsing an array from query parameters. ([\#10048](https://github.com/matrix-org/synapse/issues/10048), [\#10137](https://github.com/matrix-org/synapse/issues/10137))
+- Remove some dead code regarding TLS certificate handling. ([\#10054](https://github.com/matrix-org/synapse/issues/10054))
+- Remove redundant, unmaintained `convert_server_keys` script. ([\#10055](https://github.com/matrix-org/synapse/issues/10055))
+- Improve the error message printed by synctl when synapse fails to start. ([\#10059](https://github.com/matrix-org/synapse/issues/10059))
+- Fix GitHub Actions lint for newsfragments. ([\#10069](https://github.com/matrix-org/synapse/issues/10069))
+- Update opentracing to inject the right context into the carrier. ([\#10074](https://github.com/matrix-org/synapse/issues/10074))
+- Fix up `BatchingQueue` implementation. ([\#10078](https://github.com/matrix-org/synapse/issues/10078))
+- Log method and path when dropping request due to size limit. ([\#10091](https://github.com/matrix-org/synapse/issues/10091))
+- In Github Actions workflows, summarize the Sytest results in an easy-to-read format. ([\#10094](https://github.com/matrix-org/synapse/issues/10094))
+- Make `/sync` do fewer state resolutions. ([\#10102](https://github.com/matrix-org/synapse/issues/10102))
+- Add missing type hints to the admin API servlets. ([\#10105](https://github.com/matrix-org/synapse/issues/10105))
+- Improve opentracing annotations for `Notifier`. ([\#10111](https://github.com/matrix-org/synapse/issues/10111))
+- Enable Prometheus metrics for the jaeger client library. ([\#10112](https://github.com/matrix-org/synapse/issues/10112))
+- Work to improve the responsiveness of `/sync` requests. ([\#10124](https://github.com/matrix-org/synapse/issues/10124))
+- OpenTracing: use a consistent name for background processes. ([\#10135](https://github.com/matrix-org/synapse/issues/10135))
+
+
 Synapse 1.35.1 (2021-06-03)
 ===========================
 
