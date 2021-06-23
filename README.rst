@@ -186,11 +186,11 @@ impact to other applications will be minimal.
 Upgrading an existing Synapse
 =============================
 
-The instructions for upgrading synapse are in `UPGRADE.rst`_.
+The instructions for upgrading synapse are in `the upgrade notes`_.
 Please check these instructions as upgrading may require extra steps for some
 versions of synapse.
 
-.. _UPGRADE.rst: UPGRADE.rst
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 .. _reverse-proxy:
 
