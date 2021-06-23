@@ -97,8 +97,8 @@ def run():
                 current_version.micro,
             )
     else:
-        # If this is a new release cycle then we need to know if its a major
-        # version bump or a hotfix.
+        # If this is a new release cycle then we need to know if it's a minor
+        # or a patch version bump.
         release_type = click.prompt(
             "Release type",
             type=click.Choice(("minor", "patch")),
