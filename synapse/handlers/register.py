@@ -474,30 +474,22 @@ class RegistrationHandler(BaseHandler):
                 # join rules). Otherwise we consider it as being joinable, at the risk of
                 # failing to join, but in this case there's little more we can do since
                 # we don't have a local user in the room to craft up an invite with.
-                hosts_in_room = await self.state_handler.get_current_hosts_in_room(
-                    room_id
-                )
-                requires_invite = self.server_name in hosts_in_room
+                requires_invite = self.store.is_host_joined(room_id, self.server_name)
 
-                state = await self.store.get_filtered_current_state_ids(
-                    room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
-                )
-
-                event_id = state.get((EventTypes.JoinRules, ""))
-                if event_id:
-                    join_rules_event = await self.store.get_event(
-                        event_id, allow_none=True
+                if requires_invite:
+                    # If the server is in the room, check if the room is public.
+                    state = await self.store.get_filtered_current_state_ids(
+                        room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
                     )
-                    if join_rules_event:
-                        join_rule = join_rules_event.content.get("join_rule", None)
-                        requires_invite = join_rule and join_rule != JoinRules.PUBLIC
 
-                        if requires_invite and self.server_name not in hosts_in_room:
-                            raise SynapseError(
-                                400,
-                                "Auto-join room is invite only but there are no local"
-                                " user to invite with",
-                            )
+                    event_id = state.get((EventTypes.JoinRules, ""))
+                    if event_id:
+                        join_rules_event = await self.store.get_event(
+                            event_id, allow_none=True
+                        )
+                        if join_rules_event:
+                            join_rule = join_rules_event.content.get("join_rule", None)
+                            requires_invite = join_rule and join_rule != JoinRules.PUBLIC
 
                 # Send the invite, if necessary.
                 if requires_invite:
