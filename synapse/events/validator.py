@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import json
 from typing import Union
+
+import jsonschema
+from jsonschema import validate
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
 from synapse.api.errors import Codes, SynapseError
@@ -85,6 +89,41 @@ class EventValidator:
             if not server_matches_acl_event(config.server_name, event):
                 raise SynapseError(
                     400, "Can't create an ACL event that denies the local server"
+                )
+
+        if event.type == EventTypes.PowerLevels:
+            powerLevelsSchema = {
+                "type": "object",
+                "properties": {
+                    "ban": {"type": "integer"},
+                    "events": {
+                        "type": "object",
+                        "patternProperties": {".*": {"type": "integer"}},
+                    },
+                    "events_default": {"type": "integer"},
+                    "invite": {"type": "integer"},
+                    "kick": {"type": "integer"},
+                    "notifications": {
+                        "type": "object",
+                        "patternProperties": {".*": {"type": "integer"}},
+                    },
+                    "redact": {"type": "integer"},
+                    "state_default": {"type": "integer"},
+                    "users": {
+                        "type": "object",
+                        "patternProperties": {".*": {"type": "integer"}},
+                    },
+                    "users_default": {"type": "integer"},
+                },
+            }
+
+            try:
+                validate(instance=event.content, schema=powerLevelsSchema)
+            except jsonschema.ValidationError as e:
+                raise SynapseError(
+                    code=400,
+                    msg="'%s' not a int type" % (e.path[-1],),
+                    errcode=Codes.BAD_JSON,
                 )
 
     def _validate_retention(self, event: EventBase):
