@@ -14,7 +14,7 @@
 import base64
 import logging
 import os
-from typing import Optional
+from typing import Iterable, Optional
 from unittest.mock import patch
 
 import treq
@@ -43,7 +43,12 @@ class MatrixFederationAgentTests(TestCase):
         self.reactor = ThreadedMemoryReactorClock()
 
     def _make_connection(
-        self, client_factory, server_factory, ssl=False, expected_sni=None
+        self,
+        client_factory,
+        server_factory,
+        ssl=False,
+        expected_sni=None,
+        tls_sanlist: Optional[Iterable[bytes]] = None,
     ):
         """Builds a test server, and completes the outgoing client connection
 
@@ -60,11 +65,14 @@ class MatrixFederationAgentTests(TestCase):
 
             expected_sni (bytes|None): the expected SNI value
 
+            tls_sanlist: list of SAN entries for the TLS cert presented by the server.
+                 Defaults to [b'DNS:test.com']
+
         Returns:
             IProtocol: the server Protocol returned by server_factory
         """
         if ssl:
-            server_factory = _wrap_server_factory_for_tls(server_factory)
+            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
 
         server_protocol = server_factory.buildProtocol(None)
 
@@ -302,10 +310,16 @@ class MatrixFederationAgentTests(TestCase):
         )
         self._test_request_direct_connection(agent, b"https", b"test.com", b"abc")
 
-    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "unused.com"})
-    def test_http_request_via_proxy(self):
-        agent = ProxyAgent(self.reactor, use_proxy=True)
+    def _test_request_proxy_connection(
+        self, agent: ProxyAgent, ssl: bool = False
+    ) -> None:
+        """Send a request via an agent and check that it is correctly received at the proxy
 
+        Args:
+            agent: the Agent to send the request via. It is expected to send requests
+               to a proxy at 'proxy.com:8888'.
+            ssl: True if we expect the Agent to connect via https
+        """
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
         d = agent.request(b"GET", b"http://test.com")
 
@@ -318,7 +332,11 @@ class MatrixFederationAgentTests(TestCase):
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, _get_test_protocol_factory()
+            client_factory,
+            _get_test_protocol_factory(),
+            ssl=ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if ssl else None,
+            expected_sni=b"proxy.com" if ssl else None,
         )
 
         # the FakeTransport is async, so we need to pump the reactor
@@ -339,6 +357,20 @@ class MatrixFederationAgentTests(TestCase):
         resp = self.successResultOf(d)
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
+
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "unused.com"})
+    def test_http_request_via_proxy(self):
+        agent = ProxyAgent(self.reactor, use_proxy=True)
+        self._test_request_proxy_connection(agent)
+
+    @patch.dict(
+        os.environ, {"http_proxy": "https://proxy.com:8888", "no_proxy": "unused.com"}
+    )
+    def test_http_request_via_https_proxy(self):
+        agent = ProxyAgent(
+            self.reactor, use_proxy=True, contextFactory=get_test_https_policy()
+        )
+        self._test_request_proxy_connection(agent, ssl=True)
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
