@@ -190,7 +190,7 @@ The instructions for upgrading synapse are in `the upgrade notes`_.
 Please check these instructions as upgrading may require extra steps for some
 versions of synapse.
 
-.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/docs/upgrade.md
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 .. _reverse-proxy:
 
