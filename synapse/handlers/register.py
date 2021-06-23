@@ -386,10 +386,31 @@ class RegistrationHandler(BaseHandler):
                 room_alias = RoomAlias.from_string(r)
 
                 if self.hs.hostname != room_alias.domain:
-                    logger.warning(
-                        "Cannot create room alias %s, "
-                        "it does not match server domain",
+                    # If the alias is remote, try to join the room. This might fail
+                    # because the room might be invite only, but we don't have any local
+                    # user in the room to invite this one with, so at this point that's
+                    # the best we can do.
+                    logger.info(
+                        "Cannot automatically create room with alias %s as it isn't"
+                        " local, trying to join the room instead",
                         r,
+                    )
+
+                    (
+                        room,
+                        remote_room_hosts,
+                    ) = await room_member_handler.lookup_room_alias(room_alias)
+                    room_id = room.to_string()
+
+                    await room_member_handler.update_membership(
+                        requester=create_requester(
+                            user_id, authenticated_entity=self._server_name
+                        ),
+                        target=UserID.from_string(user_id),
+                        room_id=room_id,
+                        remote_room_hosts=remote_room_hosts,
+                        action="join",
+                        ratelimit=False,
                     )
                 else:
                     # A shallow copy is OK here since the only key that is
@@ -448,22 +469,32 @@ class RegistrationHandler(BaseHandler):
                     )
 
                 # Calculate whether the room requires an invite or can be
-                # joined directly. Note that unless a join rule of public exists,
-                # it is treated as requiring an invite.
-                requires_invite = True
-
-                state = await self.store.get_filtered_current_state_ids(
-                    room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
+                # joined directly. By default, we consider the room as requiring an
+                # invite if the homeserver is in the room (unless told otherwise by the
+                # join rules). Otherwise we consider it as being joinable, at the risk of
+                # failing to join, but in this case there's little more we can do since
+                # we don't have a local user in the room to craft up an invite with.
+                requires_invite = await self.store.is_host_joined(
+                    room_id,
+                    self.server_name,
                 )
 
-                event_id = state.get((EventTypes.JoinRules, ""))
-                if event_id:
-                    join_rules_event = await self.store.get_event(
-                        event_id, allow_none=True
+                if requires_invite:
+                    # If the server is in the room, check if the room is public.
+                    state = await self.store.get_filtered_current_state_ids(
+                        room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
                     )
-                    if join_rules_event:
-                        join_rule = join_rules_event.content.get("join_rule", None)
-                        requires_invite = join_rule and join_rule != JoinRules.PUBLIC
+
+                    event_id = state.get((EventTypes.JoinRules, ""))
+                    if event_id:
+                        join_rules_event = await self.store.get_event(
+                            event_id, allow_none=True
+                        )
+                        if join_rules_event:
+                            join_rule = join_rules_event.content.get("join_rule", None)
+                            requires_invite = (
+                                join_rule and join_rule != JoinRules.PUBLIC
+                            )
 
                 # Send the invite, if necessary.
                 if requires_invite:
