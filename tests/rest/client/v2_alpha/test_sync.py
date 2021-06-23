@@ -15,12 +15,7 @@
 import json
 
 import synapse.rest.admin
-from synapse.api.constants import (
-    EventContentFields,
-    EventTypes,
-    Membership,
-    RelationTypes,
-)
+from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import knock, read_marker, sync
 
@@ -348,7 +343,7 @@ class SyncKnockTestCase(
 
         # We expect to see the knock event in the stripped room state later
         self.expected_room_state[EventTypes.Member] = {
-            "content": {"membership": Membership.KNOCK, "displayname": "knocker"},
+            "content": {"membership": "knock", "displayname": "knocker"},
             "state_key": "@knocker:test",
         }
 
@@ -361,7 +356,7 @@ class SyncKnockTestCase(
         self.assertEqual(channel.code, 200, channel.json_body)
 
         # Extract the stripped room state events from /sync
-        knock_entry = channel.json_body["rooms"][Membership.KNOCK]
+        knock_entry = channel.json_body["rooms"]["knock"]
         room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
 
         # Validate that the knock membership event came last
