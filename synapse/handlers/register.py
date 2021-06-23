@@ -390,7 +390,7 @@ class RegistrationHandler(BaseHandler):
                     # because the room might be invite only, but we don't have any local
                     # user in the room to invite this one with, so at this point that's
                     # the best we can do.
-                    logger.warning(
+                    logger.info(
                         "Cannot automatically create room with alias %s as it isn't"
                         " local, trying to join the room instead",
                         r,
