@@ -277,6 +277,9 @@ class SigningKeyUploadServlet(RestServlet):
             request,
             body,
             "add a device signing key to your account",
+            # Allow skipping of UI auth since this is frequently called directly
+            # after login and it is silly to ask users to re-auth immediately.
+            can_skip_ui_auth=True,
         )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)

@@ -1,1 +1,0 @@
-Add `synapse_federation_soft_failed_events_total` metric to track how often events are soft failed.

@@ -1,1 +1,0 @@
-Limit the number of in-flight `/keys/query` requests from a single device.

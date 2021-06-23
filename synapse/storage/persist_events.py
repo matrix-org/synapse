@@ -111,7 +111,7 @@ class _EventPersistQueueItem:
     backfilled: bool
     deferred: ObservableDeferred
 
-    parent_opentracing_span_contexts: List = []
+    parent_opentracing_span_contexts: List = attr.ib(factory=list)
     """A list of opentracing spans waiting for this batch"""
 
     opentracing_span_context: Any = None

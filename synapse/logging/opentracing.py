@@ -173,6 +173,7 @@ from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Typ
 import attr
 
 from twisted.internet import defer
+from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
 from synapse.util import json_decoder, json_encoder
@@ -668,6 +669,25 @@ def inject_header_dict(
         headers[key.encode()] = [value.encode()]
 
 
+def inject_response_headers(response_headers: Headers) -> None:
+    """Inject the current trace id into the HTTP response headers"""
+    if not opentracing:
+        return
+    span = opentracing.tracer.active_span
+    if not span:
+        return
+
+    # This is a bit implementation-specific.
+    #
+    # Jaeger's Spans have a trace_id property; other implementations (including the
+    # dummy opentracing.span.Span which we use if init_tracer is not called) do not
+    # expose it
+    trace_id = getattr(span, "trace_id", None)
+
+    if trace_id is not None:
+        response_headers.addRawHeader("Synapse-Trace-Id", f"{trace_id:x}")
+
+
 @ensure_active_span("get the active span context as a dict", ret={})
 def get_active_span_text_map(destination=None):
     """
@@ -843,6 +863,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         scope = start_active_span(request_name)
 
     with scope:
+        inject_response_headers(request.responseHeaders)
         try:
             yield
         finally:
