@@ -468,8 +468,8 @@ class RegistrationHandler(BaseHandler):
                 # join rules). Otherwise we consider it as being joinable, at the risk of
                 # failing to join, but in this case there's little more we can do since
                 # we don't have a local user in the room to craft up an invite with.
-                hosts_in_room = (
-                    await self.state_handler.get_current_hosts_in_room(room_id)
+                hosts_in_room = await self.state_handler.get_current_hosts_in_room(
+                    room_id
                 )
                 requires_invite = self.server_name in hosts_in_room
 
