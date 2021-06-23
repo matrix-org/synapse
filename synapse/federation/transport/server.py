@@ -649,7 +649,9 @@ class FederationMakeKnockServlet(BaseFederationServerServlet):
     ) -> Tuple[int, JsonDict]:
         try:
             # Retrieve the room versions the remote homeserver claims to support
-            supported_versions = parse_strings_from_args(query, "ver", encoding="utf-8")
+            supported_versions = parse_strings_from_args(
+                query, "ver", required=True, encoding="utf-8"
+            )
         except KeyError:
             raise SynapseError(400, "Missing required query parameter 'ver'")
 
