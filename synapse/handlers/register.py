@@ -474,7 +474,10 @@ class RegistrationHandler(BaseHandler):
                 # join rules). Otherwise we consider it as being joinable, at the risk of
                 # failing to join, but in this case there's little more we can do since
                 # we don't have a local user in the room to craft up an invite with.
-                requires_invite = self.store.is_host_joined(room_id, self.server_name)
+                requires_invite = await self.store.is_host_joined(
+                    room_id,
+                    self.server_name,
+                )
 
                 if requires_invite:
                     # If the server is in the room, check if the room is public.
@@ -489,7 +492,9 @@ class RegistrationHandler(BaseHandler):
                         )
                         if join_rules_event:
                             join_rule = join_rules_event.content.get("join_rule", None)
-                            requires_invite = join_rule and join_rule != JoinRules.PUBLIC
+                            requires_invite = (
+                                join_rule and join_rule != JoinRules.PUBLIC
+                            )
 
                 # Send the invite, if necessary.
                 if requires_invite:
