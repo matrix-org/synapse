@@ -386,10 +386,25 @@ class RegistrationHandler(BaseHandler):
                 room_alias = RoomAlias.from_string(r)
 
                 if self.hs.hostname != room_alias.domain:
-                    logger.warning(
-                        "Cannot create room alias %s, "
-                        "it does not match server domain",
-                        r,
+                    # If the alias is remote, try to join the room. This might fail
+                    # because the room might be invite only, but we don't have any local
+                    # user in the room to invite this one with, so at this point that's
+                    # the best we can do.
+                    (
+                        room,
+                        remote_room_hosts,
+                    ) = await room_member_handler.lookup_room_alias(room_alias)
+                    room_id = room.to_string()
+
+                    await room_member_handler.update_membership(
+                        requester=create_requester(
+                            user_id, authenticated_entity=self._server_name
+                        ),
+                        target=UserID.from_string(user_id),
+                        room_id=room_id,
+                        remote_room_hosts=remote_room_hosts,
+                        action="join",
+                        ratelimit=False,
                     )
                 else:
                     # A shallow copy is OK here since the only key that is
@@ -464,6 +479,14 @@ class RegistrationHandler(BaseHandler):
                     if join_rules_event:
                         join_rule = join_rules_event.content.get("join_rule", None)
                         requires_invite = join_rule and join_rule != JoinRules.PUBLIC
+
+                hosts_in_room = (
+                    await self.state_handler.get_current_hosts_in_room(room_id)
+                )
+                if self.server_name not in hosts_in_room:
+                    # The server isn't in the room, so there's no way for us to craft up
+                    # an invite. Instead, try to join and see what happens.
+                    requires_invite = False
 
                 # Send the invite, if necessary.
                 if requires_invite:
