@@ -463,9 +463,15 @@ class RegistrationHandler(BaseHandler):
                     )
 
                 # Calculate whether the room requires an invite or can be
-                # joined directly. Note that unless a join rule of public exists,
-                # it is treated as requiring an invite.
-                requires_invite = True
+                # joined directly. By default, we consider the room as requiring an
+                # invite if the homeserver is in the room (unless told otherwise by the
+                # join rules). Otherwise we consider it as being joinable, at the risk of
+                # failing to join, but in this case there's little more we can do since
+                # we don't have a local user in the room to craft up an invite with.
+                hosts_in_room = (
+                    await self.state_handler.get_current_hosts_in_room(room_id)
+                )
+                requires_invite = self.server_name in hosts_in_room
 
                 state = await self.store.get_filtered_current_state_ids(
                     room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
@@ -480,13 +486,12 @@ class RegistrationHandler(BaseHandler):
                         join_rule = join_rules_event.content.get("join_rule", None)
                         requires_invite = join_rule and join_rule != JoinRules.PUBLIC
 
-                hosts_in_room = (
-                    await self.state_handler.get_current_hosts_in_room(room_id)
-                )
-                if self.server_name not in hosts_in_room:
-                    # The server isn't in the room, so there's no way for us to craft up
-                    # an invite. Instead, try to join and see what happens.
-                    requires_invite = False
+                        if requires_invite and self.server_name not in hosts_in_room:
+                            raise SynapseError(
+                                400,
+                                "Auto-join room is invite only but there are no local"
+                                " user to invite with",
+                            )
 
                 # Send the invite, if necessary.
                 if requires_invite:
