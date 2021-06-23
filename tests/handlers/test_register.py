@@ -598,7 +598,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
 
 class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
-    """ Tests auto-join on remote rooms. """
+    """Tests auto-join on remote rooms."""
 
     def make_homeserver(self, reactor, clock):
         self.room_id = "!roomid:remotetest"
