@@ -553,7 +553,7 @@ class FederationV1SendLeaveServlet(BaseFederationServerServlet):
     PATH = "/send_leave/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
-        content = await self.handler.on_send_leave_request(origin, content)
+        content = await self.handler.on_send_leave_request(origin, content, room_id)
         return 200, (200, content)
 
 
@@ -563,7 +563,7 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
     PREFIX = FEDERATION_V2_PREFIX
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
-        content = await self.handler.on_send_leave_request(origin, content)
+        content = await self.handler.on_send_leave_request(origin, content, room_id)
         return 200, content
 
 
@@ -602,9 +602,9 @@ class FederationV1SendJoinServlet(BaseFederationServerServlet):
     PATH = "/send_join/(?P<room_id>[^/]*)/(?P<event_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
-        # TODO(paul): assert that room_id/event_id parsed from path actually
+        # TODO(paul): assert that event_id parsed from path actually
         #   match those given in content
-        content = await self.handler.on_send_join_request(origin, content)
+        content = await self.handler.on_send_join_request(origin, content, room_id)
         return 200, (200, content)
 
 
@@ -614,9 +614,9 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
     PREFIX = FEDERATION_V2_PREFIX
 
     async def on_PUT(self, origin, content, query, room_id, event_id):
-        # TODO(paul): assert that room_id/event_id parsed from path actually
+        # TODO(paul): assert that event_id parsed from path actually
         #   match those given in content
-        content = await self.handler.on_send_join_request(origin, content)
+        content = await self.handler.on_send_join_request(origin, content, room_id)
         return 200, content
 
 
