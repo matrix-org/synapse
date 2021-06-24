@@ -247,7 +247,7 @@ class ProxyAgent(_AgentBase):
 def _http_proxy_endpoint(
     proxy: Optional[bytes],
     reactor: IReactorCore,
-    tls_options_factory: Optional[IPolicyForHTTPS],
+    tls_options_factory: IPolicyForHTTPS,
     **kwargs,
 ):
     """Parses an http proxy setting and returns an endpoint for the proxy
