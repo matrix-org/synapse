@@ -1,9 +1,9 @@
 Synapse 1.37.0rc1 (2021-06-24)
 ==============================
 
-This release deprecates the current spam checker interface. See the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new generic module interface.
+This release deprecates the current spam checker interface. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new generic module interface.
 
-This release also removes support for fetching and renewing TLS certificate using the ACME v1 protocol, which has been fully decomissioned by Let's Encrypt on June 1st 2021. Admins previously using this feature should use a [reverse proxy](https://matrix-org.github.io/synapse/develop/reverse_proxy.html) to handle TLS termination, or use an external ACME client (such as [certbot](https://certbot.eff.org/)) to retrieve a certificate and key and provide them to Synapse using the `tls_certificate_path` and `tls_private_key_path` configuration settings.
+This release also removes support for fetching and renewing TLS certificates using the ACME v1 protocol, which has been fully decommissioned by Let's Encrypt on June 1st 2021. Admins previously using this feature should use a [reverse proxy](https://matrix-org.github.io/synapse/develop/reverse_proxy.html) to handle TLS termination, or use an external ACME client (such as [certbot](https://certbot.eff.org/)) to retrieve a certificate and key and provide them to Synapse using the `tls_certificate_path` and `tls_private_key_path` configuration settings.
 
 
 Features
@@ -41,7 +41,7 @@ Improved Documentation
 Deprecations and Removals
 -------------------------
 
-- The current spam checker interface is deprecated in favour of a new generic modules system. See the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new system. ([\#10062](https://github.com/matrix-org/synapse/issues/10062), [\#10210](https://github.com/matrix-org/synapse/issues/10210), [\#10238](https://github.com/matrix-org/synapse/issues/10238))
+- The current spam checker interface is deprecated in favour of a new generic modules system. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new system. ([\#10062](https://github.com/matrix-org/synapse/issues/10062), [\#10210](https://github.com/matrix-org/synapse/issues/10210), [\#10238](https://github.com/matrix-org/synapse/issues/10238))
 - Stop supporting the unstable spaces prefixes from MSC1772. ([\#10161](https://github.com/matrix-org/synapse/issues/10161))
 - Remove Synapse's support for automatically fetching and renewing certificates using the ACME v1 protocol. This protocol has been fully turned off by Let's Encrypt for existing installations on June 1st 2021. Admins previously using this feature should use a [reverse proxy](https://matrix-org.github.io/synapse/develop/reverse_proxy.html) to handle TLS termination, or use an external ACME client (such as [certbot](https://certbot.eff.org/)) to retrieve a certificate and key and provide them to Synapse using the `tls_certificate_path` and `tls_private_key_path` configuration settings. ([\#10194](https://github.com/matrix-org/synapse/issues/10194))
 
