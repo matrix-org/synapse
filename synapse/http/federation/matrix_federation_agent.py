@@ -85,7 +85,7 @@ class MatrixFederationAgent:
         self._agent = Agent.usingEndpointFactory(
             self._reactor,
             ProxyHostnameEndpointFactory(
-                reactor,
+                reactor._reactor,
             ),
             pool=self._pool,
         )
