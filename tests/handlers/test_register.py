@@ -17,6 +17,7 @@ from unittest.mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
+from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
@@ -79,6 +80,39 @@ class BanBadIdPUser(TestSpamChecker):
         return RegistrationBehaviour.ALLOW
 
 
+class TestLegacyRegistrationSpamChecker:
+    def __init__(self, config, api):
+        pass
+
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+    ):
+        pass
+
+
+class LegacyAllowAll(TestLegacyRegistrationSpamChecker):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+    ):
+        return RegistrationBehaviour.ALLOW
+
+
+class LegacyDenyAll(TestLegacyRegistrationSpamChecker):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+    ):
+        return RegistrationBehaviour.DENY
+
+
 class RegistrationTestCase(unittest.HomeserverTestCase):
     """Tests the RegistrationHandler."""
 
@@ -94,6 +128,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config["limit_usage_by_mau"] = True
 
         hs = self.setup_test_homeserver(config=hs_config)
+
+        load_legacy_spam_checkers(hs)
 
         module_api = hs.get_module_api()
         for module, config in hs.config.modules.loaded_modules:
@@ -533,6 +569,46 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
     )
     def test_spam_checker_deny(self):
         """A spam checker can deny registration, which results in an error."""
+        self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
+
+    @override_config(
+        {
+            "spam_checker": [
+                {
+                    "module": TestSpamChecker.__module__ + ".LegacyAllowAll",
+                }
+            ]
+        }
+    )
+    def test_spam_checker_legacy_allow(self):
+        """Tests that a legacy spam checker implementing the legacy 3-arg version of the
+        check_registration_for_spam callback is correctly called.
+
+        In this test and the following one we test both success and failure to make sure
+        any failure comes from the spam checker (and not something else failing in the
+        call stack) and any success comes from the spam checker (and not because a
+        misconfiguration prevented it from being loaded).
+        """
+        self.get_success(self.handler.register_user(localpart="user"))
+
+    @override_config(
+        {
+            "spam_checker": [
+                {
+                    "module": TestSpamChecker.__module__ + ".LegacyDenyAll",
+                }
+            ]
+        }
+    )
+    def test_spam_checker_legacy_deny(self):
+        """Tests that a legacy spam checker implementing the legacy 3-arg version of the
+        check_registration_for_spam callback is correctly called.
+
+        In this test and the previous one we test both success and failure to make sure
+        any failure comes from the spam checker (and not something else failing in the
+        call stack) and any success comes from the spam checker (and not because a
+        misconfiguration prevented it from being loaded).
+        """
         self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
 
     @override_config(
