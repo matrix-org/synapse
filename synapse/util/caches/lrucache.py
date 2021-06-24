@@ -108,6 +108,7 @@ class _CacheEntry(Protocol):
 
 
 P = TypeVar("P", bound=_CacheEntry)
+LN = TypeVar("LN", bound="_ListNode")
 
 
 class _ListNode(Generic[P]):
@@ -138,12 +139,14 @@ class _ListNode(Generic[P]):
         root.next_node = root
         return root
 
-    @staticmethod
+    @classmethod
     def insert_after(
-        cache_entry: P, node: "_ListNode[P]", clock: Clock
-    ) -> "_ListNode[P]":
+        cls: Type[LN],
+        cache_entry: P,
+        node: "_ListNode[P]",
+    ) -> LN:
         """Create a new list node that is placed after the given node."""
-        new_node = _ListNode(cache_entry)
+        new_node = cls(cache_entry)
         new_node._refs_insert_after(node)
         return new_node
 
@@ -153,7 +156,7 @@ class _ListNode(Generic[P]):
 
         self.cache_entry = None
 
-    def move_after(self, root: "_ListNode", clock: Clock):
+    def move_after(self, root: "_ListNode"):
         """Move this node from its current location in the list to after the
         given node.
         """
@@ -221,22 +224,8 @@ class _TimedListNode(_ListNode[P]):
 
     __slots__ = ["last_access_ts_secs"]
 
-    def __init__(self, clock: Clock, cache_entry: Optional[P]) -> None:
-        super().__init__(cache_entry=cache_entry)
-
+    def update_last_access(self, clock: Clock):
         self.last_access_ts_secs = int(clock.time())
-
-    @staticmethod
-    def insert_after(
-        cache_entry: P, node: "_ListNode[P]", clock: Clock
-    ) -> "_TimedListNode[P]":
-        new_node = _TimedListNode(clock, cache_entry)
-        new_node._refs_insert_after(node)
-        return new_node
-
-    def move_after(self, root: "_ListNode", clock: Clock):
-        self.last_access_ts_secs = int(clock.time())
-        return super().move_after(root, clock)
 
 
 # Whether to insert new cache entries to the global list. We only add to it if
@@ -336,12 +325,11 @@ class _Node:
         clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
     ):
-        self._list_node = _ListNode.insert_after(self, root, clock)
+        self._list_node = _ListNode.insert_after(self, root)
         self._global_list_node = None
         if USE_GLOBAL_LIST:
-            self._global_list_node = _TimedListNode.insert_after(
-                self, GLOBAL_ROOT, clock
-            )
+            self._global_list_node = _TimedListNode.insert_after(self, GLOBAL_ROOT)
+            self._global_list_node.update_last_access(clock)
 
         # We store a weak reference to the cache object so that this _Node can
         # remove itself from the cache. If the cache is dropped we ensure we
@@ -422,9 +410,10 @@ class _Node:
 
     def move_to_front(self, clock: Clock, cache_list_root: _ListNode) -> None:
         """Moves this node to the front of all the lists its in."""
-        self._list_node.move_after(cache_list_root, clock)
+        self._list_node.move_after(cache_list_root)
         if self._global_list_node:
-            self._global_list_node.move_after(GLOBAL_ROOT, clock)
+            self._global_list_node.move_after(GLOBAL_ROOT)
+            self._global_list_node.update_last_access(clock)
 
 
 class LruCache(Generic[KT, VT]):
