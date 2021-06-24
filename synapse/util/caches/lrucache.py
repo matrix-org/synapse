@@ -235,7 +235,6 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int):
     assert node is not None
 
     i = 0
-    orphaned_nodes = 0
 
     logger.debug("Searching for stale caches")
 
@@ -247,16 +246,13 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int):
             break
 
         cache_entry = node.get_cache_entry()
-        current_node = node
         node = node.prev_node
-        if cache_entry:
-            cache_entry.drop_from_cache()
-        else:
-            # The cache entry has been dropped without being cleared out of this
-            # list. This can happen if the `LruCache` has been dropped without
-            # being cleared up properly.
-            orphaned_nodes += 1
-            current_node.remove_from_list()
+
+        # The node should always have a reference to a cache entry, as
+        # we only drop the cache entry when we remove the node from the
+        # list.
+        assert cache_entry is not None
+        cache_entry.drop_from_cache()
 
         assert node is not None
 
@@ -273,7 +269,7 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int):
 
         i += 1
 
-    logger.info("Dropped %d items from caches, (orphaned: %d)", i, orphaned_nodes)
+    logger.info("Dropped %d items from caches", i)
 
 
 def setup_expire_lru_cache_entries(hs: "HomeServer"):
@@ -495,24 +491,24 @@ class LruCache(Generic[KT, VT]):
         lock = threading.Lock()
 
         def evict():
-            orphaned = 0
             while cache_len() > self.max_size:
+                # Get the last node in the list (i.e. the oldest node).
                 todelete = list_root.prev_node
+
+                # The list root should always have a valid `prev_node` if the
+                # cache is not empty.
                 assert todelete is not None
 
+                # The node should always have a reference to a cache entry, as
+                # we only drop the cache entry when we remove the node from the
+                # list.
                 node = todelete.get_cache_entry()
-                if not node:
-                    todelete.remove_from_list()
-                    orphaned += 1
-                    continue
+                assert node is not None
 
                 evicted_len = delete_node(node)
                 cache.pop(node.key, None)
                 if metrics:
                     metrics.inc_evictions(evicted_len)
-
-            if orphaned:
-                logger.warning("Found %d orphaned nodes in cache %r", cache_name)
 
         def synchronized(f: FT) -> FT:
             @wraps(f)
