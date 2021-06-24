@@ -128,8 +128,15 @@ class _ListNode(Generic[P]):
 
     def __init__(self, cache_entry: Optional[P] = None) -> None:
         self.cache_entry = cache_entry
-        self.prev_node: Optional[_ListNode[P]] = self
-        self.next_node: Optional[_ListNode[P]] = self
+        self.prev_node: Optional[_ListNode[P]] = None
+        self.next_node: Optional[_ListNode[P]] = None
+
+    @classmethod
+    def create_root_node(cls: Type["_ListNode[P]"]) -> "_ListNode[P]":
+        root = cls()
+        root.prev_node = root
+        root.next_node = root
+        return root
 
     @staticmethod
     def insert_after(
@@ -137,25 +144,12 @@ class _ListNode(Generic[P]):
     ) -> "_ListNode[P]":
         """Create a new list node that is placed after the given node."""
         new_node = _ListNode(cache_entry)
-        new_node.move_after(node, clock)
+        new_node._refs_insert_after(node)
         return new_node
 
     def remove_from_list(self):
         """Remove this node from the list."""
-        if self.prev_node is None or self.next_node is None:
-            # We've already been removed from the list.
-            return
-
-        prev_node = self.prev_node
-        next_node = self.next_node
-
-        prev_node.next_node = next_node
-        next_node.prev_node = prev_node
-
-        # We set these to None so that we don't get circular references,
-        # allowing us to be dropped without having to go via the GC.
-        self.next_node = None
-        self.prev_node = None
+        self._refs_remove_node_from_list()
 
         self.cache_entry = None
 
@@ -170,15 +164,44 @@ class _ListNode(Generic[P]):
         assert root.next_node
 
         # Remove self from the list
+        self._refs_remove_node_from_list()
+
+        # Insert self back into the list, after root
+        self._refs_insert_after(root)
+
+    def _refs_remove_node_from_list(self):
+        """Internal method to *just* remove the node from the list, without
+        e.g. clearing out the cache entry.
+        """
+        if self.prev_node is None or self.next_node is None:
+            # We've already been removed from the list.
+            return
+
         prev_node = self.prev_node
         next_node = self.next_node
 
         prev_node.next_node = next_node
         next_node.prev_node = prev_node
 
-        # Insert self back into the list, after root
-        prev_node = root
-        next_node = root.next_node
+        # We set these to None so that we don't get circular references,
+        # allowing us to be dropped without having to go via the GC.
+        self.prev_node = None
+        self.next_node = None
+
+    def _refs_insert_after(self, node: "_ListNode"):
+        """Internal method to insert the node after the given node."""
+
+        # This method should only be called when we're not already in the list.
+        assert self.prev_node is None
+        assert self.next_node is None
+
+        # We expect the given node to be in the list and thus have valid
+        # prev/next refs.
+        assert node.next_node
+        assert node.prev_node
+
+        prev_node = node
+        next_node = node.next_node
 
         self.prev_node = prev_node
         self.next_node = next_node
@@ -208,7 +231,7 @@ class _TimedListNode(_ListNode[P]):
         cache_entry: P, node: "_ListNode[P]", clock: Clock
     ) -> "_TimedListNode[P]":
         new_node = _TimedListNode(clock, cache_entry)
-        new_node.move_after(node, clock)
+        new_node._refs_insert_after(node)
         return new_node
 
     def move_after(self, root: "_ListNode", clock: Clock):
@@ -221,7 +244,7 @@ class _TimedListNode(_ListNode[P]):
 USE_GLOBAL_LIST = False
 
 # A linked list of all cache entries, allowing efficient time based eviction.
-GLOBAL_ROOT = _ListNode[_CacheEntry]()
+GLOBAL_ROOT = _ListNode[_CacheEntry].create_root_node()
 
 
 @wrap_as_background_process("LruCache._expire_old_entries")
@@ -487,7 +510,7 @@ class LruCache(Generic[KT, VT]):
         # a single reference (as weakrefs are surprisingly large).
         weak_ref_to_self = weakref.ref(self)
 
-        list_root = _ListNode[_Node]()
+        list_root = _ListNode[_Node].create_root_node()
 
         lock = threading.Lock()
 
