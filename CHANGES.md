@@ -1,4 +1,4 @@
-Synapse 1.37.0rc1 (2021-06-23)
+Synapse 1.37.0rc1 (2021-06-24)
 ==============================
 
 This release deprecates the current spam checker interface. See the [upgrade notes](https://github.com/matrix-org/synapse/blob/develop/UPGRADE.rst#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new generic module interface.
