@@ -109,6 +109,8 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
             if f is None:
                 return None
 
+            wrapped_func = f
+
             if f.__name__ == "check_registration_for_spam":
                 checker_args = inspect.signature(f)
                 if len(checker_args.parameters) == 3:
@@ -133,19 +135,18 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
                             request_info,
                         )
 
-                    f = wrapper
+                    wrapped_func = wrapper
                 elif len(checker_args.parameters) != 4:
                     raise RuntimeError(
                         "Bad signature for callback check_registration_for_spam",
                     )
 
             def run(*args, **kwargs):
-                # We've already made sure f is not None above, but mypy doesn't do well
-                # across function boundaries so we need to tell it f is definitely not
-                # None.
-                assert f is not None
+                # mypy doesn't do well across function boundaries so we need to tell it
+                # wrapped_func is definitely not None.
+                assert wrapped_func is not None
 
-                return maybe_awaitable(f(*args, **kwargs))
+                return maybe_awaitable(wrapped_func(*args, **kwargs))
 
             return run
 
