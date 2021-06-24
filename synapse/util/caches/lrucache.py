@@ -111,10 +111,11 @@ P = TypeVar("P", bound=_CacheEntry)
 
 
 class _ListNode(Generic[P]):
-    """A node in a doubly linked list, with an (optional) weak reference to a
-    cache entry.
+    """A node in a circular doubly linked list, with an (optional) reference to
+    a cache entry.
 
-    The weak reference should only be `None` for the root node.
+    The reference should only be `None` for the root node or if the node has
+    been removed from the list.
     """
 
     # We don't use attrs here as in py3.6 you can't have `attr.s(slots=True)`
@@ -132,12 +133,12 @@ class _ListNode(Generic[P]):
 
     @staticmethod
     def insert_after(
-        cache_entry: P, root: "_ListNode[P]", clock: Clock
+        cache_entry: P, node: "_ListNode[P]", clock: Clock
     ) -> "_ListNode[P]":
-        """Create a new list node that is placed after the given root node."""
-        node = _ListNode(cache_entry)
-        node.move_after(root, clock)
-        return node
+        """Create a new list node that is placed after the given node."""
+        new_node = _ListNode(cache_entry)
+        new_node.move_after(node, clock)
+        return new_node
 
     def remove_from_list(self):
         """Remove this node from the list."""
@@ -204,11 +205,11 @@ class _TimedListNode(_ListNode[P]):
 
     @staticmethod
     def insert_after(
-        cache_entry: P, root: "_ListNode[P]", clock: Clock
+        cache_entry: P, node: "_ListNode[P]", clock: Clock
     ) -> "_TimedListNode[P]":
-        node = _TimedListNode(clock, cache_entry)
-        node.move_after(root, clock)
-        return node
+        new_node = _TimedListNode(clock, cache_entry)
+        new_node.move_after(node, clock)
+        return new_node
 
     def move_after(self, root: "_ListNode", clock: Clock):
         self.last_access_ts_secs = int(clock.time())
@@ -755,4 +756,7 @@ class LruCache(Generic[KT, VT]):
     def __del__(self) -> None:
         # We're about to be deleted, so we make sure to clear up all the nodes
         # and run callbacks, etc.
+        #
+        # This happens e.g. in the sync code where we have an expiring cache of
+        # lru caches.
         self.clear()
