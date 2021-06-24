@@ -322,8 +322,6 @@ class _Node:
             self.global_list_node = _TimedListNode.insert_after(
                 self, GLOBAL_ROOT, clock
             )
-        else:
-            self.global_list_node = None
 
         # We store a weak reference to the cache object so that this _Node can
         # remove itself from the cache. If the cache is dropped we ensure we
