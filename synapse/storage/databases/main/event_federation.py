@@ -663,6 +663,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             " ON g.event_id = e.event_id"
             " INNER JOIN event_backward_extremities as b"
             " ON g.prev_event_id = b.event_id"
+            " INNER JOIN insertion_event_extremeties as i"
+            " ON g.event_id = i.insertion_prev_event_id"
             " WHERE b.room_id = ? AND g.is_state is ?"
             " GROUP BY b.event_id"
         )

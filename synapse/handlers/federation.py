@@ -1052,6 +1052,7 @@ class FederationHandler(BaseHandler):
         with (await self._room_backfill.queue(room_id)):
             return await self._maybe_backfill_inner(room_id, current_depth, limit)
 
+    # Todo
     async def _maybe_backfill_inner(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:

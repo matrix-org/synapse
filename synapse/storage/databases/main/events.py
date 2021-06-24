@@ -1504,6 +1504,8 @@ class PersistEventsStore:
 
             self._handle_event_relations(txn, event)
 
+            self._handle_marker_event(txn, event)
+
             # Store the labels for this event.
             labels = event.content.get(EventContentFields.LABELS)
             if labels:
@@ -1755,6 +1757,39 @@ class PersistEventsStore:
 
         if rel_type == RelationTypes.REPLACE:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
+
+    def _handle_marker_event(self, txn, event):
+        """Handles inserting insertion extremeties during peristence of marker events
+
+        Args:
+            txn
+            event (EventBase)
+        """
+
+        if event.type != EventTypes.MSC2716_MARKER:
+            # Not a marker event
+            return
+
+        insertion_event_id = event.content.get(
+            EventContentFields.MSC2716_MARKER_INSERTION
+        )
+        insertion_prev_event_ids = event.content.get(
+            EventContentFields.MSC2716_MARKER_INSERTION_PREV_EVENTS
+        )
+        if not insertion_event_id or not insertion_prev_event_ids:
+            # Invalid marker event
+            return
+
+        for prev_event_id in insertion_prev_event_ids:
+            self.db_pool.simple_insert_txn(
+                txn,
+                table="insertion_event_extremeties",
+                values={
+                    "insertion_event_id": insertion_event_id,
+                    "room_id": event.room_id,
+                    "insertion_prev_event_id": prev_event_id,
+                },
+            )
 
     def _handle_redaction(self, txn, redacted_event_id):
         """Handles receiving a redaction and checking whether we need to remove
