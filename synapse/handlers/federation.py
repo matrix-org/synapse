@@ -1953,9 +1953,21 @@ class FederationHandler(BaseHandler):
         self, origin: str, event: EventBase
     ) -> EventContext:
         """
-        We have received a join/leave/knock event for a room.
+        We have received a join/leave/knock event for a room via send_join/leave/knock.
 
         Verify that event and send it into the room on the remote homeserver's behalf.
+
+        This is quite similar to on_receive_pdu, with the following principal
+        differences:
+          * only membership events are permitted (and only events with
+            sender==state_key -- ie, no kicks or bans)
+          * *We* send out the event on behalf of the remote server.
+          * We enforce the membership restrictions of restricted rooms.
+          * Rejected events result in an exception rather than being stored.
+
+        There are also other differences, however it is not clear if these are by
+        design or omission. In particular, we do not attempt to backfill any missing
+        prev_events.
 
         Args:
             origin: The homeserver of the remote (joining/invited/knocking) user.
@@ -1963,6 +1975,9 @@ class FederationHandler(BaseHandler):
 
         Returns:
             The context of the event after inserting it into the room graph.
+
+        Raises:
+            SynapseError if the event is not accepted into the room
         """
         logger.debug(
             "on_send_membership_event: Got event: %s, signatures: %s",
@@ -1981,7 +1996,7 @@ class FederationHandler(BaseHandler):
         if event.sender != event.state_key:
             raise SynapseError(400, "state_key and sender must match", Codes.BAD_JSON)
 
-        event.internal_metadata.outlier = False
+        assert not event.internal_metadata.outlier
 
         # Send this event on behalf of the other server.
         #
@@ -1991,6 +2006,11 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         context = await self.state_handler.compute_event_context(event)
+        context = await self._check_event_auth(origin, event, context)
+        if context.rejected:
+            raise SynapseError(
+                403, f"{event.membership} event was rejected", Codes.FORBIDDEN
+            )
 
         # for joins, we need to check the restrictions of restricted rooms
         if event.membership == Membership.JOIN:
@@ -2008,8 +2028,8 @@ class FederationHandler(BaseHandler):
                     403, "This event is not allowed in this context", Codes.FORBIDDEN
                 )
 
-        await self._auth_and_persist_event(origin, event, context)
-
+        # all looks good, we can persist the event.
+        await self._run_push_actions_and_persist_event(event, context)
         return context
 
     async def _check_join_restrictions(
@@ -2179,6 +2199,18 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
         )
 
+        await self._run_push_actions_and_persist_event(event, context, backfilled)
+
+    async def _run_push_actions_and_persist_event(
+        self, event: EventBase, context: EventContext, backfilled: bool = False
+    ):
+        """Run the push actions for a received event, and persist it.
+
+        Args:
+            event: The event itself.
+            context: The event context.
+            backfilled: True if the event was backfilled.
+        """
         try:
             if (
                 not event.internal_metadata.is_outlier()
@@ -2492,9 +2524,9 @@ class FederationHandler(BaseHandler):
         origin: str,
         event: EventBase,
         context: EventContext,
-        state: Optional[Iterable[EventBase]],
-        auth_events: Optional[MutableStateMap[EventBase]],
-        backfilled: bool,
+        state: Optional[Iterable[EventBase]] = None,
+        auth_events: Optional[MutableStateMap[EventBase]] = None,
+        backfilled: bool = False,
     ) -> EventContext:
         """
         Checks whether an event should be rejected (for failing auth checks).
