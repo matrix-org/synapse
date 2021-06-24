@@ -246,21 +246,22 @@ async def _expire_old_entries(clock: Clock, expiry_seconds: int):
             break
 
         cache_entry = node.get_cache_entry()
-        node = node.prev_node
+        next_node = node.prev_node
 
-        # The node should always have a reference to a cache entry, as
-        # we only drop the cache entry when we remove the node from the
+        # The node should always have a reference to a cache entry and a valid
+        # `prev_node`, as we only drop them when we remove the node from the
         # list.
+        assert next_node is not None
         assert cache_entry is not None
         cache_entry.drop_from_cache()
-
-        assert node is not None
 
         # If we do lots of work at once we yield to allow other stuff to happen.
         if (i + 1) % 10000 == 0:
             logger.debug("Waiting during drop")
             await clock.sleep(0)
             logger.debug("Waking during drop")
+
+        node = next_node
 
         # If we've yielded then our current node may have been evicted, so we
         # need to check that its still valid.
