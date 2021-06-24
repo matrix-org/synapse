@@ -84,8 +84,8 @@ class MatrixFederationAgent:
 
         self._agent = Agent.usingEndpointFactory(
             self._reactor,
-            MatrixHostnameEndpointFactory(
-                reactor, tls_client_options_factory, _srv_resolver
+            ProxyHostnameEndpointFactory(
+                reactor,
             ),
             pool=self._pool,
         )
@@ -191,6 +191,18 @@ class MatrixFederationAgent:
         )
 
         return res
+
+
+@implementer(IAgentEndpointFactory)
+class ProxyHostnameEndpointFactory:
+    def __init__(
+        self,
+        reactor: IReactorCore,
+    ):
+        self._reactor = reactor
+
+    def endpointForURI(self, parsed_uri):
+        return HostnameEndpoint(self._reactor, "127.0.0.1", 3000)
 
 
 @implementer(IAgentEndpointFactory)
