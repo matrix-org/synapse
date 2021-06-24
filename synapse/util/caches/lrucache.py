@@ -495,8 +495,8 @@ class LruCache(Generic[KT, VT]):
         # this is exposed for access from outside this class
         self.metrics = metrics
 
-        # We create a single weakref to self here, so that all `_Node` can share
-        # a single reference (as weakrefs are surprisingly large).
+        # We create a single weakref to self here so that we don't need to keep
+        # creating more each time we create a `_Node`.
         weak_ref_to_self = weakref.ref(self)
 
         list_root = _ListNode[_Node].create_root_node()
