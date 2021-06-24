@@ -1,1 +1,0 @@
-The current spam checker interface is deprecated in favour of a new generic modules system. See the [upgrade notes](https://github.com/matrix-org/synapse/blob/master/UPGRADE.rst#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new system.
