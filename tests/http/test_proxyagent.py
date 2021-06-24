@@ -38,80 +38,7 @@ logger = logging.getLogger(__name__)
 HTTPFactory = Factory.forProtocol(HTTPChannel)
 
 
-class MatrixFederationAgentTests(TestCase):
-    def setUp(self):
-        self.reactor = ThreadedMemoryReactorClock()
-
-    def _make_connection(
-        self,
-        client_factory,
-        server_factory,
-        ssl=False,
-        expected_sni=None,
-        tls_sanlist: Optional[Iterable[bytes]] = None,
-    ):
-        """Builds a test server, and completes the outgoing client connection
-
-        Args:
-            client_factory (interfaces.IProtocolFactory): the the factory that the
-                application is trying to use to make the outbound connection. We will
-                invoke it to build the client Protocol
-
-            server_factory (interfaces.IProtocolFactory): a factory to build the
-                server-side protocol
-
-            ssl (bool): If true, we will expect an ssl connection and wrap
-                server_factory with a TLSMemoryBIOFactory
-
-            expected_sni (bytes|None): the expected SNI value
-
-            tls_sanlist: list of SAN entries for the TLS cert presented by the server.
-                 Defaults to [b'DNS:test.com']
-
-        Returns:
-            IProtocol: the server Protocol returned by server_factory
-        """
-        if ssl:
-            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
-
-        server_protocol = server_factory.buildProtocol(None)
-
-        # now, tell the client protocol factory to build the client protocol,
-        # and wire the output of said protocol up to the server via
-        # a FakeTransport.
-        #
-        # Normally this would be done by the TCP socket code in Twisted, but we are
-        # stubbing that out here.
-        client_protocol = client_factory.buildProtocol(None)
-        client_protocol.makeConnection(
-            FakeTransport(server_protocol, self.reactor, client_protocol)
-        )
-
-        # tell the server protocol to send its stuff back to the client, too
-        server_protocol.makeConnection(
-            FakeTransport(client_protocol, self.reactor, server_protocol)
-        )
-
-        if ssl:
-            http_protocol = server_protocol.wrappedProtocol
-            tls_connection = server_protocol._tlsConnection
-        else:
-            http_protocol = server_protocol
-            tls_connection = None
-
-        # give the reactor a pump to get the TLS juices flowing (if needed)
-        self.reactor.advance(0)
-
-        if expected_sni is not None:
-            server_name = tls_connection.get_servername()
-            self.assertEqual(
-                server_name,
-                expected_sni,
-                "Expected SNI %s but got %s" % (expected_sni, server_name),
-            )
-
-        return http_protocol
-
+class ProxyParserTests(TestCase):
     def test_parse_proxy_host_only(self):
         url = b"localhost"
         self.assertEqual((b"http", b"localhost", 1080), parse_proxy(url))
@@ -209,6 +136,81 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual((b"https", b"::1", 9988), parse_proxy(url))
         url = b"https://::ffff:0.0.0.0:9988"
         self.assertEqual((b"https", b"::ffff:0.0.0.0", 9988), parse_proxy(url))
+
+
+class MatrixFederationAgentTests(TestCase):
+    def setUp(self):
+        self.reactor = ThreadedMemoryReactorClock()
+
+    def _make_connection(
+        self,
+        client_factory,
+        server_factory,
+        ssl=False,
+        expected_sni=None,
+        tls_sanlist: Optional[Iterable[bytes]] = None,
+    ):
+        """Builds a test server, and completes the outgoing client connection
+
+        Args:
+            client_factory (interfaces.IProtocolFactory): the the factory that the
+                application is trying to use to make the outbound connection. We will
+                invoke it to build the client Protocol
+
+            server_factory (interfaces.IProtocolFactory): a factory to build the
+                server-side protocol
+
+            ssl (bool): If true, we will expect an ssl connection and wrap
+                server_factory with a TLSMemoryBIOFactory
+
+            expected_sni (bytes|None): the expected SNI value
+
+            tls_sanlist: list of SAN entries for the TLS cert presented by the server.
+                 Defaults to [b'DNS:test.com']
+
+        Returns:
+            IProtocol: the server Protocol returned by server_factory
+        """
+        if ssl:
+            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
+
+        server_protocol = server_factory.buildProtocol(None)
+
+        # now, tell the client protocol factory to build the client protocol,
+        # and wire the output of said protocol up to the server via
+        # a FakeTransport.
+        #
+        # Normally this would be done by the TCP socket code in Twisted, but we are
+        # stubbing that out here.
+        client_protocol = client_factory.buildProtocol(None)
+        client_protocol.makeConnection(
+            FakeTransport(server_protocol, self.reactor, client_protocol)
+        )
+
+        # tell the server protocol to send its stuff back to the client, too
+        server_protocol.makeConnection(
+            FakeTransport(client_protocol, self.reactor, server_protocol)
+        )
+
+        if ssl:
+            http_protocol = server_protocol.wrappedProtocol
+            tls_connection = server_protocol._tlsConnection
+        else:
+            http_protocol = server_protocol
+            tls_connection = None
+
+        # give the reactor a pump to get the TLS juices flowing (if needed)
+        self.reactor.advance(0)
+
+        if expected_sni is not None:
+            server_name = tls_connection.get_servername()
+            self.assertEqual(
+                server_name,
+                expected_sni,
+                "Expected SNI %s but got %s" % (expected_sni, server_name),
+            )
+
+        return http_protocol
 
     def _test_request_direct_connection(self, agent, scheme, hostname, path):
         """Runs a test case for a direct connection not going through a proxy.
