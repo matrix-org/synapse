@@ -32,7 +32,7 @@ from typing import (
     overload,
 )
 
-from typing_extensions import Literal, Protocol
+from typing_extensions import Literal
 
 from twisted.internet import reactor
 
@@ -93,21 +93,7 @@ def enumerate_leaves(node, depth):
                 yield m
 
 
-class _CacheEntry(Protocol):
-    """A protocol for cache entries used by `_ListNode` that allows it to cause
-    the cache entry to be dropped.
-    """
-
-    def drop_from_cache(self) -> None:
-        """Request the entry be dropped from the cache.
-
-        Note: This should call `.remove_from_list()` on all `_ListNodes`
-        referencing it.
-        """
-        ...
-
-
-P = TypeVar("P", bound=_CacheEntry)
+P = TypeVar("P")
 LN = TypeVar("LN", bound="_ListNode")
 
 
@@ -233,7 +219,7 @@ class _TimedListNode(_ListNode[P]):
 USE_GLOBAL_LIST = False
 
 # A linked list of all cache entries, allowing efficient time based eviction.
-GLOBAL_ROOT = _ListNode[_CacheEntry].create_root_node()
+GLOBAL_ROOT = _ListNode["_Node"].create_root_node()
 
 
 @wrap_as_background_process("LruCache._expire_old_entries")
@@ -394,7 +380,11 @@ class _Node:
         self.callbacks = None
 
     def drop_from_cache(self) -> None:
-        """Implements `_CacheEntry` protocol."""
+        """Drop this node from the cache.
+
+        Ensures that the entry gets removed from the cache and that we get
+        removed from all lists.
+        """
         cache = self._cache()
         if not cache or not cache.pop(self.key, None):
             # `cache.pop` should call `drop_from_lists()`, unless this Node had
