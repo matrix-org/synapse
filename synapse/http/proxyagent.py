@@ -82,6 +82,10 @@ class ProxyAgent(_AgentBase):
 
         use_proxy (bool): Whether proxy settings should be discovered and used
             from conventional environment variables.
+            This currently supports http:// and https:// proxies.
+            A hostname without scheme is assumed to be http.
+
+    Raises: ValueError if given a proxy with a scheme we don't support.
     """
 
     def __init__(
