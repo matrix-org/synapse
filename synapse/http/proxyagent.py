@@ -254,7 +254,8 @@ def _http_proxy_endpoint(
 
     Args:
         proxy: the proxy setting in the form: [<username>:<password>@][scheme://]<host>[:<port>]
-            This currently supports http:// and https:// proxies. a hostname without scheme is assumed to be http.
+            This currently supports http:// and https:// proxies. 
+            A hostname without scheme is assumed to be http.
 
         reactor: reactor to be used to connect to the proxy
 
