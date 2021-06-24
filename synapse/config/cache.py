@@ -206,7 +206,7 @@ class CacheConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
-        expiry_time = cache_config.get("expiry_time", None)
+        expiry_time = cache_config.get("expiry_time")
         if expiry_time:
             self.expiry_time_msec = self.parse_duration(expiry_time)
         else:
