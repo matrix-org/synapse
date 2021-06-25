@@ -94,26 +94,29 @@ class EventValidator:
             powerLevelsSchema = {
                 "type": "object",
                 "properties": {
-                    "ban": {"type": "integer"},
-                    "events": {
-                        "type": "object",
-                        "patternProperties": {".*": {"type": "integer"}},
-                    },
-                    "events_default": {"type": "integer"},
-                    "invite": {"type": "integer"},
-                    "kick": {"type": "integer"},
-                    "notifications": {
-                        "type": "object",
-                        "patternProperties": {".*": {"type": "integer"}},
-                    },
-                    "redact": {"type": "integer"},
-                    "state_default": {"type": "integer"},
-                    "users": {
-                        "type": "object",
-                        "patternProperties": {".*": {"type": "integer"}},
-                    },
-                    "users_default": {"type": "integer"},
+                    "ban": {"$ref": "#/definitions/int"},
+                    "events": {"$ref": "#/definitions/objectOfInts"},
+                    "events_default": {"$ref": "#/definitions/int"},
+                    "invite": {"$ref": "#/definitions/int"},
+                    "kick": {"$ref": "#/definitions/int"},
+                    "notifications": {"$ref": "#/definitions/objectOfInts"},
+                    "redact": {"$ref": "#/definitions/int"},
+                    "state_default": {"$ref": "#/definitions/int"},
+                    "users": {"$ref": "#/definitions/objectOfInts"},
+                    "users_default": {"$ref": "#/definitions/int"}
                 },
+
+                "definitions": {
+                    "int": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991
+                    },
+                    "objectOfInts": {
+                        "type": "object",
+                        "additionalProperties": {"$ref": "#/definitions/int"}
+                    }
+                }
             }
 
             try:
@@ -125,7 +128,7 @@ class EventValidator:
             except jsonschema.ValidationError as e:
                 raise SynapseError(
                     code=400,
-                    msg="'%s' not a int type" % (e.path[-1],),
+                    msg=e.message,
                     errcode=Codes.BAD_JSON,
                 )
 
