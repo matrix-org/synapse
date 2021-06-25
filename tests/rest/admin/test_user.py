@@ -1101,7 +1101,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
     def test_deactivate_user_erase_true_no_profile(self):
         """
         Test deactivating a user and set `erase` to `true`
-        if user has no profile information in database table `profile`
+        if user has no profile information (stored in the database table `profiles`).
         """
 
         # Delete profile information
@@ -1125,7 +1125,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(channel.json_body["avatar_url"])
         self.assertIsNone(channel.json_body["displayname"])
 
-        # Deactivate user
+        # Deactivate and erase user
         body = json.dumps({"erase": True})
 
         channel = self.make_request(
@@ -1135,7 +1135,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content=body.encode(encoding="utf_8"),
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1144,7 +1144,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))

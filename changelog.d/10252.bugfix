@@ -1,1 +1,1 @@
-Deactivate and mark a user as erased also if he has no profile.
+Fix a bug introduced in v1.26.0 where only users who have set profile information could be deactivated with erasure enabled.
