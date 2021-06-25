@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import attr
 from nacl.signing import SigningKey
 
-from synapse.api.auth import Auth
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
@@ -33,6 +32,9 @@ from synapse.storage.databases.main import DataStore
 from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
+
+if TYPE_CHECKING:
+    from synapse.api.auth import Auth
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +65,7 @@ class EventBuilder:
     """
 
     _state = attr.ib(type=StateHandler)
-    _auth = attr.ib(type=Auth)
+    _auth = attr.ib(type="Auth")
     _store = attr.ib(type=DataStore)
     _clock = attr.ib(type=Clock)
     _hostname = attr.ib(type=str)
