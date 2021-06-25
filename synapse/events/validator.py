@@ -127,7 +127,7 @@ class EventValidator:
             except jsonschema.ValidationError as e:
                 raise SynapseError(
                     code=400,
-                    msg=e.message,
+                    msg=e.message,  # noqa: B306, jsonschema.ValidationError.message is a valid attribute
                     errcode=Codes.BAD_JSON,
                 )
 
