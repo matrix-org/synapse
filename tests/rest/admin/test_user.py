@@ -939,7 +939,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("POST", self.url, b"{}")
 
-        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_not_admin(self):
@@ -950,7 +950,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", url, access_token=self.other_user_token)
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         channel = self.make_request(
@@ -960,7 +960,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content=b"{}",
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
     def test_user_does_not_exist(self):
@@ -990,7 +990,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_user_is_not_local(self):
@@ -1016,24 +1016,22 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User1", channel.json_body["displayname"])
 
-        # Deactivate user
-        body = json.dumps({"erase": True})
-
+        # Deactivate and erase user
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"erase": True},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1042,7 +1040,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1063,7 +1061,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1071,13 +1069,11 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("User1", channel.json_body["displayname"])
 
         # Deactivate user
-        body = json.dumps({"erase": False})
-
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"erase": False},
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1089,7 +1085,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1118,7 +1114,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1126,13 +1122,11 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertIsNone(channel.json_body["displayname"])
 
         # Deactivate and erase user
-        body = json.dumps({"erase": True})
-
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"erase": True},
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
