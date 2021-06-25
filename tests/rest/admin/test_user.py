@@ -1006,7 +1006,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
     def test_deactivate_user_erase_true(self):
         """
-        Test deactivating an user and set `erase` to `true`
+        Test deactivating a user and set `erase` to `true`
         """
 
         # Get user
@@ -1053,7 +1053,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
     def test_deactivate_user_erase_false(self):
         """
-        Test deactivating an user and set `erase` to `false`
+        Test deactivating a user and set `erase` to `false`
         """
 
         # Get user
@@ -1097,6 +1097,61 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("User1", channel.json_body["displayname"])
 
         self._is_erased("@user:test", False)
+
+    def test_deactivate_user_erase_true_no_profile(self):
+        """
+        Test deactivating a user and set `erase` to `true`
+        if user has no profile information in database table `profile`
+        """
+
+        # Delete profile information
+        self.get_success(
+            self.store.db_pool.simple_delete_one(
+                table="profiles", keyvalues={"user_id": "user"}
+            )
+        )
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
+        self.assertIsNone(channel.json_body["avatar_url"])
+        self.assertIsNone(channel.json_body["displayname"])
+
+        # Deactivate user
+        body = json.dumps({"erase": True})
+
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content=body.encode(encoding="utf_8"),
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertEqual(0, len(channel.json_body["threepids"]))
+        self.assertIsNone(channel.json_body["avatar_url"])
+        self.assertIsNone(channel.json_body["displayname"])
+
+        self._is_erased("@user:test", True)
 
     def _is_erased(self, user_id: str, expect: bool) -> None:
         """Assert that the user is erased or not"""

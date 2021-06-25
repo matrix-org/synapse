@@ -15,7 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import StoreError, SynapseError
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import Requester, UserID, create_requester
 
@@ -136,10 +136,21 @@ class DeactivateAccountHandler(BaseHandler):
         # Mark the user as erased, if they asked for that
         if erase_data:
             user = UserID.from_string(user_id)
-            # Remove avatar URL from this user
-            await self._profile_handler.set_avatar_url(user, requester, "", by_admin)
-            # Remove displayname from this user
-            await self._profile_handler.set_displayname(user, requester, "", by_admin)
+            try:
+                # Remove avatar URL from this user
+                await self._profile_handler.set_avatar_url(
+                    user, requester, "", by_admin
+                )
+                # Remove displayname from this user
+                await self._profile_handler.set_displayname(
+                    user, requester, "", by_admin
+                )
+            except StoreError as e:
+                # catch only 404 if user does not have a profile
+                if e.code == 404:
+                    pass
+                else:
+                    raise e
 
             logger.info("Marking %s as erased", user_id)
             await self.store.mark_user_erased(user_id)
