@@ -615,7 +615,7 @@ class FederationV1SendLeaveServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, Tuple[int, JsonDict]]:
-        result = await self.handler.on_send_leave_request(origin, content)
+        result = await self.handler.on_send_leave_request(origin, content, room_id)
         return 200, (200, result)
 
 
@@ -632,7 +632,7 @@ class FederationV2SendLeaveServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, JsonDict]:
-        result = await self.handler.on_send_leave_request(origin, content)
+        result = await self.handler.on_send_leave_request(origin, content, room_id)
         return 200, result
 
 
@@ -698,9 +698,9 @@ class FederationV1SendJoinServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, Tuple[int, JsonDict]]:
-        # TODO(paul): assert that room_id/event_id parsed from path actually
+        # TODO(paul): assert that event_id parsed from path actually
         #   match those given in content
-        result = await self.handler.on_send_join_request(origin, content)
+        result = await self.handler.on_send_join_request(origin, content, room_id)
         return 200, (200, result)
 
 
@@ -717,9 +717,9 @@ class FederationV2SendJoinServlet(BaseFederationServerServlet):
         room_id: str,
         event_id: str,
     ) -> Tuple[int, JsonDict]:
-        # TODO(paul): assert that room_id/event_id parsed from path actually
+        # TODO(paul): assert that event_id parsed from path actually
         #   match those given in content
-        result = await self.handler.on_send_join_request(origin, content)
+        result = await self.handler.on_send_join_request(origin, content, room_id)
         return 200, result
 
 
