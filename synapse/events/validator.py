@@ -103,20 +103,19 @@ class EventValidator:
                     "redact": {"$ref": "#/definitions/int"},
                     "state_default": {"$ref": "#/definitions/int"},
                     "users": {"$ref": "#/definitions/objectOfInts"},
-                    "users_default": {"$ref": "#/definitions/int"}
+                    "users_default": {"$ref": "#/definitions/int"},
                 },
-
                 "definitions": {
                     "int": {
                         "type": "integer",
                         "minimum": -9007199254740991,
-                        "maximum": 9007199254740991
+                        "maximum": 9007199254740991,
                     },
                     "objectOfInts": {
                         "type": "object",
-                        "additionalProperties": {"$ref": "#/definitions/int"}
-                    }
-                }
+                        "additionalProperties": {"$ref": "#/definitions/int"},
+                    },
+                },
             }
 
             try:
