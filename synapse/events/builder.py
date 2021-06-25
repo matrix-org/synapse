@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, cmp=False, frozen=True)
+@attr.s(slots=True, cmp=False, frozen=True, auto_attribs=True)
 class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.
@@ -64,31 +64,30 @@ class EventBuilder:
         _signing_key: The signing key to use to sign the event as the server
     """
 
-    _state = attr.ib(type=StateHandler)
-    _auth = attr.ib(type="Auth")
-    _store = attr.ib(type=DataStore)
-    _clock = attr.ib(type=Clock)
-    _hostname = attr.ib(type=str)
-    _signing_key = attr.ib(type=SigningKey)
+    _state: StateHandler
+    _auth: "Auth"
+    _store: DataStore
+    _clock: Clock
+    _hostname: str
+    _signing_key: SigningKey
 
-    room_version = attr.ib(type=RoomVersion)
+    room_version: RoomVersion
 
-    room_id = attr.ib(type=str)
-    type = attr.ib(type=str)
-    sender = attr.ib(type=str)
+    room_id: str
+    type: str
+    sender: str
 
-    content = attr.ib(default=attr.Factory(dict), type=JsonDict)
-    unsigned = attr.ib(default=attr.Factory(dict), type=JsonDict)
+    content: JsonDict = attr.Factory(dict)
+    unsigned: JsonDict = attr.Factory(dict)
 
     # These only exist on a subset of events, so they raise AttributeError if
     # someone tries to get them when they don't exist.
-    _state_key = attr.ib(default=None, type=Optional[str])
-    _redacts = attr.ib(default=None, type=Optional[str])
-    _origin_server_ts = attr.ib(default=None, type=Optional[int])
+    _state_key: Optional[str] = None
+    _redacts: Optional[str] = None
+    _origin_server_ts: Optional[int] = None
 
-    internal_metadata = attr.ib(
-        default=attr.Factory(lambda: _EventInternalMetadata({})),
-        type=_EventInternalMetadata,
+    internal_metadata: _EventInternalMetadata = attr.Factory(
+        lambda: _EventInternalMetadata({})
     )
 
     @property
