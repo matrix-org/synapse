@@ -1057,6 +1057,7 @@ class FederationHandler(BaseHandler):
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
         extremities = await self.store.get_oldest_events_with_depth_in_room(room_id)
+        logger.info("_maybe_backfill_inner extremities=%s", extremities)
 
         if not extremities:
             logger.debug("Not backfilling as no extremeties found.")
@@ -2161,8 +2162,16 @@ class FederationHandler(BaseHandler):
         limit = min(limit, 100)
 
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
+        logger.info(
+            "on_backfill_request get_backfill_events events(%d)=%s", len(events), events
+        )
 
         events = await filter_events_for_server(self.storage, origin, events)
+        logger.info(
+            "on_backfill_request filter_events_for_server events(%d)=%s",
+            len(events),
+            events,
+        )
 
         return events
 
