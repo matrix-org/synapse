@@ -373,14 +373,9 @@ def _is_membership_change_allowed(
             # not need to meet the allow rules.
             if do_sig_check and not caller_in_room and not caller_invited:
                 # Find the servers of any users who could issue invites.
-                authorised_users = get_users_which_can_issue_invite(auth_events)
-                # Attempt to pull out the domain from each authorised user.
-                authorised_servers = set()
-                for user in authorised_users:
-                    try:
-                        authorised_servers.add(UserID.from_string(user).domain)
-                    except SynapseError:
-                        pass
+                authorised_servers = get_servers_from_users(
+                    get_users_which_can_issue_invite(auth_events)
+                )
 
                 # Ensure one of the signatures is from one of the authorised servers.
                 # Note that it was previously checked that the signatures are
@@ -715,6 +710,25 @@ def get_users_which_can_issue_invite(auth_events: StateMap[EventBase]) -> List[s
             result.append(state_key)
 
     return result
+
+
+def get_servers_from_users(users: List[str]) -> Set[str]:
+    """
+    Resolve a list of users into their servers.
+
+    Args:
+        users: A list of users.
+
+    Returns:
+        A set of servers.
+    """
+    servers = set()
+    for user in users:
+        try:
+            servers.add(UserID.from_string(user).domain)
+        except SynapseError:
+            pass
+    return servers
 
 
 def _get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:

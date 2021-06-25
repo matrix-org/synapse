@@ -28,6 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.event_auth import get_servers_from_users, get_users_which_can_issue_invite
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import (
@@ -701,7 +702,36 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     # so don't really fit into the general auth process.
                     raise AuthError(403, "Guest access not allowed")
 
-            if not is_host_in_room:
+            # Check if a remote join should be performed.
+            remote_join = not is_host_in_room
+            if not remote_join:
+                # If the host is in the room, but not one of the authorised hosts
+                # for restricted join rules, a remote join must be used.
+                room_version = await self.store.get_room_version(room_id)
+                current_state_ids = await self.store.get_current_state_ids(room_id)
+
+                # Otherwise, check if they should be allowed access via membership in a space.
+                if await self.event_auth_handler.has_restricted_join_rules(
+                    current_state_ids, room_version
+                ):
+                    current_state_map = await self.store.get_events(
+                        current_state_ids.values()
+                    )
+                    current_state = {
+                        state_key: current_state_map[event_id]
+                        for state_key, event_id in current_state_ids.items()
+                    }
+                    allowed_servers = get_servers_from_users(
+                        get_users_which_can_issue_invite(current_state)
+                    )
+
+                    # If the local server is not one of allowed servers, use
+                    # another server to join (and override the list of servers
+                    # with those that can issue the join).
+                    remote_room_hosts = list(allowed_servers)
+                    remote_join = self.hs.hostname not in allowed_servers
+
+            if remote_join:
                 if ratelimit:
                     time_now_s = self.clock.time()
                     (
