@@ -1,0 +1,1 @@
+Fix a long-standing bug which meant that invite rejections and knocks were not sent out over federation in a timely manner.

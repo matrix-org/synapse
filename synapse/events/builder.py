@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import attr
@@ -32,6 +33,8 @@ from synapse.storage.databases.main import DataStore
 from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
+
+logger = logging.getLogger(__name__)
 
 
 @attr.s(slots=True, cmp=False, frozen=True)
@@ -100,6 +103,7 @@ class EventBuilder:
         self,
         prev_event_ids: List[str],
         auth_event_ids: Optional[List[str]],
+        depth: Optional[int] = None,
     ) -> EventBase:
         """Transform into a fully signed and hashed event
 
@@ -108,6 +112,9 @@ class EventBuilder:
             auth_event_ids: The event IDs to use as the auth events.
                 Should normally be set to None, which will cause them to be calculated
                 based on the room state at the prev_events.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             The signed and hashed event.
@@ -131,8 +138,14 @@ class EventBuilder:
             auth_events = auth_event_ids
             prev_events = prev_event_ids
 
-        old_depth = await self._store.get_max_depth_of(prev_event_ids)
-        depth = old_depth + 1
+        # Otherwise, progress the depth as normal
+        if depth is None:
+            (
+                _,
+                most_recent_prev_event_depth,
+            ) = await self._store.get_max_depth_of(prev_event_ids)
+
+            depth = most_recent_prev_event_depth + 1
 
         # we cap depth of generated events, to ensure that they are not
         # rejected by other servers (and so that they can be persisted in

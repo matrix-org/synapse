@@ -13,7 +13,12 @@
 # limitations under the License.
 from typing import TYPE_CHECKING, Collection, Optional
 
-from synapse.api.constants import EventTypes, JoinRules, Membership
+from synapse.api.constants import (
+    EventTypes,
+    JoinRules,
+    Membership,
+    RestrictedJoinRuleTypes,
+)
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
@@ -42,7 +47,7 @@ class EventAuthHandler:
         Check whether a user can join a room without an invite due to restricted join rules.
 
         When joining a room with restricted joined rules (as defined in MSC3083),
-        the membership of spaces must be checked during a room join.
+        the membership of rooms must be checked during a room join.
 
         Args:
             state_ids: The state of the room as it currently is.
@@ -67,20 +72,20 @@ class EventAuthHandler:
         if not await self.has_restricted_join_rules(state_ids, room_version):
             return
 
-        # Get the spaces which allow access to this room and check if the user is
+        # Get the rooms which allow access to this room and check if the user is
         # in any of them.
-        allowed_spaces = await self.get_spaces_that_allow_join(state_ids)
-        if not await self.is_user_in_rooms(allowed_spaces, user_id):
+        allowed_rooms = await self.get_rooms_that_allow_join(state_ids)
+        if not await self.is_user_in_rooms(allowed_rooms, user_id):
             raise AuthError(
                 403,
-                "You do not belong to any of the required spaces to join this room.",
+                "You do not belong to any of the required rooms to join this room.",
             )
 
     async def has_restricted_join_rules(
         self, state_ids: StateMap[str], room_version: RoomVersion
     ) -> bool:
         """
-        Return if the room has the proper join rules set for access via spaces.
+        Return if the room has the proper join rules set for access via rooms.
 
         Args:
             state_ids: The state of the room as it currently is.
@@ -102,17 +107,17 @@ class EventAuthHandler:
         join_rules_event = await self._store.get_event(join_rules_event_id)
         return join_rules_event.content.get("join_rule") == JoinRules.MSC3083_RESTRICTED
 
-    async def get_spaces_that_allow_join(
+    async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]
     ) -> Collection[str]:
         """
-        Generate a list of spaces which allow access to a room.
+        Generate a list of rooms in which membership allows access to a room.
 
         Args:
-            state_ids: The state of the room as it currently is.
+            state_ids: The current state of the room the user wishes to join
 
         Returns:
-            A collection of spaces which provide membership to the room.
+            A collection of room IDs. Membership in any of the rooms in the list grants the ability to join the target room.
         """
         # If there's no join rule, then it defaults to invite (so this doesn't apply).
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""), None)
@@ -123,21 +128,25 @@ class EventAuthHandler:
         join_rules_event = await self._store.get_event(join_rules_event_id)
 
         # If allowed is of the wrong form, then only allow invited users.
-        allowed_spaces = join_rules_event.content.get("allow", [])
-        if not isinstance(allowed_spaces, list):
+        allow_list = join_rules_event.content.get("allow", [])
+        if not isinstance(allow_list, list):
             return ()
 
         # Pull out the other room IDs, invalid data gets filtered.
         result = []
-        for space in allowed_spaces:
-            if not isinstance(space, dict):
+        for allow in allow_list:
+            if not isinstance(allow, dict):
                 continue
 
-            space_id = space.get("space")
-            if not isinstance(space_id, str):
+            # If the type is unexpected, skip it.
+            if allow.get("type") != RestrictedJoinRuleTypes.ROOM_MEMBERSHIP:
                 continue
 
-            result.append(space_id)
+            room_id = allow.get("room_id")
+            if not isinstance(room_id, str):
+                continue
+
+            result.append(room_id)
 
         return result
 
