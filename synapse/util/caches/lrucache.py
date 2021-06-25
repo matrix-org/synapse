@@ -105,6 +105,9 @@ class _ListNode(Generic[P]):
     been removed from the list.
     """
 
+    # A lock to protect mutating the list prev/next pointers.
+    _LOCK = threading.Lock()
+
     # We don't use attrs here as in py3.6 you can't have `attr.s(slots=True)`
     # and inherit from `Generic` for some reason
     __slots__ = [
@@ -133,12 +136,14 @@ class _ListNode(Generic[P]):
     ) -> LN:
         """Create a new list node that is placed after the given node."""
         new_node = cls(cache_entry)
-        new_node._refs_insert_after(node)
+        with cls._LOCK:
+            new_node._refs_insert_after(node)
         return new_node
 
     def remove_from_list(self):
         """Remove this node from the list."""
-        self._refs_remove_node_from_list()
+        with self._LOCK:
+            self._refs_remove_node_from_list()
 
         self.cache_entry = None
 
@@ -146,17 +151,18 @@ class _ListNode(Generic[P]):
         """Move this node from its current location in the list to after the
         given node.
         """
-        # We assert that both this node and the root node is still "alive".
-        assert self.prev_node
-        assert self.next_node
-        assert root.prev_node
-        assert root.next_node
+        with self._LOCK:
+            # We assert that both this node and the root node is still "alive".
+            assert self.prev_node
+            assert self.next_node
+            assert root.prev_node
+            assert root.next_node
 
-        # Remove self from the list
-        self._refs_remove_node_from_list()
+            # Remove self from the list
+            self._refs_remove_node_from_list()
 
-        # Insert self back into the list, after root
-        self._refs_insert_after(root)
+            # Insert self back into the list, after root
+            self._refs_insert_after(root)
 
     def _refs_remove_node_from_list(self):
         """Internal method to *just* remove the node from the list, without
@@ -679,8 +685,8 @@ class LruCache(Generic[KT, VT]):
                 node.run_and_clear_callbacks()
                 node.drop_from_lists()
 
-            list_root.next_node = list_root
-            list_root.prev_node = list_root
+            assert list_root.next_node == list_root
+            assert list_root.prev_node == list_root
 
             cache.clear()
             if size_callback:
