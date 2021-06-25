@@ -48,6 +48,9 @@ def check(
         room_version_obj: the version of the room
         event: the event being checked.
         auth_events: the existing room state.
+        do_sig_check: True if it should be verified that the sending server
+            signed the event.
+        do_size_check: True if the size of the event fields should be verified.
 
     Raises:
         AuthError if the checks fail
@@ -163,7 +166,9 @@ def check(
 
     # 5. If type is m.room.membership
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(room_version_obj, event, auth_events)
+        _is_membership_change_allowed(
+            room_version_obj, event, auth_events, do_sig_check
+        )
         logger.debug("Allowing! %s", event)
         return
 
@@ -221,7 +226,10 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def _is_membership_change_allowed(
-    room_version: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
+    room_version: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
+    do_sig_check: bool,
 ) -> None:
     """
     Confirms that the event which changes membership is an allowed change.
@@ -230,6 +238,8 @@ def _is_membership_change_allowed(
         room_version: The version of the room.
         event: The event to check.
         auth_events: The current auth events of the room.
+        do_sig_check: True if it should be verified that the sending server
+            signed the event.
 
     Raises:
         AuthError if the event is not allowed.
@@ -353,12 +363,15 @@ def _is_membership_change_allowed(
             room_version.msc3083_join_rules
             and join_rule == JoinRules.MSC3083_RESTRICTED
         ):
-            # This is the same as public, but the must be signed by a server
+            # This is the same as public, but the event must be signed by a server
             # whose users could issue invites.
+            #
+            # Signatures are only checked once the event is fully created, e.g.
+            # not during make_join,
             #
             # Note that if the caller is in the room or invited, then they do
             # not need to meet the allow rules.
-            if not caller_in_room and not caller_invited:
+            if do_sig_check and not caller_in_room and not caller_invited:
                 # Find the servers of any users who could issue invites.
                 authorised_users = get_users_which_can_issue_invite(auth_events)
                 # Attempt to pull out the domain from each authorised user.

@@ -351,8 +351,10 @@ class EventAuthTestCase(unittest.TestCase):
         Test joining a restricted room from MSC3083.
 
         This is similar to the public test, but has some additional checks on
-        signatures. This fakes the signatures by simply adding them to the object,
-        not generating valid signatures.
+        signatures.
+
+        The checks which care about signatures fake them by simply adding an
+        object of the proper form, not generating valid signatures.
         """
         creator = "@creator:example.com"
         pleb = "@joiner:example.com"
@@ -375,29 +377,28 @@ class EventAuthTestCase(unittest.TestCase):
 
         # Check join.
         event = _join_event(pleb)
-        event.signatures["example.com"] = {}
+        event.signatures["example.com"] = {"alg": "sig"}
         event_auth.check(
             RoomVersions.MSC3083,
             event,
             auth_events,
-            do_sig_check=False,
         )
 
         # Check server from specific user.
         pl_auth_events = auth_events.copy()
         pl_auth_events[("m.room.power_levels", "")] = _power_levels_event(
-            creator, {"invite": 100, "users": {"@other:foo.test": 150}}
+            creator, {"invite": 100, "users": {"@inviter:foo.test": 150}}
         )
-        pl_auth_events[("m.room.member", "@other:foo.test")] = _join_event(
-            "@other:foo.test"
+        pl_auth_events[("m.room.member", "@inviter:foo.test")] = _join_event(
+            "@inviter:foo.test"
         )
         event = _join_event(pleb)
-        event.signatures["foo.test"] = {}
+        event.signatures["foo.test"] = {"alg": "sig"}
+        event.signatures["example.com"] = {"alg": "sig"}
         event_auth.check(
             RoomVersions.MSC3083,
             event,
             pl_auth_events,
-            do_sig_check=False,
         )
 
         # Missing signature.
@@ -406,8 +407,10 @@ class EventAuthTestCase(unittest.TestCase):
                 RoomVersions.MSC3083,
                 _join_event(pleb),
                 auth_events,
-                do_sig_check=False,
             )
+
+        # Note that the rest of the tests don't care about the signatures, they're
+        # testing more generic join rule behaviour.
 
         # A user cannot be force-joined to a room.
         with self.assertRaises(AuthError):
