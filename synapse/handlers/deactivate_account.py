@@ -146,10 +146,8 @@ class DeactivateAccountHandler(BaseHandler):
                     user, requester, "", by_admin
                 )
             except StoreError as e:
-                # catch only 404 if user does not have a profile
-                if e.code == 404:
-                    pass
-                else:
+                # bypass only 404 if user does not have a profile
+                if e.code != 404:
                     raise e
 
             logger.info("Marking %s as erased", user_id)
