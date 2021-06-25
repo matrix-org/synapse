@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import pymacaroons
 from netaddr import IPAddress
@@ -31,6 +31,7 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
+from synapse.events.builder import EventBuilder
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
@@ -490,7 +491,7 @@ class Auth:
 
     def compute_auth_events(
         self,
-        event,
+        event: Union[EventBase, EventBuilder],
         current_state_ids: StateMap[str],
         for_verification: bool = False,
     ) -> List[str]:
