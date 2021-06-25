@@ -318,7 +318,8 @@ class SpaceSummaryHandler:
 
         Returns:
             A tuple of:
-                An iterable of a single value of the room.
+                The room information, if it the room should be returned to the
+                user. None, otherwise.
 
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
