@@ -1954,7 +1954,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     async def on_send_membership_event(
-        self, origin: str, event: EventBase
+        self, origin: str, event: EventBase, room_version: RoomVersion
     ) -> EventContext:
         """
         We have received a join/leave/knock event for a room via send_join/leave/knock.
@@ -1976,6 +1976,7 @@ class FederationHandler(BaseHandler):
         Args:
             origin: The homeserver of the remote (joining/invited/knocking) user.
             event: The member event that has been signed by the remote homeserver.
+            room_version: The room version object for the event's room.
 
         Returns:
             The context of the event after inserting it into the room graph.
@@ -2008,6 +2009,17 @@ class FederationHandler(BaseHandler):
         # may not have an up-to-date list of the other homeservers participating in
         # the room, so we send it on their behalf.
         event.internal_metadata.send_on_behalf_of = origin
+
+        # Sign the event since we're vouching on behalf of the remote server that
+        # the event is valid to be sent into the room.
+        event.signatures.update(
+            compute_event_signature(
+                room_version,
+                event.get_pdu_json(),
+                self.hs.hostname,
+                self.hs.signing_key,
+            )
+        )
 
         context = await self.state_handler.compute_event_context(event)
         context = await self._check_event_auth(origin, event, context)

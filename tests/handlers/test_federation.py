@@ -251,7 +251,10 @@ class FederationTestCase(unittest.HomeserverTestCase):
         join_event.signatures[other_server] = {"x": "y"}
         with LoggingContext("send_join"):
             d = run_in_background(
-                self.handler.on_send_membership_event, other_server, join_event
+                self.handler.on_send_membership_event,
+                other_server,
+                join_event,
+                RoomVersions.V6,
             )
         self.get_success(d)
 
