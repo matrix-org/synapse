@@ -1,0 +1,1 @@
+Add SSO external_ids to Query User Account admin API.
