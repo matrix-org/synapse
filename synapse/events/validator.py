@@ -118,11 +118,19 @@ class EventValidator:
                 },
             }
 
+            validator = jsonschema.validators.validator_for(powerLevelsSchema)
+
+            type_checker = validator.TYPE_CHECKER.redefine("object", self._is_object)
+
+            CustomValidator = jsonschema.validators.extend(
+                validator, type_checker=type_checker
+            )
+
             try:
                 jsonschema.validate(
                     instance=event.content,
                     schema=powerLevelsSchema,
-                    types={"object": (dict, frozendict.frozendict)},
+                    cls=CustomValidator,
                 )
             except jsonschema.ValidationError as e:
                 raise SynapseError(
@@ -229,3 +237,8 @@ class EventValidator:
     def _ensure_state_event(self, event):
         if not event.is_state():
             raise SynapseError(400, "'%s' must be state events" % (event.type,))
+
+    def _is_object(self, checker, instance):
+        if isinstance(instance, (dict, frozendict.frozendict)):
+            return True
+        return False
