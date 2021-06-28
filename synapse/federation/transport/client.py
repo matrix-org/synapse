@@ -1,5 +1,5 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -220,7 +220,8 @@ class TransportLayerClient:
             Fails with ``FederationDeniedError`` if the remote destination
             is not in our federation whitelist
         """
-        valid_memberships = {Membership.JOIN, Membership.LEAVE}
+        valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
+
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -320,6 +321,40 @@ class TransportLayerClient:
         )
 
         return response
+
+    @log_function
+    async def send_knock_v1(
+        self,
+        destination: str,
+        room_id: str,
+        event_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
+        """
+        Sends a signed knock membership event to a remote server. This is the second
+        step for knocking after make_knock.
+
+        Args:
+            destination: The remote homeserver.
+            room_id: The ID of the room to knock on.
+            event_id: The ID of the knock membership event that we're sending.
+            content: The knock membership event that we're sending. Note that this is not the
+                `content` field of the membership event, but the entire signed membership event
+                itself represented as a JSON dict.
+
+        Returns:
+            The remote homeserver can optionally return some state from the room. The response
+            dictionary is in the form:
+
+            {"knock_state_events": [<state event dict>, ...]}
+
+            The list of state events may be empty.
+        """
+        path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
+
+        return await self.client.put_json(
+            destination=destination, path=path, data=content
+        )
 
     @log_function
     async def send_invite_v1(self, destination, room_id, event_id, content):

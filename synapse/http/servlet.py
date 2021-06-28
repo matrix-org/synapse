@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
-
 import logging
 from typing import Dict, Iterable, List, Optional, overload
 
@@ -295,6 +294,30 @@ def parse_strings_from_args(
         return default
 
 
+@overload
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    required: Literal[True] = True,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> str:
+    ...
+
+
+@overload
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[str]:
+    ...
+
+
 def parse_string_from_args(
     args: Dict[bytes, List[bytes]],
     name: str,
@@ -431,7 +454,7 @@ class RestServlet:
     """
 
     def register(self, http_server):
-        """ Register this servlet with the given HTTP server. """
+        """Register this servlet with the given HTTP server."""
         patterns = getattr(self, "PATTERNS", None)
         if patterns:
             for method in ("GET", "PUT", "POST", "DELETE"):

@@ -41,7 +41,12 @@ from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
 from synapse.http.site import SynapseRequest
-from synapse.types import JsonDict, UserID, contains_invalid_mxid_characters
+from synapse.types import (
+    JsonDict,
+    UserID,
+    contains_invalid_mxid_characters,
+    create_requester,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.stringutils import random_string
 
@@ -185,10 +190,13 @@ class SsoHandler:
         self._auth_handler = hs.get_auth_handler()
         self._error_template = hs.config.sso_error_template
         self._bad_user_template = hs.config.sso_auth_bad_user_template
+        self._profile_handler = hs.get_profile_handler()
 
         # The following template is shown after a successful user interactive
         # authentication session. It tells the user they can close the window.
         self._sso_auth_success_template = hs.config.sso_auth_success_template
+
+        self._sso_update_profile_information = hs.config.sso_update_profile_information
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
@@ -458,6 +466,21 @@ class SsoHandler:
                     request.getClientIP(),
                 )
                 new_user = True
+            elif self._sso_update_profile_information:
+                attributes = await self._call_attribute_mapper(sso_to_matrix_id_mapper)
+                if attributes.display_name:
+                    user_id_obj = UserID.from_string(user_id)
+                    profile_display_name = await self._profile_handler.get_displayname(
+                        user_id_obj
+                    )
+                    if profile_display_name != attributes.display_name:
+                        requester = create_requester(
+                            user_id,
+                            authenticated_entity=user_id,
+                        )
+                        await self._profile_handler.set_displayname(
+                            user_id_obj, requester, attributes.display_name, True
+                        )
 
         await self._auth_handler.complete_sso_login(
             user_id,

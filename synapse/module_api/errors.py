@@ -15,3 +15,4 @@
 """Exception types which are exposed as part of the stable module API"""
 
 from synapse.api.errors import RedirectException, SynapseError  # noqa: F401
+from synapse.config._base import ConfigError  # noqa: F401

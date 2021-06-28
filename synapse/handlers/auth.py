@@ -302,6 +302,7 @@ class AuthHandler(BaseHandler):
         request: SynapseRequest,
         request_body: Dict[str, Any],
         description: str,
+        can_skip_ui_auth: bool = False,
     ) -> Tuple[dict, Optional[str]]:
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -319,6 +320,10 @@ class AuthHandler(BaseHandler):
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
+
+            can_skip_ui_auth: True if the UI auth session timeout applies this
+                              action. Should be set to False for any "dangerous"
+                              actions (e.g. deactivating an account).
 
         Returns:
             A tuple of (params, session_id).
@@ -343,7 +348,7 @@ class AuthHandler(BaseHandler):
         """
         if not requester.access_token_id:
             raise ValueError("Cannot validate a user without an access token")
-        if self._ui_auth_session_timeout:
+        if can_skip_ui_auth and self._ui_auth_session_timeout:
             last_validated = await self.store.get_access_token_last_validated(
                 requester.access_token_id
             )
