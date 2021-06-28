@@ -90,11 +90,11 @@ class FederationBase:
 
         if result:
             logger.warning(
-                "Event contains spam, redacting %s: %s",
+                "Event contains spam, soft-failing %s: %s",
                 pdu.event_id,
                 pdu.get_pdu_json(),
             )
-            return prune_event(pdu)
+            pdu.internal_metadata.soft_failed = True
 
         return pdu
 
