@@ -319,7 +319,7 @@ class SpaceSummaryHandler:
 
         Returns:
             A tuple of:
-                The room information, if it the room should be returned to the
+                The room information, if the room should be returned to the
                 user. None, otherwise.
 
                 An iterable of the sorted children events. This may be limited
@@ -330,7 +330,7 @@ class SpaceSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id)
 
-        # If the the room is not a space, return just the room information.
+        # If the room is not a space, return just the room information.
         if room_entry.get("room_type") != RoomTypes.SPACE:
             return room_entry, ()
 
