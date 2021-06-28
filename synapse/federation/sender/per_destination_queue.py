@@ -287,6 +287,13 @@ class PerDestinationQueue:
                             len(pending_pdus),
                         )
 
+                        # Filter out HQ traffic for now
+                        pending_pdus = [
+                            pdu
+                            for pdu in pending_pdus
+                            if pdu.room_id != "!OGEhHVWSdvArJzumhm:matrix.org"
+                        ]
+
                     await self._transaction_manager.send_new_transaction(
                         self._destination, pending_pdus, pending_edus
                     )
