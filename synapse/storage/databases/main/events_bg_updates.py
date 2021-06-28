@@ -29,6 +29,12 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
+class _BackgroundUpdates:
+    EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
+    EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
+    DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
+
+
 @attr.s(slots=True, frozen=True)
 class _CalculateChainCover:
     """Return value for _calculate_chain_cover_txn."""
@@ -48,19 +54,15 @@ class _CalculateChainCover:
 
 
 class EventsBackgroundUpdatesStore(SQLBaseStore):
-
-    EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
-    EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
-    DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
-
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
         self.db_pool.updates.register_background_update_handler(
-            self.EVENT_ORIGIN_SERVER_TS_NAME, self._background_reindex_origin_server_ts
+            _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME,
+            self._background_reindex_origin_server_ts,
         )
         self.db_pool.updates.register_background_update_handler(
-            self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME,
+            _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME,
             self._background_reindex_fields_sender,
         )
 
@@ -85,7 +87,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            self.DELETE_SOFT_FAILED_EXTREMITIES, self._cleanup_extremities_bg_update
+            _BackgroundUpdates.DELETE_SOFT_FAILED_EXTREMITIES,
+            self._cleanup_extremities_bg_update,
         )
 
         self.db_pool.updates.register_background_update_handler(
@@ -190,18 +193,18 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             }
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, progress
+                txn, _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, progress
             )
 
             return len(rows)
 
         result = await self.db_pool.runInteraction(
-            self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
+            _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME, reindex_txn
         )
 
         if not result:
             await self.db_pool.updates._end_background_update(
-                self.EVENT_FIELDS_SENDER_URL_UPDATE_NAME
+                _BackgroundUpdates.EVENT_FIELDS_SENDER_URL_UPDATE_NAME
             )
 
         return result
@@ -264,18 +267,18 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             }
 
             self.db_pool.updates._background_update_progress_txn(
-                txn, self.EVENT_ORIGIN_SERVER_TS_NAME, progress
+                txn, _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME, progress
             )
 
             return len(rows_to_update)
 
         result = await self.db_pool.runInteraction(
-            self.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
+            _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME, reindex_search_txn
         )
 
         if not result:
             await self.db_pool.updates._end_background_update(
-                self.EVENT_ORIGIN_SERVER_TS_NAME
+                _BackgroundUpdates.EVENT_ORIGIN_SERVER_TS_NAME
             )
 
         return result
@@ -454,7 +457,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         if not num_handled:
             await self.db_pool.updates._end_background_update(
-                self.DELETE_SOFT_FAILED_EXTREMITIES
+                _BackgroundUpdates.DELETE_SOFT_FAILED_EXTREMITIES
             )
 
             def _drop_table_txn(txn):
