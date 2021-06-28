@@ -125,7 +125,7 @@ class EventBuilder:
             state_ids = await self._state.get_current_state_ids(
                 self.room_id, prev_event_ids
             )
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
+            auth_event_ids = await self._event_auth_handler.compute_auth_events(
                 self, state_ids
             )
 

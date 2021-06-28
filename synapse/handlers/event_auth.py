@@ -52,7 +52,7 @@ class EventAuthHandler:
             room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
         )
 
-    def compute_auth_events(
+    async def compute_auth_events(
         self,
         event: Union[EventBase, EventBuilder],
         current_state_ids: StateMap[str],
