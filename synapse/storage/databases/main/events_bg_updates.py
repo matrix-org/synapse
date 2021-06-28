@@ -29,10 +29,23 @@ from synapse.types import JsonDict
 logger = logging.getLogger(__name__)
 
 
+_REPLACE_STREAM_ORDRING_SQL_COMMANDS = (
+    # there should be no leftover rows without a stream_ordering2, but just in case...
+    "UPDATE events SET stream_ordering2 = stream_ordering WHERE stream_ordering2 IS NULL",
+    # finally, we can drop the rule and switch the columns
+    "DROP RULE populate_stream_ordering2 ON events",
+    "ALTER TABLE events DROP COLUMN stream_ordering",
+    "ALTER TABLE events RENAME COLUMN stream_ordering2 TO stream_ordering",
+)
+
+
 class _BackgroundUpdates:
     EVENT_ORIGIN_SERVER_TS_NAME = "event_origin_server_ts"
     EVENT_FIELDS_SENDER_URL_UPDATE_NAME = "event_fields_sender_url"
     DELETE_SOFT_FAILED_EXTREMITIES = "delete_soft_failed_extremities"
+    POPULATE_STREAM_ORDERING2 = "populate_stream_ordering2"
+    INDEX_STREAM_ORDERING2 = "index_stream_ordering2"
+    REPLACE_STREAM_ORDERING_COLUMN = "replace_stream_ordering_column"
 
 
 @attr.s(slots=True, frozen=True)
@@ -140,6 +153,24 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             "purged_chain_cover",
             self._purged_chain_cover_index,
+        )
+
+        # bg updates for replacing stream_ordering with a BIGINT
+        # (these only run on postgres.)
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.POPULATE_STREAM_ORDERING2,
+            self._background_populate_stream_ordering2,
+        )
+        self.db_pool.updates.register_background_index_update(
+            _BackgroundUpdates.INDEX_STREAM_ORDERING2,
+            index_name="events_stream_ordering",
+            table="events",
+            columns=["stream_ordering2"],
+            unique=True,
+        )
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.REPLACE_STREAM_ORDERING_COLUMN,
+            self._background_replace_stream_ordering_column,
         )
 
     async def _background_reindex_fields_sender(self, progress, batch_size):
@@ -1012,3 +1043,75 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             await self.db_pool.updates._end_background_update("purged_chain_cover")
 
         return result
+
+    async def _background_populate_stream_ordering2(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Populate events.stream_ordering2, then replace stream_ordering
+
+        This is to deal with the fact that stream_ordering was initially created as a
+        32-bit integer field.
+        """
+        batch_size = max(batch_size, 1)
+
+        def process(txn: Cursor) -> int:
+            # if this is the first pass, find the minimum stream ordering
+            last_stream = progress.get("last_stream")
+            if last_stream is None:
+                txn.execute(
+                    """
+                    SELECT stream_ordering FROM events ORDER BY stream_ordering LIMIT 1
+                    """
+                )
+                rows = txn.fetchall()
+                if not rows:
+                    return 0
+                last_stream = rows[0][0] - 1
+
+            txn.execute(
+                """
+                UPDATE events SET stream_ordering2=stream_ordering
+                WHERE stream_ordering > ? AND stream_ordering <= ?
+                """,
+                (last_stream, last_stream + batch_size),
+            )
+            row_count = txn.rowcount
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                _BackgroundUpdates.POPULATE_STREAM_ORDERING2,
+                {"last_stream": last_stream + batch_size},
+            )
+            return row_count
+
+        result = await self.db_pool.runInteraction(
+            "_background_populate_stream_ordering2", process
+        )
+
+        if result != 0:
+            return result
+
+        await self.db_pool.updates._end_background_update(
+            _BackgroundUpdates.POPULATE_STREAM_ORDERING2
+        )
+        return 0
+
+    async def _background_replace_stream_ordering_column(
+        self, progress: JsonDict, batch_size: int
+    ) -> int:
+        """Drop the old 'stream_ordering' column and rename 'stream_ordering2' into its place."""
+
+        def process(txn: Cursor) -> None:
+            for sql in _REPLACE_STREAM_ORDRING_SQL_COMMANDS:
+                logger.info("completing stream_ordering migration: %s", sql)
+                txn.execute(sql)
+
+        await self.db_pool.runInteraction(
+            "_background_replace_stream_ordering_column", process
+        )
+
+        await self.db_pool.updates._end_background_update(
+            _BackgroundUpdates.REPLACE_STREAM_ORDERING_COLUMN
+        )
+
+        return 0
