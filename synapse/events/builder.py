@@ -35,6 +35,7 @@ from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.api.auth import Auth
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ class EventBuilder:
 
 
 class EventBuilderFactory:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
@@ -194,15 +195,14 @@ class EventBuilderFactory:
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
 
-    def new(self, room_version, key_values):
+    def new(self, room_version: str, key_values: dict) -> EventBuilder:
         """Generate an event builder appropriate for the given room version
 
         Deprecated: use for_room_version with a RoomVersion object instead
 
         Args:
-            room_version (str): Version of the room that we're creating an event builder
-                for
-            key_values (dict): Fields used as the basis of the new event
+            room_version: Version of the room that we're creating an event builder for
+            key_values: Fields used as the basis of the new event
 
         Returns:
             EventBuilder
@@ -213,13 +213,15 @@ class EventBuilderFactory:
             raise UnsupportedRoomVersionError()
         return self.for_room_version(v, key_values)
 
-    def for_room_version(self, room_version, key_values):
+    def for_room_version(
+        self, room_version: RoomVersion, key_values: dict
+    ) -> EventBuilder:
         """Generate an event builder appropriate for the given room version
 
         Args:
-            room_version (synapse.api.room_versions.RoomVersion):
+            room_version:
                 Version of the room that we're creating an event builder for
-            key_values (dict): Fields used as the basis of the new event
+            key_values: Fields used as the basis of the new event
 
         Returns:
             EventBuilder
@@ -287,15 +289,15 @@ def create_local_event_from_event_dict(
 _event_id_counter = 0
 
 
-def _create_event_id(clock, hostname):
+def _create_event_id(clock: Clock, hostname: str) -> str:
     """Create a new event ID
 
     Args:
-        clock (Clock)
-        hostname (str): The server name for the event ID
+        clock
+        hostname: The server name for the event ID
 
     Returns:
-        str
+        The new event ID
     """
 
     global _event_id_counter
