@@ -4,6 +4,7 @@
   * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
+- [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
   * [Parameters](#parameters-1)
   * [Response](#response)
@@ -442,7 +443,7 @@ with a body of:
 ```
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [README.rst](README.rst).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 A response body like the following is returned:
 

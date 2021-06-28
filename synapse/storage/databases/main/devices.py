@@ -1053,7 +1053,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         # Map of (user_id, device_id) -> bool. If there is an entry that implies
         # the device exists.
         self.device_id_exists_cache = LruCache(
-            cache_name="device_id_exists", keylen=2, max_size=10000
+            cache_name="device_id_exists", max_size=10000
         )
 
     async def store_device(
@@ -1282,7 +1282,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
         )
 
         txn.call_after(self.get_cached_devices_for_user.invalidate, (user_id,))
-        txn.call_after(self._get_cached_user_device.invalidate_many, (user_id,))
+        txn.call_after(self._get_cached_user_device.invalidate, (user_id,))
         txn.call_after(
             self.get_device_list_last_stream_id_for_remote.invalidate, (user_id,)
         )

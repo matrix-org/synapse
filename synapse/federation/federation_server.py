@@ -34,7 +34,7 @@ from twisted.internet import defer
 from twisted.internet.abstract import isIPAddress
 from twisted.python import failure
 
-from synapse.api.constants import EduTypes, EventTypes
+from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -46,6 +46,7 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
+from synapse.events.snapshot import EventContext
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
 from synapse.federation.units import Edu, Transaction
@@ -129,7 +130,7 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(
             hs.get_clock(), "state_resp", timeout_ms=30000
-        )  # type: ResponseCache[Tuple[str, str]]
+        )  # type: ResponseCache[Tuple[str, Optional[str]]]
         self._state_ids_resp_cache = ResponseCache(
             hs.get_clock(), "state_ids_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
@@ -137,6 +138,8 @@ class FederationServer(FederationBase):
         self._federation_metrics_domains = (
             hs.config.federation.federation_metrics_domains
         )
+
+        self._room_prejoin_state_types = hs.config.api.room_prejoin_state
 
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
@@ -406,7 +409,7 @@ class FederationServer(FederationBase):
         )
 
     async def on_room_state_request(
-        self, origin: str, room_id: str, event_id: str
+        self, origin: str, room_id: str, event_id: Optional[str]
     ) -> Tuple[int, Dict[str, Any]]:
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
@@ -463,7 +466,7 @@ class FederationServer(FederationBase):
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
-        self, room_id: str, event_id: str
+        self, room_id: str, event_id: Optional[str]
     ) -> Dict[str, list]:
         if event_id:
             pdus = await self.handler.get_state_for_pdu(
@@ -535,26 +538,21 @@ class FederationServer(FederationBase):
         return {"event": ret_pdu.get_pdu_json(time_now)}
 
     async def on_send_join_request(
-        self, origin: str, content: JsonDict
+        self, origin: str, content: JsonDict, room_id: str
     ) -> Dict[str, Any]:
-        logger.debug("on_send_join_request: content: %s", content)
+        context = await self._on_send_membership_event(
+            origin, content, Membership.JOIN, room_id
+        )
 
-        assert_params_in_dict(content, ["room_id"])
-        room_version = await self.store.get_room_version(content["room_id"])
-        pdu = event_from_pdu_json(content, room_version)
+        prev_state_ids = await context.get_prev_state_ids()
+        state_ids = list(prev_state_ids.values())
+        auth_chain = await self.store.get_auth_chain(room_id, state_ids)
+        state = await self.store.get_events(state_ids)
 
-        origin_host, _ = parse_server_name(origin)
-        await self.check_server_matches_acl(origin_host, pdu.room_id)
-
-        logger.debug("on_send_join_request: pdu sigs: %s", pdu.signatures)
-
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
-
-        res_pdus = await self.handler.on_send_join_request(origin, pdu)
         time_now = self._clock.time_msec()
         return {
-            "state": [p.get_pdu_json(time_now) for p in res_pdus["state"]],
-            "auth_chain": [p.get_pdu_json(time_now) for p in res_pdus["auth_chain"]],
+            "state": [p.get_pdu_json(time_now) for p in state.values()],
+            "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
         }
 
     async def on_make_leave_request(
@@ -569,22 +567,146 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
 
-    async def on_send_leave_request(self, origin: str, content: JsonDict) -> dict:
+    async def on_send_leave_request(
+        self, origin: str, content: JsonDict, room_id: str
+    ) -> dict:
         logger.debug("on_send_leave_request: content: %s", content)
+        await self._on_send_membership_event(origin, content, Membership.LEAVE, room_id)
+        return {}
 
+    async def on_make_knock_request(
+        self, origin: str, room_id: str, user_id: str, supported_versions: List[str]
+    ) -> Dict[str, Union[EventBase, str]]:
+        """We've received a /make_knock/ request, so we create a partial knock
+        event for the room and hand that back, along with the room version, to the knocking
+        homeserver. We do *not* persist or process this event until the other server has
+        signed it and sent it back.
+
+        Args:
+            origin: The (verified) server name of the requesting server.
+            room_id: The room to create the knock event in.
+            user_id: The user to create the knock for.
+            supported_versions: The room versions supported by the requesting server.
+
+        Returns:
+            The partial knock event.
+        """
+        origin_host, _ = parse_server_name(origin)
+        await self.check_server_matches_acl(origin_host, room_id)
+
+        room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room version is supported by the remote homeserver
+        if room_version.identifier not in supported_versions:
+            logger.warning(
+                "Room version %s not in %s", room_version.identifier, supported_versions
+            )
+            raise IncompatibleRoomVersionError(room_version=room_version.identifier)
+
+        # Check that this room supports knocking as defined by its room version
+        if not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
+        time_now = self._clock.time_msec()
+        return {
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version.identifier,
+        }
+
+    async def on_send_knock_request(
+        self,
+        origin: str,
+        content: JsonDict,
+        room_id: str,
+    ) -> Dict[str, List[JsonDict]]:
+        """
+        We have received a knock event for a room. Verify and send the event into the room
+        on the knocking homeserver's behalf. Then reply with some stripped state from the
+        room for the knockee.
+
+        Args:
+            origin: The remote homeserver of the knocking user.
+            content: The content of the request.
+            room_id: The ID of the room to knock on.
+
+        Returns:
+            The stripped room state.
+        """
+        event_context = await self._on_send_membership_event(
+            origin, content, Membership.KNOCK, room_id
+        )
+
+        # Retrieve stripped state events from the room and send them back to the remote
+        # server. This will allow the remote server's clients to display information
+        # related to the room while the knock request is pending.
+        stripped_room_state = (
+            await self.store.get_stripped_room_state_from_event_context(
+                event_context, self._room_prejoin_state_types
+            )
+        )
+        return {"knock_state_events": stripped_room_state}
+
+    async def _on_send_membership_event(
+        self, origin: str, content: JsonDict, membership_type: str, room_id: str
+    ) -> EventContext:
+        """Handle an on_send_{join,leave,knock} request
+
+        Does some preliminary validation before passing the request on to the
+        federation handler.
+
+        Args:
+            origin: The (authenticated) requesting server
+            content: The body of the send_* request - a complete membership event
+            membership_type: The expected membership type (join or leave, depending
+                on the endpoint)
+            room_id: The room_id from the request, to be validated against the room_id
+                in the event
+
+        Returns:
+            The context of the event after inserting it into the room graph.
+
+        Raises:
+            SynapseError if there is a problem with the request, including things like
+               the room_id not matching or the event not being authorized.
+        """
         assert_params_in_dict(content, ["room_id"])
-        room_version = await self.store.get_room_version(content["room_id"])
-        pdu = event_from_pdu_json(content, room_version)
+        if content["room_id"] != room_id:
+            raise SynapseError(
+                400,
+                "Room ID in body does not match that in request path",
+                Codes.BAD_JSON,
+            )
+
+        room_version = await self.store.get_room_version(room_id)
+
+        if membership_type == Membership.KNOCK and not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
+        event = event_from_pdu_json(content, room_version)
+
+        if event.type != EventTypes.Member or not event.is_state():
+            raise SynapseError(400, "Not an m.room.member event", Codes.BAD_JSON)
+
+        if event.content.get("membership") != membership_type:
+            raise SynapseError(400, "Not a %s event" % membership_type, Codes.BAD_JSON)
 
         origin_host, _ = parse_server_name(origin)
-        await self.check_server_matches_acl(origin_host, pdu.room_id)
+        await self.check_server_matches_acl(origin_host, event.room_id)
 
-        logger.debug("on_send_leave_request: pdu sigs: %s", pdu.signatures)
+        logger.debug("_on_send_membership_event: pdu sigs: %s", event.signatures)
 
-        pdu = await self._check_sigs_and_hash(room_version, pdu)
+        event = await self._check_sigs_and_hash(room_version, event)
 
-        await self.handler.on_send_leave_request(origin, pdu)
-        return {}
+        return await self.handler.on_send_membership_event(origin, event)
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str

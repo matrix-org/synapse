@@ -32,7 +32,12 @@ from synapse.api.urls import (
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
-from synapse.app._base import max_request_body_size, register_start
+from synapse.app._base import (
+    handle_startup_exception,
+    max_request_body_size,
+    redirect_stdio_to_logs,
+    register_start,
+)
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
@@ -61,7 +66,6 @@ from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
 from synapse.replication.slave.storage.room import RoomStore
-from synapse.replication.slave.storage.transactions import SlavedTransactionStore
 from synapse.rest.admin import register_servlets_for_media_repo
 from synapse.rest.client.v1 import events, login, presence, room
 from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
@@ -110,7 +114,7 @@ from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import PresenceStore
-from synapse.storage.databases.main.search import SearchWorkerStore
+from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
 from synapse.storage.databases.main.ui_auth import UIAuthWorkerStore
@@ -237,14 +241,13 @@ class GenericWorkerSlavedStore(
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
-    SlavedTransactionStore,
     SlavedProfileStore,
     SlavedClientIpStore,
     SlavedFilteringStore,
     MonthlyActiveUsersWorkerStore,
     MediaRepositoryStore,
     ServerMetricsStore,
-    SearchWorkerStore,
+    SearchStore,
     TransactionWorkerStore,
     BaseSlavedStore,
 ):
@@ -355,6 +358,10 @@ class GenericWorkerServer(HomeServer):
 
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
+
+        # Attach additional resources registered by modules.
+        resources.update(self._module_web_resources)
+        self._module_web_resources_consumed = True
 
         root_resource = create_resource_tree(resources, OptionsResource())
 
@@ -467,13 +474,20 @@ def start(config_options):
 
     setup_logging(hs, config, use_worker_options=True)
 
-    hs.setup()
+    try:
+        hs.setup()
 
-    # Ensure the replication streamer is always started in case we write to any
-    # streams. Will no-op if no streams can be written to by this worker.
-    hs.get_replication_streamer()
+        # Ensure the replication streamer is always started in case we write to any
+        # streams. Will no-op if no streams can be written to by this worker.
+        hs.get_replication_streamer()
+    except Exception as e:
+        handle_startup_exception(e)
 
     register_start(_base.start, hs)
+
+    # redirect stdio to the logs, if configured.
+    if not hs.config.no_redirect_stdio:
+        redirect_stdio_to_logs()
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

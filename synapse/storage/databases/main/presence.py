@@ -50,7 +50,7 @@ class PresenceStore(SQLBaseStore):
                 instance_name=self._instance_name,
                 tables=[("presence_stream", "instance_name", "stream_id")],
                 sequence_name="presence_stream_sequence",
-                writers=hs.config.worker.writers.to_device,
+                writers=hs.config.worker.writers.presence,
             )
         else:
             self._presence_id_gen = StreamIdGenerator(
@@ -97,6 +97,15 @@ class PresenceStore(SQLBaseStore):
             )
             txn.call_after(self._get_presence_for_user.invalidate, (state.user_id,))
 
+        # Delete old rows to stop database from getting really big
+        sql = "DELETE FROM presence_stream WHERE stream_id < ? AND "
+
+        for states in batch_iter(presence_states, 50):
+            clause, args = make_in_list_sql_clause(
+                self.database_engine, "user_id", [s.user_id for s in states]
+            )
+            txn.execute(sql + clause, [stream_id] + list(args))
+
         # Actually insert new rows
         self.db_pool.simple_insert_many_txn(
             txn,
@@ -116,15 +125,6 @@ class PresenceStore(SQLBaseStore):
                 for stream_id, state in zip(stream_orderings, presence_states)
             ],
         )
-
-        # Delete old rows to stop database from getting really big
-        sql = "DELETE FROM presence_stream WHERE stream_id < ? AND "
-
-        for states in batch_iter(presence_states, 50):
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "user_id", [s.user_id for s in states]
-            )
-            txn.execute(sql + clause, [stream_id] + list(args))
 
     async def get_all_presence_updates(
         self, instance_name: str, last_id: int, current_id: int, limit: int

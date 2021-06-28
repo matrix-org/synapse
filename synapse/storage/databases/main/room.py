@@ -19,7 +19,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from synapse.api.constants import EventTypes
+from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.storage._base import SQLBaseStore, db_to_json
@@ -177,11 +177,13 @@ class RoomWorkerStore(SQLBaseStore):
                 INNER JOIN room_stats_current USING (room_id)
                 WHERE
                     (
-                        join_rules = 'public' OR history_visibility = 'world_readable'
+                        join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                        OR history_visibility = 'world_readable'
                     )
                     AND joined_members > 0
             """ % {
-                "published_sql": published_sql
+                "published_sql": published_sql,
+                "knock_join_rule": JoinRules.KNOCK,
             }
 
             txn.execute(sql, query_args)
@@ -303,7 +305,7 @@ class RoomWorkerStore(SQLBaseStore):
         sql = """
             SELECT
                 room_id, name, topic, canonical_alias, joined_members,
-                avatar, history_visibility, joined_members, guest_access
+                avatar, history_visibility, guest_access, join_rules
             FROM (
                 %(published_sql)s
             ) published
@@ -311,7 +313,8 @@ class RoomWorkerStore(SQLBaseStore):
             INNER JOIN room_stats_current USING (room_id)
             WHERE
                 (
-                    join_rules = 'public' OR history_visibility = 'world_readable'
+                    join_rules = 'public' OR join_rules = '%(knock_join_rule)s'
+                    OR history_visibility = 'world_readable'
                 )
                 AND joined_members > 0
                 %(where_clause)s
@@ -320,6 +323,7 @@ class RoomWorkerStore(SQLBaseStore):
             "published_sql": published_sql,
             "where_clause": where_clause,
             "dir": "DESC" if forwards else "ASC",
+            "knock_join_rule": JoinRules.KNOCK,
         }
 
         if limit is not None:
@@ -764,14 +768,15 @@ class RoomWorkerStore(SQLBaseStore):
         self,
         server_name: str,
         media_id: str,
-        quarantined_by: str,
+        quarantined_by: Optional[str],
     ) -> int:
-        """quarantines a single local or remote media id
+        """quarantines or unquarantines a single local or remote media id
 
         Args:
             server_name: The name of the server that holds this media
             media_id: The ID of the media to be quarantined
             quarantined_by: The user ID that initiated the quarantine request
+                If it is `None` media will be removed from quarantine
         """
         logger.info("Quarantining media: %s/%s", server_name, media_id)
         is_local = server_name == self.config.server_name
@@ -838,9 +843,9 @@ class RoomWorkerStore(SQLBaseStore):
         txn,
         local_mxcs: List[str],
         remote_mxcs: List[Tuple[str, str]],
-        quarantined_by: str,
+        quarantined_by: Optional[str],
     ) -> int:
-        """Quarantine local and remote media items
+        """Quarantine and unquarantine local and remote media items
 
         Args:
             txn (cursor)
@@ -848,18 +853,27 @@ class RoomWorkerStore(SQLBaseStore):
             remote_mxcs: A list of (remote server, media id) tuples representing
                 remote mxc URLs
             quarantined_by: The ID of the user who initiated the quarantine request
+                If it is `None` media will be removed from quarantine
         Returns:
             The total number of media items quarantined
         """
+
         # Update all the tables to set the quarantined_by flag
-        txn.executemany(
-            """
+        sql = """
             UPDATE local_media_repository
             SET quarantined_by = ?
-            WHERE media_id = ? AND safe_from_quarantine = ?
-        """,
-            ((quarantined_by, media_id, False) for media_id in local_mxcs),
-        )
+            WHERE media_id = ?
+        """
+
+        # set quarantine
+        if quarantined_by is not None:
+            sql += "AND safe_from_quarantine = ?"
+            rows = [(quarantined_by, media_id, False) for media_id in local_mxcs]
+        # remove from quarantine
+        else:
+            rows = [(quarantined_by, media_id) for media_id in local_mxcs]
+
+        txn.executemany(sql, rows)
         # Note that a rowcount of -1 can be used to indicate no rows were affected.
         total_media_quarantined = txn.rowcount if txn.rowcount > 0 else 0
 
@@ -1498,7 +1512,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         room_id: str,
         event_id: str,
         user_id: str,
-        reason: str,
+        reason: Optional[str],
         content: JsonDict,
         received_ts: int,
     ) -> None:
