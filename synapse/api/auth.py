@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 import pymacaroons
 from netaddr import IPAddress
@@ -31,7 +31,6 @@ from synapse.api.errors import (
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
-from synapse.events.builder import EventBuilder
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
@@ -488,44 +487,6 @@ class Auth:
             True if the user is an admin
         """
         return await self.store.is_server_admin(user)
-
-    def compute_auth_events(
-        self,
-        event: Union[EventBase, EventBuilder],
-        current_state_ids: StateMap[str],
-        for_verification: bool = False,
-    ) -> List[str]:
-        """Given an event and current state return the list of event IDs used
-        to auth an event.
-
-        If `for_verification` is False then only return auth events that
-        should be added to the event's `auth_events`.
-
-        Returns:
-            List of event IDs.
-        """
-
-        if event.type == EventTypes.Create:
-            return []
-
-        # Currently we ignore the `for_verification` flag even though there are
-        # some situations where we can drop particular auth events when adding
-        # to the event's `auth_events` (e.g. joins pointing to previous joins
-        # when room is publicly joinable). Dropping event IDs has the
-        # advantage that the auth chain for the room grows slower, but we use
-        # the auth chain in state resolution v2 to order events, which means
-        # care must be taken if dropping events to ensure that it doesn't
-        # introduce undesirable "state reset" behaviour.
-        #
-        # All of which sounds a bit tricky so we don't bother for now.
-
-        auth_ids = []
-        for etype, state_key in event_auth.auth_types_for_event(event):
-            auth_ev_id = current_state_ids.get((etype, state_key))
-            if auth_ev_id:
-                auth_ids.append(auth_ev_id)
-
-        return auth_ids
 
     async def check_can_change_room_list(self, room_id: str, user: UserID) -> bool:
         """Determine whether the user is allowed to edit the room's entry in the
