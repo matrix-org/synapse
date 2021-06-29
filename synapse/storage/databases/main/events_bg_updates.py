@@ -1060,7 +1060,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 """
                 UPDATE events SET stream_ordering2=stream_ordering
                 WHERE stream_ordering IN (
-                   SELECT stream_ordering from events WHERE stream_ordering > ?
+                   SELECT stream_ordering FROM events WHERE stream_ordering > ?
                    ORDER BY stream_ordering LIMIT ?
                 )
                 RETURNING stream_ordering;
