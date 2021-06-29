@@ -100,7 +100,7 @@ last_pdu_ts_metric = Gauge(
 
 # The name of the lock to use when process events in a room received over
 # federation.
-_INBOUND_EVENT_HANDLING_LOCK_NAME = "federtion_inbound_pdu"
+_INBOUND_EVENT_HANDLING_LOCK_NAME = "federation_inbound_pdu"
 
 
 class FederationServer(FederationBase):
@@ -904,7 +904,7 @@ class FederationServer(FederationBase):
                         exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
                     )
 
-                await self.store.remove_received_event_to_staging(
+                await self.store.remove_received_event_from_staging(
                     origin, event.event_id
                 )
 

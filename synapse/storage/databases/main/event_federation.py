@@ -1072,7 +1072,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             desc="insert_received_event_to_staging",
         )
 
-    async def remove_received_event_to_staging(
+    async def remove_received_event_from_staging(
         self,
         origin: str,
         event_id: str,
@@ -1084,7 +1084,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 "origin": origin,
                 "event_id": event_id,
             },
-            desc="remove_received_event_to_staging",
+            desc="remove_received_event_from_staging",
         )
 
     async def get_next_staged_event_id_for_room(
@@ -1150,7 +1150,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 room_id,
                 room_version_str,
             )
-            await self.remove_received_event_to_staging(
+            await self.remove_received_event_from_staging(
                 origin,
                 event_id,
             )
