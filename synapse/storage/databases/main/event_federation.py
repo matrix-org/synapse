@@ -14,18 +14,20 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Collection, Dict, Iterable, List, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
-from synapse.events import EventBase
+from synapse.api.room_versions import RoomVersion
+from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
@@ -1043,6 +1045,107 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
         )
+
+    async def insert_received_event_to_staging(
+        self, origin: str, event: EventBase
+    ) -> None:
+        """Insert a newly received event from federation into the staging area."""
+
+        # We use an upsert here to handle the case where we see the same event
+        # from the same server multiple times.
+        await self.db_pool.simple_upsert(
+            table="federation_inbound_events_staging",
+            keyvalues={
+                "origin": origin,
+                "event_id": event.event_id,
+            },
+            values={},
+            insertion_values={
+                "room_id": event.room_id,
+                "received_ts": self._clock.time_msec(),
+                "event_json": json_encoder.encode(event.get_dict()),
+                "internal_metadata": json_encoder.encode(
+                    event.internal_metadata.get_dict()
+                ),
+            },
+            desc="insert_received_event_to_staging",
+        )
+
+    async def remove_received_event_from_staging(
+        self,
+        origin: str,
+        event_id: str,
+    ) -> None:
+        """Remove the given event from the staging area"""
+        await self.db_pool.simple_delete(
+            table="federation_inbound_events_staging",
+            keyvalues={
+                "origin": origin,
+                "event_id": event_id,
+            },
+            desc="remove_received_event_from_staging",
+        )
+
+    async def get_next_staged_event_id_for_room(
+        self,
+        room_id: str,
+    ) -> Optional[Tuple[str, str]]:
+        """Get the next event ID in the staging area for the given room."""
+
+        def _get_next_staged_event_id_for_room_txn(txn):
+            sql = """
+                SELECT origin, event_id
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        return await self.db_pool.runInteraction(
+            "get_next_staged_event_id_for_room", _get_next_staged_event_id_for_room_txn
+        )
+
+    async def get_next_staged_event_for_room(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Get the next event in the staging area for the given room."""
+
+        def _get_next_staged_event_for_room_txn(txn):
+            sql = """
+                SELECT event_json, internal_metadata, origin
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        row = await self.db_pool.runInteraction(
+            "get_next_staged_event_for_room", _get_next_staged_event_for_room_txn
+        )
+
+        if not row:
+            return None
+
+        event_d = db_to_json(row[0])
+        internal_metadata_d = db_to_json(row[1])
+        origin = row[2]
+
+        event = make_event_from_dict(
+            event_dict=event_d,
+            room_version=room_version,
+            internal_metadata_dict=internal_metadata_d,
+        )
+
+        return origin, event
 
 
 class EventFederationStore(EventFederationWorkerStore):
