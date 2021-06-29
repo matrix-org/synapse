@@ -101,7 +101,7 @@ class LockStore(SQLBaseStore):
                     INSERT INTO worker_locks (lock_name, lock_key, instance_name, token, last_renewed_ts)
                     VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT (lock_name, lock_key)
-                    DO UPDATE 
+                    DO UPDATE
                         SET
                             token = EXCLUDED.token,
                             instance_name = EXCLUDED.instance_name,
@@ -219,8 +219,6 @@ class LockStore(SQLBaseStore):
             desc="renew_lock",
         )
 
-        self._live_tokens.pop((lock_name, lock_key), None)
-
     async def _drop_lock(self, lock_name: str, lock_key: str, token: str) -> None:
         """Attempt to drop the lock, if we still hold it"""
         await self.db_pool.simple_delete(
@@ -232,6 +230,8 @@ class LockStore(SQLBaseStore):
             },
             desc="drop_lock",
         )
+
+        self._live_tokens.pop((lock_name, lock_key), None)
 
 
 class Lock:
