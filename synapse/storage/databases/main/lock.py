@@ -251,7 +251,7 @@ class Lock:
             for item in work:
                 await process(item)
 
-                if not await is_still_valid():
+                if not await lock.is_still_valid():
                     break
     """
 
