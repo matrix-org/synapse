@@ -13,7 +13,7 @@
 # limitations under the License.
 import logging
 from types import TracebackType
-from typing import TYPE_CHECKING, Awaitable, Callable, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Dict, Optional, Tuple, Type
 
 from twisted.internet.interfaces import IReactorCore
 
