@@ -1,10 +1,12 @@
-Synapse 1.37.0rc1 (2021-06-24)
-==============================
+Synapse 1.37.0 (2021-06-29)
+===========================
 
 This release deprecates the current spam checker interface. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#deprecation-of-the-current-spam-checker-interface) for more information on how to update to the new generic module interface.
 
 This release also removes support for fetching and renewing TLS certificates using the ACME v1 protocol, which has been fully decommissioned by Let's Encrypt on June 1st 2021. Admins previously using this feature should use a [reverse proxy](https://matrix-org.github.io/synapse/develop/reverse_proxy.html) to handle TLS termination, or use an external ACME client (such as [certbot](https://certbot.eff.org/)) to retrieve a certificate and key and provide them to Synapse using the `tls_certificate_path` and `tls_private_key_path` configuration settings.
 
+Synapse 1.37.0rc1 (2021-06-24)
+==============================
 
 Features
 --------
