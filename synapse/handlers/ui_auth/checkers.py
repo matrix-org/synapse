@@ -257,7 +257,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
                 400, "Registration token must be a string", Codes.INVALID_PARAM
             )
         if "session" not in authdict:
-            raise SynapseError(400, "Missing UIA session", Codes.MISSING_PARAM)
+            raise LoginError(400, "Missing UIA session", Codes.MISSING_PARAM)
 
         # Import here to avoid a cyclic dependency
         from synapse.handlers.ui_auth import UIAuthSessionDataConstants
@@ -274,7 +274,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
         )
         if stored_token:
             if token != stored_token:
-                raise SynapseError(
+                raise LoginError(
                     400, "Registration token has changed", Codes.INVALID_PARAM
                 )
             else:
