@@ -342,17 +342,7 @@ def _is_membership_change_allowed(
         # * They are accepting a previously sent invitation.
         # * They are already joined (it's a NOOP).
         # * The room is public or restricted.
-        logger.info(
-            "check join aewffaewafewf %s %s",
-            event.user_id,
-            target_user_id,
-        )
         if event.user_id != target_user_id:
-            logger.error(
-                "Cannot force another user to join aewffaewafewf %s %s",
-                event.user_id,
-                target_user_id,
-            )
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
