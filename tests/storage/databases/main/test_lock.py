@@ -84,3 +84,17 @@ class LockTestCase(unittest.HomeserverTestCase):
         self.assertIsNotNone(lock2)
 
         self.assertFalse(self.get_success(is_valid_callback()))
+
+    def test_drop(self):
+        """Test that dropping the context manager means we stop renewing the lock"""
+
+        lock = self.get_success(self.store.try_acquire_lock("name", "key"))
+        self.assertIsNotNone(lock)
+
+        del lock
+
+        # Wait for the lock to timeout.
+        self.reactor.advance(2 * _LOCK_TIMEOUT_MS / 1000)
+
+        lock2 = self.get_success(self.store.try_acquire_lock("name", "key"))
+        self.assertIsNotNone(lock2)

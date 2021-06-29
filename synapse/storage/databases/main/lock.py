@@ -273,13 +273,27 @@ class Lock:
 
         self._token = token
 
-        self._looping_call = clock.looping_call(self._renew, _RENEWAL_INTERVAL_MS)
+        self._looping_call = clock.looping_call(
+            self._renew, _RENEWAL_INTERVAL_MS, store, lock_name, lock_key, token
+        )
 
         self._dropped = False
 
+    @staticmethod
     @wrap_as_background_process("Lock._renew")
-    async def _renew(self) -> None:
-        await self._store._renew_lock(self._lock_name, self._lock_key, self._token)
+    async def _renew(
+        store: LockStore,
+        lock_name: str,
+        lock_key: str,
+        token: str,
+    ) -> None:
+        """Renew the lock.
+
+        Note: this is a static method, rather than using self.*, so that we
+        don't end up with a reference to `self` in the reactor, which would stop
+        this from being cleaned up if we dropped the context manager.
+        """
+        await store._renew_lock(lock_name, lock_key, token)
 
     async def is_lock_still_valid(self) -> bool:
         """Check if the lock is still held by us"""
