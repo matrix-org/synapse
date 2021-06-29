@@ -1015,3 +1015,29 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
         )
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertEquals(channel.json_body["valid"], False)
+
+    @override_config(
+        {"rc_registration_token_validity": {"per_second": 0.1, "burst_count": 5}}
+    )
+    def test_GET_ratelimiting(self):
+        token = "1234"
+
+        for i in range(0, 6):
+            channel = self.make_request(
+                b"GET",
+                self.url + "?token={}".format(token),
+            )
+
+            if i == 5:
+                self.assertEquals(channel.result["code"], b"429", channel.result)
+                retry_after_ms = int(channel.json_body["retry_after_ms"])
+            else:
+                self.assertEquals(channel.result["code"], b"200", channel.result)
+
+        self.reactor.advance(retry_after_ms / 1000.0 + 1.0)
+
+        channel = self.make_request(
+            b"GET",
+            self.url + "?token={}".format(token),
+        )
+        self.assertEquals(channel.result["code"], b"200", channel.result)

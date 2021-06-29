@@ -832,6 +832,8 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #     is using
 #   - one for registration that ratelimits registration requests based on the
 #     client's IP address.
+#   - one for checking the validity of registration tokens that ratelimits
+#     requests based on the client's IP address.
 #   - one for login that ratelimits login requests based on the client's IP
 #     address.
 #   - one for login that ratelimits login requests based on the account the
@@ -859,6 +861,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_registration:
 #  per_second: 0.17
 #  burst_count: 3
+#
+#rc_registration_token_validity:
+#  per_second: 0.1
+#  burst_count: 5
 #
 #rc_login:
 #  address:

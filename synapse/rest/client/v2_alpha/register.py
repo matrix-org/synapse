@@ -28,6 +28,7 @@ from synapse.api.errors import (
     ThreepidValidationError,
     UnrecognizedRequestError,
 )
+from synapse.api.ratelimiting import Ratelimiter
 from synapse.config import ConfigError
 from synapse.config.captcha import CaptchaConfig
 from synapse.config.consent import ConsentConfig
@@ -391,8 +392,16 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastore()
+        self.ratelimiter = Ratelimiter(
+            store=self.store,
+            clock=hs.get_clock(),
+            rate_hz=hs.config.ratelimiting.rc_registration_token_validity.per_second,
+            burst_count=hs.config.ratelimiting.rc_registration_token_validity.burst_count,
+        )
 
     async def on_GET(self, request):
+        await self.ratelimiter.ratelimit(None, (request.getClientIP(),))
+
         if not self.hs.config.enable_registration:
             raise SynapseError(
                 403, "Registration has been disabled", errcode=Codes.FORBIDDEN
