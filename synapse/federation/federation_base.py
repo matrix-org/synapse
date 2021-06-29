@@ -89,12 +89,12 @@ class FederationBase:
         result = await self.spam_checker.check_event_for_spam(pdu)
 
         if result:
-            logger.warning(
-                "Event contains spam, redacting %s: %s",
-                pdu.event_id,
-                pdu.get_pdu_json(),
-            )
-            return prune_event(pdu)
+            logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
+            # we redact (to save disk space) as well as soft-failing (to stop
+            # using the event in prev_events).
+            redacted_event = prune_event(pdu)
+            redacted_event.internal_metadata.soft_failed = True
+            return redacted_event
 
         return pdu
 

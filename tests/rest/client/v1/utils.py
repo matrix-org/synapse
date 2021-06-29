@@ -52,6 +52,7 @@ class RestHelper:
         room_version: str = None,
         tok: str = None,
         expect_code: int = 200,
+        extra_content: Optional[Dict] = None,
     ) -> str:
         """
         Create a room.
@@ -72,7 +73,7 @@ class RestHelper:
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
-        content = {}
+        content = extra_content or {}
         if not is_public:
             content["visibility"] = "private"
         if room_version:
