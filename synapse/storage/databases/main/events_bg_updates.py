@@ -1055,32 +1055,25 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         batch_size = max(batch_size, 1)
 
         def process(txn: Cursor) -> int:
-            # if this is the first pass, find the minimum stream ordering
-            last_stream = progress.get("last_stream")
-            if last_stream is None:
-                txn.execute(
-                    """
-                    SELECT stream_ordering FROM events ORDER BY stream_ordering LIMIT 1
-                    """
-                )
-                rows = txn.fetchall()
-                if not rows:
-                    return 0
-                last_stream = rows[0][0] - 1
-
+            last_stream = progress.get("last_stream", -(1 << 31))
             txn.execute(
                 """
                 UPDATE events SET stream_ordering2=stream_ordering
-                WHERE stream_ordering > ? AND stream_ordering <= ?
+                WHERE stream_ordering IN (
+                   SELECT stream_ordering from events WHERE stream_ordering > ?
+                   ORDER BY stream_ordering LIMIT ?
+                )
+                RETURNING stream_ordering;
                 """,
-                (last_stream, last_stream + batch_size),
+                (last_stream, batch_size),
             )
             row_count = txn.rowcount
+            last_stream = max(row[0] for row in txn)
 
             self.db_pool.updates._background_update_progress_txn(
                 txn,
                 _BackgroundUpdates.POPULATE_STREAM_ORDERING2,
-                {"last_stream": last_stream + batch_size},
+                {"last_stream": last_stream},
             )
             return row_count
 
