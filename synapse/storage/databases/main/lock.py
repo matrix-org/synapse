@@ -161,6 +161,7 @@ class LockStore(SQLBaseStore):
                     insertion_values={
                         "token": token,
                         "last_renewed_ts": self._clock.time_msec(),
+                        "instance_name": self._instance_name,
                     },
                 )
 
