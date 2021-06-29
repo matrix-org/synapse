@@ -44,7 +44,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.persistence import TransactionActions
@@ -850,12 +850,15 @@ class FederationServer(FederationBase):
             _INBOUND_EVENT_HANDLING_LOCK_NAME, pdu.room_id
         )
         if lock:
-            self._process_incoming_pdus_in_room_inner(pdu.room_id, lock, origin, pdu)
+            self._process_incoming_pdus_in_room_inner(
+                pdu.room_id, room_version, lock, origin, pdu
+            )
 
     @wrap_as_background_process("_process_incoming_pdus_in_room_inner")
     async def _process_incoming_pdus_in_room_inner(
         self,
         room_id: str,
+        room_version: RoomVersion,
         lock: Lock,
         latest_origin: str,
         latest_event: EventBase,
@@ -876,7 +879,9 @@ class FederationServer(FederationBase):
             origin = latest_origin
             event = latest_event
         else:
-            next = await self.store.get_next_staged_event_for_room(room_id)
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
             if not next:
                 return
 
@@ -911,7 +916,9 @@ class FederationServer(FederationBase):
             # We need to do this check outside the lock to avoid a race between
             # a new event being inserted by another instance and it attempting
             # to acquire the lock.
-            next = await self.store.get_next_staged_event_for_room(room_id)
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
             if not next:
                 break
 

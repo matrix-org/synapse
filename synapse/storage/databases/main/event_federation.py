@@ -18,7 +18,7 @@ from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
@@ -1062,7 +1062,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             values={},
             insertion_values={
                 "room_id": event.room_id,
-                "room_version": event.room_version.identifier,
                 "received_ts": self._clock.time_msec(),
                 "event_json": json_encoder.encode(event.get_dict()),
                 "internal_metadata": json_encoder.encode(
@@ -1113,12 +1112,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
     async def get_next_staged_event_for_room(
         self,
         room_id: str,
+        room_version: RoomVersion,
     ) -> Optional[Tuple[str, EventBase]]:
         """Get the next event in the staging area for the given room."""
 
         def _get_next_staged_event_for_room_txn(txn):
             sql = """
-                SELECT room_version, event_id, event_json, internal_metadata, origin
+                SELECT event_json, internal_metadata, origin
                 FROM federation_inbound_events_staging
                 WHERE room_id = ?
                 ORDER BY received_ts ASC
@@ -1135,26 +1135,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         if not row:
             return None
 
-        room_version_str = row[0]
-        event_id = row[1]
-        event_d = db_to_json(row[2])
-        internal_metadata_d = db_to_json(row[3])
-        origin = row[4]
-
-        room_version = KNOWN_ROOM_VERSIONS.get(room_version_str)
-
-        if not room_version:
-            logger.warning(
-                "Event %s in room %s has unknown room version %s",
-                event_id,
-                room_id,
-                room_version_str,
-            )
-            await self.remove_received_event_from_staging(
-                origin,
-                event_id,
-            )
-            return None
+        event_d = db_to_json(row[0])
+        internal_metadata_d = db_to_json(row[1])
+        origin = row[2]
 
         event = make_event_from_dict(
             event_dict=event_d,

@@ -23,7 +23,6 @@ CREATE TABLE federation_inbound_events_staging (
     origin TEXT NOT NULL,
     room_id TEXT NOT NULL,
     event_id TEXT NOT NULL,
-    room_version TEXT NOT NULL,
     received_ts BIGINT NOT NULL,
     event_json TEXT NOT NULL,
     internal_metadata TEXT NOT NULL
