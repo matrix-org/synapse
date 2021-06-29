@@ -3146,7 +3146,7 @@ class FederationHandler(BaseHandler):
         last_exception = None  # type: Optional[Exception]
 
         # for each public key in the 3pid invite event
-        for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
+        for public_key_object in event_auth.get_public_keys(invite_event):
             try:
                 # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():

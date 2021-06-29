@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import pymacaroons
 from netaddr import IPAddress
@@ -141,9 +141,6 @@ class Auth:
     async def check_host_in_room(self, room_id: str, host: str) -> bool:
         with Measure(self.clock, "check_host_in_room"):
             return await self.store.is_host_joined(room_id, host)
-
-    def get_public_keys(self, invite_event: EventBase) -> List[Dict[str, Any]]:
-        return event_auth.get_public_keys(invite_event)
 
     async def get_user_by_req(
         self,
