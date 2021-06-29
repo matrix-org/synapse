@@ -411,7 +411,6 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
                  JOIN events USING (stream_ordering)
                 WHERE destination = ?
                   AND stream_ordering > ?
-                  AND destination_rooms.room_id != '!OGEhHVWSdvArJzumhm:matrix.org'
                 ORDER BY stream_ordering
                 LIMIT 50
             """
