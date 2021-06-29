@@ -103,7 +103,7 @@ class JWTConfig(Config):
             #
             #subject_claim: "sub"
 
-            # Perform normalization of the user ID and encode unsupported characters.
+            # Perform normalisation of the user ID and encode unsupported characters.
             #
             # Optional, defaults to false.
             #
