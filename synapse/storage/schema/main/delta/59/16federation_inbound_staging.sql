@@ -17,7 +17,7 @@
 -- A staging area for newly received events over federation.
 --
 -- Note we may store the same event multiple times if it comes from different
--- servers, this is to handle the case if we get a redacted and non-redacted
+-- servers; this is to handle the case if we get a redacted and non-redacted
 -- versions of the event.
 CREATE TABLE federation_inbound_events_staging (
     origin TEXT NOT NULL,
