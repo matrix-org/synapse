@@ -1068,6 +1068,8 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 (last_stream, batch_size),
             )
             row_count = txn.rowcount
+            if row_count == 0:
+                return 0
             last_stream = max(row[0] for row in txn)
             logger.info("populated stream_ordering2 up to %i", last_stream)
 
