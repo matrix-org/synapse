@@ -1,3 +1,12 @@
+Synapse 1.37.1rc1 (2021-06-29)
+==============================
+
+Features
+--------
+
+- Handle inbound events from federation asynchronously. ([\#10269](https://github.com/matrix-org/synapse/issues/10269), [\#10272](https://github.com/matrix-org/synapse/issues/10272))
+
+
 Synapse 1.37.0 (2021-06-29)
 ===========================
 
