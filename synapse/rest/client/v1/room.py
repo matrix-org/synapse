@@ -14,7 +14,6 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
-import copy
 import logging
 import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
