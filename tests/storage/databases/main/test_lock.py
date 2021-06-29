@@ -31,14 +31,14 @@ class LockTestCase(unittest.HomeserverTestCase):
         self.assertIsNotNone(lock)
 
         # Enter the context manager
-        is_valid_callback = self.get_success(lock.__aenter__())
+        self.get_success(lock.__aenter__())
 
         # Attempting to acquire the lock again fails.
         lock2 = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNone(lock2)
 
-        # Calling the `is_lock_still_valid` callback reports true.
-        self.assertTrue(self.get_success(is_valid_callback()))
+        # Calling `is_still_valid` reports true.
+        self.assertTrue(self.get_success(lock.is_still_valid()))
 
         # Drop the lock
         self.get_success(lock.__aexit__(None, None, None))
@@ -71,7 +71,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNotNone(lock)
 
-        is_valid_callback = self.get_success(lock.__aenter__())
+        self.get_success(lock.__aenter__())
 
         # We simulate the process getting stuck by cancelling the looping call
         # that keeps the lock active.
@@ -83,7 +83,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         lock2 = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNotNone(lock2)
 
-        self.assertFalse(self.get_success(is_valid_callback()))
+        self.assertFalse(self.get_success(lock.is_still_valid()))
 
     def test_drop(self):
         """Test that dropping the context manager means we stop renewing the lock"""

@@ -238,9 +238,8 @@ class Lock:
     """An async context manager that manages an acquired lock, ensuring it is
     regularly renewed and dropping it when the context manager exits.
 
-    The context manager returns an async function that can be called to check if
-    the lock is still valid, which can be used to bail out of processing if e.g.
-    processing work in a loop.
+    The lock object has an `is_still_valid` method which can be used to
+    double-check the lock is still valid, if e.g. processing work in a loop.
 
     For example:
 
@@ -248,11 +247,11 @@ class Lock:
         if not lock:
             return
 
-        async with lock as still_valid:
+        async with lock:
             for item in work:
                 await process(item)
 
-                if not await still_valid():
+                if not await is_still_valid():
                     break
     """
 
@@ -295,14 +294,15 @@ class Lock:
         """
         await store._renew_lock(lock_name, lock_key, token)
 
-    async def is_lock_still_valid(self) -> bool:
+    async def is_still_valid(self) -> bool:
         """Check if the lock is still held by us"""
         return await self._store._is_lock_still_valid(
             self._lock_name, self._lock_key, self._token
         )
 
-    async def __aenter__(self) -> Callable[[], Awaitable[bool]]:
-        return self.is_lock_still_valid
+    async def __aenter__(self) -> None:
+        if self._dropped:
+            raise Exception("Cannot reuse a Lock object")
 
     async def __aexit__(
         self,
