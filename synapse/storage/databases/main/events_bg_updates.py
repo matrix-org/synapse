@@ -1069,6 +1069,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             )
             row_count = txn.rowcount
             last_stream = max(row[0] for row in txn)
+            logger.info("populated stream_ordering2 up to %i", last_stream)
 
             self.db_pool.updates._background_update_progress_txn(
                 txn,
