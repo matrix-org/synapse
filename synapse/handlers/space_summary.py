@@ -472,7 +472,7 @@ class SpaceSummaryHandler:
         # If this is a request over federation, check if the host is in the room or
         # is in one of the spaces specified via the join rules.
         elif origin:
-            if await self._auth.check_host_in_room(room_id, origin):
+            if await self._event_auth_handler.check_host_in_room(room_id, origin):
                 return True
 
             # Alternately, if the host has a user in any of the spaces specified
@@ -485,7 +485,9 @@ class SpaceSummaryHandler:
                     await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 for space_id in allowed_rooms:
-                    if await self._auth.check_host_in_room(space_id, origin):
+                    if await self._event_auth_handler.check_host_in_room(
+                        space_id, origin
+                    ):
                         return True
 
         # otherwise, check if the room is peekable

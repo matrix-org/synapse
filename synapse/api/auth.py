@@ -37,7 +37,6 @@ from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, StateMap, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
-from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -137,10 +136,6 @@ class Auth:
                     return member
 
         raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
-
-    async def check_host_in_room(self, room_id: str, host: str) -> bool:
-        with Measure(self.clock, "check_host_in_room"):
-            return await self.store.is_host_joined(room_id, host)
 
     async def get_user_by_req(
         self,

@@ -25,6 +25,7 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.types import StateMap
+from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -36,6 +37,7 @@ class EventAuthHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self._clock = hs.get_clock()
         self._store = hs.get_datastore()
 
     async def check_from_context(
@@ -87,6 +89,10 @@ class EventAuthHandler:
                 auth_ids.append(auth_ev_id)
 
         return auth_ids
+
+    async def check_host_in_room(self, room_id: str, host: str) -> bool:
+        with Measure(self._clock, "check_host_in_room"):
+            return await self._store.is_host_joined(room_id, host)
 
     async def check_restricted_join_rules(
         self,
