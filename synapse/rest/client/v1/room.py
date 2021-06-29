@@ -14,6 +14,7 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with rooms: /rooms/<paths> """
+import copy
 import logging
 import re
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
@@ -47,6 +48,7 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    Requester,
     RoomAlias,
     RoomID,
     StreamToken,
@@ -309,7 +311,14 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    async def inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
+    def _copy_requester_and_override_user_id(self, requester, new_user_id):
+        serialized_requester = requester.serialize()
+        serialized_requester["user_id"] = new_user_id
+        new_requester = Requester.deserialize(self.store, serialized_requester)
+
+        return new_requester
+
+    async def _inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
         (
             most_recent_prev_event_id,
             most_recent_prev_event_depth,
@@ -438,7 +447,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
-                    requester,
+                    self._copy_requester_and_override_user_id(
+                        requester, state_event["sender"]
+                    ),
                     target=UserID.from_string(event_dict["state_key"]),
                     room_id=room_id,
                     action=membership,
@@ -458,7 +469,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                     event,
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                    requester,
+                    self._copy_requester_and_override_user_id(
+                        requester, state_event["sender"]
+                    ),
                     event_dict,
                     outlier=True,
                     prev_event_ids=[fake_prev_event_id],
@@ -510,7 +523,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # Prepend the insertion event to the start of the chunk
         events_to_create = [insertion_event] + events_to_create
 
-        inherited_depth = await self.inherit_depth_from_prev_ids(prev_events_from_query)
+        inherited_depth = await self._inherit_depth_from_prev_ids(
+            prev_events_from_query
+        )
 
         event_ids = []
         prev_event_ids = prev_events_from_query
@@ -532,7 +547,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             }
 
             event, context = await self.event_creation_handler.create_event(
-                requester,
+                self._copy_requester_and_override_user_id(requester, ev["sender"]),
                 event_dict,
                 prev_event_ids=event_dict.get("prev_events"),
                 auth_event_ids=auth_event_ids,
@@ -562,7 +577,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # where topological_ordering is just depth.
         for (event, context) in reversed(events_to_persist):
             ev = await self.event_creation_handler.handle_new_client_event(
-                requester=requester,
+                self._copy_requester_and_override_user_id(requester, event["sender"]),
                 event=event,
                 context=context,
             )
