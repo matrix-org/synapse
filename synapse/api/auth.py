@@ -20,7 +20,6 @@ from netaddr import IPAddress
 from twisted.web.server import Request
 
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -41,15 +40,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-AuthEventTypes = (
-    EventTypes.Create,
-    EventTypes.Member,
-    EventTypes.PowerLevels,
-    EventTypes.JoinRules,
-    EventTypes.RoomHistoryVisibility,
-    EventTypes.ThirdPartyInvite,
-)
 
 # guests always get this device id.
 GUEST_DEVICE_ID = "guest_device"
