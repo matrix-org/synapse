@@ -200,14 +200,10 @@ class LockStore(SQLBaseStore):
             allow_none=True,
             desc="is_lock_still_valid",
         )
-        # If there is an entry and it has not timed out, then we still hold the lock
-        if (
+        return (
             last_renewed_ts is not None
             and self._clock.time_msec() - _LOCK_TIMEOUT_MS < last_renewed_ts
-        ):
-            return True
-
-        return False
+        )
 
     async def _renew_lock(self, lock_name: str, lock_key: str, token: str) -> None:
         """Attempt to renew the lock if we still hold it."""
