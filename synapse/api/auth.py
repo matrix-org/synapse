@@ -19,9 +19,8 @@ from netaddr import IPAddress
 
 from twisted.web.server import Request
 
-from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes, HistoryVisibility, Membership
+from synapse.api.constants import EventTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -29,12 +28,11 @@ from synapse.api.errors import (
     MissingClientTokenError,
 )
 from synapse.appservice import ApplicationService
-from synapse.events import EventBase
 from synapse.http import get_request_user_agent
 from synapse.http.site import SynapseRequest
 from synapse.logging import opentracing as opentracing
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import Requester, StateMap, UserID, create_requester
+from synapse.types import Requester, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 
@@ -86,56 +84,6 @@ class Auth:
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
-
-    async def check_user_in_room(
-        self,
-        room_id: str,
-        user_id: str,
-        current_state: Optional[StateMap[EventBase]] = None,
-        allow_departed_users: bool = False,
-    ) -> EventBase:
-        """Check if the user is in the room, or was at some point.
-        Args:
-            room_id: The room to check.
-
-            user_id: The user to check.
-
-            current_state: Optional map of the current state of the room.
-                If provided then that map is used to check whether they are a
-                member of the room. Otherwise the current membership is
-                loaded from the database.
-
-            allow_departed_users: if True, accept users that were previously
-                members but have now departed.
-
-        Raises:
-            AuthError if the user is/was not in the room.
-        Returns:
-            Membership event for the user if the user was in the
-            room. This will be the join event if they are currently joined to
-            the room. This will be the leave event if they have left the room.
-        """
-        if current_state:
-            member = current_state.get((EventTypes.Member, user_id), None)
-        else:
-            member = await self.state.get_current_state(
-                room_id=room_id, event_type=EventTypes.Member, state_key=user_id
-            )
-
-        if member:
-            membership = member.membership
-
-            if membership == Membership.JOIN:
-                return member
-
-            # XXX this looks totally bogus. Why do we not allow users who have been banned,
-            # or those who were members previously and have been re-invited?
-            if allow_departed_users and membership == Membership.LEAVE:
-                forgot = await self.store.did_forget(user_id, room_id)
-                if not forgot:
-                    return member
-
-        raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
 
     async def get_user_by_req(
         self,
@@ -467,40 +415,6 @@ class Auth:
         """
         return await self.store.is_server_admin(user)
 
-    async def check_can_change_room_list(self, room_id: str, user: UserID) -> bool:
-        """Determine whether the user is allowed to edit the room's entry in the
-        published room list.
-
-        Args:
-            room_id
-            user
-        """
-
-        is_admin = await self.is_server_admin(user)
-        if is_admin:
-            return True
-
-        user_id = user.to_string()
-        await self.check_user_in_room(room_id, user_id)
-
-        # We currently require the user is a "moderator" in the room. We do this
-        # by checking if they would (theoretically) be able to change the
-        # m.room.canonical_alias events
-        power_level_event = await self.state.get_current_state(
-            room_id, EventTypes.PowerLevels, ""
-        )
-
-        auth_events = {}
-        if power_level_event:
-            auth_events[(EventTypes.PowerLevels, "")] = power_level_event
-
-        send_level = event_auth.get_send_level(
-            EventTypes.CanonicalAlias, "", power_level_event
-        )
-        user_level = event_auth.get_user_power_level(user_id, auth_events)
-
-        return user_level >= send_level
-
     @staticmethod
     def has_access_token(request: Request) -> bool:
         """Checks if the request has an access_token.
@@ -552,50 +466,6 @@ class Auth:
                 raise MissingClientTokenError()
 
             return query_params[0].decode("ascii")
-
-    async def check_user_in_room_or_world_readable(
-        self, room_id: str, user_id: str, allow_departed_users: bool = False
-    ) -> Tuple[str, Optional[str]]:
-        """Checks that the user is or was in the room or the room is world
-        readable. If it isn't then an exception is raised.
-
-        Args:
-            room_id: room to check
-            user_id: user to check
-            allow_departed_users: if True, accept users that were previously
-                members but have now departed
-
-        Returns:
-            Resolves to the current membership of the user in the room and the
-            membership event ID of the user. If the user is not in the room and
-            never has been, then `(Membership.JOIN, None)` is returned.
-        """
-
-        try:
-            # check_user_in_room will return the most recent membership
-            # event for the user if:
-            #  * The user is a non-guest user, and was ever in the room
-            #  * The user is a guest user, and has joined the room
-            # else it will throw.
-            member_event = await self.check_user_in_room(
-                room_id, user_id, allow_departed_users=allow_departed_users
-            )
-            return member_event.membership, member_event.event_id
-        except AuthError:
-            visibility = await self.state.get_current_state(
-                room_id, EventTypes.RoomHistoryVisibility, ""
-            )
-            if (
-                visibility
-                and visibility.content.get("history_visibility")
-                == HistoryVisibility.WORLD_READABLE
-            ):
-                return Membership.JOIN, None
-            raise AuthError(
-                403,
-                "User %s not in room %s, and room previews are disabled"
-                % (user_id, room_id),
-            )
 
     async def check_auth_blocking(self, *args, **kwargs) -> None:
         await self._auth_blocking.check_auth_blocking(*args, **kwargs)

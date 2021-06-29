@@ -113,7 +113,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 raise AuthError(401, "User is not in the room")
             return None
 
-        hs.get_auth().check_user_in_room = check_user_in_room
+        hs.get_event_auth_handler().check_user_in_room = check_user_in_room
 
         def get_joined_hosts_for_room(room_id):
             return {member.domain for member in self.room_members}

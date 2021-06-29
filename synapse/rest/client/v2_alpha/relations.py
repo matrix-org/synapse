@@ -143,13 +143,14 @@ class RelationPaginationServlet(RestServlet):
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self.event_handler = hs.get_event_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
     async def on_GET(
         self, request, room_id, parent_id, relation_type=None, event_type=None
     ):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        await self.auth.check_user_in_room_or_world_readable(
+        await self._event_auth_handler.check_user_in_room_or_world_readable(
             room_id, requester.user.to_string(), allow_departed_users=True
         )
 
@@ -236,13 +237,14 @@ class RelationAggregationPaginationServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.event_handler = hs.get_event_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
     async def on_GET(
         self, request, room_id, parent_id, relation_type=None, event_type=None
     ):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        await self.auth.check_user_in_room_or_world_readable(
+        await self._event_auth_handler.check_user_in_room_or_world_readable(
             room_id,
             requester.user.to_string(),
             allow_departed_users=True,
@@ -318,11 +320,12 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
         self.clock = hs.get_clock()
         self._event_serializer = hs.get_event_client_serializer()
         self.event_handler = hs.get_event_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
     async def on_GET(self, request, room_id, parent_id, relation_type, event_type, key):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        await self.auth.check_user_in_room_or_world_readable(
+        await self._event_auth_handler.check_user_in_room_or_world_readable(
             room_id,
             requester.user.to_string(),
             allow_departed_users=True,
