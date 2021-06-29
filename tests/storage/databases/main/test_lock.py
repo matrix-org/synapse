@@ -71,7 +71,7 @@ class LockTestCase(unittest.HomeserverTestCase):
         lock = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNotNone(lock)
 
-        self.get_success(lock.__aenter__())
+        is_valid_callback = self.get_success(lock.__aenter__())
 
         # We simulate the process getting stuck by cancelling the looping call
         # that keeps the lock active.
@@ -82,3 +82,5 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         lock2 = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNotNone(lock2)
+
+        self.assertFalse(self.get_success(is_valid_callback()))
