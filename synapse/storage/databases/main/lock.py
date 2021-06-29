@@ -150,7 +150,7 @@ class LockStore(SQLBaseStore):
                     (lock_name, lock_key, now - _LOCK_TIMEOUT_MS),
                 )
 
-                self.db_pool.simple_upsert_txn(
+                inserted = self.db_pool.simple_upsert_txn_emulated(
                     txn,
                     table="worker_locks",
                     keyvalues={
@@ -165,7 +165,7 @@ class LockStore(SQLBaseStore):
                     },
                 )
 
-                return bool(txn.rowcount)
+                return inserted
 
             did_lock = await self.db_pool.runInteraction(
                 "try_acquire_lock_emulated", _try_acquire_lock_emulated_txn
