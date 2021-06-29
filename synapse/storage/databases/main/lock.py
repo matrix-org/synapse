@@ -65,7 +65,7 @@ class LockStore(SQLBaseStore):
 
         # When we shut down we want to remove the locks. Technically this can
         # lead to a race, as we may drop the lock while we are still processing.
-        # However, a) it should be a small windown, b) the lock is best effort
+        # However, a) it should be a small window, b) the lock is best effort
         # anyway and c) we want to really avoid leaking locks when we restart.
         hs.get_reactor().addSystemEventTrigger(
             "before",
@@ -101,12 +101,13 @@ class LockStore(SQLBaseStore):
                     INSERT INTO worker_locks (lock_name, lock_key, instance_name, token, last_renewed_ts)
                     VALUES (?, ?, ?, ?, ?)
                     ON CONFLICT (lock_name, lock_key)
-                    DO UPDATE SET
-                        token = EXCLUDED.token,
-                        instance_name = EXCLUDED.instance_name,
-                        last_renewed_ts = EXCLUDED.last_renewed_ts
-                    WHERE
-                        worker_locks.last_renewed_ts < ?
+                    DO UPDATE 
+                        SET
+                            token = EXCLUDED.token,
+                            instance_name = EXCLUDED.instance_name,
+                            last_renewed_ts = EXCLUDED.last_renewed_ts
+                        WHERE
+                            worker_locks.last_renewed_ts < ?
                 """
                 txn.execute(
                     sql,
@@ -247,7 +248,7 @@ class Lock:
         if not lock:
             return
 
-        async with lock() as still_valid:
+        async with lock as still_valid:
             for item in work:
                 await process(item)
 
