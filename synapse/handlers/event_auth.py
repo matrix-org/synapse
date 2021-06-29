@@ -21,7 +21,7 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
 )
 from synapse.api.errors import AuthError
-from synapse.api.room_versions import RoomVersion
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.types import StateMap
@@ -37,6 +37,18 @@ class EventAuthHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
+
+    async def check_from_context(
+        self, room_version: str, event, context, do_sig_check=True
+    ) -> None:
+        auth_event_ids = event.auth_event_ids()
+        auth_events_by_id = await self._store.get_events(auth_event_ids)
+        auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
+
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+        event_auth.check(
+            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
+        )
 
     def compute_auth_events(
         self,

@@ -28,7 +28,6 @@ from synapse.api.errors import (
     InvalidClientTokenError,
     MissingClientTokenError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.http import get_request_user_agent
@@ -88,18 +87,6 @@ class Auth:
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
-
-    async def check_from_context(
-        self, room_version: str, event, context, do_sig_check=True
-    ) -> None:
-        auth_event_ids = event.auth_event_ids()
-        auth_events_by_id = await self.store.get_events(auth_event_ids)
-        auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
-
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-        event_auth.check(
-            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
-        )
 
     async def check_user_in_room(
         self,

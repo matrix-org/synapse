@@ -83,6 +83,7 @@ class RoomCreationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self.config = hs.config
 
         # Room state based off defined presets
@@ -226,7 +227,7 @@ class RoomCreationHandler(BaseHandler):
             },
         )
         old_room_version = await self.store.get_room_version_id(old_room_id)
-        await self.auth.check_from_context(
+        await self._event_auth_handler.check_from_context(
             old_room_version, tombstone_event, tombstone_context
         )
 
