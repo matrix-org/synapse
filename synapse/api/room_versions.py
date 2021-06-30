@@ -229,7 +229,7 @@ MSC3244_CAPABILITIES = {
             v.identifier
             for v in KNOWN_ROOM_VERSIONS.values()
             if cap.support_check_lambda(v)
-        ]
+        ],
     }
     for cap in (
         RoomVersionCapability(
