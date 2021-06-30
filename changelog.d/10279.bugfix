@@ -1,0 +1,1 @@
+Fix the prometheus `synapse_federation_server_pdu_process_time` metric. Broke in v1.37.1.
