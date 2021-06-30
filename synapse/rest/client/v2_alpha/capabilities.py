@@ -57,7 +57,9 @@ class CapabilitiesRestServlet(RestServlet):
         }
 
         if self.config.experimental.msc3244_enabled:
-            response["capabilities"]["m.room_versions"]["org.matrix.msc3244.room_capabilities"] = MSC3244_CAPABILITIES
+            response["capabilities"]["m.room_versions"][
+                "org.matrix.msc3244.room_capabilities"
+            ] = MSC3244_CAPABILITIES
 
         return 200, response
 

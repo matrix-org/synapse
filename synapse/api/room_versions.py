@@ -222,14 +222,16 @@ class RoomVersionCapability:
 
 MSC3244_CAPABILITIES = {
     cap.identifier: {
-        "preferred": cap.preferred_version.identifier if cap.preferred_version is not None else None,
+        "preferred": cap.preferred_version.identifier
+        if cap.preferred_version is not None
+        else None,
         "support": [
             v.identifier
-            for v
-            in KNOWN_ROOM_VERSIONS.values()
+            for v in KNOWN_ROOM_VERSIONS.values()
             if cap.support_check_lambda(v)
         ]
-    } for cap in (
+    }
+    for cap in (
         RoomVersionCapability(
             "knock",
             RoomVersions.V7,

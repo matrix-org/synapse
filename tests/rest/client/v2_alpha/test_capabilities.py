@@ -142,7 +142,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             if details["preferred"] is not None:
                 self.assertTrue(
                     details["preferred"] in KNOWN_ROOM_VERSIONS,
-                    "" + details["preferred"]
+                    "" + details["preferred"],
                 )
 
             self.assertTrue(len(capability["support"]) > 0)
