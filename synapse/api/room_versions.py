@@ -211,13 +211,13 @@ KNOWN_ROOM_VERSIONS = {
 }  # type: Dict[str, RoomVersion]
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class RoomVersionCapability:
     """An object which describes the unique attributes of a room version."""
 
-    identifier = attr.ib(type=str)  # the identifier for this capability
-    preferred_version = attr.ib(type=Optional[RoomVersion])
-    support_check_lambda = attr.ib(type=Callable[[RoomVersion], bool])
+    identifier: str  # the identifier for this capability
+    preferred_version: Optional[RoomVersion]
+    support_check_lambda: Callable[[RoomVersion], bool])
 
 
 MSC3244_CAPABILITIES = {

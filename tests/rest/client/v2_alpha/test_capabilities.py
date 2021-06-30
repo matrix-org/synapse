@@ -117,8 +117,8 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
-        self.assertIsNone(
-            capabilities["m.room_versions"]["org.matrix.msc3244.room_capabilities"]
+        self.assertNotIn(
+            "org.matrix.msc3244.room_capabilities", capabilities["m.room_versions"]
         )
 
     @override_config({"experimental_features": {"msc3244_enabled": True}})
@@ -142,9 +142,9 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             if details["preferred"] is not None:
                 self.assertTrue(
                     details["preferred"] in KNOWN_ROOM_VERSIONS,
-                    "" + details["preferred"],
+                    str(details["preferred"]),
                 )
 
-            self.assertTrue(len(capability["support"]) > 0)
-            for room_version in capability["support"]:
-                self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
+            self.assertGreater(len(details["support"]), 0)
+            for room_version in details["support"]:
+                self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, str(room_version))
