@@ -136,9 +136,9 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
-        for capability, details in capabilities["m.room_versions"][
+        for details in capabilities["m.room_versions"][
             "org.matrix.msc3244.room_capabilities"
-        ].items():
+        ].values():
             if details["preferred"] is not None:
                 self.assertTrue(
                     details["preferred"] in KNOWN_ROOM_VERSIONS,

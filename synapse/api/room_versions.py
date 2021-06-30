@@ -217,7 +217,7 @@ class RoomVersionCapability:
 
     identifier: str  # the identifier for this capability
     preferred_version: Optional[RoomVersion]
-    support_check_lambda: Callable[[RoomVersion], bool])
+    support_check_lambda: Callable[[RoomVersion], bool]
 
 
 MSC3244_CAPABILITIES = {
