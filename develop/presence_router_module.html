@@ -367,7 +367,9 @@ routing information pulled from the resulting dictionary.</p>
 <p>Once you've crafted your module and installed it into the same Python environment as
 Synapse, amend your homeserver config file with the following.</p>
 <pre><code class="language-yaml">presence:
-  routing_module:
+  enabled: true
+
+  presence_router:
     module: my_module.ExamplePresenceRouter
     config:
       # Any configuration options for your module. The below is an example.
