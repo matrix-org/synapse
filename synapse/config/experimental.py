@@ -32,3 +32,6 @@ class ExperimentalConfig(Config):
 
         # MSC2716 (backfill existing history)
         self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool
+
+        # MSC3244 (room version capabilities)
+        self.msc3244_enabled = experimental.get("msc3244_enabled", True)  # type: bool

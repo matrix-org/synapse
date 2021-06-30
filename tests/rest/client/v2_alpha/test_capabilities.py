@@ -102,3 +102,49 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
+
+    def test_get_does_not_include_msc3244_fields_by_default(self):
+        localpart = "user"
+        password = "pass"
+        user = self.register_user(localpart, password)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertIsNone(
+            capabilities["m.room_versions"]["org.matrix.msc3244.room_capabilities"]
+        )
+
+    @override_config({"experimental_features": {"msc3244_enabled": True}})
+    def test_get_does_include_msc3244_fields_when_enabled(self):
+        localpart = "user"
+        password = "pass"
+        user = self.register_user(localpart, password)
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        for capability, details in capabilities["m.room_versions"][
+            "org.matrix.msc3244.room_capabilities"
+        ].items():
+            if details["preferred"] is not None:
+                self.assertTrue(
+                    details["preferred"] in KNOWN_ROOM_VERSIONS,
+                    "" + details["preferred"]
+                )
+
+            self.assertTrue(len(capability["support"]) > 0)
+            for room_version in capability["support"]:
+                self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, "" + room_version)
