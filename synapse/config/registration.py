@@ -122,6 +122,8 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        # The fallback template used for authenticating using a registration token
+        self.registration_token_template = self.read_template("registration_token.html")
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
