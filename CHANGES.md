@@ -1,7 +1,9 @@
 Synapse 1.37.1 (2021-06-30)
 ===========================
 
-No significant changes.
+This release resolves issues (such as #9490) where one busy room could cause head-of-line blocking, starving Synapse from processing events in other rooms, and causing all federated traffic to fall behind. Synapse 1.37.1 processes inbound federation traffic asynchronously, ensuring that one busy room won't impact others. Please upgrade to Synapse 1.37.1 as soon as possible, in order to increase resilience to other traffic spikes.
+
+No significant changes since v1.37.1rc1.
 
 
 Synapse 1.37.1rc1 (2021-06-29)
