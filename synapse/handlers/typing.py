@@ -206,7 +206,7 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         assert hs.config.worker.writers.typing == hs.get_instance_name()
 
-        self._event_auth_handler = hs.get_event_auth_handler()
+        self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
 
         self.hs = hs
@@ -253,7 +253,7 @@ class TypingWriterHandler(FollowerTypingHandler):
             await self.clock.sleep(random.randint(1, 10))
             raise ShadowBanError()
 
-        await self._event_auth_handler.check_user_in_room(room_id, target_user_id)
+        await self.auth.check_user_in_room(room_id, target_user_id)
 
         logger.debug("%s has started typing in %s", target_user_id, room_id)
 
@@ -289,7 +289,7 @@ class TypingWriterHandler(FollowerTypingHandler):
             await self.clock.sleep(random.randint(1, 10))
             raise ShadowBanError()
 
-        await self._event_auth_handler.check_user_in_room(room_id, target_user_id)
+        await self.auth.check_user_in_room(room_id, target_user_id)
 
         logger.debug("%s has stopped typing in %s", target_user_id, room_id)
 

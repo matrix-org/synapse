@@ -73,7 +73,6 @@ class MessageHandler:
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.state = hs.get_state_handler()
-        self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -111,7 +110,7 @@ class MessageHandler:
         (
             membership,
             membership_event_id,
-        ) = await self._event_auth_handler.check_user_in_room_or_world_readable(
+        ) = await self.auth.check_user_in_room_or_world_readable(
             room_id, user_id, allow_departed_users=True
         )
 
@@ -210,7 +209,7 @@ class MessageHandler:
             (
                 membership,
                 membership_event_id,
-            ) = await self._event_auth_handler.check_user_in_room_or_world_readable(
+            ) = await self.auth.check_user_in_room_or_world_readable(
                 room_id, user_id, allow_departed_users=True
             )
 
@@ -254,10 +253,7 @@ class MessageHandler:
         if not requester.app_service:
             # We check AS auth after fetching the room membership, as it
             # requires us to pull out all joined members anyway.
-            (
-                membership,
-                _,
-            ) = await self._event_auth_handler.check_user_in_room_or_world_readable(
+            membership, _ = await self.auth.check_user_in_room_or_world_readable(
                 room_id, user_id, allow_departed_users=True
             )
             if membership != Membership.JOIN:

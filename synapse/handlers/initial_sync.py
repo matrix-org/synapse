@@ -44,7 +44,6 @@ class InitialSyncHandler(BaseHandler):
         super().__init__(hs)
         self.hs = hs
         self.state = hs.get_state_handler()
-        self._event_auth_handler = hs.get_event_auth_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
         self.snapshot_cache = ResponseCache(
@@ -287,7 +286,7 @@ class InitialSyncHandler(BaseHandler):
         (
             membership,
             member_event_id,
-        ) = await self._event_auth_handler.check_user_in_room_or_world_readable(
+        ) = await self.auth.check_user_in_room_or_world_readable(
             room_id,
             user_id,
             allow_departed_users=True,

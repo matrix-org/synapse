@@ -83,9 +83,7 @@ class SpaceSummaryHandler:
         """
         # first of all, check that the user is in the room in question (or it's
         # world-readable)
-        await self._event_auth_handler.check_user_in_room_or_world_readable(
-            room_id, requester
-        )
+        await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
         # the queue of rooms to process
         room_queue = deque((_RoomQueueEntry(room_id, ()),))

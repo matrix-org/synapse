@@ -73,7 +73,7 @@ class PaginationHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
-        self._event_auth_handler = hs.get_event_auth_handler()
+        self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -360,7 +360,7 @@ class PaginationHandler:
             (
                 membership,
                 member_event_id,
-            ) = await self._event_auth_handler.check_user_in_room_or_world_readable(
+            ) = await self.auth.check_user_in_room_or_world_readable(
                 room_id, user_id, allow_departed_users=True
             )
 

@@ -45,7 +45,6 @@ class DirectoryHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.appservice_handler = hs.get_application_service_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
-        self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastore()
         self.config = hs.config
         self.enable_room_list_search = hs.config.enable_room_list_search
@@ -404,7 +403,7 @@ class DirectoryHandler(BaseHandler):
         if not room_id:
             return False
 
-        return await self._event_auth_handler.check_can_change_room_list(
+        return await self.auth.check_can_change_room_list(
             room_id, UserID.from_string(user_id)
         )
 
@@ -440,10 +439,8 @@ class DirectoryHandler(BaseHandler):
         if room is None:
             raise SynapseError(400, "Unknown room")
 
-        can_change_room_list = (
-            await self._event_auth_handler.check_can_change_room_list(
-                room_id, requester.user
-            )
+        can_change_room_list = await self.auth.check_can_change_room_list(
+            room_id, requester.user
         )
         if not can_change_room_list:
             raise AuthError(
@@ -506,7 +503,7 @@ class DirectoryHandler(BaseHandler):
         # allow access to server admins and current members of the room
         is_admin = await self.auth.is_server_admin(requester.user)
         if not is_admin:
-            await self._event_auth_handler.check_user_in_room_or_world_readable(
+            await self.auth.check_user_in_room_or_world_readable(
                 room_id, requester.user.to_string()
             )
 
