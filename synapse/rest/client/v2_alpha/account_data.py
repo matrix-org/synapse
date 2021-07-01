@@ -84,7 +84,10 @@ class RoomAccountDataServlet(RestServlet):
 
     async def on_PUT(self, request, user_id, room_id, account_data_type):
         requester = await self.auth.get_user_by_req(request)
-        if user_id != requester.user.to_string():
+        is_admin = await self.auth.is_server_admin(requester.user)
+
+        # Allow server admins to change other user account data, otherwise raise an AuthError
+        if not is_admin and user_id != requester.user.to_string():
             raise AuthError(403, "Cannot add account data for other users.")
 
         body = parse_json_object_from_request(request)
@@ -104,7 +107,10 @@ class RoomAccountDataServlet(RestServlet):
 
     async def on_GET(self, request, user_id, room_id, account_data_type):
         requester = await self.auth.get_user_by_req(request)
-        if user_id != requester.user.to_string():
+        is_admin = await self.auth.is_server_admin(requester.user)
+
+        # Allow server admins to read other user account data, otherwise raise an AuthError
+        if not is_admin and user_id != requester.user.to_string():
             raise AuthError(403, "Cannot get account data for other users.")
 
         event = await self.store.get_account_data_for_room_and_type(
