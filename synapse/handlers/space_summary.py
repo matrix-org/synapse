@@ -25,6 +25,7 @@ from synapse.api.constants import (
     EventTypes,
     HistoryVisibility,
     Membership,
+    RoomTypes,
 )
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
@@ -318,7 +319,8 @@ class SpaceSummaryHandler:
 
         Returns:
             A tuple of:
-                An iterable of a single value of the room.
+                The room information, if the room should be returned to the
+                user. None, otherwise.
 
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
@@ -328,7 +330,11 @@ class SpaceSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id)
 
-        # look for child rooms/spaces.
+        # If the room is not a space, return just the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE:
+            return room_entry, ()
+
+        # Otherwise, look for child rooms/spaces.
         child_events = await self._get_child_events(room_id)
 
         if suggested_only:
@@ -348,6 +354,7 @@ class SpaceSummaryHandler:
                     event_format=format_event_for_client_v2,
                 )
             )
+
         return room_entry, events_result
 
     async def _summarize_remote_room(
