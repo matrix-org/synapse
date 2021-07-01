@@ -96,6 +96,7 @@ def main():
         action="append",
         metavar="CONFIG_FILE",
         help="The config files for Synapse.",
+        required=True,
     )
     parser.add_argument(
         "-s",
@@ -110,6 +111,12 @@ def main():
         action="store_false",
         help="Exclude users that have validated email addresses",
     )
+    parser.add_argument(
+        "-u",
+        "--only-users",
+        action="store_true",
+        help="Only print user IDs that match.",
+    )
 
     config = ReviewConfig()
 
@@ -121,7 +128,8 @@ def main():
     )
 
     since_ms = time.time() * 1000 - config.parse_duration(config_args.since)
-    include_users_with_email = config_args.exclude_emails
+    exclude_users_with_email = config_args.exclude_emails
+    include_context = not config_args.only_users
 
     for database_config in config.database.databases:
         if "main" in database_config.databases:
@@ -133,30 +141,34 @@ def main():
         user_infos = get_recent_users(db_conn.cursor(), since_ms)
 
     for user_info in user_infos:
-        if not include_users_with_email and user_info.emails:
+        if exclude_users_with_email and user_info.emails:
             continue
 
-        print_public_rooms = ""
-        if user_info.public_rooms:
-            print_public_rooms = "(" + ", ".join(user_info.public_rooms[:3])
+        if include_context:
+            print_public_rooms = ""
+            if user_info.public_rooms:
+                print_public_rooms = "(" + ", ".join(user_info.public_rooms[:3])
 
-            if len(user_info.public_rooms) > 3:
-                print_public_rooms += ", ..."
+                if len(user_info.public_rooms) > 3:
+                    print_public_rooms += ", ..."
 
-            print_public_rooms += ")"
+                print_public_rooms += ")"
 
-        print("User ID:", user_info.user_id)
-        print("Created:", datetime.fromtimestamp(user_info.creation_ts))
-        print("Email:", ", ".join(user_info.emails) or "None")
-        print("IPs:", ", ".join(user_info.ips))
-        print(
-            "Number joined public rooms:",
-            len(user_info.public_rooms),
-            print_public_rooms,
-        )
-        print("Number joined private rooms:", len(user_info.private_rooms))
+            print("# Created:", datetime.fromtimestamp(user_info.creation_ts))
+            print("# Email:", ", ".join(user_info.emails) or "None")
+            print("# IPs:", ", ".join(user_info.ips))
+            print(
+                "# Number joined public rooms:",
+                len(user_info.public_rooms),
+                print_public_rooms,
+            )
+            print("# Number joined private rooms:", len(user_info.private_rooms))
+            print("#")
 
-        print()
+        print(user_info.user_id)
+
+        if include_context:
+            print()
 
 
 if __name__ == "__main__":
