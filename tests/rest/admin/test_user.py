@@ -1877,8 +1877,9 @@ class UserRestTestCase(unittest.HomeserverTestCase):
 
     def _check_fields(self, content: JsonDict):
         """Checks that the expected user attributes are present in content
+
         Args:
-            content: List that is checked for content
+            content: Content dictionary to check
         """
         self.assertIn("displayname", content)
         self.assertIn("threepids", content)
