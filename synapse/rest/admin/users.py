@@ -556,14 +556,15 @@ class AccountValidityRenewServlet(RestServlet):
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
-        self.account_validity = hs.get_account_validity()
 
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        try:
-            expiration_ts = await self.account_validity.on_legacy_admin_request(request)
-        except NotImplementedError:
+        if self.account_activity_handler.on_legacy_admin_request_callback:
+            expiration_ts = (
+                self.account_activity_handler.on_legacy_admin_request_callback(request)
+            )
+        else:
             body = parse_json_object_from_request(request)
 
             if "user_id" not in body:

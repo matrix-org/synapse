@@ -39,7 +39,6 @@ from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import IResource
 
-from synapse.account_validity import AccountValidity
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
 from synapse.api.ratelimiting import Ratelimiter
@@ -812,10 +811,6 @@ class HomeServer(metaclass=abc.ABCMeta):
             password=self.config.redis.redis_password,
             reconnect=True,
         )
-
-    @cache_in_self
-    def get_account_validity(self) -> AccountValidity:
-        return AccountValidity(self)
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"

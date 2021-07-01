@@ -56,21 +56,12 @@ class AccountValidityConfig(Config):
 
         # Initialise the list of modules, which will stay empty if no modules or the
         # legacy config was provided.
-        self.account_validity_modules = []
 
-        if config.get("account_validity_modules") is not None:
-            for i, module in enumerate(config.get("account_validity_modules")):
-                config_path = ("account_validity", "<item %i>" % i)
-                if not isinstance(module, dict):
-                    raise ConfigError("expected a mapping", config_path)
+        # If the configuration is for the legacy feature, then read it as such.
+        account_validity_config = config.get("account_validity")
 
-                self.account_validity_modules.append(load_module(module, config_path))
-        elif config.get("account_validity") is not None:
-            # If the configuration is for the legacy feature, then read it as such.
-            self.read_legacy_config(config.get("account_validity"))
-
-    def read_legacy_config(self, account_validity_config):
-        logger.warning(LEGACY_ACCOUNT_VALIDITY_IN_USE)
+        if account_validity_config:
+            logger.warning(LEGACY_ACCOUNT_VALIDITY_IN_USE)
 
         self.account_validity_enabled = account_validity_config.get("enabled", False)
         self.account_validity_renew_by_email_enabled = (
@@ -104,22 +95,3 @@ class AccountValidityConfig(Config):
         if self.account_validity_renew_by_email_enabled:
             if not self.public_baseurl:
                 raise ConfigError("Can't send renewal emails without 'public_baseurl'")
-
-    def generate_config_section(self, **kwargs):
-        return """\
-        ## Account Validity ##
-
-        # Server admins can (optionally) get Synapse to check the validity of all user
-        # accounts against one or more custom modules.
-        #
-        # See the documentation on how to write an account validity module:
-        # https://github.com/matrix-org/synapse/blob/master/docs/account_validity.md
-        #
-        account_validity_modules:
-            #- module: "my_custom_project.SomeAccountValidity"
-            #  config:
-            #    example_option: 'things'
-            #- module: "my_custom_project.SomeOtherAccountValidity"
-            #  config:
-            #    other_example_option: 'stuff'
-        """

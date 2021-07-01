@@ -15,7 +15,9 @@
 import email.mime.multipart
 import email.utils
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
+
+from twisted.web.http import Request
 
 from synapse.api.errors import AuthError, StoreError, SynapseError
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -27,6 +29,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[bool]]
+ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
+# Legacy callbacks to allow for a smoother transition between the legacy native account
+# validity feature and synapse-email-account-validity.
+ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
+ON_LEGACY_RENEW_CALLBACK = Callable[[str], Awaitable[Tuple[bool, bool, int]]]
+ON_LEGACY_ADMIN_REQUEST = Callable[[Request], Awaitable]
+
 
 class AccountValidityHandler:
     def __init__(self, hs: "HomeServer"):
@@ -35,7 +45,6 @@ class AccountValidityHandler:
         self.store = self.hs.get_datastore()
         self.send_email_handler = self.hs.get_send_email_handler()
         self.clock = self.hs.get_clock()
-        self._new_account_validity = hs.get_account_validity()
 
         self._app_name = self.hs.config.email_app_name
 
@@ -73,6 +82,76 @@ class AccountValidityHandler:
             if hs.config.run_background_tasks:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
+        self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
+        self._on_user_registration_callback: Optional[
+            ON_USER_REGISTRATION_CALLBACK
+        ] = []
+        self._on_legacy_send_mail_callback: Optional[
+            ON_LEGACY_SEND_MAIL_CALLBACK
+        ] = None
+        self._on_legacy_renew_callback: Optional[ON_LEGACY_RENEW_CALLBACK] = None
+
+        # The legacy admin requests callback isn't a protected attribute because we need
+        # to access it from the admin servlet, which is outside of this handler.
+        self.on_legacy_admin_request_callback: Optional[ON_LEGACY_ADMIN_REQUEST] = None
+
+    def register_account_validity_callbacks(
+        self,
+        is_user_expired: Optional[IS_USER_EXPIRED_CALLBACK] = None,
+        on_user_registration: Optional[ON_USER_REGISTRATION_CALLBACK] = None,
+        on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
+        on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
+        on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
+    ):
+        """Register callbacks from module for each hook."""
+        if is_user_expired is not None:
+            self._is_user_expired_callbacks.append(is_user_expired)
+
+        if on_user_registration is not None:
+            self._on_user_registration_callback = on_user_registration
+
+        if on_legacy_send_mail is not None:
+            if self._on_legacy_send_mail_callback is not None:
+                raise RuntimeError("Tried to register on_legacy_send_mail twice")
+
+            self._on_legacy_send_mail_callback = on_legacy_send_mail
+
+        if on_legacy_renew is not None:
+            if self._on_legacy_renew_callback is not None:
+                raise RuntimeError("Tried to register on_legacy_renew twice")
+
+            self._on_legacy_renew_callback = on_legacy_renew
+
+        if on_legacy_admin_request is not None:
+            if self.on_legacy_admin_request_callback is not None:
+                raise RuntimeError("Tried to register on_legacy_admin_request twice")
+
+            self.on_legacy_admin_request_callback = on_legacy_admin_request
+
+    async def is_user_expired(self, user_id: str) -> bool:
+        """Checks if a user has expired against third-party modules.
+
+        Args:
+            user_id: The user to check the expiry of.
+
+        Returns:
+            Whether the user has expired.
+        """
+        for callback in self._is_user_expired_callbacks:
+            if await callback(user_id) is True:
+                return True
+
+        return False
+
+    async def on_user_registration(self, user_id: str):
+        """Tell third-party modules about a user's registration.
+
+        Args:
+            user_id: The ID of the newly registered user.
+        """
+        for callback in self._on_user_registration_callback:
+            await callback(user_id)
+
     @wrap_as_background_process("send_renewals")
     async def _send_renewal_emails(self) -> None:
         """Gets the list of users whose account is expiring in the amount of time
@@ -100,11 +179,9 @@ class AccountValidityHandler:
         """
         # If a module supports sending a renewal email from here, do that, otherwise do
         # the legacy dance.
-        try:
-            await self._new_account_validity.on_legacy_send_mail(user_id)
+        if self._on_legacy_send_mail_callback is not None:
+            await self._on_legacy_send_mail_callback(user_id)
             return
-        except NotImplementedError:
-            pass
 
         if not self._account_validity_renew_by_email_enabled:
             raise AuthError(
@@ -236,10 +313,8 @@ class AccountValidityHandler:
         """
         # If a module supports triggering a renew from here, do that, otherwise do the
         # legacy dance.
-        try:
-            return await self._new_account_validity.on_legacy_renew(renewal_token)
-        except NotImplementedError:
-            pass
+        if self._on_legacy_renew_callback is not None:
+            return await self._on_legacy_renew_callback(renewal_token)
 
         try:
             (

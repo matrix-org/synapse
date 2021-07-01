@@ -77,7 +77,7 @@ class RegistrationHandler(BaseHandler):
         self.identity_handler = self.hs.get_identity_handler()
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._account_validity = hs.get_account_validity()
+        self._account_validity_handler = hs.get_account_validity_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self._server_name = hs.hostname
 
@@ -703,7 +703,7 @@ class RegistrationHandler(BaseHandler):
 
             # Only call the account validity module(s) on the main process, to avoid
             # repeating e.g. database writes on all of the workers.
-            await self._account_validity.on_user_registration(user_id)
+            await self._account_validity_handler.on_user_registration(user_id)
 
     async def register_device(
         self,

@@ -85,7 +85,6 @@ class AccountValiditySendMailServlet(RestServlet):
         super().__init__()
 
         self.hs = hs
-        self.account_validity = hs.get_account_validity()
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
         self.account_validity_renew_by_email_enabled = (

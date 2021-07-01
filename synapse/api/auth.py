@@ -75,6 +75,7 @@ class Auth:
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         self.token_cache = LruCache(
             10000, "token_cache"
@@ -220,7 +221,7 @@ class Auth:
 
             # Deny the request if the user account has expired.
             if not allow_expired:
-                if await self.hs.get_account_validity().is_user_expired(
+                if await self._account_validity_handler.is_user_expired(
                     user_info.user_id
                 ) or (
                     self._account_validity_enabled

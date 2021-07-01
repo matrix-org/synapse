@@ -109,6 +109,7 @@ class ModuleApi:
         self._public_room_list_manager = PublicRoomListManager(hs)
 
         self._spam_checker = hs.get_spam_checker()
+        self._account_validity_handler = hs.get_account_validity_handler()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -117,6 +118,11 @@ class ModuleApi:
     def register_spam_checker_callbacks(self):
         """Registers callbacks for spam checking capabilities."""
         return self._spam_checker.register_callbacks
+
+    @property
+    def register_account_validity_callbacks(self):
+        """Registers callbacks for account validity capabilities."""
+        return self._account_validity_handler.register_account_validity_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.
