@@ -104,7 +104,7 @@ class BulkPushRuleEvaluator:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.store = hs.get_datastore()
-        self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
         # Used by `RulesForRoom` to ensure only one thing mutates the cache at a
         # time. Keyed off room_id.
@@ -172,7 +172,7 @@ class BulkPushRuleEvaluator:
             # not having a power level event is an extreme edge case
             auth_events = {POWER_KEY: await self.store.get_event(pl_event_id)}
         else:
-            auth_events_ids = self.auth.compute_auth_events(
+            auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=False
             )
             auth_events_dict = await self.store.get_events(auth_events_ids)
