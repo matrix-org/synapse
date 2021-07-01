@@ -24,6 +24,7 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     HistoryVisibility,
+    JoinRules,
     Membership,
     RoomTypes,
 )
@@ -420,9 +421,8 @@ class SpaceSummaryHandler:
 
         It should be included if:
 
-        * The requester is joined or invited to the room.
-        * The requester can join without an invite (per MSC3083).
-        * The origin server has any user that is joined or invited to the room.
+        * The requester is joined or can join the room (per MSC3173).
+        * The origin server has any user that is joined or can join the room.
         * The history visibility is set to world readable.
 
         Args:
@@ -446,8 +446,30 @@ class SpaceSummaryHandler:
 
         room_version = await self._store.get_room_version(room_id)
 
-        # if we have an authenticated requesting user, first check if they are able to view
-        # stripped state in the room.
+        # Include the room if it has join rules of public or knock.
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
+        if join_rules_event_id:
+            join_rules_event = await self._store.get_event(join_rules_event_id)
+            join_rule = join_rules_event.content.get("join_rule")
+            if (
+                join_rule == JoinRules.PUBLIC
+                or room_version.msc2403_knocking
+                and join_rule == JoinRules.KNOCK
+            ):
+                return True
+
+        # Include the room if it is peekable.
+        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+        if hist_vis_event_id:
+            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
+            hist_vis = hist_vis_ev.content.get("history_visibility")
+            if hist_vis == HistoryVisibility.WORLD_READABLE:
+                return True
+
+        # Otherwise we need to check information specific to the user or server.
+
+        # If we have an authenticated requesting user, check if they are a member
+        # of the room (or can join the room).
         if requester:
             member_event_id = state_ids.get((EventTypes.Member, requester), None)
 
@@ -470,10 +492,13 @@ class SpaceSummaryHandler:
                     return True
 
         # If this is a request over federation, check if the host is in the room or
-        # is in one of the spaces specified via the join rules.
+        # has a user who could join the room.
         elif origin:
             if await self._event_auth_handler.check_host_in_room(room_id, origin):
                 return True
+
+            # TODO This does not handle if a server has a pending invite to the
+            # room.
 
             # Alternately, if the host has a user in any of the spaces specified
             # for access, then the host can see this room (and should do filtering
@@ -490,18 +515,10 @@ class SpaceSummaryHandler:
                     ):
                         return True
 
-        # otherwise, check if the room is peekable
-        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""), None)
-        if hist_vis_event_id:
-            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
-            hist_vis = hist_vis_ev.content.get("history_visibility")
-            if hist_vis == HistoryVisibility.WORLD_READABLE:
-                return True
-
         logger.info(
-            "room %s is unpeekable and user %s is not a member / not allowed to join, omitting from summary",
+            "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
             room_id,
-            requester,
+            requester or origin,
         )
         return False
 

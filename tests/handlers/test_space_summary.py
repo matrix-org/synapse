@@ -14,7 +14,13 @@
 from typing import Any, Iterable, Optional, Tuple
 from unittest import mock
 
-from synapse.api.constants import EventContentFields, RoomTypes
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    HistoryVisibility,
+    JoinRules,
+    RoomTypes,
+)
 from synapse.api.errors import AuthError
 from synapse.handlers.space_summary import _child_events_comparison_key
 from synapse.rest import admin
@@ -117,7 +123,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         """Add a child room to a space."""
         self.helper.send_state(
             space_id,
-            event_type="m.space.child",
+            event_type=EventTypes.SpaceChild,
             body={"via": [self.hs.hostname]},
             tok=token,
             state_key=room_id,
@@ -148,7 +154,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_events(result, [(self.space, self.room)])
 
     def test_visibility(self):
-        """A user not in a space cannot inspect it."""
+        """
+        A user not in a space cannot inspect it.
+
+        Once in the space, they only see joined & joinable rooms.
+        """
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
 
@@ -159,22 +169,63 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
 
-        # The result should only have the space, but includes the link to the room.
+        # The result should have the space and room.
+        self._assert_rooms(result, [self.space, self.room])
+        self._assert_events(result, [(self.space, self.room)])
+
+        # Make the room's state only viewable to those in it.
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": HistoryVisibility.JOINED},
+            tok=self.token,
+        )
+
+        # If the room is made invite-only, it disappears...
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
         self._assert_rooms(result, [self.space])
         self._assert_events(result, [(self.space, self.room)])
 
+        # Until the user has an invite.
+        self.helper.invite(self.room, targ=user2, tok=self.token)
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+        self._assert_rooms(result, [self.space, self.room])
+        self._assert_events(result, [(self.space, self.room)])
+
+        # Or joins it.
+        self.helper.join(self.room, user2, tok=token2)
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+        self._assert_rooms(result, [self.space, self.room])
+        self._assert_events(result, [(self.space, self.room)])
+
     def test_world_readable(self):
-        """A world-readable room is visible to everyone."""
+        """A world-readable space is visible to everyone."""
         self.helper.send_state(
             self.space,
-            event_type="m.room.history_visibility",
-            body={"history_visibility": "world_readable"},
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
             tok=self.token,
         )
 
         user2 = self.register_user("user2", "pass")
 
+        # The space should not be visible.
+        self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
+
+        self.helper.send_state(
+            self.space,
+            event_type=EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": HistoryVisibility.WORLD_READABLE},
+            tok=self.token,
+        )
+
         # The space should be visible, as well as the link to the room.
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space])
+        self._assert_rooms(result, [self.space, self.room])
         self._assert_events(result, [(self.space, self.room)])
