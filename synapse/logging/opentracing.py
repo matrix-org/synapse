@@ -168,11 +168,12 @@ import inspect
 import logging
 import re
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Pattern, Type
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Type
 
 import attr
 
 from twisted.internet import defer
+from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
 from synapse.util import json_decoder, json_encoder
@@ -278,12 +279,18 @@ class SynapseTags:
     DB_TXN_ID = "db.txn_id"
 
 
+class SynapseBaggage:
+    FORCE_TRACING = "synapse-force-tracing"
+
+
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
 _homeserver_whitelist = None  # type: Optional[Pattern[str]]
 
 # Util methods
+
+Sentinel = object()
 
 
 def only_if_tracing(func):
@@ -447,12 +454,28 @@ def start_active_span(
     )
 
 
-def start_active_span_follows_from(operation_name, contexts):
+def start_active_span_follows_from(
+    operation_name: str, contexts: Collection, inherit_force_tracing=False
+):
+    """Starts an active opentracing span, with additional references to previous spans
+
+    Args:
+        operation_name: name of the operation represented by the new span
+        contexts: the previous spans to inherit from
+        inherit_force_tracing: if set, and any of the previous contexts have had tracing
+           forced, the new span will also have tracing forced.
+    """
     if opentracing is None:
         return noop_context_manager()
 
     references = [opentracing.follows_from(context) for context in contexts]
     scope = start_active_span(operation_name, references=references)
+
+    if inherit_force_tracing and any(
+        is_context_forced_tracing(ctx) for ctx in contexts
+    ):
+        force_tracing(scope.span)
+
     return scope
 
 
@@ -551,6 +574,10 @@ def start_active_span_from_edu(
 
 
 # Opentracing setters for tags, logs, etc
+@only_if_tracing
+def active_span():
+    """Get the currently active span, if any"""
+    return opentracing.tracer.active_span
 
 
 @ensure_active_span("set a tag")
@@ -571,25 +598,52 @@ def set_operation_name(operation_name):
     opentracing.tracer.active_span.set_operation_name(operation_name)
 
 
+@only_if_tracing
+def force_tracing(span=Sentinel) -> None:
+    """Force sampling for the active/given span and its children.
+
+    Args:
+        span: span to force tracing for. By default, the active span.
+    """
+    if span is Sentinel:
+        span = opentracing.tracer.active_span
+    if span is None:
+        logger.error("No active span in force_tracing")
+        return
+
+    span.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+
+    # also set a bit of baggage, so that we have a way of figuring out if
+    # it is enabled later
+    span.set_baggage_item(SynapseBaggage.FORCE_TRACING, "1")
+
+
+def is_context_forced_tracing(span_context) -> bool:
+    """Check if sampling has been force for the given span context."""
+    if span_context is None:
+        return False
+    return span_context.baggage.get(SynapseBaggage.FORCE_TRACING) is not None
+
+
 # Injection and extraction
 
 
-@ensure_active_span("inject the span into a header")
-def inject_active_span_twisted_headers(headers, destination, check_destination=True):
+@ensure_active_span("inject the span into a header dict")
+def inject_header_dict(
+    headers: Dict[bytes, List[bytes]],
+    destination: Optional[str] = None,
+    check_destination: bool = True,
+) -> None:
     """
-    Injects a span context into twisted headers in-place
+    Injects a span context into a dict of HTTP headers
 
     Args:
-        headers (twisted.web.http_headers.Headers)
-        destination (str): address of entity receiving the span context. If check_destination
-            is true the context will only be injected if the destination matches the
-            opentracing whitelist
+        headers: the dict to inject headers into
+        destination: address of entity receiving the span context. Must be given unless
+            check_destination is False. The context will only be injected if the
+            destination matches the opentracing whitelist
         check_destination (bool): If false, destination will be ignored and the context
             will always be injected.
-        span (opentracing.Span)
-
-    Returns:
-        In-place modification of headers
 
     Note:
         The headers set by the tracer are custom to the tracer implementation which
@@ -598,45 +652,13 @@ def inject_active_span_twisted_headers(headers, destination, check_destination=T
         here:
         https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
     """
-
-    if check_destination and not whitelisted_homeserver(destination):
-        return
-
-    span = opentracing.tracer.active_span
-    carrier = {}  # type: Dict[str, str]
-    opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
-
-    for key, value in carrier.items():
-        headers.addRawHeaders(key, value)
-
-
-@ensure_active_span("inject the span into a byte dict")
-def inject_active_span_byte_dict(headers, destination, check_destination=True):
-    """
-    Injects a span context into a dict where the headers are encoded as byte
-    strings
-
-    Args:
-        headers (dict)
-        destination (str): address of entity receiving the span context. If check_destination
-            is true the context will only be injected if the destination matches the
-            opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
-            will always be injected.
-        span (opentracing.Span)
-
-    Returns:
-        In-place modification of headers
-
-    Note:
-        The headers set by the tracer are custom to the tracer implementation which
-        should be unique enough that they don't interfere with any headers set by
-        synapse or twisted. If we're still using jaeger these headers would be those
-        here:
-        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
-    """
-    if check_destination and not whitelisted_homeserver(destination):
-        return
+    if check_destination:
+        if destination is None:
+            raise ValueError(
+                "destination must be given unless check_destination is False"
+            )
+        if not whitelisted_homeserver(destination):
+            return
 
     span = opentracing.tracer.active_span
 
@@ -647,36 +669,23 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
         headers[key.encode()] = [value.encode()]
 
 
-@ensure_active_span("inject the span into a text map")
-def inject_active_span_text_map(carrier, destination, check_destination=True):
-    """
-    Injects a span context into a dict
-
-    Args:
-        carrier (dict)
-        destination (str): address of entity receiving the span context. If check_destination
-            is true the context will only be injected if the destination matches the
-            opentracing whitelist
-        check_destination (bool): If false, destination will be ignored and the context
-            will always be injected.
-
-    Returns:
-        In-place modification of carrier
-
-    Note:
-        The headers set by the tracer are custom to the tracer implementation which
-        should be unique enough that they don't interfere with any headers set by
-        synapse or twisted. If we're still using jaeger these headers would be those
-        here:
-        https://github.com/jaegertracing/jaeger-client-python/blob/master/jaeger_client/constants.py
-    """
-
-    if check_destination and not whitelisted_homeserver(destination):
+def inject_response_headers(response_headers: Headers) -> None:
+    """Inject the current trace id into the HTTP response headers"""
+    if not opentracing:
+        return
+    span = opentracing.tracer.active_span
+    if not span:
         return
 
-    opentracing.tracer.inject(
-        opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
-    )
+    # This is a bit implementation-specific.
+    #
+    # Jaeger's Spans have a trace_id property; other implementations (including the
+    # dummy opentracing.span.Span which we use if init_tracer is not called) do not
+    # expose it
+    trace_id = getattr(span, "trace_id", None)
+
+    if trace_id is not None:
+        response_headers.addRawHeader("Synapse-Trace-Id", f"{trace_id:x}")
 
 
 @ensure_active_span("get the active span context as a dict", ret={})
@@ -854,6 +863,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         scope = start_active_span(request_name)
 
     with scope:
+        inject_response_headers(request.responseHeaders)
         try:
             yield
         finally:

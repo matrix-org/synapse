@@ -92,11 +92,8 @@ class Auth:
     async def check_from_context(
         self, room_version: str, event, context, do_sig_check=True
     ) -> None:
-        prev_state_ids = await context.get_prev_state_ids()
-        auth_events_ids = self.compute_auth_events(
-            event, prev_state_ids, for_verification=True
-        )
-        auth_events_by_id = await self.store.get_events(auth_events_ids)
+        auth_event_ids = event.auth_event_ids()
+        auth_events_by_id = await self.store.get_events(auth_event_ids)
         auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
 
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
@@ -207,7 +204,7 @@ class Auth:
 
                 request.requester = user_id
                 if user_id in self._force_tracing_for_users:
-                    opentracing.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+                    opentracing.force_tracing()
                 opentracing.set_tag("authenticated_entity", user_id)
                 opentracing.set_tag("user_id", user_id)
                 opentracing.set_tag("appservice_id", app_service.id)
@@ -260,7 +257,7 @@ class Auth:
 
             request.requester = requester
             if user_info.token_owner in self._force_tracing_for_users:
-                opentracing.set_tag(opentracing.tags.SAMPLING_PRIORITY, 1)
+                opentracing.force_tracing()
             opentracing.set_tag("authenticated_entity", user_info.token_owner)
             opentracing.set_tag("user_id", user_info.user_id)
             if device_id:

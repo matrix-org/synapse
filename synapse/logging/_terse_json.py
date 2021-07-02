@@ -20,8 +20,9 @@ import logging
 
 _encoder = json.JSONEncoder(ensure_ascii=False, separators=(",", ":"))
 
-# The properties of a standard LogRecord.
-_LOG_RECORD_ATTRIBUTES = {
+# The properties of a standard LogRecord that should be ignored when generating
+# JSON logs.
+_IGNORED_LOG_RECORD_ATTRIBUTES = {
     "args",
     "asctime",
     "created",
@@ -59,9 +60,9 @@ class JsonFormatter(logging.Formatter):
         return self._format(record, event)
 
     def _format(self, record: logging.LogRecord, event: dict) -> str:
-        # Add any extra attributes to the event.
+        # Add attributes specified via the extra keyword to the logged event.
         for key, value in record.__dict__.items():
-            if key not in _LOG_RECORD_ATTRIBUTES:
+            if key not in _IGNORED_LOG_RECORD_ATTRIBUTES:
                 event[key] = value
 
         return _encoder.encode(event)

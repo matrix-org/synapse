@@ -17,7 +17,7 @@ POST /_synapse/admin/v1/purge_history/<room_id>[/<event_id>]
 ```
 
 To use it, you will need to authenticate by providing an `access_token` for a
-server admin: [Admin API](../../usage/administration/admin_api)
+server admin: [Admin API](../usage/administration/admin_api)
 
 By default, events sent by local users are not deleted, as they may represent
 the only copies of this content in existence. (Events sent by remote users are

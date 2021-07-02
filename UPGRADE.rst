@@ -85,6 +85,23 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.37.0
+====================
+
+Deprecation of the current spam checker interface
+-------------------------------------------------
+
+The current spam checker interface is deprecated in favour of a new generic modules system.
+Authors of spam checker modules can refer to `this documentation <https://matrix-org.github.io/synapse/develop/modules.html#porting-an-existing-module-that-uses-the-old-interface>`_
+to update their modules. Synapse administrators can refer to `this documentation <https://matrix-org.github.io/synapse/develop/modules.html#using-modules>`_
+to update their configuration once the modules they are using have been updated.
+
+We plan to remove support for the current spam checker interface in August 2021.
+
+More module interfaces will be ported over to this new generic system in future versions
+of Synapse.
+
+
 Upgrading to v1.34.0
 ====================
 

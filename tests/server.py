@@ -138,21 +138,19 @@ class FakeChannel:
     def transport(self):
         return self
 
-    def await_result(self, timeout: int = 100) -> None:
+    def await_result(self, timeout_ms: int = 1000) -> None:
         """
         Wait until the request is finished.
         """
+        end_time = self._reactor.seconds() + timeout_ms / 1000.0
         self._reactor.run()
-        x = 0
 
         while not self.is_finished():
             # If there's a producer, tell it to resume producing so we get content
             if self._producer:
                 self._producer.resumeProducing()
 
-            x += 1
-
-            if x > timeout:
+            if self._reactor.seconds() > end_time:
                 raise TimedOutException("Timed out waiting for request to finish.")
 
             self._reactor.advance(0.1)

@@ -35,7 +35,7 @@
     - [URL Previews](url_previews.md)
     - [User Directory](user_directory.md)
     - [Message Retention Policies](message_retention_policies.md)
-    - [Pluggable Modules]()
+    - [Pluggable Modules](modules.md)
       - [Third Party Rules]()
       - [Spam Checker](spam_checker.md)
       - [Presence Router](presence_router_module.md)
@@ -61,6 +61,7 @@
       - [Server Version](admin_api/version_api.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
+    - [Request log format](usage/administration/request_log.md)
     - [Scripts]()
 
 # Development
@@ -69,6 +70,7 @@
   - [Git Usage](dev/git.md)
   - [Testing]()
   - [OpenTracing](opentracing.md)
+  - [Database Schemas](development/database_schema.md)
   - [Synapse Architecture]()
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)

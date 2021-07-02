@@ -142,13 +142,6 @@ the form of::
 As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
 
-ACME setup
-==========
-
-For details on having Synapse manage your federation TLS certificates
-automatically, please see `<docs/ACME.md>`_.
-
-
 Security note
 =============
 
@@ -293,18 +286,6 @@ try installing the failing modules individually::
 
     pip install -e "module-name"
 
-Once this is done, you may wish to run Synapse's unit tests to
-check that everything is installed correctly::
-
-    python -m twisted.trial tests
-
-This should end with a 'PASSED' result (note that exact numbers will
-differ)::
-
-    Ran 1337 tests in 716.064s
-
-    PASSED (skips=15, successes=1322)
-
 We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
 
     ./demo/start.sh
@@ -324,6 +305,23 @@ If you just want to start a single instance of the app and run it directly::
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
+Running the unit tests
+======================
+
+After getting up and running, you may wish to run Synapse's unit tests to
+check that everything is installed correctly::
+
+    trial tests
+
+This should end with a 'PASSED' result (note that exact numbers will
+differ)::
+
+    Ran 1337 tests in 716.064s
+
+    PASSED (skips=15, successes=1322)
+
+For more tips on running the unit tests, like running a specific test or
+to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
 
 
 Running the Integration Tests
