@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[bool]]
+IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
 ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
 # Legacy callbacks to allow for a smoother transition between the legacy native account
 # validity feature and synapse-email-account-validity.
@@ -140,8 +140,9 @@ class AccountValidityHandler:
             # legacy configuration and use the module(s) to determine if the user has
             # expired.
             for callback in self._is_user_expired_callbacks:
-                if await callback(user_id) is True:
-                    return True
+                expired = await callback(user_id)
+                if expired is not None:
+                    return expired
         elif self._account_validity_enabled:
             # Otherwise, if the legacy configuration is enabled, use it to figure out if
             # the user has expired.
