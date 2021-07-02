@@ -561,7 +561,7 @@ class AccountValidityRenewServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if self.account_activity_handler.on_legacy_admin_request_callback:
-            expiration_ts = (
+            expiration_ts = await (
                 self.account_activity_handler.on_legacy_admin_request_callback(request)
             )
         else:
