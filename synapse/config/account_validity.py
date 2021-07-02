@@ -35,34 +35,7 @@ class AccountValidityConfig(Config):
     section = "account_validity"
 
     def read_config(self, config, **kwargs):
-        # Consider legacy account validity disabled unless proven otherwise
-        self.account_validity_enabled = False
-        self.account_validity_renew_by_email_enabled = False
-
-        # Read and store template content. We need to do that regardless of whether the
-        # configuration is using modules or the legacy account validity implementation,
-        # because we need these templates to register the account validity servlets.
-        (
-            self.account_validity_account_renewed_template,
-            self.account_validity_account_previously_renewed_template,
-            self.account_validity_invalid_token_template,
-        ) = self.read_templates(
-            [
-                "account_renewed.html",
-                "account_previously_renewed.html",
-                "invalid_token.html",
-            ],
-        )
-
-        # Initialise the list of modules, which will stay empty if no modules or the
-        # legacy config was provided.
-
-        # If the configuration is for the legacy feature, then read it as such.
-        account_validity_config = config.get("account_validity")
-
-        if account_validity_config:
-            logger.warning(LEGACY_ACCOUNT_VALIDITY_IN_USE)
-
+        account_validity_config = config.get("account_validity") or {}
         self.account_validity_enabled = account_validity_config.get("enabled", False)
         self.account_validity_renew_by_email_enabled = (
             "renew_at" in account_validity_config
@@ -95,3 +68,27 @@ class AccountValidityConfig(Config):
         if self.account_validity_renew_by_email_enabled:
             if not self.public_baseurl:
                 raise ConfigError("Can't send renewal emails without 'public_baseurl'")
+
+        # Load account validity templates.
+        account_validity_template_dir = account_validity_config.get("template_dir")
+
+        account_renewed_template_filename = account_validity_config.get(
+            "account_renewed_html_path", "account_renewed.html"
+        )
+        invalid_token_template_filename = account_validity_config.get(
+            "invalid_token_html_path", "invalid_token.html"
+        )
+
+        # Read and store template content
+        (
+            self.account_validity_account_renewed_template,
+            self.account_validity_account_previously_renewed_template,
+            self.account_validity_invalid_token_template,
+        ) = self.read_templates(
+            [
+                account_renewed_template_filename,
+                "account_previously_renewed.html",
+                invalid_token_template_filename,
+            ],
+            account_validity_template_dir,
+        )
