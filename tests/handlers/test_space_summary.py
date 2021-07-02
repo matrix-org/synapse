@@ -14,7 +14,7 @@
 from typing import Any, Iterable, Optional, Tuple
 from unittest import mock
 
-from synapse.api.constants import EventContentFields, RoomTypes
+from synapse.api.constants import EventContentFields, JoinRules, RoomTypes
 from synapse.api.errors import AuthError
 from synapse.handlers.space_summary import _child_events_comparison_key
 from synapse.rest import admin
@@ -280,5 +280,103 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 (self.space, self.room),
                 (self.space, subspace),
                 (subspace, subroom),
+            ],
+        )
+
+    def test_fed_filtering(self):
+        """
+        Rooms returned over federation should be properly filtered to only include
+        rooms the user has access to.
+        """
+        fed_hostname = self.hs.hostname + "2"
+        subspace = "#subspace:" + fed_hostname
+
+        # Create a few rooms which will have different properties.
+        restricted_room = "#restricted:" + fed_hostname
+        restricted_accessible_room = "#restricted_accessible:" + fed_hostname
+        world_readable_room = "#world_readable:" + fed_hostname
+        joined_room = self.helper.create_room_as(self.user, tok=self.token)
+
+        async def summarize_remote_room(
+            _self, room, suggested_only, max_children, exclude_rooms
+        ):
+            # Note that these entries are brief, but should contain enough info.
+            rooms = [
+                {
+                    "room_id": restricted_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.MSC3083_RESTRICTED,
+                    "allowed_spaces": [],
+                },
+                {
+                    "room_id": restricted_accessible_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.MSC3083_RESTRICTED,
+                    "allowed_spaces": [self.room],
+                },
+                {
+                    "room_id": world_readable_room,
+                    "world_readable": True,
+                    "join_rules": JoinRules.INVITE,
+                },
+                {
+                    "room_id": joined_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.INVITE,
+                },
+            ]
+
+            # Place each room in the sub-space.
+            event_content = {"via": [fed_hostname]}
+            events = [
+                {
+                    "room_id": subspace,
+                    "state_key": room["room_id"],
+                    "content": event_content,
+                }
+                for room in rooms
+            ]
+
+            # Also include the subspace.
+            rooms.insert(
+                0,
+                {
+                    "room_id": subspace,
+                    "world_readable": True,
+                },
+            )
+            return rooms, events
+
+        # Add a room to the space which is on another server.
+        self._add_child(self.space, subspace, self.token)
+
+        with mock.patch(
+            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            new=summarize_remote_room,
+        ):
+            result = self.get_success(
+                self.handler.get_space_summary(self.user, self.space)
+            )
+
+        self._assert_rooms(
+            result,
+            [
+                self.space,
+                self.room,
+                subspace,
+                restricted_accessible_room,
+                world_readable_room,
+                joined_room,
+            ],
+        )
+        self._assert_events(
+            result,
+            [
+                (self.space, self.room),
+                (self.space, subspace),
+                (subspace, restricted_room),
+                (subspace, restricted_accessible_room),
+                (subspace, world_readable_room),
+                (subspace, joined_room),
             ],
         )
