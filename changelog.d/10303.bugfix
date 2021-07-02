@@ -1,0 +1,1 @@
+Ensure that inbound events from federation that were being processed when Synapse was restarted get promptly processed on start up.
