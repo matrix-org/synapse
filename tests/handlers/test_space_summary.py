@@ -19,11 +19,13 @@ from synapse.api.constants import (
     EventTypes,
     HistoryVisibility,
     JoinRules,
+    Membership,
     RestrictedJoinRuleTypes,
     RoomTypes,
 )
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
+from synapse.events import make_event_from_dict
 from synapse.handlers.space_summary import _child_events_comparison_key
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -225,6 +227,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         knock_room = self._create_room_with_join_rule(
             JoinRules.KNOCK, room_version=RoomVersions.V7.identifier
         )
+        not_invited_room = self._create_room_with_join_rule(JoinRules.INVITE)
+        invited_room = self._create_room_with_join_rule(JoinRules.INVITE)
+        self.helper.invite(invited_room, targ=user2, tok=self.token)
         restricted_room = self._create_room_with_join_rule(
             JoinRules.MSC3083_RESTRICTED,
             room_version=RoomVersions.MSC3083.identifier,
@@ -248,7 +253,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             body={"history_visibility": HistoryVisibility.WORLD_READABLE},
             tok=self.token,
         )
-        joined_room = self._create_room_with_join_rule(JoinRules.PUBLIC)
+        joined_room = self._create_room_with_join_rule(JoinRules.INVITE)
+        self.helper.invite(joined_room, targ=user2, tok=self.token)
         self.helper.join(joined_room, user2, tok=token2)
 
         # Join the space.
@@ -262,6 +268,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.room,
                 public_room,
                 knock_room,
+                invited_room,
                 restricted_accessible_room,
                 world_readable_room,
                 joined_room,
@@ -273,6 +280,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 (self.space, self.room),
                 (self.space, public_room),
                 (self.space, knock_room),
+                (self.space, not_invited_room),
+                (self.space, invited_room),
                 (self.space, restricted_room),
                 (self.space, restricted_accessible_room),
                 (self.space, world_readable_room),
@@ -395,10 +404,32 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Create a few rooms which will have different properties.
         public_room = "#public:" + fed_hostname
         knock_room = "#knock:" + fed_hostname
+        not_invited_room = "#not_invited:" + fed_hostname
+        invited_room = "#invited:" + fed_hostname
         restricted_room = "#restricted:" + fed_hostname
         restricted_accessible_room = "#restricted_accessible:" + fed_hostname
         world_readable_room = "#world_readable:" + fed_hostname
         joined_room = self.helper.create_room_as(self.user, tok=self.token)
+
+        # Poke an invite over federation into the database.
+        fed_handler = self.hs.get_federation_handler()
+        event = make_event_from_dict(
+            {
+                "room_id": invited_room,
+                "event_id": "!abcd:" + fed_hostname,
+                "type": EventTypes.Member,
+                "sender": "@remote:" + fed_hostname,
+                "state_key": self.user,
+                "content": {"membership": Membership.INVITE},
+                "prev_events": [],
+                "auth_events": [],
+                "depth": 1,
+                "origin_server_ts": 1234,
+            }
+        )
+        self.get_success(
+            fed_handler.on_invite_request(fed_hostname, event, RoomVersions.V6)
+        )
 
         async def summarize_remote_room(
             _self, room, suggested_only, max_children, exclude_rooms
@@ -409,13 +440,21 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                     "room_id": public_room,
                     "world_readable": False,
                     "join_rules": JoinRules.PUBLIC,
-                    "allowed_spaces": [],
                 },
                 {
                     "room_id": knock_room,
                     "world_readable": False,
                     "join_rules": JoinRules.KNOCK,
-                    "allowed_spaces": [],
+                },
+                {
+                    "room_id": not_invited_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.INVITE,
+                },
+                {
+                    "room_id": invited_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.INVITE,
                 },
                 {
                     "room_id": restricted_room,
@@ -481,6 +520,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 subspace,
                 public_room,
                 knock_room,
+                invited_room,
                 restricted_accessible_room,
                 world_readable_room,
                 joined_room,
@@ -493,6 +533,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 (self.space, subspace),
                 (subspace, public_room),
                 (subspace, knock_room),
+                (subspace, not_invited_room),
+                (subspace, invited_room),
                 (subspace, restricted_room),
                 (subspace, restricted_accessible_room),
                 (subspace, world_readable_room),

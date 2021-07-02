@@ -448,6 +448,12 @@ class SpaceSummaryHandler:
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
+            # The user might have a pending invite for the room.
+            if requester and await self._store.get_invite_for_local_user_in_room(
+                requester, room_id
+            ):
+                return True
+
             logger.info("room %s is unknown, omitting from summary", room_id)
             return False
 
@@ -499,11 +505,10 @@ class SpaceSummaryHandler:
         # If this is a request over federation, check if the host is in the room or
         # has a user who could join the room.
         elif origin:
-            if await self._event_auth_handler.check_host_in_room(room_id, origin):
+            if await self._event_auth_handler.check_host_in_room(
+                room_id, origin
+            ) or await self._store.is_host_invited(room_id, origin):
                 return True
-
-            # TODO This does not handle if a server has a pending invite to the
-            # room.
 
             # Alternately, if the host has a user in any of the spaces specified
             # for access, then the host can see this room (and should do filtering
