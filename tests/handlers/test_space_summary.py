@@ -19,9 +19,11 @@ from synapse.api.constants import (
     EventTypes,
     HistoryVisibility,
     JoinRules,
+    RestrictedJoinRuleTypes,
     RoomTypes,
 )
 from synapse.api.errors import AuthError
+from synapse.api.room_versions import RoomVersions
 from synapse.handlers.space_summary import _child_events_comparison_key
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
@@ -154,81 +156,129 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_events(result, [(self.space, self.room)])
 
     def test_visibility(self):
-        """
-        A user not in a space cannot inspect it.
-
-        Once in the space, they only see joined & joinable rooms.
-        """
+        """A user not in a space cannot inspect it."""
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
 
         # The user cannot see the space.
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
 
-        # Joining the room causes it to be visible.
-        self.helper.join(self.space, user2, tok=token2)
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
-
-        # The result should have the space and room.
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
-
-        # Make the room's state only viewable to those in it.
-        self.helper.send_state(
-            self.room,
-            event_type=EventTypes.RoomHistoryVisibility,
-            body={"history_visibility": HistoryVisibility.JOINED},
-            tok=self.token,
-        )
-
-        # If the room is made invite-only, it disappears...
-        self.helper.send_state(
-            self.room,
-            event_type=EventTypes.JoinRules,
-            body={"join_rule": JoinRules.INVITE},
-            tok=self.token,
-        )
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space])
-        self._assert_events(result, [(self.space, self.room)])
-
-        # Until the user has an invite.
-        self.helper.invite(self.room, targ=user2, tok=self.token)
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
-
-        # Or joins it.
-        self.helper.join(self.room, user2, tok=token2)
-        result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
-
-    def test_world_readable(self):
-        """A world-readable space is visible to everyone."""
-        self.helper.send_state(
-            self.space,
-            event_type=EventTypes.JoinRules,
-            body={"join_rule": JoinRules.INVITE},
-            tok=self.token,
-        )
-
-        user2 = self.register_user("user2", "pass")
-
-        # The space should not be visible.
-        self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
-
+        # If the space is made world-readable it should return a result.
         self.helper.send_state(
             self.space,
             event_type=EventTypes.RoomHistoryVisibility,
             body={"history_visibility": HistoryVisibility.WORLD_READABLE},
             tok=self.token,
         )
-
-        # The space should be visible, as well as the link to the room.
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
         self._assert_rooms(result, [self.space, self.room])
         self._assert_events(result, [(self.space, self.room)])
+
+        # Make it not world-readable again and confirm it results in an error.
+        self.helper.send_state(
+            self.space,
+            event_type=EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": HistoryVisibility.JOINED},
+            tok=self.token,
+        )
+        self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
+
+        # Join the space and results should be returned.
+        self.helper.join(self.space, user2, tok=token2)
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+        self._assert_rooms(result, [self.space, self.room])
+        self._assert_events(result, [(self.space, self.room)])
+
+    def _create_room_with_join_rule(
+        self, join_rule: str, room_version: Optional[str] = None, **extra_content
+    ) -> str:
+        """Create a room with the given join rule and add it to the space."""
+        room_id = self.helper.create_room_as(
+            self.user,
+            room_version=room_version,
+            tok=self.token,
+            extra_content={
+                "initial_state": [
+                    {
+                        "type": EventTypes.JoinRules,
+                        "state_key": "",
+                        "content": {
+                            "join_rule": join_rule,
+                            **extra_content,
+                        },
+                    }
+                ]
+            },
+        )
+        self._add_child(self.space, room_id, self.token)
+        return room_id
+
+    def test_filtering(self):
+        """
+        Rooms should be properly filtered to only include rooms the user has access to.
+        """
+        user2 = self.register_user("user2", "pass")
+        token2 = self.login("user2", "pass")
+
+        # Create a few rooms which will have different properties.
+        public_room = self._create_room_with_join_rule(JoinRules.PUBLIC)
+        knock_room = self._create_room_with_join_rule(
+            JoinRules.KNOCK, room_version=RoomVersions.V7.identifier
+        )
+        restricted_room = self._create_room_with_join_rule(
+            JoinRules.MSC3083_RESTRICTED,
+            room_version=RoomVersions.MSC3083.identifier,
+            allow=[],
+        )
+        restricted_accessible_room = self._create_room_with_join_rule(
+            JoinRules.MSC3083_RESTRICTED,
+            room_version=RoomVersions.MSC3083.identifier,
+            allow=[
+                {
+                    "type": RestrictedJoinRuleTypes.ROOM_MEMBERSHIP,
+                    "room_id": self.space,
+                    "via": [self.hs.hostname],
+                }
+            ],
+        )
+        world_readable_room = self._create_room_with_join_rule(JoinRules.INVITE)
+        self.helper.send_state(
+            world_readable_room,
+            event_type=EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": HistoryVisibility.WORLD_READABLE},
+            tok=self.token,
+        )
+        joined_room = self._create_room_with_join_rule(JoinRules.PUBLIC)
+        self.helper.join(joined_room, user2, tok=token2)
+
+        # Join the space.
+        self.helper.join(self.space, user2, tok=token2)
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+
+        self._assert_rooms(
+            result,
+            [
+                self.space,
+                self.room,
+                public_room,
+                knock_room,
+                restricted_accessible_room,
+                world_readable_room,
+                joined_room,
+            ],
+        )
+        self._assert_events(
+            result,
+            [
+                (self.space, self.room),
+                (self.space, public_room),
+                (self.space, knock_room),
+                (self.space, restricted_room),
+                (self.space, restricted_accessible_room),
+                (self.space, world_readable_room),
+                (self.space, joined_room),
+            ],
+        )
 
     def test_complex_space(self):
         """
