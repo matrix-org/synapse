@@ -223,11 +223,6 @@ class Auth:
             if not allow_expired:
                 if await self._account_validity_handler.is_user_expired(
                     user_info.user_id
-                ) or (
-                    self._account_validity_enabled
-                    and await self.store.is_account_expired(
-                        user_info.user_id, self.clock.time_msec()
-                    )
                 ):
                     # Raise the error if either an account validity module has determined
                     # the account has expired, or the legacy account validity

@@ -137,9 +137,17 @@ class AccountValidityHandler:
         Returns:
             Whether the user has expired.
         """
-        for callback in self._is_user_expired_callbacks:
-            if await callback(user_id) is True:
-                return True
+        if self._is_user_expired_callbacks:
+            # If we have at least one module implementing this callback, ignore the
+            # legacy configuration and use the module(s) to determine if the user has
+            # expired.
+            for callback in self._is_user_expired_callbacks:
+                if await callback(user_id) is True:
+                    return True
+        elif self._account_validity_enabled:
+            # Otherwise, if the legacy configuration is enabled, use it to figure out if
+            # the user has expired.
+            return await self.store.is_account_expired(user_id, self.clock.time_msec())
 
         return False
 

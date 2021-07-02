@@ -41,7 +41,7 @@ from synapse.http.server import (
 from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
-from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
@@ -552,24 +552,37 @@ class ModuleApi:
                 presence_events, destination
             )
 
-    def looping_background_call_async(self, f: Callable, msec: float, *args, **kwargs):
-        """Wraps an async function as a background process and calls it repeatedly.
+    def looping_background_call(
+        self,
+        f: Callable,
+        msec: float,
+        desc: Optional[str] = None,
+        *args,
+        **kwargs,
+    ):
+        """Wraps a function as a background process and calls it repeatedly.
 
         Waits `msec` initially before calling `f` for the first time.
 
         Args:
-            f(function): The function to call repeatedly.
-            msec(float): How long to wait between calls in milliseconds.
+            f: The function to call repeatedly.
+            msec: How long to wait between calls in milliseconds.
+            desc: The background task's description. Default to the function's name.
             *args: Positional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
-
-        @wrap_as_background_process(f.__name__)
-        async def background_call(*args, **kwargs):
-            await f(*args, **kwargs)
+        if desc is None:
+            desc = f.__name__
 
         if self._hs.config.run_background_tasks:
-            self._clock.looping_call(background_call, msec, *args, **kwargs)
+            self._clock.looping_call(
+                run_as_background_process,
+                msec,
+                desc,
+                f,
+                *args,
+                **kwargs,
+            )
         else:
             logger.warning(
                 "Not running looping call %s as the configuration forbids it",
