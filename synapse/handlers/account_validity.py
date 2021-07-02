@@ -83,8 +83,8 @@ class AccountValidityHandler:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []
-        self._on_user_registration_callback: Optional[
-            ON_USER_REGISTRATION_CALLBACK
+        self._on_user_registration_callbacks: Optional[
+            List[ON_USER_REGISTRATION_CALLBACK]
         ] = []
         self._on_legacy_send_mail_callback: Optional[
             ON_LEGACY_SEND_MAIL_CALLBACK
@@ -108,7 +108,7 @@ class AccountValidityHandler:
             self._is_user_expired_callbacks.append(is_user_expired)
 
         if on_user_registration is not None:
-            self._on_user_registration_callback = on_user_registration
+            self._on_user_registration_callbacks = on_user_registration
 
         if on_legacy_send_mail is not None:
             if self._on_legacy_send_mail_callback is not None:
@@ -157,7 +157,7 @@ class AccountValidityHandler:
         Args:
             user_id: The ID of the newly registered user.
         """
-        for callback in self._on_user_registration_callback:
+        for callback in self._on_user_registration_callbacks:
             await callback(user_id)
 
     @wrap_as_background_process("send_renewals")
