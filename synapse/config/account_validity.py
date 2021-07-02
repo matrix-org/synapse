@@ -11,24 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
-
 from synapse.config._base import Config, ConfigError
-from synapse.util.module_loader import load_module
-
-logger = logging.getLogger(__name__)
-
-LEGACY_ACCOUNT_VALIDITY_IN_USE = """
-You are using the deprecated account validity feature. It is recommended to change your
-configuration to be using one or more modules instead. This feature will be removed in a
-future version of Synapse, at which point it will only be available through custom
-modules.
-See the sample configuration file for more information:
-https://github.com/matrix-org/synapse/blob/master/docs/sample_config.yaml
-The behaviour and features of the deprecated account validity feature have been ported
-to a dedicated module:
-https://github.com/matrix-org/synapse-email-account-validity
---------------------------------------------------------------------------------------"""
 
 
 class AccountValidityConfig(Config):
