@@ -1301,23 +1301,6 @@ account_threepid_delegates:
 #auto_join_rooms_for_guests: false
 
 
-## Account Validity ##
-
-# Server admins can (optionally) get Synapse to check the validity of all user
-# accounts against one or more custom modules.
-#
-# See the documentation on how to write an account validity module:
-# https://github.com/matrix-org/synapse/blob/master/docs/account_validity.md
-#
-account_validity_modules:
-    #- module: "my_custom_project.SomeAccountValidity"
-    #  config:
-    #    example_option: 'things'
-    #- module: "my_custom_project.SomeOtherAccountValidity"
-    #  config:
-    #    other_example_option: 'stuff'
-
-
 ## Metrics ###
 
 # Enable collection and rendering of performance metrics
