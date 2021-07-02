@@ -451,10 +451,8 @@ class SpaceSummaryHandler:
         if join_rules_event_id:
             join_rules_event = await self._store.get_event(join_rules_event_id)
             join_rule = join_rules_event.content.get("join_rule")
-            if (
-                join_rule == JoinRules.PUBLIC
-                or room_version.msc2403_knocking
-                and join_rule == JoinRules.KNOCK
+            if join_rule == JoinRules.PUBLIC or (
+                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
             ):
                 return True
 
