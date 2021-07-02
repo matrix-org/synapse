@@ -151,14 +151,21 @@ class SpaceSummaryHandler:
                     # The room should only be included in the summary if:
                     #     a. the user is in the room;
                     #     b. the room is world readable; or
-                    #     c. the user is in a space that has been granted access to
-                    #        the room.
+                    #     c. the user could join the room, e.g. the join rules
+                    #        are set to public or the user is in a space that
+                    #        has been granted access to the room.
                     #
                     # Note that we know the user is not in the root room (which is
                     # why the remote call was made in the first place), but the user
                     # could be in one of the children rooms and we just didn't know
                     # about the link.
-                    include_room = room.get("world_readable") is True
+
+                    # The API doesn't return the room version so assume that a
+                    # join rule of knock is valid.
+                    include_room = (
+                        room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+                        or room.get("world_readable") is True
+                    )
 
                     # Check if the user is a member of any of the allowed spaces
                     # from the response.
@@ -550,6 +557,7 @@ class SpaceSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            "join_rules": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
