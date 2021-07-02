@@ -343,6 +343,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         subspace = "#subspace:" + fed_hostname
 
         # Create a few rooms which will have different properties.
+        public_room = "#public:" + fed_hostname
+        knock_room = "#knock:" + fed_hostname
         restricted_room = "#restricted:" + fed_hostname
         restricted_accessible_room = "#restricted_accessible:" + fed_hostname
         world_readable_room = "#world_readable:" + fed_hostname
@@ -353,6 +355,18 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ):
             # Note that these entries are brief, but should contain enough info.
             rooms = [
+                {
+                    "room_id": public_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.PUBLIC,
+                    "allowed_spaces": [],
+                },
+                {
+                    "room_id": knock_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.KNOCK,
+                    "allowed_spaces": [],
+                },
                 {
                     "room_id": restricted_room,
                     "world_readable": False,
@@ -415,6 +429,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.space,
                 self.room,
                 subspace,
+                public_room,
+                knock_room,
                 restricted_accessible_room,
                 world_readable_room,
                 joined_room,
@@ -425,6 +441,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             [
                 (self.space, self.room),
                 (self.space, subspace),
+                (subspace, public_room),
+                (subspace, knock_room),
                 (subspace, restricted_room),
                 (subspace, restricted_accessible_room),
                 (subspace, world_readable_room),
