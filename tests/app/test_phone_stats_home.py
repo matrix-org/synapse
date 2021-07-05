@@ -26,9 +26,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token)
 
         # Check the R30 results do not count that user.
-        r30_results = self.get_success(
-            self.hs.get_datastore().count_r30_users()
-        )
+        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         # Advance 30 days (+ 1 second, because strict inequality causes issues if we are
@@ -36,9 +34,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.reactor.advance(30 * DAY + 1)
 
         # (Make sure the user isn't somehow counted by this point.)
-        r30_results = self.get_success(
-            self.hs.get_datastore().count_r30_users()
-        )
+        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
         # Send a message (this counts as activity)
@@ -48,18 +44,14 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.reactor.advance(4)
 
         # *Now* the user is counted.
-        r30_results = self.get_success(
-            self.hs.get_datastore().count_r30_users()
-        )
+        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance 27 days. The user has now not posted for 27 days.
         self.reactor.advance(27 * DAY)
 
         # The user is still counted.
-        r30_results = self.get_success(
-            self.hs.get_datastore().count_r30_users()
-        )
+        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance another day. The user has now not posted for 28 days.
@@ -67,9 +59,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
 
         # The user is now no longer counted in R30.
         # TODO: why is this the case after only 28 days?
-        r30_results = self.get_success(
-            self.hs.get_datastore().count_r30_users()
-        )
+        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
     def test_r30_user_must_be_retained_for_at_least_a_month(self):
