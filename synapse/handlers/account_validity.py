@@ -31,8 +31,6 @@ logger = logging.getLogger(__name__)
 
 IS_USER_EXPIRED_CALLBACK = Callable[[str], Awaitable[Optional[bool]]]
 ON_USER_REGISTRATION_CALLBACK = Callable[[str], Awaitable]
-# Legacy callbacks to allow for a smoother transition between the legacy native account
-# validity feature and synapse-email-account-validity.
 ON_LEGACY_SEND_MAIL_CALLBACK = Callable[[str], Awaitable]
 ON_LEGACY_RENEW_CALLBACK = Callable[[str], Awaitable[Tuple[bool, bool, int]]]
 ON_LEGACY_ADMIN_REQUEST = Callable[[Request], Awaitable]
@@ -108,6 +106,19 @@ class AccountValidityHandler:
         if on_user_registration is not None:
             self._on_user_registration_callbacks.append(on_user_registration)
 
+        # The builtin account validity feature exposes 3 endpoints (send_mail, renew, and
+        # an admin one). As part of moving the feature into a module, we need to change
+        # the path from /_matrix/client/unstable/account_validity/... to
+        # /_synapse/client/account_validity, because:
+        #   * the feature isn't part of the Matrix spec thus shouldn't live under /_matrix
+        #   * because of the way we register servlets modules can't register resources
+        #     under /_matrix/client
+        # We need to allow for a transition period between the old and new endpoints
+        # in order to allow for clients to update (and for emails to be processed).
+        # Therefore we need to allow modules (in practice just the one implementing the
+        # email-based account validity) to temporarily hook into the legacy endpoint so we
+        # can route the traffic coming into the old endpoints into the module, which is
+        # why we have the following three temporary hooks.
         if on_legacy_send_mail is not None:
             if self._on_legacy_send_mail_callback is not None:
                 raise RuntimeError("Tried to register on_legacy_send_mail twice")
