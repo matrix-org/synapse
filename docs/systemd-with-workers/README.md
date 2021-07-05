@@ -6,16 +6,18 @@ well as a `matrix-synapse-worker@` service template for any workers you
 require. Additionally, to group the required services, it sets up a
 `matrix-synapse.target`.
 
-See the folder [system](system) for the systemd unit files.
+See the folder [system](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/)
+for the systemd unit files.
 
-The folder [workers](workers) contains an example configuration for the
-`federation_reader` worker.
+The folder [workers](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/)
+contains an example configuration for the `federation_reader` worker.
 
 ## Synapse configuration files
 
 See [workers.md](../workers.md) for information on how to set up the
 configuration files and reverse-proxy correctly. You can find an example worker
-config in the [workers](workers) folder.
+config in the [workers](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/)
+folder.
 
 Systemd manages daemonization itself, so ensure that none of the configuration
 files set either `daemonize` or `worker_daemonize`.
@@ -29,8 +31,8 @@ There is no need for a separate configuration file for the master process.
 ## Set up
 
 1. Adjust synapse configuration files as above.
-1. Copy the `*.service` and `*.target` files in [system](system) to
-`/etc/systemd/system`.
+1. Copy the `*.service` and `*.target` files in [system](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/)
+to `/etc/systemd/system`.
 1. Run `systemctl daemon-reload` to tell systemd to load the new unit files.
 1. Run `systemctl enable matrix-synapse.service`. This will configure the
 synapse master process to be started as part of the `matrix-synapse.target`

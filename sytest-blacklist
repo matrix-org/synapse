@@ -41,3 +41,8 @@ We can't peek into rooms with invited history_visibility
 We can't peek into rooms with joined history_visibility
 Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
+
+
+# Blacklisted due to changes made in #10272
+Outbound federation will ignore a missing event with bad JSON for room version 6
+Federation rejects inbound events where the prev_events cannot be found

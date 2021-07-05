@@ -1,0 +1,1 @@
+Update the release script to use the semver terminology and determine the release branch based on the next version.

@@ -17,10 +17,14 @@ import json
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import read_marker, sync
+from synapse.rest.client.v2_alpha import knock, read_marker, sync
 
 from tests import unittest
+from tests.federation.transport.test_knocking import (
+    KnockingStrippedStateEventHelperMixin,
+)
 from tests.server import TimedOutException
+from tests.unittest import override_config
 
 
 class FilterTestCase(unittest.HomeserverTestCase):
@@ -37,35 +41,7 @@ class FilterTestCase(unittest.HomeserverTestCase):
         channel = self.make_request("GET", "/sync")
 
         self.assertEqual(channel.code, 200)
-        self.assertTrue(
-            {
-                "next_batch",
-                "rooms",
-                "presence",
-                "account_data",
-                "to_device",
-                "device_lists",
-            }.issubset(set(channel.json_body.keys()))
-        )
-
-    def test_sync_presence_disabled(self):
-        """
-        When presence is disabled, the key does not appear in /sync.
-        """
-        self.hs.config.use_presence = False
-
-        channel = self.make_request("GET", "/sync")
-
-        self.assertEqual(channel.code, 200)
-        self.assertTrue(
-            {
-                "next_batch",
-                "rooms",
-                "account_data",
-                "to_device",
-                "device_lists",
-            }.issubset(set(channel.json_body.keys()))
-        )
+        self.assertIn("next_batch", channel.json_body)
 
 
 class SyncFilterTestCase(unittest.HomeserverTestCase):
@@ -305,6 +281,93 @@ class SyncTypingTests(unittest.HomeserverTestCase):
             self.make_request("GET", sync_url % (access_token, next_batch))
 
 
+class SyncKnockTestCase(
+    unittest.HomeserverTestCase, KnockingStrippedStateEventHelperMixin
+):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+        sync.register_servlets,
+        knock.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
+        self.url = "/sync?since=%s"
+        self.next_batch = "s0"
+
+        # Register the first user (used to create the room to knock on).
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        # Create the room we'll knock on.
+        self.room_id = self.helper.create_room_as(
+            self.user_id,
+            is_public=False,
+            room_version="7",
+            tok=self.tok,
+        )
+
+        # Register the second user (used to knock on the room).
+        self.knocker = self.register_user("knocker", "monkey")
+        self.knocker_tok = self.login("knocker", "monkey")
+
+        # Perform an initial sync for the knocking user.
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Store the next batch for the next request.
+        self.next_batch = channel.json_body["next_batch"]
+
+        # Set up some room state to test with.
+        self.expected_room_state = self.send_example_state_events_to_room(
+            hs, self.room_id, self.user_id
+        )
+
+    @override_config({"experimental_features": {"msc2403_enabled": True}})
+    def test_knock_room_state(self):
+        """Tests that /sync returns state from a room after knocking on it."""
+        # Knock on a room
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/knock/%s" % (self.room_id,),
+            b"{}",
+            self.knocker_tok,
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
+        # We expect to see the knock event in the stripped room state later
+        self.expected_room_state[EventTypes.Member] = {
+            "content": {"membership": "knock", "displayname": "knocker"},
+            "state_key": "@knocker:test",
+        }
+
+        # Check that /sync includes stripped state from the room
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.knocker_tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Extract the stripped room state events from /sync
+        knock_entry = channel.json_body["rooms"]["knock"]
+        room_state_events = knock_entry[self.room_id]["knock_state"]["events"]
+
+        # Validate that the knock membership event came last
+        self.assertEqual(room_state_events[-1]["type"], EventTypes.Member)
+
+        # Validate the stripped room state events
+        self.check_knock_room_state_against_room_state(
+            room_state_events, self.expected_room_state
+        )
+
+
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -447,7 +510,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         )
         self._check_unread_count(5)
 
-    def _check_unread_count(self, expected_count: True):
+    def _check_unread_count(self, expected_count: int):
         """Syncs and compares the unread count with the expected value."""
 
         channel = self.make_request(
@@ -467,3 +530,53 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
 
         # Store the next batch for the next request.
         self.next_batch = channel.json_body["next_batch"]
+
+
+class SyncCacheTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def test_noop_sync_does_not_tightloop(self):
+        """If the sync times out, we shouldn't cache the result
+
+        Essentially a regression test for #8518.
+        """
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        # we should immediately get an initial sync response
+        channel = self.make_request("GET", "/sync", access_token=self.tok)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # now, make an incremental sync request, with a timeout
+        next_batch = channel.json_body["next_batch"]
+        channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}&timeout=10000",
+            access_token=self.tok,
+            await_result=False,
+        )
+        # that should block for 10 seconds
+        with self.assertRaises(TimedOutException):
+            channel.await_result(timeout_ms=9900)
+        channel.await_result(timeout_ms=200)
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # we expect the next_batch in the result to be the same as before
+        self.assertEqual(channel.json_body["next_batch"], next_batch)
+
+        # another incremental sync should also block.
+        channel = self.make_request(
+            "GET",
+            f"/sync?since={next_batch}&timeout=10000",
+            access_token=self.tok,
+            await_result=False,
+        )
+        # that should block for 10 seconds
+        with self.assertRaises(TimedOutException):
+            channel.await_result(timeout_ms=9900)
+        channel.await_result(timeout_ms=200)
+        self.assertEqual(channel.code, 200, channel.json_body)
