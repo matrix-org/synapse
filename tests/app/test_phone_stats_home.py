@@ -1,6 +1,7 @@
 import synapse
 from synapse.rest.client.v1 import login, room
 
+from tests import unittest
 from tests.unittest import HomeserverTestCase
 
 DAY = 86400
@@ -13,6 +14,9 @@ class PhoneHomeTestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
+    # Override the retention time for the user_ips table because otherwise it
+    # gets pruned too aggressively for our R30 test.
+    @unittest.override_config({"user_ips_max_age": "365d"})
     def test_r30_minimum_usage(self):
         """
         Tests the minimum amount of interaction necessary for the R30 metric
@@ -48,18 +52,17 @@ class PhoneHomeTestCase(HomeserverTestCase):
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
-        # Advance 27 days. The user has now not posted for 27 days.
-        self.reactor.advance(27 * DAY)
+        # Advance 29 days. The user has now not posted for 29 days.
+        self.reactor.advance(29 * DAY)
 
         # The user is still counted.
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
-        # Advance another day. The user has now not posted for 28 days.
+        # Advance another day. The user has now not posted for 30 days.
         self.reactor.advance(DAY)
 
         # The user is now no longer counted in R30.
-        # TODO: why is this the case after only 28 days?
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 0})
 
