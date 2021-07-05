@@ -23,7 +23,12 @@ jobs:
           mdbook-version: '0.4.9'
 
       - name: Build the documentation
-        run: mdbook build
+        # mdbook will only create an index.html if we're including docs/README.md in SUMMARY.md.
+        # However, we're using docs/README.md for other purposes and need to pick a new page
+        # as the default. Let's opt for the welcome page instead.
+        run: |
+          mdbook build
+          cp book/welcome_and_overview.html book/index.html
 
       # Deploy to the latest documentation directories
       - name: Deploy latest documentation

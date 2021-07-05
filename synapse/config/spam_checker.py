@@ -12,12 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from typing import Any, Dict, List, Tuple
 
 from synapse.config import ConfigError
 from synapse.util.module_loader import load_module
 
 from ._base import Config
+
+logger = logging.getLogger(__name__)
+
+LEGACY_SPAM_CHECKER_WARNING = """
+This server is using a spam checker module that is implementing the deprecated spam
+checker interface. Please check with the module's maintainer to see if a new version
+supporting Synapse's generic modules system is available.
+For more information, please see https://matrix-org.github.io/synapse/develop/modules.html
+---------------------------------------------------------------------------------------"""
 
 
 class SpamCheckerConfig(Config):
@@ -42,3 +52,8 @@ class SpamCheckerConfig(Config):
                 self.spam_checkers.append(load_module(spam_checker, config_path))
         else:
             raise ConfigError("spam_checker syntax is incorrect")
+
+        # If this configuration is being used in any way, warn the admin that it is going
+        # away soon.
+        if self.spam_checkers:
+            logger.warning(LEGACY_SPAM_CHECKER_WARNING)

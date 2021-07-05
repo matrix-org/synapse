@@ -36,7 +36,17 @@ It returns a JSON body like the following:
     "creation_ts": 1560432506,
     "appservice_id": null,
     "consent_server_notice_sent": null,
-    "consent_version": null
+    "consent_version": null,
+    "external_ids": [
+        {
+            "auth_provider": "<provider1>",
+            "external_id": "<user_id_provider_1>"
+        },
+        {
+            "auth_provider": "<provider2>",
+            "external_id": "<user_id_provider_2>"
+        }
+    ]
 }
 ```
 

@@ -74,6 +74,10 @@ class SSOConfig(Config):
 
         self.sso_client_whitelist = sso_config.get("client_whitelist") or []
 
+        self.sso_update_profile_information = (
+            sso_config.get("update_profile_information") or False
+        )
+
         # Attempt to also whitelist the server's login fallback, since that fallback sets
         # the redirect URL to itself (so it can process the login token then return
         # gracefully to the client). This would make it pointless to ask the user for
@@ -110,6 +114,17 @@ class SSOConfig(Config):
             #client_whitelist:
             #  - https://riot.im/develop
             #  - https://my.custom.client/
+
+            # Uncomment to keep a user's profile fields in sync with information from
+            # the identity provider. Currently only syncing the displayname is
+            # supported. Fields are checked on every SSO login, and are updated
+            # if necessary.
+            #
+            # Note that enabling this option will override user profile information,
+            # regardless of whether users have opted-out of syncing that
+            # information when first signing in. Defaults to false.
+            #
+            #update_profile_information: true
 
             # Directory in which Synapse will try to find the template files below.
             # If not set, or the files named below are not found within the template

@@ -1,1 +1,0 @@
-Always require users to re-authenticate for dangerous operations: deactivating an account, modifying an account password, and adding 3PIDs.
