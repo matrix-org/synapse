@@ -915,6 +915,13 @@ class FederationServer(FederationBase):
             self._process_incoming_pdus_in_room_inner(
                 pdu.room_id, room_version, lock, origin, pdu
             )
+        else:
+            logger.info(
+                "Previously received events in the room are already being"
+                " processed; event has been added to the queue: %s in %s",
+                pdu.event_id,
+                pdu.room_id,
+            )
 
     @wrap_as_background_process("_process_incoming_pdus_in_room_inner")
     async def _process_incoming_pdus_in_room_inner(
