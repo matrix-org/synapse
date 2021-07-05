@@ -151,18 +151,6 @@ class FederationServer(FederationBase):
         # Whether we have started handling old events in the staging area.
         self._started_handling_of_staged_events = False
 
-    def _start_handling_old_staged_events(self) -> None:
-        """Start handling old events in the staging area. This should be called
-        when we receive a new incoming transaction (and are thus an instance
-        that handles incoming federation).
-        """
-        if self._started_handling_of_staged_events:
-            return
-
-        self._started_handling_of_staged_events = True
-
-        self._handle_old_staged_events()
-
     @wrap_as_background_process("_handle_old_staged_events")
     async def _handle_old_staged_events(self) -> None:
         """Handle old staged events by fetching all rooms that have staged
@@ -214,7 +202,9 @@ class FederationServer(FederationBase):
     ) -> Tuple[int, Dict[str, Any]]:
         # If we receive a transaction we should make sure that kick off handling
         # any old events in the staging area.
-        self._start_handling_old_staged_events()
+        if not self._started_handling_of_staged_events:
+            self._started_handling_of_staged_events = True
+            self._handle_old_staged_events()
 
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
