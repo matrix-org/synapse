@@ -41,6 +41,7 @@ from synapse.metrics.background_process_metrics import wrap_as_background_proces
 from synapse.util import Clock, caches
 from synapse.util.caches import CacheMetric, register_cache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
+from synapse.util.linked_list import ListNode
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -94,139 +95,10 @@ def enumerate_leaves(node, depth):
 
 
 P = TypeVar("P")
-LN = TypeVar("LN", bound="_ListNode")
 
 
-class _ListNode(Generic[P]):
-    """A node in a circular doubly linked list, with an (optional) reference to
-    a cache entry.
-
-    The reference should only be `None` for the root node or if the node has
-    been removed from the list.
-    """
-
-    # A lock to protect mutating the list prev/next pointers.
-    _LOCK = threading.Lock()
-
-    # We don't use attrs here as in py3.6 you can't have `attr.s(slots=True)`
-    # and inherit from `Generic` for some reason
-    __slots__ = [
-        "cache_entry",
-        "prev_node",
-        "next_node",
-    ]
-
-    def __init__(self, cache_entry: Optional[P] = None) -> None:
-        self.cache_entry = cache_entry
-        self.prev_node: Optional[_ListNode[P]] = None
-        self.next_node: Optional[_ListNode[P]] = None
-
-    @classmethod
-    def create_root_node(cls: Type["_ListNode[P]"]) -> "_ListNode[P]":
-        """Create a new linked list by creating a "root" node, which is a node
-        that has prev_node/next_node pointing to itself and no associated cache
-        entry.
-        """
-        root = cls()
-        root.prev_node = root
-        root.next_node = root
-        return root
-
-    @classmethod
-    def insert_after(
-        cls: Type[LN],
-        cache_entry: P,
-        node: "_ListNode[P]",
-    ) -> LN:
-        """Create a new list node that is placed after the given node.
-
-        Args:
-            cache_entry: The associated cache entry.
-            node: The existing node in the list to insert the new entry after.
-        """
-        new_node = cls(cache_entry)
-        with cls._LOCK:
-            new_node._refs_insert_after(node)
-        return new_node
-
-    def remove_from_list(self):
-        """Remove this node from the list."""
-        with self._LOCK:
-            self._refs_remove_node_from_list()
-
-        # We drop the reference to the cache entry to break the reference cycle
-        # between the list node and cache entry, allowing the two to be dropped
-        # immediately rather than at the next GC.
-        self.cache_entry = None
-
-    def move_after(self, node: "_ListNode"):
-        """Move this node from its current location in the list to after the
-        given node.
-        """
-        with self._LOCK:
-            # We assert that both this node and the root node is still "alive".
-            assert self.prev_node
-            assert self.next_node
-            assert node.prev_node
-            assert node.next_node
-
-            assert self is not node
-
-            # Remove self from the list
-            self._refs_remove_node_from_list()
-
-            # Insert self back into the list, after root
-            self._refs_insert_after(node)
-
-    def _refs_remove_node_from_list(self):
-        """Internal method to *just* remove the node from the list, without
-        e.g. clearing out the cache entry.
-        """
-        if self.prev_node is None or self.next_node is None:
-            # We've already been removed from the list.
-            return
-
-        prev_node = self.prev_node
-        next_node = self.next_node
-
-        prev_node.next_node = next_node
-        next_node.prev_node = prev_node
-
-        # We set these to None so that we don't get circular references,
-        # allowing us to be dropped without having to go via the GC.
-        self.prev_node = None
-        self.next_node = None
-
-    def _refs_insert_after(self, node: "_ListNode"):
-        """Internal method to insert the node after the given node."""
-
-        # This method should only be called when we're not already in the list.
-        assert self.prev_node is None
-        assert self.next_node is None
-
-        # We expect the given node to be in the list and thus have valid
-        # prev/next refs.
-        assert node.next_node
-        assert node.prev_node
-
-        prev_node = node
-        next_node = node.next_node
-
-        self.prev_node = prev_node
-        self.next_node = next_node
-
-        prev_node.next_node = self
-        next_node.prev_node = self
-
-    def get_cache_entry(self) -> Optional[P]:
-        """Get the cache entry, returns None if this is the root node (i.e.
-        cache_entry is None) or if the entry has been dropped.
-        """
-        return self.cache_entry
-
-
-class _TimedListNode(_ListNode[P]):
-    """A `_ListNode` that tracks last access time."""
+class _TimedListNode(ListNode[P]):
+    """A `ListNode` that tracks last access time."""
 
     __slots__ = ["last_access_ts_secs"]
 
@@ -239,7 +111,7 @@ class _TimedListNode(_ListNode[P]):
 USE_GLOBAL_LIST = False
 
 # A linked list of all cache entries, allowing efficient time based eviction.
-GLOBAL_ROOT = _ListNode["_Node"].create_root_node()
+GLOBAL_ROOT = ListNode["_Node"].create_root_node()
 
 
 @wrap_as_background_process("LruCache._expire_old_entries")
@@ -324,14 +196,14 @@ class _Node:
 
     def __init__(
         self,
-        root: "_ListNode[_Node]",
+        root: "ListNode[_Node]",
         key,
         value,
         cache: "weakref.ReferenceType[LruCache]",
         clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
     ):
-        self._list_node = _ListNode.insert_after(self, root)
+        self._list_node = ListNode.insert_after(self, root)
         self._global_list_node = None
         if USE_GLOBAL_LIST:
             self._global_list_node = _TimedListNode.insert_after(self, GLOBAL_ROOT)
@@ -418,7 +290,7 @@ class _Node:
         if self._global_list_node:
             self._global_list_node.remove_from_list()
 
-    def move_to_front(self, clock: Clock, cache_list_root: _ListNode) -> None:
+    def move_to_front(self, clock: Clock, cache_list_root: ListNode) -> None:
         """Moves this node to the front of all the lists its in."""
         self._list_node.move_after(cache_list_root)
         if self._global_list_node:
@@ -509,7 +381,7 @@ class LruCache(Generic[KT, VT]):
         # creating more each time we create a `_Node`.
         weak_ref_to_self = weakref.ref(self)
 
-        list_root = _ListNode[_Node].create_root_node()
+        list_root = ListNode[_Node].create_root_node()
 
         lock = threading.Lock()
 
