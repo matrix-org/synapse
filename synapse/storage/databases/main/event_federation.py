@@ -1213,7 +1213,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             table="federation_inbound_events_staging",
             keyvalues={},
             retcol="DISTINCT room_id",
-            desc="get_all_staged_rooms",
+            desc="get_all_rooms_with_staged_incoming_events",
         )
 
     @wrap_as_background_process("_get_stats_for_federation_staging")

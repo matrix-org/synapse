@@ -170,7 +170,7 @@ class FederationServer(FederationBase):
         """
 
         # Get all the rooms IDs with staged events.
-        room_ids = await self.store.get_all_staged_rooms()
+        room_ids = await self.store.get_all_rooms_with_staged_incoming_events()
 
         # We then shuffle them so that if there are multiple instances doing
         # this work they're less likely to collide.
