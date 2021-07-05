@@ -123,6 +123,10 @@ class _ListNode(Generic[P]):
 
     @classmethod
     def create_root_node(cls: Type["_ListNode[P]"]) -> "_ListNode[P]":
+        """Create a new linked list by creating a "root" node, which is a node
+        that has prev_node/next_node pointing to itself and no associated cache
+        entry.
+        """
         root = cls()
         root.prev_node = root
         root.next_node = root
@@ -134,7 +138,12 @@ class _ListNode(Generic[P]):
         cache_entry: P,
         node: "_ListNode[P]",
     ) -> LN:
-        """Create a new list node that is placed after the given node."""
+        """Create a new list node that is placed after the given node.
+
+        Args:
+            cache_entry: The associated cache entry.
+            node: The existing node in the list to insert the new entry after.
+        """
         new_node = cls(cache_entry)
         with cls._LOCK:
             new_node._refs_insert_after(node)
@@ -145,9 +154,12 @@ class _ListNode(Generic[P]):
         with self._LOCK:
             self._refs_remove_node_from_list()
 
+        # We drop the reference to the cache entry to break the reference cycle
+        # between the list node and cache entry, allowing the two to be dropped
+        # immediately rather than at the next GC.
         self.cache_entry = None
 
-    def move_after(self, root: "_ListNode"):
+    def move_after(self, node: "_ListNode"):
         """Move this node from its current location in the list to after the
         given node.
         """
@@ -155,14 +167,16 @@ class _ListNode(Generic[P]):
             # We assert that both this node and the root node is still "alive".
             assert self.prev_node
             assert self.next_node
-            assert root.prev_node
-            assert root.next_node
+            assert node.prev_node
+            assert node.next_node
+
+            assert self is not node
 
             # Remove self from the list
             self._refs_remove_node_from_list()
 
             # Insert self back into the list, after root
-            self._refs_insert_after(root)
+            self._refs_insert_after(node)
 
     def _refs_remove_node_from_list(self):
         """Internal method to *just* remove the node from the list, without
