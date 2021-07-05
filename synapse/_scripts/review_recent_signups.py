@@ -108,7 +108,7 @@ def main():
     parser.add_argument(
         "-e",
         "--exclude-emails",
-        action="store_false",
+        action="store_true",
         help="Exclude users that have validated email addresses",
     )
     parser.add_argument(
