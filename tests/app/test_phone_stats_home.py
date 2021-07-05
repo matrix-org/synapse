@@ -40,8 +40,9 @@ class PhoneHomeTestCase(HomeserverTestCase):
         # Send a message (this counts as activity)
         self.helper.send(room_id, "message2", tok=access_token)
 
-        # TODO: Not sure why this needs 4+ seconds advancing here...?
-        self.reactor.advance(4)
+        # We have to wait up to 5 seconds for _update_client_ips_batch to get
+        # called and update the user_ips table in a batch.
+        self.reactor.advance(5.1)
 
         # *Now* the user is counted.
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
