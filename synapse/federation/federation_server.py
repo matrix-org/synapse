@@ -951,6 +951,7 @@ class FederationServer(FederationBase):
             ) = await self.store.get_next_staged_event_id_for_room(room_id)
             if next_origin != latest_origin or next_event_id != latest_event.event_id:
                 latest_origin = None
+                latest_event = None
 
         if latest_origin is None or latest_event is None:
             next = await self.store.get_next_staged_event_for_room(
