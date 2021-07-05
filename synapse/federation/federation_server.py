@@ -944,18 +944,15 @@ class FederationServer(FederationBase):
         # The common path is for the event we just received be the only event in
         # the room, so instead of pulling the event out of the DB and parsing
         # the event we just pull out the next event ID and check if that matches.
-        found_origin = None
-        found_event = None
         if latest_event is not None and latest_origin is not None:
             (
                 next_origin,
                 next_event_id,
             ) = await self.store.get_next_staged_event_id_for_room(room_id)
-            if next_origin == latest_origin and next_event_id == latest_event.event_id:
-                found_origin = latest_origin
-                found_event = latest_event
+            if next_origin != latest_origin or next_event_id != latest_event.event_id:
+                latest_origin = None
 
-        if found_origin is None or found_event is None:
+        if latest_origin is None or latest_event is None:
             next = await self.store.get_next_staged_event_for_room(
                 room_id, room_version
             )
@@ -964,8 +961,8 @@ class FederationServer(FederationBase):
 
             origin, event = next
         else:
-            origin = found_origin
-            event = found_event
+            origin = latest_origin
+            event = latest_event
 
         # We loop round until there are no more events in the room in the
         # staging area, or we fail to get the lock (which means another process
