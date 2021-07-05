@@ -89,7 +89,7 @@ class ListNode(Generic[P]):
         given node.
         """
         with self._LOCK:
-            # We assert that both this node and the root node is still "alive".
+            # We assert that both this node and the target node is still "alive".
             assert self.prev_node
             assert self.next_node
             assert node.prev_node
@@ -100,7 +100,7 @@ class ListNode(Generic[P]):
             # Remove self from the list
             self._refs_remove_node_from_list()
 
-            # Insert self back into the list, after root
+            # Insert self back into the list, after target node
             self._refs_insert_after(node)
 
     def _refs_remove_node_from_list(self):
