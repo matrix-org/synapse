@@ -1,0 +1,1 @@
+Fix purging rooms that other homeservers are still sending events for. Contributed by @ilmari.
