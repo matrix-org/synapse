@@ -250,7 +250,9 @@ class FederationHandler(BaseHandler):
         #
         # Note that if we were never in the room then we would have already
         # dropped the event, since we wouldn't know the room version.
-        is_in_room = await self.auth.check_host_in_room(room_id, self.server_name)
+        is_in_room = await self._event_auth_handler.check_host_in_room(
+            room_id, self.server_name
+        )
         if not is_in_room:
             logger.info(
                 "Ignoring PDU from %s as we're not in the room",
@@ -1674,7 +1676,9 @@ class FederationHandler(BaseHandler):
         room_version = await self.store.get_room_version_id(room_id)
 
         # now check that we are *still* in the room
-        is_in_room = await self.auth.check_host_in_room(room_id, self.server_name)
+        is_in_room = await self._event_auth_handler.check_host_in_room(
+            room_id, self.server_name
+        )
         if not is_in_room:
             logger.info(
                 "Got /make_join request for room %s we are no longer in",
@@ -1705,7 +1709,7 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self.auth.check_from_context(
+        await self._event_auth_handler.check_from_context(
             room_version, event, context, do_sig_check=False
         )
 
@@ -1877,7 +1881,7 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self.auth.check_from_context(
+            await self._event_auth_handler.check_from_context(
                 room_version, event, context, do_sig_check=False
             )
         except AuthError as e:
@@ -1939,7 +1943,7 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self.auth.check_from_context(
+            await self._event_auth_handler.check_from_context(
                 room_version, event, context, do_sig_check=False
             )
         except AuthError as e:
@@ -2111,7 +2115,7 @@ class FederationHandler(BaseHandler):
     async def on_backfill_request(
         self, origin: str, room_id: str, pdu_list: List[str], limit: int
     ) -> List[EventBase]:
-        in_room = await self.auth.check_host_in_room(room_id, origin)
+        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
@@ -2146,7 +2150,9 @@ class FederationHandler(BaseHandler):
         )
 
         if event:
-            in_room = await self.auth.check_host_in_room(event.room_id, origin)
+            in_room = await self._event_auth_handler.check_host_in_room(
+                event.room_id, origin
+            )
             if not in_room:
                 raise AuthError(403, "Host not in room.")
 
@@ -2499,7 +2505,7 @@ class FederationHandler(BaseHandler):
         latest_events: List[str],
         limit: int,
     ) -> List[EventBase]:
-        in_room = await self.auth.check_host_in_room(room_id, origin)
+        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
@@ -2562,7 +2568,7 @@ class FederationHandler(BaseHandler):
 
         if not auth_events:
             prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self.auth.compute_auth_events(
+            auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events_x = await self.store.get_events(auth_events_ids)
@@ -2991,7 +2997,7 @@ class FederationHandler(BaseHandler):
             "state_key": target_user_id,
         }
 
-        if await self.auth.check_host_in_room(room_id, self.hs.hostname):
+        if await self._event_auth_handler.check_host_in_room(room_id, self.hs.hostname):
             room_version = await self.store.get_room_version_id(room_id)
             builder = self.event_builder_factory.new(room_version, event_dict)
 
@@ -3011,7 +3017,9 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                await self.auth.check_from_context(room_version, event, context)
+                await self._event_auth_handler.check_from_context(
+                    room_version, event, context
+                )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
                 raise e
@@ -3054,7 +3062,9 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            await self.auth.check_from_context(room_version, event, context)
+            await self._event_auth_handler.check_from_context(
+                room_version, event, context
+            )
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
             raise e
@@ -3142,7 +3152,7 @@ class FederationHandler(BaseHandler):
         last_exception = None  # type: Optional[Exception]
 
         # for each public key in the 3pid invite event
-        for public_key_object in self.hs.get_auth().get_public_keys(invite_event):
+        for public_key_object in event_auth.get_public_keys(invite_event):
             try:
                 # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():

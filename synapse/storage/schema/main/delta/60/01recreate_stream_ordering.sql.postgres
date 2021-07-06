@@ -42,4 +42,4 @@ INSERT INTO background_updates (ordering, update_name, progress_json, depends_on
 
 -- ... and another to do the switcheroo
 INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
-  (6003, 'replace_stream_ordering_column', '{}', 'index_stream_ordering2_ts');
+  (6001, 'replace_stream_ordering_column', '{}', 'index_stream_ordering2_ts');

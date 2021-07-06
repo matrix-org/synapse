@@ -34,7 +34,7 @@ from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
-    from synapse.api.auth import Auth
+    from synapse.handlers.event_auth import EventAuthHandler
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ class EventBuilder:
     """
 
     _state: StateHandler
-    _auth: "Auth"
+    _event_auth_handler: "EventAuthHandler"
     _store: DataStore
     _clock: Clock
     _hostname: str
@@ -125,7 +125,9 @@ class EventBuilder:
             state_ids = await self._state.get_current_state_ids(
                 self.room_id, prev_event_ids
             )
-            auth_event_ids = self._auth.compute_auth_events(self, state_ids)
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                self, state_ids
+            )
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
@@ -193,7 +195,7 @@ class EventBuilderFactory:
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
-        self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
     def new(self, room_version: str, key_values: dict) -> EventBuilder:
         """Generate an event builder appropriate for the given room version
@@ -229,7 +231,7 @@ class EventBuilderFactory:
         return EventBuilder(
             store=self.store,
             state=self.state,
-            auth=self.auth,
+            event_auth_handler=self._event_auth_handler,
             clock=self.clock,
             hostname=self.hostname,
             signing_key=self.signing_key,
