@@ -1100,7 +1100,8 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         if user has no profile information (stored in the database table `profiles`).
         """
 
-        # Delete profile information
+        # Users normally have an entry in `profiles`, but occasionally they are created without one.
+        # To test deactivation for users without a profile, we delete the profile information for our user.
         self.get_success(
             self.store.db_pool.simple_delete_one(
                 table="profiles", keyvalues={"user_id": "user"}
