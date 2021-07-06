@@ -90,7 +90,7 @@ process, for example:
 
 ## Re-indexing of `events` table on Postgres databases
 
-This release includes a database schema update which require re-indexing one of
+This release includes a database schema update which requires re-indexing one of
 the larger tables in the database, `events`. This could result in increased
 disk I/O for several hours or days after upgrading while the migration
 completes. Furthermore, because we have to keep the old indexes until the new
@@ -101,7 +101,7 @@ To get a rough idea of the disk space required, check the current size of one
 of the indexes. For example, from a `psql` shell, run the following sql:
 
 ```sql
-select pg_size_pretty(pg_relation_size('events_order_room'));
+SELECT pg_size_pretty(pg_relation_size('events_order_room'));
 ```
 
 We need to rebuild **four** indexes, so you will need to multiply this result
