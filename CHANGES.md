@@ -1,6 +1,8 @@
 Synapse 1.38.0rc1 (2021-07-06)
 ==============================
 
+This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade.md#upgrading-to-v1380) for more information.
+
 Features
 --------
 
@@ -37,19 +39,15 @@ Improved Documentation
 Internal Changes
 ----------------
 
-- Drop Origin and Accept from the value of the Access-Control-Allow-Headers response header. ([\#10114](https://github.com/matrix-org/synapse/issues/10114))
+- Drop `Origin` and `Accept` from the value of the `Access-Control-Allow-Headers` response header. ([\#10114](https://github.com/matrix-org/synapse/issues/10114))
 - Add type hints to the federation servlets. ([\#10213](https://github.com/matrix-org/synapse/issues/10213))
 - Improve the reliability of auto-joining remote rooms. ([\#10237](https://github.com/matrix-org/synapse/issues/10237))
 - Update the release script to use the semver terminology and determine the release branch based on the next version. ([\#10239](https://github.com/matrix-org/synapse/issues/10239))
 - Fix type hints for computing auth events. ([\#10253](https://github.com/matrix-org/synapse/issues/10253))
 - Improve the performance of the spaces summary endpoint by only recursing into spaces (and not rooms in general). ([\#10256](https://github.com/matrix-org/synapse/issues/10256))
 - Move event authentication methods from `Auth` to `EventAuthHandler`. ([\#10268](https://github.com/matrix-org/synapse/issues/10268))
-- Reenable a SyTest after it has been fixed. ([\#10292](https://github.com/matrix-org/synapse/issues/10292))
+- Re-enable a SyTest after it has been fixed. ([\#10292](https://github.com/matrix-org/synapse/issues/10292))
 
-
-Synapse 1.38.0 (**UNRELEASED**)
-===============================
-This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade.md#upgrading-to-v1380) for more information.
 
 Synapse 1.37.1 (2021-06-30)
 ===========================
