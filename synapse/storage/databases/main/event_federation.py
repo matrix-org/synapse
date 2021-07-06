@@ -14,21 +14,35 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Collection, Dict, Iterable, List, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
+
+from prometheus_client import Gauge
 
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
-from synapse.events import EventBase
+from synapse.api.room_versions import RoomVersion
+from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
+
+oldest_pdu_in_federation_staging = Gauge(
+    "synapse_federation_server_oldest_inbound_pdu_in_staging",
+    "The age in seconds since we received the oldest pdu in the federation staging area",
+)
+
+number_pdus_in_federation_queue = Gauge(
+    "synapse_federation_server_number_inbound_pdu_in_staging",
+    "The total number of events in the inbound federation staging",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +65,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         self._event_auth_cache = LruCache(
             500000, "_event_auth_cache", size_callback=len
         )  # type: LruCache[str, List[Tuple[str, int]]]
+
+        self._clock.looping_call(self._get_stats_for_federation_staging, 30 * 1000)
 
     async def get_auth_chain(
         self, room_id: str, event_ids: Collection[str], include_given: bool = False
@@ -1043,6 +1059,187 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
         )
+
+    async def insert_received_event_to_staging(
+        self, origin: str, event: EventBase
+    ) -> None:
+        """Insert a newly received event from federation into the staging area."""
+
+        # We use an upsert here to handle the case where we see the same event
+        # from the same server multiple times.
+        await self.db_pool.simple_upsert(
+            table="federation_inbound_events_staging",
+            keyvalues={
+                "origin": origin,
+                "event_id": event.event_id,
+            },
+            values={},
+            insertion_values={
+                "room_id": event.room_id,
+                "received_ts": self._clock.time_msec(),
+                "event_json": json_encoder.encode(event.get_dict()),
+                "internal_metadata": json_encoder.encode(
+                    event.internal_metadata.get_dict()
+                ),
+            },
+            desc="insert_received_event_to_staging",
+        )
+
+    async def remove_received_event_from_staging(
+        self,
+        origin: str,
+        event_id: str,
+    ) -> Optional[int]:
+        """Remove the given event from the staging area.
+
+        Returns:
+            The received_ts of the row that was deleted, if any.
+        """
+        if self.db_pool.engine.supports_returning:
+
+            def _remove_received_event_from_staging_txn(txn):
+                sql = """
+                    DELETE FROM federation_inbound_events_staging
+                    WHERE origin = ? AND event_id = ?
+                    RETURNING received_ts
+                """
+
+                txn.execute(sql, (origin, event_id))
+                return txn.fetchone()
+
+            row = await self.db_pool.runInteraction(
+                "remove_received_event_from_staging",
+                _remove_received_event_from_staging_txn,
+                db_autocommit=True,
+            )
+            if row is None:
+                return None
+
+            return row[0]
+
+        else:
+
+            def _remove_received_event_from_staging_txn(txn):
+                received_ts = self.db_pool.simple_select_one_onecol_txn(
+                    txn,
+                    table="federation_inbound_events_staging",
+                    keyvalues={
+                        "origin": origin,
+                        "event_id": event_id,
+                    },
+                    retcol="received_ts",
+                    allow_none=True,
+                )
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    table="federation_inbound_events_staging",
+                    keyvalues={
+                        "origin": origin,
+                        "event_id": event_id,
+                    },
+                )
+
+                return received_ts
+
+            return await self.db_pool.runInteraction(
+                "remove_received_event_from_staging",
+                _remove_received_event_from_staging_txn,
+            )
+
+    async def get_next_staged_event_id_for_room(
+        self,
+        room_id: str,
+    ) -> Optional[Tuple[str, str]]:
+        """Get the next event ID in the staging area for the given room."""
+
+        def _get_next_staged_event_id_for_room_txn(txn):
+            sql = """
+                SELECT origin, event_id
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        return await self.db_pool.runInteraction(
+            "get_next_staged_event_id_for_room", _get_next_staged_event_id_for_room_txn
+        )
+
+    async def get_next_staged_event_for_room(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Get the next event in the staging area for the given room."""
+
+        def _get_next_staged_event_for_room_txn(txn):
+            sql = """
+                SELECT event_json, internal_metadata, origin
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        row = await self.db_pool.runInteraction(
+            "get_next_staged_event_for_room", _get_next_staged_event_for_room_txn
+        )
+
+        if not row:
+            return None
+
+        event_d = db_to_json(row[0])
+        internal_metadata_d = db_to_json(row[1])
+        origin = row[2]
+
+        event = make_event_from_dict(
+            event_dict=event_d,
+            room_version=room_version,
+            internal_metadata_dict=internal_metadata_d,
+        )
+
+        return origin, event
+
+    async def get_all_rooms_with_staged_incoming_events(self) -> List[str]:
+        """Get the room IDs of all events currently staged."""
+        return await self.db_pool.simple_select_onecol(
+            table="federation_inbound_events_staging",
+            keyvalues={},
+            retcol="DISTINCT room_id",
+            desc="get_all_rooms_with_staged_incoming_events",
+        )
+
+    @wrap_as_background_process("_get_stats_for_federation_staging")
+    async def _get_stats_for_federation_staging(self):
+        """Update the prometheus metrics for the inbound federation staging area."""
+
+        def _get_stats_for_federation_staging_txn(txn):
+            txn.execute(
+                "SELECT coalesce(count(*), 0) FROM federation_inbound_events_staging"
+            )
+            (count,) = txn.fetchone()
+
+            txn.execute(
+                "SELECT coalesce(min(received_ts), 0) FROM federation_inbound_events_staging"
+            )
+
+            (age,) = txn.fetchone()
+
+            return count, age
+
+        count, age = await self.db_pool.runInteraction(
+            "_get_stats_for_federation_staging", _get_stats_for_federation_staging_txn
+        )
+
+        number_pdus_in_federation_queue.set(count)
+        oldest_pdu_in_federation_staging.set(age)
 
 
 class EventFederationStore(EventFederationWorkerStore):

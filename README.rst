@@ -25,7 +25,7 @@ The overall architecture is::
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
 accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
-via IRC bridge at irc://irc.freenode.net/matrix.
+via IRC bridge at irc://irc.libera.chat/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
@@ -186,11 +186,11 @@ impact to other applications will be minimal.
 Upgrading an existing Synapse
 =============================
 
-The instructions for upgrading synapse are in `UPGRADE.rst`_.
+The instructions for upgrading synapse are in `the upgrade notes`_.
 Please check these instructions as upgrading may require extra steps for some
 versions of synapse.
 
-.. _UPGRADE.rst: UPGRADE.rst
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 .. _reverse-proxy:
 

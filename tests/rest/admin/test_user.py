@@ -939,7 +939,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         """
         channel = self.make_request("POST", self.url, b"{}")
 
-        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(401, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
     def test_requester_is_not_admin(self):
@@ -950,7 +950,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request("POST", url, access_token=self.other_user_token)
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         channel = self.make_request(
@@ -960,7 +960,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             content=b"{}",
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
     def test_user_does_not_exist(self):
@@ -990,7 +990,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(400, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.BAD_JSON, channel.json_body["errcode"])
 
     def test_user_is_not_local(self):
@@ -1006,7 +1006,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
     def test_deactivate_user_erase_true(self):
         """
-        Test deactivating an user and set `erase` to `true`
+        Test deactivating a user and set `erase` to `true`
         """
 
         # Get user
@@ -1016,24 +1016,22 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
         self.assertEqual("mxc://servername/mediaid", channel.json_body["avatar_url"])
         self.assertEqual("User1", channel.json_body["displayname"])
 
-        # Deactivate user
-        body = json.dumps({"erase": True})
-
+        # Deactivate and erase user
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"erase": True},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1042,7 +1040,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1053,7 +1051,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
 
     def test_deactivate_user_erase_false(self):
         """
-        Test deactivating an user and set `erase` to `false`
+        Test deactivating a user and set `erase` to `false`
         """
 
         # Get user
@@ -1063,7 +1061,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(False, channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1071,13 +1069,11 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("User1", channel.json_body["displayname"])
 
         # Deactivate user
-        body = json.dumps({"erase": False})
-
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"erase": False},
         )
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
@@ -1089,7 +1085,7 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(True, channel.json_body["deactivated"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
@@ -1097,6 +1093,60 @@ class DeactivateAccountTestCase(unittest.HomeserverTestCase):
         self.assertEqual("User1", channel.json_body["displayname"])
 
         self._is_erased("@user:test", False)
+
+    def test_deactivate_user_erase_true_no_profile(self):
+        """
+        Test deactivating a user and set `erase` to `true`
+        if user has no profile information (stored in the database table `profiles`).
+        """
+
+        # Users normally have an entry in `profiles`, but occasionally they are created without one.
+        # To test deactivation for users without a profile, we delete the profile information for our user.
+        self.get_success(
+            self.store.db_pool.simple_delete_one(
+                table="profiles", keyvalues={"user_id": "user"}
+            )
+        )
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(False, channel.json_body["deactivated"])
+        self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
+        self.assertIsNone(channel.json_body["avatar_url"])
+        self.assertIsNone(channel.json_body["displayname"])
+
+        # Deactivate and erase user
+        channel = self.make_request(
+            "POST",
+            self.url,
+            access_token=self.admin_user_tok,
+            content={"erase": True},
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+
+        # Get user
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(True, channel.json_body["deactivated"])
+        self.assertEqual(0, len(channel.json_body["threepids"]))
+        self.assertIsNone(channel.json_body["avatar_url"])
+        self.assertIsNone(channel.json_body["displayname"])
+
+        self._is_erased("@user:test", True)
 
     def _is_erased(self, user_id: str, expect: bool) -> None:
         """Assert that the user is erased or not"""
@@ -1150,7 +1200,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.other_user_token,
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
         channel = self.make_request(
@@ -1160,7 +1210,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content=b"{}",
         )
 
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual("You are not a server admin", channel.json_body["error"])
 
     def test_user_does_not_exist(self):
@@ -1177,6 +1227,58 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual("M_NOT_FOUND", channel.json_body["errcode"])
 
+    def test_get_user(self):
+        """
+        Test a simple get of a user.
+        """
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual("User", channel.json_body["displayname"])
+        self._check_fields(channel.json_body)
+
+    def test_get_user_with_sso(self):
+        """
+        Test get a user with SSO details.
+        """
+        self.get_success(
+            self.store.record_user_external_id(
+                "auth_provider1", "external_id1", self.other_user
+            )
+        )
+        self.get_success(
+            self.store.record_user_external_id(
+                "auth_provider2", "external_id2", self.other_user
+            )
+        )
+
+        channel = self.make_request(
+            "GET",
+            self.url_other_user,
+            access_token=self.admin_user_tok,
+        )
+
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual("@user:test", channel.json_body["name"])
+        self.assertEqual(
+            "external_id1", channel.json_body["external_ids"][0]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider1", channel.json_body["external_ids"][0]["auth_provider"]
+        )
+        self.assertEqual(
+            "external_id2", channel.json_body["external_ids"][1]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider2", channel.json_body["external_ids"][1]["auth_provider"]
+        )
+        self._check_fields(channel.json_body)
+
     def test_create_server_admin(self):
         """
         Check that a new admin user is created successfully.
@@ -1184,30 +1286,29 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user (server admin)
-        body = json.dumps(
-            {
-                "password": "abc123",
-                "admin": True,
-                "displayname": "Bob's name",
-                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
-                "avatar_url": "mxc://fibble/wibble",
-            }
-        )
+        body = {
+            "password": "abc123",
+            "admin": True,
+            "displayname": "Bob's name",
+            "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            "avatar_url": "mxc://fibble/wibble",
+        }
 
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content=body,
         )
 
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertTrue(channel.json_body["admin"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
+        self._check_fields(channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1216,7 +1317,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1225,6 +1326,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body["is_guest"])
         self.assertFalse(channel.json_body["deactivated"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
+        self._check_fields(channel.json_body)
 
     def test_create_user(self):
         """
@@ -1233,30 +1335,29 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
-        body = json.dumps(
-            {
-                "password": "abc123",
-                "admin": False,
-                "displayname": "Bob's name",
-                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
-                "avatar_url": "mxc://fibble/wibble",
-            }
-        )
+        body = {
+            "password": "abc123",
+            "admin": False,
+            "displayname": "Bob's name",
+            "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            "avatar_url": "mxc://fibble/wibble",
+        }
 
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content=body,
         )
 
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertFalse(channel.json_body["admin"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
+        self._check_fields(channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1265,7 +1366,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
@@ -1275,6 +1376,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertFalse(channel.json_body["deactivated"])
         self.assertFalse(channel.json_body["shadow_banned"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
+        self._check_fields(channel.json_body)
 
     @override_config(
         {"limit_usage_by_mau": True, "max_mau_value": 2, "mau_trial_days": 0}
@@ -1311,16 +1413,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
-        body = json.dumps({"password": "abc123", "admin": False})
-
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"password": "abc123", "admin": False},
         )
 
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1350,17 +1450,15 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
-        body = json.dumps({"password": "abc123", "admin": False})
-
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"password": "abc123", "admin": False},
         )
 
         # Admin user is not blocked by mau anymore
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["admin"])
 
@@ -1382,21 +1480,19 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
-        body = json.dumps(
-            {
-                "password": "abc123",
-                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
-            }
-        )
+        body = {
+            "password": "abc123",
+            "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+        }
 
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content=body,
         )
 
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1426,21 +1522,19 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         url = "/_synapse/admin/v2/users/@bob:test"
 
         # Create user
-        body = json.dumps(
-            {
-                "password": "abc123",
-                "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
-            }
-        )
+        body = {
+            "password": "abc123",
+            "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+        }
 
         channel = self.make_request(
             "PUT",
             url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content=body,
         )
 
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1457,16 +1551,15 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # Change password
-        body = json.dumps({"password": "hahaha"})
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"password": "hahaha"},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self._check_fields(channel.json_body)
 
     def test_set_displayname(self):
         """
@@ -1474,16 +1567,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # Modify user
-        body = json.dumps({"displayname": "foobar"})
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"displayname": "foobar"},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("foobar", channel.json_body["displayname"])
 
@@ -1494,7 +1585,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("foobar", channel.json_body["displayname"])
 
@@ -1504,18 +1595,14 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         """
 
         # Delete old and add new threepid to user
-        body = json.dumps(
-            {"threepids": [{"medium": "email", "address": "bob3@bob.bob"}]}
-        )
-
         channel = self.make_request(
             "PUT",
             self.url_other_user,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"threepids": [{"medium": "email", "address": "bob3@bob.bob"}]},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1527,7 +1614,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][0]["address"])
@@ -1552,7 +1639,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self.assertEqual("foo@bar.com", channel.json_body["threepids"][0]["address"])
@@ -1567,7 +1654,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"deactivated": True},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
         self.assertIsNone(channel.json_body["password_hash"])
@@ -1583,7 +1670,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
         self.assertIsNone(channel.json_body["password_hash"])
@@ -1610,7 +1697,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"deactivated": True},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
 
@@ -1626,7 +1713,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"displayname": "Foobar"},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["deactivated"])
         self.assertEqual("Foobar", channel.json_body["displayname"])
@@ -1650,7 +1737,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False},
         )
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(400, channel.code, msg=channel.json_body)
 
         # Reactivate the user.
         channel = self.make_request(
@@ -1659,7 +1746,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self.assertIsNotNone(channel.json_body["password_hash"])
@@ -1681,7 +1768,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
         )
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Reactivate the user without a password.
@@ -1691,7 +1778,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False},
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self.assertIsNone(channel.json_body["password_hash"])
@@ -1713,7 +1800,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False, "password": "foo"},
         )
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(403, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
         # Reactivate the user without a password.
@@ -1723,7 +1810,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": False},
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertFalse(channel.json_body["deactivated"])
         self.assertIsNone(channel.json_body["password_hash"])
@@ -1742,7 +1829,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"admin": True},
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["admin"])
 
@@ -1753,7 +1840,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertTrue(channel.json_body["admin"])
 
@@ -1772,7 +1859,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123"},
         )
 
-        self.assertEqual(201, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(201, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
 
@@ -1783,7 +1870,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
         self.assertEqual(0, channel.json_body["deactivated"])
@@ -1796,7 +1883,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             content={"password": "abc123", "deactivated": "false"},
         )
 
-        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(400, channel.code, msg=channel.json_body)
 
         # Check user is not deactivated
         channel = self.make_request(
@@ -1805,7 +1892,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
 
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@bob:test", channel.json_body["name"])
         self.assertEqual("bob", channel.json_body["displayname"])
 
@@ -1830,13 +1917,32 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
             content={"deactivated": True},
         )
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertTrue(channel.json_body["deactivated"])
         self.assertIsNone(channel.json_body["password_hash"])
         self._is_erased(user_id, False)
         d = self.store.mark_user_erased(user_id)
         self.assertIsNone(self.get_success(d))
         self._is_erased(user_id, True)
+
+    def _check_fields(self, content: JsonDict):
+        """Checks that the expected user attributes are present in content
+
+        Args:
+            content: Content dictionary to check
+        """
+        self.assertIn("displayname", content)
+        self.assertIn("threepids", content)
+        self.assertIn("avatar_url", content)
+        self.assertIn("admin", content)
+        self.assertIn("deactivated", content)
+        self.assertIn("shadow_banned", content)
+        self.assertIn("password_hash", content)
+        self.assertIn("creation_ts", content)
+        self.assertIn("appservice_id", content)
+        self.assertIn("consent_server_notice_sent", content)
+        self.assertIn("consent_version", content)
+        self.assertIn("external_ids", content)
 
 
 class UserMembershipRestTestCase(unittest.HomeserverTestCase):

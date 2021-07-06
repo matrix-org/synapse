@@ -1,3 +1,21 @@
+matrix-synapse-py3 (1.37.1ubuntu1) UNRELEASED; urgency=medium
+
+  * Add synapse_review_recent_signups script
+
+ -- Erik Johnston <erikj@matrix.org>  Thu, 01 Jul 2021 15:55:03 +0100
+
+matrix-synapse-py3 (1.37.1) stable; urgency=medium
+
+  * New synapse release 1.37.1.
+
+ -- Synapse Packaging team <packages@matrix.org>  Wed, 30 Jun 2021 12:24:06 +0100
+
+matrix-synapse-py3 (1.37.0) stable; urgency=medium
+
+  * New synapse release 1.37.0.
+
+ -- Synapse Packaging team <packages@matrix.org>  Tue, 29 Jun 2021 10:15:25 +0100
+
 matrix-synapse-py3 (1.36.0) stable; urgency=medium
 
   * New synapse release 1.36.0.

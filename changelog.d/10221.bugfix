@@ -1,1 +1,0 @@
-Fix performance regression in responding to user key requests over federation. Introduced in v1.34.0rc1.

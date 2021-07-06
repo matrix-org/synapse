@@ -1,1 +1,0 @@
-Fix a minor bug in the response to `/_matrix/client/r0/user/{user}/openid/request_token`. Contributed by @lukaslihotzki.
