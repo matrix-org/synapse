@@ -1,3 +1,7 @@
+Synapse 1.38.0 (**UNRELEASED**)
+===============================
+This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade.md#upgrading-to-v1380) for more information.
+
 Synapse 1.37.1 (2021-06-30)
 ===========================
 
