@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 _REPLACE_STREAM_ORDERING_SQL_COMMANDS = (
     # there should be no leftover rows without a stream_ordering2, but just in case...
     "UPDATE events SET stream_ordering2 = stream_ordering WHERE stream_ordering2 IS NULL",
+    # Build stats on the new column
+    "ANALYZE events(stream_ordering2)"
     # now we can drop the rule and switch the columns
     "DROP RULE populate_stream_ordering2 ON events",
     "ALTER TABLE events DROP COLUMN stream_ordering",
