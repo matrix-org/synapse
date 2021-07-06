@@ -7,6 +7,8 @@ on:
       - develop
       # For documentation specific to a release
       - 'release-v*'
+      # stable docs
+      - master
 
   workflow_dispatch:
 
