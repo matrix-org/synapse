@@ -1141,9 +1141,6 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
     ) -> int:
         """Drop the old 'stream_ordering' column and rename 'stream_ordering2' into its place."""
 
-        def analyze_new_column(txn: Cursor) -> None:
-            txn.execute("ANALYZE events(stream_ordering2)")
-
         def process(txn: Cursor) -> None:
             for sql in _REPLACE_STREAM_ORDERING_SQL_COMMANDS:
                 logger.info("completing stream_ordering migration: %s", sql)
