@@ -260,6 +260,30 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1380"><a class="header" href="#upgrading-to-v1380">Upgrading to v1.38.0</a></h1>
+<h2 id="re-indexing-of-events-table-on-postgres-databases"><a class="header" href="#re-indexing-of-events-table-on-postgres-databases">Re-indexing of <code>events</code> table on Postgres databases</a></h2>
+<p>This release includes a database schema update which requires re-indexing one of
+the larger tables in the database, <code>events</code>. This could result in increased
+disk I/O for several hours or days after upgrading while the migration
+completes. Furthermore, because we have to keep the old indexes until the new
+indexes are ready, it could result in a significant, temporary, increase in
+disk space.</p>
+<p>To get a rough idea of the disk space required, check the current size of one
+of the indexes. For example, from a <code>psql</code> shell, run the following sql:</p>
+<pre><code class="language-sql">SELECT pg_size_pretty(pg_relation_size('events_order_room'));
+</code></pre>
+<p>We need to rebuild <strong>four</strong> indexes, so you will need to multiply this result
+by four to give an estimate of the disk space required. For example, on one
+particular server:</p>
+<pre><code>synapse=# select pg_size_pretty(pg_relation_size('events_order_room'));
+ pg_size_pretty
+----------------
+ 288 MB
+(1 row)
+</code></pre>
+<p>On this server, it would be wise to ensure that at least 1152MB are free.</p>
+<p>The additional disk space will be freed once the migration completes.</p>
+<p>SQLite databases are unaffected by this change.</p>
 <h1 id="upgrading-to-v1370"><a class="header" href="#upgrading-to-v1370">Upgrading to v1.37.0</a></h1>
 <h2 id="deprecation-of-the-current-spam-checker-interface"><a class="header" href="#deprecation-of-the-current-spam-checker-interface">Deprecation of the current spam checker interface</a></h2>
 <p>The current spam checker interface is deprecated in favour of a new generic modules system.
