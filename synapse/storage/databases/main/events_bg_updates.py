@@ -1151,7 +1151,11 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
 
         # ANALYZE the new column to build stats on it, to encourage PostgreSQL to use the
         # indexes on it.
-        await self.db_pool.execute("background_analyze_new_stream_ordering_column", None, "ANALYZE events(stream_ordering2)")
+        await self.db_pool.execute(
+            "background_analyze_new_stream_ordering_column",
+            None,
+            "ANALYZE events(stream_ordering2)",
+        )
 
         await self.db_pool.runInteraction(
             "_background_replace_stream_ordering_column", process
