@@ -284,7 +284,6 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
             for row in txn:
                 if row[0] == "unknown":
-                    # XXX this is a sneaky no-op; suspect `continue` was meant.
                     pass
                 results[row[0]] = row[1]
 
