@@ -1,6 +1,53 @@
-Synapse 1.38.0 (**UNRELEASED**)
-===============================
+Synapse 1.38.0rc1 (2021-07-06)
+==============================
+
 This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade.md#upgrading-to-v1380) for more information.
+
+Features
+--------
+
+- Implement refresh tokens as specified by [MSC2918](https://github.com/matrix-org/matrix-doc/pull/2918). ([\#9450](https://github.com/matrix-org/synapse/issues/9450))
+- Add support for evicting cache entries based on last access time. ([\#10205](https://github.com/matrix-org/synapse/issues/10205))
+- Omit empty fields from the `/sync` response. Contributed by @deepbluev7. ([\#10214](https://github.com/matrix-org/synapse/issues/10214))
+- Improve validation on federation `send_{join,leave,knock}` endpoints. ([\#10225](https://github.com/matrix-org/synapse/issues/10225), [\#10243](https://github.com/matrix-org/synapse/issues/10243))
+- Add SSO `external_ids` to the Query User Account admin API. ([\#10261](https://github.com/matrix-org/synapse/issues/10261))
+- Mark events received over federation which fail a spam check as "soft-failed". ([\#10263](https://github.com/matrix-org/synapse/issues/10263))
+- Add metrics for new inbound federation staging area. ([\#10284](https://github.com/matrix-org/synapse/issues/10284))
+- Add script to print information about recently registered users. ([\#10290](https://github.com/matrix-org/synapse/issues/10290))
+
+
+Bugfixes
+--------
+
+- Fix a long-standing bug which meant that invite rejections and knocks were not sent out over federation in a timely manner. ([\#10223](https://github.com/matrix-org/synapse/issues/10223))
+- Fix a bug introduced in v1.26.0 where only users who have set profile information could be deactivated with erasure enabled. ([\#10252](https://github.com/matrix-org/synapse/issues/10252))
+- Fix a long-standing bug where Synapse would return errors after 2<sup>31</sup> events were handled by the server. ([\#10264](https://github.com/matrix-org/synapse/issues/10264), [\#10267](https://github.com/matrix-org/synapse/issues/10267), [\#10282](https://github.com/matrix-org/synapse/issues/10282), [\#10286](https://github.com/matrix-org/synapse/issues/10286), [\#10291](https://github.com/matrix-org/synapse/issues/10291), [\#10314](https://github.com/matrix-org/synapse/issues/10314))
+- Fix the prometheus `synapse_federation_server_pdu_process_time` metric. Broke in v1.37.1. ([\#10279](https://github.com/matrix-org/synapse/issues/10279))
+- Ensure that inbound events from federation that were being processed when Synapse was restarted get promptly processed on start up. ([\#10303](https://github.com/matrix-org/synapse/issues/10303))
+
+
+Improved Documentation
+----------------------
+
+- Move the upgrade notes to [docs/upgrade.md](https://github.com/matrix-org/synapse/blob/develop/docs/upgrade.md) and convert them to markdown. ([\#10166](https://github.com/matrix-org/synapse/issues/10166))
+- Choose Welcome & Overview as the default page for synapse documentation website. ([\#10242](https://github.com/matrix-org/synapse/issues/10242))
+- Adjust the URL in the README.rst file to point to irc.libera.chat. ([\#10258](https://github.com/matrix-org/synapse/issues/10258))
+- Fix homeserver config option name in presence router documentation. ([\#10288](https://github.com/matrix-org/synapse/issues/10288))
+- Fix link pointing at the wrong section in the modules documentation page. ([\#10302](https://github.com/matrix-org/synapse/issues/10302))
+
+
+Internal Changes
+----------------
+
+- Drop `Origin` and `Accept` from the value of the `Access-Control-Allow-Headers` response header. ([\#10114](https://github.com/matrix-org/synapse/issues/10114))
+- Add type hints to the federation servlets. ([\#10213](https://github.com/matrix-org/synapse/issues/10213))
+- Improve the reliability of auto-joining remote rooms. ([\#10237](https://github.com/matrix-org/synapse/issues/10237))
+- Update the release script to use the semver terminology and determine the release branch based on the next version. ([\#10239](https://github.com/matrix-org/synapse/issues/10239))
+- Fix type hints for computing auth events. ([\#10253](https://github.com/matrix-org/synapse/issues/10253))
+- Improve the performance of the spaces summary endpoint by only recursing into spaces (and not rooms in general). ([\#10256](https://github.com/matrix-org/synapse/issues/10256))
+- Move event authentication methods from `Auth` to `EventAuthHandler`. ([\#10268](https://github.com/matrix-org/synapse/issues/10268))
+- Re-enable a SyTest after it has been fixed. ([\#10292](https://github.com/matrix-org/synapse/issues/10292))
+
 
 Synapse 1.37.1 (2021-06-30)
 ===========================
