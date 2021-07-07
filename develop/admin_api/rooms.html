@@ -184,19 +184,12 @@
 
                         <h1 id="contents"><a class="header" href="#contents">Contents</a></h1>
 <ul>
-<li><a href="#list-room-api">List Room API</a>
-<ul>
-<li><a href="#parameters">Parameters</a></li>
-<li><a href="#usage">Usage</a></li>
-</ul>
-</li>
+<li><a href="#list-room-api">List Room API</a></li>
 <li><a href="#room-details-api">Room Details API</a></li>
 <li><a href="#room-members-api">Room Members API</a></li>
 <li><a href="#room-state-api">Room State API</a></li>
 <li><a href="#delete-room-api">Delete Room API</a>
 <ul>
-<li><a href="#parameters-1">Parameters</a></li>
-<li><a href="#response">Response</a></li>
 <li><a href="#undoing-room-shutdowns">Undoing room shutdowns</a></li>
 </ul>
 </li>
@@ -208,7 +201,7 @@
 <p>The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
-<h2 id="parameters"><a class="header" href="#parameters">Parameters</a></h2>
+<p><strong>Parameters</strong></p>
 <p>The following query parameters are available:</p>
 <ul>
 <li><code>from</code> - Offset in the returned list. Defaults to <code>0</code>.</li>
@@ -237,6 +230,7 @@ this value to <code>b</code> will reverse the above sort order. Defaults to <cod
 <li><code>search_term</code> - Filter rooms by their room name. Search term can be contained in any
 part of the room name. Defaults to no filtering.</li>
 </ul>
+<p><strong>Response</strong></p>
 <p>The following fields are possible in the JSON response body:</p>
 <ul>
 <li><code>rooms</code> - An array of objects, each containing information about a room.
@@ -276,13 +270,11 @@ the value of <code>next_batch</code>.</li>
 Use <code>prev_batch</code> for the <code>from</code> value in the next request to
 get the &quot;previous page&quot; of results.</li>
 </ul>
-<h2 id="usage"><a class="header" href="#usage">Usage</a></h2>
+<p>The API is:</p>
 <p>A standard request with no filtering:</p>
 <pre><code>GET /_synapse/admin/v1/rooms
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-jsonc">{
   &quot;rooms&quot;: [
     {
@@ -325,10 +317,8 @@ get the &quot;previous page&quot; of results.</li>
 </code></pre>
 <p>Filtering by room name:</p>
 <pre><code>GET /_synapse/admin/v1/rooms?search_term=TWIM
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
@@ -354,10 +344,8 @@ get the &quot;previous page&quot; of results.</li>
 </code></pre>
 <p>Paginating through a list of rooms:</p>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-jsonc">{
   &quot;rooms&quot;: [
     {
@@ -404,10 +392,8 @@ than returned in this request, and we need to make another request to get them.
 To get the next batch of room results, we repeat our request, setting the <code>from</code>
 parameter to the value of <code>next_token</code>.</p>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size&amp;from=100
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-jsonc">{
   &quot;rooms&quot;: [
     {
@@ -473,13 +459,10 @@ end of the list.</p>
 <li><code>history_visibility</code> - Who can see the room history. One of: [&quot;invited&quot;, &quot;joined&quot;, &quot;shared&quot;, &quot;world_readable&quot;].</li>
 <li><code>state_events</code> - Total number of state_events of a room. Complexity of the room.</li>
 </ul>
-<h2 id="usage-1"><a class="header" href="#usage-1">Usage</a></h2>
-<p>A standard request:</p>
+<p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;room_id&quot;: &quot;!mscvqgqpHYjBGDxNym:matrix.org&quot;,
   &quot;name&quot;: &quot;Music Theory&quot;,
@@ -507,13 +490,10 @@ end of the list.</p>
 <li><code>members</code> - A list of all the members that are present in the room, represented by their ids.</li>
 <li><code>total</code> - Total number of members in the room.</li>
 </ul>
-<h2 id="usage-2"><a class="header" href="#usage-2">Usage</a></h2>
-<p>A standard request:</p>
+<p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;/members
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;members&quot;: [
     &quot;@foo:matrix.org&quot;,
@@ -529,13 +509,10 @@ end of the list.</p>
 <ul>
 <li><code>state</code> - The current state of the room at the time of request.</li>
 </ul>
-<h2 id="usage-3"><a class="header" href="#usage-3">Usage</a></h2>
-<p>A standard request:</p>
+<p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;/state
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;state&quot;: [
     {&quot;type&quot;: &quot;m.room.create&quot;, &quot;state_key&quot;: &quot;&quot;, &quot;etc&quot;: true},
@@ -589,7 +566,7 @@ server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
     &quot;new_room_id&quot;: &quot;!newroomid:example.com&quot;
 }
 </code></pre>
-<h2 id="parameters-1"><a class="header" href="#parameters-1">Parameters</a></h2>
+<p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
 <ul>
 <li><code>room_id</code> - The ID of the room.</li>
@@ -616,7 +593,7 @@ use this unless a regular <code>purge</code> operation fails, as it could leave 
 clients in a confused state.</li>
 </ul>
 <p>The JSON body must not be empty. The body must be at least <code>{}</code>.</p>
-<h2 id="response"><a class="header" href="#response">Response</a></h2>
+<p><strong>Response</strong></p>
 <p>The following fields are returned in the JSON response body:</p>
 <ul>
 <li><code>kicked_users</code> - An array of users (<code>user_id</code>) that were kicked.</li>
@@ -663,10 +640,10 @@ to recover at all:</p>
 If the user is not in the room, and it is not publicly joinable, then invite the user.</p>
 <p>By default the server admin (the caller) is granted power, but another user can
 optionally be specified, e.g.:</p>
-<pre><code>    POST /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/make_room_admin
-    {
-        &quot;user_id&quot;: &quot;@foo:example.com&quot;
-    }
+<pre><code>POST /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/make_room_admin
+{
+    &quot;user_id&quot;: &quot;@foo:example.com&quot;
+}
 </code></pre>
 <h1 id="forward-extremities-admin-api"><a class="header" href="#forward-extremities-admin-api">Forward Extremities Admin API</a></h1>
 <p>Enables querying and deleting forward extremities from rooms. When a lot of forward
@@ -674,7 +651,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
 <a href="https://github.com/matrix-org/synapse/issues/1760">#1760</a>.</p>
 <h2 id="check-for-forward-extremities"><a class="header" href="#check-for-forward-extremities">Check for forward extremities</a></h2>
 <p>To check the status of forward extremities for a room:</p>
-<pre><code>    GET /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
+<pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
 </code></pre>
 <p>A response as follows will be returned:</p>
 <pre><code class="language-json">{
@@ -687,7 +664,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
       &quot;received_ts&quot;: 1611263016761
     }
   ]
-}    
+}
 </code></pre>
 <h2 id="deleting-forward-extremities"><a class="header" href="#deleting-forward-extremities">Deleting forward extremities</a></h2>
 <p><strong>WARNING</strong>: Please ensure you know what you're doing and have read 
@@ -695,7 +672,7 @@ the related issue <a href="https://github.com/matrix-org/synapse/issues/1760">#1
 Under no situations should this API be executed as an automated maintenance task!</p>
 <p>If a room has lots of forward extremities, the extra can be
 deleted as follows:</p>
-<pre><code>    DELETE /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
+<pre><code>DELETE /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
 </code></pre>
 <p>A response as follows will be returned, indicating the amount of forward extremities
 that were deleted.</p>
