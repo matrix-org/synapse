@@ -107,6 +107,10 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     for name, count in r30_results.items():
         stats["r30_users_" + name] = count
 
+    r30v2_results = await hs.get_datastore().count_r30_users()
+    for name, count in r30v2_results.items():
+        stats["r30v2_users_" + name] = count
+
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
 
