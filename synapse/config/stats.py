@@ -51,7 +51,7 @@ class StatsConfig(Config):
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Settings for local room and user statistics collection. See
-        # docs/room_and_user_statistics.md.
+        # https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.
         #
         stats:
           # Uncomment the following to disable room and user statistics. Note that doing
