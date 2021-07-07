@@ -153,7 +153,7 @@ ROOM_COMPLEXITY_TOO_GREAT = (
 METRICS_PORT_WARNING = """\
 The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
 a listener. Please see
-https://matrix-org.github.io/synapse/develop/metrics-howto.html
+https://matrix-org.github.io/synapse/latest/metrics-howto.html
 on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
@@ -811,7 +811,7 @@ class ServerConfig(Config):
         # In most cases you should avoid using a matrix specific subdomain such as
         # matrix.example.com or synapse.example.com as the server_name for the same
         # reasons you wouldn't use user@email.example.com as your email address.
-        # See https://matrix-org.github.io/synapse/develop/delegate.html
+        # See https://matrix-org.github.io/synapse/latest/delegate.html
         # for information on how to host Synapse on a subdomain while preserving
         # a clean server_name.
         #
@@ -988,9 +988,9 @@ class ServerConfig(Config):
         #       'all local interfaces'.
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
-        #       'manhole' (see https://matrix-org.github.io/synapse/develop/manhole.html),
-        #       'metrics' (see https://matrix-org.github.io/synapse/develop/metrics-howto.html),
-        #       'replication' (see https://matrix-org.github.io/synapse/develop/workers.html).
+        #       'manhole' (see https://matrix-org.github.io/synapse/latest/manhole.html),
+        #       'metrics' (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
+        #       'replication' (see https://matrix-org.github.io/synapse/latest/workers.html).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -1016,7 +1016,7 @@ class ServerConfig(Config):
         #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
         #   consent: user consent forms (/_matrix/consent).
-        #       See https://matrix-org.github.io/synapse/develop/consent_tracking.html.
+        #       See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
         #
         #   federation: the server-server API (/_matrix/federation). Also implies
         #       'media', 'keys', 'openid'
@@ -1026,12 +1026,12 @@ class ServerConfig(Config):
         #   media: the media API (/_matrix/media).
         #
         #   metrics: the metrics interface.
-        #       See https://matrix-org.github.io/synapse/develop/metrics-howto.html.
+        #       See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
         #
         #   openid: OpenID authentication.
         #
         #   replication: the HTTP replication API (/_synapse/replication).
-        #       See https://matrix-org.github.io/synapse/develop/workers.html.
+        #       See https://matrix-org.github.io/synapse/latest/workers.html.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -1051,7 +1051,7 @@ class ServerConfig(Config):
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://matrix-org.github.io/synapse/develop/reverse_proxy.html.
+          # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
           #
           %(unsecure_http_bindings)s
 

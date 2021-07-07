@@ -63,7 +63,7 @@ DEFAULT_CONFIG = """\
 #    cp_max: 10
 #
 # For more information on using Synapse with Postgres,
-# see https://matrix-org.github.io/synapse/develop/postgres.html.
+# see https://matrix-org.github.io/synapse/latest/postgres.html.
 #
 database:
   name: sqlite3

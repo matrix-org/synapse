@@ -57,7 +57,7 @@ class PasswordAuthProviderConfig(Config):
         # ex. LDAP, external tokens, etc.
         #
         # For more information and known implementations, please see
-        # https://matrix-org.github.io/synapse/develop/password_auth_providers.html
+        # https://matrix-org.github.io/synapse/latest/password_auth_providers.html
         #
         # Note: instances wishing to use SAML or CAS authentication should
         # instead use the `saml2_config` or `cas_config` options,

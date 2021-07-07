@@ -250,7 +250,7 @@ class ContentRepositoryConfig(Config):
         #
         # If you are using a reverse proxy you may also need to set this value in
         # your reverse proxy's config. Notably Nginx has a small max body size by default.
-        # See https://matrix-org.github.io/synapse/develop/reverse_proxy.html.
+        # See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
         #
         #max_upload_size: 50M
 
