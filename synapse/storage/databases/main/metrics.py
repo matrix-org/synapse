@@ -316,6 +316,125 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
         return await self.db_pool.runInteraction("count_r30_users", _count_r30_users)
 
+    async def count_r30v2_users(self) -> Dict[str, int]:
+        """
+        Counts the number of 30 day retained users, defined as users that:
+         - Appear more than once in the past 60 days
+         - Have more than 30 days between the most and least recent appearances that
+           occurred in the past 60 days.
+
+        (This is the second version of this metric, hence R30'v2')
+
+        Returns:
+             A mapping of counts globally as well as broken out by platform.
+        """
+
+        def _count_r30v2_users(txn):
+            thirty_days_in_secs = 86400 * 30
+            now = int(self._clock.time())
+            sixty_days_ago_in_secs = now - 2 * thirty_days_in_secs
+            one_day_from_now_in_secs = now + 86400
+
+            # This is the 'per-platform' count.
+            sql = """
+                SELECT
+                    client_type,
+                    count(client_type)
+                FROM
+                    (
+                        SELECT
+                            user_id,
+                            CASE
+                                WHEN
+                                    user_agent IS NULL OR
+                                    user_agent = ''
+                                    THEN 'unknown'
+                                WHEN
+                                    LOWER(user_agent) LIKE '%%riot%%' OR
+                                    LOWER(user_agent) LIKE '%%element%%'
+                                    THEN CASE
+                                        WHEN
+                                            LOWER(user_agent) LIKE '%%electron%%'
+                                            THEN 'electron'
+                                        WHEN
+                                            LOWER(user_agent) LIKE '%%android%%'
+                                            THEN 'android'
+                                        WHEN
+                                            LOWER(user_agent) LIKE '%%ios%%'
+                                            THEN 'ios'
+                                        ELSE 'unknown'
+                                    END
+                                WHEN
+                                    LOWER(user_agent) LIKE '%%mozilla%%' OR
+                                    LOWER(user_agent) LIKE '%%gecko%%'
+                                    THEN 'web'
+                                ELSE 'unknown'
+                            END as client_type
+                        FROM
+                            user_daily_visits
+                        WHERE
+                            timestamp > (? * 1000)
+                            AND
+                            timestamp < (? * 1000)
+                        GROUP BY
+                            user_id,
+                            client_type
+                        HAVING
+                            max(timestamp) - min(timestamp) > (? * 1000)
+                    ) AS temp
+                GROUP BY
+                    client_type
+                ORDER BY
+                    client_type
+                ;
+            """
+
+            # REVIEW: do we want to initialise the counts to zero so that we
+            # get an explicit zero for clients that don't appear in our tables?
+            results = {}
+            txn.execute(
+                sql,
+                (sixty_days_ago_in_secs, one_day_from_now_in_secs, thirty_days_in_secs),
+            )
+
+            for row in txn:
+                if row[0] == "unknown":
+                    continue
+                results[row[0]] = row[1]
+
+            # This is the 'all users' count.
+            sql = """
+                SELECT
+                    DISTINCT COUNT(*) OVER ()
+                FROM
+                    user_daily_visits
+                WHERE
+                    timestamp > (? * 1000)
+                    AND
+                    timestamp < (? * 1000)
+                GROUP BY
+                    user_id
+                HAVING
+                    max(timestamp) - min(timestamp) > (? * 1000)
+                ;
+            """
+
+            txn.execute(
+                sql,
+                (sixty_days_ago_in_secs, one_day_from_now_in_secs, thirty_days_in_secs),
+            )
+            row = txn.fetchone()
+            if row is None:
+                results["all"] = 0
+            else:
+                results["all"] = row[0]
+
+            return results
+
+        return await self.db_pool.runInteraction(
+            "count_r30v2_users", _count_r30v2_users
+        )
+
     def _get_start_of_day(self):
         """
         Returns millisecond unixtime for start of UTC day.
