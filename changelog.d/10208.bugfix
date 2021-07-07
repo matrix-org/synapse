@@ -1,1 +1,0 @@
-Fix a bug introduced in v1.35.1 where an `allow` key of a `m.room.join_rules` event could be applied for incorrect room versions and configurations.

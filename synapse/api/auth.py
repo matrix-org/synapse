@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import pymacaroons
 from netaddr import IPAddress
@@ -28,7 +28,6 @@ from synapse.api.errors import (
     InvalidClientTokenError,
     MissingClientTokenError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.appservice import ApplicationService
 from synapse.events import EventBase
 from synapse.http import get_request_user_agent
@@ -38,22 +37,12 @@ from synapse.storage.databases.main.registration import TokenLookupResult
 from synapse.types import Requester, StateMap, UserID, create_requester
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
-from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
-
-AuthEventTypes = (
-    EventTypes.Create,
-    EventTypes.Member,
-    EventTypes.PowerLevels,
-    EventTypes.JoinRules,
-    EventTypes.RoomHistoryVisibility,
-    EventTypes.ThirdPartyInvite,
-)
 
 # guests always get this device id.
 GUEST_DEVICE_ID = "guest_device"
@@ -65,9 +54,7 @@ class _InvalidMacaroonException(Exception):
 
 class Auth:
     """
-    FIXME: This class contains a mix of functions for authenticating users
-    of our client-server API and authenticating events added to room graphs.
-    The latter should be moved to synapse.handlers.event_auth.EventAuthHandler.
+    This class contains functions for authenticating users of our client-server API.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -88,18 +75,6 @@ class Auth:
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
-
-    async def check_from_context(
-        self, room_version: str, event, context, do_sig_check=True
-    ) -> None:
-        auth_event_ids = event.auth_event_ids()
-        auth_events_by_id = await self.store.get_events(auth_event_ids)
-        auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
-
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-        event_auth.check(
-            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
-        )
 
     async def check_user_in_room(
         self,
@@ -150,13 +125,6 @@ class Auth:
                     return member
 
         raise AuthError(403, "User %s not in room %s" % (user_id, room_id))
-
-    async def check_host_in_room(self, room_id: str, host: str) -> bool:
-        with Measure(self.clock, "check_host_in_room"):
-            return await self.store.is_host_joined(room_id, host)
-
-    def get_public_keys(self, invite_event: EventBase) -> List[Dict[str, Any]]:
-        return event_auth.get_public_keys(invite_event)
 
     async def get_user_by_req(
         self,
@@ -244,6 +212,11 @@ class Auth:
                     "Guest access not allowed",
                     errcode=Codes.GUEST_ACCESS_FORBIDDEN,
                 )
+
+            # Mark the token as used. This is used to invalidate old refresh
+            # tokens after some time.
+            if not user_info.token_used and token_id is not None:
+                await self.store.mark_access_token_as_used(token_id)
 
             requester = create_requester(
                 user_info.user_id,
@@ -482,44 +455,6 @@ class Auth:
             True if the user is an admin
         """
         return await self.store.is_server_admin(user)
-
-    def compute_auth_events(
-        self,
-        event,
-        current_state_ids: StateMap[str],
-        for_verification: bool = False,
-    ) -> List[str]:
-        """Given an event and current state return the list of event IDs used
-        to auth an event.
-
-        If `for_verification` is False then only return auth events that
-        should be added to the event's `auth_events`.
-
-        Returns:
-            List of event IDs.
-        """
-
-        if event.type == EventTypes.Create:
-            return []
-
-        # Currently we ignore the `for_verification` flag even though there are
-        # some situations where we can drop particular auth events when adding
-        # to the event's `auth_events` (e.g. joins pointing to previous joins
-        # when room is publicly joinable). Dropping event IDs has the
-        # advantage that the auth chain for the room grows slower, but we use
-        # the auth chain in state resolution v2 to order events, which means
-        # care must be taken if dropping events to ensure that it doesn't
-        # introduce undesirable "state reset" behaviour.
-        #
-        # All of which sounds a bit tricky so we don't bother for now.
-
-        auth_ids = []
-        for etype, state_key in event_auth.auth_types_for_event(event):
-            auth_ev_id = current_state_ids.get((etype, state_key))
-            if auth_ev_id:
-                auth_ids.append(auth_ev_id)
-
-        return auth_ids
 
     async def check_can_change_room_list(self, room_id: str, user: UserID) -> bool:
         """Determine whether the user is allowed to edit the room's entry in the

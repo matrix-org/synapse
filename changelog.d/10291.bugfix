@@ -1,0 +1,1 @@
+Fix a long-standing bug where Synapse would return errors after 2<sup>31</sup> events were handled by the server.

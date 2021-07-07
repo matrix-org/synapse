@@ -25,6 +25,7 @@ from synapse.api.constants import (
     EventTypes,
     HistoryVisibility,
     Membership,
+    RoomTypes,
 )
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
@@ -318,7 +319,8 @@ class SpaceSummaryHandler:
 
         Returns:
             A tuple of:
-                An iterable of a single value of the room.
+                The room information, if the room should be returned to the
+                user. None, otherwise.
 
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
@@ -328,7 +330,11 @@ class SpaceSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id)
 
-        # look for child rooms/spaces.
+        # If the room is not a space, return just the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE:
+            return room_entry, ()
+
+        # Otherwise, look for child rooms/spaces.
         child_events = await self._get_child_events(room_id)
 
         if suggested_only:
@@ -348,6 +354,7 @@ class SpaceSummaryHandler:
                     event_format=format_event_for_client_v2,
                 )
             )
+
         return room_entry, events_result
 
     async def _summarize_remote_room(
@@ -465,7 +472,7 @@ class SpaceSummaryHandler:
         # If this is a request over federation, check if the host is in the room or
         # is in one of the spaces specified via the join rules.
         elif origin:
-            if await self._auth.check_host_in_room(room_id, origin):
+            if await self._event_auth_handler.check_host_in_room(room_id, origin):
                 return True
 
             # Alternately, if the host has a user in any of the spaces specified
@@ -478,7 +485,9 @@ class SpaceSummaryHandler:
                     await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 for space_id in allowed_rooms:
-                    if await self._auth.check_host_in_room(space_id, origin):
+                    if await self._event_auth_handler.check_host_in_room(
+                        space_id, origin
+                    ):
                         return True
 
         # otherwise, check if the room is peekable
