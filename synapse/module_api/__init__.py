@@ -169,7 +169,7 @@ class ModuleApi:
         """
         return self._hs.config.email.email_app_name
 
-    def get_user_by_req(
+    async def get_user_by_req(
         self,
         req: SynapseRequest,
         allow_guest: bool = False,
@@ -186,13 +186,16 @@ class ModuleApi:
                 is False, and the access token is for an expired user, an
                 AuthError will be thrown
         Returns:
-            twisted.internet.defer.Deferred[synapse.types.Requester]:
-                the requester for this request
+            synapse.types.Requester: the requester for this request
         Raises:
-            synapse.api.errors.AuthError: if no user by that token exists,
+            InvalidClientCredentialsError: if no user by that token exists,
                 or the token is invalid.
         """
-        return self._auth.get_user_by_req(req, allow_guest, allow_expired=allow_expired)
+        return await self._auth.get_user_by_req(
+            req,
+            allow_guest,
+            allow_expired=allow_expired,
+        )
 
     async def is_user_admin(self, user_id: str) -> bool:
         """Checks if a user is a server admin.
@@ -220,6 +223,32 @@ class ModuleApi:
         if username.startswith("@"):
             return username
         return UserID(username, self._hs.hostname).to_string()
+
+    async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
+        """Look up the profile info for the user with the given localpart.
+
+        Args:
+            localpart: The localpart to look up profile information for.
+
+        Returns:
+            The profile information (i.e. display name and avatar URL).
+        """
+        return await self._store.get_profileinfo(localpart)
+
+    async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
+        """Look up the threepids (email addresses and phone numbers) associated with the
+        given Matrix user ID.
+
+        Args:
+            user_id: The Matrix user ID to look up threepids for.
+
+        Returns:
+            A list of threepids, each threepid being represented by a dictionary
+            containing a "medium" key which value is "email" for email addresses and
+            "msisdn" for phone numbers, and an "address" key which value is the
+            threepid's address.
+        """
+        return await self._store.user_get_threepids(user_id)
 
     def check_user_exists(self, user_id):
         """Check if user exists.
@@ -555,8 +584,8 @@ class ModuleApi:
         self,
         f: Callable,
         msec: float,
-        desc: Optional[str] = None,
         *args,
+        desc: Optional[str] = None,
         **kwargs,
     ):
         """Wraps a function as a background process and calls it repeatedly.
@@ -629,32 +658,6 @@ class ModuleApi:
             the filenames parameter.
         """
         return self._hs.config.read_templates(filenames, custom_template_directory)
-
-    async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
-        """Look up the profile info for the user with the given localpart.
-
-        Args:
-            localpart: The localpart to look up profile information for.
-
-        Returns:
-            The profile information (i.e. display name and avatar URL).
-        """
-        return await self._store.get_profileinfo(localpart)
-
-    async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
-        """Look up the threepids (email addresses and phone numbers) associated with the
-        given Matrix user ID.
-
-        Args:
-            user_id: The Matrix user ID to look up threepids for.
-
-        Returns:
-            A list of threepids, each threepid being represented by a dictionary
-            containing a "medium" key which value is "email" for email addresses and
-            "msisdn" for phone numbers, and an "address" key which value is the
-            threepid's address.
-        """
-        return await self._store.user_get_threepids(user_id)
 
 
 class PublicRoomListManager:

@@ -49,8 +49,6 @@ class AccountValidityHandler:
 
         self._app_name = self.hs.config.email_app_name
 
-        self._app_name = self.hs.config.email_app_name
-
         self._account_validity_enabled = (
             hs.config.account_validity.account_validity_enabled
         )
@@ -149,17 +147,14 @@ class AccountValidityHandler:
         Returns:
             Whether the user has expired.
         """
-        if self._is_user_expired_callbacks:
-            # If we have at least one module implementing this callback, ignore the
-            # legacy configuration and use the module(s) to determine if the user has
-            # expired.
-            for callback in self._is_user_expired_callbacks:
-                expired = await callback(user_id)
-                if expired is not None:
-                    return expired
-        elif self._account_validity_enabled:
-            # Otherwise, if the legacy configuration is enabled, use it to figure out if
-            # the user has expired.
+        for callback in self._is_user_expired_callbacks:
+            expired = await callback(user_id)
+            if expired is not None:
+                return expired
+
+        if self._account_validity_enabled:
+            # If no module could determine whether the user has expired and the legacy
+            # configuration is enabled, fall back to it.
             return await self.store.is_account_expired(user_id, self.clock.time_msec())
 
         return False

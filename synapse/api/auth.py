@@ -83,9 +83,6 @@ class Auth:
 
         self._auth_blocking = AuthBlocking(self.hs)
 
-        self._account_validity_enabled = (
-            hs.config.account_validity.account_validity_enabled
-        )
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
