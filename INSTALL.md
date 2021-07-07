@@ -53,7 +53,7 @@ production-ready setup, you will probably want to specify your domain
 (`example.com`) rather than a matrix-specific hostname here (in the same way
 that your email address is probably `user@example.com` rather than
 `user@email.example.com`) - but doing so may require more advanced setup: see
-[Setting up Federation](docs/federate.md).
+[Setting up Federation](https://matrix-org.github.io/synapse/develop/federate.html).
 
 ## Installing Synapse
 
@@ -408,7 +408,7 @@ instead. Advantages include:
 - allowing the DB to be run on separate hardware
 
 For information on how to install and use PostgreSQL in Synapse, please see
-[docs/postgres.md](docs/postgres.md)
+[docs/postgres.md](https://matrix-org.github.io/synapse/develop/postgres.html)
 
 SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
@@ -423,7 +423,7 @@ over HTTPS.
 
 The recommended way to do so is to set up a reverse proxy on port
 `8448`. You can find documentation on doing so in
-[docs/reverse_proxy.md](docs/reverse_proxy.md).
+[docs/reverse_proxy.md](https://matrix-org.github.io/synapse/develop/reverse_proxy.html).
 
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
@@ -450,7 +450,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
-[federate.md](docs/federate.md).
+[federate.md](https://matrix-org.github.io/synapse/develop/federate.html).
 
 ### Client Well-Known URI
 
@@ -562,7 +562,9 @@ on your server even if `enable_registration` is `false`.
 ### Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See [docs/turn-howto.md](docs/turn-howto.md) for details.
+a TURN server. See
+[docs/turn-howto.md](https://matrix-org.github.io/synapse/develop/turn-howto.html)
+for details.
 
 ### URL previews
 
