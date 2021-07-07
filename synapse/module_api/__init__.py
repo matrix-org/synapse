@@ -165,8 +165,7 @@ class ModuleApi:
 
     @property
     def email_app_name(self) -> str:
-        """The application name configured in the homeserver's configuration.
-        """
+        """The application name configured in the homeserver's configuration."""
         return self._hs.config.email.email_app_name
 
     async def get_user_by_req(
