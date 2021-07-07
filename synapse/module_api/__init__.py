@@ -159,14 +159,13 @@ class ModuleApi:
         return self._public_room_list_manager
 
     @property
-    def public_baseurl(self):
-        """Allow accessing the configured public base URL for this homeserver."""
+    def public_baseurl(self) -> str:
+        """The configured public base URL for this homeserver."""
         return self._hs.config.public_baseurl
 
     @property
-    def email_app_name(self):
-        """Allow accessing the application name configured in the homeserver's
-        configuration.
+    def email_app_name(self) -> str:
+        """The application name configured in the homeserver's configuration.
         """
         return self._hs.config.email.email_app_name
 

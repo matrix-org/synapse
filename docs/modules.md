@@ -92,7 +92,7 @@ and is under no obligation to implement all callbacks from the categories it reg
 callbacks for.
 
 Modules can register callbacks using one of the module API's `register_[...]_callbacks`
-methods. The callbacks functions are passed to these methods as keyword arguments, with
+methods. The callback functions are passed to these methods as keyword arguments, with
 the callback name as the argument name and the function as its value. This is demonstrated
 in the example below. A `register_[...]_callbacks` method exists for each module type
 documented in this section.
