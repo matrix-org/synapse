@@ -350,17 +350,18 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         return depth
 
     def _create_insertion_event_dict(self, sender: str, origin_server_ts: int):
-        """
-        Creates an event dict for an "insertion" event with the proper fields
+        """Creates an event dict for an "insertion" event with the proper fields
         and a random chunk ID.
+
         Args:
             sender: The event author MXID
             origin_server_ts: Timestamp when the event was sent
+
         Returns:
             Tuple of event ID and stream ordering position
         """
 
-        next_chunk_id = random_string(64)
+        next_chunk_id = random_string(8)
         insertion_event = {
             "type": EventTypes.MSC2716_INSERTION,
             "sender": sender,
@@ -481,8 +482,13 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         if chunk_id_from_query:
             # TODO: Verify the chunk_id_from_query corresponds to an insertion event
             pass
-        # Otherwise, create an insertion event to be based off of and connect
-        # to as a starting point.
+        # Otherwise, create an insertion event to act as a starting point.
+        #
+        # We don't always have an insertion event to start hanging more history
+        # off of (ideally there would be one in the main DAG, but that's not the
+        # case if we're wanting to add history to e.g. existing rooms without
+        # an insertion event), in which case we just create a new insertion event
+        # that can then get pointed to by a "marker" event later.
         else:
             base_insertion_event = self._create_insertion_event_dict(
                 sender=requester.user.to_string(),
