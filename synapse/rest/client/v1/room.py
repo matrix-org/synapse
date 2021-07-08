@@ -350,12 +350,15 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
 
         return depth
 
-    def _create_insertion_event_dict(self, sender: str, origin_server_ts: int):
+    def _create_insertion_event_dict(
+        self, sender: str, room_id: str, origin_server_ts: int
+    ):
         """Creates an event dict for an "insertion" event with the proper fields
         and a random chunk ID.
 
         Args:
             sender: The event author MXID
+            room_id: The room ID that the event belongs to
             origin_server_ts: Timestamp when the event was sent
 
         Returns:
@@ -366,6 +369,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         insertion_event = {
             "type": EventTypes.MSC2716_INSERTION,
             "sender": sender,
+            "room_id": room_id,
             "content": {
                 EventContentFields.MSC2716_NEXT_CHUNK_ID: next_chunk_id,
                 EventContentFields.MSC2716_HISTORICAL: True,
@@ -479,11 +483,17 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
 
         events_to_create = body["events"]
 
+        prev_event_ids = prev_events_from_query
+        inherited_depth = await self._inherit_depth_from_prev_ids(
+            prev_events_from_query
+        )
+
         # Figure out which chunk to connect to. If they passed in
         # chunk_id_from_query let's use it. The chunk ID passed in comes
         # from the chunk_id in the "insertion" event from the previous chunk.
         last_event_in_chunk = events_to_create[-1]
         chunk_id_to_connect_to = chunk_id_from_query
+        base_insertion_event = None
         if chunk_id_from_query:
             # TODO: Verify the chunk_id_from_query corresponds to an insertion event
             pass
@@ -495,11 +505,28 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # an insertion event), in which case we just create a new insertion event
         # that can then get pointed to by a "marker" event later.
         else:
-            base_insertion_event = self._create_insertion_event_dict(
+            base_insertion_event_dict = self._create_insertion_event_dict(
                 sender=requester.user.to_string(),
+                room_id=room_id,
                 origin_server_ts=last_event_in_chunk["origin_server_ts"],
             )
-            events_to_create.append(base_insertion_event)
+            base_insertion_event_dict["prev_events"] = prev_event_ids.copy()
+
+            (
+                base_insertion_event,
+                _,
+            ) = await self.event_creation_handler.create_and_send_nonmember_event(
+                create_requester(
+                    base_insertion_event_dict["sender"],
+                    app_service=requester.app_service,
+                ),
+                base_insertion_event_dict,
+                prev_event_ids=base_insertion_event_dict.get("prev_events"),
+                auth_event_ids=auth_event_ids,
+                historical=True,
+                depth=inherited_depth,
+            )
+
             chunk_id_to_connect_to = base_insertion_event["content"][
                 EventContentFields.MSC2716_NEXT_CHUNK_ID
             ]
@@ -513,6 +540,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # event in the chunk) so the next chunk can be connected to this one.
         insertion_event = self._create_insertion_event_dict(
             sender=requester.user.to_string(),
+            room_id=room_id,
             # Since the insertion event is put at the start of the chunk,
             # where the oldest-in-time event is, copy the origin_server_ts from
             # the first event we're inserting
@@ -521,12 +549,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # Prepend the insertion event to the start of the chunk
         events_to_create = [insertion_event] + events_to_create
 
-        inherited_depth = await self._inherit_depth_from_prev_ids(
-            prev_events_from_query
-        )
-
         event_ids = []
-        prev_event_ids = prev_events_from_query
         events_to_persist = []
         for ev in events_to_create:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
@@ -579,6 +602,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 event=event,
                 context=context,
             )
+
+        # Add the base_insertion_event to the bottom of the list we return
+        if base_insertion_event is not None:
+            event_ids.append(base_insertion_event.event_id)
 
         return 200, {
             "state_events": auth_event_ids,
