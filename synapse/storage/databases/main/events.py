@@ -1504,6 +1504,7 @@ class PersistEventsStore:
 
             self._handle_event_relations(txn, event)
 
+            self._handle_insertion_event(txn, event)
             self._handle_marker_event(txn, event)
 
             # Store the labels for this event.
@@ -1758,6 +1759,31 @@ class PersistEventsStore:
         if rel_type == RelationTypes.REPLACE:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
+    def _handle_insertion_event(self, txn, event):
+        """Handles inserting insertion extremeties during peristence of marker events
+
+        Args:
+            txn
+            event (EventBase)
+        """
+
+        if event.type != EventTypes.MSC2716_INSERTION:
+            # Not a insertion event
+            return
+
+        logger.info("_handle_insertion_event %s", event)
+
+        for prev_event_id in event.prev_event_ids:
+            self.db_pool.simple_insert_txn(
+                txn,
+                table="insertion_event_extremeties",
+                values={
+                    "insertion_event_id": event.event_id,
+                    "room_id": event.room_id,
+                    "insertion_prev_event_id": prev_event_id,
+                },
+            )
+
     def _handle_marker_event(self, txn, event):
         """Handles inserting insertion extremeties during peristence of marker events
 
@@ -1769,6 +1795,8 @@ class PersistEventsStore:
         if event.type != EventTypes.MSC2716_MARKER:
             # Not a marker event
             return
+
+        logger.info("_handle_marker_event %s", event)
 
         insertion_event_id = event.content.get(
             EventContentFields.MSC2716_MARKER_INSERTION
