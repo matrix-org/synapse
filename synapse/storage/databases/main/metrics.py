@@ -320,7 +320,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         """
         Returns millisecond unixtime for start of UTC day.
         """
-        now = time.gmtime(self.hs.get_clock().time())
+        now = time.gmtime(self._clock.time())
         today_start = calendar.timegm((now.tm_year, now.tm_mon, now.tm_mday, 0, 0, 0))
         return today_start * 1000
 
