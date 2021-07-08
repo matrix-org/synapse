@@ -949,10 +949,8 @@ class FederationServer(FederationBase):
                 room_id, room_version
             )
             if not next:
-                # We need to ensure that we always use the lock, so that it gets
-                # correctly dropped.
-                async with lock:
-                    return
+                await lock.release()
+                return
 
             origin, event = next
         else:
