@@ -248,8 +248,9 @@ for a number of platforms.
 
 There is an official synapse image available at
 <https://hub.docker.com/r/matrixdotorg/synapse> which can be used with
-the docker-compose file available at [contrib/docker](contrib/docker). Further
-information on this including configuration options is available in the README
+the docker-compose file available at
+[contrib/docker](https://github.com/matrix-org/synapse/tree/develop/contrib/docker).
+Further information on this including configuration options is available in the README
 on hub.docker.com.
 
 Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
