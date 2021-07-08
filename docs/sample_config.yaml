@@ -2652,11 +2652,6 @@ stats:
   #
   #enabled: false
 
-  # The size of each timeslice in the room_stats_historical and
-  # user_stats_historical tables, as a time period. Defaults to "1d".
-  #
-  #bucket_size: 1h
-
 
 # Server Notices room configuration
 #
