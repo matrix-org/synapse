@@ -908,8 +908,13 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
         os.stat(file_path)
         with open(file_path) as file_stream:
             return file_stream.read()
-    except OSError as e:
-        raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+     except OSError:
+        try: #will attempt to fix problems, risen if file_path symlink is (f.e. letsencrypt certbot)
+            file_path = os.path.realpath(file_path) #trying to process file_path as if it is symlink
+            with open(file_path) as file_stream: #tan - deal as usual
+                return file_stream.read()
+        except OSError as e:
+             raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
 
 
 __all__ = [
