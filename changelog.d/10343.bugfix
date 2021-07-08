@@ -1,0 +1,1 @@
+Fix duplicate key error during backfilling of redaction events that were not deleted by the history purge job. Contributed by Andreas Rammhold (@andir).
