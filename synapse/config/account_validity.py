@@ -18,6 +18,21 @@ class AccountValidityConfig(Config):
     section = "account_validity"
 
     def read_config(self, config, **kwargs):
+        """Parses the old account validity config. The config format looks like this:
+
+        account_validity:
+            enabled: true
+            period: 6w
+            renew_at: 1w
+            renew_email_subject: "Renew your %(app)s account"
+            template_dir: "res/templates"
+            account_renewed_html_path: "account_renewed.html"
+            invalid_token_html_path: "invalid_token.html"
+
+        We expect admins to use modules for this feature (which is why it doesn't appear
+        in the sample config file), but we want to keep support for it around for a bit
+        for backwards compatibility.
+        """
         account_validity_config = config.get("account_validity") or {}
         self.account_validity_enabled = account_validity_config.get("enabled", False)
         self.account_validity_renew_by_email_enabled = (
