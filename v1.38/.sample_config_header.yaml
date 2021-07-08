@@ -8,7 +8,8 @@
 #
 # It is *not* intended to be copied and used as the basis for a real
 # homeserver.yaml. Instead, if you are starting from scratch, please generate
-# a fresh config using Synapse by following the instructions in INSTALL.md.
+# a fresh config using Synapse by following the instructions in
+# https://matrix-org.github.io/synapse/latest/setup/installation.html.
 
 # Configuration options that take a time period can be set using a number
 # followed by a letter. Letters have the following meanings:
