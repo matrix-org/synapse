@@ -215,6 +215,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             "event_relations",
             "event_search",
             "rejections",
+            "redactions",
         ):
             logger.info("[purge] removing events from %s", table)
 
