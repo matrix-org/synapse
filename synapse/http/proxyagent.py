@@ -117,7 +117,8 @@ class ProxyAgent(_AgentBase):
             https_proxy = proxies["https"].encode() if "https" in proxies else None
             no_proxy = proxies["no"] if "no" in proxies else None
 
-        # Parse credentials from https proxy connection string if present
+        # Parse credentials from http and https proxy connection string if present
+        self.http_proxy_creds, http_proxy = parse_username_password(http_proxy)
         self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
 
         self.http_proxy_endpoint = _http_proxy_endpoint(
@@ -189,11 +190,28 @@ class ProxyAgent(_AgentBase):
             and self.http_proxy_endpoint
             and not should_skip_proxy
         ):
-            # Cache *all* connections under the same key, since we are only
-            # connecting to a single destination, the proxy:
-            pool_key = ("http-proxy", self.http_proxy_endpoint)
-            endpoint = self.http_proxy_endpoint
-            request_path = uri
+            # Determine whether we need to set Proxy-Authorization headers
+            if self.http_proxy_creds:
+                # Set a Proxy-Authorization header
+                connect_headers = Headers()
+                connect_headers.addRawHeader(
+                    b"Proxy-Authorization",
+                    self.http_proxy_creds.as_proxy_authorization_value(),
+                )
+                # if authentification is requierd, use tunnel instead of transparent mode
+                endpoint = HTTPConnectProxyEndpoint(
+                    self.proxy_reactor,
+                    self.http_proxy_endpoint,
+                    parsed_uri.host,
+                    parsed_uri.port,
+                    headers=connect_headers,
+                )
+            else:
+                # Cache *all* connections under the same key, since we are only
+                # connecting to a single destination, the proxy:
+                pool_key = ("http-proxy", self.http_proxy_endpoint)
+                endpoint = self.http_proxy_endpoint
+                request_path = uri
         elif (
             parsed_uri.scheme == b"https"
             and self.https_proxy_endpoint
