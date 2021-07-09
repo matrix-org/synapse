@@ -1,1 +1,0 @@
-Improve the performance of the spaces summary endpoint by only recursing into spaces (and not rooms in general).

@@ -1753,7 +1753,6 @@ PURGE_TABLES = [
     "room_memberships",
     "room_stats_state",
     "room_stats_current",
-    "room_stats_historical",
     "room_stats_earliest_token",
     "rooms",
     "stream_ordering_to_exterm",
