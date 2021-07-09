@@ -4,7 +4,7 @@ from synapse.rest.client.v1 import login, room
 from tests import unittest
 from tests.unittest import HomeserverTestCase
 
-DAY = 86400
+ONE_DAY_IN_SECONDS = 86400
 
 
 class PhoneHomeTestCase(HomeserverTestCase):
@@ -35,7 +35,7 @@ class PhoneHomeTestCase(HomeserverTestCase):
 
         # Advance 30 days (+ 1 second, because strict inequality causes issues if we are
         # bang on 30 days later).
-        self.reactor.advance(30 * DAY + 1)
+        self.reactor.advance(30 * ONE_DAY_IN_SECONDS + 1)
 
         # (Make sure the user isn't somehow counted by this point.)
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
@@ -53,14 +53,14 @@ class PhoneHomeTestCase(HomeserverTestCase):
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance 29 days. The user has now not posted for 29 days.
-        self.reactor.advance(29 * DAY)
+        self.reactor.advance(29 * ONE_DAY_IN_SECONDS)
 
         # The user is still counted.
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "unknown": 1})
 
         # Advance another day. The user has now not posted for 30 days.
-        self.reactor.advance(DAY)
+        self.reactor.advance(ONE_DAY_IN_SECONDS)
 
         # The user is now no longer counted in R30.
         r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
@@ -84,14 +84,14 @@ class PhoneHomeTestCase(HomeserverTestCase):
 
         for _ in range(30):
             # This loop posts a message every day for 30 days
-            self.reactor.advance(DAY)
+            self.reactor.advance(ONE_DAY_IN_SECONDS)
             self.helper.send(room_id, "I'm still here", tok=access_token)
 
             # Notice that the user *still* does not contribute to R30!
             r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
             self.assertEqual(r30_results, {"all": 0})
 
-        self.reactor.advance(DAY)
+        self.reactor.advance(ONE_DAY_IN_SECONDS)
         self.helper.send(room_id, "Still here!", tok=access_token)
 
         # *Now* the user appears in R30.
