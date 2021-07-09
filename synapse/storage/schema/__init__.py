@@ -21,6 +21,10 @@ older versions of Synapse).
 
 See `README.md <synapse/storage/schema/README.md>`_  for more information on how this
 works.
+
+Changes in SCHEMA_VERSION = 61:
+    - The `user_stats_historical` and `room_stats_historical` tables are not written and
+      are not read (previously, they were written but not read).
 """
 
 
