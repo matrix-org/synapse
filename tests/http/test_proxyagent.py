@@ -305,7 +305,7 @@ class MatrixFederationAgentTests(TestCase):
         # request.setHeader(b"Content-Length", b"0")
         request.finish()
 
-        '''
+        """
         here need to wrap the http request, but not with ssl
         
         # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
@@ -342,7 +342,7 @@ class MatrixFederationAgentTests(TestCase):
         resp = self.successResultOf(d)
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
-        '''
+        """
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
