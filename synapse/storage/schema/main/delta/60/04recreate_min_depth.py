@@ -45,7 +45,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs
         """
         CREATE TRIGGER populate_min_depth2_trigger BEFORE INSERT OR UPDATE ON room_depth
         FOR EACH ROW
-        EXECUTE FUNCTION populate_min_depth2()
+        EXECUTE PROCEDURE populate_min_depth2()
         """
     )
 
