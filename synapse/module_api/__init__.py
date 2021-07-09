@@ -594,7 +594,8 @@ class ModuleApi:
         Args:
             f: The function to call repeatedly. f can be either synchronous or
                 asynchronous, and must follow Synapse's logcontext rules.
-                More info about logcontexts is available at https://matrix-org.github.io/synapse/latest/log_contexts.html
+                More info about logcontexts is available at
+                https://matrix-org.github.io/synapse/latest/log_contexts.html
             msec: How long to wait between calls in milliseconds.
             desc: The background task's description. Default to the function's name.
             *args: Positional arguments to pass to function.
