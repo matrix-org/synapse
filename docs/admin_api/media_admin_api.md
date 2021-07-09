@@ -47,7 +47,7 @@ The API returns a JSON body like the following:
 ## List all media uploaded by a user
 
 Listing all media that has been uploaded by a local user can be achieved through
-the use of the [List media of a user](user_admin_api.rst#list-media-of-a-user)
+the use of the [List media of a user](user_admin_api.md#list-media-of-a-user)
 Admin API.
 
 # Quarantine media
@@ -257,7 +257,7 @@ URL Parameters
 * `server_name`: string - The name of your local server (e.g `matrix.org`).
 * `before_ts`: string representing a positive integer - Unix timestamp in ms.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation. 
+last access and not the timestamp creation.
 * `size_gt`: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to `0`.
 * `keep_profiles`: Optional - string representing a boolean - Switch to also delete files

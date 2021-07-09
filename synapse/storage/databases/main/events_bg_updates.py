@@ -1146,6 +1146,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
                 logger.info("completing stream_ordering migration: %s", sql)
                 txn.execute(sql)
 
+        # ANALYZE the new column to build stats on it, to encourage PostgreSQL to use the
+        # indexes on it.
+        # We need to pass execute a dummy function to handle the txn's result otherwise
+        # it tries to call fetchall() on it and fails because there's no result to fetch.
+        await self.db_pool.execute(
+            "background_analyze_new_stream_ordering_column",
+            lambda txn: None,
+            "ANALYZE events(stream_ordering2)",
+        )
+
         await self.db_pool.runInteraction(
             "_background_replace_stream_ordering_column", process
         )

@@ -401,7 +401,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         if app_service.sender == user_id:
             pass
         elif not app_service.is_interested_in_user(user_id):
-            raise AuthError(403, "Application service cannot masquerade as this user (%s)." % user_id)
+            raise AuthError(
+                403,
+                "Application service cannot masquerade as this user (%s)." % user_id,
+            )
         elif not (await self.store.get_user_by_id(user_id)):
             raise AuthError(
                 403, "Application service has not registered this user (%s)" % user_id
