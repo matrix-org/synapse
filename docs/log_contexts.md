@@ -125,8 +125,7 @@ Always await your awaitables
 ----------------------------
 
 Whenever you get an awaitable back from a function, you should `await` on
-it as soon as possible. (Returning it directly to your caller is ok too,
-if you're not using `async`.) Do not pass go; do not do any logging; do not
+it as soon as possible. Do not pass go; do not do any logging; do not
 call any other functions.
 
 ```python
@@ -138,11 +137,6 @@ async def fun():
     result = await coro         # also fine, of course
 
     return result
-
-def nonAsyncFun():
-    logger.debug("just a wrapper really")
-    return do_some_stuff()      # this is ok too - the caller will await on
-                                # it anyway.
 ```
 
 Provided this pattern is followed all the way back up to the callchain
@@ -167,37 +161,25 @@ Most of the time, an awaitable comes from another synapse function.
 Sometimes, though, we need to make up a new awaitable, or we get an awaitable
 back from external code. We need to make it follow our rules.
 
-The easy way to do it is with a combination of `async`, and
-`context.PreserveLoggingContext`. Suppose we want to implement
+The easy way to do it is by using `context.make_deferred_yieldable`. Suppose we want to implement
 `sleep`, which returns a deferred which will run its callbacks after a
 given number of seconds. That might look like:
 
 ```python
 # not a logcontext-rules-compliant function
-def get_sleep_async(seconds):
-    t = asyncio.create_task(...)
-    reactor.callLater(seconds, t.get_coro(), None)
-    return t
+
+def get_sleep_deferred(seconds):
+    d = defer.Deferred()
+    reactor.callLater(seconds, d.callback, None)
+    return d
 ```
 
-That doesn't follow the rules, but we can fix it by wrapping it with
-`PreserveLoggingContext` and `await`ing it:
+That doesn't follow the rules, but we can fix it by calling it through
+`context.make_deferred_yieldable`:
 
 ```python
 async def sleep(seconds):
-    with PreserveLoggingContext():
-        await get_sleep_async(seconds)
-```
-
-This technique works equally for external functions which return
-awaitables, or awaitables we have made ourselves.
-
-You can also use `context.make_deferred_yieldable`, which just does the
-boilerplate for you, so the above could be written:
-
-```python
-def sleep(seconds):
-    return context.make_deferred_yieldable(get_sleep_deferred(seconds))
+    return await context.make_deferred_yieldable(get_sleep_deferred(seconds))
 ```
 
 ## Fire-and-forget
@@ -288,7 +270,7 @@ more awaitables via `defer.gatherResults`:
 ```python
 a1 = operation1()
 a2 = operation2()
-a3 = asyncio.gather(a1, a2)
+a3 = defer.gatherResults(a1, a2)
 ```
 
 This is really a variation of the fire-and-forget problem above, in that
@@ -311,11 +293,11 @@ async def do_request_handling():
     with PreserveLoggingContext():
         a1 = operation1()
         a2 = operation2()
-        result = await asyncio.gather(a1, a2)
+        result = await defer.gatherResults(a1, a2)
 ```
 
 In this case particularly, though, option two, of using
-`context.preserve_fn` almost certainly makes more sense, so that
+`context.run_in_background` almost certainly makes more sense, so that
 `operation1` and `operation2` are both logged against the original
 logcontext. This looks like:
 
@@ -328,102 +310,9 @@ async def do_request_handling():
         result = await defer.gatherResults(a1, a2)
 ```
 
-## Was all this really necessary?
+## A note on garbage-collection of awaitable chains
 
-The conventions used work fine for a linear flow where everything
-happens in series via `async` and `await`, but are certainly tricky
-to follow for any more exotic flows. It's hard not to wonder if we
-could have done something else.
-
-We're not going to rewrite Synapse now, so the following is entirely of
-academic interest, but we'd like to record some thoughts on an
-alternative approach.
-
-We briefly prototyped some code following an alternative set of rules. We
-think it would work, but we certainly didn't get as far as thinking how
-it would interact with concepts as complicated as the cache descriptors.
-
-The alternative rules were:
-
--   functions always preserve the logcontext of their caller, whether or
-    not they are returning a awaitable.
--   Awaitables returned by synapse functions run their callbacks in the
-    same context as the function was orignally called in.
-
-The main point of this scheme is that everywhere that sets the
-logcontext is responsible for clearing it before returning control to
-the reactor.
-
-So, for example, if you were the function which started a
-`with LoggingContext` block, you wouldn't `await` within it --- instead
-you'd start off the background process, and then leave the `with` block
-to wait for it:
-
-```python
-def handle_request(request_id):
-    with context.LoggingContext() as request_context:
-        request_context.request = request_id
-        d = do_request_handling()    # d is a Twisted Deferred
-
-    def cb(r):
-        logger.debug("finished")
-
-    d.addCallback(cb)
-    return d
-```
-
-(in general, mixing `with LoggingContext` blocks and `async` in the same
-function leads to slighly counter-intuitive code, under this scheme).
-
-Because we leave the original `with` block as soon as the awaitable is
-returned (as opposed to waiting for it to be resolved, as we do today),
-the logcontext is cleared before control passes back to the reactor; so
-if there is some code within `do_request_handling` which needs to wait
-for an awaitable to complete, there is no need for it to worry about
-clearing the logcontext before doing so:
-
-```python
-def handle_request():
-    d = do_some_stuff()    # d is a Twisted Deferred
-    d.addCallback(do_some_more_stuff)
-    return d
-```
-
---- and provided `do_some_stuff` follows the rules of returning an awaitable
-which runs its callbacks in the original logcontext, all is happy.
-
-The business of an awaitable which runs its callbacks in the original
-logcontext isn't hard to achieve --- we have it today, in the shape of
-`context._PreservingContextDeferred`:
-
-```python
-def do_some_stuff():
-    deferred = do_some_io()
-    pcd = _PreservingContextDeferred(LoggingContext.current_context())
-    deferred.chainDeferred(pcd)
-    return pcd
-```
-
-It turns out that, thanks to the way that awaitables chain together, we
-automatically get the property of a context-preserving deferred with
-`async`, provided the final Defered the function `yields` on has that
-property. So we can just write:
-
-```python
-async def handle_request():
-    await do_some_stuff()
-    await do_some_more_stuff()
-```
-
-To conclude: I think this scheme would have worked equally well, with
-less danger of messing it up, and probably made some more esoteric code
-easier to write. But again --- changing the conventions of the entire
-Synapse codebase is not a sensible option for the marginal improvement
-offered.
-
-## A note on garbage-collection of Deferred chains
-
-It turns out that our logcontext rules do not play nicely with Deferred
+It turns out that our logcontext rules do not play nicely with awaitable
 chains which get orphaned and garbage-collected.
 
 Imagine we have some code that looks like this:
@@ -435,13 +324,12 @@ def on_something_interesting():
     for d in listener_queue:
         d.callback("foo")
 
-@defer.inlineCallbacks
-def await_something_interesting():
-    new_deferred = defer.Deferred()
-    listener_queue.append(new_deferred)
+async def await_something_interesting():
+    new_awaitable = defer.Deferred()
+    listener_queue.append(new_awaitable)
 
     with PreserveLoggingContext():
-        yield new_deferred
+        await new_awaitable
 ```
 
 Obviously, the idea here is that we have a bunch of things which are
@@ -460,8 +348,8 @@ def reset_listener_queue():
     listener_queue.clear()
 ```
 
-So, both ends of the deferred chain have now dropped their references,
-and the deferred chain is now orphaned, and will be garbage-collected at
+So, both ends of the awaitable chain have now dropped their references,
+and the awaitable chain is now orphaned, and will be garbage-collected at
 some point. Note that `await_something_interesting` is a generator
 function, and when Python garbage-collects generator functions, it gives
 them a chance to clean up by making the `yield` raise a `GeneratorExit`
@@ -470,8 +358,8 @@ exception. In our case, that means that the `__exit__` handler of
 there is now nothing waiting for its return, so the request context is
 never cleared.
 
-To reiterate, this problem only arises when *both* ends of a deferred
-chain are dropped. Dropping the the reference to a deferred you're
+To reiterate, this problem only arises when *both* ends of a awaitable
+chain are dropped. Dropping the the reference to an awaitable you're
 supposed to be calling is probably bad practice, so this doesn't
 actually happen too much. Unfortunately, when it does happen, it will
 lead to leaked logcontexts which are incredibly hard to track down.
