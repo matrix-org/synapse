@@ -373,14 +373,14 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                         FROM
                             user_daily_visits
                         WHERE
-                            timestamp > (? * 1000)
+                            timestamp > (CAST(? AS BIGINT) * 1000)
                             AND
-                            timestamp < (? * 1000)
+                            timestamp < (CAST(? AS BIGINT) * 1000)
                         GROUP BY
                             user_id,
                             client_type
                         HAVING
-                            max(timestamp) - min(timestamp) > (? * 1000)
+                            max(timestamp) - min(timestamp) > (CAST(? AS BIGINT) * 1000)
                     ) AS temp
                 GROUP BY
                     client_type
@@ -410,13 +410,13 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     FROM
                         user_daily_visits
                     WHERE
-                        timestamp > (? * 1000)
+                        timestamp > (CAST(? AS BIGINT) * 1000)
                         AND
-                        timestamp < (? * 1000)
+                        timestamp < (CAST(? AS BIGINT) * 1000)
                     GROUP BY
                         user_id
                     HAVING
-                        max(timestamp) - min(timestamp) > (? * 1000)
+                        max(timestamp) - min(timestamp) > (CAST(? AS BIGINT) * 1000)
                 )
             """
 
