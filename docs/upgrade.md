@@ -16,7 +16,7 @@ this document.
     summaries.
 
 -   If Synapse was installed using [prebuilt
-    packages](../setup/INSTALL.md#prebuilt-packages), you will need to follow the
+    packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
 -   If Synapse was installed from source, then:

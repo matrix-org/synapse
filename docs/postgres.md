@@ -8,14 +8,14 @@ Synapse will require the python postgres client library in order to
 connect to a postgres database.
 
 -   If you are using the [matrix.org debian/ubuntu
-    packages](../INSTALL.md#matrixorg-packages), the necessary python
+    packages](setup/installation.md#matrixorg-packages), the necessary python
     library will already be installed, but you will need to ensure the
     low-level postgres library is installed, which you can do with
     `apt install libpq5`.
 -   For other pre-built packages, please consult the documentation from
     the relevant package.
 -   If you installed synapse [in a
-    virtualenv](../INSTALL.md#installing-from-source), you can install
+    virtualenv](setup/installation.md#installing-from-source), you can install
     the library with:
 
         ~/synapse/env/bin/pip install "matrix-synapse[postgres]"
