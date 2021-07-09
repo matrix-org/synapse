@@ -404,19 +404,20 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
 
             # This is the 'all users' count.
             sql = """
-                SELECT
-                    DISTINCT COUNT(*) OVER ()
-                FROM
-                    user_daily_visits
-                WHERE
-                    timestamp > (? * 1000)
-                    AND
-                    timestamp < (? * 1000)
-                GROUP BY
-                    user_id
-                HAVING
-                    max(timestamp) - min(timestamp) > (? * 1000)
-                ;
+                SELECT COUNT(*) FROM (
+                    SELECT
+                        1
+                    FROM
+                        user_daily_visits
+                    WHERE
+                        timestamp > (? * 1000)
+                        AND
+                        timestamp < (? * 1000)
+                    GROUP BY
+                        user_id
+                    HAVING
+                        max(timestamp) - min(timestamp) > (? * 1000)
+                )
             """
 
             txn.execute(
