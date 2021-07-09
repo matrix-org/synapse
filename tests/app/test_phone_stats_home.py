@@ -206,7 +206,6 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # Advance 31 days.
         # (R30v2 includes users with **more** than 30 days between the two visits,
         #  and user_daily_visits records the timestamp as the start of the day.)
-        # REVIEW: is >=31 days really what was intended? Need to ask.
         self.reactor.advance(31 * DAY)
         # Also advance 10 minutes to let another user_daily_visits update occur
         self.reactor.advance(600)
