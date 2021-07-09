@@ -29,8 +29,6 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.filtering import Filter
-
-
 from synapse.appservice import ApplicationService
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
@@ -398,13 +396,16 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             Requester object
         """
 
+        # It's ok if the app service is trying to use the sender from their registration
         if app_service.sender == user_id:
             pass
+        # Check to make sure the app service is allowed to control the user
         elif not app_service.is_interested_in_user(user_id):
             raise AuthError(
                 403,
                 "Application service cannot masquerade as this user (%s)." % user_id,
             )
+        # Check to make sure the user is already registered on the homeserver
         elif not (await self.store.get_user_by_id(user_id)):
             raise AuthError(
                 403, "Application service has not registered this user (%s)" % user_id
