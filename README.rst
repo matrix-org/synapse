@@ -94,7 +94,8 @@ Synapse Installation
 
 .. _federation:
 
-* For details on how to install synapse, see `Installation Instructions`_.
+* For details on how to install synapse, see
+  `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
 * For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
 
@@ -334,8 +335,8 @@ access the API as a Matrix client would. It is able to run Synapse directly from
 the source tree, so installation of the server is not required.
 
 Testing with SyTest is recommended for verifying that changes related to the
-Client-Server API are functioning correctly. See the `installation instructions`_
-for details.
+Client-Server API are functioning correctly. See the `SyTest installation
+instructions <https://github.com/matrix-org/sytest#installing>`_ for details.
 
 
 Platform dependencies
@@ -455,5 +456,3 @@ This is normally caused by a misconfiguration in your reverse-proxy. See
 .. |python| image:: https://img.shields.io/pypi/pyversions/matrix-synapse
   :alt: (supported python versions)
   :target: https://pypi.org/project/matrix-synapse
-
-.. _installation instructions <https://github.com/matrix-org/sytest#installing>
