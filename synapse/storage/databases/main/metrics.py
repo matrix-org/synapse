@@ -389,9 +389,9 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                 ;
             """
 
-            # REVIEW: do we want to initialise the counts to zero so that we
-            # get an explicit zero for clients that don't appear in our tables?
-            results = {}
+            # We initialise all the client types to zero, so we get an explicit
+            # zero if they don't appear in the query results
+            results = {"ios": 0, "android": 0, "web": 0, "electron": 0}
             txn.execute(
                 sql,
                 (sixty_days_ago_in_secs, one_day_from_now_in_secs, thirty_days_in_secs),

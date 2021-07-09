@@ -199,7 +199,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # Check the R30 results do not count that user.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 0})
+        self.assertEqual(
+            r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
         # Advance 31 days.
         # (R30v2 includes users with **more** than 30 days between the two visits,
@@ -212,7 +214,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # (Make sure the user isn't somehow counted by this point.)
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 0})
+        self.assertEqual(
+            r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
         # Send a message (this counts as activity)
         self.helper.send(room_id, "message2", tok=access_token)
@@ -224,7 +228,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # *Now* the user is counted.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 1})
+        self.assertEqual(
+            r30_results, {"all": 1, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
         # Advance to JUST under 60 days after the user's first post
         self._advance_to(first_post_at + 60 * DAY - 5)
@@ -232,14 +238,18 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # Check the user is still counted.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 1})
+        self.assertEqual(
+            r30_results, {"all": 1, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
         # Advance into the next day. The user's first activity is now more than 60 days old.
         self._advance_to(first_post_at + 60 * DAY + 5)
 
         # Check the user is now no longer counted in R30.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 0})
+        self.assertEqual(
+            r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
     def test_r30v2_user_must_be_retained_for_at_least_a_month(self):
         """
@@ -268,7 +278,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # Check the user does not contribute to R30 yet.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 0})
+        self.assertEqual(
+            r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
         for _ in range(30):
             # This loop posts a message every day for 30 days
@@ -283,7 +295,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
             # Notice that the user *still* does not contribute to R30!
             r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-            self.assertEqual(r30_results, {"all": 0})
+            self.assertEqual(
+                r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+            )
 
         # (This advance needs to be split up into multiple advances
         #  because otherwise strict inequality hits.)
@@ -298,7 +312,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # *Now* the user appears in R30.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 1, "android": 1})
+        self.assertEqual(
+            r30_results, {"all": 1, "android": 1, "electron": 0, "ios": 0, "web": 0}
+        )
 
     def test_r30v2_returning_dormant_users_not_counted(self):
         """
@@ -337,7 +353,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # Check that the user does not contribute to R30v2, even though it's been
         # more than 30 days since registration.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 0})
+        self.assertEqual(
+            r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
 
         # Check that this is a situation where old R30 differs:
         # old R30 DOES count this as 'retained'.
@@ -357,18 +375,24 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # Check the user now satisfies the requirements to appear in R30v2.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 1, "ios": 1})
+        self.assertEqual(
+            r30_results, {"all": 1, "ios": 1, "android": 0, "electron": 0, "web": 0}
+        )
 
         # Advance to 59.5 days after the user's first R30v2-eligible activity.
         self.reactor.advance(27.5 * DAY)
 
         # Check the user still appears in R30v2.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 1, "ios": 1})
+        self.assertEqual(
+            r30_results, {"all": 1, "ios": 1, "android": 0, "electron": 0, "web": 0}
+        )
 
         # Advance to 60.5 days after the user's first R30v2-eligible activity.
         self.reactor.advance(DAY)
 
         # Check the user no longer appears in R30v2.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
-        self.assertEqual(r30_results, {"all": 0})
+        self.assertEqual(
+            r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
+        )
