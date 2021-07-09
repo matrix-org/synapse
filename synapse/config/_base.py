@@ -889,8 +889,10 @@ class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
 
 def read_file(file_path: Any, config_path: Iterable[str]) -> str:
     """Check the given file exists, and read it into a string
+   
+    If file can not be read, will try to hendle it as symlink, before throwing an error.
 
-    If it does not, emit an error indicating the problem
+    If file can even after, emit an error indicating the problem
 
     Args:
         file_path: the file to be read
@@ -909,7 +911,7 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
         with open(file_path) as file_stream:
             return file_stream.read()
     except OSError:
-          try: #trying to handle error by converting any symlinks into realpatheth. If would be better to use this mtod as main one, but I am no shoure how .realpath() would work in this case. 
+          try:
             file_path = os.path.realpath(file_path)
             os.stat(file_path)
             with open(file_path) as file_stream:
