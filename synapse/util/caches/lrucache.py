@@ -90,8 +90,7 @@ def enumerate_leaves(node, depth):
         yield node
     else:
         for n in node.values():
-            for m in enumerate_leaves(n, depth - 1):
-                yield m
+            yield from enumerate_leaves(n, depth - 1)
 
 
 P = TypeVar("P")

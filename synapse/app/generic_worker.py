@@ -395,10 +395,8 @@ class GenericWorkerServer(HomeServer):
             elif listener.type == "metrics":
                 if not self.config.enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but "
+                        "enable_metrics is not True!"
                     )
                 else:
                     _base.listen_metrics(listener.bind_addresses, listener.port)

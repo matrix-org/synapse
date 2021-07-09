@@ -66,10 +66,8 @@ class TlsConfig(Config):
         if self.federation_client_minimum_tls_version == "1.3":
             if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
                 raise ConfigError(
-                    (
-                        "federation_client_minimum_tls_version cannot be 1.3, "
-                        "your OpenSSL does not support it"
-                    )
+                    "federation_client_minimum_tls_version cannot be 1.3, "
+                    "your OpenSSL does not support it"
                 )
 
         # Whitelist of domains to not verify certificates for

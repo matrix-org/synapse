@@ -137,8 +137,7 @@ class _Collector:
             _background_process_db_txn_duration,
             _background_process_db_sched_duration,
         ):
-            for r in m.collect():
-                yield r
+            yield from m.collect()
 
 
 REGISTRY.register(_Collector())

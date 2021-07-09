@@ -907,7 +907,7 @@ class DatabasePool:
         # The sort is to ensure that we don't rely on dictionary iteration
         # order.
         keys, vals = zip(
-            *[zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i]
+            *(zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i)
         )
 
         for k in keys:

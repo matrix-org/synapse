@@ -372,7 +372,7 @@ class SamlHandler(BaseHandler):
 
 
 DOT_REPLACE_PATTERN = re.compile(
-    ("[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),))
+    "[^%s]" % (re.escape("".join(mxid_localpart_allowed_characters)),)
 )
 
 

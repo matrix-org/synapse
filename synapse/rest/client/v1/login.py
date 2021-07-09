@@ -44,19 +44,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-LoginResponse = TypedDict(
-    "LoginResponse",
-    {
-        "user_id": str,
-        "access_token": str,
-        "home_server": str,
-        "expires_in_ms": Optional[int],
-        "refresh_token": Optional[str],
-        "device_id": str,
-        "well_known": Optional[Dict[str, Any]],
-    },
-    total=False,
-)
+class LoginResponse(TypedDict, total=False):
+    user_id: str
+    access_token: str
+    home_server: str
+    expires_in_ms: Optional[int]
+    refresh_token: Optional[str]
+    device_id: str
+    well_known: Optional[Dict[str, Any]]
 
 
 class LoginRestServlet(RestServlet):
@@ -150,9 +145,7 @@ class LoginRestServlet(RestServlet):
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
 
-        flows.extend(
-            ({"type": t} for t in self.auth_handler.get_supported_login_types())
-        )
+        flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
