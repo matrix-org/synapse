@@ -205,7 +205,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # Advance 31 days.
         # (R30v2 includes users with **more** than 30 days between the two visits,
         #  and user_daily_visits records the timestamp as the start of the day.)
-        self.reactor.advance(31 * DAY)
+        self.reactor.advance(31 * ONE_DAY_IN_SECONDS)
         # Also advance 10 minutes to let another user_daily_visits update occur
         self.reactor.advance(600)
 
@@ -229,7 +229,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         )
 
         # Advance to JUST under 60 days after the user's first post
-        self._advance_to(first_post_at + 60 * DAY - 5)
+        self._advance_to(first_post_at + 60 * ONE_DAY_IN_SECONDS - 5)
         self.reactor.advance(1)
 
         # Check the user is still counted.
@@ -239,7 +239,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         )
 
         # Advance into the next day. The user's first activity is now more than 60 days old.
-        self._advance_to(first_post_at + 60 * DAY + 5)
+        self._advance_to(first_post_at + 60 * ONE_DAY_IN_SECONDS + 5)
 
         # Check the user is now no longer counted in R30.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
@@ -279,7 +279,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         for _ in range(30):
             # This loop posts a message every day for 30 days
-            self.reactor.advance(DAY - 400)
+            self.reactor.advance(ONE_DAY_IN_SECONDS - 400)
             self.helper.send(
                 room_id, "I'm still here", tok=access_token, custom_headers=headers
             )
@@ -294,7 +294,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # (This advance needs to be split up into multiple advances
         #  because otherwise strict inequality hits.)
-        self.reactor.advance(DAY)
+        self.reactor.advance(ONE_DAY_IN_SECONDS)
         self.helper.send(
             room_id, "Still here!", tok=access_token, custom_headers=headers
         )
@@ -331,7 +331,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
         # the user goes inactive for 2 months
-        self.reactor.advance(60 * DAY)
+        self.reactor.advance(60 * ONE_DAY_IN_SECONDS)
 
         # the user returns for one day, perhaps just to check out a new feature
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
@@ -354,7 +354,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # Now we want to check that the user will still be able to appear in
         # R30v2 as long as the user performs some other activity between
         # 30 and 60 days later.
-        self.reactor.advance(32 * DAY)
+        self.reactor.advance(32 * ONE_DAY_IN_SECONDS)
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
         # (give time for tables to update)
@@ -367,7 +367,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         )
 
         # Advance to 59.5 days after the user's first R30v2-eligible activity.
-        self.reactor.advance(27.5 * DAY)
+        self.reactor.advance(27.5 * ONE_DAY_IN_SECONDS)
 
         # Check the user still appears in R30v2.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
@@ -376,7 +376,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         )
 
         # Advance to 60.5 days after the user's first R30v2-eligible activity.
-        self.reactor.advance(DAY)
+        self.reactor.advance(ONE_DAY_IN_SECONDS)
 
         # Check the user no longer appears in R30v2.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
