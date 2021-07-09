@@ -29,6 +29,9 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.filtering import Filter
+
+
+from synapse.appservice import ApplicationService
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
@@ -47,6 +50,7 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    Requester,
     RoomAlias,
     RoomID,
     StreamToken,
@@ -379,6 +383,35 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
 
         return insertion_event
 
+    async def _create_requester_from_app_service(
+        self, user_id: str, app_service: ApplicationService
+    ) -> Requester:
+        """Creates a new requester for the given user_id
+        and validates that the app service is allowed to control
+        the given user.
+
+        Args:
+            user_id: The author MXID that the app service is controlling
+            app_service: The app service that controls the user
+
+        Returns:
+            Requester object
+        """
+
+        if app_service.sender == user_id:
+            pass
+        elif not app_service.is_interested_in_user(user_id):
+            raise AuthError(
+                403,
+                "Application service cannot masquerade as this user (%s)." % user_id,
+            )
+        elif not (await self.store.get_user_by_id(user_id)):
+            raise AuthError(
+                403, "Application service has not registered this user (%s)" % user_id
+            )
+
+        return create_requester(user_id, app_service=app_service)
+
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
@@ -444,8 +477,8 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
-                    create_requester(
-                        state_event["sender"], app_service=requester.app_service
+                    await self._create_requester_from_app_service(
+                        state_event["sender"], requester.app_service
                     ),
                     target=UserID.from_string(event_dict["state_key"]),
                     room_id=room_id,
@@ -466,8 +499,8 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                     event,
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                    create_requester(
-                        state_event["sender"], app_service=requester.app_service
+                    await self._create_requester_from_app_service(
+                        state_event["sender"], requester.app_service
                     ),
                     event_dict,
                     outlier=True,
@@ -516,7 +549,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 base_insertion_event,
                 _,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
+                await self._create_requester_from_app_service(
+                    base_insertion_event_dict["sender"],
+                    requester.app_service,
+                ),
                 base_insertion_event_dict,
                 prev_event_ids=base_insertion_event_dict.get("prev_events"),
                 auth_event_ids=auth_event_ids,
@@ -565,7 +601,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             }
 
             event, context = await self.event_creation_handler.create_event(
-                create_requester(ev["sender"], app_service=requester.app_service),
+                await self._create_requester_from_app_service(
+                    ev["sender"], requester.app_service
+                ),
                 event_dict,
                 prev_event_ids=event_dict.get("prev_events"),
                 auth_event_ids=auth_event_ids,
@@ -595,7 +633,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # where topological_ordering is just depth.
         for (event, context) in reversed(events_to_persist):
             ev = await self.event_creation_handler.handle_new_client_event(
-                create_requester(event["sender"], app_service=requester.app_service),
+                await self._create_requester_from_app_service(
+                    event["sender"], requester.app_service
+                ),
                 event=event,
                 context=context,
             )
