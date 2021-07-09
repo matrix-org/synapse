@@ -915,7 +915,10 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
             os.stat(file_path)
             with open(file_path) as file_stream:
                 return file_stream.read()
-          except OSError as e:
+       except OSError as e:
+           raise ConfigError(
+               "Error accessing file %r" % (file_path,), config_path
+           ) from e
               raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
 
 
