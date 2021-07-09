@@ -417,7 +417,7 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                         user_id
                     HAVING
                         max(timestamp) - min(timestamp) > (CAST(? AS BIGINT) * 1000)
-                )
+                ) AS r30_users
             """
 
             txn.execute(
