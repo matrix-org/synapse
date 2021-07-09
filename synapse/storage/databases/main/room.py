@@ -1032,7 +1032,7 @@ class _BackgroundUpdates:
 
 _REPLACE_ROOM_DEPTH_SQL_COMMANDS = (
     "DROP TRIGGER populate_min_depth2_trigger ON room_depth",
-    "DROP FUNCTION populate_min_depth2",
+    "DROP FUNCTION populate_min_depth2()",
     "ALTER TABLE room_depth DROP COLUMN min_depth",
     "ALTER TABLE room_depth RENAME COLUMN min_depth2 TO min_depth",
 )
