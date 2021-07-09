@@ -1,1 +1,0 @@
-Fix bug where inbound federation in a room could be delayed due to not correctly dropping a lock. Introduced in v1.37.1.
