@@ -889,7 +889,6 @@ class RoutableShardedWorkerHandlingConfig(ShardedWorkerHandlingConfig):
 
 def read_file(file_path: Any, config_path: Iterable[str]) -> str:
     """Check the given file exists, and read it into a string
-   
     If file can not be read, will try to hendle it as symlink, before throwing an error.
 
     If file can even after, emit an error indicating the problem
