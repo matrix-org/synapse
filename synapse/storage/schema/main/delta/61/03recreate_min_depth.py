@@ -53,7 +53,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs
     cur.execute(
         """
        INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
-            (6004, 'populate_room_depth_min_depth2', '{}')
+            (6103, 'populate_room_depth_min_depth2', '{}')
        """
     )
 
@@ -61,7 +61,7 @@ def run_create(cur: Cursor, database_engine: BaseDatabaseEngine, *args, **kwargs
     cur.execute(
         """
         INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
-            (6004, 'replace_room_depth_min_depth', '{}', 'populate_room_depth2')
+            (6103, 'replace_room_depth_min_depth', '{}', 'populate_room_depth2')
         """
     )
 
