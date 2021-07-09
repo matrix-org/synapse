@@ -183,13 +183,7 @@
                         <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="introduction"><a class="header" href="#introduction">Introduction</a></h1>
 <p>Welcome to the documentation repository for Synapse, the reference
 <a href="https://matrix.org">Matrix</a> homeserver implementation.</p>
-<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><!--
-  Include the contents of INSTALL.md from the project root without moving it, which may
-  break links around the internet. Additionally, note that SUMMARY.md is unable to 
-  directly link to content outside of the docs/ directory. So we use this file as a 
-  redirection.
--->
-<h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
+<div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
 <p>There are 3 steps to follow under <strong>Installation Instructions</strong>.</p>
 <ul>
 <li><a href="setup/installation.html#installation-instructions">Installation Instructions</a>
@@ -260,7 +254,7 @@ production-ready setup, you will probably want to specify your domain
 (<code>example.com</code>) rather than a matrix-specific hostname here (in the same way
 that your email address is probably <code>user@example.com</code> rather than
 <code>user@email.example.com</code>) - but doing so may require more advanced setup: see
-<a href="setup/docs/federate.html">Setting up Federation</a>.</p>
+<a href="setup/../federate.html">Setting up Federation</a>.</p>
 <h2 id="installing-synapse"><a class="header" href="#installing-synapse">Installing Synapse</a></h2>
 <h3 id="installing-from-source"><a class="header" href="#installing-from-source">Installing from source</a></h3>
 <p>(Prebuilt packages are available for some platforms - see <a href="setup/installation.html#prebuilt-packages">Prebuilt packages</a>.)</p>
@@ -389,8 +383,9 @@ for a number of platforms.</p>
 <h4 id="docker-images-and-ansible-playbooks"><a class="header" href="#docker-images-and-ansible-playbooks">Docker images and Ansible playbooks</a></h4>
 <p>There is an official synapse image available at
 <a href="https://hub.docker.com/r/matrixdotorg/synapse">https://hub.docker.com/r/matrixdotorg/synapse</a> which can be used with
-the docker-compose file available at <a href="setup/contrib/docker">contrib/docker</a>. Further
-information on this including configuration options is available in the README
+the docker-compose file available at
+<a href="https://github.com/matrix-org/synapse/tree/develop/contrib/docker">contrib/docker</a>.
+Further information on this including configuration options is available in the README
 on hub.docker.com.</p>
 <p>Alternatively, Andreas Peters (previously Silvio Fricke) has contributed a
 Dockerfile to automate a synapse server in a single Docker image, at
@@ -496,7 +491,7 @@ caching model, smarter query optimiser</li>
 <li>allowing the DB to be run on separate hardware</li>
 </ul>
 <p>For information on how to install and use PostgreSQL in Synapse, please see
-<a href="setup/docs/postgres.html">docs/postgres.md</a></p>
+<a href="setup/../postgres.html">docs/postgres.md</a></p>
 <p>SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
 SQLite, especially when participating in large rooms.</p>
@@ -507,7 +502,7 @@ but for any practical use, you will need Synapse's APIs to be served
 over HTTPS.</p>
 <p>The recommended way to do so is to set up a reverse proxy on port
 <code>8448</code>. You can find documentation on doing so in
-<a href="setup/docs/reverse_proxy.html">docs/reverse_proxy.md</a>.</p>
+<a href="setup/../reverse_proxy.html">docs/reverse_proxy.md</a>.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
@@ -533,7 +528,7 @@ includes the full certificate chain including any intermediate certificates
 </li>
 </ul>
 <p>For a more detailed guide to configuring your server for federation, see
-<a href="setup/docs/federate.html">federate.md</a>.</p>
+<a href="setup/../federate.html">federate.md</a>.</p>
 <h3 id="client-well-known-uri"><a class="header" href="#client-well-known-uri">Client Well-Known URI</a></h3>
 <p>Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. <code>@user:&lt;server_name&gt;</code>) into clients
@@ -619,7 +614,9 @@ anyone with knowledge of it can register users, including admin accounts,
 on your server even if <code>enable_registration</code> is <code>false</code>.</p>
 <h3 id="setting-up-a-turn-server"><a class="header" href="#setting-up-a-turn-server">Setting up a TURN server</a></h3>
 <p>For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See <a href="setup/docs/turn-howto.html">docs/turn-howto.md</a> for details.</p>
+a TURN server. See
+<a href="setup/../turn-howto.html">docs/turn-howto.md</a>
+for details.</p>
 <h3 id="url-previews"><a class="header" href="#url-previews">URL previews</a></h3>
 <p>Synapse includes support for previewing URLs, which is disabled by default.  To
 turn it on you must enable the <code>url_preview_enabled: True</code> config parameter
@@ -647,7 +644,7 @@ failing, e.g.:</p>
 connect to a postgres database.</p>
 <ul>
 <li>
-<p>If you are using the <a href="../INSTALL.html#matrixorg-packages">matrix.org debian/ubuntu
+<p>If you are using the <a href="setup/installation.html#matrixorg-packages">matrix.org debian/ubuntu
 packages</a>, the necessary python
 library will already be installed, but you will need to ensure the
 low-level postgres library is installed, which you can do with
@@ -658,7 +655,7 @@ low-level postgres library is installed, which you can do with
 the relevant package.</p>
 </li>
 <li>
-<p>If you installed synapse <a href="../INSTALL.html#installing-from-source">in a
+<p>If you installed synapse <a href="setup/installation.html#installing-from-source">in a
 virtualenv</a>, you can install
 the library with:</p>
 <pre><code>~/synapse/env/bin/pip install &quot;matrix-synapse[postgres]&quot;
@@ -1383,7 +1380,7 @@ which are no longer maintained.</p>
 summaries.</p>
 </li>
 <li>
-<p>If Synapse was installed using <a href="../setup/INSTALL.html#prebuilt-packages">prebuilt
+<p>If Synapse was installed using <a href="setup/installation.html#prebuilt-packages">prebuilt
 packages</a>, you will need to follow the
 normal process for upgrading those packages.</p>
 </li>
@@ -2510,7 +2507,7 @@ certificate checks.</p>
 upgraded, however it may be of use to those with old installs returning to the
 project.</p>
 <p>If you are setting up a server from scratch you almost certainly should look at
-the <a href="../INSTALL.html">installation guide</a> instead.</p>
+the <a href="setup/installation.html">installation guide</a> instead.</p>
 <h2 id="introduction-1"><a class="header" href="#introduction-1">Introduction</a></h2>
 <p>The goal of Synapse 0.99.0 is to act as a stepping stone to Synapse 1.0.0. It
 supports the r0.1 release of the server to server specification, but is
@@ -2846,7 +2843,8 @@ a fresh config using Synapse by following the instructions in
 #
 # It is *not* intended to be copied and used as the basis for a real
 # homeserver.yaml. Instead, if you are starting from scratch, please generate
-# a fresh config using Synapse by following the instructions in INSTALL.md.
+# a fresh config using Synapse by following the instructions in
+# https://matrix-org.github.io/synapse/latest/setup/installation.html.
 
 # Configuration options that take a time period can be set using a number
 # followed by a letter. Letters have the following meanings:
