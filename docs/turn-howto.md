@@ -114,6 +114,8 @@ This will install and start a systemd service called `coturn`.
 
     We recommend that you only try to set up TLS/DTLS once you have set up a
     basic installation and got it working.
+    
+    Please note that letsencrypt authority is currently not supported by element-andoid.
 
 1.  Ensure your firewall allows traffic into the TURN server on the ports
     you've configured it to listen on (By default: 3478 and 5349 for TURN
