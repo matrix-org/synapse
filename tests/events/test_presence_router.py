@@ -152,7 +152,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         )
         self.assertEqual(len(presence_updates), 1)
 
-        presence_update = presence_updates[0]  # type: UserPresenceState
+        presence_update: UserPresenceState = presence_updates[0]
         self.assertEqual(presence_update.user_id, self.other_user_one_id)
         self.assertEqual(presence_update.state, "online")
         self.assertEqual(presence_update.status_msg, "boop")
@@ -274,7 +274,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         presence_updates, _ = sync_presence(self, self.other_user_id)
         self.assertEqual(len(presence_updates), 1)
 
-        presence_update = presence_updates[0]  # type: UserPresenceState
+        presence_update: UserPresenceState = presence_updates[0]
         self.assertEqual(presence_update.user_id, self.other_user_id)
         self.assertEqual(presence_update.state, "online")
         self.assertEqual(presence_update.status_msg, "I'm online!")
@@ -320,7 +320,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         )
         for call in calls:
             call_args = call[0]
-            federation_transaction = call_args[0]  # type: Transaction
+            federation_transaction: Transaction = call_args[0]
 
             # Get the sent EDUs in this transaction
             edus = federation_transaction.get_dict()["edus"]

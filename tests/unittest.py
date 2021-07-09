@@ -520,7 +520,7 @@ class HomeserverTestCase(TestCase):
         if not isinstance(deferred, Deferred):
             return d
 
-        results = []  # type: list
+        results: list = []
         deferred.addBoth(results.append)
 
         self.pump(by=by)
