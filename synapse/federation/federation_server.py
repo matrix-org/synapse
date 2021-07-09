@@ -949,6 +949,7 @@ class FederationServer(FederationBase):
                 room_id, room_version
             )
             if not next:
+                await lock.release()
                 return
 
             origin, event = next
