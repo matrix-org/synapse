@@ -908,8 +908,14 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
         os.stat(file_path)
         with open(file_path) as file_stream:
             return file_stream.read()
-    except OSError as e:
-        raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+    except OSError:
+          try: #trying to handle error by converting any symlinks into realpatheth. If would be better to use this mtod as main one, but I am no shoure how .realpath() would work in this case. 
+            file_path = os.path.realpath(file_path)
+            os.stat(file_path)
+            with open(file_path) as file_stream:
+                return file_stream.read()
+          except OSError as e:
+              raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
 
 
 __all__ = [
