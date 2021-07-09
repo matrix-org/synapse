@@ -129,9 +129,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)"""
-        channel = self.make_request(
-            "GET", b"/joined_groups", access_token=access_token
-        )
+        channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 

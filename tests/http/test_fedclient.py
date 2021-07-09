@@ -339,8 +339,8 @@ class FederationClientTests(HomeserverTestCase):
 
         # Send it the HTTP response
         client.dataReceived(
-                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                b"Server: Fake\r\n\r\n"
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+            b"Server: Fake\r\n\r\n"
         )
 
         # Push by enough to time it out
