@@ -335,8 +335,8 @@ access the API as a Matrix client would. It is able to run Synapse directly from
 the source tree, so installation of the server is not required.
 
 Testing with SyTest is recommended for verifying that changes related to the
-Client-Server API are functioning correctly. See the `installation instructions
-<https://github.com/matrix-org/sytest#installing>`_ for details.
+Client-Server API are functioning correctly. See the `SyTest installation
+instructions <https://github.com/matrix-org/sytest#installing>`_ for details.
 
 
 Platform dependencies
