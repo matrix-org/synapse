@@ -14,16 +14,16 @@ The `synapse.logging.context` module provides a facilities for managing
 the current log context (as well as providing the `LoggingContextFilter`
 class).
 
-Awaitables make the whole thing complicated, so this document describes
+Asynchronous functions make the whole thing complicated, so this document describes
 how it all works, and how to write code which follows the rules.
 
-In this document, "awaitable" refers to both Python's
-[native awaitables types](https://docs.python.org/3/library/asyncio-task.html#awaitables)
-and Twisted's [Deferreds](https://twistedmatrix.com/documents/current/core/howto/defer.html).
+In this document, "awaitable" refers to any object which can be `await`ed. In the context of
+Synapse, that normally means either a coroutine or a Twisted 
+[`Deferred`](https://twistedmatrix.com/documents/current/api/twisted.internet.defer.Deferred.html).
 
-## Logcontexts without awaitables
+## Logcontexts without asynchronous code
 
-In the absence of any awaitable voodoo, things are simple enough. As with
+In the absence of any asynchronous voodoo, things are simple enough. As with
 any code of this nature, the rule is that our function should leave
 things as it found them:
 
@@ -79,15 +79,15 @@ In the above flow:
 
 -   The logcontext is set
 -   `do_request_handling` is called, and returns an awaitable
--   `handle_request` yields the deferred
--   The `async` syntax on `handle_request` returns an awaitable
+-   `handle_request` awaits the awaitable
+-   Execution of `handle_request` is suspended
 
 So we have stopped processing the request (and will probably go on to
 start processing the next), without clearing the logcontext.
 
 To circumvent this problem, synapse code assumes that, wherever you have
-a deferred, you will want to yield on it. To that end, whereever
-functions return a deferred, we adopt the following conventions:
+an awaitable, you will want to `await` it. To that end, whereever
+functions return awaitables, we adopt the following conventions:
 
 **Rules for functions returning awaitables:**
 
@@ -148,7 +148,7 @@ def nonAsyncFun():
 Provided this pattern is followed all the way back up to the callchain
 to where the logcontext was set, this will make things work out ok:
 provided `do_some_stuff` and `more_stuff` follow the rules above, then
-so will `fun` (as wrapped by `async`) and `nonAsyncFun`.
+so will `fun`.
 
 It's all too easy to forget to `await`: for instance if we forgot that
 `do_some_stuff` returned an awaitable, we might plough on regardless. This
@@ -181,7 +181,7 @@ def get_sleep_async(seconds):
 ```
 
 That doesn't follow the rules, but we can fix it by wrapping it with
-`PreserveLoggingContext` and `yield` ing on it:
+`PreserveLoggingContext` and `await`ing it:
 
 ```python
 async def sleep(seconds):
@@ -283,7 +283,7 @@ async def do_request_handling():
 ## Passing synapse deferreds into third-party functions
 
 A typical example of this is where we want to collect together two or
-more deferred via `asyncio.gather`:
+more awaitables via `defer.gatherResults`:
 
 ```python
 a1 = operation1()
@@ -321,11 +321,11 @@ logcontext. This looks like:
 
 ```python
 async def do_request_handling():
-    a1 = context.preserve_fn(operation1)()
-    a2 = context.preserve_fn(operation2)()
+    a1 = context.run_in_background(operation1)
+    a2 = context.run_in_background(operation2)
 
     with PreserveLoggingContext():
-        result = await asyncio.gather(a1, a2)
+        result = await defer.gatherResults(a1, a2)
 ```
 
 ## Was all this really necessary?
