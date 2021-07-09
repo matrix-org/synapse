@@ -910,7 +910,7 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
         with open(file_path) as file_stream:
             return file_stream.read()
     except OSError:
-          try:
+       try:
             file_path = os.path.realpath(file_path)
             os.stat(file_path)
             with open(file_path) as file_stream:
