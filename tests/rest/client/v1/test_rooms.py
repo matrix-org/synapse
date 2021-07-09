@@ -1206,7 +1206,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/join",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1220,7 +1220,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1234,7 +1234,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.second_tok,
         )
@@ -1248,7 +1248,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/ban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1260,7 +1260,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/unban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1272,7 +1272,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/invite",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1291,7 +1291,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )

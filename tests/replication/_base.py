@@ -550,12 +550,12 @@ class FakeRedisPubSubProtocol(Protocol):
         if obj is None:
             return "$-1\r\n"
         if isinstance(obj, str):
-            return "${len}\r\n{str}\r\n".format(len=len(obj), str=obj)
+            return f"${len(obj)}\r\n{obj}\r\n"
         if isinstance(obj, int):
-            return ":{val}\r\n".format(val=obj)
+            return f":{obj}\r\n"
         if isinstance(obj, (list, tuple)):
             items = "".join(self.encode(a) for a in obj)
-            return "*{len}\r\n{items}".format(len=len(obj), items=items)
+            return f"*{len(obj)}\r\n{items}"
 
         raise Exception("Unrecognized type for encoding redis: %r: %r", type(obj), obj)
 
