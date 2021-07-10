@@ -305,18 +305,11 @@ class MatrixFederationAgentTests(TestCase):
         # request.setHeader(b"Content-Length", b"0")
         request.finish()
 
-        """
-        here need to wrap the http request, but not with ssl
-        
-        # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
-        ssl_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
-        ssl_protocol = ssl_factory.buildProtocol(None)
-        http_server = ssl_protocol.wrappedProtocol
-
-        ssl_protocol.makeConnection(
-            FakeTransport(client_protocol, self.reactor, ssl_protocol)
+        http_server = _get_test_protocol_factory().buildProtocol(None)
+        http_server.makeConnection(
+            FakeTransport(client_protocol, self.reactor, http_server)
         )
-        c2s_transport.other = ssl_protocol
+        c2s_transport.other = http_server
 
         self.reactor.advance(0)
 
@@ -342,7 +335,6 @@ class MatrixFederationAgentTests(TestCase):
         resp = self.successResultOf(d)
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
-        """
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
