@@ -249,7 +249,7 @@ PUT /_synapse/admin/v1/registration_tokens/defg
 ## Delete token
 
 Delete a registration token. If the request is successful, the response body
-will be empty.
+will be an empty JSON object.
 
 ```
 DELETE /_synapse/admin/v1/registration_tokens/<token>
@@ -265,6 +265,8 @@ DELETE /_synapse/admin/v1/registration_tokens/wxyz
 ```
 ```
 200 OK
+
+{}
 ```
 
 
