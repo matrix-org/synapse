@@ -111,7 +111,7 @@ example.com:8448 {
 example.com {
     handle /.well-known/matrix/server {
         import matrix-well-known-header
-        respond `{"m.server":"matrix.example.com:8448"}`
+        respond `{"m.server":"matrix.example.com:443"}`
     }
 
     handle /.well-known/matrix/client {
@@ -123,10 +123,6 @@ example.com {
 matrix.example.com {
     reverse_proxy /_matrix/* http://localhost:8008
     reverse_proxy /_synapse/client/* http://localhost:8008
-}
-
-matrix.example.com:8448 {
-    reverse_proxy http://localhost:8008
 }
 ```
 
