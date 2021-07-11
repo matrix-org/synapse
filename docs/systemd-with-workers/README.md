@@ -74,7 +74,7 @@ systemctl restart matrix-synapse.target
 
 **Optional:** If further hardening is desired, the file
 `override-hardened.conf` may be copied from
-[contrib/systemd/override-hardened.conf](https://github.com/matrix-org/synapse/tree/develop/contrib/systemd)
+[contrib/systemd/override-hardened.conf](https://github.com/matrix-org/synapse/tree/develop/contrib/systemd/)
 in this repository to the location
 `/etc/systemd/system/matrix-synapse.service.d/override-hardened.conf` (the
 directory may have to be created). It enables certain sandboxing features in

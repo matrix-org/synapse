@@ -14,5 +14,5 @@ the script.
 # `purge_remote_media.sh`
 
 A bash file, that uses the
-[purge history API](https://matrix-org.github.io/synapse/latest/admin_api/purge_history_api.html) to 
-purge all old cached remote media.
+[purge history API](https://matrix-org.github.io/synapse/latest/admin_api/purge_history_api.html)
+to purge all old cached remote media.
