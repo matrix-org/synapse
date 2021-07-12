@@ -206,6 +206,8 @@ class ContentRepositoryConfig(Config):
                 "url_preview_accept_language"
             ) or ["en"]
 
+            self.oembed_globs = config.get("oembed_globs", {})
+
     def generate_config_section(self, data_dir_path, **kwargs):
         media_store = os.path.join(data_dir_path, "media_store")
 
@@ -366,6 +368,24 @@ class ContentRepositoryConfig(Config):
         #
         url_preview_accept_language:
         #   - en
+        
+        # TODO
+        # oembed_globs:
+        #   "https://publish.twitter.com/oembed":
+        #       - https://twitter.com/*/status/*
+        #       - https://*.twitter.com/*/status/*
+        #       - https://twitter.com/*/moments/*
+        #       - https://*.twitter.com/*/moments/*
+        #       # Include the HTTP versions too.
+        #       - http://twitter.com/*/status/*
+        #       - http://*.twitter.com/*/status/*
+        #       - http://twitter.com/*/moments/*
+        #       - http://*.twitter.com/*/moments/*
+        #   "https://www.youtube.com/oembed":
+        #       - https://*.youtube.com/watch*
+        #       - https://*.youtube.com/v/*
+        #       - https://youtu.be/*
+        #       - https://*.youtube.com/playlist?list=*
         """
             % locals()
         )

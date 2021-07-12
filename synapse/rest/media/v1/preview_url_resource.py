@@ -69,56 +69,13 @@ OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
 
-# A map of globs to API endpoints.
-_oembed_globs = {
-    # Twitter.
-    "https://publish.twitter.com/oembed": [
-        "https://twitter.com/*/status/*",
-        "https://*.twitter.com/*/status/*",
-        "https://twitter.com/*/moments/*",
-        "https://*.twitter.com/*/moments/*",
-        # Include the HTTP versions too.
-        "http://twitter.com/*/status/*",
-        "http://*.twitter.com/*/status/*",
-        "http://twitter.com/*/moments/*",
-        "http://*.twitter.com/*/moments/*",
-    ],
-}
-# Convert the globs to regular expressions.
-_oembed_patterns = {}
-for endpoint, globs in _oembed_globs.items():
-    for glob in globs:
-        # Convert the glob into a sane regular expression to match against. The
-        # rules followed will be slightly different for the domain portion vs.
-        # the rest.
-        #
-        # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
-        # 2. The domain can have globs, but we limit it to characters that can
-        #    reasonably be a domain part.
-        #    TODO: This does not attempt to handle Unicode domain names.
-        # 3. Other parts allow a glob to be any one, or more, characters.
-        results = urlparse.urlparse(glob)
-
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
-        if results.scheme not in {"http", "https"}:
-            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
-
-        pattern = urlparse.urlunparse(
-            [
-                results.scheme,
-                re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-            ]
-            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-        )
-        _oembed_patterns[re.compile(pattern)] = endpoint
-
-
 @attr.s(slots=True)
 class OEmbedResult:
     # Either HTML content or URL must be provided.
     html = attr.ib(type=Optional[str])
     url = attr.ib(type=Optional[str])
     title = attr.ib(type=Optional[str])
+    provider_name = attr.ib(type=Optional[str])
     # Number of seconds to cache the content.
     cache_age = attr.ib(type=int)
 
@@ -166,6 +123,34 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
         self.url_preview_accept_language = hs.config.url_preview_accept_language
+
+        # Convert the globs to regular expressions.
+        self.oembed_patterns = {}
+        for endpoint, globs in hs.config.oembed_globs.items():
+            for glob in globs:
+                # Convert the glob into a sane regular expression to match against. The
+                # rules followed will be slightly different for the domain portion vs.
+                # the rest.
+                #
+                # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
+                # 2. The domain can have globs, but we limit it to characters that can
+                #    reasonably be a domain part.
+                #    TODO: This does not attempt to handle Unicode domain names.
+                # 3. Other parts allow a glob to be any one, or more, characters.
+                results = urlparse.urlparse(glob)
+
+                # Ensure the scheme does not have wildcards (and is a sane scheme).
+                if results.scheme not in {"http", "https"}:
+                    raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
+
+                pattern = urlparse.urlunparse(
+                    [
+                        results.scheme,
+                        re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
+                    ]
+                    + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
+                )
+                self.oembed_patterns[re.compile(pattern)] = endpoint
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -340,6 +325,15 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.warning("Failed to find any OG data in %s", url)
             og = {}
 
+        if not og.get("og:url"):
+            og["og:url"] = url
+
+        if not og.get("og:title") and media_info["title"]:
+            og["og:title"] = media_info["title"]
+
+        if not og.get("og:site_name") and media_info["site_name"]:
+            og["og:site_name"] = media_info["site_name"]
+
         # filter out any stupidly long values
         keys_to_remove = []
         for k, v in og.items():
@@ -379,7 +373,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         Returns:
             A URL to use instead or None if the original URL should be used.
         """
-        for url_pattern, endpoint in _oembed_patterns.items():
+        for url_pattern, endpoint in self.oembed_patterns.items():
             if url_pattern.fullmatch(url):
                 return endpoint
 
@@ -420,7 +414,13 @@ class PreviewUrlResource(DirectServeJsonResource):
             if cache_age:
                 cache_age = int(cache_age)
 
-            oembed_result = OEmbedResult(None, None, result.get("title"), cache_age)
+            oembed_result = OEmbedResult(
+                None,
+                None,
+                result.get("title", result.get("author_name")),
+                result.get("provider_name"),
+                cache_age,
+            )
 
             # HTML content.
             if oembed_type == "rich":
@@ -462,6 +462,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # If this URL can be accessed via oEmbed, use that instead.
         url_to_download = url  # type: Optional[str]
         oembed_url = self._get_oembed_url(url)
+        oembed_result = None
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
             try:
@@ -542,6 +543,12 @@ class PreviewUrlResource(DirectServeJsonResource):
             code = 200
             etag = None
 
+        title = None
+        site_name = None
+        if oembed_result:
+            title = oembed_result.title
+            site_name = oembed_result.provider_name
+
         try:
             time_now_ms = self.clock.time_msec()
 
@@ -573,6 +580,9 @@ class PreviewUrlResource(DirectServeJsonResource):
             "response_code": code,
             "expires": expires,
             "etag": etag,
+
+            "title": title,
+            "site_name": site_name,
         }
 
     def _start_expire_url_cache_data(self):
