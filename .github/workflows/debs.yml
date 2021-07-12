@@ -1,0 +1,44 @@
+# GitHub actions workflow which builds the debian packages.
+
+name: Debs
+
+on:
+  push:
+    branches: ["develop", "release-*"]
+
+permissions:
+  contents: read
+
+jobs:
+  # first get the list of distros to build for.
+  get-distros:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - id: set-distros
+        run: |
+          echo "::set-output name=distros::$(scripts-dev/build_debian_packages --show-dists-json)"
+    # map the step outputs to job outputs
+    outputs:
+      distros: ${{ steps.set-distros.outputs.distros }}
+
+  # now build the packages with a matrix build.
+  build-debs:
+    needs: get-distros
+    name: "Build .deb packages"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro: ${{ fromJson(needs.get-distros.outputs.distros) }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: src
+      - uses: actions/setup-python@v2
+      - run: ./src/scripts-dev/build_debian_packages "${{ matrix.distro }}"
+      - uses: actions/upload-artifact@v2
+        with:
+          name: packages
+          path: debs/*
