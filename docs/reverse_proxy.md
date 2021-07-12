@@ -116,7 +116,7 @@ example.com {
 
     handle /.well-known/matrix/client {
         import matrix-well-known-header
-        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com}}`
+        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
     }
 }
 
