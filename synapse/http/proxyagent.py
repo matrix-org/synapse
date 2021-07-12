@@ -198,7 +198,7 @@ class ProxyAgent(_AgentBase):
                     b"Proxy-Authorization",
                     self.http_proxy_creds.as_proxy_authorization_value(),
                 )
-                # if authentification is requierd, use tunnel instead of transparent mode
+                # if authentication is required, use tunnel instead of transparent mode
                 endpoint = HTTPConnectProxyEndpoint(
                     self.proxy_reactor,
                     self.http_proxy_endpoint,
