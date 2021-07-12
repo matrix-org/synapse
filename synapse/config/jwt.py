@@ -64,7 +64,7 @@ class JWTConfig(Config):
         # Note that this is a non-standard login type and client support is
         # expected to be non-existent.
         #
-        # See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
+        # See https://matrix-org.github.io/synapse/latest/jwt.html.
         #
         #jwt_config:
             # Uncomment the following to enable authorization using JSON web

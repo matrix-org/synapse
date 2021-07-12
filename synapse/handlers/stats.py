@@ -45,7 +45,6 @@ class StatsHandler:
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
         self.is_mine_id = hs.is_mine_id
-        self.stats_bucket_size = hs.config.stats_bucket_size
 
         self.stats_enabled = hs.config.stats_enabled
 
@@ -105,20 +104,6 @@ class StatsHandler:
             else:
                 room_deltas = {}
                 user_deltas = {}
-
-            # Then count deltas for total_events and total_event_bytes.
-            (
-                room_count,
-                user_count,
-            ) = await self.store.get_changes_room_total_events_and_bytes(
-                self.pos, max_pos
-            )
-
-            for room_id, fields in room_count.items():
-                room_deltas.setdefault(room_id, Counter()).update(fields)
-
-            for user_id, fields in user_count.items():
-                user_deltas.setdefault(user_id, Counter()).update(fields)
 
             logger.debug("room_deltas: %s", room_deltas)
             logger.debug("user_deltas: %s", user_deltas)
@@ -181,12 +166,10 @@ class StatsHandler:
 
             event_content = {}  # type: JsonDict
 
-            sender = None
             if event_id is not None:
                 event = await self.store.get_event(event_id, allow_none=True)
                 if event:
                     event_content = event.content or {}
-                    sender = event.sender
 
             # All the values in this dict are deltas (RELATIVE changes)
             room_stats_delta = room_to_stats_deltas.setdefault(room_id, Counter())
@@ -244,12 +227,6 @@ class StatsHandler:
                     room_stats_delta["joined_members"] += 1
                 elif membership == Membership.INVITE:
                     room_stats_delta["invited_members"] += 1
-
-                    if sender and self.is_mine_id(sender):
-                        user_to_stats_deltas.setdefault(sender, Counter())[
-                            "invites_sent"
-                        ] += 1
-
                 elif membership == Membership.LEAVE:
                     room_stats_delta["left_members"] += 1
                 elif membership == Membership.BAN:
@@ -279,10 +256,6 @@ class StatsHandler:
                 room_state["is_federatable"] = (
                     event_content.get("m.federate", True) is True
                 )
-                if sender and self.is_mine_id(sender):
-                    user_to_stats_deltas.setdefault(sender, Counter())[
-                        "rooms_created"
-                    ] += 1
             elif typ == EventTypes.JoinRules:
                 room_state["join_rules"] = event_content.get("join_rule")
             elif typ == EventTypes.RoomHistoryVisibility:

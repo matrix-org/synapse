@@ -38,20 +38,16 @@ class StatsConfig(Config):
 
     def read_config(self, config, **kwargs):
         self.stats_enabled = True
-        self.stats_bucket_size = 86400 * 1000
         stats_config = config.get("stats", None)
         if stats_config:
             self.stats_enabled = stats_config.get("enabled", self.stats_enabled)
-            self.stats_bucket_size = self.parse_duration(
-                stats_config.get("bucket_size", "1d")
-            )
         if not self.stats_enabled:
             logger.warning(ROOM_STATS_DISABLED_WARN)
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """
         # Settings for local room and user statistics collection. See
-        # docs/room_and_user_statistics.md.
+        # https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.
         #
         stats:
           # Uncomment the following to disable room and user statistics. Note that doing
@@ -59,9 +55,4 @@ class StatsConfig(Config):
           # correctly.
           #
           #enabled: false
-
-          # The size of each timeslice in the room_stats_historical and
-          # user_stats_historical tables, as a time period. Defaults to "1d".
-          #
-          #bucket_size: 1h
         """
