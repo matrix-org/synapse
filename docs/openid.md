@@ -166,6 +166,77 @@ oidc_providers:
         localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.name }}"
 ```
+
+### [Authelia][authelia]
+
+[Authelia][authelia] is an open-source authentication and authorization server. Authelia supports the OIDC OP role currently in beta - you can follow the progress [here](https://www.authelia.com/docs/configuration/identity-providers/oidc.html#beta). While this setup is working, it is so far not advised to be run in production. In order to use this, you need to use the image authelia/authelia:feat-oidc-userinfo-endpoint or newer, since the neccesary endpoints are not included in the current release v.4.29.4.
+
+1. Follow the [Getting Started Guide](https://www.authelia.com/docs/getting-started.html) to install Authelia and configure the authentication backend.
+
+2. Create a private key with ```authelia rsa generate --dir /config```.
+
+3. Add the following section to the Authelia configuration.yaml.  
+```yaml
+identity_providers:
+  oidc:
+    hmac_secret: secret
+    issuer_private_key: |
+      --- KEY START
+      -----BEGIN RSA PRIVATE KEY-----
+      Your RSA Key
+      -----END RSA PRIVATE KEY-----
+      --- KEY END
+    access_token_lifespan: 1h
+    authorize_code_lifespan: 1m
+    id_token_lifespan: 1h
+    refresh_token_lifespan: 720h
+    enable_client_debug_messages: false
+    clients:
+      - id: synapse
+        description: Synapse Matrix Server
+        secret: secret
+        authorization_policy: one_factor #change to two_factor if preferred.
+        redirect_uris:
+          - https://[synapse public baseurl]]/_synapse/client/oidc/callback
+        scopes:
+          - openid
+          - email
+        grant_types:
+          - refresh_token
+          - authorization_code
+        response_types:
+          - code
+        response_modes:
+          - form_post
+          - query
+          - fragment
+
+```
+4. Restart your Authelia server to apply the new configuration.
+
+5. Add the following section to the Synapse homeserver.yaml.
+
+```yaml
+oidc_providers:
+  - idp_id: authelia
+    idp_name: "My Authelia Server"
+    issuer: "https://[authelia public baseurl]
+    client_id: "synapse"
+    client_secret: "secret"
+    scopes: ["openid", "email"]
+    authorization_endpoint: "https://[authelia public baseurl]/api/oidc/authorize"
+    token_endpoint: "https://[authelia public baseurl]/api/oidc/token"
+    userinfo_endpoint: "https://[authelia public baseurl]/api/oidc/userinfo"
+    jwks_uri: "https://[authelia public baseurl]/api/oidc/jwks"
+    user_mapping_provider:
+      config:
+        subject_claim: "sub"
+        display_name_template: "{{ user.name }}"
+        email_template: "{{ user.email }}"
+
+```
+6. Restart your Synapse homeserver to apply the new configuration.
+
 ### [Auth0][auth0]
 
 1. Create a regular web application for Synapse
