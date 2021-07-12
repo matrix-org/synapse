@@ -2128,7 +2128,9 @@ class FederationHandler(BaseHandler):
 
         events = await self.store.get_backfill_events(room_id, pdu_list, limit)
         logger.info(
-            "on_backfill_request get_backfill_events events(%d)=%s", len(events), events
+            "on_backfill_request get_backfill_events events(%d)=%s",
+            len(events),
+            [f'{ev.content.get("body")}: {ev.type} ({ev.event_id})' for ev in events],
         )
 
         events = await filter_events_for_server(self.storage, origin, events)

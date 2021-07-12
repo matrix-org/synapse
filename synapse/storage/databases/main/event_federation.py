@@ -673,20 +673,6 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     def get_oldest_events_with_depth_in_room_txn(self, txn, room_id):
-        # sql = (
-        #     "SELECT b.event_id, MAX(e.depth) FROM events as e"
-        #     " INNER JOIN event_edges as g"
-        #     " ON g.event_id = e.event_id"
-        #     " INNER JOIN event_backward_extremities as b"
-        #     " ON g.prev_event_id = b.event_id"
-        #     # TODO
-        #     # " INNER JOIN insertion_event_extremeties as i"
-        #     # " ON g.event_id = i.insertion_prev_event_id"
-        #     " WHERE b.room_id = ? AND g.is_state is ?"
-        #     " GROUP BY b.event_id"
-        # )
-        # txn.execute(sql, (room_id, False))
-
         sqlAsdf = "SELECT * FROM insertion_event_extremeties as i"
         txn.execute(sqlAsdf)
         logger.info("wfeafewawafeawg %s", dict(txn))
@@ -709,6 +695,20 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
         txn.execute(sql, (room_id,))
+
+        sql = (
+            "SELECT b.event_id, MAX(e.depth) FROM events as e"
+            " INNER JOIN event_edges as g"
+            " ON g.event_id = e.event_id"
+            " INNER JOIN event_backward_extremities as b"
+            " ON g.prev_event_id = b.event_id"
+            # TODO
+            # " INNER JOIN insertion_event_extremeties as i"
+            # " ON g.event_id = i.insertion_prev_event_id"
+            " WHERE b.room_id = ? AND g.is_state is ?"
+            " GROUP BY b.event_id"
+        )
+        txn.execute(sql, (room_id, False))
 
         return dict(txn)
 

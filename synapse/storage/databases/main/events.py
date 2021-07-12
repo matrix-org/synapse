@@ -1773,7 +1773,7 @@ class PersistEventsStore:
 
         logger.info("_handle_insertion_event %s", event)
 
-        for prev_event_id in event.prev_event_ids:
+        for prev_event_id in event.prev_events:
             self.db_pool.simple_insert_txn(
                 txn,
                 table="insertion_event_extremeties",
