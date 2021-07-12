@@ -37,6 +37,7 @@ can be passed on the commandline for debugging.
 
 projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 
+
 class Builder(object):
     def __init__(self, redirect_stdout=False):
         self.redirect_stdout = redirect_stdout
@@ -192,7 +193,6 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
     if args.show_dists_json:
-        json.dump(DISTS, sys.stdout)
-        print()
+        print(json.dumps(DISTS))
     else:
         run_builds(dists=args.dist, jobs=args.jobs, skip_tests=args.no_check)
