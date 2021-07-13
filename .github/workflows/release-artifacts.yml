@@ -13,7 +13,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # first get the list of distros to build for.
@@ -62,3 +62,29 @@ jobs:
         with:
           name: python-dist
           path: dist/*
+
+  # if it's a tag, create a release and attach the artifacts to it
+  attach-assets:
+    name: "Attach assets to release"
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+      - build-debs
+      - build-sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v2
+      - name: Build a tarball for the debs
+        run: tar -cvJf debs.tar.xz debs
+      - name: Attach to release
+        uses: softprops/action-gh-release@a929a66f232c1b11af63782948aa2210f981808a  # PR#109
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            python-dist/*
+            debs.tar.xz
+          # if it's not already published, keep the release as a draft.
+          draft: true
+          # mark it as a prerelease if the tag contains 'rc'.
+          prerelease: ${{ contains(github.ref, 'rc') }}
