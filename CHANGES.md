@@ -1,7 +1,7 @@
 Synapse 1.38.0 (2021-07-13)
 ===========================
 
-No significant changes.
+No significant changes since 1.38.0rc3.
 
 
 Synapse 1.38.0rc3 (2021-07-13)
