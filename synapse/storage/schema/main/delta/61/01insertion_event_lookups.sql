@@ -18,23 +18,33 @@
 -- and we hit an event which matches `insertion_prev_event_id`, it should backfill 
 -- the "insertion" event and start navigating from there.
 
+CREATE TABLE IF NOT EXISTS insertion_events(
+    insertion_event_id TEXT NOT NULL,
+    room_id TEXT NOT NULL,
+    next_chunk_id TEXT NOT NULL,
+    UNIQUE (insertion_event_id, room_id, next_chunk_id)
+);
 
-CREATE TABLE IF NOT EXISTS insertion_event_extremeties(
+CREATE INDEX IF NOT EXISTS insertion_events_insertion_room_id ON insertion_events(room_id);
+CREATE INDEX IF NOT EXISTS insertion_events_insertion_event_id ON insertion_events(insertion_event_id);
+CREATE INDEX IF NOT EXISTS insertion_events_next_chunk_id ON insertion_events(next_chunk_id);
+
+CREATE TABLE IF NOT EXISTS insertion_event_edges(
     insertion_event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     insertion_prev_event_id TEXT NOT NULL,
-    UNIQUE (insertion_event_id, room_id, room_id, insertion_prev_event_id)
+    UNIQUE (insertion_event_id, room_id, insertion_prev_event_id)
 );
 
-CREATE INDEX IF NOT EXISTS insertion_event_extremeties_insertion_room_id ON insertion_event_extremeties(room_id);
-CREATE INDEX IF NOT EXISTS insertion_event_extremeties_insertion_event_id ON insertion_event_extremeties(insertion_event_id);
-CREATE INDEX IF NOT EXISTS insertion_event_extremeties_insertion_prev_event_id ON insertion_event_extremeties(insertion_prev_event_id);
+CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_room_id ON insertion_event_edges(room_id);
+CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_event_id ON insertion_event_edges(insertion_event_id);
+CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_prev_event_id ON insertion_event_edges(insertion_prev_event_id);
 
-CREATE TABLE IF NOT EXISTS chunk_connections(
+CREATE TABLE IF NOT EXISTS chunk_edges(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     chunk_id TEXT NOT NULL,
     UNIQUE (event_id, room_id)
 );
 
-CREATE INDEX IF NOT EXISTS chunk_connections_insertion_chunk_id ON chunk_connections(chunk_id);
+CREATE INDEX IF NOT EXISTS chunk_edges_chunk_id ON chunk_edges(chunk_id);

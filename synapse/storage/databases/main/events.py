@@ -1506,6 +1506,7 @@ class PersistEventsStore:
 
             self._handle_insertion_event(txn, event)
             self._handle_marker_event(txn, event)
+            self._handle_chunk_id(txn, event)
 
             # Store the labels for this event.
             labels = event.content.get(EventContentFields.LABELS)
@@ -1773,10 +1774,27 @@ class PersistEventsStore:
 
         logger.info("_handle_insertion_event %s", event)
 
+        next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
+        if next_chunk_id is None:
+            # Invalid insertion event without next chunk ID
+            return
+
+        # Keep track of the insertion event and the chunk ID
+        self.db_pool.simple_insert_txn(
+            txn,
+            table="insertion_events",
+            values={
+                "insertion_event_id": event.event_id,
+                "room_id": event.room_id,
+                "next_chunk_id": next_chunk_id,
+            },
+        )
+
+        # Insert an edge for every prev_event connection
         for prev_event_id in event.prev_events:
             self.db_pool.simple_insert_txn(
                 txn,
-                table="insertion_event_extremeties",
+                table="insertion_event_edges",
                 values={
                     "insertion_event_id": event.event_id,
                     "room_id": event.room_id,
@@ -1798,26 +1816,55 @@ class PersistEventsStore:
 
         logger.info("_handle_marker_event %s", event)
 
-        insertion_event_id = event.content.get(
-            EventContentFields.MSC2716_MARKER_INSERTION
-        )
-        insertion_prev_event_ids = event.content.get(
-            EventContentFields.MSC2716_MARKER_INSERTION_PREV_EVENTS
-        )
-        if not insertion_event_id or not insertion_prev_event_ids:
-            # Invalid marker event
+        # TODO: We should attempt to backfill the insertion event instead
+        # of trying to  pack all of the info in the marker event. Otherwise,
+        # we need to pack in the insertion_prev_events and insertion_next_chunk_id.
+
+        # insertion_event_id = event.content.get(
+        #     EventContentFields.MSC2716_MARKER_INSERTION
+        # )
+        # insertion_prev_event_ids = event.content.get(
+        #     EventContentFields.MSC2716_MARKER_INSERTION_PREV_EVENTS
+        # )
+        # if not insertion_event_id or not insertion_prev_event_ids:
+        #     # Invalid marker event
+        #     return
+
+        # for prev_event_id in insertion_prev_event_ids:
+        #     self.db_pool.simple_insert_txn(
+        #         txn,
+        #         table="insertion_event_edges",
+        #         values={
+        #             "insertion_event_id": insertion_event_id,
+        #             "room_id": event.room_id,
+        #             "insertion_prev_event_id": prev_event_id,
+        #         },
+        #     )
+
+    def _handle_chunk_id(self, txn, event):
+        """Handles inserting the chunk connections between the event at the
+        start of a chunk and an insertion event
+
+        Args: txn event (EventBase)
+        """
+
+        chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
+        if chunk_id is None:
+            # No chunk connection to persist
             return
 
-        for prev_event_id in insertion_prev_event_ids:
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="insertion_event_extremeties",
-                values={
-                    "insertion_event_id": insertion_event_id,
-                    "room_id": event.room_id,
-                    "insertion_prev_event_id": prev_event_id,
-                },
-            )
+        logger.info("_handle_chunk_id %s %s", chunk_id, event)
+
+        # Keep track of the insertion event and the chunk ID
+        self.db_pool.simple_insert_txn(
+            txn,
+            table="chunk_edges",
+            values={
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "chunk_id": chunk_id,
+            },
+        )
 
     def _handle_redaction(self, txn, redacted_event_id):
         """Handles receiving a redaction and checking whether we need to remove

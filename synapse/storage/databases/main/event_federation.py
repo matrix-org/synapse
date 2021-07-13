@@ -673,11 +673,11 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     def get_oldest_events_with_depth_in_room_txn(self, txn, room_id):
-        sqlAsdf = "SELECT * FROM insertion_event_extremeties as i"
+        sqlAsdf = "SELECT * FROM insertion_event_edges as i"
         txn.execute(sqlAsdf)
         logger.info("wfeafewawafeawg %s", dict(txn))
 
-        sqlAsdf = "SELECT * FROM insertion_event_extremeties as i WHERE i.room_id = ?"
+        sqlAsdf = "SELECT * FROM insertion_event_edges as i WHERE i.room_id = ?"
         txn.execute(sqlAsdf, (room_id,))
         logger.info("awfeawefw %s", dict(txn))
 
@@ -688,7 +688,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             # " INNER JOIN event_backward_extremities as b"
             # " ON g.prev_event_id = b.event_id"
             # TODO
-            " INNER JOIN insertion_event_extremeties as i"
+            " INNER JOIN insertion_event_edges as i"
             " ON e.event_id = i.insertion_prev_event_id"
             " WHERE i.room_id = ?"
             " GROUP BY i.insertion_event_id"
@@ -703,7 +703,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             " INNER JOIN event_backward_extremities as b"
             " ON g.prev_event_id = b.event_id"
             # TODO
-            # " INNER JOIN insertion_event_extremeties as i"
+            # " INNER JOIN insertion_event_edges as i"
             # " ON g.event_id = i.insertion_prev_event_id"
             " WHERE b.room_id = ? AND g.is_state is ?"
             " GROUP BY b.event_id"
@@ -961,16 +961,50 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # We want to make sure that we do a breadth-first, "depth" ordered
         # search.
 
-        # TODO
+        # Look for the prev_event_id connected to the given event_id
         query = (
             "SELECT depth, prev_event_id FROM event_edges"
+            # Get the depth of the prev_event_id from the events table
             " INNER JOIN events"
             " ON prev_event_id = events.event_id"
+            # Find an event which matches the given event_id
             " WHERE event_edges.event_id = ?"
             " AND event_edges.is_state = ?"
             " LIMIT ?"
         )
 
+        # Look for the "insertion" events connected to the given event_id
+        # TODO: Do we need to worry about selecting only from the given room_id? The other query above doesn't
+        connected_insertion_event_query = (
+            "SELECT e.depth, i.insertion_event_id FROM insertion_event_edges AS i"
+            # Get the depth of the insertion event from the events table
+            " INNER JOIN events AS e"
+            " ON e.event_id = i.insertion_event_id"
+            # Find an insertion event which points via prev_events to the given event_id
+            " WHERE i.insertion_prev_event_id = ?"
+            " LIMIT ?"
+        )
+
+        # Find any chunk connections of a given insertion event
+        # TODO: Do we need to worry about selecting only from the given room_id? The other query above doesn't
+        chunk_connection_query = (
+            "SELECT e.depth, c.event_id FROM insertion_events AS i"
+            # Find the chunk that connects to the given insertion event
+            " INNER JOIN chunk_edges AS c"
+            " ON i.next_chunk_id = c.chunk_id"
+            # Get the depth of the chunk start event from the events table
+            " INNER JOIN events AS e"
+            " ON e.event_id = c.event_id"
+            # Find an insertion event which matches the given event_id
+            " WHERE i.insertion_event_id = ?"
+            " LIMIT ?"
+        )
+
+        # In a PriorityQueue, the lowest valued entries are retrieved first.
+        # We're using depth as the priority in the queue.
+        # Depth is lowest at the oldest-in-time message and highest and
+        # newest-in-time message. We add events to the queue with a negative depth so that
+        # we process the newest-in-time messages first going backwards in time.
         queue = PriorityQueue()
 
         for event_id in event_list:
@@ -996,9 +1030,36 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
-            txn.execute(query, (event_id, False, limit - len(event_results)))
+            txn.execute(
+                connected_insertion_event_query, (event_id, limit - len(event_results))
+            )
+            connected_insertion_event_id_results = list(txn)
+            logger.info(
+                "connected_insertion_event_query %s",
+                connected_insertion_event_id_results,
+            )
+            for row in connected_insertion_event_id_results:
+                if row[1] not in event_results:
+                    queue.put((-row[0], row[1]))
 
-            for row in txn:
+                    # Find any chunk connections for the given insertion event
+                    txn.execute(
+                        chunk_connection_query, (row[1], limit - len(event_results))
+                    )
+                    chunk_start_event_id_results = list(txn)
+                    logger.info(
+                        "chunk_start_event_id_results %s",
+                        chunk_start_event_id_results,
+                    )
+                    for row in chunk_start_event_id_results:
+                        if row[1] not in event_results:
+                            queue.put((-row[0], row[1]))
+
+            txn.execute(query, (event_id, False, limit - len(event_results)))
+            prev_event_id_results = list(txn)
+            logger.info("prev_event_ids %s", prev_event_id_results)
+
+            for row in prev_event_id_results:
                 if row[1] not in event_results:
                     queue.put((-row[0], row[1]))
 
