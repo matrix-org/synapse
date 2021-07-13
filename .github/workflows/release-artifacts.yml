@@ -3,21 +3,23 @@
 name: Build release artifacts
 
 on:
+  # we build on PRs and develop to (hopefully) get early warning
+  # of things breaking (but only build one set of debs)
+  pull_request:
   push:
-    # we build on develop and release branches to (hopefully) get early warning
-    # of things breaking
-    branches: ["develop", "release-*"]
+    branches: ["develop"]
 
-    # we also rebuild on tags, so that we can be sure of picking the artifacts
-    # from the right tag.
+    # we do the full build on tags.
     tags: ["v*"]
 
 permissions:
   contents: write
 
 jobs:
-  # first get the list of distros to build for.
+  # if we're running from a tag, get the full list of distros
   get-distros:
+    name: "Calculate list of debian distros"
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -33,10 +35,15 @@ jobs:
   build-debs:
     needs: get-distros
     name: "Build .deb packages"
+    # build even if get-distros didn't run
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     strategy:
       matrix:
         distro: ${{ fromJson(needs.get-distros.outputs.distros) }}
+        # always build for sid
+        include:
+          - distro: debian:sid
 
     steps:
       - uses: actions/checkout@v2
@@ -66,7 +73,7 @@ jobs:
   # if it's a tag, create a release and attach the artifacts to it
   attach-assets:
     name: "Attach assets to release"
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build-debs
       - build-sdist
