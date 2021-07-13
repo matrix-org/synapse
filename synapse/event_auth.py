@@ -725,7 +725,7 @@ def get_servers_from_users(users: List[str]) -> Set[str]:
     servers = set()
     for user in users:
         try:
-            servers.add(UserID.from_string(user).domain)
+            servers.add(get_domain_from_id(user))
         except SynapseError:
             pass
     return servers
