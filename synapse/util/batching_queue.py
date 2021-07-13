@@ -93,11 +93,11 @@ class BatchingQueue(Generic[V, R]):
         self._clock = clock
 
         # The set of keys currently being processed.
-        self._processing_keys = set()  # type: Set[Hashable]
+        self._processing_keys: Set[Hashable] = set()
 
         # The currently pending batch of values by key, with a Deferred to call
         # with the result of the corresponding `_process_batch_callback` call.
-        self._next_values = {}  # type: Dict[Hashable, List[Tuple[V, defer.Deferred]]]
+        self._next_values: Dict[Hashable, List[Tuple[V, defer.Deferred]]] = {}
 
         # The function to call with batches of values.
         self._process_batch_callback = process_batch_callback
@@ -108,9 +108,7 @@ class BatchingQueue(Generic[V, R]):
 
         number_of_keys.labels(self._name).set_function(lambda: len(self._next_values))
 
-        self._number_in_flight_metric = number_in_flight.labels(
-            self._name
-        )  # type: Gauge
+        self._number_in_flight_metric: Gauge = number_in_flight.labels(self._name)
 
     async def add_to_queue(self, value: V, key: Hashable = ()) -> R:
         """Adds the value to the queue with the given key, returning the result
