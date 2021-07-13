@@ -26,7 +26,7 @@ jobs:
         run: |
           # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
           dists='["debian:sid"]'
-          if [[ $GITHUB_REF == "refs/tags/*" ]]; then
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
               dists=$(scripts-dev/build_debian_packages --show-dists-json)
           fi
           echo "::set-output name=distros::$dists"
