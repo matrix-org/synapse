@@ -15,9 +15,11 @@ contains an example configuration for the `federation_reader` worker.
 ## Synapse configuration files
 
 See [workers.md](../workers.md) for information on how to set up the
-configuration files and reverse-proxy correctly. You can find an example worker
-config in the [workers](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/)
-folder.
+configuration files and reverse-proxy correctly.
+Below is a sample `federation_reader` worker configuration file.
+```yaml
+{{#include workers/federation_reader.yaml}}
+```
 
 Systemd manages daemonization itself, so ensure that none of the configuration
 files set either `daemonize` or `worker_daemonize`.
@@ -72,12 +74,12 @@ systemctl restart matrix-synapse.target
 
 **Optional:** If further hardening is desired, the file
 `override-hardened.conf` may be copied from
-`contrib/systemd/override-hardened.conf` in this repository to the location
+[contrib/systemd/override-hardened.conf](https://github.com/matrix-org/synapse/tree/develop/contrib/systemd/)
+in this repository to the location
 `/etc/systemd/system/matrix-synapse.service.d/override-hardened.conf` (the
 directory may have to be created). It enables certain sandboxing features in
 systemd to further secure the synapse service. You may read the comments to
-understand what the override file is doing. The same file will need to be copied
-to
+understand what the override file is doing. The same file will need to be copied to
 `/etc/systemd/system/matrix-synapse-worker@.service.d/override-hardened-worker.conf`
 (this directory may also have to be created) in order to apply the same
 hardening options to any worker processes.

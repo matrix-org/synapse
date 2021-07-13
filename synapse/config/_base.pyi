@@ -5,6 +5,7 @@ from synapse.config import (
     api,
     appservice,
     auth,
+    cache,
     captcha,
     cas,
     consent,
@@ -88,6 +89,7 @@ class RootConfig:
     tracer: tracer.TracerConfig
     redis: redis.RedisConfig
     modules: modules.ModulesConfig
+    caches: cache.CacheConfig
     federation: federation.FederationConfig
 
     config_classes: List = ...

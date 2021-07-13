@@ -1,0 +1,1 @@
+Fix errors during backfill caused by previously purged redaction events. Contributed by Andreas Rammhold (@andir).

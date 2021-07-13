@@ -17,7 +17,7 @@ class).
 Deferreds make the whole thing complicated, so this document describes
 how it all works, and how to write code which follows the rules.
 
-##Logcontexts without Deferreds
+## Logcontexts without Deferreds
 
 In the absence of any Deferred voodoo, things are simple enough. As with
 any code of this nature, the rule is that our function should leave

@@ -194,7 +194,7 @@ In order to port a module that uses Synapse's old module interface, its author n
 
 * ensure the module's callbacks are all asynchronous.
 * register their callbacks using one or more of the `register_[...]_callbacks` methods
-  from the `ModuleApi` class in the module's `__init__` method (see [this section](#registering-a-web-resource)
+  from the `ModuleApi` class in the module's `__init__` method (see [this section](#registering-a-callback)
   for more info).
 
 Additionally, if the module is packaged with an additional web resource, the module
