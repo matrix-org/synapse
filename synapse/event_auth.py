@@ -684,7 +684,7 @@ def get_users_which_can_issue_invite(auth_events: StateMap[EventBase]) -> List[s
     Returns:
         The users which can issue invites.
     """
-    invite_level = _get_named_level(auth_events, "invite", 50)
+    invite_level = _get_named_level(auth_events, "invite", 0)
     users_default_level = _get_named_level(auth_events, "users_default", 0)
     power_level_event = _get_power_level_event(auth_events)
 
