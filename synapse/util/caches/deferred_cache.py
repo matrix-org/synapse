@@ -81,7 +81,7 @@ class DeferredCache(Generic[KT, VT]):
 
         # _pending_deferred_cache maps from the key value to a `CacheEntry` object.
         self._pending_deferred_cache: Union[
-            TreeCache, MutableMapping[KT, CacheEntry]
+            TreeCache, "MutableMapping[KT, CacheEntry]"
         ] = cache_type()
 
         def metrics_cb():
