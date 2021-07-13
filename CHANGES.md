@@ -1,6 +1,8 @@
 Synapse 1.38.0 (2021-07-13)
 ===========================
 
+This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1380) for more information.
+
 No significant changes since 1.38.0rc3.
 
 
@@ -31,8 +33,6 @@ Improved Documentation
 
 Synapse 1.38.0rc1 (2021-07-06)
 ==============================
-
-This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1380) for more information.
 
 Features
 --------
