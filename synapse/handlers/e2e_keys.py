@@ -766,7 +766,7 @@ class E2eKeysHandler:
         Raises:
             SynapseError: if the input is malformed
         """
-        signature_list: List[SignatureListItem] = []
+        signature_list: List["SignatureListItem"] = []
         failures: Dict[str, Dict[str, JsonDict]] = {}
         if not signatures:
             return signature_list, failures
@@ -928,7 +928,7 @@ class E2eKeysHandler:
         Raises:
             SynapseError: if the input is malformed
         """
-        signature_list: List[SignatureListItem] = []
+        signature_list: List["SignatureListItem"] = []
         failures: Dict[str, Dict[str, JsonDict]] = {}
         if not signatures:
             return signature_list, failures
