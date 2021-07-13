@@ -148,7 +148,7 @@ class FederationSender(AbstractFederationSender):
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
-        self._presence_router: Optional[PresenceRouter] = None
+        self._presence_router: Optional["PresenceRouter"] = None
         self._transaction_manager = TransactionManager(hs)
 
         self._instance_name = hs.get_instance_name()

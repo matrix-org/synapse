@@ -294,7 +294,7 @@ class LoggingContext:
         self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
-        self.scope: Optional[_LogContextScope] = None
+        self.scope: Optional["_LogContextScope"] = None
 
         # keep track of whether we have hit the __exit__ block for this context
         # (suggesting that the the thing that created the context thinks it should

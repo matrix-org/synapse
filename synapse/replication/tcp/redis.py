@@ -91,7 +91,7 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
             commands.
     """
 
-    synapse_handler: ReplicationCommandHandler
+    synapse_handler: "ReplicationCommandHandler"
     synapse_stream_name: str
     synapse_outbound_redis_connection: txredisapi.RedisProtocol
 
