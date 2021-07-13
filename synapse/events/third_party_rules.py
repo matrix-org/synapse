@@ -11,15 +11,94 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import TYPE_CHECKING, Union, Callable, List, Optional, Awaitable
 
-from typing import TYPE_CHECKING, Union
-
+from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import Requester, StateMap
+from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+
+CHECK_EVENT_ALLOWED_CALLBACK = Callable[
+    [EventBase, EventContext], Awaitable[Union[bool, dict]]
+]
+ON_CREATE_ROOM_CALLBACK = Callable[[Requester, dict, bool], Awaitable]
+CHECK_THREEPID_CAN_BE_INVITED_CALLBACK = Callable[
+    [str, str, StateMap[EventBase]], Awaitable[bool]
+]
+CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
+    [str, StateMap[EventBase], str], Awaitable[bool]
+]
+
+
+def load_legacy_third_party_event_rules(hs: "HomeServer"):
+    """Wrapper that loads a third party event rules module configured using the old
+    configuration, and registers the hooks they implement.
+    """
+    if hs.config.third_party_event_rules:
+        module, config = hs.config.third_party_event_rules
+    else:
+        return
+
+    api = hs.get_module_api()
+    third_party_rules = module(config=config, module_api=api)
+
+    # The known hooks. If a module implements a method which name appears in this set,
+    # we'll want to register it.
+    third_party_event_rules_methods = {
+        "check_event_allowed",
+        "on_create_room",
+        "check_threepid_can_be_invited",
+        "check_visibility_can_be_modified",
+    }
+
+    def async_wrapper(f: Optional[Callable]) -> Optional[Callable[..., Awaitable]]:
+        # f might be None if the callback isn't implemented by the module. In this
+        # case we don't want to register a callback at all so we return None.
+        if f is None:
+            return None
+
+        if f.__name__ == "on_create_room":
+            # We return a separate wrapper for on_create_room because, in order to wrap
+            # it correctly, we need to await its result. Therefore it doesn't make a lot
+            # of sense to make it go through the run() wrapper.
+            async def wrapper(
+                requester: Requester, config: dict, is_requester_admin: bool
+            ) -> None:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                res = await f(requester, config, is_requester_admin)
+                if res is False:
+                    raise SynapseError(
+                        403,
+                        "Room creation forbidden with these parameters",
+                    )
+
+            return wrapper
+
+        def run(*args, **kwargs):
+            # mypy doesn't do well across function boundaries so we need to tell it
+            # f is definitely not None.
+            assert f is not None
+
+            return maybe_awaitable(f(*args, **kwargs))
+
+        return run
+
+    # Register the hooks through the module API.
+    hooks = {
+        hook: async_wrapper(getattr(third_party_rules, hook, None))
+        for hook in third_party_event_rules_methods
+    }
+
+    api.register_spam_checker_callbacks(**hooks)
 
 
 class ThirdPartyEventRules:
@@ -46,6 +125,43 @@ class ThirdPartyEventRules:
                 module_api=hs.get_module_api(),
             )
 
+        self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
+        self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []
+        self._check_threepid_can_be_invited_callbacks: List[
+            CHECK_THREEPID_CAN_BE_INVITED_CALLBACK
+        ] = []
+        self._check_visibility_can_be_modified_callbacks: List[
+            CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
+        ] = []
+
+    def register_third_party_rules_callbacks(
+        self,
+        check_event_allowed: Optional[CHECK_EVENT_ALLOWED_CALLBACK] = None,
+        on_create_room: Optional[ON_CREATE_ROOM_CALLBACK] = None,
+        check_threepid_can_be_invited: Optional[
+            CHECK_THREEPID_CAN_BE_INVITED_CALLBACK
+        ] = None,
+        check_visibility_can_be_modified: Optional[
+            CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
+        ] = None,
+    ):
+        """Register callbacks from module for each hook."""
+        if check_event_allowed is not None:
+            self._check_event_allowed_callbacks.append(check_event_allowed)
+
+        if on_create_room is not None:
+            self._on_create_room_callbacks.append(on_create_room)
+
+        if check_threepid_can_be_invited is not None:
+            self._check_threepid_can_be_invited_callbacks.append(
+                check_threepid_can_be_invited,
+            )
+
+        if check_visibility_can_be_modified is not None:
+            self._check_visibility_can_be_modified_callbacks.append(
+                check_visibility_can_be_modified,
+            )
+
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
     ) -> Union[bool, dict]:
@@ -63,7 +179,8 @@ class ThirdPartyEventRules:
         Returns:
             The result from the ThirdPartyRules module, as above
         """
-        if self.third_party_rules is None:
+        # Bail out early without hitting the store if we don't have any callback
+        if len(self._check_event_allowed_callbacks) == 0:
             return True
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -77,29 +194,31 @@ class ThirdPartyEventRules:
         # the hashes and signatures.
         event.freeze()
 
-        return await self.third_party_rules.check_event_allowed(event, state_events)
+        for callback in self._check_event_allowed_callbacks:
+            res = await callback(event, state_events)
+            # Return if the event shouldn't be allowed or if the module came up with a
+            # replacement content for the event.
+            # TODO: is this really the right place to let modules replace the event's
+            #  content (or should it happen in another callback, or as a second return
+            #  argument)?
+            if not res or isinstance(res, dict):
+                return res
+
+        return True
 
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
-    ) -> bool:
-        """Intercept requests to create room to allow, deny or update the
-        request config.
+    ) -> None:
+        """Intercept requests to create room to maybe deny it (via an exception) or
+        update the request config.
 
         Args:
             requester
             config: The creation config from the client.
             is_requester_admin: If the requester is an admin
-
-        Returns:
-            Whether room creation is allowed or denied.
         """
-
-        if self.third_party_rules is None:
-            return True
-
-        return await self.third_party_rules.on_create_room(
-            requester, config, is_requester_admin
-        )
+        for callback in self._on_create_room_callbacks:
+            await callback(requester, config, is_requester_admin)
 
     async def check_threepid_can_be_invited(
         self, medium: str, address: str, room_id: str
@@ -114,15 +233,17 @@ class ThirdPartyEventRules:
         Returns:
             True if the 3PID can be invited, False if not.
         """
-
-        if self.third_party_rules is None:
+        # Bail out early without hitting the store if we don't have any callback
+        if len(self._check_threepid_can_be_invited_callbacks) == 0:
             return True
 
         state_events = await self._get_state_map_for_room(room_id)
 
-        return await self.third_party_rules.check_threepid_can_be_invited(
-            medium, address, state_events
-        )
+        for callback in self._check_threepid_can_be_invited_callbacks:
+            if await callback(medium, address, state_events) is False:
+                return False
+
+        return True
 
     async def check_visibility_can_be_modified(
         self, room_id: str, new_visibility: str
@@ -137,18 +258,17 @@ class ThirdPartyEventRules:
         Returns:
             True if the room's visibility can be modified, False if not.
         """
-        if self.third_party_rules is None:
-            return True
-
-        check_func = getattr(
-            self.third_party_rules, "check_visibility_can_be_modified", None
-        )
-        if not check_func or not callable(check_func):
+        # Bail out early without hitting the store if we don't have any callback
+        if len(self._check_visibility_can_be_modified_callbacks) == 0:
             return True
 
         state_events = await self._get_state_map_for_room(room_id)
 
-        return await check_func(room_id, state_events, new_visibility)
+        for callback in self._check_visibility_can_be_modified_callbacks:
+            if await callback(room_id, state_events, new_visibility) is False:
+                return False
+
+        return True
 
     async def _get_state_map_for_room(self, room_id: str) -> StateMap[EventBase]:
         """Given a room ID, return the state events of that room.
