@@ -54,7 +54,7 @@ class ModuleApi:
         self._state = hs.get_state_handler()
 
         # We expose these as properties below in order to attach a helpful docstring.
-        self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
+        self._http_client: SimpleHttpClient = hs.get_simple_http_client()
         self._public_room_list_manager = PublicRoomListManager(hs)
 
         self._spam_checker = hs.get_spam_checker()

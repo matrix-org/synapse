@@ -46,9 +46,9 @@ class Ratelimiter:
         #   * How many times an action has occurred since a point in time
         #   * The point in time
         #   * The rate_hz of this particular entry. This can vary per request
-        self.actions = (
+        self.actions: OrderedDict[Hashable, Tuple[float, int, float]] = (
             OrderedDict()
-        )  # type: OrderedDict[Hashable, Tuple[float, int, float]]
+        )
 
     async def can_do_action(
         self,
