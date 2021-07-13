@@ -18,10 +18,10 @@
 -- number of distinct state groups are in the `state_groups_state`, which can
 -- cause postgres to use table scans for queries for multiple state groups.
 --
--- To work around this we can manually tell postgres the number of distint state
+-- To work around this we can manually tell postgres the number of distinct state
 -- groups there are by setting `n_distinct` (a negative value here is the number
 -- of distinct values divided by the number of rows, so -0.02 means on average
--- there are 50 rows per disinct value). We don't need a particularly
+-- there are 50 rows per distinct value). We don't need a particularly
 -- accurate number here, as a) we just want it to always use index scans and b)
 -- our estimate is going to be better than the one made by the statistics
 -- collector.
