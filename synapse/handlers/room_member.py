@@ -730,15 +730,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 room_version = await self.store.get_room_version(room_id)
                 current_state_ids = await self.store.get_current_state_ids(room_id)
 
-                # Otherwise, check if they should be allowed access via membership in a space.
                 if await self.event_auth_handler.has_restricted_join_rules(
                     current_state_ids, room_version
                 ):
-                    current_state_map = await self.store.get_events(
-                        current_state_ids.values()
-                    )
+                    event_map = await self.store.get_events(current_state_ids.values())
                     current_state = {
-                        state_key: current_state_map[event_id]
+                        state_key: event_map[event_id]
                         for state_key, event_id in current_state_ids.items()
                     }
                     allowed_servers = get_servers_from_users(
