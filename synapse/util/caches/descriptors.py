@@ -472,9 +472,9 @@ class _CacheContext:
 
     Cache = Union[DeferredCache, LruCache]
 
-    _cache_context_objects: WeakValueDictionary[
+    _cache_context_objects: """WeakValueDictionary[
         Tuple["_CacheContext.Cache", CacheKey], "_CacheContext"
-    ] = WeakValueDictionary()
+    ]""" = WeakValueDictionary()
 
     def __init__(self, cache: "_CacheContext.Cache", cache_key: CacheKey) -> None:
         self._cache = cache
