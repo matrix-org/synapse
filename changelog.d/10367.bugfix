@@ -1,0 +1,1 @@
+Bugfix `make_room_admin` fails for users that have left a private room.
