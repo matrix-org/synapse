@@ -131,7 +131,7 @@ jobs:
           || true
 
   trial-olddeps:
-    if: ${{ !cancelled && !failure() }} # Allow previous steps to be skipped, but not fail
+    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
