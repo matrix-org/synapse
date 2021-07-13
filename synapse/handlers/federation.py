@@ -2059,15 +2059,21 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         # Sign the event since we're vouching on behalf of the remote server that
-        # the event is valid to be sent into the room.
-        event.signatures.update(
-            compute_event_signature(
-                room_version,
-                event.get_pdu_json(),
-                self.hs.hostname,
-                self.hs.signing_key,
+        # the event is valid to be sent into the room. Currently this is only done
+        # if the user is being joined via restricted join rules.
+        if (
+            room_version.msc3083_join_rules
+            and event.membership == Membership.JOIN
+            and "join_authorised_via_users_server" in event.content
+        ):
+            event.signatures.update(
+                compute_event_signature(
+                    room_version,
+                    event.get_pdu_json(),
+                    self.hs.hostname,
+                    self.hs.signing_key,
+                )
             )
-        )
 
         context = await self.state_handler.compute_event_context(event)
         context = await self._check_event_auth(origin, event, context)
