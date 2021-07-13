@@ -102,7 +102,7 @@ class FederationClientTests(HomeserverTestCase):
         self.assertNoResult(test_d)
 
         # Send it the HTTP response
-        res_json = '{ "a": 1 }'.encode("ascii")
+        res_json = b'{ "a": 1 }'
         protocol.dataReceived(
             b"HTTP/1.1 200 OK\r\n"
             b"Server: Fake\r\n"
@@ -339,10 +339,8 @@ class FederationClientTests(HomeserverTestCase):
 
         # Send it the HTTP response
         client.dataReceived(
-            (
-                b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
-                b"Server: Fake\r\n\r\n"
-            )
+            b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+            b"Server: Fake\r\n\r\n"
         )
 
         # Push by enough to time it out
