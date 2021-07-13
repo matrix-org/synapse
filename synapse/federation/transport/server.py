@@ -30,7 +30,12 @@ from typing import (
 from typing_extensions import Literal
 
 import synapse
-from synapse.api.constants import MAX_GROUP_CATEGORYID_LENGTH, MAX_GROUP_ROLEID_LENGTH
+from synapse.api.constants import (
+    MAX_GROUP_CATEGORYID_LENGTH,
+    MAX_GROUP_ROLEID_LENGTH,
+    EventTypes,
+    Membership,
+)
 from synapse.api.errors import Codes, FederationDeniedError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.api.urls import (
@@ -57,7 +62,7 @@ from synapse.logging.opentracing import (
     whitelisted_homeserver,
 )
 from synapse.server import HomeServer
-from synapse.types import JsonDict, ThirdPartyInstanceID, get_domain_from_id
+from synapse.types import JsonDict, ThirdPartyInstanceID, UserID, get_domain_from_id
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import parse_and_validate_server_name
 from synapse.util.versionstring import get_version_string
@@ -927,7 +932,45 @@ class OpenIdUserInfo(BaseFederationServerServlet):
                 },
             )
 
-        return 200, {"sub": user_id}
+        userinfo = {"sub": user_id}
+
+        if self.hs.config.federation.openid_userinfo_fields:
+            if "name" in self.hs.config.federation.openid_userinfo_fields:
+                localpart = UserID.from_string(user_id).localpart
+                userinfo[
+                    "name"
+                ] = await self.hs.get_datastore().get_profile_displayname(localpart)
+            if "room_powerlevels" in self.hs.config.federation.openid_userinfo_fields:
+                userinfo["room_powerlevels"] = await self._get_powerlevels(user_id)
+
+        return 200, userinfo
+
+    async def _get_powerlevels(self, user_id):
+        room_list = (
+            await self.hs.get_datastore().get_rooms_for_local_user_where_membership_is(
+                user_id=user_id, membership_list=[Membership.JOIN]
+            )
+        )
+
+        power_levels = {}
+        for room in room_list:
+            room_state = await self.hs.get_state_handler().get_current_state(
+                room.room_id
+            )
+            room_power_level = None
+            room_power_levels = room_state.get((EventTypes.PowerLevels, ""))
+            if room_power_levels is not None:
+                user_power = room_power_levels.content.get("users", None)
+                if user_power is not None:
+                    room_power_level = user_power[user_id]
+                if room_power_level is None:
+                    room_power_level = room_power_levels.content.get(
+                        "state_default", None
+                    )
+            if room_power_level is not None:
+                power_levels[room.room_id] = room_power_level
+
+        return power_levels
 
 
 class PublicRoomList(BaseFederationServlet):
