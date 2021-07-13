@@ -88,23 +88,9 @@ class EventAuthHandler:
             if auth_ev_id:
                 auth_ids.append(auth_ev_id)
 
-        # If the current room is using restricted join rules, an additional event
-        # must be included to assert that the server has the right to authorise
-        # a join event.
-        if event.type == EventTypes.Member:
-            if await self.has_restricted_join_rules(
-                current_state_ids, event.room_version
-            ):
-                additional_auth_id = await self._get_user_event_which_could_invite(
-                    event.room_id,
-                    current_state_ids,
-                )
-                if additional_auth_id:
-                    auth_ids.append(additional_auth_id)
-
         return auth_ids
 
-    async def _get_user_event_which_could_invite(
+    async def get_user_which_could_invite(
         self, room_id: str, current_state_ids: StateMap[str]
     ) -> Optional[str]:
         """
@@ -116,7 +102,7 @@ class EventAuthHandler:
             current_state_ids: The current state of the room.
 
         Returns:
-            The event ID of the member event.
+            The MXID of the user which could issue an invite.
 
         Raises:
             SynapseError if no appropriate user is found.
@@ -144,11 +130,11 @@ class EventAuthHandler:
                 if chosen_user is None or user_level >= chosen_user[1]:
                     chosen_user = (user, user_level)
 
-        # Add that user's event ID to the list of auth events.
+        # Return the chosen user.
         if chosen_user:
-            return current_state_ids[(EventTypes.Member, chosen_user[0])]
+            return chosen_user[0]
 
-        # TODO What to do if no event is found?
+        # TODO What to do if no user is found?
         return None
 
     async def check_host_in_room(self, room_id: str, host: str) -> bool:

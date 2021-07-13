@@ -346,10 +346,30 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
 
-            # Check if the member should be allowed access via membership in a space.
-            await self.event_auth_handler.check_restricted_join_rules(
-                prev_state_ids, event.room_version, user_id, prev_member_event
-            )
+            # If the current room is using restricted join rules, additional information
+            # must be included in the event content in order to efficiently validate
+            # the event.
+            if (
+                newly_joined
+                and await self.event_auth_handler.has_restricted_join_rules(
+                    prev_state_ids, event.room_version
+                )
+            ):
+                # Check if the member should be allowed access via membership in a space.
+                await self.event_auth_handler.check_restricted_join_rules(
+                    prev_state_ids, event.room_version, user_id, prev_member_event
+                )
+
+                authorised_user_id = (
+                    await self.event_auth_handler.get_user_which_could_invite(
+                        room_id,
+                        prev_state_ids,
+                    )
+                )
+                if authorised_user_id:
+                    event.content[
+                        "join_authorised_via_users_server"
+                    ] = authorised_user_id
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.

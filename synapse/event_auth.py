@@ -851,4 +851,13 @@ def auth_types_for_event(event: Union[EventBase, EventBuilder]) -> Set[Tuple[str
                 )
                 auth_types.add(key)
 
+        # TODO Should this be limited to only MSC3083 rooms.
+        if membership == Membership.JOIN:
+            if "join_authorised_via_users_server" in event.content:
+                key = (
+                    EventTypes.Member,
+                    event.content["join_authorised_via_users_server"],
+                )
+                auth_types.add(key)
+
     return auth_types

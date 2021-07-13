@@ -82,6 +82,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
+from synapse.storage.databases.main.state import StateFilter
 from synapse.types import (
     JsonDict,
     MutableStateMap,
@@ -1687,6 +1688,50 @@ class FederationHandler(BaseHandler):
             raise NotFoundError("Not an active room on this server")
 
         event_content = {"membership": Membership.JOIN}
+
+        # If the current room is using restricted join rules, additional information
+        # may need to be included in the event content in order to efficiently
+        # validate the event.
+        #
+        # Note that this requires the /send_join request to come back to the
+        # same server.
+        if room_version.msc3083_join_rules:
+            state_ids = await self.store.get_filtered_current_state_ids(
+                room_id,
+                StateFilter.from_types(
+                    (
+                        (EventTypes.JoinRules, ""),
+                        (EventTypes.Member, user_id),
+                    )
+                ),
+            )
+            if await self._event_auth_handler.has_restricted_join_rules(
+                state_ids, room_version
+            ):
+                prev_member_event_id = state_ids.get((EventTypes.Member, user_id), None)
+                # If the user is invited or joined to the room already, then
+                # no additional info is needed.
+                include_auth_user_id = True
+                if prev_member_event_id:
+                    prev_member_event = await self.store.get_event(prev_member_event_id)
+                    include_auth_user_id = prev_member_event.membership not in (
+                        Membership.JOIN,
+                        Membership.INVITE,
+                    )
+
+                if include_auth_user_id:
+                    authorised_user_id = (
+                        await self._event_auth_handler.get_user_which_could_invite(
+                            room_id,
+                            state_ids,
+                        )
+                    )
+                    if authorised_user_id:
+                        event_content[
+                            "join_authorised_via_users_server"
+                        ] = authorised_user_id
+
+                    # TODO What if there's no authorised user?
 
         builder = self.event_builder_factory.new(
             room_version.identifier,
