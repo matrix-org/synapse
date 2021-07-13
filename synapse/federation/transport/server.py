@@ -1095,7 +1095,9 @@ class FederationGroupsProfileServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1110,7 +1112,9 @@ class FederationGroupsProfileServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1131,7 +1135,9 @@ class FederationGroupsSummaryServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1152,7 +1158,9 @@ class FederationGroupsRoomsServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1174,7 +1182,9 @@ class FederationGroupsAddRoomsServlet(BaseGroupsServerServlet):
         group_id: str,
         room_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1192,7 +1202,9 @@ class FederationGroupsAddRoomsServlet(BaseGroupsServerServlet):
         group_id: str,
         room_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1220,7 +1232,9 @@ class FederationGroupsAddRoomsConfigServlet(BaseGroupsServerServlet):
         room_id: str,
         config_key: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1243,7 +1257,9 @@ class FederationGroupsUsersServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1264,7 +1280,9 @@ class FederationGroupsInvitedUsersServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1288,7 +1306,9 @@ class FederationGroupsInviteServlet(BaseGroupsServerServlet):
         group_id: str,
         user_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1354,7 +1374,9 @@ class FederationGroupsRemoveUserServlet(BaseGroupsServerServlet):
         group_id: str,
         user_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1487,7 +1509,9 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
         category_id: str,
         room_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1523,7 +1547,9 @@ class FederationGroupsSummaryRoomsServlet(BaseGroupsServerServlet):
         category_id: str,
         room_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1549,7 +1575,9 @@ class FederationGroupsCategoriesServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1571,7 +1599,9 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
         group_id: str,
         category_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1589,7 +1619,9 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
         group_id: str,
         category_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1618,7 +1650,9 @@ class FederationGroupsCategoryServlet(BaseGroupsServerServlet):
         group_id: str,
         category_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1644,7 +1678,9 @@ class FederationGroupsRolesServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1666,7 +1702,9 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
         group_id: str,
         role_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1682,7 +1720,9 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
         group_id: str,
         role_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1713,7 +1753,9 @@ class FederationGroupsRoleServlet(BaseGroupsServerServlet):
         group_id: str,
         role_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1750,7 +1792,9 @@ class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
         role_id: str,
         user_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1784,7 +1828,9 @@ class FederationGroupsSummaryUsersServlet(BaseGroupsServerServlet):
         role_id: str,
         user_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 
@@ -1825,7 +1871,9 @@ class FederationGroupsSettingJoinPolicyServlet(BaseGroupsServerServlet):
         query: Dict[bytes, List[bytes]],
         group_id: str,
     ) -> Tuple[int, JsonDict]:
-        requester_user_id = parse_string_from_args(query, "requester_user_id")
+        requester_user_id = parse_string_from_args(
+            query, "requester_user_id", required=True
+        )
         if get_domain_from_id(requester_user_id) != origin:
             raise SynapseError(403, "requester_user_id doesn't match origin")
 

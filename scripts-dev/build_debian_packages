@@ -10,6 +10,7 @@
 # can be passed on the commandline for debugging.
 
 import argparse
+import json
 import os
 import signal
 import subprocess
@@ -34,6 +35,8 @@ By default, builds for all known distributions, but a list of distributions
 can be passed on the commandline for debugging.
 """
 
+projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
 
 class Builder(object):
     def __init__(self, redirect_stdout=False):
@@ -57,9 +60,6 @@ class Builder(object):
             raise
 
     def _inner_build(self, dist, skip_tests=False):
-        projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(projdir)
-
         tag = dist.split(":", 1)[1]
 
         # Make the dir where the debs will live.
@@ -93,6 +93,7 @@ class Builder(object):
             ],
             stdout=stdout,
             stderr=subprocess.STDOUT,
+            cwd=projdir,
         )
 
         container_name = "synapse_build_" + tag
@@ -180,10 +181,18 @@ if __name__ == "__main__":
         help="skip running tests after building",
     )
     parser.add_argument(
+        "--show-dists-json",
+        action="store_true",
+        help="instead of building the packages, just list the dists to build for, as a json array",
+    )
+    parser.add_argument(
         "dist",
         nargs="*",
         default=DISTS,
         help="a list of distributions to build for. Default: %(default)s",
     )
     args = parser.parse_args()
-    run_builds(dists=args.dist, jobs=args.jobs, skip_tests=args.no_check)
+    if args.show_dists_json:
+        print(json.dumps(DISTS))
+    else:
+        run_builds(dists=args.dist, jobs=args.jobs, skip_tests=args.no_check)

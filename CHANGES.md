@@ -1,7 +1,38 @@
-Synapse 1.38.0rc1 (2021-07-06)
-==============================
+Synapse 1.38.0 (2021-07-13)
+===========================
 
 This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1380) for more information.
+
+No significant changes since 1.38.0rc3.
+
+
+Synapse 1.38.0rc3 (2021-07-13)
+==============================
+
+Internal Changes
+----------------
+
+- Build the Debian packages in CI. ([\#10247](https://github.com/matrix-org/synapse/issues/10247), [\#10379](https://github.com/matrix-org/synapse/issues/10379))
+
+
+Synapse 1.38.0rc2 (2021-07-09)
+==============================
+
+Bugfixes
+--------
+
+- Fix bug where inbound federation in a room could be delayed due to not correctly dropping a lock. Introduced in v1.37.1. ([\#10336](https://github.com/matrix-org/synapse/issues/10336))
+
+
+Improved Documentation
+----------------------
+
+- Update links to documentation in the sample config. Contributed by @dklimpel. ([\#10287](https://github.com/matrix-org/synapse/issues/10287))
+- Fix broken links in [INSTALL.md](INSTALL.md). Contributed by @dklimpel. ([\#10331](https://github.com/matrix-org/synapse/issues/10331))
+
+
+Synapse 1.38.0rc1 (2021-07-06)
+==============================
 
 Features
 --------
@@ -1226,7 +1257,10 @@ Crucially, this means __we will not produce .deb packages for Debian 9 (Stretch)
 
 The website https://endoflife.date/ has convenient summaries of the support schedules for projects like [Python](https://endoflife.date/python) and [PostgreSQL](https://endoflife.date/postgresql).
 
-If you are unable to upgrade your environment to a supported version of Python or Postgres, we encourage you to consider using the [Synapse Docker images](./INSTALL.md#docker-images-and-ansible-playbooks) instead.
+If you are unable to upgrade your environment to a supported version of Python or
+Postgres, we encourage you to consider using the
+[Synapse Docker images](https://matrix-org.github.io/synapse/latest/setup/installation.html#docker-images-and-ansible-playbooks)
+instead.
 
 ### Transition Period
 
@@ -1369,11 +1403,11 @@ To upgrade Synapse along with the cryptography package:
 * Administrators using the [`matrix.org` Docker
   image](https://hub.docker.com/r/matrixdotorg/synapse/) or the [Debian/Ubuntu
   packages from
-  `matrix.org`](https://github.com/matrix-org/synapse/blob/master/INSTALL.md#matrixorg-packages)
+  `matrix.org`](https://matrix-org.github.io/synapse/latest/setup/installation.html#matrixorg-packages)
   should ensure that they have version 1.24.0 or 1.23.1 installed: these images include
   the updated packages.
 * Administrators who have [installed Synapse from
-  source](https://github.com/matrix-org/synapse/blob/master/INSTALL.md#installing-from-source)
+  source](https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source)
   should upgrade the cryptography package within their virtualenv by running:
   ```sh
   <path_to_virtualenv>/bin/pip install 'cryptography>=3.3'
@@ -1415,11 +1449,11 @@ To upgrade Synapse along with the cryptography package:
 * Administrators using the [`matrix.org` Docker
   image](https://hub.docker.com/r/matrixdotorg/synapse/) or the [Debian/Ubuntu
   packages from
-  `matrix.org`](https://github.com/matrix-org/synapse/blob/master/INSTALL.md#matrixorg-packages)
+  `matrix.org`](https://matrix-org.github.io/synapse/latest/setup/installation.html#matrixorg-packages)
   should ensure that they have version 1.24.0 or 1.23.1 installed: these images include
   the updated packages.
 * Administrators who have [installed Synapse from
-  source](https://github.com/matrix-org/synapse/blob/master/INSTALL.md#installing-from-source)
+  source](https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source)
   should upgrade the cryptography package within their virtualenv by running:
   ```sh
   <path_to_virtualenv>/bin/pip install 'cryptography>=3.3'
@@ -2998,11 +3032,11 @@ installation remains secure.
 * Administrators using the [`matrix.org` Docker
   image](https://hub.docker.com/r/matrixdotorg/synapse/) or the [Debian/Ubuntu
   packages from
-  `matrix.org`](https://github.com/matrix-org/synapse/blob/master/INSTALL.md#matrixorg-packages)
+  `matrix.org`](https://matrix-org.github.io/synapse/latest/setup/installation.html#matrixorg-packages)
   should ensure that they have version 1.12.0 installed: these images include
   Twisted 20.3.0.
 * Administrators who have [installed Synapse from
-  source](https://github.com/matrix-org/synapse/blob/master/INSTALL.md#installing-from-source)
+  source](https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source)
   should upgrade Twisted within their virtualenv by running:
   ```sh
   <path_to_virtualenv>/bin/pip install 'Twisted>=20.3.0'

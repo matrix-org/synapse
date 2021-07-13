@@ -434,7 +434,7 @@ class StatsStore(StateDeltasStore):
             ]
 
             relative_updates = [
-                "%(field)s = EXCLUDED.%(field)s + %(table)s.%(field)s"
+                "%(field)s = EXCLUDED.%(field)s + COALESCE(%(table)s.%(field)s, 0)"
                 % {"table": table, "field": field}
                 for field in additive_relatives.keys()
             ]
@@ -474,7 +474,10 @@ class StatsStore(StateDeltasStore):
                 self.db_pool.simple_insert_txn(txn, table, merged_dict)
             else:
                 for (key, val) in additive_relatives.items():
-                    current_row[key] += val
+                    if current_row[key] is None:
+                        current_row[key] = val
+                    else:
+                        current_row[key] += val
                 current_row.update(absolutes)
                 self.db_pool.simple_update_one_txn(txn, table, keyvalues, current_row)
 
@@ -604,6 +607,7 @@ class StatsStore(StateDeltasStore):
                 "invited_members": membership_counts.get(Membership.INVITE, 0),
                 "left_members": membership_counts.get(Membership.LEAVE, 0),
                 "banned_members": membership_counts.get(Membership.BAN, 0),
+                "knocked_members": membership_counts.get(Membership.KNOCK, 0),
                 "local_users_in_room": len(local_users_in_room),
             },
         )

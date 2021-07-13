@@ -1,0 +1,1 @@
+Fix newly added `synapse_federation_server_oldest_inbound_pdu_in_staging` prometheus metric to measure age rather than timestamp.
