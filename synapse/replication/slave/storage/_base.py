@@ -27,7 +27,9 @@ class BaseSlavedStore(CacheInvalidationWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
         if isinstance(self.database_engine, PostgresEngine):
-            self._cache_id_gen: Optional[MultiWriterIdGenerator] = MultiWriterIdGenerator(
+            self._cache_id_gen: Optional[
+                MultiWriterIdGenerator
+            ] = MultiWriterIdGenerator(
                 db_conn,
                 database,
                 stream_name="caches",

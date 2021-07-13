@@ -513,7 +513,9 @@ class StateResolutionHandler:
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
         # dict of set of event_ids -> _StateCacheEntry.
-        self._state_cache: ExpiringCache[FrozenSet[int], _StateCacheEntry] = ExpiringCache(
+        self._state_cache: ExpiringCache[
+            FrozenSet[int], _StateCacheEntry
+        ] = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
             max_len=100000,

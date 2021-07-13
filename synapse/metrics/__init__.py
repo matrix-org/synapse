@@ -46,7 +46,7 @@ logger = logging.getLogger(__name__)
 METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_gauges: Dict[str, Union[LaterGauge, InFlightGauge]] = {}
+all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 

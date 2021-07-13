@@ -1973,9 +1973,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationMakeKnockServlet,
 )
 
-OPENID_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
-    OpenIdUserInfo,
-)
+OPENID_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (OpenIdUserInfo,)
 
 ROOM_LIST_CLASSES: Tuple[Type[PublicRoomList], ...] = (PublicRoomList,)
 

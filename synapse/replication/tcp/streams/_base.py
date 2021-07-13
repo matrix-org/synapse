@@ -283,9 +283,7 @@ class PresenceStream(Stream):
 
             assert isinstance(presence_handler, PresenceHandler)
 
-            update_function: UpdateFunction = (
-                presence_handler.get_all_presence_updates
-            )
+            update_function: UpdateFunction = presence_handler.get_all_presence_updates
         else:
             # Query presence writer process
             update_function = make_http_update_function(hs, self.NAME)
@@ -334,9 +332,9 @@ class TypingStream(Stream):
         if writer_instance == hs.get_instance_name():
             # On the writer, query the typing handler
             typing_writer_handler = hs.get_typing_writer_handler()
-            update_function: Callable[[str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]] = (
-                typing_writer_handler.get_all_typing_updates
-            )
+            update_function: Callable[
+                [str, int, int, int], Awaitable[Tuple[List[Tuple[int, Any]], int, bool]]
+            ] = typing_writer_handler.get_all_typing_updates
             current_token_function = typing_writer_handler.get_current_token
         else:
             # Query the typing writer process

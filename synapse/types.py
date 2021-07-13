@@ -304,7 +304,7 @@ class GroupID(DomainSpecificString):
 
     @classmethod
     def from_string(cls: Type[DS], s: str) -> DS:
-        group_id: DS = super().from_string(s) # type: ignore
+        group_id: DS = super().from_string(s)  # type: ignore
 
         if not group_id.localpart:
             raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)

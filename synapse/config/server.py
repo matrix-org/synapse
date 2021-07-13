@@ -695,9 +695,7 @@ class ServerConfig(Config):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
         # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules: set = set(
-            users_new_default_push_rules
-        )
+        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
 
         # Whitelist of domain names that given next_link parameters must have
         next_link_domain_whitelist: Optional[List[str]] = config.get(

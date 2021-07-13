@@ -434,7 +434,7 @@ class XForwardedForRequest(SynapseRequest):
     """
 
     # the client IP and ssl flag, as extracted from the headers.
-    _forwarded_for: Optional[_XForwardedForAddress] = None
+    _forwarded_for: "Optional[_XForwardedForAddress]" = None
     _forwarded_https: bool = False
 
     def requestReceived(self, command, path, version):
