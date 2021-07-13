@@ -47,7 +47,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
-        row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
+        row: TypingStream.TypingStreamRow = rdata_rows[0]
         self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([USER_ID], row.user_ids)
 
@@ -102,7 +102,7 @@ class TypingStreamTestCase(BaseStreamTestCase):
         stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "typing")
         self.assertEqual(1, len(rdata_rows))
-        row = rdata_rows[0]  # type: TypingStream.TypingStreamRow
+        row: TypingStream.TypingStreamRow = rdata_rows[0]
         self.assertEqual(ROOM_ID, row.room_id)
         self.assertEqual([USER_ID], row.user_ids)
 
