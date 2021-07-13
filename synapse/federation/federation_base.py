@@ -178,12 +178,43 @@ async def _check_sigs_on_pdu(
             )
             raise SynapseError(403, errmsg, Codes.FORBIDDEN)
 
+    # If this is a join event for a restricted room it may have been authorised
+    # via a different server from the sending server. Check those signatures.
+    if room_version.msc3083_join_rules and _is_invite_via_allow_rule(pdu):
+        authorising_server = get_domain_from_id(
+            pdu.content["join_authorised_via_users_server"]
+        )
+        try:
+            await keyring.verify_event_for_server(
+                authorising_server,
+                pdu,
+                pdu.origin_server_ts if room_version.enforce_key_validity else 0,
+            )
+        except Exception as e:
+            errmsg = (
+                "event id %s: unable to verify signature for authorising server %s: %s"
+                % (
+                    pdu.event_id,
+                    authorising_server,
+                    e,
+                )
+            )
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+
 
 def _is_invite_via_3pid(event: EventBase) -> bool:
     return (
         event.type == EventTypes.Member
         and event.membership == Membership.INVITE
         and "third_party_invite" in event.content
+    )
+
+
+def _is_invite_via_allow_rule(event: EventBase) -> bool:
+    return (
+        event.type == EventTypes.Member
+        and event.membership == Membership.JOIN
+        and "join_authorised_via_users_server" in event.content
     )
 
 
