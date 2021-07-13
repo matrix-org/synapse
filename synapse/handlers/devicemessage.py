@@ -203,7 +203,7 @@ class DeviceMessageHandler:
         log_kv({"number_of_to_device_messages": len(messages)})
         set_tag("sender", sender_user_id)
         local_messages = {}
-        remote_messages = {}  # type: Dict[str, Dict[str, Dict[str, JsonDict]]]
+        remote_messages: Dict[str, Dict[str, Dict[str, JsonDict]]] = {}
         for user_id, by_device in messages.items():
             # Ratelimit local cross-user key requests by the sending device.
             if (

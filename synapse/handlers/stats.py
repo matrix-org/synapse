@@ -49,7 +49,7 @@ class StatsHandler:
         self.stats_enabled = hs.config.stats_enabled
 
         # The current position in the current_state_delta stream
-        self.pos = None  # type: Optional[int]
+        self.pos: Optional[int] = None
 
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
@@ -131,10 +131,10 @@ class StatsHandler:
             mapping from room/user ID to changes in the various fields.
         """
 
-        room_to_stats_deltas = {}  # type: Dict[str, CounterType[str]]
-        user_to_stats_deltas = {}  # type: Dict[str, CounterType[str]]
+        room_to_stats_deltas: Dict[str, CounterType[str]] = {}
+        user_to_stats_deltas: Dict[str, CounterType[str]] = {}
 
-        room_to_state_updates = {}  # type: Dict[str, Dict[str, Any]]
+        room_to_state_updates: Dict[str, Dict[str, Any]] = {}
 
         for delta in deltas:
             typ = delta["type"]
@@ -164,7 +164,7 @@ class StatsHandler:
                 )
                 continue
 
-            event_content = {}  # type: JsonDict
+            event_content: JsonDict = {}
 
             if event_id is not None:
                 event = await self.store.get_event(event_id, allow_none=True)

@@ -139,7 +139,7 @@ class AdminHandler(BaseHandler):
             to_key = RoomStreamToken(None, stream_ordering)
 
             # Events that we've processed in this room
-            written_events = set()  # type: Set[str]
+            written_events: Set[str] = set()
 
             # We need to track gaps in the events stream so that we can then
             # write out the state at those events. We do this by keeping track
@@ -152,7 +152,7 @@ class AdminHandler(BaseHandler):
             # The reverse mapping to above, i.e. map from unseen event to events
             # that have the unseen event in their prev_events, i.e. the unseen
             # events "children".
-            unseen_to_child_events = {}  # type: Dict[str, Set[str]]
+            unseen_to_child_events: Dict[str, Set[str]] = {}
 
             # We fetch events in the room the user could see by fetching *all*
             # events that we have and then filtering, this isn't the most
