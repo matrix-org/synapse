@@ -13,9 +13,8 @@
 # limitations under the License.
 
 import abc
-import collections
 import logging
-import typing
+from collections import OrderedDict
 from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
 import attr
@@ -164,9 +163,7 @@ class _PresenceQueue:
 
     sender: "FederationSender" = attr.ib()
     clock: Clock = attr.ib()
-    queue: typing.OrderedDict[str, Literal[None]] = attr.ib(
-        factory=collections.OrderedDict
-    )
+    queue: "OrderedDict[str, Literal[None]]" = attr.ib(factory=OrderedDict)
     processing: bool = attr.ib(default=False)
 
     def add_to_queue(self, destination: str) -> None:
