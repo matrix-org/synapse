@@ -63,7 +63,7 @@ Modules can register web resources onto Synapse's web server using the following
 API method:
 
 ```python
-def ModuleApi.register_web_resource(path: str, resource: IResource)
+def ModuleApi.register_web_resource(path: str, resource: IResource) -> None
 ```
 
 The path is the full absolute path to register the resource at. For example, if you
@@ -216,7 +216,7 @@ If the module returns `True`, the current request will be denied with the error 
 invalidate the user's access token.
 
 ```python
-async def on_user_registration(user: str)
+async def on_user_registration(user: str) -> None
 ```
 
 Called after successfully registering a user, in case the module needs to perform extra

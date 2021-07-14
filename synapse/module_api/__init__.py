@@ -45,7 +45,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, UserID, create_requester, Requester
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -173,7 +173,7 @@ class ModuleApi:
         req: SynapseRequest,
         allow_guest: bool = False,
         allow_expired: bool = False,
-    ):
+    ) -> Requester:
         """Check the access_token provided for a request
 
         Args:
@@ -184,8 +184,10 @@ class ModuleApi:
             allow_expired: True if expired users should be allowed. If this
                 is False, and the access token is for an expired user, an
                 AuthError will be thrown
+
         Returns:
-            synapse.types.Requester: the requester for this request
+            The requester for this request
+
         Raises:
             InvalidClientCredentialsError: if no user by that token exists,
                 or the token is invalid.
@@ -597,8 +599,8 @@ class ModuleApi:
                 More info about logcontexts is available at
                 https://matrix-org.github.io/synapse/latest/log_contexts.html
             msec: How long to wait between calls in milliseconds.
-            desc: The background task's description. Default to the function's name.
             *args: Positional arguments to pass to function.
+            desc: The background task's description. Default to the function's name.
             **kwargs: Key arguments to pass to function.
         """
         if desc is None:
