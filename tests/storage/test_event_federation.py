@@ -15,7 +15,9 @@
 import attr
 from parameterized import parameterized
 
+from synapse.api.room_versions import RoomVersions
 from synapse.events import _EventInternalMetadata
+from synapse.util import json_encoder
 
 import tests.unittest
 import tests.utils
@@ -503,6 +505,61 @@ class EventFederationWorkerStoreTestCase(tests.unittest.HomeserverTestCase):
             self.store.get_auth_chain_difference(room_id, [{"a"}])
         )
         self.assertSetEqual(difference, set())
+
+    def test_prune_inbound_federation_queue(self):
+        "Test that pruning of inbound federation queues work"
+
+        room_id = "some_room_id"
+
+        # Insert a bunch of events that all reference the previous one.
+        self.get_success(
+            self.store.db_pool.simple_insert_many(
+                table="federation_inbound_events_staging",
+                values=[
+                    {
+                        "origin": "some_origin",
+                        "room_id": room_id,
+                        "received_ts": 0,
+                        "event_id": f"$fake_event_id_{i + 1}",
+                        "event_json": json_encoder.encode(
+                            {"prev_events": [f"$fake_event_id_{i}"]}
+                        ),
+                        "internal_metadata": "{}",
+                    }
+                    for i in range(500)
+                ],
+                desc="test_prune_inbound_federation_queue",
+            )
+        )
+
+        # Calling prune once should return True, i.e. a prune happen. The second
+        # time it shouldn't.
+        pruned = self.get_success(
+            self.store.prune_staged_events_in_room(room_id, RoomVersions.V6)
+        )
+        self.assertTrue(pruned)
+
+        pruned = self.get_success(
+            self.store.prune_staged_events_in_room(room_id, RoomVersions.V6)
+        )
+        self.assertFalse(pruned)
+
+        # Assert that we only have a single event left in the queue, and that it
+        # is the last one.
+        count = self.get_success(
+            self.store.db_pool.simple_select_one_onecol(
+                table="federation_inbound_events_staging",
+                keyvalues={"room_id": room_id},
+                retcol="COALESCE(COUNT(*), 0)",
+                desc="test_prune_inbound_federation_queue",
+            )
+        )
+        self.assertEqual(count, 1)
+
+        _, event_id = self.get_success(
+            self.store.get_next_staged_event_id_for_room(room_id)
+        )
+        self.assertEqual(event_id, "$fake_event_id_500")
 
 
 @attr.s
