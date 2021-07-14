@@ -937,43 +937,40 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # search.
 
         # Look for the prev_event_id connected to the given event_id
-        query = (
-            "SELECT depth, prev_event_id FROM event_edges"
-            # Get the depth of the prev_event_id from the events table
-            " INNER JOIN events"
-            " ON prev_event_id = events.event_id"
-            # Find an event which matches the given event_id
-            " WHERE event_edges.event_id = ?"
-            " AND event_edges.is_state = ?"
-            " LIMIT ?"
-        )
+        query = """
+            SELECT depth, prev_event_id FROM event_edges
+            /* Get the depth of the prev_event_id from the events table */
+            INNER JOIN events
+            ON prev_event_id = events.event_id
+            /* Find an event which matches the given event_id */
+            WHERE event_edges.event_id = ?
+            AND event_edges.is_state = ?
+            LIMIT ?
+        """
 
         # Look for the "insertion" events connected to the given event_id
-        # TODO: Do we need to worry about selecting only from the given room_id? The other query above doesn't
-        connected_insertion_event_query = (
-            "SELECT e.depth, i.event_id FROM insertion_event_edges AS i"
-            # Get the depth of the insertion event from the events table
-            " INNER JOIN events AS e"
-            " ON e.event_id = i.event_id"
-            # Find an insertion event which points via prev_events to the given event_id
-            " WHERE i.insertion_prev_event_id = ?"
-            " LIMIT ?"
-        )
+        connected_insertion_event_query = """
+            SELECT e.depth, i.event_id FROM insertion_event_edges AS i
+            /* Get the depth of the insertion event from the events table */
+            INNER JOIN events AS e USING (event_id)
+            /* Find an insertion event which points via prev_events to the given event_id */
+            WHERE i.insertion_prev_event_id = ?
+            LIMIT ?
+        """
 
         # Find any chunk connections of a given insertion event
-        # TODO: Do we need to worry about selecting only from the given room_id? The other query above doesn't
-        chunk_connection_query = (
-            "SELECT e.depth, c.event_id FROM insertion_events AS i"
-            # Find the chunk that connects to the given insertion event
-            " INNER JOIN chunk_edges AS c"
-            " ON i.next_chunk_id = c.chunk_id"
-            # Get the depth of the chunk start event from the events table
-            " INNER JOIN events AS e"
-            " ON e.event_id = c.event_id"
-            # Find an insertion event which matches the given event_id
-            " WHERE i.event_id = ?"
-            " LIMIT ?"
-        )
+        chunk_connection_query = """
+            SELECT e.depth, c.event_id FROM insertion_events AS i
+            /* Find the chunk that connects to the given insertion event */
+            INNER JOIN chunk_edges AS c
+            ON i.next_chunk_id = c.chunk_id
+            /* Get the depth of the chunk start event from the events table */
+            INNER JOIN events AS e
+            ON e.event_id = c.event_id
+            /* Find an insertion event which matches the given event_id */
+            WHERE i.event_id = ?
+            LIMIT ?
+        """
 
         # In a PriorityQueue, the lowest valued entries are retrieved first.
         # We're using depth as the priority in the queue.
@@ -1008,7 +1005,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             txn.execute(
                 connected_insertion_event_query, (event_id, limit - len(event_results))
             )
-            connected_insertion_event_id_results = list(txn)
+            connected_insertion_event_id_results = txn.fetchall()
             logger.debug(
                 "_get_backfill_events: connected_insertion_event_query %s",
                 connected_insertion_event_id_results,
@@ -1021,7 +1018,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     txn.execute(
                         chunk_connection_query, (row[1], limit - len(event_results))
                     )
-                    chunk_start_event_id_results = list(txn)
+                    chunk_start_event_id_results = txn.fetchall()
                     logger.debug(
                         "_get_backfill_events: chunk_start_event_id_results %s",
                         chunk_start_event_id_results,
@@ -1031,7 +1028,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                             queue.put((-row[0], row[1]))
 
             txn.execute(query, (event_id, False, limit - len(event_results)))
-            prev_event_id_results = list(txn)
+            prev_event_id_results = txn.fetchall()
             logger.debug(
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )

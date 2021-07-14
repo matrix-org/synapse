@@ -1760,7 +1760,8 @@ class PersistEventsStore:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
     def _handle_insertion_event(self, txn: LoggingTransaction, event: EventBase):
-        """Handles keeping track of insertion events and edges/connections
+        """Handles keeping track of insertion events and edges/connections.
+        Part of MSC2716.
 
         Args:
             txn: The database transaction object
@@ -1805,7 +1806,7 @@ class PersistEventsStore:
 
     def _handle_chunk_id(self, txn: LoggingTransaction, event: EventBase):
         """Handles inserting the chunk edges/connections between the event at the
-        start of a chunk and an insertion event
+        start of a chunk and an insertion event. Part of MSC2716.
 
         Args:
             txn: The database transaction object
