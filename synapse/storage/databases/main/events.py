@@ -1771,12 +1771,14 @@ class PersistEventsStore:
             # Not a insertion event
             return
 
-        logger.debug("_handle_insertion_event %s", event)
-
         next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
         if next_chunk_id is None:
             # Invalid insertion event without next chunk ID
             return
+
+        logger.debug(
+            "_handle_insertion_event (next_chunk_id=%s) %s", next_chunk_id, event
+        )
 
         # Keep track of the insertion event and the chunk ID
         self.db_pool.simple_insert_txn(
