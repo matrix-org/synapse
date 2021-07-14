@@ -3034,9 +3034,13 @@ class FederationHandler(BaseHandler):
             await member_handler.send_membership_event(None, event, context)
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
-            await self.federation_client.forward_third_party_invite(
-                destinations, room_id, event_dict
-            )
+
+            try:
+                await self.federation_client.forward_third_party_invite(
+                    destinations, room_id, event_dict
+                )
+            except (RequestSendFailed, HttpResponseException):
+                raise SynapseError(502, "Failed to forward third party invite")
 
     async def on_exchange_third_party_invite_request(
         self, event_dict: JsonDict
