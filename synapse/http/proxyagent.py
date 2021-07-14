@@ -193,25 +193,17 @@ class ProxyAgent(_AgentBase):
             # Determine whether we need to set Proxy-Authorization headers
             if self.http_proxy_creds:
                 # Set a Proxy-Authorization header
-                connect_headers = Headers()
-                connect_headers.addRawHeader(
+                if headers is None:
+                    headers = Headers()
+                headers.addRawHeader(
                     b"Proxy-Authorization",
                     self.http_proxy_creds.as_proxy_authorization_value(),
                 )
-                # if authentication is required, use tunnel instead of transparent mode
-                endpoint = HTTPConnectProxyEndpoint(
-                    self.proxy_reactor,
-                    self.http_proxy_endpoint,
-                    parsed_uri.host,
-                    parsed_uri.port,
-                    headers=connect_headers,
-                )
-            else:
-                # Cache *all* connections under the same key, since we are only
-                # connecting to a single destination, the proxy:
-                pool_key = ("http-proxy", self.http_proxy_endpoint)
-                endpoint = self.http_proxy_endpoint
-                request_path = uri
+            # Cache *all* connections under the same key, since we are only
+            # connecting to a single destination, the proxy:
+            pool_key = ("http-proxy", self.http_proxy_endpoint)
+            endpoint = self.http_proxy_endpoint
+            request_path = uri
         elif (
             parsed_uri.scheme == b"https"
             and self.https_proxy_endpoint
