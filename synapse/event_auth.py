@@ -48,6 +48,9 @@ def check(
         room_version_obj: the version of the room
         event: the event being checked.
         auth_events: the existing room state.
+        do_sig_check: True if it should be verified that the sending server
+            signed the event.
+        do_size_check: True if the size of the event fields should be verified.
 
     Raises:
         AuthError if the checks fail
