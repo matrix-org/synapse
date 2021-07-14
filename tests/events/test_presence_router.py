@@ -285,6 +285,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         presence_updates, _ = sync_presence(self, self.presence_receiving_user_two_id)
         self.assertEqual(len(presence_updates), 3)
 
+        # We stagger sending of presence, so we need to wait a bit for them to
+        # get sent out.
+        self.reactor.advance(60)
+
         # Test that sending to a remote user works
         remote_user_id = "@far_away_person:island"
 
@@ -300,6 +304,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         self.get_success(
             self.module_api.send_local_online_presence_to([remote_user_id])
         )
+
+        # We stagger sending of presence, so we need to wait a bit for them to
+        # get sent out.
+        self.reactor.advance(60)
 
         # Check that the expected presence updates were sent
         # We explicitly compare using sets as we expect that calling
