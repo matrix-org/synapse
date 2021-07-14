@@ -1505,7 +1505,6 @@ class PersistEventsStore:
             self._handle_event_relations(txn, event)
 
             self._handle_insertion_event(txn, event)
-            self._handle_marker_event(txn, event)
             self._handle_chunk_id(txn, event)
 
             # Store the labels for this event.
@@ -1760,19 +1759,19 @@ class PersistEventsStore:
         if rel_type == RelationTypes.REPLACE:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
-    def _handle_insertion_event(self, txn, event):
+    def _handle_insertion_event(self, txn: LoggingTransaction, event: EventBase):
         """Handles inserting insertion extremeties during peristence of marker events
 
         Args:
-            txn
-            event (EventBase)
+            txn: The database transaction object
+            event: The event to process
         """
 
         if event.type != EventTypes.MSC2716_INSERTION:
             # Not a insertion event
             return
 
-        logger.info("_handle_insertion_event %s", event)
+        logger.debug("_handle_insertion_event %s", event)
 
         next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
         if next_chunk_id is None:
@@ -1802,64 +1801,13 @@ class PersistEventsStore:
                 },
             )
 
-    def _handle_marker_event(self, txn, event):
-        """Handles inserting insertion extremeties during peristence of marker events
-
-        Args:
-            txn
-            event (EventBase)
-        """
-
-        if event.type != EventTypes.MSC2716_MARKER:
-            # Not a marker event
-            return
-
-        logger.info("_handle_marker_event %s", event)
-
-        # TODO: We should attempt to backfill the insertion event instead
-        # of trying to  pack all of the info in the marker event. Otherwise,
-        # we need to pack in the insertion_prev_events and insertion_next_chunk_id.
-        # GET /_matrix/federation/v1/event/{eventId}
-
-        insertion_event_id = event.content.get(
-            EventContentFields.MSC2716_MARKER_INSERTION
-        )
-
-        # We will trust that the application service sending the marker event is
-        # also the one that knows about the insertion event
-        # insertion_event_origin = get_domain_from_id(event.sender)
-        # m_ev = await self.federation_client.get_event(
-        #     [insertion_event_origin],
-        #     insertion_event_id,
-        #     outlier=True,
-        #     timeout=10000,
-        # )
-        # _auth_and_persist_events
-        # handle_new_client_event
-
-        # insertion_prev_event_ids = event.content.get(
-        #     EventContentFields.MSC2716_MARKER_INSERTION_PREV_EVENTS
-        # )
-        # if not insertion_event_id or not insertion_prev_event_ids:
-        #     # Invalid marker event
-        #     return
-
-        # for prev_event_id in insertion_prev_event_ids:
-        #     self.db_pool.simple_insert_txn(
-        #         txn,
-        #         table="insertion_event_edges",
-        #         values={
-        #             "insertion_event_id": insertion_event_id,
-        #             "room_id": event.room_id,
-        #             "insertion_prev_event_id": prev_event_id,
-        #         },
-        #     )
-
-    def _handle_chunk_id(self, txn, event):
+    def _handle_chunk_id(self, txn: LoggingTransaction, event: EventBase):
         """Handles inserting the chunk connections between the event at the
         start of a chunk and an insertion event
 
-        Args: txn event (EventBase)
+        Args:
+            txn: The database transaction object
+            event: The event to process
         """
 
         chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
@@ -1867,7 +1815,7 @@ class PersistEventsStore:
             # No chunk connection to persist
             return
 
-        logger.info("_handle_chunk_id %s %s", chunk_id, event)
+        logger.debug("_handle_chunk_id %s %s", chunk_id, event)
 
         # Keep track of the insertion event and the chunk ID
         self.db_pool.simple_insert_txn(

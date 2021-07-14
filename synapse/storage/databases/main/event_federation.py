@@ -1009,8 +1009,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event_query, (event_id, limit - len(event_results))
             )
             connected_insertion_event_id_results = list(txn)
-            logger.info(
-                "connected_insertion_event_query %s",
+            logger.debug(
+                "_get_backfill_events: connected_insertion_event_query %s",
                 connected_insertion_event_id_results,
             )
             for row in connected_insertion_event_id_results:
@@ -1022,8 +1022,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                         chunk_connection_query, (row[1], limit - len(event_results))
                     )
                     chunk_start_event_id_results = list(txn)
-                    logger.info(
-                        "chunk_start_event_id_results %s",
+                    logger.debug(
+                        "_get_backfill_events: chunk_start_event_id_results %s",
                         chunk_start_event_id_results,
                     )
                     for row in chunk_start_event_id_results:
@@ -1032,7 +1032,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             txn.execute(query, (event_id, False, limit - len(event_results)))
             prev_event_id_results = list(txn)
-            logger.info("prev_event_ids %s", prev_event_id_results)
+            logger.debug(
+                "_get_backfill_events: prev_event_ids %s", prev_event_id_results
+            )
 
             for row in prev_event_id_results:
                 if row[1] not in event_results:
