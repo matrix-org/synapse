@@ -1819,10 +1819,24 @@ class PersistEventsStore:
         # TODO: We should attempt to backfill the insertion event instead
         # of trying to  pack all of the info in the marker event. Otherwise,
         # we need to pack in the insertion_prev_events and insertion_next_chunk_id.
+        # GET /_matrix/federation/v1/event/{eventId}
 
-        # insertion_event_id = event.content.get(
-        #     EventContentFields.MSC2716_MARKER_INSERTION
+        insertion_event_id = event.content.get(
+            EventContentFields.MSC2716_MARKER_INSERTION
+        )
+
+        # We will trust that the application service sending the marker event is
+        # also the one that knows about the insertion event
+        # insertion_event_origin = get_domain_from_id(event.sender)
+        # m_ev = await self.federation_client.get_event(
+        #     [insertion_event_origin],
+        #     insertion_event_id,
+        #     outlier=True,
+        #     timeout=10000,
         # )
+        # _auth_and_persist_events
+        # handle_new_client_event
+
         # insertion_prev_event_ids = event.content.get(
         #     EventContentFields.MSC2716_MARKER_INSERTION_PREV_EVENTS
         # )
