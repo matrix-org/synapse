@@ -27,6 +27,7 @@ from synapse.api.errors import (
     InvalidClientCredentialsError,
     ShadowBanError,
     SynapseError,
+    MissingClientTokenError,
 )
 from synapse.api.filtering import Filter
 from synapse.appservice import ApplicationService
@@ -1428,8 +1429,48 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         )
 
 
+class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/im.nheko.summary"
+            "/rooms/(?P<room_identifier>[^/]*)/summary$"
+        ),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self._auth = hs.get_auth()
+        self._room_summary_handler = hs.get_room_summary_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
+        try:
+            requester = await self._auth.get_user_by_req(request, allow_guest=True)
+            requester_user_id = requester.user.to_string()
+        except MissingClientTokenError:
+            requester_user_id = None
+
+        # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+        remote_room_hosts = parse_strings_from_args(
+            args, "via", required=False
+        )
+        room_id, remote_room_hosts = await self.resolve_room_id(
+            room_identifier,
+            remote_room_hosts,
+        )
+
+        return 200, await self._room_summary_handler.get_room_summary(
+            requester_user_id,
+            room_id,
+            remote_room_hosts,
+        )
+
+
 def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     msc2716_enabled = hs.config.experimental.msc2716_enabled
+    mxc3266_enabled = hs.config.experimental.mxc3266_enabled
 
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
@@ -1446,6 +1487,8 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RoomSpaceSummaryRestServlet(hs).register(http_server)
+    if mxc3266_enabled:
+        RoomSummaryRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     JoinedRoomsRestServlet(hs).register(http_server)
     RoomAliasListServlet(hs).register(http_server)

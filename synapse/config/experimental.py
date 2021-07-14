@@ -32,3 +32,6 @@ class ExperimentalConfig(Config):
 
         # MSC2716 (backfill existing history)
         self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool
+
+        # MSC3266 (room summary api)
+        self.mxc3266_enabled = experimental.get("mxc3266_enabled", False)  # type: bool
