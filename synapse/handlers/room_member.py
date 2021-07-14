@@ -733,20 +733,44 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 if await self.event_auth_handler.has_restricted_join_rules(
                     current_state_ids, room_version
                 ):
-                    event_map = await self.store.get_events(current_state_ids.values())
-                    current_state = {
-                        state_key: event_map[event_id]
-                        for state_key, event_id in current_state_ids.items()
-                    }
-                    allowed_servers = get_servers_from_users(
-                        get_users_which_can_issue_invite(current_state)
+                    # If the user is invited to the room or already joined, the
+                    # join event can always be issued locally.
+                    prev_member_event_id = current_state_ids.get(
+                        (EventTypes.Member, target.to_string()), None
                     )
+                    can_issue_join_locally = False
+                    if prev_member_event_id:
+                        prev_member_event = await self.store.get_event(
+                            prev_member_event_id
+                        )
+                        can_issue_join_locally = prev_member_event.membership not in (
+                            Membership.JOIN,
+                            Membership.INVITE,
+                        )
+                        # TODO Nothing to do.
 
-                    # If the local server is not one of allowed servers, use
-                    # another server to join (and override the list of servers
-                    # with those that can issue the join).
-                    remote_room_hosts = list(allowed_servers)
-                    remote_join = self.hs.hostname not in allowed_servers
+                    # Otherwise, check if a remote host needs to be used by seeing
+                    # if any local user can issue invites.
+                    #
+                    # If not, generate a new list of remote hosts based on which
+                    # can issue invites.
+                    if not can_issue_join_locally:
+                        event_map = await self.store.get_events(
+                            current_state_ids.values()
+                        )
+                        current_state = {
+                            state_key: event_map[event_id]
+                            for state_key, event_id in current_state_ids.items()
+                        }
+                        allowed_servers = get_servers_from_users(
+                            get_users_which_can_issue_invite(current_state)
+                        )
+
+                        # If the local server is not one of allowed servers, use
+                        # another server to join (and override the list of servers
+                        # with those that can issue the join).
+                        remote_room_hosts = list(allowed_servers)
+                        remote_join = self.hs.hostname not in allowed_servers
 
             if remote_join:
                 if ratelimit:
