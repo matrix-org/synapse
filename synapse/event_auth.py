@@ -166,9 +166,7 @@ def check(
 
     # 5. If type is m.room.membership
     if event.type == EventTypes.Member:
-        _is_membership_change_allowed(
-            room_version_obj, event, auth_events, do_sig_check
-        )
+        _is_membership_change_allowed(room_version_obj, event, auth_events)
         logger.debug("Allowing! %s", event)
         return
 
@@ -226,10 +224,7 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
 
 
 def _is_membership_change_allowed(
-    room_version: RoomVersion,
-    event: EventBase,
-    auth_events: StateMap[EventBase],
-    do_sig_check: bool,
+    room_version: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
 ) -> None:
     """
     Confirms that the event which changes membership is an allowed change.
@@ -238,8 +233,6 @@ def _is_membership_change_allowed(
         room_version: The version of the room.
         event: The event to check.
         auth_events: The current auth events of the room.
-        do_sig_check: True if it should be verified that the sending server
-            signed the event.
 
     Raises:
         AuthError if the event is not allowed.
@@ -292,6 +285,7 @@ def _is_membership_change_allowed(
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
 
+    invite_level = _get_named_level(auth_events, "invite", 0)
     ban_level = _get_named_level(auth_events, "ban", 50)
 
     logger.debug(
@@ -342,8 +336,6 @@ def _is_membership_change_allowed(
         elif target_in_room:  # the target is already in the room.
             raise AuthError(403, "%s is already in the room." % target_user_id)
         else:
-            invite_level = _get_named_level(auth_events, "invite", 0)
-
             if user_level < invite_level:
                 raise AuthError(403, "You don't have permission to invite users")
     elif Membership.JOIN == membership:
@@ -363,29 +355,27 @@ def _is_membership_change_allowed(
             room_version.msc3083_join_rules
             and join_rule == JoinRules.MSC3083_RESTRICTED
         ):
-            # This is the same as public, but the event must be signed by a server
-            # whose users could issue invites.
-            #
-            # Signatures are only checked once the event is fully created, e.g.
-            # not during make_join,
+            # This is the same as public, but the event must contain a reference
+            # to the server who authorised the join. If the event does not contain
+            # the proper content it is rejected.
             #
             # Note that if the caller is in the room or invited, then they do
             # not need to meet the allow rules.
-            if do_sig_check and not caller_in_room and not caller_invited:
-                # Find the servers of any users who could issue invites.
-                authorised_servers = get_servers_from_users(
-                    get_users_which_can_issue_invite(auth_events)
+            if not caller_in_room and not caller_invited:
+                authorising_user = event.content.get("join_authorised_via_users_server")
+                authorising_user_level = get_user_power_level(
+                    authorising_user, auth_events
                 )
 
-                # Ensure one of the signatures is from one of the authorised servers.
-                # Note that it was previously checked that the signatures are
-                # valid.
-                for signing_server in event.signatures:
-                    if signing_server in authorised_servers:
-                        break
-                else:
-                    # No valid servers were found!
-                    raise AuthError(403, "Join event signed by invalid server.")
+                # The authorising user cannot issue invites!
+                if authorising_user_level < invite_level:
+                    raise AuthError(403, "Join event authorised by invalid server.")
+
+                # The authorising user must be in the room.
+                key = (EventTypes.Member, authorising_user)
+                member_event = auth_events.get(key)
+                _check_joined_room(member_event, authorising_user, event.room_id)
+
         elif join_rule == JoinRules.INVITE or (
             room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
         ):
