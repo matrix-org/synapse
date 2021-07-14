@@ -181,12 +181,67 @@ The arguments passed to this callback are:
 ```python
 async def check_media_file_for_spam(
     file_wrapper: "synapse.rest.media.v1.media_storage.ReadableFileWrapper",
-    file_info: "synapse.rest.media.v1._base.FileInfo"
+    file_info: "synapse.rest.media.v1._base.FileInfo",
 ) -> bool
 ```
 
 Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.
+
+#### Third party rules callbacks
+
+Third party rules callbacks allow modules developers to add extra checks to verify the
+validity of incoming events. Third party event rules callbacks can be registered using
+the module API's `register_third_party_rules_callbacks` method.
+
+The available third party rules callbacks are:
+
+```python
+async def check_event_allowed(
+    event: "synapse.events.EventBase",
+    state_events: "synapse.types.StateMap",
+) -> Tuple[bool, Optional[dict]]
+```
+
+Called when processing any incoming event, with the event and the a `StateMap`
+representing the current state of the room the event is being sent into. A `StateMap` is
+a dictionary indexed on tuples containing an event type and a state key; for example
+retrieving the room's `m.room.create` event from the `state_events` argument looks like
+this: `state_events.get(("m.room.create", ""))`. The module must return a boolean
+indicating whether the event can be allowed.
+
+Note that this callback function processes incoming events coming via federation
+traffic (on top of client traffic). This means denying an event might cause the local
+copy of the room's history to diverge from the ones of remote servers. This may cause
+federation issues in the room. It is strongly recommended to only deny events using this
+callback function if the sender is a local user, or in a private federation in which all
+servers are using the same module, with the same configuration.
+
+If the boolean returned by the module is `True`, it may also tell Synapse to replace the
+event with new data by returning the new event's data as a dictionary. In order to do
+that, it is recommended the module calls `event.get_dict()` to get the current event as a
+dictionary, and modify the returned dictionary accordingly.
+
+Note that replacing the event only works for events sent by local users, not for events
+received over federation.
+
+```python
+async def on_create_room(
+    requester: "synapse.types.Requester",
+    request_content: dict,
+    is_requester_admin: bool,
+) -> None
+```
+
+Called when processing a room creation request, with the `Requester` object for the user
+performing the request, a dictionary representing the room creation request's JSON body
+(see [the spec](https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-createroom)
+for a list of possible parameters), and a boolean indicating whether the user performing
+the request is a server admin.
+
+Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
+or deny the room's creation by raising a `module_api.errors.SynapseError`.
+
 
 ### Porting an existing module that uses the old interface
 

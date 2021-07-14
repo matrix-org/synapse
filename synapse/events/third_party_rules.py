@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 CHECK_EVENT_ALLOWED_CALLBACK = Callable[
-    [EventBase, EventContext], Awaitable[Tuple[bool, Optional[dict]]]
+    [EventBase, StateMap[EventBase]], Awaitable[Tuple[bool, Optional[dict]]]
 ]
 ON_CREATE_ROOM_CALLBACK = Callable[[Requester, dict, bool], Awaitable]
 CHECK_THREEPID_CAN_BE_INVITED_CALLBACK = Callable[
@@ -66,6 +66,7 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
         # correctly, we need to await its result. Therefore it doesn't make a lot of
         # sense to make it go through the run() wrapper.
         if f.__name__ == "check_event_allowed":
+
             async def wrapper(
                 event: EventBase,
                 state_events: StateMap[EventBase],
@@ -216,13 +217,13 @@ class ThirdPartyEventRules:
         event.freeze()
 
         for callback in self._check_event_allowed_callbacks:
-            res, new_content = await callback(event, state_events)
+            res, replacement_data = await callback(event, state_events)
             # Return if the event shouldn't be allowed or if the module came up with a
-            # replacement content for the event.
+            # replacement dict for the event.
             if res is False:
                 return res, None
-            elif isinstance(new_content, dict):
-                return True, new_content
+            elif isinstance(replacement_data, dict):
+                return True, replacement_data
 
         return True, None
 
