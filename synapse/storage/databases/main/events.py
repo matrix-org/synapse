@@ -1760,7 +1760,7 @@ class PersistEventsStore:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
     def _handle_insertion_event(self, txn: LoggingTransaction, event: EventBase):
-        """Handles inserting insertion extremeties during peristence of marker events
+        """Handles keeping track of insertion events and edges/connections
 
         Args:
             txn: The database transaction object
@@ -1802,7 +1802,7 @@ class PersistEventsStore:
             )
 
     def _handle_chunk_id(self, txn: LoggingTransaction, event: EventBase):
-        """Handles inserting the chunk connections between the event at the
+        """Handles inserting the chunk edges/connections between the event at the
         start of a chunk and an insertion event
 
         Args:
