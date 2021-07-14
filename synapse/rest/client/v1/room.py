@@ -39,6 +39,7 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
     parse_strings_from_args,
+    ResolveRoomIdMixin,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
@@ -650,10 +651,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for room ID + alias joins
-class JoinRoomAliasServlet(TransactionRestServlet):
+class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.room_member_handler = hs.get_room_member_handler()
+        super(ResolveRoomIdMixin, self).__init__(hs)  # ensure the Mixin is set up
         self.auth = hs.get_auth()
 
     def register(self, http_server):
@@ -676,24 +677,15 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-
-            # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
-            args: Dict[bytes, List[bytes]] = request.args  # type: ignore
-
-            remote_room_hosts = parse_strings_from_args(
-                args, "server_name", required=False
-            )
-        elif RoomAlias.is_valid(room_identifier):
-            handler = self.room_member_handler
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id_obj, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-            room_id = room_id_obj.to_string()
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
+        # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+        remote_room_hosts = parse_strings_from_args(
+            args, "server_name", required=False
+        )
+        room_id, remote_room_hosts = await self.resolve_room_id(
+            room_identifier,
+            remote_room_hosts,
+        )
 
         await self.room_member_handler.update_membership(
             requester=requester,

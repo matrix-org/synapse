@@ -14,7 +14,7 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 import logging
-from typing import Dict, Iterable, List, Optional, overload
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, overload, Tuple
 
 from typing_extensions import Literal
 
@@ -22,13 +22,17 @@ from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
+from synapse.types import RoomAlias, RoomID
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 def parse_integer(request, name, default=None, required=False):
     """Parse an integer parameter from the request string
-
+thank
     Args:
         request: the twisted HTTP request.
         name (bytes/unicode): the name of the query parameter.
@@ -509,3 +513,45 @@ class RestServlet:
 
         else:
             raise NotImplementedError("RestServlet must register something.")
+
+
+class ResolveRoomIdMixin:
+    def __init__(self, hs: "HomeServer"):
+        self.room_member_handler = hs.get_room_member_handler()
+
+    async def resolve_room_id(
+        self, room_identifier: str, remote_room_hosts: Optional[List[str]] = None
+    ) -> Tuple[str, Optional[List[str]]]:
+        """
+        Resolve a room identifier to a room ID, if necessary.
+
+        This also performanes checks to ensure the room ID is of the proper form.
+
+        Args:
+            room_identifier: The room ID or alias.
+            remote_room_hosts: The potential remote room hosts to use.
+
+        Returns:
+            The resolved room ID.
+
+        Raises:
+            SynapseError if the room ID is of the wrong form.
+        """
+        if RoomID.is_valid(room_identifier):
+            resolved_room_id = room_identifier
+        elif RoomAlias.is_valid(room_identifier):
+            room_alias = RoomAlias.from_string(room_identifier)
+            (
+                room_id,
+                remote_room_hosts,
+            ) = await self.room_member_handler.lookup_room_alias(room_alias)
+            resolved_room_id = room_id.to_string()
+        else:
+            raise SynapseError(
+                400, "%s was not legal room ID or room alias" % (room_identifier,)
+            )
+        if not resolved_room_id:
+            raise SynapseError(
+                400, "Unknown room ID or room alias %s" % room_identifier
+            )
+        return resolved_room_id, remote_room_hosts
