@@ -16,6 +16,7 @@ import logging
 import os
 from collections import namedtuple
 from typing import Dict, List
+from urllib.request import getproxies_environment
 
 from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
@@ -23,7 +24,7 @@ from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
 
-logger = logging.Logger(__name__)
+logger = logging.getLogger(__name__)
 
 DEFAULT_THUMBNAIL_SIZES = [
     {"width": 32, "height": 32, "method": "crop"},
@@ -186,16 +187,16 @@ class ContentRepositoryConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
-            proxies = ["HTTP_PROXY", "HTTPS_PROXY"]
+            proxy_env = getproxies_environment()
             if "url_preview_ip_range_blacklist" not in config:
-                if not any(proxy in os.environ for proxy in proxies):
+                if "http" not in proxy_env or "https" not in proxy_env:
                     raise ConfigError(
                         "For security, you must specify an explicit target IP address "
                         "blacklist in url_preview_ip_range_blacklist for url previewing "
                         "to work"
                     )
             else:
-                if any(proxy in os.environ for proxy in proxies):
+                if "http" in proxy_env or "https" in proxy_env:
                     logger.warning("".join(HTTP_PROXY_SET_WARNING))
 
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
