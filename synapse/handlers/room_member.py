@@ -341,35 +341,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
-            prev_member_event = None
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
-
-            # If the current room is using restricted join rules, additional information
-            # must be included in the event content in order to efficiently validate
-            # the event.
-            if (
-                newly_joined
-                and await self.event_auth_handler.has_restricted_join_rules(
-                    prev_state_ids, event.room_version
-                )
-            ):
-                # Check if the member should be allowed access via membership in a space.
-                await self.event_auth_handler.check_restricted_join_rules(
-                    prev_state_ids, event.room_version, user_id, prev_member_event
-                )
-
-                authorised_user_id = (
-                    await self.event_auth_handler.get_user_which_could_invite(
-                        room_id,
-                        prev_state_ids,
-                    )
-                )
-                if authorised_user_id:
-                    event.content[
-                        "join_authorised_via_users_server"
-                    ] = authorised_user_id
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
@@ -723,55 +697,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     raise AuthError(403, "Guest access not allowed")
 
             # Check if a remote join should be performed.
-            remote_join = not is_host_in_room
-            if not remote_join:
-                # If the host is in the room, but not one of the authorised hosts
-                # for restricted join rules, a remote join must be used.
-                room_version = await self.store.get_room_version(room_id)
-                current_state_ids = await self.store.get_current_state_ids(room_id)
-
-                if await self.event_auth_handler.has_restricted_join_rules(
-                    current_state_ids, room_version
-                ):
-                    # If the user is invited to the room or already joined, the
-                    # join event can always be issued locally.
-                    prev_member_event_id = current_state_ids.get(
-                        (EventTypes.Member, target.to_string()), None
-                    )
-                    can_issue_join_locally = False
-                    if prev_member_event_id:
-                        prev_member_event = await self.store.get_event(
-                            prev_member_event_id
-                        )
-                        can_issue_join_locally = prev_member_event.membership not in (
-                            Membership.JOIN,
-                            Membership.INVITE,
-                        )
-                        # TODO Nothing to do.
-
-                    # Otherwise, check if a remote host needs to be used by seeing
-                    # if any local user can issue invites.
-                    #
-                    # If not, generate a new list of remote hosts based on which
-                    # can issue invites.
-                    if not can_issue_join_locally:
-                        event_map = await self.store.get_events(
-                            current_state_ids.values()
-                        )
-                        current_state = {
-                            state_key: event_map[event_id]
-                            for state_key, event_id in current_state_ids.items()
-                        }
-                        allowed_servers = get_servers_from_users(
-                            get_users_which_can_issue_invite(current_state)
-                        )
-
-                        # If the local server is not one of allowed servers, use
-                        # another server to join (and override the list of servers
-                        # with those that can issue the join).
-                        remote_room_hosts = list(allowed_servers)
-                        remote_join = self.hs.hostname not in allowed_servers
-
+            remote_join, remote_room_hosts = await self._should_perform_remote_join(
+                target.to_string(), room_id, remote_room_hosts, content, is_host_in_room
+            )
             if remote_join:
                 if ratelimit:
                     time_now_s = self.clock.time()
@@ -896,6 +824,107 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             require_consent=require_consent,
             outlier=outlier,
         )
+
+    async def _should_perform_remote_join(
+        self,
+        user_id: str,
+        room_id: str,
+        remote_room_hosts: List[str],
+        content: JsonDict,
+        is_host_in_room: bool,
+    ) -> Tuple[bool, List[str]]:
+        """
+        Check whether the server should do a remote join (as opposed to a local
+        join) for a user.
+
+        Generally a remote join is used if:
+
+        * The server is not yet in the room.
+        * The server is in the room, the room has restricted join rules, the user
+          is not joined or invited to the room, and the server does not have
+          another user who is capable of issuing invites.
+
+        Args:
+            user_id: The user joining the room.
+            room_id: The room being joined.
+            remote_room_hosts: A list of remote room hosts.
+            content: The content to use as the event body of the join. This may
+                be modified.
+            is_host_in_room: True if the host is in the room.
+
+        Returns:
+            A tuple of:
+                True if a remote join should be performed. False if the join can be
+                done locally.
+
+                A list of remote room hosts to use. This is an empty list if a
+                local join is to be done.
+        """
+        # If the host isn't in the room, pass through the prospective hosts.
+        if not is_host_in_room:
+            return True, remote_room_hosts
+
+        # If the host is in the room, but not one of the authorised hosts
+        # for restricted join rules, a remote join must be used.
+        room_version = await self.store.get_room_version(room_id)
+        current_state_ids = await self.store.get_current_state_ids(room_id)
+
+        # If restricted join rules are not being used, a local join can always
+        # be used.
+        if not await self.event_auth_handler.has_restricted_join_rules(
+            current_state_ids, room_version
+        ):
+            return False, []
+
+        # If the user is invited to the room or already joined, the join
+        # event can always be issued locally.
+        prev_member_event_id = current_state_ids.get((EventTypes.Member, user_id), None)
+        prev_member_event = None
+        if prev_member_event_id:
+            prev_member_event = await self.store.get_event(prev_member_event_id)
+            if prev_member_event.membership in (
+                Membership.JOIN,
+                Membership.INVITE,
+            ):
+                return False, []
+
+        # If the local host has a user who can issue invites, then a local
+        # join can be done.
+        #
+        # If not, generate a new list of remote hosts based on which
+        # can issue invites.
+        event_map = await self.store.get_events(current_state_ids.values())
+        current_state = {
+            state_key: event_map[event_id]
+            for state_key, event_id in current_state_ids.items()
+        }
+        allowed_servers = get_servers_from_users(
+            get_users_which_can_issue_invite(current_state)
+        )
+
+        # If the local server isnot  one of allowed servers, then a remote
+        # join must be done. Return the list of prospective servers based on
+        # which can issue invites.
+        if self.hs.hostname not in allowed_servers:
+            return True, list(allowed_servers)
+
+        # Ensure the member should be allowed access via membership in a room.
+        await self.event_auth_handler.check_restricted_join_rules(
+            current_state_ids, room_version, user_id, prev_member_event
+        )
+
+        # If this is going to be a local join, additional information must
+        # be included in the event content in order to efficiently validate
+        # the event.
+        authorised_user_id = await self.event_auth_handler.get_user_which_could_invite(
+            room_id,
+            current_state_ids,
+        )
+        if authorised_user_id:
+            content["join_authorised_via_users_server"] = authorised_user_id
+        # TODO If no authorised user is found then something bad happened.
+
+        return False, []
 
     async def transfer_room_state_on_room_upgrade(
         self, old_room_id: str, room_id: str
