@@ -98,6 +98,33 @@ example.com:8448 {
   reverse_proxy http://localhost:8008
 }
 ```
+[Delegation](delegate.md) example:
+```
+(matrix-well-known-header) {
+    # Headers
+    header Access-Control-Allow-Origin "*"
+    header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    header Content-Type "application/json"
+}
+
+example.com {
+    handle /.well-known/matrix/server {
+        import matrix-well-known-header
+        respond `{"m.server":"matrix.example.com:443"}`
+    }
+
+    handle /.well-known/matrix/client {
+        import matrix-well-known-header
+        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
+    }
+}
+
+matrix.example.com {
+    reverse_proxy /_matrix/* http://localhost:8008
+    reverse_proxy /_synapse/client/* http://localhost:8008
+}
+```
 
 ### Apache
 
