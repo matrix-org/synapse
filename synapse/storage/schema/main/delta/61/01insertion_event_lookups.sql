@@ -19,10 +19,9 @@ CREATE TABLE IF NOT EXISTS insertion_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     next_chunk_id TEXT NOT NULL,
-    UNIQUE (event_id, room_id, next_chunk_id)
+    UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS insertion_events_insertion_room_id ON insertion_events(room_id);
 CREATE INDEX IF NOT EXISTS insertion_events_event_id ON insertion_events(event_id);
 CREATE INDEX IF NOT EXISTS insertion_events_next_chunk_id ON insertion_events(next_chunk_id);
 
@@ -34,7 +33,7 @@ CREATE TABLE IF NOT EXISTS insertion_event_edges(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     insertion_prev_event_id TEXT NOT NULL,
-    UNIQUE (event_id, room_id, insertion_prev_event_id)
+    UNIQUE (event_id)
 );
 
 CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_room_id ON insertion_event_edges(room_id);
@@ -47,7 +46,7 @@ CREATE TABLE IF NOT EXISTS chunk_edges(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     chunk_id TEXT NOT NULL,
-    UNIQUE (event_id, room_id)
+    UNIQUE (event_id)
 );
 
 CREATE INDEX IF NOT EXISTS chunk_edges_chunk_id ON chunk_edges(chunk_id);
