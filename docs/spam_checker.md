@@ -1,7 +1,7 @@
 <h2 style="color:red">
 This page of the Synapse documentation is now deprecated. For up to date
 documentation on setting up or writing a spam checker module, please see
-<a href="https://matrix-org.github.io/synapse/develop/modules.html">this page</a>.
+<a href="modules.md">this page</a>.
 </h2>
 
 # Handling spam in Synapse
