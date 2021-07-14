@@ -1783,7 +1783,7 @@ class PersistEventsStore:
             txn,
             table="insertion_events",
             values={
-                "insertion_event_id": event.event_id,
+                "event_id": event.event_id,
                 "room_id": event.room_id,
                 "next_chunk_id": next_chunk_id,
             },
@@ -1795,7 +1795,7 @@ class PersistEventsStore:
                 txn,
                 table="insertion_event_edges",
                 values={
-                    "insertion_event_id": event.event_id,
+                    "event_id": event.event_id,
                     "room_id": event.room_id,
                     "insertion_prev_event_id": prev_event_id,
                 },

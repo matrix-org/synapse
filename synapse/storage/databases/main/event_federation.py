@@ -951,10 +951,10 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         # Look for the "insertion" events connected to the given event_id
         # TODO: Do we need to worry about selecting only from the given room_id? The other query above doesn't
         connected_insertion_event_query = (
-            "SELECT e.depth, i.insertion_event_id FROM insertion_event_edges AS i"
+            "SELECT e.depth, i.event_id FROM insertion_event_edges AS i"
             # Get the depth of the insertion event from the events table
             " INNER JOIN events AS e"
-            " ON e.event_id = i.insertion_event_id"
+            " ON e.event_id = i.event_id"
             # Find an insertion event which points via prev_events to the given event_id
             " WHERE i.insertion_prev_event_id = ?"
             " LIMIT ?"
@@ -971,7 +971,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             " INNER JOIN events AS e"
             " ON e.event_id = c.event_id"
             # Find an insertion event which matches the given event_id
-            " WHERE i.insertion_event_id = ?"
+            " WHERE i.event_id = ?"
             " LIMIT ?"
         )
 
