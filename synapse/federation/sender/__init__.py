@@ -13,10 +13,14 @@
 # limitations under the License.
 
 import abc
+import collections
 import logging
+import typing
 from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
+import attr
 from prometheus_client import Counter
+from typing_extensions import Literal
 
 from twisted.internet import defer
 
@@ -33,8 +37,12 @@ from synapse.metrics import (
     event_processing_loop_room_count,
     events_processed_counter,
 )
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
+from synapse.util import Clock
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -137,6 +145,86 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
 
+@attr.s
+class _PresenceQueue:
+    """A queue of destinations that need to be woken up due to new presence
+    updates.
+
+    Staggers waking up of per destination queues to ensure that we don't attempt
+    to start TLS connections with many hosts all at once, leading to pinned CPU.
+    """
+
+    # The maximum duration in seconds between queuing up a destination and it
+    # being woken up.
+    _MAX_TIME_IN_QUEUE = 30.0
+
+    # The maximum duration in seconds between waking up consecutive destination
+    # queues.
+    _MAX_DELAY = 0.1
+
+    sender: "FederationSender" = attr.ib()
+    clock: Clock = attr.ib()
+    queue: typing.OrderedDict[str, Literal[None]] = attr.ib(
+        factory=collections.OrderedDict
+    )
+    processing: bool = attr.ib(default=False)
+
+    def add_to_queue(self, destination: str) -> None:
+        """Add a destination to the queue to be woken up."""
+
+        self.queue[destination] = None
+
+        if not self.processing:
+            self._handle()
+
+    @wrap_as_background_process("_PresenceQueue.handle")
+    async def _handle(self) -> None:
+        """Background process to drain the queue."""
+
+        if not self.queue:
+            return
+
+        assert not self.processing
+        self.processing = True
+
+        try:
+            # We start with a delay that should drain queue quickly enough that
+            # we process all destinations in the queue in _MAX_TIME_IN_QUEUE
+            # seconds.
+            #
+            # We also add an upper bound to the delay, to gracefully handle the
+            # case where the queue only has a few entries in it.
+            current_sleep_seconds = min(
+                self._MAX_DELAY, self._MAX_TIME_IN_QUEUE / len(self.queue)
+            )
+
+            while self.queue:
+                destination, _ = self.queue.popitem(last=False)
+
+                queue = self.sender._get_per_destination_queue(destination)
+
+                if not queue._new_data_to_send:
+                    # The per destination queue has already been woken up.
+                    continue
+
+                queue.attempt_new_transaction()
+
+                await self.clock.sleep(current_sleep_seconds)
+
+                if not self.queue:
+                    break
+
+                # More destinations may have been added to the queue, so we may
+                # need to reduce the delay to ensure everything gets processed
+                # with _MAX_TIME_IN_QUEUE seconds.
+                current_sleep_seconds = min(
+                    current_sleep_seconds, self._MAX_TIME_IN_QUEUE / len(self.queue)
+                )
+
+        finally:
+            self.processing = False
+
+
 class FederationSender(AbstractFederationSender):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -209,6 +297,8 @@ class FederationSender(AbstractFederationSender):
         )
 
         self._external_cache = hs.get_external_cache()
+
+        self._presence_queue = _PresenceQueue(self, self.clock)
 
     def _get_per_destination_queue(self, destination: str) -> PerDestinationQueue:
         """Get or create a PerDestinationQueue for the given destination
@@ -519,7 +609,12 @@ class FederationSender(AbstractFederationSender):
                 self._instance_name, destination
             ):
                 continue
-            self._get_per_destination_queue(destination).send_presence(states)
+
+            self._get_per_destination_queue(destination).send_presence(
+                states, start_loop=False
+            )
+
+            self._presence_queue.add_to_queue(destination)
 
     def build_and_send_edu(
         self,

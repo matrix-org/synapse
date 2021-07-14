@@ -171,14 +171,24 @@ class PerDestinationQueue:
 
         self.attempt_new_transaction()
 
-    def send_presence(self, states: Iterable[UserPresenceState]) -> None:
-        """Add presence updates to the queue. Start the transmission loop if necessary.
+    def send_presence(
+        self, states: Iterable[UserPresenceState], start_loop: bool = True
+    ) -> None:
+        """Add presence updates to the queue.
+
+        Args:
+            states: Presence updates to send
+            start_loop: Whether to start the transmission loop if not already
+                running.
 
         Args:
             states: presence to send
         """
         self._pending_presence.update({state.user_id: state for state in states})
-        self.attempt_new_transaction()
+        self._new_data_to_send = True
+
+        if start_loop:
+            self.attempt_new_transaction()
 
     def queue_read_receipt(self, receipt: ReadReceipt) -> None:
         """Add a RR to the list to be sent. Doesn't start the transmission loop yet
