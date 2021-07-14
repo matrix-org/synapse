@@ -13,11 +13,8 @@
  * limitations under the License.
  */
 
--- Add a table that keeps track of "insertion" events back in the history
--- when we get a "marker" event over the "live" timeline. When navigating the DAG
--- and we hit an event which matches `insertion_prev_event_id`, it should backfill 
--- the "insertion" event and start navigating from there.
-
+-- Add a table that keeps track of "insertion" events and
+-- their next_chunk_id's so we can navigate to the next chunk of history.
 CREATE TABLE IF NOT EXISTS insertion_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
@@ -29,6 +26,10 @@ CREATE INDEX IF NOT EXISTS insertion_events_insertion_room_id ON insertion_event
 CREATE INDEX IF NOT EXISTS insertion_events_event_id ON insertion_events(event_id);
 CREATE INDEX IF NOT EXISTS insertion_events_next_chunk_id ON insertion_events(next_chunk_id);
 
+-- Add a table that keeps track of all of the events we are inserting between.
+-- We use this when navigating the DAG and when we hit an event which matches
+-- `insertion_prev_event_id`, it should backfill from the "insertion" event and
+-- navigate the historical messages from there.
 CREATE TABLE IF NOT EXISTS insertion_event_edges(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
@@ -40,6 +41,8 @@ CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_room_id ON insertion_
 CREATE INDEX IF NOT EXISTS insertion_event_edges_event_id ON insertion_event_edges(event_id);
 CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_prev_event_id ON insertion_event_edges(insertion_prev_event_id);
 
+-- Add a table that keeps track of how each chunk is labeled. The chunks are
+-- connected together based insertion points `next_chunk_id`.
 CREATE TABLE IF NOT EXISTS chunk_edges(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
