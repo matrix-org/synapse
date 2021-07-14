@@ -67,7 +67,7 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
         # sense to make it go through the run() wrapper.
         if f.__name__ == "check_event_allowed":
 
-            async def wrapper(
+            async def wrap_check_event_allowed(
                 event: EventBase,
                 state_events: StateMap[EventBase],
             ) -> Tuple[bool, Optional[dict]]:
@@ -82,11 +82,11 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
                 else:
                     return res, None
 
-            return wrapper
+            return wrap_check_event_allowed
 
         if f.__name__ == "on_create_room":
 
-            async def wrapper(
+            async def wrap_on_create_room(
                 requester: Requester, config: dict, is_requester_admin: bool
             ) -> None:
                 # We've already made sure f is not None above, but mypy doesn't do well
@@ -101,7 +101,7 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
                         "Room creation forbidden with these parameters",
                     )
 
-            return wrapper
+            return wrap_on_create_room
 
         def run(*args, **kwargs):
             # mypy doesn't do well across function boundaries so we need to tell it
@@ -184,7 +184,7 @@ class ThirdPartyEventRules:
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
-    ) -> Tuple[bool, dict]:
+    ) -> Tuple[bool, Optional[dict]]:
         """Check if a provided event should be allowed in the given context.
 
         The module can return:
@@ -203,7 +203,7 @@ class ThirdPartyEventRules:
         """
         # Bail out early without hitting the store if we don't have any callback
         if len(self._check_event_allowed_callbacks) == 0:
-            return True
+            return True, None
 
         prev_state_ids = await context.get_prev_state_ids()
 
