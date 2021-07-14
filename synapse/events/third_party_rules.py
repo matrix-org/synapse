@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Union, Callable, List, Optional, Awaitable
+from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple, Union
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 CHECK_EVENT_ALLOWED_CALLBACK = Callable[
-    [EventBase, EventContext], Awaitable[Union[bool, dict]]
+    [EventBase, EventContext], Awaitable[Tuple[bool, Optional[dict]]]
 ]
 ON_CREATE_ROOM_CALLBACK = Callable[[Requester, dict, bool], Awaitable]
 CHECK_THREEPID_CAN_BE_INVITED_CALLBACK = Callable[
@@ -62,10 +62,29 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
         if f is None:
             return None
 
+        # We return a separate wrapper for these methods because, in order to wrap them
+        # correctly, we need to await its result. Therefore it doesn't make a lot of
+        # sense to make it go through the run() wrapper.
+        if f.__name__ == "check_event_allowed":
+            async def wrapper(
+                event: EventBase,
+                state_events: StateMap[EventBase],
+            ) -> Tuple[bool, Optional[dict]]:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                res = await f(event, state_events)
+                if isinstance(res, dict):
+                    return True, res
+                else:
+                    return res, None
+
+            return wrapper
+
         if f.__name__ == "on_create_room":
-            # We return a separate wrapper for on_create_room because, in order to wrap
-            # it correctly, we need to await its result. Therefore it doesn't make a lot
-            # of sense to make it go through the run() wrapper.
+
             async def wrapper(
                 requester: Requester, config: dict, is_requester_admin: bool
             ) -> None:
@@ -164,20 +183,22 @@ class ThirdPartyEventRules:
 
     async def check_event_allowed(
         self, event: EventBase, context: EventContext
-    ) -> Union[bool, dict]:
+    ) -> Tuple[bool, dict]:
         """Check if a provided event should be allowed in the given context.
 
         The module can return:
             * True: the event is allowed.
             * False: the event is not allowed, and should be rejected with M_FORBIDDEN.
-            * a dict: replacement event data.
+
+        If the event is allowed, the module can also return a dictionary to use as a
+        replacement for the event.
 
         Args:
             event: The event to be checked.
             context: The context of the event.
 
         Returns:
-            The result from the ThirdPartyRules module, as above
+            The result from the ThirdPartyRules module, as above.
         """
         # Bail out early without hitting the store if we don't have any callback
         if len(self._check_event_allowed_callbacks) == 0:
@@ -195,16 +216,15 @@ class ThirdPartyEventRules:
         event.freeze()
 
         for callback in self._check_event_allowed_callbacks:
-            res = await callback(event, state_events)
+            res, new_content = await callback(event, state_events)
             # Return if the event shouldn't be allowed or if the module came up with a
             # replacement content for the event.
-            # TODO: is this really the right place to let modules replace the event's
-            #  content (or should it happen in another callback, or as a second return
-            #  argument)?
-            if not res or isinstance(res, dict):
-                return res
+            if res is False:
+                return res, None
+            elif isinstance(new_content, dict):
+                return True, new_content
 
-        return True
+        return True, None
 
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
