@@ -618,15 +618,11 @@ class RoomCreationHandler(BaseHandler):
         else:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
 
-        # Check whether the third party rules allows/changes the room create
-        # request.
-        event_allowed = await self.third_party_event_rules.on_create_room(
+        # Let the third party rules modify the room creation config if needed, or abort
+        # the room creation entirely with an exception.
+        await self.third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
-        if not event_allowed:
-            raise SynapseError(
-                403, "You are not permitted to create rooms", Codes.FORBIDDEN
-            )
 
         if not is_requester_admin and not await self.spam_checker.user_may_create_room(
             user_id
