@@ -341,7 +341,7 @@ class MatrixFederationAgentTests(TestCase):
         {"http_proxy": "https://bob:pinkponies@proxy.com:8888", "no_proxy": "unused.com"}
     )
     def test_http_request_via_https_proxy_with_auth(self):
-        self._test_request_proxy_connection(ssl=True, auth_credentials="bob:pinkponies")
+        self._do_http_request_via_proxy(ssl=True, auth_credentials="bob:pinkponies")
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_https_request_via_proxy(self):
