@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 TRACK_MEMORY_USAGE = False
 
 
-caches_by_name = {}  # type: Dict[str, Sized]
-collectors_by_name = {}  # type: Dict[str, CacheMetric]
+caches_by_name: Dict[str, Sized] = {}
+collectors_by_name: Dict[str, "CacheMetric"] = {}
 
 cache_size = Gauge("synapse_util_caches_cache:size", "", ["name"])
 cache_hits = Gauge("synapse_util_caches_cache:hits", "", ["name"])

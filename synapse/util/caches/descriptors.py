@@ -46,17 +46,17 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 class _CachedFunction(Generic[F]):
-    invalidate = None  # type: Any
-    invalidate_all = None  # type: Any
-    prefill = None  # type: Any
-    cache = None  # type: Any
-    num_args = None  # type: Any
+    invalidate: Any = None
+    invalidate_all: Any = None
+    prefill: Any = None
+    cache: Any = None
+    num_args: Any = None
 
-    __name__ = None  # type: str
+    __name__: str
 
     # Note: This function signature is actually fiddled with by the synapse mypy
     # plugin to a) make it a bound method, and b) remove any `cache_context` arg.
-    __call__ = None  # type: F
+    __call__: F
 
 
 class _CacheDescriptorBase:
@@ -115,8 +115,8 @@ class _CacheDescriptorBase:
 
 
 class _LruCachedFunction(Generic[F]):
-    cache = None  # type: LruCache[CacheKey, Any]
-    __call__ = None  # type: F
+    cache: LruCache[CacheKey, Any]
+    __call__: F
 
 
 def lru_cache(
@@ -180,10 +180,10 @@ class LruCacheDescriptor(_CacheDescriptorBase):
         self.max_entries = max_entries
 
     def __get__(self, obj, owner):
-        cache = LruCache(
+        cache: LruCache[CacheKey, Any] = LruCache(
             cache_name=self.orig.__name__,
             max_size=self.max_entries,
-        )  # type: LruCache[CacheKey, Any]
+        )
 
         get_cache_key = self.cache_key_builder
         sentinel = LruCacheDescriptor._Sentinel.sentinel
@@ -271,12 +271,12 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         self.iterable = iterable
 
     def __get__(self, obj, owner):
-        cache = DeferredCache(
+        cache: DeferredCache[CacheKey, Any] = DeferredCache(
             name=self.orig.__name__,
             max_entries=self.max_entries,
             tree=self.tree,
             iterable=self.iterable,
-        )  # type: DeferredCache[CacheKey, Any]
+        )
 
         get_cache_key = self.cache_key_builder
 
@@ -359,7 +359,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
 
     def __get__(self, obj, objtype=None):
         cached_method = getattr(obj, self.cached_method_name)
-        cache = cached_method.cache  # type: DeferredCache[CacheKey, Any]
+        cache: DeferredCache[CacheKey, Any] = cached_method.cache
         num_args = cached_method.num_args
 
         @functools.wraps(self.orig)
@@ -472,15 +472,15 @@ class _CacheContext:
 
     Cache = Union[DeferredCache, LruCache]
 
-    _cache_context_objects = (
-        WeakValueDictionary()
-    )  # type: WeakValueDictionary[Tuple[_CacheContext.Cache, CacheKey], _CacheContext]
+    _cache_context_objects: """WeakValueDictionary[
+        Tuple["_CacheContext.Cache", CacheKey], "_CacheContext"
+    ]""" = WeakValueDictionary()
 
     def __init__(self, cache: "_CacheContext.Cache", cache_key: CacheKey) -> None:
         self._cache = cache
         self._cache_key = cache_key
 
-    def invalidate(self):  # type: () -> None
+    def invalidate(self) -> None:
         """Invalidates the cache entry referred to by the context."""
         self._cache.invalidate(self._cache_key)
 

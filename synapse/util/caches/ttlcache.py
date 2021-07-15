@@ -23,7 +23,7 @@ from synapse.util.caches import register_cache
 
 logger = logging.getLogger(__name__)
 
-SENTINEL = object()  # type: Any
+SENTINEL: Any = object()
 
 T = TypeVar("T")
 KT = TypeVar("KT")
@@ -35,10 +35,10 @@ class TTLCache(Generic[KT, VT]):
 
     def __init__(self, cache_name: str, timer: Callable[[], float] = time.time):
         # map from key to _CacheEntry
-        self._data = {}  # type: Dict[KT, _CacheEntry]
+        self._data: Dict[KT, _CacheEntry] = {}
 
         # the _CacheEntries, sorted by expiry time
-        self._expiry_list = SortedList()  # type: SortedList[_CacheEntry]
+        self._expiry_list: SortedList[_CacheEntry] = SortedList()
 
         self._timer = timer
 

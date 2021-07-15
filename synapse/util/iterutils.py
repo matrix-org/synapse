@@ -68,7 +68,7 @@ def sorted_topologically(
     # This is implemented by Kahn's algorithm.
 
     degree_map = {node: 0 for node in nodes}
-    reverse_graph = {}  # type: Dict[T, Set[T]]
+    reverse_graph: Dict[T, Set[T]] = {}
 
     for node, edges in graph.items():
         if node not in degree_map:
