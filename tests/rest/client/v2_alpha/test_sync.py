@@ -17,7 +17,7 @@ import json
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import knock, read_marker, sync
+from synapse.rest.client.v2_alpha import knock, read_marker, receipts, sync
 
 from tests import unittest
 from tests.federation.transport.test_knocking import (
@@ -375,6 +375,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         read_marker.register_servlets,
         room.register_servlets,
         sync.register_servlets,
+        receipts.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -440,6 +441,23 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "/rooms/%s/read_markers" % self.room_id,
+            body,
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Check that the unread counter is back to 0.
+        self._check_unread_count(0)
+
+        # Check that hidden read receipts don't break unread counts
+        res = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        self._check_unread_count(1)
+
+        # Send a read receipt to tell the server we've read the latest event.
+        body = json.dumps({"org.matrix.msc2285.hidden": True}).encode("utf8")
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
             body,
             access_token=self.tok,
         )
