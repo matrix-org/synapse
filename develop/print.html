@@ -493,7 +493,7 @@ caching model, smarter query optimiser</li>
 <li>allowing the DB to be run on separate hardware</li>
 </ul>
 <p>For information on how to install and use PostgreSQL in Synapse, please see
-<a href="setup/../postgres.html">docs/postgres.md</a></p>
+<a href="setup/../postgres.html">Using Postgres</a></p>
 <p>SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
 SQLite, especially when participating in large rooms.</p>
@@ -504,7 +504,7 @@ but for any practical use, you will need Synapse's APIs to be served
 over HTTPS.</p>
 <p>The recommended way to do so is to set up a reverse proxy on port
 <code>8448</code>. You can find documentation on doing so in
-<a href="setup/../reverse_proxy.html">docs/reverse_proxy.md</a>.</p>
+<a href="setup/../reverse_proxy.html">the reverse proxy documentation</a>.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
@@ -530,7 +530,7 @@ includes the full certificate chain including any intermediate certificates
 </li>
 </ul>
 <p>For a more detailed guide to configuring your server for federation, see
-<a href="setup/../federate.html">federate.md</a>.</p>
+<a href="setup/../federate.html">Federation</a>.</p>
 <h3 id="client-well-known-uri"><a class="header" href="#client-well-known-uri">Client Well-Known URI</a></h3>
 <p>Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. <code>@user:&lt;server_name&gt;</code>) into clients
@@ -616,9 +616,7 @@ anyone with knowledge of it can register users, including admin accounts,
 on your server even if <code>enable_registration</code> is <code>false</code>.</p>
 <h3 id="setting-up-a-turn-server"><a class="header" href="#setting-up-a-turn-server">Setting up a TURN server</a></h3>
 <p>For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See
-<a href="setup/../turn-howto.html">docs/turn-howto.md</a>
-for details.</p>
+a TURN server. See <a href="setup/../turn-howto.html">TURN setup</a> for details.</p>
 <h3 id="url-previews"><a class="header" href="#url-previews">URL previews</a></h3>
 <p>Synapse includes support for previewing URLs, which is disabled by default.  To
 turn it on you must enable the <code>url_preview_enabled: True</code> config parameter
@@ -856,7 +854,7 @@ port 8448. Where these are different, we refer to the 'client port' and the
 'federation port'. See <a href="https://matrix.org/docs/spec/server_server/latest#resolving-server-names">the Matrix
 specification</a>
 for more details of the algorithm used for federation connections, and
-<a href="delegate.html">delegate.md</a> for instructions on setting up delegation.</p>
+<a href="delegate.html">Delegation</a> for instructions on setting up delegation.</p>
 <p><strong>NOTE</strong>: Your reverse proxy must not <code>canonicalise</code> or <code>normalise</code>
 the requested URI in any way (for example, by decoding <code>%xx</code> escapes).
 Beware that Apache <em>will</em> canonicalise URIs unless you specify
@@ -1379,7 +1377,7 @@ find it using delegation.</p>
 <p>We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
 <p>This is no longer necessary. If you are using a reverse proxy for all of your
@@ -2635,7 +2633,7 @@ and the key to Synapse via <code>tls_certificate_path</code> and <code>tls_priva
 your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h4 id="option-3-add-a-well-known-file-to-delegate-your-matrix-traffic"><a class="header" href="#option-3-add-a-well-known-file-to-delegate-your-matrix-traffic">Option 3: add a .well-known file to delegate your matrix traffic</a></h4>
 <p>This will allow you to keep Synapse on a separate domain, without having to
@@ -2776,7 +2774,7 @@ federation end points.</p>
 <p>We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy-1"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy-1">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
 <p>Practically speaking, this is no longer necessary.</p>
@@ -2810,7 +2808,7 @@ server (via port 8448). This is easy to set up and will work provided
 you set the <code>server_name</code> to match your machine's public DNS hostname.</p>
 <p>For this default configuration to work, you will need to listen for TLS
 connections on port 8448. The preferred way to do that is by using a
-reverse proxy: see <a href="reverse_proxy.html">reverse_proxy.md</a> for instructions
+reverse proxy: see <a href="reverse_proxy.html">the reverse proxy documentation</a> for instructions
 on how to correctly set one up.</p>
 <p>In some cases you might not want to run Synapse on the machine that has
 the <code>server_name</code> as its public DNS hostname, or you might want federation
@@ -2818,7 +2816,7 @@ traffic to use a different port than 8448. For example, you might want to
 have your user names look like <code>@user:example.com</code>, but you want to run
 Synapse on <code>synapse.example.com</code> on port 443. This can be done using
 delegation, which allows an admin to control where federation traffic should
-be sent. See <a href="delegate.html">delegate.md</a> for instructions on how to set this up.</p>
+be sent. See <a href="delegate.html">the delegation documentation</a> for instructions on how to set this up.</p>
 <p>Once federation has been configured, you should be able to join a room over
 federation. A good place to start is <code>#synapse:matrix.org</code> - a room for
 Synapse admins.</p>
@@ -2834,8 +2832,8 @@ servers in the room could not access yours. (Joining a room over federation is
 a complicated dance which requires connections in both directions).</p>
 <p>Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see <a href="reverse_proxy.html">reverse_proxy.md</a> for instructions on how to correctly
-configure a reverse proxy.</p>
+proxy: see <a href="reverse_proxy.html">the reverse proxy documentation</a> for instructions on how
+to correctly configure a reverse proxy.</p>
 <h3 id="known-issues"><a class="header" href="#known-issues">Known issues</a></h3>
 <p><strong>HTTP <code>308 Permanent Redirect</code> redirects are not followed</strong>: Due to missing features
 in the HTTP library used by Synapse, 308 redirects are currently not followed by
@@ -6872,8 +6870,8 @@ namespaces:
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="server-notices"><a class="header" href="#server-notices">Server Notices</a></h1>
 <p>'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
 channel whereby server administrators can send messages to users on the server.</p>
-<p>They are used as part of communication of the server polices(see
-<a href="consent_tracking.html">consent_tracking.md</a>), however the intention is that
+<p>They are used as part of communication of the server polices (see
+<a href="consent_tracking.html">Consent Tracking</a>), however the intention is that
 they may also find a use for features such as &quot;Message of the day&quot;.</p>
 <p>This is a feature specific to Synapse, but it uses standard Matrix
 communication mechanisms, so should work with any Matrix client.</p>
@@ -7039,7 +7037,7 @@ version of the policy. To do so:</p>
 <p>ensure that the consent resource is configured, as in the previous section</p>
 </li>
 <li>
-<p>ensure that server notices are configured, as in <a href="server_notices.html">server_notices.md</a>.</p>
+<p>ensure that server notices are configured, as in <a href="server_notices.html">the server notice documentation</a>.</p>
 </li>
 <li>
 <p>Add <code>server_notice_content</code> under <code>user_consent</code> in <code>homeserver.yaml</code>. For
@@ -7905,7 +7903,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.</p>
 <p>To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-<a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a reverse
+<a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a reverse
 proxy.</p>
 <p>When using workers, each worker process has its own configuration file which
 contains settings specific to that worker, such as the HTTP listener that it
@@ -7980,8 +7978,8 @@ endpoints to the worker (<code>localhost:8083</code> in the above example).</p>
 <code>synctl</code> or your distribution's preferred service manager such as <code>systemd</code>. We
 recommend the use of <code>systemd</code> where available: for information on setting up
 <code>systemd</code> to start synapse workers, see
-<a href="systemd-with-workers">systemd-with-workers</a>. To use <code>synctl</code>, see
-<a href="synctl_workers.html">synctl_workers.md</a>.</p>
+<a href="systemd-with-workers">Systemd with Workers</a>. To use <code>synctl</code>, see
+<a href="synctl_workers.html">Using synctl with Workers</a>.</p>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
 <p>This worker can handle API requests matching the following regular
@@ -8313,7 +8311,7 @@ for the systemd unit files.</p>
 <p>The folder <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/">workers</a>
 contains an example configuration for the <code>federation_reader</code> worker.</p>
 <h2 id="synapse-configuration-files"><a class="header" href="#synapse-configuration-files">Synapse configuration files</a></h2>
-<p>See <a href="systemd-with-workers/../workers.html">workers.md</a> for information on how to set up the
+<p>See <a href="systemd-with-workers/../workers.html">the worker documentation</a> for information on how to set up the
 configuration files and reverse-proxy correctly.
 Below is a sample <code>federation_reader</code> worker configuration file.</p>
 <pre><code class="language-yaml">worker_app: synapse.app.federation_reader
@@ -9633,7 +9631,7 @@ ignored in the same way as with <code>PUT /_matrix/client/r0/rooms/{roomId}/send
 }
 </code></pre>
 <p>Note that server notices must be enabled in <code>homeserver.yaml</code> before this API
-can be used. See <a href="admin_api/../server_notices.html">server_notices.md</a> for more information.</p>
+can be used. See <a href="admin_api/../server_notices.html">the server notices documentation</a> for more information.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="deprecated-shutdown-room-api"><a class="header" href="#deprecated-shutdown-room-api">Deprecated: Shutdown room API</a></h1>
 <p><strong>The old Shutdown room API is deprecated and will be removed in a future release.
 See the new <a href="admin_api/rooms.html#delete-room-api">Delete Room API</a> for more details.</strong></p>
@@ -12138,7 +12136,7 @@ needed to expose the append-only log to the readers should be fairly
 minimal.</p>
 <h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
 <h3 id="the-replication-protocol"><a class="header" href="#the-replication-protocol">The Replication Protocol</a></h3>
-<p>See <a href="tcp_replication.html">tcp_replication.md</a></p>
+<p>See <a href="tcp_replication.html">the TCP replication documentation</a>.</p>
 <h3 id="the-slaved-datastore"><a class="header" href="#the-slaved-datastore">The Slaved DataStore</a></h3>
 <p>There are read-only version of the synapse storage layer in
 <code>synapse/replication/slave/storage</code> that use the response of the

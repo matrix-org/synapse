@@ -295,7 +295,7 @@ and the key to Synapse via <code>tls_certificate_path</code> and <code>tls_priva
 your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h4 id="option-3-add-a-well-known-file-to-delegate-your-matrix-traffic"><a class="header" href="#option-3-add-a-well-known-file-to-delegate-your-matrix-traffic">Option 3: add a .well-known file to delegate your matrix traffic</a></h4>
 <p>This will allow you to keep Synapse on a separate domain, without having to
@@ -436,7 +436,7 @@ federation end points.</p>
 <p>We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
 <p>Practically speaking, this is no longer necessary.</p>

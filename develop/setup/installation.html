@@ -492,7 +492,7 @@ caching model, smarter query optimiser</li>
 <li>allowing the DB to be run on separate hardware</li>
 </ul>
 <p>For information on how to install and use PostgreSQL in Synapse, please see
-<a href="../postgres.html">docs/postgres.md</a></p>
+<a href="../postgres.html">Using Postgres</a></p>
 <p>SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
 SQLite, especially when participating in large rooms.</p>
@@ -503,7 +503,7 @@ but for any practical use, you will need Synapse's APIs to be served
 over HTTPS.</p>
 <p>The recommended way to do so is to set up a reverse proxy on port
 <code>8448</code>. You can find documentation on doing so in
-<a href="../reverse_proxy.html">docs/reverse_proxy.md</a>.</p>
+<a href="../reverse_proxy.html">the reverse proxy documentation</a>.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
@@ -529,7 +529,7 @@ includes the full certificate chain including any intermediate certificates
 </li>
 </ul>
 <p>For a more detailed guide to configuring your server for federation, see
-<a href="../federate.html">federate.md</a>.</p>
+<a href="../federate.html">Federation</a>.</p>
 <h3 id="client-well-known-uri"><a class="header" href="#client-well-known-uri">Client Well-Known URI</a></h3>
 <p>Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. <code>@user:&lt;server_name&gt;</code>) into clients
@@ -615,9 +615,7 @@ anyone with knowledge of it can register users, including admin accounts,
 on your server even if <code>enable_registration</code> is <code>false</code>.</p>
 <h3 id="setting-up-a-turn-server"><a class="header" href="#setting-up-a-turn-server">Setting up a TURN server</a></h3>
 <p>For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See
-<a href="../turn-howto.html">docs/turn-howto.md</a>
-for details.</p>
+a TURN server. See <a href="../turn-howto.html">TURN setup</a> for details.</p>
 <h3 id="url-previews"><a class="header" href="#url-previews">URL previews</a></h3>
 <p>Synapse includes support for previewing URLs, which is disabled by default.  To
 turn it on you must enable the <code>url_preview_enabled: True</code> config parameter
