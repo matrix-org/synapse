@@ -28,7 +28,7 @@ minimal.
 
 ### The Replication Protocol
 
-See [the TCP replication page](tcp_replication.md).
+See [the TCP replication documentation](tcp_replication.md).
 
 ### The Slaved DataStore
 

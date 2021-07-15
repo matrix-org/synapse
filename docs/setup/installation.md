@@ -427,7 +427,7 @@ over HTTPS.
 
 The recommended way to do so is to set up a reverse proxy on port
 `8448`. You can find documentation on doing so in
-[the reverse proxy page](../reverse_proxy.md).
+[the reverse proxy documentation](../reverse_proxy.md).
 
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
