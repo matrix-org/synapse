@@ -163,7 +163,7 @@ class _PresenceQueue:
 
     sender: "FederationSender" = attr.ib()
     clock: Clock = attr.ib()
-    queue: OrderedDict[str, Literal[None]] = attr.ib(factory=OrderedDict)
+    queue: "OrderedDict[str, Literal[None]]" = attr.ib(factory=OrderedDict)
     processing: bool = attr.ib(default=False)
 
     def add_to_queue(self, destination: str) -> None:
