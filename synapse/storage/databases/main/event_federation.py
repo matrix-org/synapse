@@ -965,8 +965,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             INNER JOIN chunk_edges AS c
             ON i.next_chunk_id = c.chunk_id
             /* Get the depth of the chunk start event from the events table */
-            INNER JOIN events AS e
-            ON e.event_id = c.event_id
+            INNER JOIN events AS e USING (event_id)
             /* Find an insertion event which matches the given event_id */
             WHERE i.event_id = ?
             LIMIT ?
@@ -1006,30 +1005,32 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event_query, (event_id, limit - len(event_results))
             )
             connected_insertion_event_id_results = txn.fetchall()
-            logger.debug(
+            logger.info(
                 "_get_backfill_events: connected_insertion_event_query %s",
                 connected_insertion_event_id_results,
             )
             for row in connected_insertion_event_id_results:
-                if row[1] not in event_results:
-                    queue.put((-row[0], row[1]))
+                connected_insertion_event_depth = row[0]
+                connected_insertion_event = row[1]
+                queue.put((-connected_insertion_event_depth, connected_insertion_event))
 
-                    # Find any chunk connections for the given insertion event
-                    txn.execute(
-                        chunk_connection_query, (row[1], limit - len(event_results))
-                    )
-                    chunk_start_event_id_results = txn.fetchall()
-                    logger.debug(
-                        "_get_backfill_events: chunk_start_event_id_results %s",
-                        chunk_start_event_id_results,
-                    )
-                    for row in chunk_start_event_id_results:
-                        if row[1] not in event_results:
-                            queue.put((-row[0], row[1]))
+                # Find any chunk connections for the given insertion event
+                txn.execute(
+                    chunk_connection_query,
+                    (connected_insertion_event, limit - len(event_results)),
+                )
+                chunk_start_event_id_results = txn.fetchall()
+                logger.info(
+                    "_get_backfill_events: chunk_start_event_id_results %s",
+                    chunk_start_event_id_results,
+                )
+                for row in chunk_start_event_id_results:
+                    if row[1] not in event_results:
+                        queue.put((-row[0], row[1]))
 
             txn.execute(query, (event_id, False, limit - len(event_results)))
             prev_event_id_results = txn.fetchall()
-            logger.debug(
+            logger.info(
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )
 
