@@ -15,7 +15,7 @@
 
 import logging
 import urllib
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple, Union
 
 import attr
 import ijson
@@ -29,6 +29,7 @@ from synapse.api.urls import (
     FEDERATION_V2_PREFIX,
 )
 from synapse.events import EventBase, make_event_from_dict
+from synapse.federation.units import Transaction
 from synapse.http.matrixfederationclient import ByteParser
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict
@@ -49,23 +50,25 @@ class TransportLayerClient:
         self.client = hs.get_federation_http_client()
 
     @log_function
-    def get_room_state_ids(self, destination, room_id, event_id):
+    async def get_room_state_ids(
+        self, destination: str, room_id: str, event_id: str
+    ) -> JsonDict:
         """Requests all state for a given room from the given server at the
         given event. Returns the state's event_id's
 
         Args:
-            destination (str): The host name of the remote homeserver we want
+            destination: The host name of the remote homeserver we want
                 to get the state from.
-            context (str): The name of the context we want the state of
-            event_id (str): The event we want the context at.
+            context: The name of the context we want the state of
+            event_id: The event we want the context at.
 
         Returns:
-            Awaitable: Results in a dict received from the remote homeserver.
+            Results in a dict received from the remote homeserver.
         """
         logger.debug("get_room_state_ids dest=%s, room=%s", destination, room_id)
 
         path = _create_v1_path("/state_ids/%s", room_id)
-        return self.client.get_json(
+        return await self.client.get_json(
             destination,
             path=path,
             args={"event_id": event_id},
@@ -73,39 +76,43 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_event(self, destination, event_id, timeout=None):
+    async def get_event(
+        self, destination: str, event_id: str, timeout: Optional[int] = None
+    ) -> JsonDict:
         """Requests the pdu with give id and origin from the given server.
 
         Args:
-            destination (str): The host name of the remote homeserver we want
+            destination: The host name of the remote homeserver we want
                 to get the state from.
-            event_id (str): The id of the event being requested.
-            timeout (int): How long to try (in ms) the destination for before
+            event_id: The id of the event being requested.
+            timeout: How long to try (in ms) the destination for before
                 giving up. None indicates no timeout.
 
         Returns:
-            Awaitable: Results in a dict received from the remote homeserver.
+            Results in a dict received from the remote homeserver.
         """
         logger.debug("get_pdu dest=%s, event_id=%s", destination, event_id)
 
         path = _create_v1_path("/event/%s", event_id)
-        return self.client.get_json(
+        return await self.client.get_json(
             destination, path=path, timeout=timeout, try_trailing_slash_on_400=True
         )
 
     @log_function
-    def backfill(self, destination, room_id, event_tuples, limit):
+    async def backfill(
+        self, destination: str, room_id: str, event_tuples: Iterable[str], limit: int
+    ) -> Optional[JsonDict]:
         """Requests `limit` previous PDUs in a given context before list of
         PDUs.
 
         Args:
-            dest (str)
-            room_id (str)
-            event_tuples (list)
-            limit (int)
+            destination
+            room_id
+            event_tuples
+            limit
 
         Returns:
-            Awaitable: Results in a dict received from the remote homeserver.
+            Results in a dict received from the remote homeserver.
         """
         logger.debug(
             "backfill dest=%s, room_id=%s, event_tuples=%r, limit=%s",
@@ -117,18 +124,22 @@ class TransportLayerClient:
 
         if not event_tuples:
             # TODO: raise?
-            return
+            return None
 
         path = _create_v1_path("/backfill/%s", room_id)
 
         args = {"v": event_tuples, "limit": [str(limit)]}
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination, path=path, args=args, try_trailing_slash_on_400=True
         )
 
     @log_function
-    async def send_transaction(self, transaction, json_data_callback=None):
+    async def send_transaction(
+        self,
+        transaction: Transaction,
+        json_data_callback: Optional[Callable[[], JsonDict]] = None,
+    ) -> JsonDict:
         """Sends the given Transaction to its destination
 
         Args:
@@ -149,21 +160,21 @@ class TransportLayerClient:
         """
         logger.debug(
             "send_data dest=%s, txid=%s",
-            transaction.destination,
-            transaction.transaction_id,
+            transaction.destination,  # type: ignore
+            transaction.transaction_id,  # type: ignore
         )
 
-        if transaction.destination == self.server_name:
+        if transaction.destination == self.server_name:  # type: ignore
             raise RuntimeError("Transport layer cannot send to itself!")
 
         # FIXME: This is only used by the tests. The actual json sent is
         # generated by the json_data_callback.
         json_data = transaction.get_dict()
 
-        path = _create_v1_path("/send/%s", transaction.transaction_id)
+        path = _create_v1_path("/send/%s", transaction.transaction_id)  # type: ignore
 
-        response = await self.client.put_json(
-            transaction.destination,
+        return await self.client.put_json(
+            transaction.destination,  # type: ignore
             path=path,
             data=json_data,
             json_data_callback=json_data_callback,
@@ -171,8 +182,6 @@ class TransportLayerClient:
             backoff_on_404=True,  # If we get a 404 the other side has gone
             try_trailing_slash_on_400=True,
         )
-
-        return response
 
     @log_function
     async def make_query(
@@ -193,8 +202,13 @@ class TransportLayerClient:
 
     @log_function
     async def make_membership_event(
-        self, destination, room_id, user_id, membership, params
-    ):
+        self,
+        destination: str,
+        room_id: str,
+        user_id: str,
+        membership: str,
+        params: Optional[Mapping[str, Union[str, Iterable[str]]]],
+    ) -> JsonDict:
         """Asks a remote server to build and sign us a membership event
 
         Note that this does not append any events to any graphs.
@@ -240,7 +254,7 @@ class TransportLayerClient:
             ignore_backoff = True
             retry_on_dns_fail = True
 
-        content = await self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args=params,
@@ -248,8 +262,6 @@ class TransportLayerClient:
             timeout=20000,
             ignore_backoff=ignore_backoff,
         )
-
-        return content
 
     @log_function
     async def send_join_v1(
@@ -386,7 +398,7 @@ class TransportLayerClient:
         search_filter: Optional[Dict] = None,
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
-    ):
+    ) -> JsonDict:
         """Get the list of public rooms from a remote homeserver
 
         See synapse.federation.federation_client.FederationClient.get_public_rooms for
@@ -451,25 +463,27 @@ class TransportLayerClient:
         return response
 
     @log_function
-    async def exchange_third_party_invite(self, destination, room_id, event_dict):
+    async def exchange_third_party_invite(
+        self, destination: str, room_id: str, event_dict: JsonDict
+    ) -> JsonDict:
         path = _create_v1_path("/exchange_third_party_invite/%s", room_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination, path=path, data=event_dict
         )
 
-        return response
-
     @log_function
-    async def get_event_auth(self, destination, room_id, event_id):
+    async def get_event_auth(
+        self, destination: str, room_id: str, event_id: str
+    ) -> JsonDict:
         path = _create_v1_path("/event_auth/%s/%s", room_id, event_id)
 
-        content = await self.client.get_json(destination=destination, path=path)
-
-        return content
+        return await self.client.get_json(destination=destination, path=path)
 
     @log_function
-    async def query_client_keys(self, destination, query_content, timeout):
+    async def query_client_keys(
+        self, destination: str, query_content: JsonDict, timeout: int
+    ) -> JsonDict:
         """Query the device keys for a list of user ids hosted on a remote
         server.
 
@@ -497,20 +511,21 @@ class TransportLayerClient:
             }
 
         Args:
-            destination(str): The server to query.
-            query_content(dict): The user ids to query.
+            destination: The server to query.
+            query_content: The user ids to query.
         Returns:
             A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/keys/query")
 
-        content = await self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
-        return content
 
     @log_function
-    async def query_user_devices(self, destination, user_id, timeout):
+    async def query_user_devices(
+        self, destination: str, user_id: str, timeout: int
+    ) -> JsonDict:
         """Query the devices for a user id hosted on a remote server.
 
         Response:
@@ -536,20 +551,21 @@ class TransportLayerClient:
             }
 
         Args:
-            destination(str): The server to query.
-            query_content(dict): The user ids to query.
+            destination: The server to query.
+            query_content: The user ids to query.
         Returns:
             A dict containing device and cross-signing keys.
         """
         path = _create_v1_path("/user/devices/%s", user_id)
 
-        content = await self.client.get_json(
+        return await self.client.get_json(
             destination=destination, path=path, timeout=timeout
         )
-        return content
 
     @log_function
-    async def claim_client_keys(self, destination, query_content, timeout):
+    async def claim_client_keys(
+        self, destination: str, query_content: JsonDict, timeout: int
+    ) -> JsonDict:
         """Claim one-time keys for a list of devices hosted on a remote server.
 
         Request:
@@ -573,33 +589,32 @@ class TransportLayerClient:
             }
 
         Args:
-            destination(str): The server to query.
-            query_content(dict): The user ids to query.
+            destination: The server to query.
+            query_content: The user ids to query.
         Returns:
             A dict containing the one-time keys.
         """
 
         path = _create_v1_path("/user/keys/claim")
 
-        content = await self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=query_content, timeout=timeout
         )
-        return content
 
     @log_function
     async def get_missing_events(
         self,
-        destination,
-        room_id,
-        earliest_events,
-        latest_events,
-        limit,
-        min_depth,
-        timeout,
-    ):
+        destination: str,
+        room_id: str,
+        earliest_events: Iterable[str],
+        latest_events: Iterable[str],
+        limit: int,
+        min_depth: int,
+        timeout: int,
+    ) -> JsonDict:
         path = _create_v1_path("/get_missing_events/%s", room_id)
 
-        content = await self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             data={
@@ -610,8 +625,6 @@ class TransportLayerClient:
             },
             timeout=timeout,
         )
-
-        return content
 
     @log_function
     def get_group_profile(self, destination, group_id, requester_user_id):
