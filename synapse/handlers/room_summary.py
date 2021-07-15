@@ -85,9 +85,7 @@ class RoomSummaryHandler(RoomSummaryMixin):
         super().__init__(hs)
         self._clock = hs.get_clock()
         self._auth = hs.get_auth()
-        self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
-        self._federation_client = hs.get_federation_client()
 
     async def get_room_summary(
         self,
