@@ -627,11 +627,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_group_profile(self, destination, group_id, requester_user_id):
+    async def get_group_profile(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get a group profile"""
         path = _create_v1_path("/groups/%s/profile", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -639,14 +641,16 @@ class TransportLayerClient:
         )
 
     @log_function
-    def update_group_profile(self, destination, group_id, requester_user_id, content):
+    async def update_group_profile(
+        self, destination: str, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Update a remote group profile
 
         Args:
-            destination (str)
-            group_id (str)
-            requester_user_id (str)
-            content (dict): The new profile of the group
+            destination
+            group_id
+            requester_user_id
+            content: The new profile of the group
         """
         path = _create_v1_path("/groups/%s/profile", group_id)
 
@@ -659,11 +663,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_group_summary(self, destination, group_id, requester_user_id):
+    async def get_group_summary(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get a group summary"""
         path = _create_v1_path("/groups/%s/summary", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -671,24 +677,31 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_rooms_in_group(self, destination, group_id, requester_user_id):
+    async def get_rooms_in_group(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get all rooms in a group"""
         path = _create_v1_path("/groups/%s/rooms", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
 
-    def add_room_to_group(
-        self, destination, group_id, requester_user_id, room_id, content
-    ):
+    async def add_room_to_group(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        room_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Add a room to a group"""
         path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -696,15 +709,21 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    def update_room_in_group(
-        self, destination, group_id, requester_user_id, room_id, config_key, content
-    ):
+    async def update_room_in_group(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        room_id: str,
+        config_key: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Update room in group"""
         path = _create_v1_path(
             "/groups/%s/room/%s/config/%s", group_id, room_id, config_key
         )
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -712,11 +731,13 @@ class TransportLayerClient:
             ignore_backoff=True,
         )
 
-    def remove_room_from_group(self, destination, group_id, requester_user_id, room_id):
+    async def remove_room_from_group(
+        self, destination: str, group_id: str, requester_user_id: str, room_id: str
+    ) -> JsonDict:
         """Remove a room from a group"""
         path = _create_v1_path("/groups/%s/room/%s", group_id, room_id)
 
-        return self.client.delete_json(
+        return await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -724,11 +745,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_users_in_group(self, destination, group_id, requester_user_id):
+    async def get_users_in_group(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get users in a group"""
         path = _create_v1_path("/groups/%s/users", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -736,11 +759,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_invited_users_in_group(self, destination, group_id, requester_user_id):
+    async def get_invited_users_in_group(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get users that have been invited to a group"""
         path = _create_v1_path("/groups/%s/invited_users", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -748,16 +773,20 @@ class TransportLayerClient:
         )
 
     @log_function
-    def accept_group_invite(self, destination, group_id, user_id, content):
+    async def accept_group_invite(
+        self, destination: str, group_id: str, user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Accept a group invite"""
         path = _create_v1_path("/groups/%s/users/%s/accept_invite", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def join_group(self, destination, group_id, user_id, content):
+    def join_group(
+        self, destination: str, group_id: str, user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Attempts to join a group"""
         path = _create_v1_path("/groups/%s/users/%s/join", group_id, user_id)
 
@@ -766,13 +795,18 @@ class TransportLayerClient:
         )
 
     @log_function
-    def invite_to_group(
-        self, destination, group_id, user_id, requester_user_id, content
-    ):
+    async def invite_to_group(
+        self,
+        destination: str,
+        group_id: str,
+        user_id: str,
+        requester_user_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Invite a user to a group"""
         path = _create_v1_path("/groups/%s/users/%s/invite", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -781,25 +815,32 @@ class TransportLayerClient:
         )
 
     @log_function
-    def invite_to_group_notification(self, destination, group_id, user_id, content):
+    async def invite_to_group_notification(
+        self, destination: str, group_id: str, user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Sent by group server to inform a user's server that they have been
         invited.
         """
 
         path = _create_v1_path("/groups/local/%s/users/%s/invite", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def remove_user_from_group(
-        self, destination, group_id, requester_user_id, user_id, content
-    ):
+    async def remove_user_from_group(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        user_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Remove a user from a group"""
         path = _create_v1_path("/groups/%s/users/%s/remove", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -808,35 +849,43 @@ class TransportLayerClient:
         )
 
     @log_function
-    def remove_user_from_group_notification(
-        self, destination, group_id, user_id, content
-    ):
+    async def remove_user_from_group_notification(
+        self, destination: str, group_id: str, user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Sent by group server to inform a user's server that they have been
         kicked from the group.
         """
 
         path = _create_v1_path("/groups/local/%s/users/%s/remove", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def renew_group_attestation(self, destination, group_id, user_id, content):
+    async def renew_group_attestation(
+        self, destination: str, group_id: str, user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Sent by either a group server or a user's server to periodically update
         the attestations
         """
 
         path = _create_v1_path("/groups/%s/renew_attestation/%s", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
     @log_function
-    def update_group_summary_room(
-        self, destination, group_id, user_id, room_id, category_id, content
-    ):
+    async def update_group_summary_room(
+        self,
+        destination: str,
+        group_id: str,
+        user_id: str,
+        room_id: str,
+        category_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Update a room entry in a group summary"""
         if category_id:
             path = _create_v1_path(
@@ -848,7 +897,7 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": user_id},
@@ -857,9 +906,14 @@ class TransportLayerClient:
         )
 
     @log_function
-    def delete_group_summary_room(
-        self, destination, group_id, user_id, room_id, category_id
-    ):
+    async def delete_group_summary_room(
+        self,
+        destination: str,
+        group_id: str,
+        user_id: str,
+        room_id: str,
+        category_id: str,
+    ) -> JsonDict:
         """Delete a room entry in a group summary"""
         if category_id:
             path = _create_v1_path(
@@ -871,7 +925,7 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/rooms/%s", group_id, room_id)
 
-        return self.client.delete_json(
+        return await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": user_id},
@@ -879,11 +933,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_group_categories(self, destination, group_id, requester_user_id):
+    async def get_group_categories(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get all categories in a group"""
         path = _create_v1_path("/groups/%s/categories", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -891,11 +947,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_group_category(self, destination, group_id, requester_user_id, category_id):
+    async def get_group_category(
+        self, destination: str, group_id: str, requester_user_id: str, category_id: str
+    ) -> JsonDict:
         """Get category info in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -903,13 +961,18 @@ class TransportLayerClient:
         )
 
     @log_function
-    def update_group_category(
-        self, destination, group_id, requester_user_id, category_id, content
-    ):
+    async def update_group_category(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        category_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Update a category in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -918,13 +981,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def delete_group_category(
-        self, destination, group_id, requester_user_id, category_id
-    ):
+    async def delete_group_category(
+        self, destination: str, group_id: str, requester_user_id: str, category_id: str
+    ) -> JsonDict:
         """Delete a category in a group"""
         path = _create_v1_path("/groups/%s/categories/%s", group_id, category_id)
 
-        return self.client.delete_json(
+        return await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -932,11 +995,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_group_roles(self, destination, group_id, requester_user_id):
+    async def get_group_roles(
+        self, destination: str, group_id: str, requester_user_id: str
+    ) -> JsonDict:
         """Get all roles in a group"""
         path = _create_v1_path("/groups/%s/roles", group_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -944,11 +1009,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def get_group_role(self, destination, group_id, requester_user_id, role_id):
+    async def get_group_role(
+        self, destination: str, group_id: str, requester_user_id: str, role_id: str
+    ) -> JsonDict:
         """Get a roles info"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
-        return self.client.get_json(
+        return await self.client.get_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -956,13 +1023,18 @@ class TransportLayerClient:
         )
 
     @log_function
-    def update_group_role(
-        self, destination, group_id, requester_user_id, role_id, content
-    ):
+    async def update_group_role(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        role_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Update a role in a group"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -971,11 +1043,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def delete_group_role(self, destination, group_id, requester_user_id, role_id):
+    async def delete_group_role(
+        self, destination: str, group_id: str, requester_user_id: str, role_id: str
+    ) -> JsonDict:
         """Delete a role in a group"""
         path = _create_v1_path("/groups/%s/roles/%s", group_id, role_id)
 
-        return self.client.delete_json(
+        return await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -983,9 +1057,15 @@ class TransportLayerClient:
         )
 
     @log_function
-    def update_group_summary_user(
-        self, destination, group_id, requester_user_id, user_id, role_id, content
-    ):
+    async def update_group_summary_user(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        user_id: str,
+        role_id: str,
+        content: JsonDict,
+    ) -> JsonDict:
         """Update a users entry in a group"""
         if role_id:
             path = _create_v1_path(
@@ -994,7 +1074,7 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -1003,11 +1083,13 @@ class TransportLayerClient:
         )
 
     @log_function
-    def set_group_join_policy(self, destination, group_id, requester_user_id, content):
+    async def set_group_join_policy(
+        self, destination: str, group_id: str, requester_user_id: str, content: JsonDict
+    ) -> JsonDict:
         """Sets the join policy for a group"""
         path = _create_v1_path("/groups/%s/settings/m.join_policy", group_id)
 
-        return self.client.put_json(
+        return await self.client.put_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
@@ -1016,9 +1098,14 @@ class TransportLayerClient:
         )
 
     @log_function
-    def delete_group_summary_user(
-        self, destination, group_id, requester_user_id, user_id, role_id
-    ):
+    async def delete_group_summary_user(
+        self,
+        destination: str,
+        group_id: str,
+        requester_user_id: str,
+        user_id: str,
+        role_id: str,
+    ) -> JsonDict:
         """Delete a users entry in a group"""
         if role_id:
             path = _create_v1_path(
@@ -1027,33 +1114,35 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/groups/%s/summary/users/%s", group_id, user_id)
 
-        return self.client.delete_json(
+        return await self.client.delete_json(
             destination=destination,
             path=path,
             args={"requester_user_id": requester_user_id},
             ignore_backoff=True,
         )
 
-    def bulk_get_publicised_groups(self, destination, user_ids):
+    async def bulk_get_publicised_groups(
+        self, destination: str, user_ids: Iterable[str]
+    ) -> JsonDict:
         """Get the groups a list of users are publicising"""
 
         path = _create_v1_path("/get_groups_publicised")
 
         content = {"user_ids": user_ids}
 
-        return self.client.post_json(
+        return await self.client.post_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
 
-    def get_room_complexity(self, destination, room_id):
+    async def get_room_complexity(self, destination: str, room_id: str) -> JsonDict:
         """
         Args:
-            destination (str): The remote server
-            room_id (str): The room ID to ask about.
+            destination: The remote server
+            room_id: The room ID to ask about.
         """
         path = _create_path(FEDERATION_UNSTABLE_PREFIX, "/rooms/%s/complexity", room_id)
 
-        return self.client.get_json(destination=destination, path=path)
+        return await self.client.get_json(destination=destination, path=path)
 
     async def get_space_summary(
         self,
@@ -1089,14 +1178,14 @@ class TransportLayerClient:
         )
 
 
-def _create_path(federation_prefix, path, *args):
+def _create_path(federation_prefix: str, path: str, *args: str) -> str:
     """
     Ensures that all args are url encoded.
     """
     return federation_prefix + path % tuple(urllib.parse.quote(arg, "") for arg in args)
 
 
-def _create_v1_path(path, *args):
+def _create_v1_path(path: str, *args: str) -> str:
     """Creates a path against V1 federation API from the path template and
     args. Ensures that all args are url encoded.
 
@@ -1105,16 +1194,13 @@ def _create_v1_path(path, *args):
         _create_v1_path("/event/%s", event_id)
 
     Args:
-        path (str): String template for the path
-        args: ([str]): Args to insert into path. Each arg will be url encoded
-
-    Returns:
-        str
+        path: String template for the path
+        args: Args to insert into path. Each arg will be url encoded
     """
     return _create_path(FEDERATION_V1_PREFIX, path, *args)
 
 
-def _create_v2_path(path, *args):
+def _create_v2_path(path: str, *args: str) -> str:
     """Creates a path against V2 federation API from the path template and
     args. Ensures that all args are url encoded.
 
@@ -1123,11 +1209,8 @@ def _create_v2_path(path, *args):
         _create_v2_path("/event/%s", event_id)
 
     Args:
-        path (str): String template for the path
-        args: ([str]): Args to insert into path. Each arg will be url encoded
-
-    Returns:
-        str
+        path: String template for the path
+        args: Args to insert into path. Each arg will be url encoded
     """
     return _create_path(FEDERATION_V2_PREFIX, path, *args)
 
