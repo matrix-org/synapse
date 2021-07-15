@@ -1443,7 +1443,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
     ) -> Tuple[int, JsonDict]:
         try:
             requester = await self._auth.get_user_by_req(request, allow_guest=True)
-            requester_user_id = requester.user.to_string()
+            requester_user_id: Optional[str] = requester.user.to_string()
         except MissingClientTokenError:
             requester_user_id = None
 

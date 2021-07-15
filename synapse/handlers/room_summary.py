@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, List, Optional
 
 from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
+from synapse.api.errors import NotFoundError
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -87,7 +88,7 @@ class RoomSummaryHandler(RoomSummaryMixin):
         self,
         requester: Optional[str],
         room_id: str,
-        remote_room_hosts: List[str],
+        remote_room_hosts: Optional[List[str]],
     ) -> JsonDict:
         """
         Implementation of the room summary C-S API MSC3244
@@ -134,7 +135,7 @@ class RoomSummaryHandler(RoomSummaryMixin):
         requester: Optional[str],
         origin: Optional[str],
         room_id: str,
-    ) -> Optional[JsonDict]:
+    ) -> JsonDict:
         """
         Generate a room entry and a list of event entries for a given room.
 
@@ -151,15 +152,15 @@ class RoomSummaryHandler(RoomSummaryMixin):
             summary dict to return
         """
         if not await self._auth.is_room_accessible(room_id, requester, origin):
-            return None
+            raise NotFoundError("Room not found or is not accessible")
 
         return await self.build_room_entry(room_id)
 
     async def _summarize_remote_room(
         self,
         room_id: str,
-        remote_room_hosts: List[str],
-    ) -> Optional[JsonDict]:
+        remote_room_hosts: Optional[List[str]],
+    ) -> JsonDict:
         """
         Request room entries and a list of event entries for a given room by querying a remote server.
 
@@ -172,4 +173,5 @@ class RoomSummaryHandler(RoomSummaryMixin):
         """
         logger.info("Requesting summary for %s via %s", room_id, remote_room_hosts)
 
-        return None  # TODO federation API
+        # TODO federation API
+        raise NotFoundError("Room not found or is not accessible")
