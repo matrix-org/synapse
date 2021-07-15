@@ -166,12 +166,15 @@ sudo dnf groupinstall "Development Tools"
 
 Installing prerequisites on macOS:
 
+You may need to install the latest Xcode developer tools:
 ```sh
 xcode-select --install
-sudo easy_install pip
-sudo pip install virtualenv
-brew install pkg-config libffi
 ```
+
+On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
+```sh
+ brew install jpeg
+ ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform `pip` about it so that `psycopg2` builds:
