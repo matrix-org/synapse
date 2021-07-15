@@ -1,1 +1,1 @@
-Updated installation dependencies for ARM Macs & simplified overall Mac section by removing references to 1/ installing pip with easy_install (since pip3 comes with developer tools) & 2/ installing libffi with brew (since this only affects Mojave & older OS versions)!
+Updated installation dependencies for newer macOS versions and ARM Macs. Contributed by Luke Walsh.
