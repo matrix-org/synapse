@@ -1,0 +1,1 @@
+Fix PostgreSQL sometimes using table scans for queries against `state_groups_state` table, taking a long time and a large amount of IO.
