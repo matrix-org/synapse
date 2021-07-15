@@ -78,6 +78,9 @@ class RoomSummaryHandler:
             # TODO validate that the requester has permission to see this room
             # https://github.com/matrix-org/matrix-doc/pull/3266/files#diff-97aeb566f3ce4bd6ec3b98e71ecbca3d6e86c0407e6a82afbc57e86bf0316607R106-R108
 
+        # Before returning to the client, remove the allowed_room_ids key.
+        room_summary.pop("allowed_room_ids", None)
+
         return room_summary
 
     async def _summarize_local_room(
@@ -275,8 +278,8 @@ class RoomSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
-            "allowed_spaces": allowed_rooms,  # TODO unspecced for MSC3266
             "is_encrypted": (EventTypes.RoomEncryption, "") in current_state_ids,
+            "allowed_room_ids": allowed_rooms,  # this field is stripped from the cs response
         }
 
         # Filter out Nones – rather omit the field altogether
