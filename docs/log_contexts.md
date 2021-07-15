@@ -167,7 +167,6 @@ given number of seconds. That might look like:
 
 ```python
 # not a logcontext-rules-compliant function
-
 def get_sleep_deferred(seconds):
     d = defer.Deferred()
     reactor.callLater(seconds, d.callback, None)
@@ -270,7 +269,7 @@ more awaitables via `defer.gatherResults`:
 ```python
 a1 = operation1()
 a2 = operation2()
-a3 = defer.gatherResults(a1, a2)
+a3 = defer.gatherResults([a1, a2])
 ```
 
 This is really a variation of the fire-and-forget problem above, in that
@@ -293,7 +292,7 @@ async def do_request_handling():
     with PreserveLoggingContext():
         a1 = operation1()
         a2 = operation2()
-        result = await defer.gatherResults(a1, a2)
+        result = await defer.gatherResults([a1, a2])
 ```
 
 In this case particularly, though, option two, of using
@@ -350,9 +349,10 @@ def reset_listener_queue():
 
 So, both ends of the awaitable chain have now dropped their references,
 and the awaitable chain is now orphaned, and will be garbage-collected at
-some point. Note that `await_something_interesting` is a generator
-function, and when Python garbage-collects generator functions, it gives
-them a chance to clean up by making the `yield` raise a `GeneratorExit`
+some point. Note that `await_something_interesting` is a coroutine, 
+which Python implements as a generator function.  When Python
+garbage-collects generator functions, it gives them a chance to 
+clean up by making the `async` (or `yield`) raise a `GeneratorExit`
 exception. In our case, that means that the `__exit__` handler of
 `PreserveLoggingContext` will carefully restore the request context, but
 there is now nothing waiting for its return, so the request context is
@@ -360,6 +360,6 @@ never cleared.
 
 To reiterate, this problem only arises when *both* ends of a awaitable
 chain are dropped. Dropping the the reference to an awaitable you're
-supposed to be calling is probably bad practice, so this doesn't
+supposed to be awaiting is bad practice, so this doesn't
 actually happen too much. Unfortunately, when it does happen, it will
 lead to leaked logcontexts which are incredibly hard to track down.
