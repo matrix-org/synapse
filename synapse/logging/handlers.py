@@ -8,8 +8,8 @@ from typing import Optional
 
 class PeriodicallyFlushingMemoryHandler(MemoryHandler):
     """
-    This is a subclass of MemoryHandler which additionally spawns a background
-    thread which periodically flushes the buffers.
+    This is a subclass of MemoryHandler that additionally spawns a background
+    thread to periodically flush the buffer.
 
     This prevents messages from being buffered for too long.
     """
