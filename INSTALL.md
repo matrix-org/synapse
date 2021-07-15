@@ -164,7 +164,7 @@ sudo dnf groupinstall "Development Tools"
 
 ##### macOS
 
-Installing prerequisites on macOS (Big Sur):
+Installing prerequisites on macOS:
 
 You'll need the updated Xcode developer tools:
 ```sh
@@ -176,7 +176,7 @@ Install virtualenv with Pip:
 sudo pip3 install virtualenv
 ```
 
-Install libjpeg. You can use Homebrew (https://brew.sh):
+On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
 ```sh
 brew install jpeg
 ```
