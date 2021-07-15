@@ -34,6 +34,10 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         self._flushing_thread.start()
 
     def _flush_periodically(self):
+        """
+        Whilst this handler is active, flush the handler periodically.
+        """
+
         while self._active:
             self.flush()
             time.sleep(self._flush_period)
