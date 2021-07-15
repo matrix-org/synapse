@@ -22,6 +22,7 @@ from synapse.api.errors import (
     CodeMessageException,
     Codes,
     NotFoundError,
+    RequestSendFailed,
     ShadowBanError,
     StoreError,
     SynapseError,
@@ -252,12 +253,14 @@ class DirectoryHandler(BaseHandler):
                     retry_on_dns_fail=False,
                     ignore_backoff=True,
                 )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to fetch alias")
             except CodeMessageException as e:
                 logging.warning("Error retrieving alias")
                 if e.code == 404:
                     fed_result = None
                 else:
-                    raise
+                    raise SynapseError(502, "Failed to fetch alias")
 
             if fed_result and "room_id" in fed_result and "servers" in fed_result:
                 room_id = fed_result["room_id"]

@@ -205,7 +205,7 @@ class ResourceLimitsServerNotices:
             # The user has yet to join the server notices room
             pass
 
-        referenced_events = []  # type: List[str]
+        referenced_events: List[str] = []
         if pinned_state_event is not None:
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 

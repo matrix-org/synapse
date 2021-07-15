@@ -233,11 +233,11 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             "content": content,
             "sender": self.user_id,
         }
-        event = self.get_success(
+        event: EventBase = self.get_success(
             current_rules_module().module_api.create_and_send_event_into_room(
                 event_dict
             )
-        )  # type: EventBase
+        )
 
         self.assertEquals(event.sender, self.user_id)
         self.assertEquals(event.room_id, self.room_id)

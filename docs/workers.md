@@ -73,7 +73,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-[reverse_proxy.md](reverse_proxy.md) for information on setting up a reverse
+[the reverse proxy documentation](reverse_proxy.md) for information on setting up a reverse
 proxy.
 
 When using workers, each worker process has its own configuration file which
@@ -170,8 +170,8 @@ Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
 recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
-[systemd-with-workers](systemd-with-workers). To use `synctl`, see
-[synctl_workers.md](synctl_workers.md).
+[Systemd with Workers](systemd-with-workers). To use `synctl`, see
+[Using synctl with Workers](synctl_workers.md).
 
 
 ## Available worker applications

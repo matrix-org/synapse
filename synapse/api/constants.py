@@ -65,6 +65,12 @@ class JoinRules:
     MSC3083_RESTRICTED = "restricted"
 
 
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
+
+
 class LoginType:
     PASSWORD = "m.login.password"
     EMAIL_IDENTITY = "m.login.email.identity"
@@ -112,6 +118,9 @@ class EventTypes:
 
     SpaceChild = "m.space.child"
     SpaceParent = "m.space.parent"
+
+    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_MARKER = "org.matrix.msc2716.marker"
 
 
 class ToDeviceEventTypes:
@@ -178,6 +187,24 @@ class EventContentFields:
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
+
+    # Used on normal messages to indicate they were historically imported after the fact
+    MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
+    # For "insertion" events
+    MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
+    # Used on normal message events to indicate where the chunk connects to
+    MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
+    # For "marker" events
+    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+    MSC2716_MARKER_INSERTION_PREV_EVENTS = (
+        "org.matrix.msc2716.marker.insertion_prev_events"
+    )
+
+
+class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
+    SPACE = "m.space"
 
 
 class RoomEncryptionAlgorithms:

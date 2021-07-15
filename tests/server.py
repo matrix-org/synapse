@@ -52,7 +52,7 @@ class FakeChannel:
     _reactor = attr.ib()
     result = attr.ib(type=dict, default=attr.Factory(dict))
     _ip = attr.ib(type=str, default="127.0.0.1")
-    _producer = None  # type: Optional[Union[IPullProducer, IPushProducer]]
+    _producer: Optional[Union[IPullProducer, IPushProducer]] = None
 
     @property
     def json_body(self):
@@ -138,21 +138,19 @@ class FakeChannel:
     def transport(self):
         return self
 
-    def await_result(self, timeout: int = 100) -> None:
+    def await_result(self, timeout_ms: int = 1000) -> None:
         """
         Wait until the request is finished.
         """
+        end_time = self._reactor.seconds() + timeout_ms / 1000.0
         self._reactor.run()
-        x = 0
 
         while not self.is_finished():
             # If there's a producer, tell it to resume producing so we get content
             if self._producer:
                 self._producer.resumeProducing()
 
-            x += 1
-
-            if x > timeout:
+            if self._reactor.seconds() > end_time:
                 raise TimedOutException("Timed out waiting for request to finish.")
 
             self._reactor.advance(0.1)
@@ -318,8 +316,10 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
         self._tcp_callbacks = {}
         self._udp = []
-        lookups = self.lookups = {}  # type: Dict[str, str]
-        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]
+        self.lookups: Dict[str, str] = {}
+        self._thread_callbacks: Deque[Callable[[], None]] = deque()
+
+        lookups = self.lookups
 
         @implementer(IResolverSimple)
         class FakeResolver:

@@ -11,7 +11,7 @@
   - [Delegation](delegate.md)
 
 # Upgrading
-  - [Upgrading between Synapse Versions](upgrading/README.md)
+  - [Upgrading between Synapse Versions](upgrade.md)
   - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
 
 # Usage
@@ -35,7 +35,7 @@
     - [URL Previews](url_previews.md)
     - [User Directory](user_directory.md)
     - [Message Retention Policies](message_retention_policies.md)
-    - [Pluggable Modules]()
+    - [Pluggable Modules](modules.md)
       - [Third Party Rules]()
       - [Spam Checker](spam_checker.md)
       - [Presence Router](presence_router_module.md)

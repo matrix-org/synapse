@@ -385,6 +385,7 @@ class EventCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
@@ -482,6 +483,9 @@ class EventCreationHandler:
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
         require_consent: bool = True,
+        outlier: bool = False,
+        historical: bool = False,
+        depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """
         Given a dict from a client, create a new event.
@@ -506,8 +510,21 @@ class EventCreationHandler:
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
 
+                If non-None, prev_event_ids must also be provided.
+
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
+
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
+
         Raises:
             ResourceLimitError if server is blocked to some resource being
             exceeded
@@ -563,11 +580,39 @@ class EventCreationHandler:
         if txn_id is not None:
             builder.internal_metadata.txn_id = txn_id
 
+        builder.internal_metadata.outlier = outlier
+
+        builder.internal_metadata.historical = historical
+
+        # Strip down the auth_event_ids to only what we need to auth the event.
+        # For example, we don't need extra m.room.member that don't match event.sender
+        if auth_event_ids is not None:
+            # If auth events are provided, prev events must be also.
+            assert prev_event_ids is not None
+
+            temp_event = await builder.build(
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                depth=depth,
+            )
+            auth_events = await self.store.get_events_as_list(auth_event_ids)
+            # Create a StateMap[str]
+            auth_event_state_map = {
+                (e.type, e.state_key): e.event_id for e in auth_events
+            }
+            # Actually strip down and use the necessary auth events
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                event=temp_event,
+                current_state_ids=auth_event_state_map,
+                for_verification=False,
+            )
+
         event, context = await self.create_new_client_event(
             builder=builder,
             requester=requester,
             prev_event_ids=prev_event_ids,
             auth_event_ids=auth_event_ids,
+            depth=depth,
         )
 
         # In an ideal world we wouldn't need the second part of this condition. However,
@@ -724,9 +769,14 @@ class EventCreationHandler:
         self,
         requester: Requester,
         event_dict: dict,
+        prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
         ratelimit: bool = True,
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
+        outlier: bool = False,
+        historical: bool = False,
+        depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
         """
         Creates an event, then sends it.
@@ -736,10 +786,29 @@ class EventCreationHandler:
         Args:
             requester: The requester sending the event.
             event_dict: An entire event.
+            prev_event_ids:
+                The event IDs to use as the prev events.
+                Should normally be left as None to automatically request them
+                from the database.
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
+                If non-None, prev_event_ids must also be provided.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
                 send this event.
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             The event, and its stream ordering (if deduplication happened,
@@ -779,7 +848,14 @@ class EventCreationHandler:
                     return event, event.internal_metadata.stream_ordering
 
             event, context = await self.create_event(
-                requester, event_dict, txn_id=txn_id
+                requester,
+                event_dict,
+                txn_id=txn_id,
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                outlier=outlier,
+                historical=historical,
+                depth=depth,
             )
 
             assert self.hs.is_mine_id(event.sender), "User must be our own: %s" % (
@@ -811,6 +887,7 @@ class EventCreationHandler:
         requester: Optional[Requester] = None,
         prev_event_ids: Optional[List[str]] = None,
         auth_event_ids: Optional[List[str]] = None,
+        depth: Optional[int] = None,
     ) -> Tuple[EventBase, EventContext]:
         """Create a new event for a local client
 
@@ -827,6 +904,10 @@ class EventCreationHandler:
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
+
+            depth: Override the depth used to order the event in the DAG.
+                Should normally be set to None, which will cause the depth to be calculated
+                based on the prev_events.
 
         Returns:
             Tuple of created event, context
@@ -851,9 +932,24 @@ class EventCreationHandler:
         ), "Attempting to create an event with no prev_events"
 
         event = await builder.build(
-            prev_event_ids=prev_event_ids, auth_event_ids=auth_event_ids
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
+            depth=depth,
         )
-        context = await self.state.compute_event_context(event)
+
+        old_state = None
+
+        # Pass on the outlier property from the builder to the event
+        # after it is created
+        if builder.internal_metadata.outlier:
+            event.internal_metadata.outlier = builder.internal_metadata.outlier
+
+            # Calculate the state for outliers that pass in their own `auth_event_ids`
+            if auth_event_ids:
+                old_state = await self.store.get_events_as_list(auth_event_ids)
+
+        context = await self.state.compute_event_context(event, old_state=old_state)
+
         if requester:
             context.app_service = requester.app_service
 
@@ -969,7 +1065,9 @@ class EventCreationHandler:
             assert event.content["membership"] == Membership.LEAVE
         else:
             try:
-                await self.auth.check_from_context(room_version, event, context)
+                await self._event_auth_handler.check_from_context(
+                    room_version, event, context
+                )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
                 raise err
@@ -1018,7 +1116,13 @@ class EventCreationHandler:
         the arguments.
         """
 
-        await self.action_generator.handle_push_actions_for_event(event, context)
+        # Skip push notification actions for historical messages
+        # because we don't want to notify people about old history back in time.
+        # The historical messages also do not have the proper `context.current_state_ids`
+        # and `state_groups` because they have `prev_events` that aren't persisted yet
+        # (historical messages persisted in reverse-chronological order).
+        if not event.internal_metadata.is_historical():
+            await self.action_generator.handle_push_actions_for_event(event, context)
 
         try:
             # If we're a worker we need to hit out to the master.
@@ -1288,7 +1392,7 @@ class EventCreationHandler:
                     raise AuthError(403, "Redacting server ACL events is not permitted")
 
             prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self.auth.compute_auth_events(
+            auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events_map = await self.store.get_events(auth_events_ids)
@@ -1317,13 +1421,21 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
+        # Mark any `m.historical` messages as backfilled so they don't appear
+        # in `/sync` and have the proper decrementing `stream_ordering` as we import
+        backfilled = False
+        if event.internal_metadata.is_historical():
+            backfilled = True
+
         # Note that this returns the event that was persisted, which may not be
         # the same as we passed in if it was deduplicated due transaction IDs.
         (
             event,
             event_pos,
             max_stream_token,
-        ) = await self.storage.persistence.persist_event(event, context=context)
+        ) = await self.storage.persistence.persist_event(
+            event, context=context, backfilled=backfilled
+        )
 
         if self._ephemeral_events_enabled:
             # If there's an expiry timestamp on the event, schedule its expiry.
@@ -1490,11 +1602,13 @@ class EventCreationHandler:
         for k, v in original_event.internal_metadata.get_dict().items():
             setattr(builder.internal_metadata, k, v)
 
-        # the event type hasn't changed, so there's no point in re-calculating the
-        # auth events.
+        # modules can send new state events, so we re-calculate the auth events just in
+        # case.
+        prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
+
         event = await builder.build(
-            prev_event_ids=original_event.prev_event_ids(),
-            auth_event_ids=original_event.auth_event_ids(),
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=None,
         )
 
         # we rebuild the event context, to be on the safe side. If nothing else,

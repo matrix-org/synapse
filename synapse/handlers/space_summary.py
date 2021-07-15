@@ -24,7 +24,9 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     HistoryVisibility,
+    JoinRules,
     Membership,
+    RoomTypes,
 )
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
@@ -149,25 +151,32 @@ class SpaceSummaryHandler:
                     # The room should only be included in the summary if:
                     #     a. the user is in the room;
                     #     b. the room is world readable; or
-                    #     c. the user is in a space that has been granted access to
-                    #        the room.
+                    #     c. the user could join the room, e.g. the join rules
+                    #        are set to public or the user is in a space that
+                    #        has been granted access to the room.
                     #
                     # Note that we know the user is not in the root room (which is
                     # why the remote call was made in the first place), but the user
                     # could be in one of the children rooms and we just didn't know
                     # about the link.
-                    include_room = room.get("world_readable") is True
+
+                    # The API doesn't return the room version so assume that a
+                    # join rule of knock is valid.
+                    include_room = (
+                        room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+                        or room.get("world_readable") is True
+                    )
 
                     # Check if the user is a member of any of the allowed spaces
                     # from the response.
-                    allowed_spaces = room.get("allowed_spaces")
+                    allowed_rooms = room.get("allowed_spaces")
                     if (
                         not include_room
-                        and allowed_spaces
-                        and isinstance(allowed_spaces, list)
+                        and allowed_rooms
+                        and isinstance(allowed_rooms, list)
                     ):
                         include_room = await self._event_auth_handler.is_user_in_rooms(
-                            allowed_spaces, requester
+                            allowed_rooms, requester
                         )
 
                     # Finally, if this isn't the requested room, check ourselves
@@ -318,7 +327,8 @@ class SpaceSummaryHandler:
 
         Returns:
             A tuple of:
-                An iterable of a single value of the room.
+                The room information, if the room should be returned to the
+                user. None, otherwise.
 
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
@@ -328,7 +338,11 @@ class SpaceSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id)
 
-        # look for child rooms/spaces.
+        # If the room is not a space, return just the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE:
+            return room_entry, ()
+
+        # Otherwise, look for child rooms/spaces.
         child_events = await self._get_child_events(room_id)
 
         if suggested_only:
@@ -348,6 +362,7 @@ class SpaceSummaryHandler:
                     event_format=format_event_for_client_v2,
                 )
             )
+
         return room_entry, events_result
 
     async def _summarize_remote_room(
@@ -413,9 +428,8 @@ class SpaceSummaryHandler:
 
         It should be included if:
 
-        * The requester is joined or invited to the room.
-        * The requester can join without an invite (per MSC3083).
-        * The origin server has any user that is joined or invited to the room.
+        * The requester is joined or can join the room (per MSC3173).
+        * The origin server has any user that is joined or can join the room.
         * The history visibility is set to world readable.
 
         Args:
@@ -434,39 +448,66 @@ class SpaceSummaryHandler:
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
+            # The user might have a pending invite for the room.
+            if requester and await self._store.get_invite_for_local_user_in_room(
+                requester, room_id
+            ):
+                return True
+
             logger.info("room %s is unknown, omitting from summary", room_id)
             return False
 
         room_version = await self._store.get_room_version(room_id)
 
-        # if we have an authenticated requesting user, first check if they are able to view
-        # stripped state in the room.
+        # Include the room if it has join rules of public or knock.
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
+        if join_rules_event_id:
+            join_rules_event = await self._store.get_event(join_rules_event_id)
+            join_rule = join_rules_event.content.get("join_rule")
+            if join_rule == JoinRules.PUBLIC or (
+                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+            ):
+                return True
+
+        # Include the room if it is peekable.
+        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+        if hist_vis_event_id:
+            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
+            hist_vis = hist_vis_ev.content.get("history_visibility")
+            if hist_vis == HistoryVisibility.WORLD_READABLE:
+                return True
+
+        # Otherwise we need to check information specific to the user or server.
+
+        # If we have an authenticated requesting user, check if they are a member
+        # of the room (or can join the room).
         if requester:
             member_event_id = state_ids.get((EventTypes.Member, requester), None)
 
             # If they're in the room they can see info on it.
-            member_event = None
             if member_event_id:
                 member_event = await self._store.get_event(member_event_id)
                 if member_event.membership in (Membership.JOIN, Membership.INVITE):
                     return True
 
             # Otherwise, check if they should be allowed access via membership in a space.
-            if self._event_auth_handler.has_restricted_join_rules(
+            if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
-                allowed_spaces = (
-                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 if await self._event_auth_handler.is_user_in_rooms(
-                    allowed_spaces, requester
+                    allowed_rooms, requester
                 ):
                     return True
 
         # If this is a request over federation, check if the host is in the room or
-        # is in one of the spaces specified via the join rules.
+        # has a user who could join the room.
         elif origin:
-            if await self._auth.check_host_in_room(room_id, origin):
+            if await self._event_auth_handler.check_host_in_room(
+                room_id, origin
+            ) or await self._store.is_host_invited(room_id, origin):
                 return True
 
             # Alternately, if the host has a user in any of the spaces specified
@@ -475,25 +516,19 @@ class SpaceSummaryHandler:
             if await self._event_auth_handler.has_restricted_join_rules(
                 state_ids, room_version
             ):
-                allowed_spaces = (
-                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
-                for space_id in allowed_spaces:
-                    if await self._auth.check_host_in_room(space_id, origin):
+                for space_id in allowed_rooms:
+                    if await self._event_auth_handler.check_host_in_room(
+                        space_id, origin
+                    ):
                         return True
 
-        # otherwise, check if the room is peekable
-        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""), None)
-        if hist_vis_event_id:
-            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
-            hist_vis = hist_vis_ev.content.get("history_visibility")
-            if hist_vis == HistoryVisibility.WORLD_READABLE:
-                return True
-
         logger.info(
-            "room %s is unpeekable and user %s is not a member / not allowed to join, omitting from summary",
+            "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
             room_id,
-            requester,
+            requester or origin,
         )
         return False
 
@@ -512,11 +547,11 @@ class SpaceSummaryHandler:
         )
 
         room_version = await self._store.get_room_version(room_id)
-        allowed_spaces = None
+        allowed_rooms = None
         if await self._event_auth_handler.has_restricted_join_rules(
             current_state_ids, room_version
         ):
-            allowed_spaces = await self._event_auth_handler.get_spaces_that_allow_join(
+            allowed_rooms = await self._event_auth_handler.get_rooms_that_allow_join(
                 current_state_ids
             )
 
@@ -527,13 +562,14 @@ class SpaceSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            "join_rules": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
-            "allowed_spaces": allowed_spaces,
+            "allowed_spaces": allowed_rooms,
         }
 
         # Filter out Nones – rather omit the field altogether

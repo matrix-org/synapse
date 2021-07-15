@@ -113,8 +113,18 @@ def parse_boolean_from_args(args, name, default=None, required=False):
 def parse_bytes_from_args(
     args: Dict[bytes, List[bytes]],
     name: str,
+    default: Optional[bytes] = None,
+) -> Optional[bytes]:
+    ...
+
+
+@overload
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
     default: Literal[None] = None,
-    required: Literal[True] = True,
+    *,
+    required: Literal[True],
 ) -> bytes:
     ...
 
@@ -195,9 +205,14 @@ def parse_string(
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
-    args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+    args: Dict[bytes, List[bytes]] = request.args  # type: ignore
     return parse_string_from_args(
-        args, name, default, required, allowed_values, encoding
+        args,
+        name,
+        default,
+        required=required,
+        allowed_values=allowed_values,
+        encoding=encoding,
     )
 
 
@@ -227,7 +242,20 @@ def parse_strings_from_args(
     args: Dict[bytes, List[bytes]],
     name: str,
     default: Optional[List[str]] = None,
-    required: Literal[True] = True,
+    *,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[List[str]]:
+    ...
+
+
+@overload
+def parse_strings_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[List[str]] = None,
+    *,
+    required: Literal[True],
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
 ) -> List[str]:
@@ -239,6 +267,7 @@ def parse_strings_from_args(
     args: Dict[bytes, List[bytes]],
     name: str,
     default: Optional[List[str]] = None,
+    *,
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
@@ -299,7 +328,20 @@ def parse_string_from_args(
     args: Dict[bytes, List[bytes]],
     name: str,
     default: Optional[str] = None,
-    required: Literal[True] = True,
+    *,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[str]:
+    ...
+
+
+@overload
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    *,
+    required: Literal[True],
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
 ) -> str:
@@ -454,7 +496,7 @@ class RestServlet:
     """
 
     def register(self, http_server):
-        """ Register this servlet with the given HTTP server. """
+        """Register this servlet with the given HTTP server."""
         patterns = getattr(self, "PATTERNS", None)
         if patterns:
             for method in ("GET", "PUT", "POST", "DELETE"):

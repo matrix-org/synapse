@@ -1,0 +1,95 @@
+# GitHub actions workflow which builds the release artifacts.
+
+name: Build release artifacts
+
+on:
+  # we build on PRs and develop to (hopefully) get early warning
+  # of things breaking (but only build one set of debs)
+  pull_request:
+  push:
+    branches: ["develop"]
+
+    # we do the full build on tags.
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  get-distros:
+    name: "Calculate list of debian distros"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - id: set-distros
+        run: |
+          # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
+          dists='["debian:sid"]'
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+              dists=$(scripts-dev/build_debian_packages --show-dists-json)
+          fi
+          echo "::set-output name=distros::$dists"
+    # map the step outputs to job outputs
+    outputs:
+      distros: ${{ steps.set-distros.outputs.distros }}
+
+  # now build the packages with a matrix build.
+  build-debs:
+    needs: get-distros
+    name: "Build .deb packages"
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        distro: ${{ fromJson(needs.get-distros.outputs.distros) }}
+
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          path: src
+      - uses: actions/setup-python@v2
+      - run: ./src/scripts-dev/build_debian_packages "${{ matrix.distro }}"
+      - uses: actions/upload-artifact@v2
+        with:
+          name: debs
+          path: debs/*
+
+  build-sdist:
+    name: "Build pypi distribution files"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: pip install wheel
+      - run: |
+          python setup.py sdist bdist_wheel
+      - uses: actions/upload-artifact@v2
+        with:
+          name: python-dist
+          path: dist/*
+
+  # if it's a tag, create a release and attach the artifacts to it
+  attach-assets:
+    name: "Attach assets to release"
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    needs:
+      - build-debs
+      - build-sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all workflow run artifacts
+        uses: actions/download-artifact@v2
+      - name: Build a tarball for the debs
+        run: tar -cvJf debs.tar.xz debs
+      - name: Attach to release
+        uses: softprops/action-gh-release@a929a66f232c1b11af63782948aa2210f981808a  # PR#109
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          files: |
+            python-dist/*
+            debs.tar.xz
+          # if it's not already published, keep the release as a draft.
+          draft: true
+          # mark it as a prerelease if the tag contains 'rc'.
+          prerelease: ${{ contains(github.ref, 'rc') }}

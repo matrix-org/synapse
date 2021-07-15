@@ -173,6 +173,7 @@ from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Pattern, Typ
 import attr
 
 from twisted.internet import defer
+from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
 from synapse.util import json_decoder, json_encoder
@@ -250,7 +251,7 @@ try:
             except Exception:
                 logger.exception("Failed to report span")
 
-    RustReporter = _WrappedRustReporter  # type: Optional[Type[_WrappedRustReporter]]
+    RustReporter: Optional[Type[_WrappedRustReporter]] = _WrappedRustReporter
 except ImportError:
     RustReporter = None
 
@@ -285,7 +286,7 @@ class SynapseBaggage:
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
-_homeserver_whitelist = None  # type: Optional[Pattern[str]]
+_homeserver_whitelist: Optional[Pattern[str]] = None
 
 # Util methods
 
@@ -661,11 +662,30 @@ def inject_header_dict(
 
     span = opentracing.tracer.active_span
 
-    carrier = {}  # type: Dict[str, str]
+    carrier: Dict[str, str] = {}
     opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
+
+
+def inject_response_headers(response_headers: Headers) -> None:
+    """Inject the current trace id into the HTTP response headers"""
+    if not opentracing:
+        return
+    span = opentracing.tracer.active_span
+    if not span:
+        return
+
+    # This is a bit implementation-specific.
+    #
+    # Jaeger's Spans have a trace_id property; other implementations (including the
+    # dummy opentracing.span.Span which we use if init_tracer is not called) do not
+    # expose it
+    trace_id = getattr(span, "trace_id", None)
+
+    if trace_id is not None:
+        response_headers.addRawHeader("Synapse-Trace-Id", f"{trace_id:x}")
 
 
 @ensure_active_span("get the active span context as a dict", ret={})
@@ -684,7 +704,7 @@ def get_active_span_text_map(destination=None):
     if destination and not whitelisted_homeserver(destination):
         return {}
 
-    carrier = {}  # type: Dict[str, str]
+    carrier: Dict[str, str] = {}
     opentracing.tracer.inject(
         opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
@@ -698,7 +718,7 @@ def active_span_context_as_string():
     Returns:
         The active span context encoded as a string.
     """
-    carrier = {}  # type: Dict[str, str]
+    carrier: Dict[str, str] = {}
     if opentracing:
         opentracing.tracer.inject(
             opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
@@ -843,6 +863,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         scope = start_active_span(request_name)
 
     with scope:
+        inject_response_headers(request.responseHeaders)
         try:
             yield
         finally:

@@ -26,7 +26,7 @@ from .. import unittest
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):
-    """ Tests the ApplicationServicesHandler. """
+    """Tests the ApplicationServicesHandler."""
 
     def setUp(self):
         self.mock_store = Mock()

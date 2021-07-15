@@ -90,7 +90,7 @@ async def filter_events_for_client(
         AccountDataTypes.IGNORED_USER_LIST, user_id
     )
 
-    ignore_list = frozenset()  # type: FrozenSet[str]
+    ignore_list: FrozenSet[str] = frozenset()
     if ignore_dict_content:
         ignored_users_dict = ignore_dict_content.get("ignored_users", {})
         if isinstance(ignored_users_dict, dict):

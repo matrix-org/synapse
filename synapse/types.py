@@ -182,14 +182,14 @@ def create_requester(
     )
 
 
-def get_domain_from_id(string):
+def get_domain_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
     return string[idx + 1 :]
 
 
-def get_localpart_from_id(string):
+def get_localpart_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
@@ -210,7 +210,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         'domain' : The domain part of the name
     """
 
-    SIGIL = abc.abstractproperty()  # type: str  # type: ignore
+    SIGIL: str = abc.abstractproperty()  # type: ignore
 
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)
@@ -284,14 +284,14 @@ class RoomAlias(DomainSpecificString):
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomID(DomainSpecificString):
-    """Structure representing a room id. """
+    """Structure representing a room id."""
 
     SIGIL = "!"
 
 
 @attr.s(slots=True, frozen=True, repr=False)
 class EventID(DomainSpecificString):
-    """Structure representing an event id. """
+    """Structure representing an event id."""
 
     SIGIL = "$"
 
@@ -304,7 +304,7 @@ class GroupID(DomainSpecificString):
 
     @classmethod
     def from_string(cls: Type[DS], s: str) -> DS:
-        group_id = super().from_string(s)  # type: DS # type: ignore
+        group_id: DS = super().from_string(s)  # type: ignore
 
         if not group_id.localpart:
             raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
@@ -404,7 +404,7 @@ def map_username_to_mxid_localpart(
     return username.decode("ascii")
 
 
-@attr.s(frozen=True, slots=True, cmp=False)
+@attr.s(frozen=True, slots=True, order=False)
 class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 
@@ -600,7 +600,7 @@ class StreamToken:
     groups_key = attr.ib(type=int)
 
     _SEPARATOR = "_"
-    START = None  # type: StreamToken
+    START: "StreamToken"
 
     @classmethod
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":

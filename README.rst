@@ -25,7 +25,7 @@ The overall architecture is::
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
 accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
-via IRC bridge at irc://irc.freenode.net/matrix.
+via IRC bridge at irc://irc.libera.chat/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
@@ -94,7 +94,8 @@ Synapse Installation
 
 .. _federation:
 
-* For details on how to install synapse, see `<INSTALL.md>`_.
+* For details on how to install synapse, see
+  `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
 * For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
 
@@ -106,7 +107,8 @@ from a web client.
 
 Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
-connect from a client: see `<INSTALL.md#tls-certificates>`_.
+connect from a client: see
+`TLS certificates <https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates>`_.
 
 An easy way to get started is to login or register via Element at
 https://app.element.io/#/login or https://app.element.io/#/register respectively.
@@ -141,13 +143,6 @@ the form of::
 
 As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
-
-ACME setup
-==========
-
-For details on having Synapse manage your federation TLS certificates
-automatically, please see `<docs/ACME.md>`_.
-
 
 Security note
 =============
@@ -193,11 +188,11 @@ impact to other applications will be minimal.
 Upgrading an existing Synapse
 =============================
 
-The instructions for upgrading synapse are in `UPGRADE.rst`_.
+The instructions for upgrading synapse are in `the upgrade notes`_.
 Please check these instructions as upgrading may require extra steps for some
 versions of synapse.
 
-.. _UPGRADE.rst: UPGRADE.rst
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 .. _reverse-proxy:
 
@@ -272,7 +267,7 @@ Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
-`Installing from source <INSTALL.md#installing-from-source>`_.
+`Installing from source <https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source>`_.
 
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
@@ -340,8 +335,8 @@ access the API as a Matrix client would. It is able to run Synapse directly from
 the source tree, so installation of the server is not required.
 
 Testing with SyTest is recommended for verifying that changes related to the
-Client-Server API are functioning correctly. See the `installation instructions
-<https://github.com/matrix-org/sytest#installing>`_ for details.
+Client-Server API are functioning correctly. See the `SyTest installation
+instructions <https://github.com/matrix-org/sytest#installing>`_ for details.
 
 
 Platform dependencies

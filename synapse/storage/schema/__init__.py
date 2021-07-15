@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 59
+SCHEMA_VERSION = 61
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -21,6 +21,10 @@ older versions of Synapse).
 
 See `README.md <synapse/storage/schema/README.md>`_  for more information on how this
 works.
+
+Changes in SCHEMA_VERSION = 61:
+    - The `user_stats_historical` and `room_stats_historical` tables are not written and
+      are not read (previously, they were written but not read).
 """
 
 
