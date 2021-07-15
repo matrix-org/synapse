@@ -22,6 +22,7 @@ from netaddr import IPSet
 
 from twisted.internet import interfaces  # noqa: F401
 from twisted.internet.endpoints import HostnameEndpoint, _WrapperEndpoint
+from twisted.internet.interfaces import IProtocol, IProtocolFactory
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.http import HTTPChannel
@@ -144,32 +145,32 @@ class MatrixFederationAgentTests(TestCase):
 
     def _make_connection(
         self,
-        client_factory,
-        server_factory,
-        ssl=False,
-        expected_sni=None,
+        client_factory: IProtocolFactory,
+        server_factory: IProtocolFactory,
+        ssl: bool = False,
+        expected_sni: Optional[bytes] = None,
         tls_sanlist: Optional[Iterable[bytes]] = None,
-    ):
+    ) -> IProtocol:
         """Builds a test server, and completes the outgoing client connection
 
         Args:
-            client_factory (interfaces.IProtocolFactory): the the factory that the
+            client_factory: the the factory that the
                 application is trying to use to make the outbound connection. We will
                 invoke it to build the client Protocol
 
-            server_factory (interfaces.IProtocolFactory): a factory to build the
+            server_factory: a factory to build the
                 server-side protocol
 
-            ssl (bool): If true, we will expect an ssl connection and wrap
+            ssl: If true, we will expect an ssl connection and wrap
                 server_factory with a TLSMemoryBIOFactory
 
-            expected_sni (bytes|None): the expected SNI value
+            expected_sni: the expected SNI value
 
             tls_sanlist: list of SAN entries for the TLS cert presented by the server.
                  Defaults to [b'DNS:test.com']
 
         Returns:
-            IProtocol: the server Protocol returned by server_factory
+            the server Protocol returned by server_factory
         """
         if ssl:
             server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
@@ -207,22 +208,28 @@ class MatrixFederationAgentTests(TestCase):
             self.assertEqual(
                 server_name,
                 expected_sni,
-                "Expected SNI %s but got %s" % (expected_sni, server_name),
+                f"Expected SNI {expected_sni} but got {server_name}",
             )
 
         return http_protocol
 
-    def _test_request_direct_connection(self, agent, scheme, hostname, path):
+    def _test_request_direct_connection(
+        self,
+        agent: ProxyAgent,
+        scheme: bytes,
+        hostname: bytes,
+        path: bytes,
+    ):
         """Runs a test case for a direct connection not going through a proxy.
 
         Args:
-            agent (ProxyAgent): the proxy agent being tested
+            agent: the proxy agent being tested
 
-            scheme (bytes): expected to be either "http" or "https"
+            scheme: expected to be either "http" or "https"
 
-            hostname (bytes): the hostname to connect to in the test
+            hostname: the hostname to connect to in the test
 
-            path (bytes): the path to connect to in the test
+            path: the path to connect to in the test
         """
         is_https = scheme == b"https"
 
@@ -320,7 +327,7 @@ class MatrixFederationAgentTests(TestCase):
         self._do_http_request_via_proxy(ssl=False, auth_credentials=None)
 
     @patch.dict(
-        os.environ,
+        os.environ, 
         {"http_proxy": "bob:pinkponies@proxy.com:8888", "no_proxy": "unused.com"},
     )
     def test_http_request_via_proxy_with_auth(self):
@@ -330,15 +337,17 @@ class MatrixFederationAgentTests(TestCase):
         self._do_http_request_via_proxy(ssl=False, auth_credentials="bob:pinkponies")
 
     @patch.dict(
-        os.environ,
-        {"http_proxy": "https://proxy.com:8888", "no_proxy": "unused.com"}
+        os.environ, {"http_proxy": "https://proxy.com:8888", "no_proxy": "unused.com"}
     )
     def test_http_request_via_https_proxy(self):
         self._do_http_request_via_proxy(ssl=True, auth_credentials=None)
 
     @patch.dict(
         os.environ,
-        {"http_proxy": "https://bob:pinkponies@proxy.com:8888", "no_proxy": "unused.com"}
+        {
+            "http_proxy": "https://bob:pinkponies@proxy.com:8888",
+            "no_proxy": "unused.com",
+        }
     )
     def test_http_request_via_https_proxy_with_auth(self):
         self._do_http_request_via_proxy(ssl=True, auth_credentials="bob:pinkponies")
@@ -357,8 +366,10 @@ class MatrixFederationAgentTests(TestCase):
         self._do_https_request_via_proxy(auth_credentials="bob:pinkponies")
 
     def _do_http_request_via_proxy(
-        self, ssl: bool = False, auth_credentials: Optional[str] = None,
-    ) -> None:
+        self,
+        ssl: bool = False,
+        auth_credentials: Optional[str] = None,
+    ):
         """Send a http request via an agent and check that it is correctly received at
             the proxy. The proxy can use either http or https.
         Args:
@@ -507,7 +518,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            "Expected SNI %s but got %s" % (expected_sni, server_name),
+            f"Expected SNI {expected_sni} but got {server_name}",
         )
 
         # now there should be a pending request
@@ -644,7 +655,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            "Expected SNI %s but got %s" % (expected_sni, server_name),
+            f"Expected SNI {expected_sni} but got {server_name}",
         )
 
         # now there should be a pending request
@@ -694,15 +705,17 @@ class MatrixFederationAgentTests(TestCase):
         )
 
 
-def _wrap_server_factory_for_tls(factory, sanlist=None):
+def _wrap_server_factory_for_tls(
+    factory: IProtocolFactory, sanlist: Iterable[bytes] = None
+) -> IProtocolFactory:
     """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
 
     The resultant factory will create a TLS server which presents a certificate
     signed by our test CA, valid for the domains in `sanlist`
 
     Args:
-        factory (interfaces.IProtocolFactory): protocol factory to wrap
-        sanlist (iterable[bytes]): list of domains the cert should be valid for
+        factory: protocol factory to wrap
+        sanlist: list of domains the cert should be valid for
 
     Returns:
         interfaces.IProtocolFactory
@@ -716,7 +729,7 @@ def _wrap_server_factory_for_tls(factory, sanlist=None):
     )
 
 
-def _get_test_protocol_factory():
+def _get_test_protocol_factory() -> IProtocolFactory:
     """Get a protocol Factory which will build an HTTPChannel
 
     Returns:
@@ -730,6 +743,6 @@ def _get_test_protocol_factory():
     return server_factory
 
 
-def _log_request(request):
+def _log_request(request: str):
     """Implements Factory.log, which is expected by Request.finish"""
-    logger.info("Completed request %s", request)
+    logger.info(f"Completed request {request}")
