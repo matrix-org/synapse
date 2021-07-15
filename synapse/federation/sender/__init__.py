@@ -163,7 +163,7 @@ class _PresenceQueue:
 
     sender: "FederationSender" = attr.ib()
     clock: Clock = attr.ib()
-    queue: "OrderedDict[str, Literal[None]]" = attr.ib(factory=OrderedDict)
+    queue: OrderedDict[str, Literal[None]] = attr.ib(factory=OrderedDict)
     processing: bool = attr.ib(default=False)
 
     def add_to_queue(self, destination: str) -> None:
@@ -185,7 +185,7 @@ class _PresenceQueue:
         self.processing = True
 
         try:
-            # We start with a delay that should drain queue quickly enough that
+            # We start with a delay that should drain the queue quickly enough that
             # we process all destinations in the queue in _MAX_TIME_IN_QUEUE
             # seconds.
             #
@@ -213,7 +213,7 @@ class _PresenceQueue:
 
                 # More destinations may have been added to the queue, so we may
                 # need to reduce the delay to ensure everything gets processed
-                # with _MAX_TIME_IN_QUEUE seconds.
+                # within _MAX_TIME_IN_QUEUE seconds.
                 current_sleep_seconds = min(
                     current_sleep_seconds, self._MAX_TIME_IN_QUEUE / len(self.queue)
                 )
