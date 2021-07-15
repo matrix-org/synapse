@@ -20,12 +20,12 @@ from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.api.filtering import Filter
 from synapse.http.servlet import (
+    ResolveRoomIdMixin,
     RestServlet,
     assert_params_in_dict,
     parse_integer,
     parse_json_object_from_request,
     parse_string,
-    ResolveRoomIdMixin,
 )
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (

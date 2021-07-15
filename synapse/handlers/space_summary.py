@@ -20,11 +20,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
-from synapse.api.constants import (
-    EventTypes,
-    JoinRules,
-    RoomTypes,
-)
+from synapse.api.constants import EventTypes, JoinRules, RoomTypes
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.handlers.room_summary import RoomSummaryMixin

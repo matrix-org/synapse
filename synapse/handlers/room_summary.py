@@ -15,11 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional
 
-from synapse.api.constants import (
-    EventContentFields,
-    EventTypes,
-    HistoryVisibility,
-)
+from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
@@ -114,7 +110,10 @@ class RoomSummaryHandler(RoomSummaryMixin):
             room_summary = await self._summarize_local_room(requester, None, room_id)
 
             if requester:
-                membership, _ = await self._store.get_local_current_membership_for_user_in_room(
+                (
+                    membership,
+                    _,
+                ) = await self._store.get_local_current_membership_for_user_in_room(
                     requester, room_id
                 )
 

@@ -21,7 +21,7 @@ from twisted.web.server import Request
 
 from synapse import event_auth
 from synapse.api.auth_blocking import AuthBlocking
-from synapse.api.constants import EventTypes, HistoryVisibility, Membership, JoinRules
+from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -728,5 +728,5 @@ class Auth:
             "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
             room_id,
             requester or origin,
-            )
+        )
         return False

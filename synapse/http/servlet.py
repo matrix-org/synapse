@@ -14,15 +14,15 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, overload, Tuple
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, overload
 
 from typing_extensions import Literal
 
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
-from synapse.util import json_decoder
 from synapse.types import RoomAlias, RoomID
+from synapse.util import json_decoder
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 def parse_integer(request, name, default=None, required=False):
     """Parse an integer parameter from the request string
-thank
+
     Args:
         request: the twisted HTTP request.
         name (bytes/unicode): the name of the query parameter.

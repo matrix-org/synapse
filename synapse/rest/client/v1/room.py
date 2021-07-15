@@ -25,14 +25,15 @@ from synapse.api.errors import (
     Codes,
     HttpResponseException,
     InvalidClientCredentialsError,
+    MissingClientTokenError,
     ShadowBanError,
     SynapseError,
-    MissingClientTokenError,
 )
 from synapse.api.filtering import Filter
 from synapse.appservice import ApplicationService
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
+    ResolveRoomIdMixin,
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
@@ -40,7 +41,6 @@ from synapse.http.servlet import (
     parse_json_object_from_request,
     parse_string,
     parse_strings_from_args,
-    ResolveRoomIdMixin,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
@@ -51,8 +51,6 @@ from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
     Requester,
-    RoomAlias,
-    RoomID,
     StreamToken,
     ThirdPartyInstanceID,
     UserID,
@@ -680,9 +678,7 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
 
         # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
         args: Dict[bytes, List[bytes]] = request.args  # type: ignore
-        remote_room_hosts = parse_strings_from_args(
-            args, "server_name", required=False
-        )
+        remote_room_hosts = parse_strings_from_args(args, "server_name", required=False)
         room_id, remote_room_hosts = await self.resolve_room_id(
             room_identifier,
             remote_room_hosts,
@@ -1453,9 +1449,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
 
         # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
         args: Dict[bytes, List[bytes]] = request.args  # type: ignore
-        remote_room_hosts = parse_strings_from_args(
-            args, "via", required=False
-        )
+        remote_room_hosts = parse_strings_from_args(args, "via", required=False)
         room_id, remote_room_hosts = await self.resolve_room_id(
             room_identifier,
             remote_room_hosts,
