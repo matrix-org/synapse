@@ -31,10 +31,15 @@ CREATE OR REPLACE RULE "populate_stream_ordering2" AS
 INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
   (6001, 'populate_stream_ordering2', '{}');
 
--- ... and another to build an index on it
+-- ... and some more to build indexes on it. These aren't really interdependent
+-- but the backround_updates manager can only handle a single dependency per update.
 INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
-  (6001, 'index_stream_ordering2', '{}', 'populate_stream_ordering2');
+  (6001, 'index_stream_ordering2', '{}', 'populate_stream_ordering2'),
+  (6001, 'index_stream_ordering2_room_order', '{}', 'index_stream_ordering2'),
+  (6001, 'index_stream_ordering2_contains_url', '{}', 'index_stream_ordering2_room_order'),
+  (6001, 'index_stream_ordering2_room_stream', '{}', 'index_stream_ordering2_contains_url'),
+  (6001, 'index_stream_ordering2_ts', '{}', 'index_stream_ordering2_room_stream');
 
 -- ... and another to do the switcheroo
 INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
-  (6001, 'replace_stream_ordering_column', '{}', 'index_stream_ordering2');
+  (6001, 'replace_stream_ordering_column', '{}', 'index_stream_ordering2_ts');

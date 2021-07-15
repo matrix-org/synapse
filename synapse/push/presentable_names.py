@@ -199,7 +199,7 @@ def name_from_member_event(member_event: EventBase) -> str:
 
 
 def _state_as_two_level_dict(state: StateMap[str]) -> Dict[str, Dict[str, str]]:
-    ret = {}  # type: Dict[str, Dict[str, str]]
+    ret: Dict[str, Dict[str, str]] = {}
     for k, v in state.items():
         ret.setdefault(k[0], {})[k[1]] = v
     return ret

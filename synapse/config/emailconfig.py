@@ -134,9 +134,9 @@ class EmailConfig(Config):
 
                 # trusted_third_party_id_servers does not contain a scheme whereas
                 # account_threepid_delegate_email is expected to. Presume https
-                self.account_threepid_delegate_email = (
+                self.account_threepid_delegate_email: Optional[str] = (
                     "https://" + first_trusted_identity_server
-                )  # type: Optional[str]
+                )
                 self.using_identity_server_from_trusted_list = True
             else:
                 raise ConfigError(

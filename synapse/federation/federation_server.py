@@ -44,7 +44,7 @@ from synapse.api.errors import (
     SynapseError,
     UnsupportedRoomVersionError,
 )
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -58,10 +58,12 @@ from synapse.logging.context import (
 )
 from synapse.logging.opentracing import log_kv, start_active_span_from_edu, trace
 from synapse.logging.utils import log_function
+from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.replication.http.federation import (
     ReplicationFederationSendEduRestServlet,
     ReplicationGetQueryRestServlet,
 )
+from synapse.storage.databases.main.lock import Lock
 from synapse.types import JsonDict
 from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
@@ -97,13 +99,18 @@ last_pdu_ts_metric = Gauge(
 )
 
 
+# The name of the lock to use when process events in a room received over
+# federation.
+_INBOUND_EVENT_HANDLING_LOCK_NAME = "federation_inbound_pdu"
+
+
 class FederationServer(FederationBase):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.auth = hs.get_auth()
         self.handler = hs.get_federation_handler()
         self.state = hs.get_state_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
         self.device_handler = hs.get_device_handler()
 
@@ -115,12 +122,12 @@ class FederationServer(FederationBase):
 
         # origins that we are currently processing a transaction from.
         # a dict from origin to txn id.
-        self._active_transactions = {}  # type: Dict[str, str]
+        self._active_transactions: Dict[str, str] = {}
 
         # We cache results for transaction with the same ID
-        self._transaction_resp_cache = ResponseCache(
+        self._transaction_resp_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "fed_txn_handler", timeout_ms=30000
-        )  # type: ResponseCache[Tuple[str, str]]
+        )
 
         self.transaction_actions = TransactionActions(self.store)
 
@@ -128,18 +135,53 @@ class FederationServer(FederationBase):
 
         # We cache responses to state queries, as they take a while and often
         # come in waves.
-        self._state_resp_cache = ResponseCache(
-            hs.get_clock(), "state_resp", timeout_ms=30000
-        )  # type: ResponseCache[Tuple[str, Optional[str]]]
-        self._state_ids_resp_cache = ResponseCache(
+        self._state_resp_cache: ResponseCache[
+            Tuple[str, Optional[str]]
+        ] = ResponseCache(hs.get_clock(), "state_resp", timeout_ms=30000)
+        self._state_ids_resp_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "state_ids_resp", timeout_ms=30000
-        )  # type: ResponseCache[Tuple[str, str]]
+        )
 
         self._federation_metrics_domains = (
             hs.config.federation.federation_metrics_domains
         )
 
         self._room_prejoin_state_types = hs.config.api.room_prejoin_state
+
+        # Whether we have started handling old events in the staging area.
+        self._started_handling_of_staged_events = False
+
+    @wrap_as_background_process("_handle_old_staged_events")
+    async def _handle_old_staged_events(self) -> None:
+        """Handle old staged events by fetching all rooms that have staged
+        events and start the processing of each of those rooms.
+        """
+
+        # Get all the rooms IDs with staged events.
+        room_ids = await self.store.get_all_rooms_with_staged_incoming_events()
+
+        # We then shuffle them so that if there are multiple instances doing
+        # this work they're less likely to collide.
+        random.shuffle(room_ids)
+
+        for room_id in room_ids:
+            room_version = await self.store.get_room_version(room_id)
+
+            # Try and acquire the processing lock for the room, if we get it start a
+            # background process for handling the events in the room.
+            lock = await self.store.try_acquire_lock(
+                _INBOUND_EVENT_HANDLING_LOCK_NAME, room_id
+            )
+            if lock:
+                logger.info("Handling old staged inbound events in %s", room_id)
+                self._process_incoming_pdus_in_room_inner(
+                    room_id,
+                    room_version,
+                    lock,
+                )
+
+            # We pause a bit so that we don't start handling all rooms at once.
+            await self._clock.sleep(random.uniform(0, 0.1))
 
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
@@ -159,6 +201,12 @@ class FederationServer(FederationBase):
     async def on_incoming_transaction(
         self, origin: str, transaction_data: JsonDict
     ) -> Tuple[int, Dict[str, Any]]:
+        # If we receive a transaction we should make sure that kick off handling
+        # any old events in the staging area.
+        if not self._started_handling_of_staged_events:
+            self._started_handling_of_staged_events = True
+            self._handle_old_staged_events()
+
         # keep this as early as possible to make the calculated origin ts as
         # accurate as possible.
         request_time = self._clock.time_msec()
@@ -289,7 +337,7 @@ class FederationServer(FederationBase):
 
         origin_host, _ = parse_server_name(origin)
 
-        pdus_by_room = {}  # type: Dict[str, List[EventBase]]
+        pdus_by_room: Dict[str, List[EventBase]] = {}
 
         newest_pdu_ts = 0
 
@@ -362,22 +410,21 @@ class FederationServer(FederationBase):
 
         async def process_pdu(pdu: EventBase) -> JsonDict:
             event_id = pdu.event_id
-            with pdu_process_time.time():
-                with nested_logging_context(event_id):
-                    try:
-                        await self._handle_received_pdu(origin, pdu)
-                        return {}
-                    except FederationError as e:
-                        logger.warning("Error handling PDU %s: %s", event_id, e)
-                        return {"error": str(e)}
-                    except Exception as e:
-                        f = failure.Failure()
-                        logger.error(
-                            "Failed to handle PDU %s",
-                            event_id,
-                            exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
-                        )
-                        return {"error": str(e)}
+            with nested_logging_context(event_id):
+                try:
+                    await self._handle_received_pdu(origin, pdu)
+                    return {}
+                except FederationError as e:
+                    logger.warning("Error handling PDU %s: %s", event_id, e)
+                    return {"error": str(e)}
+                except Exception as e:
+                    f = failure.Failure()
+                    logger.error(
+                        "Failed to handle PDU %s",
+                        event_id,
+                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                    )
+                    return {"error": str(e)}
 
         await concurrently_execute(
             process_pdus_for_room, pdus_by_room.keys(), TRANSACTION_CONCURRENCY_LIMIT
@@ -414,7 +461,7 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
-        in_room = await self.auth.check_host_in_room(room_id, origin)
+        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
@@ -447,7 +494,7 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
-        in_room = await self.auth.check_host_in_room(room_id, origin)
+        in_room = await self._event_auth_handler.check_host_in_room(room_id, origin)
         if not in_room:
             raise AuthError(403, "Host not in room.")
 
@@ -469,9 +516,9 @@ class FederationServer(FederationBase):
         self, room_id: str, event_id: Optional[str]
     ) -> Dict[str, list]:
         if event_id:
-            pdus = await self.handler.get_state_for_pdu(
+            pdus: Iterable[EventBase] = await self.handler.get_state_for_pdu(
                 room_id, event_id
-            )  # type: Iterable[EventBase]
+            )
         else:
             pdus = (await self.state.get_current_state(room_id)).values()
 
@@ -744,7 +791,7 @@ class FederationServer(FederationBase):
         log_kv({"message": "Claiming one time keys.", "user, device pairs": query})
         results = await self.store.claim_e2e_one_time_keys(query)
 
-        json_result = {}  # type: Dict[str, Dict[str, dict]]
+        json_result: Dict[str, Dict[str, dict]] = {}
         for user_id, device_keys in results.items():
             for device_id, keys in device_keys.items():
                 for key_id, json_str in keys.items():
@@ -857,7 +904,105 @@ class FederationServer(FederationBase):
         except SynapseError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=pdu.event_id)
 
-        await self.handler.on_receive_pdu(origin, pdu, sent_to_us_directly=True)
+        # Add the event to our staging area
+        await self.store.insert_received_event_to_staging(origin, pdu)
+
+        # Try and acquire the processing lock for the room, if we get it start a
+        # background process for handling the events in the room.
+        lock = await self.store.try_acquire_lock(
+            _INBOUND_EVENT_HANDLING_LOCK_NAME, pdu.room_id
+        )
+        if lock:
+            self._process_incoming_pdus_in_room_inner(
+                pdu.room_id, room_version, lock, origin, pdu
+            )
+
+    @wrap_as_background_process("_process_incoming_pdus_in_room_inner")
+    async def _process_incoming_pdus_in_room_inner(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+        lock: Lock,
+        latest_origin: Optional[str] = None,
+        latest_event: Optional[EventBase] = None,
+    ) -> None:
+        """Process events in the staging area for the given room.
+
+        The latest_origin and latest_event args are the latest origin and event
+        received (or None to simply pull the next event from the database).
+        """
+
+        # The common path is for the event we just received be the only event in
+        # the room, so instead of pulling the event out of the DB and parsing
+        # the event we just pull out the next event ID and check if that matches.
+        if latest_event is not None and latest_origin is not None:
+            (
+                next_origin,
+                next_event_id,
+            ) = await self.store.get_next_staged_event_id_for_room(room_id)
+            if next_origin != latest_origin or next_event_id != latest_event.event_id:
+                latest_origin = None
+                latest_event = None
+
+        if latest_origin is None or latest_event is None:
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
+            if not next:
+                await lock.release()
+                return
+
+            origin, event = next
+        else:
+            origin = latest_origin
+            event = latest_event
+
+        # We loop round until there are no more events in the room in the
+        # staging area, or we fail to get the lock (which means another process
+        # has started processing).
+        while True:
+            async with lock:
+                try:
+                    await self.handler.on_receive_pdu(
+                        origin, event, sent_to_us_directly=True
+                    )
+                except FederationError as e:
+                    # XXX: Ideally we'd inform the remote we failed to process
+                    # the event, but we can't return an error in the transaction
+                    # response (as we've already responded).
+                    logger.warning("Error handling PDU %s: %s", event.event_id, e)
+                except Exception:
+                    f = failure.Failure()
+                    logger.error(
+                        "Failed to handle PDU %s",
+                        event.event_id,
+                        exc_info=(f.type, f.value, f.getTracebackObject()),  # type: ignore
+                    )
+
+                received_ts = await self.store.remove_received_event_from_staging(
+                    origin, event.event_id
+                )
+                if received_ts is not None:
+                    pdu_process_time.observe(
+                        (self._clock.time_msec() - received_ts) / 1000
+                    )
+
+            # We need to do this check outside the lock to avoid a race between
+            # a new event being inserted by another instance and it attempting
+            # to acquire the lock.
+            next = await self.store.get_next_staged_event_for_room(
+                room_id, room_version
+            )
+            if not next:
+                break
+
+            origin, event = next
+
+            lock = await self.store.try_acquire_lock(
+                _INBOUND_EVENT_HANDLING_LOCK_NAME, room_id
+            )
+            if not lock:
+                return
 
     def __str__(self) -> str:
         return "<ReplicationLayer(%s)>" % self.server_name
@@ -974,17 +1119,13 @@ class FederationHandlerRegistry:
         self._get_query_client = ReplicationGetQueryRestServlet.make_client(hs)
         self._send_edu = ReplicationFederationSendEduRestServlet.make_client(hs)
 
-        self.edu_handlers = (
-            {}
-        )  # type: Dict[str, Callable[[str, dict], Awaitable[None]]]
-        self.query_handlers = (
-            {}
-        )  # type: Dict[str, Callable[[dict], Awaitable[JsonDict]]]
+        self.edu_handlers: Dict[str, Callable[[str, dict], Awaitable[None]]] = {}
+        self.query_handlers: Dict[str, Callable[[dict], Awaitable[JsonDict]]] = {}
 
         # Map from type to instance names that we should route EDU handling to.
         # We randomly choose one instance from the list to route to for each new
         # EDU received.
-        self._edu_type_to_instance = {}  # type: Dict[str, List[str]]
+        self._edu_type_to_instance: Dict[str, List[str]] = {}
 
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]

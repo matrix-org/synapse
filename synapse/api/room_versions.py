@@ -195,7 +195,7 @@ class RoomVersions:
     )
 
 
-KNOWN_ROOM_VERSIONS = {
+KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
     v.identifier: v
     for v in (
         RoomVersions.V1,
@@ -208,7 +208,7 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.MSC3083,
         RoomVersions.V7,
     )
-}  # type: Dict[str, RoomVersion]
+}
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)

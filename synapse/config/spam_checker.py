@@ -26,7 +26,7 @@ LEGACY_SPAM_CHECKER_WARNING = """
 This server is using a spam checker module that is implementing the deprecated spam
 checker interface. Please check with the module's maintainer to see if a new version
 supporting Synapse's generic modules system is available.
-For more information, please see https://matrix-org.github.io/synapse/develop/modules.html
+For more information, please see https://matrix-org.github.io/synapse/latest/modules.html
 ---------------------------------------------------------------------------------------"""
 
 
@@ -34,7 +34,7 @@ class SpamCheckerConfig(Config):
     section = "spamchecker"
 
     def read_config(self, config, **kwargs):
-        self.spam_checkers = []  # type: List[Tuple[Any, Dict]]
+        self.spam_checkers: List[Tuple[Any, Dict]] = []
 
         spam_checkers = config.get("spam_checker") or []
         if isinstance(spam_checkers, dict):

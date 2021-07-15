@@ -125,7 +125,7 @@ def generate_latest(registry, emit_help=False):
             )
         output.append("# TYPE {0} {1}\n".format(mname, mtype))
 
-        om_samples = {}  # type: Dict[str, List[str]]
+        om_samples: Dict[str, List[str]] = {}
         for s in metric.samples:
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if s.name == metric.name + suffix:

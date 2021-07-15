@@ -170,11 +170,13 @@ class Keyring:
             )
         self._key_fetchers = key_fetchers
 
-        self._server_queue = BatchingQueue(
+        self._server_queue: BatchingQueue[
+            _FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]
+        ] = BatchingQueue(
             "keyring_server",
             clock=hs.get_clock(),
             process_batch_callback=self._inner_fetch_key_requests,
-        )  # type: BatchingQueue[_FetchKeyRequest, Dict[str, Dict[str, FetchKeyResult]]]
+        )
 
     async def verify_json_for_server(
         self,
@@ -330,7 +332,7 @@ class Keyring:
         # First we need to deduplicate requests for the same key. We do this by
         # taking the *maximum* requested `minimum_valid_until_ts` for each pair
         # of server name/key ID.
-        server_to_key_to_ts = {}  # type: Dict[str, Dict[str, int]]
+        server_to_key_to_ts: Dict[str, Dict[str, int]] = {}
         for request in requests:
             by_server = server_to_key_to_ts.setdefault(request.server_name, {})
             for key_id in request.key_ids:
@@ -355,7 +357,7 @@ class Keyring:
 
         # We now convert the returned list of results into a map from server
         # name to key ID to FetchKeyResult, to return.
-        to_return = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
+        to_return: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (request, results) in zip(deduped_requests, results_per_request):
             to_return_by_server = to_return.setdefault(request.server_name, {})
             for key_id, key_result in results.items():
@@ -455,7 +457,7 @@ class StoreKeyFetcher(KeyFetcher):
         )
 
         res = await self.store.get_server_verify_keys(key_ids_to_fetch)
-        keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
+        keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for (server_name, key_id), key in res.items():
             keys.setdefault(server_name, {})[key_id] = key
         return keys
@@ -603,7 +605,7 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
             ).addErrback(unwrapFirstError)
         )
 
-        union_of_keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
+        union_of_keys: Dict[str, Dict[str, FetchKeyResult]] = {}
         for result in results:
             for server_name, keys in result.items():
                 union_of_keys.setdefault(server_name, {}).update(keys)
@@ -656,8 +658,8 @@ class PerspectivesKeyFetcher(BaseV2KeyFetcher):
         except HttpResponseException as e:
             raise KeyLookupError("Remote server returned an error: %s" % (e,))
 
-        keys = {}  # type: Dict[str, Dict[str, FetchKeyResult]]
-        added_keys = []  # type: List[Tuple[str, str, FetchKeyResult]]
+        keys: Dict[str, Dict[str, FetchKeyResult]] = {}
+        added_keys: List[Tuple[str, str, FetchKeyResult]] = []
 
         time_now_ms = self.clock.time_msec()
 
@@ -805,7 +807,7 @@ class ServerKeyFetcher(BaseV2KeyFetcher):
         Raises:
             KeyLookupError if there was a problem making the lookup
         """
-        keys = {}  # type: Dict[str, FetchKeyResult]
+        keys: Dict[str, FetchKeyResult] = {}
 
         for requested_key_id in key_ids:
             # we may have found this key as a side-effect of asking for another.

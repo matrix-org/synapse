@@ -41,7 +41,7 @@ def do_patch():
         @functools.wraps(f)
         def wrapped(*args, **kwargs):
             start_context = current_context()
-            changes = []  # type: List[str]
+            changes: List[str] = []
             orig = orig_inline_callbacks(_check_yield_points(f, changes))
 
             try:
@@ -131,7 +131,7 @@ def _check_yield_points(f: Callable, changes: List[str]):
         gen = f(*args, **kwargs)
 
         last_yield_line_no = gen.gi_frame.f_lineno
-        result = None  # type: Any
+        result: Any = None
         while True:
             expected_context = current_context()
 

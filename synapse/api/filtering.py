@@ -289,7 +289,7 @@ class Filter:
             room_id = None
             ev_type = "m.presence"
             contains_url = False
-            labels = []  # type: List[str]
+            labels: List[str] = []
         else:
             sender = event.get("sender", None)
             if not sender:

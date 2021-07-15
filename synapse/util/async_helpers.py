@@ -257,7 +257,7 @@ class Linearizer:
             max_count: The maximum number of concurrent accesses
         """
         if name is None:
-            self.name = id(self)  # type: Union[str, int]
+            self.name: Union[str, int] = id(self)
         else:
             self.name = name
 
@@ -269,7 +269,7 @@ class Linearizer:
         self.max_count = max_count
 
         # key_to_defer is a map from the key to a _LinearizerEntry.
-        self.key_to_defer = {}  # type: Dict[Hashable, _LinearizerEntry]
+        self.key_to_defer: Dict[Hashable, _LinearizerEntry] = {}
 
     def is_queued(self, key: Hashable) -> bool:
         """Checks whether there is a process queued up waiting"""
@@ -409,10 +409,10 @@ class ReadWriteLock:
 
     def __init__(self):
         # Latest readers queued
-        self.key_to_current_readers = {}  # type: Dict[str, Set[defer.Deferred]]
+        self.key_to_current_readers: Dict[str, Set[defer.Deferred]] = {}
 
         # Latest writer queued
-        self.key_to_current_writer = {}  # type: Dict[str, defer.Deferred]
+        self.key_to_current_writer: Dict[str, defer.Deferred] = {}
 
     async def read(self, key: str) -> ContextManager:
         new_defer = defer.Deferred()

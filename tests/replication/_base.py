@@ -53,9 +53,9 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         # build a replication server
         server_factory = ReplicationStreamProtocolFactory(hs)
         self.streamer = hs.get_replication_streamer()
-        self.server = server_factory.buildProtocol(
+        self.server: ServerReplicationStreamProtocol = server_factory.buildProtocol(
             None
-        )  # type: ServerReplicationStreamProtocol
+        )
 
         # Make a new HomeServer object for the worker
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -195,7 +195,7 @@ class BaseStreamTestCase(unittest.HomeserverTestCase):
         fetching updates for given stream.
         """
 
-        path = request.path  # type: bytes  # type: ignore
+        path: bytes = request.path  # type: ignore
         self.assertRegex(
             path,
             br"^/_synapse/replication/get_repl_stream_updates/%s/[^/]+$"
@@ -212,7 +212,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
     unlike `BaseStreamTestCase`.
     """
 
-    servlets = []  # type: List[Callable[[HomeServer, JsonResource], None]]
+    servlets: List[Callable[[HomeServer, JsonResource], None]] = []
 
     def setUp(self):
         super().setUp()
@@ -448,7 +448,7 @@ class TestReplicationDataHandler(ReplicationDataHandler):
         super().__init__(hs)
 
         # list of received (stream_name, token, row) tuples
-        self.received_rdata_rows = []  # type: List[Tuple[str, int, Any]]
+        self.received_rdata_rows: List[Tuple[str, int, Any]] = []
 
     async def on_rdata(self, stream_name, instance_name, token, rows):
         await super().on_rdata(stream_name, instance_name, token, rows)
@@ -484,7 +484,7 @@ class FakeRedisPubSubServer:
 class FakeRedisPubSubProtocol(Protocol):
     """A connection from a client talking to the fake Redis server."""
 
-    transport = None  # type: Optional[FakeTransport]
+    transport: Optional[FakeTransport] = None
 
     def __init__(self, server: FakeRedisPubSubServer):
         self._server = server
@@ -550,12 +550,12 @@ class FakeRedisPubSubProtocol(Protocol):
         if obj is None:
             return "$-1\r\n"
         if isinstance(obj, str):
-            return "${len}\r\n{str}\r\n".format(len=len(obj), str=obj)
+            return f"${len(obj)}\r\n{obj}\r\n"
         if isinstance(obj, int):
-            return ":{val}\r\n".format(val=obj)
+            return f":{obj}\r\n"
         if isinstance(obj, (list, tuple)):
             items = "".join(self.encode(a) for a in obj)
-            return "*{len}\r\n{items}".format(len=len(obj), items=items)
+            return f"*{len(obj)}\r\n{items}"
 
         raise Exception("Unrecognized type for encoding redis: %r: %r", type(obj), obj)
 

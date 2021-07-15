@@ -118,7 +118,7 @@ class RedirectException(CodeMessageException):
         super().__init__(code=http_code, msg=msg)
         self.location = location
 
-        self.cookies = []  # type: List[bytes]
+        self.cookies: List[bytes] = []
 
 
 class SynapseError(CodeMessageException):
@@ -160,7 +160,7 @@ class ProxiedRequestError(SynapseError):
     ):
         super().__init__(code, msg, errcode)
         if additional_fields is None:
-            self._additional_fields = {}  # type: Dict
+            self._additional_fields: Dict = {}
         else:
             self._additional_fields = dict(additional_fields)
 
