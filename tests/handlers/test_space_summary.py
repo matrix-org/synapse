@@ -460,13 +460,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                     "room_id": restricted_room,
                     "world_readable": False,
                     "join_rules": JoinRules.MSC3083_RESTRICTED,
-                    "allowed_spaces": [],
+                    "allowed_room_ids": [],
                 },
                 {
                     "room_id": restricted_accessible_room,
                     "world_readable": False,
                     "join_rules": JoinRules.MSC3083_RESTRICTED,
-                    "allowed_spaces": [self.room],
+                    "allowed_room_ids": [self.room],
                 },
                 {
                     "room_id": world_readable_room,
