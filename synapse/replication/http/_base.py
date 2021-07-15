@@ -85,17 +85,17 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
             is received.
     """
 
-    NAME = abc.abstractproperty()  # type: str  # type: ignore
-    PATH_ARGS = abc.abstractproperty()  # type: Tuple[str, ...]  # type: ignore
+    NAME: str = abc.abstractproperty()  # type: ignore
+    PATH_ARGS: Tuple[str, ...] = abc.abstractproperty()  # type: ignore
     METHOD = "POST"
     CACHE = True
     RETRY_ON_TIMEOUT = True
 
     def __init__(self, hs: "HomeServer"):
         if self.CACHE:
-            self.response_cache = ResponseCache(
+            self.response_cache: ResponseCache[str] = ResponseCache(
                 hs.get_clock(), "repl." + self.NAME, timeout_ms=30 * 60 * 1000
-            )  # type: ResponseCache[str]
+            )
 
         # We reserve `instance_name` as a parameter to sending requests, so we
         # assert here that sub classes don't try and use the name.
@@ -232,7 +232,7 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
                 # have a good idea that the request has either succeeded or failed on
                 # the master, and so whether we should clean up or not.
                 while True:
-                    headers = {}  # type: Dict[bytes, List[bytes]]
+                    headers: Dict[bytes, List[bytes]] = {}
                     # Add an authorization header, if configured.
                     if replication_secret:
                         headers[b"Authorization"] = [b"Bearer " + replication_secret]

@@ -25,7 +25,7 @@ class PasswordAuthProviderConfig(Config):
     section = "authproviders"
 
     def read_config(self, config, **kwargs):
-        self.password_providers = []  # type: List[Any]
+        self.password_providers: List[Any] = []
         providers = []
 
         # We want to be backwards compatible with the old `ldap_config`

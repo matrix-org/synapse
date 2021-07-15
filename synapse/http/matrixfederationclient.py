@@ -106,7 +106,7 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
     the parsed data.
     """
 
-    CONTENT_TYPE = abc.abstractproperty()  # type: str  # type: ignore
+    CONTENT_TYPE: str = abc.abstractproperty()  # type: ignore
     """The expected content type of the response, e.g. `application/json`. If
     the content type doesn't match we fail the request.
     """
@@ -327,11 +327,11 @@ class MatrixFederationHttpClient:
 
         # We need to use a DNS resolver which filters out blacklisted IP
         # addresses, to prevent DNS rebinding.
-        self.reactor = BlacklistingReactorWrapper(
+        self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
             hs.get_reactor(),
             hs.config.federation_ip_range_whitelist,
             hs.config.federation_ip_range_blacklist,
-        )  # type: ISynapseReactor
+        )
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
@@ -504,7 +504,7 @@ class MatrixFederationHttpClient:
         )
 
         # Inject the span into the headers
-        headers_dict = {}  # type: Dict[bytes, List[bytes]]
+        headers_dict: Dict[bytes, List[bytes]] = {}
         opentracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
@@ -533,9 +533,9 @@ class MatrixFederationHttpClient:
                             destination_bytes, method_bytes, url_to_sign_bytes, json
                         )
                         data = encode_canonical_json(json)
-                        producer = QuieterFileBodyProducer(
+                        producer: Optional[IBodyProducer] = QuieterFileBodyProducer(
                             BytesIO(data), cooperator=self._cooperator
-                        )  # type: Optional[IBodyProducer]
+                        )
                     else:
                         producer = None
                         auth_headers = self.build_auth_headers(
