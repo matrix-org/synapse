@@ -45,4 +45,4 @@ Once the notice has been sent, the API will return the following response:
 ```
 
 Note that server notices must be enabled in `homeserver.yaml` before this API
-can be used. See [server_notices.md](../server_notices.md) for more information.
+can be used. See [the server notices documentation](../server_notices.md) for more information.

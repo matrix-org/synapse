@@ -21,7 +21,7 @@ port 8448. Where these are different, we refer to the 'client port' and the
 'federation port'. See [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
 for more details of the algorithm used for federation connections, and
-[delegate.md](delegate.md) for instructions on setting up delegation.
+[Delegation](delegate.md) for instructions on setting up delegation.
 
 **NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
 the requested URI in any way (for example, by decoding `%xx` escapes).
