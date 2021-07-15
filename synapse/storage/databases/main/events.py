@@ -1777,7 +1777,7 @@ class PersistEventsStore:
             # Invalid insertion event without next chunk ID
             return
 
-        logger.info(
+        logger.debug(
             "_handle_insertion_event (next_chunk_id=%s) %s", next_chunk_id, event
         )
 
@@ -1818,7 +1818,7 @@ class PersistEventsStore:
             # No chunk connection to persist
             return
 
-        logger.info("_handle_chunk_id %s %s", chunk_id, event)
+        logger.debug("_handle_chunk_id %s %s", chunk_id, event)
 
         # Keep track of the insertion event and the chunk ID
         self.db_pool.simple_insert_txn(
