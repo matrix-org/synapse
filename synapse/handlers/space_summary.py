@@ -25,7 +25,6 @@ from synapse.api.constants import (
     EventTypes,
     HistoryVisibility,
     JoinRules,
-    Membership,
     RoomTypes,
 )
 from synapse.events import EventBase
@@ -182,7 +181,7 @@ class SpaceSummaryHandler:
                     # Finally, if this isn't the requested room, check ourselves
                     # if we can access the room.
                     if not include_room and fed_room_id != queue_entry.room_id:
-                        include_room = await self._is_room_accessible(
+                        include_room = await self._auth.is_room_accessible(
                             fed_room_id, requester, None
                         )
 
@@ -333,7 +332,7 @@ class SpaceSummaryHandler:
                 An iterable of the sorted children events. This may be limited
                 to a maximum size or may include all children.
         """
-        if not await self._is_room_accessible(room_id, requester, origin):
+        if not await self._auth.is_room_accessible(room_id, requester, origin):
             return None, ()
 
         room_entry = await self._build_room_entry(room_id)
@@ -419,118 +418,6 @@ class SpaceSummaryHandler:
         return res.rooms, tuple(
             ev.data for ev in res.events if ev.event_type == EventTypes.SpaceChild
         )
-
-    async def _is_room_accessible(
-        self, room_id: str, requester: Optional[str], origin: Optional[str]
-    ) -> bool:
-        """
-        Calculate whether the room should be shown in the spaces summary.
-
-        It should be included if:
-
-        * The requester is joined or can join the room (per MSC3173).
-        * The origin server has any user that is joined or can join the room.
-        * The history visibility is set to world readable.
-
-        Args:
-            room_id: The room ID to summarize.
-            requester:
-                The user requesting the summary, if it is a local request. None
-                if this is a federation request.
-            origin:
-                The server requesting the summary, if it is a federation request.
-                None if this is a local request.
-
-        Returns:
-             True if the room should be included in the spaces summary.
-        """
-        state_ids = await self._store.get_current_state_ids(room_id)
-
-        # If there's no state for the room, it isn't known.
-        if not state_ids:
-            # The user might have a pending invite for the room.
-            if requester and await self._store.get_invite_for_local_user_in_room(
-                requester, room_id
-            ):
-                return True
-
-            logger.info("room %s is unknown, omitting from summary", room_id)
-            return False
-
-        room_version = await self._store.get_room_version(room_id)
-
-        # Include the room if it has join rules of public or knock.
-        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
-        if join_rules_event_id:
-            join_rules_event = await self._store.get_event(join_rules_event_id)
-            join_rule = join_rules_event.content.get("join_rule")
-            if join_rule == JoinRules.PUBLIC or (
-                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
-            ):
-                return True
-
-        # Include the room if it is peekable.
-        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""))
-        if hist_vis_event_id:
-            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
-            hist_vis = hist_vis_ev.content.get("history_visibility")
-            if hist_vis == HistoryVisibility.WORLD_READABLE:
-                return True
-
-        # Otherwise we need to check information specific to the user or server.
-
-        # If we have an authenticated requesting user, check if they are a member
-        # of the room (or can join the room).
-        if requester:
-            member_event_id = state_ids.get((EventTypes.Member, requester), None)
-
-            # If they're in the room they can see info on it.
-            if member_event_id:
-                member_event = await self._store.get_event(member_event_id)
-                if member_event.membership in (Membership.JOIN, Membership.INVITE):
-                    return True
-
-            # Otherwise, check if they should be allowed access via membership in a space.
-            if await self._event_auth_handler.has_restricted_join_rules(
-                state_ids, room_version
-            ):
-                allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
-                )
-                if await self._event_auth_handler.is_user_in_rooms(
-                    allowed_rooms, requester
-                ):
-                    return True
-
-        # If this is a request over federation, check if the host is in the room or
-        # has a user who could join the room.
-        elif origin:
-            if await self._event_auth_handler.check_host_in_room(
-                room_id, origin
-            ) or await self._store.is_host_invited(room_id, origin):
-                return True
-
-            # Alternately, if the host has a user in any of the spaces specified
-            # for access, then the host can see this room (and should do filtering
-            # if the requester cannot see it).
-            if await self._event_auth_handler.has_restricted_join_rules(
-                state_ids, room_version
-            ):
-                allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
-                )
-                for space_id in allowed_rooms:
-                    if await self._event_auth_handler.check_host_in_room(
-                        space_id, origin
-                    ):
-                        return True
-
-        logger.info(
-            "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
-            room_id,
-            requester or origin,
-        )
-        return False
 
     async def _build_room_entry(self, room_id: str) -> JsonDict:
         """Generate en entry suitable for the 'rooms' list in the summary response"""
