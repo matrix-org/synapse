@@ -1383,29 +1383,33 @@ def register_txn_path(servlet, regex_string, http_server, with_get=False):
             servlet.__class__.__name__,
         )
 
-class TimestampLookupRestServlet(ClientV1RestServlet):
-    PATTERNS = client_path_patterns("/rooms/(?P<room_id>[^/]*)/timestamp_to_event$")
 
-    def __init__(self, hs):
-        super(TimestampLookupRestServlet, self).__init__(hs)
-        self.store = hs.get_datastore()
+class TimestampLookupRestServlet(RestServlet):
+    PATTERNS = client_patterns("/rooms/(?P<room_id>[^/]*)/timestamp_to_event$")
 
-    @defer.inlineCallbacks
-    def on_GET(self, request, room_id):
-        requester = yield self.auth.get_user_by_req(request)
-        yield self.auth.check_joined_room(room_id, requester..to_string())
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._store = hs.get_datastore()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request)
+        await self._auth.check_joined_room(room_id, requester.to_string())
 
         timestamp = parse_integer(request, "ts")
         thread_id = parse_integer(request, "thread_id", 0)
 
-        event_id = yield self.store.get_event_for_timestamp(
-            room_id, thread_id, timestamp,
+        event_id = await self._store.get_event_for_timestamp(
+            room_id,
+            thread_id,
+            timestamp,
         )
 
-        .returnValue((200, {
+        return 200, {
             "event_id": event_id,
-        }))
-
+        }
 
 
 class RoomSpaceSummaryRestServlet(RestServlet):
