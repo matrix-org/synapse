@@ -182,14 +182,14 @@ def create_requester(
     )
 
 
-def get_domain_from_id(string):
+def get_domain_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
     return string[idx + 1 :]
 
 
-def get_localpart_from_id(string):
+def get_localpart_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
@@ -284,14 +284,14 @@ class RoomAlias(DomainSpecificString):
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomID(DomainSpecificString):
-    """Structure representing a room id. """
+    """Structure representing a room id."""
 
     SIGIL = "!"
 
 
 @attr.s(slots=True, frozen=True, repr=False)
 class EventID(DomainSpecificString):
-    """Structure representing an event id. """
+    """Structure representing an event id."""
 
     SIGIL = "$"
 
@@ -404,7 +404,7 @@ def map_username_to_mxid_localpart(
     return username.decode("ascii")
 
 
-@attr.s(frozen=True, slots=True, cmp=False)
+@attr.s(frozen=True, slots=True, order=False)
 class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 

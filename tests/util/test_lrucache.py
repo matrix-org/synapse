@@ -15,7 +15,7 @@
 
 from unittest.mock import Mock
 
-from synapse.util.caches.lrucache import LruCache
+from synapse.util.caches.lrucache import LruCache, setup_expire_lru_cache_entries
 from synapse.util.caches.treecache import TreeCache
 
 from tests import unittest
@@ -59,7 +59,7 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache.pop("key"), None)
 
     def test_del_multi(self):
-        cache = LruCache(4, keylen=2, cache_type=TreeCache)
+        cache = LruCache(4, cache_type=TreeCache)
         cache[("animal", "cat")] = "mew"
         cache[("animal", "dog")] = "woof"
         cache[("vehicles", "car")] = "vroom"
@@ -165,7 +165,7 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         m2 = Mock()
         m3 = Mock()
         m4 = Mock()
-        cache = LruCache(4, keylen=2, cache_type=TreeCache)
+        cache = LruCache(4, cache_type=TreeCache)
 
         cache.set(("a", "1"), "value", callbacks=[m1])
         cache.set(("a", "2"), "value", callbacks=[m2])
@@ -260,3 +260,47 @@ class LruCacheSizedTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache["key3"], [3])
         self.assertEquals(cache["key4"], [4])
         self.assertEquals(cache["key5"], [5, 6])
+
+
+class TimeEvictionTestCase(unittest.HomeserverTestCase):
+    """Test that time based eviction works correctly."""
+
+    def default_config(self):
+        config = super().default_config()
+
+        config.setdefault("caches", {})["expiry_time"] = "30m"
+
+        return config
+
+    def test_evict(self):
+        setup_expire_lru_cache_entries(self.hs)
+
+        cache = LruCache(5, clock=self.hs.get_clock())
+
+        # Check that we evict entries we haven't accessed for 30 minutes.
+        cache["key1"] = 1
+        cache["key2"] = 2
+
+        self.reactor.advance(20 * 60)
+
+        self.assertEqual(cache.get("key1"), 1)
+
+        self.reactor.advance(20 * 60)
+
+        # We have only touched `key1` in the last 30m, so we expect that to
+        # still be in the cache while `key2` should have been evicted.
+        self.assertEqual(cache.get("key1"), 1)
+        self.assertEqual(cache.get("key2"), None)
+
+        # Check that re-adding an expired key works correctly.
+        cache["key2"] = 3
+        self.assertEqual(cache.get("key2"), 3)
+
+        self.reactor.advance(20 * 60)
+
+        self.assertEqual(cache.get("key2"), 3)
+
+        self.reactor.advance(20 * 60)
+
+        self.assertEqual(cache.get("key1"), None)
+        self.assertEqual(cache.get("key2"), 3)

@@ -7,12 +7,6 @@
 tls_certificate_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.crt"
 tls_private_key_path: "/data/{{ SYNAPSE_SERVER_NAME }}.tls.key"
 
-{% if SYNAPSE_ACME %}
-acme:
-    enabled: true
-    port: 8009
-{% endif %}
-
 {% endif %}
 
 ## Server ##

@@ -13,12 +13,13 @@
 # limitations under the License.
 
 import unittest
+from typing import Optional
 
 from synapse import event_auth
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
-from synapse.events import make_event_from_dict
-from synapse.types import get_domain_from_id
+from synapse.events import EventBase, make_event_from_dict
+from synapse.types import JsonDict, get_domain_from_id
 
 
 class EventAuthTestCase(unittest.TestCase):
@@ -432,7 +433,7 @@ class EventAuthTestCase(unittest.TestCase):
 TEST_ROOM_ID = "!test:room"
 
 
-def _create_event(user_id):
+def _create_event(user_id: str) -> EventBase:
     return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
@@ -444,7 +445,9 @@ def _create_event(user_id):
     )
 
 
-def _member_event(user_id, membership, sender=None):
+def _member_event(
+    user_id: str, membership: str, sender: Optional[str] = None
+) -> EventBase:
     return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
@@ -458,11 +461,11 @@ def _member_event(user_id, membership, sender=None):
     )
 
 
-def _join_event(user_id):
+def _join_event(user_id: str) -> EventBase:
     return _member_event(user_id, "join")
 
 
-def _power_levels_event(sender, content):
+def _power_levels_event(sender: str, content: JsonDict) -> EventBase:
     return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
@@ -475,7 +478,7 @@ def _power_levels_event(sender, content):
     )
 
 
-def _alias_event(sender, **kwargs):
+def _alias_event(sender: str, **kwargs) -> EventBase:
     data = {
         "room_id": TEST_ROOM_ID,
         "event_id": _get_event_id(),
@@ -488,7 +491,7 @@ def _alias_event(sender, **kwargs):
     return make_event_from_dict(data)
 
 
-def _random_state_event(sender):
+def _random_state_event(sender: str) -> EventBase:
     return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
@@ -501,7 +504,7 @@ def _random_state_event(sender):
     )
 
 
-def _join_rules_event(sender, join_rule):
+def _join_rules_event(sender: str, join_rule: str) -> EventBase:
     return make_event_from_dict(
         {
             "room_id": TEST_ROOM_ID,
@@ -519,7 +522,7 @@ def _join_rules_event(sender, join_rule):
 event_count = 0
 
 
-def _get_event_id():
+def _get_event_id() -> str:
     global event_count
     c = event_count
     event_count += 1

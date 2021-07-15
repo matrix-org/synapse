@@ -248,6 +248,10 @@ class ContentRepositoryConfig(Config):
 
         # The largest allowed upload size in bytes
         #
+        # If you are using a reverse proxy you may also need to set this value in
+        # your reverse proxy's config. Notably Nginx has a small max body size by default.
+        # See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
+        #
         #max_upload_size: 50M
 
         # Maximum number of pixels that will be thumbnailed

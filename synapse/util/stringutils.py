@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import itertools
-import random
 import re
+import secrets
 import string
 from collections.abc import Iterable
 from typing import Optional, Tuple
@@ -35,26 +35,27 @@ CLIENT_SECRET_REGEX = re.compile(r"^[0-9a-zA-Z\.=_\-]+$")
 #
 MXC_REGEX = re.compile("^mxc://([^/]+)/([^/#?]+)$")
 
-# random_string and random_string_with_symbols are used for a range of things,
-# some cryptographically important, some less so. We use SystemRandom to make sure
-# we get cryptographically-secure randoms.
-rand = random.SystemRandom()
-
 
 def random_string(length: int) -> str:
-    return "".join(rand.choice(string.ascii_letters) for _ in range(length))
+    """Generate a cryptographically secure string of random letters.
+
+    Drawn from the characters: `a-z` and `A-Z`
+    """
+    return "".join(secrets.choice(string.ascii_letters) for _ in range(length))
 
 
 def random_string_with_symbols(length: int) -> str:
-    return "".join(rand.choice(_string_with_symbols) for _ in range(length))
+    """Generate a cryptographically secure string of random letters/numbers/symbols.
+
+    Drawn from the characters: `a-z`, `A-Z`, `0-9`, and `.,;:^&*-_+=#~@`
+    """
+    return "".join(secrets.choice(_string_with_symbols) for _ in range(length))
 
 
 def is_ascii(s: bytes) -> bool:
     try:
         s.decode("ascii").encode("ascii")
-    except UnicodeDecodeError:
-        return False
-    except UnicodeEncodeError:
+    except UnicodeError:
         return False
     return True
 
@@ -220,3 +221,23 @@ def strtobool(val: str) -> bool:
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+_BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def base62_encode(num: int, minwidth: int = 1) -> str:
+    """Encode a number using base62
+
+    Args:
+        num: number to be encoded
+        minwidth: width to pad to, if the number is small
+    """
+    res = ""
+    while num:
+        num, rem = divmod(num, 62)
+        res = _BASE62[rem] + res
+
+    # pad to minimum width
+    pad = "0" * (minwidth - len(res))
+    return pad + res

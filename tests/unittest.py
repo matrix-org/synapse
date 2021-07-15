@@ -140,7 +140,7 @@ class TestCase(unittest.TestCase):
             try:
                 self.assertEquals(attrs[key], getattr(obj, key))
             except AssertionError as e:
-                raise (type(e))("Assert error for '.{}':".format(key)) from e
+                raise (type(e))(f"Assert error for '.{key}':") from e
 
     def assert_dict(self, required, actual):
         """Does a partial assert of a dict.
@@ -520,7 +520,7 @@ class HomeserverTestCase(TestCase):
         if not isinstance(deferred, Deferred):
             return d
 
-        results = []  # type: list
+        results: list = []
         deferred.addBoth(results.append)
 
         self.pump(by=by)

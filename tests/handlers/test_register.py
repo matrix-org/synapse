@@ -17,8 +17,9 @@ from unittest.mock import Mock
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
+from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
 from tests.test_utils import make_awaitable
 from tests.unittest import override_config
@@ -27,8 +28,93 @@ from tests.utils import mock_getRawHeaders
 from .. import unittest
 
 
+class TestSpamChecker:
+    def __init__(self, config, api):
+        api.register_spam_checker_callbacks(
+            check_registration_for_spam=self.check_registration_for_spam,
+        )
+
+    @staticmethod
+    def parse_config(config):
+        return config
+
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+        auth_provider_id,
+    ):
+        pass
+
+
+class DenyAll(TestSpamChecker):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+        auth_provider_id,
+    ):
+        return RegistrationBehaviour.DENY
+
+
+class BanAll(TestSpamChecker):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+        auth_provider_id,
+    ):
+        return RegistrationBehaviour.SHADOW_BAN
+
+
+class BanBadIdPUser(TestSpamChecker):
+    async def check_registration_for_spam(
+        self, email_threepid, username, request_info, auth_provider_id=None
+    ):
+        # Reject any user coming from CAS and whose username contains profanity
+        if auth_provider_id == "cas" and "flimflob" in username:
+            return RegistrationBehaviour.DENY
+        return RegistrationBehaviour.ALLOW
+
+
+class TestLegacyRegistrationSpamChecker:
+    def __init__(self, config, api):
+        pass
+
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+    ):
+        pass
+
+
+class LegacyAllowAll(TestLegacyRegistrationSpamChecker):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+    ):
+        return RegistrationBehaviour.ALLOW
+
+
+class LegacyDenyAll(TestLegacyRegistrationSpamChecker):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+    ):
+        return RegistrationBehaviour.DENY
+
+
 class RegistrationTestCase(unittest.HomeserverTestCase):
-    """ Tests the RegistrationHandler. """
+    """Tests the RegistrationHandler."""
 
     def make_homeserver(self, reactor, clock):
         hs_config = self.default_config()
@@ -42,16 +128,19 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config["limit_usage_by_mau"] = True
 
         hs = self.setup_test_homeserver(config=hs_config)
+
+        load_legacy_spam_checkers(hs)
+
+        module_api = hs.get_module_api()
+        for module, config in hs.config.modules.loaded_modules:
+            module(config=config, api=module_api)
+
         return hs
 
     def prepare(self, reactor, clock, hs):
         self.mock_distributor = Mock()
         self.mock_distributor.declare("registered_user")
         self.mock_captcha_client = Mock()
-        self.macaroon_generator = Mock(
-            generate_access_token=Mock(return_value="secret")
-        )
-        self.hs.get_macaroon_generator = Mock(return_value=self.macaroon_generator)
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
         self.lots_of_users = 100
@@ -67,8 +156,8 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.get_or_create_user(requester, frank.localpart, "Frankie")
         )
         self.assertEquals(result_user_id, user_id)
-        self.assertTrue(result_token is not None)
-        self.assertEquals(result_token, "secret")
+        self.assertIsInstance(result_token, str)
+        self.assertGreater(len(result_token), 20)
 
     def test_if_user_exists(self):
         store = self.hs.get_datastore()
@@ -469,38 +558,74 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             self.handler.register_user(localpart=invalid_user_id), SynapseError
         )
 
+    @override_config(
+        {
+            "modules": [
+                {
+                    "module": TestSpamChecker.__module__ + ".DenyAll",
+                }
+            ]
+        }
+    )
     def test_spam_checker_deny(self):
         """A spam checker can deny registration, which results in an error."""
-
-        class DenyAll:
-            def check_registration_for_spam(
-                self, email_threepid, username, request_info
-            ):
-                return RegistrationBehaviour.DENY
-
-        # Configure a spam checker that denies all users.
-        spam_checker = self.hs.get_spam_checker()
-        spam_checker.spam_checkers = [DenyAll()]
-
         self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
 
+    @override_config(
+        {
+            "spam_checker": [
+                {
+                    "module": TestSpamChecker.__module__ + ".LegacyAllowAll",
+                }
+            ]
+        }
+    )
+    def test_spam_checker_legacy_allow(self):
+        """Tests that a legacy spam checker implementing the legacy 3-arg version of the
+        check_registration_for_spam callback is correctly called.
+
+        In this test and the following one we test both success and failure to make sure
+        any failure comes from the spam checker (and not something else failing in the
+        call stack) and any success comes from the spam checker (and not because a
+        misconfiguration prevented it from being loaded).
+        """
+        self.get_success(self.handler.register_user(localpart="user"))
+
+    @override_config(
+        {
+            "spam_checker": [
+                {
+                    "module": TestSpamChecker.__module__ + ".LegacyDenyAll",
+                }
+            ]
+        }
+    )
+    def test_spam_checker_legacy_deny(self):
+        """Tests that a legacy spam checker implementing the legacy 3-arg version of the
+        check_registration_for_spam callback is correctly called.
+
+        In this test and the previous one we test both success and failure to make sure
+        any failure comes from the spam checker (and not something else failing in the
+        call stack) and any success comes from the spam checker (and not because a
+        misconfiguration prevented it from being loaded).
+        """
+        self.get_failure(self.handler.register_user(localpart="user"), SynapseError)
+
+    @override_config(
+        {
+            "modules": [
+                {
+                    "module": TestSpamChecker.__module__ + ".BanAll",
+                }
+            ]
+        }
+    )
     def test_spam_checker_shadow_ban(self):
         """A spam checker can choose to shadow-ban a user, which allows registration to succeed."""
-
-        class BanAll:
-            def check_registration_for_spam(
-                self, email_threepid, username, request_info
-            ):
-                return RegistrationBehaviour.SHADOW_BAN
-
-        # Configure a spam checker that denies all users.
-        spam_checker = self.hs.get_spam_checker()
-        spam_checker.spam_checkers = [BanAll()]
-
         user_id = self.get_success(self.handler.register_user(localpart="user"))
 
         # Get an access token.
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = "testtok"
         self.get_success(
             self.store.add_access_token_to_user(
                 user_id=user_id, token=token, device_id=None, valid_until_ms=None
@@ -516,22 +641,17 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         self.assertTrue(requester.shadow_banned)
 
+    @override_config(
+        {
+            "modules": [
+                {
+                    "module": TestSpamChecker.__module__ + ".BanBadIdPUser",
+                }
+            ]
+        }
+    )
     def test_spam_checker_receives_sso_type(self):
         """Test rejecting registration based on SSO type"""
-
-        class BanBadIdPUser:
-            def check_registration_for_spam(
-                self, email_threepid, username, request_info, auth_provider_id=None
-            ):
-                # Reject any user coming from CAS and whose username contains profanity
-                if auth_provider_id == "cas" and "flimflob" in username:
-                    return RegistrationBehaviour.DENY
-                return RegistrationBehaviour.ALLOW
-
-        # Configure a spam checker that denies a certain user on a specific IdP
-        spam_checker = self.hs.get_spam_checker()
-        spam_checker.spam_checkers = [BanBadIdPUser()]
-
         f = self.get_failure(
             self.handler.register_user(localpart="bobflimflob", auth_provider_id="cas"),
             SynapseError,
@@ -577,7 +697,7 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
 
         user = UserID(localpart, self.hs.hostname)
         user_id = user.to_string()
-        token = self.macaroon_generator.generate_access_token(user_id)
+        token = self.hs.get_auth_handler().generate_access_token(user)
 
         if need_register:
             await self.handler.register_with_store(
@@ -599,3 +719,50 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
 
         return user_id, token
+
+
+class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
+    """Tests auto-join on remote rooms."""
+
+    def make_homeserver(self, reactor, clock):
+        self.room_id = "!roomid:remotetest"
+
+        async def update_membership(*args, **kwargs):
+            pass
+
+        async def lookup_room_alias(*args, **kwargs):
+            return RoomID.from_string(self.room_id), ["remotetest"]
+
+        self.room_member_handler = Mock(spec=["update_membership", "lookup_room_alias"])
+        self.room_member_handler.update_membership.side_effect = update_membership
+        self.room_member_handler.lookup_room_alias.side_effect = lookup_room_alias
+
+        hs = self.setup_test_homeserver(room_member_handler=self.room_member_handler)
+        return hs
+
+    def prepare(self, reactor, clock, hs):
+        self.handler = self.hs.get_registration_handler()
+        self.store = self.hs.get_datastore()
+
+    @override_config({"auto_join_rooms": ["#room:remotetest"]})
+    def test_auto_create_auto_join_remote_room(self):
+        """Tests that we don't attempt to create remote rooms, and that we don't attempt
+        to invite ourselves to rooms we're not in."""
+
+        # Register a first user; this should call _create_and_join_rooms
+        self.get_success(self.handler.register_user(localpart="jeff"))
+
+        _, kwargs = self.room_member_handler.update_membership.call_args
+
+        self.assertEqual(kwargs["room_id"], self.room_id)
+        self.assertEqual(kwargs["action"], "join")
+        self.assertEqual(kwargs["remote_room_hosts"], ["remotetest"])
+
+        # Register a second user; this should call _join_rooms
+        self.get_success(self.handler.register_user(localpart="jeff2"))
+
+        _, kwargs = self.room_member_handler.update_membership.call_args
+
+        self.assertEqual(kwargs["room_id"], self.room_id)
+        self.assertEqual(kwargs["action"], "join")
+        self.assertEqual(kwargs["remote_room_hosts"], ["remotetest"])

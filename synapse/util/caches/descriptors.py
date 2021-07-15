@@ -48,7 +48,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 class _CachedFunction(Generic[F]):
     invalidate = None  # type: Any
     invalidate_all = None  # type: Any
-    invalidate_many = None  # type: Any
     prefill = None  # type: Any
     cache = None  # type: Any
     num_args = None  # type: Any
@@ -262,6 +261,11 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
     ):
         super().__init__(orig, num_args=num_args, cache_context=cache_context)
 
+        if tree and self.num_args < 2:
+            raise RuntimeError(
+                "tree=True is nonsensical for cached functions with a single parameter"
+            )
+
         self.max_entries = max_entries
         self.tree = tree
         self.iterable = iterable
@@ -270,7 +274,6 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         cache = DeferredCache(
             name=self.orig.__name__,
             max_entries=self.max_entries,
-            keylen=self.num_args,
             tree=self.tree,
             iterable=self.iterable,
         )  # type: DeferredCache[CacheKey, Any]
@@ -303,11 +306,11 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
         wrapped = cast(_CachedFunction, _wrapped)
 
         if self.num_args == 1:
+            assert not self.tree
             wrapped.invalidate = lambda key: cache.invalidate(key[0])
             wrapped.prefill = lambda key, val: cache.prefill(key[0], val)
         else:
             wrapped.invalidate = cache.invalidate
-            wrapped.invalidate_many = cache.invalidate_many
             wrapped.prefill = cache.prefill
 
         wrapped.invalidate_all = cache.invalidate_all
@@ -322,8 +325,8 @@ class DeferredCacheDescriptor(_CacheDescriptorBase):
 class DeferredCacheListDescriptor(_CacheDescriptorBase):
     """Wraps an existing cache to support bulk fetching of keys.
 
-    Given a list of keys it looks in the cache to find any hits, then passes
-    the list of missing keys to the wrapped function.
+    Given an iterable of keys it looks in the cache to find any hits, then passes
+    the tuple of missing keys to the wrapped function.
 
     Once wrapped, the function returns a Deferred which resolves to the list
     of results.
@@ -437,7 +440,9 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                     return f
 
                 args_to_call = dict(arg_dict)
-                args_to_call[self.list_name] = list(missing)
+                # copy the missing set before sending it to the callee, to guard against
+                # modification.
+                args_to_call[self.list_name] = tuple(missing)
 
                 cached_defers.append(
                     defer.maybeDeferred(
@@ -522,14 +527,14 @@ def cachedList(
 
     Used to do batch lookups for an already created cache. A single argument
     is specified as a list that is iterated through to lookup keys in the
-    original cache. A new list consisting of the keys that weren't in the cache
-    get passed to the original function, the result of which is stored in the
+    original cache. A new tuple consisting of the (deduplicated) keys that weren't in
+    the cache gets passed to the original function, the result of which is stored in the
     cache.
 
     Args:
         cached_method_name: The name of the single-item lookup method.
             This is only used to find the cache to use.
-        list_name: The name of the argument that is the list to use to
+        list_name: The name of the argument that is the iterable to use to
             do batch lookups in the cache.
         num_args: Number of arguments to use as the key in the cache
             (including list_name). Defaults to all named parameters.

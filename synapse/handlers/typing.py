@@ -208,6 +208,7 @@ class TypingWriterHandler(FollowerTypingHandler):
 
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
+        self.event_auth_handler = hs.get_event_auth_handler()
 
         self.hs = hs
 
@@ -325,6 +326,19 @@ class TypingWriterHandler(FollowerTypingHandler):
     async def _recv_edu(self, origin: str, content: JsonDict) -> None:
         room_id = content["room_id"]
         user_id = content["user_id"]
+
+        # If we're not in the room just ditch the event entirely. This is
+        # probably an old server that has come back and thinks we're still in
+        # the room (or we've been rejoined to the room by a state reset).
+        is_in_room = await self.event_auth_handler.check_host_in_room(
+            room_id, self.server_name
+        )
+        if not is_in_room:
+            logger.info(
+                "Ignoring typing update from %s as we're not in the room",
+                origin,
+            )
+            return
 
         member = RoomMember(user_id=user_id, room_id=room_id)
 

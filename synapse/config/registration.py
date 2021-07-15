@@ -119,6 +119,27 @@ class RegistrationConfig(Config):
             session_lifetime = self.parse_duration(session_lifetime)
         self.session_lifetime = session_lifetime
 
+        # The `access_token_lifetime` applies for tokens that can be renewed
+        # using a refresh token, as per MSC2918. If it is `None`, the refresh
+        # token mechanism is disabled.
+        #
+        # Since it is incompatible with the `session_lifetime` mechanism, it is set to
+        # `None` by default if a `session_lifetime` is set.
+        access_token_lifetime = config.get(
+            "access_token_lifetime", "5m" if session_lifetime is None else None
+        )
+        if access_token_lifetime is not None:
+            access_token_lifetime = self.parse_duration(access_token_lifetime)
+        self.access_token_lifetime = access_token_lifetime
+
+        if session_lifetime is not None and access_token_lifetime is not None:
+            raise ConfigError(
+                "The refresh token mechanism is incompatible with the "
+                "`session_lifetime` option. Consider disabling the "
+                "`session_lifetime` option or disabling the refresh token "
+                "mechanism by removing the `access_token_lifetime` option."
+            )
+
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
@@ -349,4 +370,4 @@ class RegistrationConfig(Config):
 
     def read_arguments(self, args):
         if args.enable_registration is not None:
-            self.enable_registration = bool(strtobool(str(args.enable_registration)))
+            self.enable_registration = strtobool(str(args.enable_registration))

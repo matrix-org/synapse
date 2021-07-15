@@ -11,4 +11,4 @@ POST /_synapse/admin/v1/delete_group/<group_id>
 ```
 
 To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [README.rst](README.rst).
+server admin: see [Admin API](../usage/administration/admin_api).

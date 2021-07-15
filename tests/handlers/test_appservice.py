@@ -26,7 +26,7 @@ from .. import unittest
 
 
 class AppServiceHandlerTestCase(unittest.TestCase):
-    """ Tests the ApplicationServicesHandler. """
+    """Tests the ApplicationServicesHandler."""
 
     def setUp(self):
         self.mock_store = Mock()
@@ -57,10 +57,10 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             sender="@someone:anywhere", type="m.room.message", room_id="!foo:bar"
         )
         self.mock_store.get_new_events_for_appservice.side_effect = [
-            make_awaitable((0, [event])),
             make_awaitable((0, [])),
+            make_awaitable((1, [event])),
         ]
-        self.handler.notify_interested_services(RoomStreamToken(None, 0))
+        self.handler.notify_interested_services(RoomStreamToken(None, 1))
 
         self.mock_scheduler.submit_event_for_as.assert_called_once_with(
             interested_service, event
@@ -77,7 +77,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.query_user.return_value = make_awaitable(True)
         self.mock_store.get_new_events_for_appservice.side_effect = [
             make_awaitable((0, [event])),
-            make_awaitable((0, [])),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))
@@ -95,7 +94,6 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.mock_as_api.query_user.return_value = make_awaitable(True)
         self.mock_store.get_new_events_for_appservice.side_effect = [
             make_awaitable((0, [event])),
-            make_awaitable((0, [])),
         ]
 
         self.handler.notify_interested_services(RoomStreamToken(None, 0))

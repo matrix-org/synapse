@@ -133,6 +133,11 @@ class PostgresEngine(BaseDatabaseEngine):
         """Do we support using `a = ANY(?)` and passing a list"""
         return True
 
+    @property
+    def supports_returning(self) -> bool:
+        """Do we support the `RETURNING` clause in insert/update/delete?"""
+        return True
+
     def is_deadlock(self, error):
         if isinstance(error, self.module.DatabaseError):
             # https://www.postgresql.org/docs/current/static/errcodes-appendix.html

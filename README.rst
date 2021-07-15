@@ -25,7 +25,7 @@ The overall architecture is::
 
 ``#matrix:matrix.org`` is the official support room for Matrix, and can be
 accessed by any client from https://matrix.org/docs/projects/try-matrix-now.html or
-via IRC bridge at irc://irc.freenode.net/matrix.
+via IRC bridge at irc://irc.libera.chat/matrix.
 
 Synapse is currently in rapid development, but as of version 0.5 we believe it
 is sufficiently stable to be run as an internet-facing service for real usage!
@@ -94,7 +94,8 @@ Synapse Installation
 
 .. _federation:
 
-* For details on how to install synapse, see `<INSTALL.md>`_.
+* For details on how to install synapse, see
+  `Installation Instructions <https://matrix-org.github.io/synapse/latest/setup/installation.html>`_.
 * For specific details on how to configure Synapse for federation see `docs/federate.md <docs/federate.md>`_
 
 
@@ -106,7 +107,8 @@ from a web client.
 
 Unless you are running a test instance of Synapse on your local machine, in
 general, you will need to enable TLS support before you can successfully
-connect from a client: see `<INSTALL.md#tls-certificates>`_.
+connect from a client: see
+`TLS certificates <https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates>`_.
 
 An easy way to get started is to login or register via Element at
 https://app.element.io/#/login or https://app.element.io/#/register respectively.
@@ -142,38 +144,55 @@ the form of::
 As when logging in, you will need to specify a "Custom server".  Specify your
 desired ``localpart`` in the 'User name' box.
 
-ACME setup
-==========
-
-For details on having Synapse manage your federation TLS certificates
-automatically, please see `<docs/ACME.md>`_.
-
-
-Security Note
+Security note
 =============
 
-Matrix serves raw user generated data in some APIs - specifically the `content
-repository endpoints <https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid>`_.
+Matrix serves raw, user-supplied data in some APIs -- specifically the `content
+repository endpoints`_.
 
-Whilst we have tried to mitigate against possible XSS attacks (e.g.
-https://github.com/matrix-org/synapse/pull/1021) we recommend running
-matrix homeservers on a dedicated domain name, to limit any malicious user generated
-content served to web browsers a matrix API from being able to attack webapps hosted
-on the same domain.  This is particularly true of sharing a matrix webclient and
-server on the same domain.
+.. _content repository endpoints: https://matrix.org/docs/spec/client_server/latest.html#get-matrix-media-r0-download-servername-mediaid
 
-See https://github.com/vector-im/riot-web/issues/1977 and
-https://developer.github.com/changes/2014-04-25-user-content-security for more details.
+Whilst we make a reasonable effort to mitigate against XSS attacks (for
+instance, by using `CSP`_), a Matrix homeserver should not be hosted on a
+domain hosting other web applications. This especially applies to sharing
+the domain with Matrix web clients and other sensitive applications like
+webmail. See
+https://developer.github.com/changes/2014-04-25-user-content-security for more
+information.
+
+.. _CSP: https://github.com/matrix-org/synapse/pull/1021
+
+Ideally, the homeserver should not simply be on a different subdomain, but on
+a completely different `registered domain`_ (also known as top-level site or
+eTLD+1). This is because `some attacks`_ are still possible as long as the two
+applications share the same registered domain.
+
+.. _registered domain: https://tools.ietf.org/html/draft-ietf-httpbis-rfc6265bis-03#section-2.3
+
+.. _some attacks: https://en.wikipedia.org/wiki/Session_fixation#Attacks_using_cross-subdomain_cookie
+
+To illustrate this with an example, if your Element Web or other sensitive web
+application is hosted on ``A.example1.com``, you should ideally host Synapse on
+``example2.com``. Some amount of protection is offered by hosting on
+``B.example1.com`` instead, so this is also acceptable in some scenarios.
+However, you should *not* host your Synapse on ``A.example1.com``.
+
+Note that all of the above refers exclusively to the domain used in Synapse's
+``public_baseurl`` setting. In particular, it has no bearing on the domain
+mentioned in MXIDs hosted on that server.
+
+Following this advice ensures that even if an XSS is found in Synapse, the
+impact to other applications will be minimal.
 
 
 Upgrading an existing Synapse
 =============================
 
-The instructions for upgrading synapse are in `UPGRADE.rst`_.
+The instructions for upgrading synapse are in `the upgrade notes`_.
 Please check these instructions as upgrading may require extra steps for some
 versions of synapse.
 
-.. _UPGRADE.rst: UPGRADE.rst
+.. _the upgrade notes: https://matrix-org.github.io/synapse/develop/upgrade.html
 
 .. _reverse-proxy:
 
@@ -248,7 +267,7 @@ Join our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix
 
 Before setting up a development environment for synapse, make sure you have the
 system dependencies (such as the python header files) installed - see
-`Installing from source <INSTALL.md#installing-from-source>`_.
+`Installing from source <https://matrix-org.github.io/synapse/latest/setup/installation.html#installing-from-source>`_.
 
 To check out a synapse for development, clone the git repo into a working
 directory of your choice::
@@ -269,18 +288,6 @@ try installing the failing modules individually::
 
     pip install -e "module-name"
 
-Once this is done, you may wish to run Synapse's unit tests to
-check that everything is installed correctly::
-
-    python -m twisted.trial tests
-
-This should end with a 'PASSED' result (note that exact numbers will
-differ)::
-
-    Ran 1337 tests in 716.064s
-
-    PASSED (skips=15, successes=1322)
-
 We recommend using the demo which starts 3 federated instances running on ports `8080` - `8082`
 
     ./demo/start.sh
@@ -300,6 +307,23 @@ If you just want to start a single instance of the app and run it directly::
     python -m synapse.app.homeserver --config-path homeserver.yaml
 
 
+Running the unit tests
+======================
+
+After getting up and running, you may wish to run Synapse's unit tests to
+check that everything is installed correctly::
+
+    trial tests
+
+This should end with a 'PASSED' result (note that exact numbers will
+differ)::
+
+    Ran 1337 tests in 716.064s
+
+    PASSED (skips=15, successes=1322)
+
+For more tips on running the unit tests, like running a specific test or
+to see the logging output, see the `CONTRIBUTING doc <CONTRIBUTING.md#run-the-unit-tests>`_.
 
 
 Running the Integration Tests
@@ -311,8 +335,8 @@ access the API as a Matrix client would. It is able to run Synapse directly from
 the source tree, so installation of the server is not required.
 
 Testing with SyTest is recommended for verifying that changes related to the
-Client-Server API are functioning correctly. See the `installation instructions
-<https://github.com/matrix-org/sytest#installing>`_ for details.
+Client-Server API are functioning correctly. See the `SyTest installation
+instructions <https://github.com/matrix-org/sytest#installing>`_ for details.
 
 
 Platform dependencies

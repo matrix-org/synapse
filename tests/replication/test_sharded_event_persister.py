@@ -30,7 +30,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
     """Checks event persisting sharding works"""
 
     # Event persister sharding requires postgres (due to needing
-    # `MutliWriterIdGenerator`).
+    # `MultiWriterIdGenerator`).
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
 
@@ -211,7 +211,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             sync_hs_site,
             "GET",
-            "/sync?since={}".format(next_batch),
+            f"/sync?since={next_batch}",
             access_token=access_token,
         )
 
@@ -241,7 +241,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             sync_hs_site,
             "GET",
-            "/sync?since={}".format(vector_clock_token),
+            f"/sync?since={vector_clock_token}",
             access_token=access_token,
         )
 
@@ -266,7 +266,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             sync_hs_site,
             "GET",
-            "/sync?since={}".format(next_batch),
+            f"/sync?since={next_batch}",
             access_token=access_token,
         )
 
