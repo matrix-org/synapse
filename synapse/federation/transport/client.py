@@ -15,7 +15,7 @@
 
 import logging
 import urllib
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import attr
 import ijson
@@ -254,15 +254,15 @@ class TransportLayerClient:
     @log_function
     async def send_join_v1(
         self,
-        room_version,
-        destination,
-        room_id,
-        event_id,
-        content,
+        room_version: RoomVersion,
+        destination: str,
+        room_id: str,
+        event_id: str,
+        content: JsonDict,
     ) -> "SendJoinResponse":
         path = _create_v1_path("/send_join/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -270,15 +270,18 @@ class TransportLayerClient:
             max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
-        return response
-
     @log_function
     async def send_join_v2(
-        self, room_version, destination, room_id, event_id, content
+        self,
+        room_version: RoomVersion,
+        destination: str,
+        room_id: str,
+        event_id: str,
+        content: JsonDict,
     ) -> "SendJoinResponse":
         path = _create_v2_path("/send_join/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -286,13 +289,13 @@ class TransportLayerClient:
             max_response_size=MAX_RESPONSE_SIZE_SEND_JOIN,
         )
 
-        return response
-
     @log_function
-    async def send_leave_v1(self, destination, room_id, event_id, content):
+    async def send_leave_v1(
+        self, destination: str, room_id: str, event_id: str, content: JsonDict
+    ) -> Tuple[int, JsonDict]:
         path = _create_v1_path("/send_leave/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -302,14 +305,14 @@ class TransportLayerClient:
             # sync.
             ignore_backoff=True,
         )
-
-        return response
 
     @log_function
-    async def send_leave_v2(self, destination, room_id, event_id, content):
+    async def send_leave_v2(
+        self, destination: str, room_id: str, event_id: str, content: JsonDict
+    ) -> JsonDict:
         path = _create_v2_path("/send_leave/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination,
             path=path,
             data=content,
@@ -319,8 +322,6 @@ class TransportLayerClient:
             # sync.
             ignore_backoff=True,
         )
-
-        return response
 
     @log_function
     async def send_knock_v1(
@@ -357,24 +358,24 @@ class TransportLayerClient:
         )
 
     @log_function
-    async def send_invite_v1(self, destination, room_id, event_id, content):
+    async def send_invite_v1(
+        self, destination: str, room_id: str, event_id: str, content: JsonDict
+    ) -> Tuple[int, JsonDict]:
         path = _create_v1_path("/invite/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
-
-        return response
 
     @log_function
-    async def send_invite_v2(self, destination, room_id, event_id, content):
+    async def send_invite_v2(
+        self, destination: str, room_id: str, event_id: str, content: JsonDict
+    ) -> JsonDict:
         path = _create_v2_path("/invite/%s/%s", room_id, event_id)
 
-        response = await self.client.put_json(
+        return await self.client.put_json(
             destination=destination, path=path, data=content, ignore_backoff=True
         )
-
-        return response
 
     @log_function
     async def get_public_rooms(
