@@ -34,4 +34,4 @@ class ExperimentalConfig(Config):
         self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool
 
         # MSC3266 (room summary api)
-        self.mxc3266_enabled = experimental.get("mxc3266_enabled", False)  # type: bool
+        self.msc3266_enabled = experimental.get("msc3266_enabled", False)  # type: bool
