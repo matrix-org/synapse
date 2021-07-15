@@ -305,8 +305,7 @@ async def do_request_handling():
     a1 = context.run_in_background(operation1)
     a2 = context.run_in_background(operation2)
 
-    with PreserveLoggingContext():
-        result = await defer.gatherResults(a1, a2)
+    result = await make_deferred_yieldable(defer.gatherResults([a1, a2]))
 ```
 
 ## A note on garbage-collection of awaitable chains
