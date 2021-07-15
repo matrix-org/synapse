@@ -13,7 +13,9 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 
+from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
 from ._base import client_patterns
@@ -37,14 +39,23 @@ class ReadMarkerRestServlet(RestServlet):
         await self.presence_handler.bump_presence_active_time(requester.user)
 
         body = parse_json_object_from_request(request)
-
         read_event_id = body.get("m.read", None)
+        hidden = body.get("org.matrix.msc2285.hidden", False)
+
+        if not isinstance(hidden, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'hidden' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         if read_event_id:
             await self.receipts_handler.received_client_receipt(
                 room_id,
                 "m.read",
                 user_id=requester.user.to_string(),
                 event_id=read_event_id,
+                hidden=hidden,
             )
 
         read_marker_event_id = body.get("m.fully_read", None)

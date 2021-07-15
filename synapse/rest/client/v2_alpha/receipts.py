@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 
-from synapse.api.errors import SynapseError
-from synapse.http.servlet import RestServlet
+from synapse.api.errors import Codes, SynapseError
+from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
 from ._base import client_patterns
 
@@ -42,10 +43,24 @@ class ReceiptRestServlet(RestServlet):
         if receipt_type != "m.read":
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
+        body = parse_json_object_from_request(request)
+        hidden = body.get("org.matrix.msc2285.hidden", False)
+
+        if not isinstance(hidden, bool):
+            raise SynapseError(
+                HTTPStatus.BAD_REQUEST,
+                "Param 'hidden' must be a boolean, if given",
+                Codes.BAD_JSON,
+            )
+
         await self.presence_handler.bump_presence_active_time(requester.user)
 
         await self.receipts_handler.received_client_receipt(
-            room_id, receipt_type, user_id=requester.user.to_string(), event_id=event_id
+            room_id,
+            receipt_type,
+            user_id=requester.user.to_string(),
+            event_id=event_id,
+            hidden=hidden,
         )
 
         return 200, {}
