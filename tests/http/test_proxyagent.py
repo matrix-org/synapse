@@ -40,103 +40,141 @@ HTTPFactory = Factory.forProtocol(HTTPChannel)
 
 
 class ProxyParserTests(TestCase):
-    def test_parse_proxy_host_only(self):
-        url = b"localhost"
-        self.assertEqual((b"http", b"localhost", 1080), parse_proxy(url))
-
-    def test_parse_proxy_host_port(self):
-        url = b"localhost:9988"
-        self.assertEqual((b"http", b"localhost", 9988), parse_proxy(url))
-
-    def test_parse_proxy_scheme_host(self):
-        url = b"https://localhost"
-        self.assertEqual((b"https", b"localhost", 1080), parse_proxy(url))
-
-    def test_parse_proxy_scheme_host_port(self):
-        url = b"https://localhost:1234"
-        self.assertEqual((b"https", b"localhost", 1234), parse_proxy(url))
-
-    def test_parse_proxy_host_only_ipv4(self):
-        url = b"1.2.3.4"
-        self.assertEqual((b"http", b"1.2.3.4", 1080), parse_proxy(url))
-
-    def test_parse_proxy_host_port_ipv4(self):
-        url = b"1.2.3.4:9988"
-        self.assertEqual((b"http", b"1.2.3.4", 9988), parse_proxy(url))
-
-    def test_parse_proxy_scheme_host_ipv4(self):
-        url = b"https://1.2.3.4"
-        self.assertEqual((b"https", b"1.2.3.4", 1080), parse_proxy(url))
-
-    def test_parse_proxy_scheme_host_port_ipv4(self):
-        url = b"https://1.2.3.4:9988"
-        self.assertEqual((b"https", b"1.2.3.4", 9988), parse_proxy(url))
-
-    def test_parse_proxy_host_ipv6(self):
-        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:effe"
-        self.assertEqual(
-            (b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 1080),
-            parse_proxy(url),
-        )
-
-        # currently broken
-        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:1234"
-        # self.assertEqual((b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 1080), parse_proxy(url))
-
-        # also broken
-        url = b"::1"
-        # self.assertEqual((b"http", b"::1", 1080), parse_proxy(url))
-        url = b"::ffff:0.0.0.0"
-        self.assertEqual((b"http", b"::ffff:0.0.0.0", 1080), parse_proxy(url))
-
-    def test_parse_proxy_host_port_ipv6(self):
-        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:effe:9988"
-        self.assertEqual(
-            (b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 9988),
-            parse_proxy(url),
-        )
-
-        # currently broken
-        url = b"2001:0db8:85a3:0000:0000:8a2e:0370:1234:9988"
-        # self.assertEqual((b"http", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 9988), parse_proxy(url))
-
-        url = b"::1:9988"
-        self.assertEqual((b"http", b"::1", 9988), parse_proxy(url))
-        url = b"::ffff:0.0.0.0:9988"
-        self.assertEqual((b"http", b"::ffff:0.0.0.0", 9988), parse_proxy(url))
-
-    def test_parse_proxy_scheme_host_ipv6(self):
-        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:effe"
-        self.assertEqual(
-            (b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 1080),
-            parse_proxy(url),
-        )
-
-        # currently broken
-        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:1234"
-        # self.assertEqual((b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 1080), parse_proxy(url))
-
-        # also broken
-        url = b"https://::1"
-        # self.assertEqual((b"https", b"::1", 1080), parse_proxy(url))
-        url = b"https://::ffff:0.0.0.0:1080"
-        self.assertEqual((b"https", b"::ffff:0.0.0.0", 1080), parse_proxy(url))
-
-    def test_parse_proxy_scheme_host_port_ipv6(self):
-        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:effe:9988"
-        self.assertEqual(
-            (b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:effe", 9988),
-            parse_proxy(url),
-        )
-
-        # currently broken
-        url = b"https://2001:0db8:85a3:0000:0000:8a2e:0370:1234:9988"
-        # self.assertEqual((b"https", b"2001:0db8:85a3:0000:0000:8a2e:0370:1234", 9988), parse_proxy(url))
-
-        url = b"https://::1:9988"
-        self.assertEqual((b"https", b"::1", 9988), parse_proxy(url))
-        url = b"https://::ffff:0.0.0.0:9988"
-        self.assertEqual((b"https", b"::ffff:0.0.0.0", 9988), parse_proxy(url))
+    @parameterized.expand(
+        [
+            # host
+            [b"localhost", b"http", b"localhost", 1080, None],
+            [b"localhost:9988", b"http", b"localhost", 9988, None],
+            # host+scheme
+            [b"https://localhost", b"https", b"localhost", 1080, None],
+            [b"https://localhost:1234", b"https", b"localhost", 1234, None],
+            # ipv4
+            [b"1.2.3.4", b"http", b"1.2.3.4", 1080, None],
+            [b"1.2.3.4:9988", b"http", b"1.2.3.4", 9988, None],
+            # ipv4+scheme
+            [b"https://1.2.3.4", b"https", b"1.2.3.4", 1080, None],
+            [b"https://1.2.3.4:9988", b"https", b"1.2.3.4", 9988, None],
+            # ipv6 - without brackets broken
+            # [
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+            #     b"http",
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+            #     1080,
+            #     None
+            # ],
+            # [
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+            #     b"http",
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+            #     1080,
+            #     None
+            # ],
+            # [b"::1", b"http", b"::1", 1080, None],
+            # [b"::ffff:0.0.0.0", b"http", b"::ffff:0.0.0.0", 1080, None],
+            # ipv6 - with brackets
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:effe]",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                1080,
+                None
+            ],
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:1234]",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                1080,
+                None
+            ],
+            [b"[::1]", b"http", b"::1", 1080, None],
+            [b"[::ffff:0.0.0.0]", b"http", b"::ffff:0.0.0.0", 1080, None],
+            # ipv6+port
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:effe]:9988",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                9988,
+                None,
+            ],
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:1234]:9988",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                9988,
+                None,
+            ],
+            [b"[::1]:9988", b"http", b"::1", 9988, None],
+            [b"[::ffff:0.0.0.0]:9988", b"http", b"::ffff:0.0.0.0", 9988, None],
+            # ipv6+scheme
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:effe]",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                1080,
+                None,
+            ],
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:1234]",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                1080,
+                None,
+            ],
+            [b"https://[::1]", b"https", b"::1", 1080, None],
+            [b"https://[::ffff:0.0.0.0]", b"https", b"::ffff:0.0.0.0", 1080, None],
+            # ipv6+scheme+port
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:effe]:9988",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                9988,
+                None,
+            ],
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:1234]:9988",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                9988,
+                None,
+            ],
+            [b"https://[::1]:9988", b"https", b"::1", 9988, None],
+            # with credentials
+            [
+                b"https://user:pass@1.2.3.4:9988",
+                b"https",
+                b"1.2.3.4",
+                9988,
+                b"user:pass",
+            ],
+            [b"user:pass@1.2.3.4:9988", b"http", b"1.2.3.4", 9988, b"user:pass"],
+            [
+                b"https://user:pass@proxy.local:9988",
+                b"https",
+                b"proxy.local",
+                9988,
+                b"user:pass",
+            ],
+            [
+                b"user:pass@proxy.local:9988",
+                b"http",
+                b"proxy.local",
+                9988,
+                b"user:pass",
+            ],
+        ]
+    )
+    def test_parse_proxy(
+        self,
+        proxy: bytes,
+        scheme: bytes,
+        hostname: bytes,
+        port: int,
+        credentials: Optional[bytes],
+    ):
+        cred = None
+        if credentials:
+            cred = ProxyCredentials(credentials)
+        self.assertEqual((scheme, hostname, port, cred), parse_proxy(proxy))
 
 
 class MatrixFederationAgentTests(TestCase):
