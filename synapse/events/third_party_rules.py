@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
@@ -21,6 +22,8 @@ from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+logger = logging.getLogger(__name__)
 
 
 CHECK_EVENT_ALLOWED_CALLBACK = Callable[
@@ -67,6 +70,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
         # sense to make it go through the run() wrapper.
         if f.__name__ == "check_event_allowed":
 
+            # We need to wrap check_event_allowed because its old form would return either
+            # a boolean or a dict, but now we want to return the dict separately from the
+            # boolean.
             async def wrap_check_event_allowed(
                 event: EventBase,
                 state_events: StateMap[EventBase],
@@ -86,6 +92,9 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
 
         if f.__name__ == "on_create_room":
 
+            # We need to wrap on_create_room because its old form would return a boolean
+            # if the room creation is denied, but now we just want it to raise an
+            # exception.
             async def wrap_on_create_room(
                 requester: Requester, config: dict, is_requester_admin: bool
             ) -> None:
@@ -206,7 +215,12 @@ class ThirdPartyEventRules:
         event.freeze()
 
         for callback in self._check_event_allowed_callbacks:
-            res, replacement_data = await callback(event, state_events)
+            try:
+                res, replacement_data = await callback(event, state_events)
+            except Exception as e:
+                logger.warning("Failed to run callback %s: %s", callback, e)
+                continue
+
             # Return if the event shouldn't be allowed or if the module came up with a
             # replacement dict for the event.
             if res is False:
@@ -228,7 +242,10 @@ class ThirdPartyEventRules:
             is_requester_admin: If the requester is an admin
         """
         for callback in self._on_create_room_callbacks:
-            await callback(requester, config, is_requester_admin)
+            try:
+                await callback(requester, config, is_requester_admin)
+            except Exception as e:
+                logger.warning("Failed to run callback %s: %s", callback, e)
 
     async def check_threepid_can_be_invited(
         self, medium: str, address: str, room_id: str
@@ -250,8 +267,11 @@ class ThirdPartyEventRules:
         state_events = await self._get_state_map_for_room(room_id)
 
         for callback in self._check_threepid_can_be_invited_callbacks:
-            if await callback(medium, address, state_events) is False:
-                return False
+            try:
+                if await callback(medium, address, state_events) is False:
+                    return False
+            except Exception as e:
+                logger.warning("Failed to run callback %s: %s", callback, e)
 
         return True
 
@@ -275,8 +295,11 @@ class ThirdPartyEventRules:
         state_events = await self._get_state_map_for_room(room_id)
 
         for callback in self._check_visibility_can_be_modified_callbacks:
-            if await callback(room_id, state_events, new_visibility) is False:
-                return False
+            try:
+                if await callback(room_id, state_events, new_visibility) is False:
+                    return False
+            except Exception as e:
+                logger.warning("Failed to run callback %s: %s", callback, e)
 
         return True
 

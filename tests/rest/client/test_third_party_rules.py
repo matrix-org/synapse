@@ -74,7 +74,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         # Some tests might prevent room creation on purpose.
         try:
             self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
-        except Exception as e:
+        except Exception:
             pass
 
     def test_third_party_rules(self):
@@ -87,7 +87,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             return ev.type != "foo.bar.forbidden", None
 
         callback = Mock(spec=[], side_effect=check)
-        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [callback]
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
+            callback
+        ]
 
         channel = self.make_request(
             "PUT",

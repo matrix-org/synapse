@@ -204,15 +204,16 @@ async def check_event_allowed(
 ```
 
 **<span style="color:red">
-This callback is very experimental and can and will break without notice.
+This callback is very experimental and can and will break without notice. Module developers
+are encouraged to implement `check_event_for_spam` from the spam checker category instead.
 </span>**
 
 Called when processing any incoming event, with the event and a `StateMap`
 representing the current state of the room the event is being sent into. A `StateMap` is
-a dictionary indexed on tuples containing an event type and a state key; for example
-retrieving the room's `m.room.create` event from the `state_events` argument looks like
-this: `state_events.get(("m.room.create", ""))`. The module must return a boolean
-indicating whether the event can be allowed.
+a dictionary that maps tuples containing an event type and a state key to the
+corresponding state event. For example retrieving the room's `m.room.create` event from
+the `state_events` argument would look like this: `state_events.get(("m.room.create", ""))`.
+The module must return a boolean indicating whether the event can be allowed.
 
 Note that this callback function processes incoming events coming via federation
 traffic (on top of client traffic). This means denying an event might cause the local
