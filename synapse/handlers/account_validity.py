@@ -111,13 +111,19 @@ class AccountValidityHandler:
         # an admin one). As part of moving the feature into a module, we need to change
         # the path from /_matrix/client/unstable/account_validity/... to
         # /_synapse/client/account_validity, because:
+        #
         #   * the feature isn't part of the Matrix spec thus shouldn't live under /_matrix
-        #   * because of the way we register servlets modules can't register resources
+        #   * the way we register servlets means that modules can't register resources
         #     under /_matrix/client
+        #
         # We need to allow for a transition period between the old and new endpoints
         # in order to allow for clients to update (and for emails to be processed).
-        # Therefore we need to allow modules (in practice just the one implementing the
-        # email-based account validity) to temporarily hook into the legacy endpoint so we
+        #
+        # Once the email-account-validity module is loaded, it will take control of account
+        # validity by moving the rows from our `account_validity` table into its own table.
+        # 
+        # Therefore, we need to allow modules (in practice just the one implementing the
+        # email-based account validity) to temporarily hook into the legacy endpoints so we
         # can route the traffic coming into the old endpoints into the module, which is
         # why we have the following three temporary hooks.
         if on_legacy_send_mail is not None:
