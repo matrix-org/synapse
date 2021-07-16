@@ -45,6 +45,7 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -747,6 +748,23 @@ class FederationServer(FederationBase):
         await self.check_server_matches_acl(origin_host, event.room_id)
 
         logger.debug("_on_send_membership_event: pdu sigs: %s", event.signatures)
+
+        # Sign the event since we're vouching on behalf of the remote server that
+        # the event is valid to be sent into the room. Currently this is only done
+        # if the user is being joined via restricted join rules.
+        if (
+            room_version.msc3083_join_rules
+            and event.membership == Membership.JOIN
+            and "join_authorised_via_users_server" in event.content
+        ):
+            event.signatures.update(
+                compute_event_signature(
+                    room_version,
+                    event.get_pdu_json(),
+                    self.hs.hostname,
+                    self.hs.signing_key,
+                )
+            )
 
         event = await self._check_sigs_and_hash(room_version, event)
 
