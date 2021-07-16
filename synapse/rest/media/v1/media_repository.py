@@ -79,7 +79,7 @@ class MediaRepository:
         Thumbnailer.set_limits(self.max_image_pixels)
 
         self.primary_base_path: str = hs.config.media_store_path
-        self.filepaths = MediaFilePaths(self.primary_base_path)
+        self.filepaths: MediaFilePaths = MediaFilePaths(self.primary_base_path)
 
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
