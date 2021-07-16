@@ -65,7 +65,7 @@ from synapse.replication.http.federation import (
     ReplicationGetQueryRestServlet,
 )
 from synapse.storage.databases.main.lock import Lock
-from synapse.types import JsonDict
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
@@ -758,6 +758,17 @@ class FederationServer(FederationBase):
             and event.membership == Membership.JOIN
             and "join_authorised_via_users_server" in event.content
         ):
+            # We can only authorise our own users.
+            authorising_server = get_domain_from_id(
+                event.content["join_authorised_via_users_server"]
+            )
+            if authorising_server != self.server_name:
+                raise SynapseError(
+                    400,
+                    "Cannot authorise request from resident server: %s"
+                    % (authorising_server,),
+                )
+
             event.signatures.update(
                 compute_event_signature(
                     room_version,
