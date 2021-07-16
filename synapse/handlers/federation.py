@@ -42,6 +42,7 @@ from twisted.internet import defer
 
 from synapse import event_auth
 from synapse.api.constants import (
+    EventContentFields,
     EventTypes,
     Membership,
     RejectedReason,
@@ -263,6 +264,7 @@ class FederationHandler(BaseHandler):
         state = None
 
         # Get missing pdus if necessary.
+        # We don't need to worry about outliers because TODO!
         if not pdu.internal_metadata.is_outlier():
             # We only backfill backwards to the min depth.
             min_depth = await self.get_min_depth_for_context(pdu.room_id)
@@ -888,6 +890,57 @@ class FederationHandler(BaseHandler):
                 run_as_background_process(
                     "resync_device_due_to_pdu", self._resync_device, event.sender
                 )
+
+        await self._handle_marker_event(origin, event)
+
+    async def _handle_marker_event(self, origin: str, marker_event: EventBase):
+        """Handles backfilling the insertion event when we receive a marker
+        event that points to one
+
+        Args:
+            origin: Origin of the event. Will be called to get the insertion event
+            event: The event to process
+        """
+
+        if marker_event.type != EventTypes.MSC2716_MARKER:
+            # Not a marker event
+            return
+
+        logger.info("_handle_marker_event: received %s", marker_event)
+
+        insertion_event_id = marker_event.content.get(
+            EventContentFields.MSC2716_MARKER_INSERTION
+        )
+
+        if insertion_event_id is None:
+            # Nothing to retrieve then (invalid marker)
+            return
+
+        logger.info(
+            "_handle_marker_event: backfilling insertion event %s", insertion_event_id
+        )
+
+        await self._get_events_and_persist(
+            origin,
+            marker_event.room_id,
+            [insertion_event_id],
+        )
+
+        insertion_event = await self.store.get_event(insertion_event_id, allow_none=True)
+        if insertion_event is None:
+            logger.warning(
+                "_handle_marker_event: server %s didn't return insertion event %s for marker %s",
+                origin,
+                insertion_event_id,
+                marker_event.event_id,
+            )
+            return
+
+        logger.info(
+            "_handle_marker_event: Succesfully backfilled insertion event %s from marker event %s",
+            insertion_event,
+            marker_event,
+        )
 
     async def _resync_device(self, sender: str) -> None:
         """We have detected that the device list for the given user may be out
