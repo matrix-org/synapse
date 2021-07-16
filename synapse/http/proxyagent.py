@@ -128,15 +128,11 @@ class ProxyAgent(_AgentBase):
             https_proxy = proxies["https"].encode() if "https" in proxies else None
             no_proxy = proxies["no"] if "no" in proxies else None
 
-        # Parse credentials from http and https proxy connection string if present
-        self.http_proxy_creds, http_proxy = parse_username_password(http_proxy)
-        self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
-
-        self.http_proxy_endpoint = _http_proxy_endpoint(
+        self.http_proxy_endpoint, self.http_proxy_creds = _http_proxy_endpoint(
             http_proxy, self.proxy_reactor, contextFactory, **self._endpoint_kwargs
         )
 
-        self.https_proxy_endpoint = _http_proxy_endpoint(
+        self.https_proxy_endpoint, self.https_proxy_creds = _http_proxy_endpoint(
             https_proxy, self.proxy_reactor, contextFactory, **self._endpoint_kwargs
         )
 
@@ -274,7 +270,7 @@ def _http_proxy_endpoint(
     reactor: IReactorCore,
     tls_options_factory: IPolicyForHTTPS,
     **kwargs,
-) -> Optional[IStreamClientEndpoint]:
+) -> Tuple[Optional[IStreamClientEndpoint], Optional[ProxyCredentials]]:
     """Parses an http proxy setting and returns an endpoint for the proxy
 
     Args:
@@ -285,21 +281,20 @@ def _http_proxy_endpoint(
         reactor: reactor to be used to connect to the proxy
 
         tls_options_factory: the TLS options to use when connecting through a https proxy
+
         kwargs: other args to be passed to HostnameEndpoint
 
     Returns:
-        endpoint to use to connect to the proxy, or None
-
-    Raises: ValueError if given a proxy with a scheme we don't support.
+        a tuple of
+            endpoint to use to connect to the proxy, or None
+            ProxyCredentials or if no credentials were found, or None
     """
     if proxy is None:
-        return None
+        return None, None
 
-    # Note: we can't use urlsplit/urlparse as that is completely broken for things without a scheme://
-    scheme, host, port = parse_proxy(proxy)
-
-    if scheme not in (b"http", b"https"):
-        raise ValueError("Proxy scheme '{}' not supported".format(scheme.decode()))
+    # Note: urlsplit/urlparse cannot be used here as that does not work (for Python
+    # 3.9+) on scheme-less proxies, e.g. host:port.
+    scheme, host, port, credentials = parse_proxy(proxy)
 
     proxy_endpoint = HostnameEndpoint(reactor, host, port, **kwargs)
 
@@ -307,7 +302,7 @@ def _http_proxy_endpoint(
         tls_options = tls_options_factory.creatorForNetloc(host, port)
         proxy_endpoint = wrapClientTLS(tls_options, proxy_endpoint)
 
-    return proxy_endpoint
+    return proxy_endpoint, credentials
 
 
 def parse_username_password(proxy: bytes) -> Tuple[Optional[ProxyCredentials], bytes]:
@@ -333,33 +328,42 @@ def parse_username_password(proxy: bytes) -> Tuple[Optional[ProxyCredentials], b
 
 def parse_proxy(
     proxy: bytes, default_scheme: bytes = b"http", default_port: int = 1080
-) -> Tuple[bytes, bytes, int]:
+) -> Tuple[bytes, bytes, int, Optional[ProxyCredentials]]:
     """
-    Parse the scheme, hostname and port from a proxy connection byte string.
+    Given a HTTP proxy URL, breaks it down into components and checks that it
+    has a hostname (otherwise it is not right useful to us trying to find a
+    proxy) and asserts that the URL has the scheme as that is all we support.
+    Parse the scheme, username, password, hostname and port from a proxy connection byte string.
 
     Args:
-        proxy: The proxy connection string. Must be in the form '[scheme://]host[:port]'.
+        proxy: The proxy connection string. Must be in the form '[scheme://][<username>:<password>@]host[:port]'.
         default_scheme: The default scheme to return if one is not found in `proxy`. Defaults to http
         default_port: The default port to return if one is not found in `proxy`. Defaults to 1080
 
     Returns:
-        A tuple containing the scheme, hostname and port.
+        A tuple containing the scheme, hostname, port and ProxyCredentials.
+            If no credentials were found, the ProxyCredentials instance is replaced with None.
+
+    Raise:
+        RuntimeError if proxy has no hostname or unsupported scheme.
     """
     # First check if we have a scheme present
-    if b"://" in proxy:
-        scheme, host = proxy.split(b"://", 1)
-    else:
-        scheme, host = default_scheme, proxy
-    # Now check the leftover part for a port
-    if b":" in host:
-        new_host, port = host.rsplit(b":", 1)
-        try:
-            port = int(port)
-            return scheme, new_host, port
-        except ValueError:
-            # the thing after the : wasn't a valid port; presumably this is an
-            # IPv6 address.
-            # TODO: this doesn't work when the last part of the IP is also just a number.
-            #  We probably need to require ipv6's being wrapped in square brackets: [2001:db8:0:0:1::1]
-            pass
-    return scheme, host, default_port
+    # Note: urlsplit/urlparse cannot be used (for Python # 3.9+) on scheme-less proxies, e.g. host:port.
+    if b"://" not in proxy:
+        proxy = b"".join([default_scheme, b"://", proxy])
+
+    url = urlparse(proxy)
+
+    if not url.hostname:
+        raise RuntimeError("Proxy URL did not contain a hostname! Please specify one.")
+
+    if url.scheme not in (b"http", b"https"):
+        raise RuntimeError(
+            f"Unknown proxy scheme {url.scheme}; only 'http' and 'https' is supported."
+        )
+
+    credentials = None
+    if url.username and url.password:
+        credentials = ProxyCredentials(b"".join([url.username, b":", url.password]))
+
+    return url.scheme, url.hostname, url.port or default_port, credentials
