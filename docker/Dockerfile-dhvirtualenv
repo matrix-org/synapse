@@ -15,31 +15,31 @@ ARG distro=""
 ###
 ### Stage 0: build a dh-virtualenv
 ###
-FROM ${distro} as builder
+#FROM ${distro} as builder
+#
+#RUN apt-get update -qq -o Acquire::Languages=none
+#RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
+#        -yqq --no-install-recommends \
+#        build-essential \
+#        ca-certificates \
+#        devscripts \
+#        equivs \
+#        wget
 
-RUN apt-get update -qq -o Acquire::Languages=none
-RUN env DEBIAN_FRONTEND=noninteractive apt-get install \
-        -yqq --no-install-recommends \
-        build-essential \
-        ca-certificates \
-        devscripts \
-        equivs \
-        wget
+## fetch and unpack the package
+## TODO: Upgrade to 1.2.2 once xenial is dropped
+#RUN mkdir /dh-virtualenv
+#RUN wget -q -O /dh-virtualenv.tar.gz https://github.com/spotify/dh-virtualenv/archive/ac6e1b1.tar.gz
+#RUN tar -xv --strip-components=1 -C /dh-virtualenv -f /dh-virtualenv.tar.gz
 
-# fetch and unpack the package
-# TODO: Upgrade to 1.2.2 once xenial is dropped
-RUN mkdir /dh-virtualenv
-RUN wget -q -O /dh-virtualenv.tar.gz https://github.com/spotify/dh-virtualenv/archive/ac6e1b1.tar.gz
-RUN tar -xv --strip-components=1 -C /dh-virtualenv -f /dh-virtualenv.tar.gz
+## install its build deps. We do another apt-cache-update here, because we might
+## be using a stale cache from docker build.
+#RUN apt-get update -qq -o Acquire::Languages=none \
+#    && cd /dh-virtualenv \
+#    && env DEBIAN_FRONTEND=noninteractive mk-build-deps -ri -t "apt-get -y --no-install-recommends"
 
-# install its build deps. We do another apt-cache-update here, because we might
-# be using a stale cache from docker build.
-RUN apt-get update -qq -o Acquire::Languages=none \
-    && cd /dh-virtualenv \
-    && env DEBIAN_FRONTEND=noninteractive mk-build-deps -ri -t "apt-get -y --no-install-recommends"
-
-# build it
-RUN cd /dh-virtualenv && dpkg-buildpackage -us -uc -b
+## build it
+#RUN cd /dh-virtualenv && dpkg-buildpackage -us -uc -b
 
 ###
 ### Stage 1
@@ -77,16 +77,14 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         sqlite3 \
         libpq-dev \
         xmlsec1 \
-    && ( env DEBIAN_FRONTEND=noninteractive apt-get install \
-         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-         dh-systemd || true )
+        dh-virtualenv \
 
-COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
+#COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
 
 # install dhvirtualenv. Update the apt cache again first, in case we got a
 # cached cache from docker the first time.
-RUN apt-get update -qq -o Acquire::Languages=none \
-    && apt-get install -yq /dh-virtualenv_1.2~dev-1_all.deb
+#RUN apt-get update -qq -o Acquire::Languages=none \
+#    && apt-get install -yq /dh-virtualenv_1.2~dev-1_all.deb
 
 WORKDIR /synapse/source
 ENTRYPOINT ["bash","/synapse/source/docker/build_debian.sh"]
