@@ -318,6 +318,10 @@ class AccountValidityHandler:
         token is considered stale. A token is stale if the 'token_used_ts_ms' db column
         is non-null.
 
+        This method exists to support handling the legacy account validity /renew
+        endpoint. If a module implements the on_legacy_renew callback, then this process
+        is delegated to the module instead.
+
         Args:
             renewal_token: Token sent with the renewal request.
         Returns:
