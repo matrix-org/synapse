@@ -208,10 +208,10 @@ class LocalSequenceGenerator(SequenceGenerator):
                  get_next_id_txn; should return the curreent maximum id
         """
         # the callback. this is cleared after it is called, so that it can be GCed.
-        self._callback = get_first_callback  # type: Optional[GetFirstCallbackType]
+        self._callback: Optional[GetFirstCallbackType] = get_first_callback
 
         # The current max value, or None if we haven't looked in the DB yet.
-        self._current_max_id = None  # type: Optional[int]
+        self._current_max_id: Optional[int] = None
         self._lock = threading.Lock()
 
     def get_next_id_txn(self, txn: Cursor) -> int:
@@ -274,7 +274,7 @@ def build_sequence_generator(
             `check_consistency` details.
     """
     if isinstance(database_engine, PostgresEngine):
-        seq = PostgresSequenceGenerator(sequence_name)  # type: SequenceGenerator
+        seq: SequenceGenerator = PostgresSequenceGenerator(sequence_name)
     else:
         seq = LocalSequenceGenerator(get_first_callback)
 

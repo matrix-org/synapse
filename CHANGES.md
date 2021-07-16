@@ -1,7 +1,38 @@
-Synapse 1.38.0rc1 (2021-07-06)
-==============================
+Synapse 1.38.0 (2021-07-13)
+===========================
 
 This release includes a database schema update which could result in elevated disk usage. See the [upgrade notes](https://matrix-org.github.io/synapse/develop/upgrade#upgrading-to-v1380) for more information.
+
+No significant changes since 1.38.0rc3.
+
+
+Synapse 1.38.0rc3 (2021-07-13)
+==============================
+
+Internal Changes
+----------------
+
+- Build the Debian packages in CI. ([\#10247](https://github.com/matrix-org/synapse/issues/10247), [\#10379](https://github.com/matrix-org/synapse/issues/10379))
+
+
+Synapse 1.38.0rc2 (2021-07-09)
+==============================
+
+Bugfixes
+--------
+
+- Fix bug where inbound federation in a room could be delayed due to not correctly dropping a lock. Introduced in v1.37.1. ([\#10336](https://github.com/matrix-org/synapse/issues/10336))
+
+
+Improved Documentation
+----------------------
+
+- Update links to documentation in the sample config. Contributed by @dklimpel. ([\#10287](https://github.com/matrix-org/synapse/issues/10287))
+- Fix broken links in [INSTALL.md](INSTALL.md). Contributed by @dklimpel. ([\#10331](https://github.com/matrix-org/synapse/issues/10331))
+
+
+Synapse 1.38.0rc1 (2021-07-06)
+==============================
 
 Features
 --------

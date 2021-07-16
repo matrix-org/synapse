@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # this script will use the api:
-#    https://github.com/matrix-org/synapse/blob/master/docs/admin_api/purge_history_api.rst
+#    https://matrix-org.github.io/synapse/latest/admin_api/purge_history_api.html
 # 
 # It will purge all messages in a list of rooms up to a cetrain event
 

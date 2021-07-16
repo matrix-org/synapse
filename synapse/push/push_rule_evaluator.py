@@ -195,9 +195,9 @@ class PushRuleEvaluatorForEvent:
 
 
 # Caches (string, is_glob, word_boundary) -> regex for push. See _glob_matches
-regex_cache = LruCache(
+regex_cache: LruCache[Tuple[str, bool, bool], Pattern] = LruCache(
     50000, "regex_push_cache"
-)  # type: LruCache[Tuple[str, bool, bool], Pattern]
+)
 
 
 def _glob_matches(glob: str, value: str, word_boundary: bool = False) -> bool:

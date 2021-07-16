@@ -1,0 +1,34 @@
+/* Copyright 2021 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+
+-- By default the postgres statistics collector massively underestimates the
+-- number of distinct state groups are in the `state_groups_state`, which can
+-- cause postgres to use table scans for queries for multiple state groups.
+--
+-- To work around this we can manually tell postgres the number of distinct state
+-- groups there are by setting `n_distinct` (a negative value here is the number
+-- of distinct values divided by the number of rows, so -0.02 means on average
+-- there are 50 rows per distinct value). We don't need a particularly
+-- accurate number here, as a) we just want it to always use index scans and b)
+-- our estimate is going to be better than the one made by the statistics
+-- collector.
+
+ALTER TABLE state_groups_state ALTER COLUMN state_group SET (n_distinct = -0.02);
+
+-- Ideally we'd do an `ANALYZE state_groups_state (state_group)` here so that
+-- the above gets picked up immediately, but that can take a bit of time so we
+-- rely on the autovacuum eventually getting run and doing that in the
+-- background for us.

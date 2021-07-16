@@ -518,6 +518,9 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -772,6 +775,7 @@ class EventCreationHandler:
         txn_id: Optional[str] = None,
         ignore_shadow_ban: bool = False,
         outlier: bool = False,
+        historical: bool = False,
         depth: Optional[int] = None,
     ) -> Tuple[EventBase, int]:
         """
@@ -799,6 +803,9 @@ class EventCreationHandler:
             outlier: Indicates whether the event is an `outlier`, i.e. if
                 it's from an arbitrary point and floating in the DAG as
                 opposed to being inline with the current DAG.
+            historical: Indicates whether the message is being inserted
+                back in time around some existing events. This is used to skip
+                a few checks and mark the event as backfilled.
             depth: Override the depth used to order the event in the DAG.
                 Should normally be set to None, which will cause the depth to be calculated
                 based on the prev_events.
@@ -847,6 +854,7 @@ class EventCreationHandler:
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
                 outlier=outlier,
+                historical=historical,
                 depth=depth,
             )
 
@@ -1594,11 +1602,13 @@ class EventCreationHandler:
         for k, v in original_event.internal_metadata.get_dict().items():
             setattr(builder.internal_metadata, k, v)
 
-        # the event type hasn't changed, so there's no point in re-calculating the
-        # auth events.
+        # modules can send new state events, so we re-calculate the auth events just in
+        # case.
+        prev_event_ids = await self.store.get_prev_events_for_room(builder.room_id)
+
         event = await builder.build(
-            prev_event_ids=original_event.prev_event_ids(),
-            auth_event_ids=original_event.auth_event_ids(),
+            prev_event_ids=prev_event_ids,
+            auth_event_ids=None,
         )
 
         # we rebuild the event context, to be on the safe side. If nothing else,

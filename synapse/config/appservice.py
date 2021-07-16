@@ -57,8 +57,8 @@ def load_appservices(hostname, config_files):
         return []
 
     # Dicts of value -> filename
-    seen_as_tokens = {}  # type: Dict[str, str]
-    seen_ids = {}  # type: Dict[str, str]
+    seen_as_tokens: Dict[str, str] = {}
+    seen_ids: Dict[str, str] = {}
 
     appservices = []
 

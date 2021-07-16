@@ -20,7 +20,12 @@ import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
-from synapse.api.errors import Codes, HttpResponseException
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.response_cache import ResponseCache
@@ -418,14 +423,17 @@ class RoomListHandler(BaseHandler):
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            return await repl_layer.get_public_rooms(
-                server_name,
-                limit=limit,
-                since_token=since_token,
-                search_filter=search_filter,
-                include_all_networks=include_all_networks,
-                third_party_instance_id=third_party_instance_id,
-            )
+            try:
+                return await repl_layer.get_public_rooms(
+                    server_name,
+                    limit=limit,
+                    since_token=since_token,
+                    search_filter=search_filter,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
+                )
+            except (RequestSendFailed, HttpResponseException):
+                raise SynapseError(502, "Failed to fetch room list")
 
         key = (
             server_name,

@@ -270,7 +270,7 @@ class GenericWorkerServer(HomeServer):
             site_tag = port
 
         # We always include a health resource.
-        resources = {"/health": HealthResource()}  # type: Dict[str, IResource]
+        resources: Dict[str, IResource] = {"/health": HealthResource()}
 
         for res in listener_config.http_options.resources:
             for name in res.names:

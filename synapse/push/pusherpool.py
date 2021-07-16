@@ -87,7 +87,7 @@ class PusherPool:
         self._last_room_stream_id_seen = self.store.get_room_max_stream_ordering()
 
         # map from user id to app_id:pushkey to pusher
-        self.pushers = {}  # type: Dict[str, Dict[str, Pusher]]
+        self.pushers: Dict[str, Dict[str, Pusher]] = {}
 
     def start(self) -> None:
         """Starts the pushers off in a background process."""
