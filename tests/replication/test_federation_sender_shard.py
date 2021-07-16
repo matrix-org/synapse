@@ -15,7 +15,6 @@ import logging
 from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
-from synapse.api.room_versions import RoomVersions
 from synapse.events.builder import EventBuilderFactory
 from synapse.rest.admin import register_servlets_for_client_rest_resource
 from synapse.rest.client.v1 import login, room
@@ -229,11 +228,7 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
             builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
         )
 
-        self.get_success(
-            federation.on_send_membership_event(
-                remote_server, join_event, RoomVersions.V6
-            )
-        )
+        self.get_success(federation.on_send_membership_event(remote_server, join_event))
         self.replicate()
 
         return room

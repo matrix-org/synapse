@@ -769,7 +769,7 @@ class FederationServer(FederationBase):
 
         event = await self._check_sigs_and_hash(room_version, event)
 
-        return await self.handler.on_send_membership_event(origin, event, room_version)
+        return await self.handler.on_send_membership_event(origin, event)
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str

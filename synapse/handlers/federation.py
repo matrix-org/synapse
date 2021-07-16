@@ -1997,7 +1997,7 @@ class FederationHandler(BaseHandler):
 
     @log_function
     async def on_send_membership_event(
-        self, origin: str, event: EventBase, room_version: RoomVersion
+        self, origin: str, event: EventBase
     ) -> Tuple[EventBase, EventContext]:
         """
         We have received a join/leave/knock event for a room via send_join/leave/knock.
@@ -2019,7 +2019,6 @@ class FederationHandler(BaseHandler):
         Args:
             origin: The homeserver of the remote (joining/invited/knocking) user.
             event: The member event that has been signed by the remote homeserver.
-            room_version: The room version object for the event's room.
 
         Returns:
             The event and context of the event after inserting it into the room graph.

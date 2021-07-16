@@ -254,7 +254,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 self.handler.on_send_membership_event,
                 other_server,
                 join_event,
-                RoomVersions.V6,
             )
         self.get_success(d)
 
