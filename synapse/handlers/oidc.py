@@ -301,7 +301,7 @@ class OidcProvider:
                 hs.get_clock(),
             )
 
-        self._client_auth: ClientAuth = ClientAuth(
+        self._client_auth = ClientAuth(
             provider.client_id,
             client_secret,
             provider.client_auth_method,
