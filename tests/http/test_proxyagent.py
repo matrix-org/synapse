@@ -55,7 +55,7 @@ class ProxyParserTests(TestCase):
             # ipv4+scheme
             [b"https://1.2.3.4", b"https", b"1.2.3.4", 1080, None],
             [b"https://1.2.3.4:9988", b"https", b"1.2.3.4", 9988, None],
-            # ipv6 - without brackets broken
+            # ipv6 - without brackets is broken
             # [
             #     b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
             #     b"http",
@@ -496,7 +496,7 @@ class MatrixFederationAgentTests(TestCase):
         self,
         ssl: bool = False,
         auth_credentials: Optional[bytes] = None,
-    ) -> None:
+    ):
         """Send a https request via an agent and check that it is correctly received at
             the proxy and client. The proxy can use either http or https.
         Args:
