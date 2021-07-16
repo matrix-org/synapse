@@ -81,7 +81,7 @@ class MessageHandler:
 
         # The scheduled call to self._expire_event. None if no call is currently
         # scheduled.
-        self._scheduled_expiry = None  # type: Optional[IDelayedCall]
+        self._scheduled_expiry: Optional[IDelayedCall] = None
 
         if not hs.config.worker_app:
             run_as_background_process(
@@ -196,9 +196,7 @@ class MessageHandler:
                 room_state_events = await self.state_store.get_state_for_events(
                     [event.event_id], state_filter=state_filter
                 )
-                room_state = room_state_events[
-                    event.event_id
-                ]  # type: Mapping[Any, EventBase]
+                room_state: Mapping[Any, EventBase] = room_state_events[event.event_id]
             else:
                 raise AuthError(
                     403,
@@ -421,9 +419,9 @@ class EventCreationHandler:
         self.action_generator = hs.get_action_generator()
 
         self.spam_checker = hs.get_spam_checker()
-        self.third_party_event_rules = (
+        self.third_party_event_rules: "ThirdPartyEventRules" = (
             self.hs.get_third_party_event_rules()
-        )  # type: ThirdPartyEventRules
+        )
 
         self._block_events_without_consent_error = (
             self.config.block_events_without_consent_error
@@ -440,7 +438,7 @@ class EventCreationHandler:
         #
         # map from room id to time-of-last-attempt.
         #
-        self._rooms_to_exclude_from_dummy_event_insertion = {}  # type: Dict[str, int]
+        self._rooms_to_exclude_from_dummy_event_insertion: Dict[str, int] = {}
         # The number of forward extremeities before a dummy event is sent.
         self._dummy_events_threshold = hs.config.dummy_events_threshold
 
@@ -465,9 +463,7 @@ class EventCreationHandler:
         # Stores the state groups we've recently added to the joined hosts
         # external cache. Note that the timeout must be significantly less than
         # the TTL on the external cache.
-        self._external_cache_joined_hosts_updates = (
-            None
-        )  # type: Optional[ExpiringCache]
+        self._external_cache_joined_hosts_updates: Optional[ExpiringCache] = None
         if self._external_cache.is_enabled():
             self._external_cache_joined_hosts_updates = ExpiringCache(
                 "_external_cache_joined_hosts_updates",
@@ -1299,7 +1295,7 @@ class EventCreationHandler:
             # Validate a newly added alias or newly added alt_aliases.
 
             original_alias = None
-            original_alt_aliases = []  # type: List[str]
+            original_alt_aliases: List[str] = []
 
             original_event_id = event.unsigned.get("replaces_state")
             if original_event_id:

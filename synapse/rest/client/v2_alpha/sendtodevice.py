@@ -59,7 +59,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
             requester, message_type, content["messages"]
         )
 
-        response = (200, {})  # type: Tuple[int, dict]
+        response: Tuple[int, dict] = (200, {})
         return response
 
 

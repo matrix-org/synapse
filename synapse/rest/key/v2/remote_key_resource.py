@@ -97,7 +97,7 @@ class RemoteKey(DirectServeJsonResource):
     async def _async_render_GET(self, request):
         if len(request.postpath) == 1:
             (server,) = request.postpath
-            query = {server.decode("ascii"): {}}  # type: dict
+            query: dict = {server.decode("ascii"): {}}
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
@@ -141,7 +141,7 @@ class RemoteKey(DirectServeJsonResource):
         time_now_ms = self.clock.time_msec()
 
         # Note that the value is unused.
-        cache_misses = {}  # type: Dict[str, Dict[str, int]]
+        cache_misses: Dict[str, Dict[str, int]] = {}
         for (server_name, key_id, _), results in cached.items():
             results = [(result["ts_added_ms"], result) for result in results]
 

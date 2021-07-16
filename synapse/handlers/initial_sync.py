@@ -46,9 +46,17 @@ class InitialSyncHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
-        self.snapshot_cache = ResponseCache(
-            hs.get_clock(), "initial_sync_cache"
-        )  # type: ResponseCache[Tuple[str, Optional[StreamToken], Optional[StreamToken], str, Optional[int], bool, bool]]
+        self.snapshot_cache: ResponseCache[
+            Tuple[
+                str,
+                Optional[StreamToken],
+                Optional[StreamToken],
+                str,
+                Optional[int],
+                bool,
+                bool,
+            ]
+        ] = ResponseCache(hs.get_clock(), "initial_sync_cache")
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state

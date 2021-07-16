@@ -197,7 +197,7 @@ class ProfileHandler(BaseHandler):
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        displayname_to_set = new_displayname  # type: Optional[str]
+        displayname_to_set: Optional[str] = new_displayname
         if new_displayname == "":
             displayname_to_set = None
 
@@ -286,7 +286,7 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        avatar_url_to_set = new_avatar_url  # type: Optional[str]
+        avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
             avatar_url_to_set = None
 
