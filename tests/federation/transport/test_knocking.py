@@ -212,7 +212,6 @@ class FederationKnockingTestCase(
 
         return super().prepare(reactor, clock, homeserver)
 
-    @override_config({"experimental_features": {"msc2403_enabled": True}})
     def test_room_state_returned_when_knocking(self):
         """
         Tests that specific, stripped state events from a room are returned after
