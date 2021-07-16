@@ -4172,91 +4172,6 @@ account_threepid_delegates:
 #auto_join_rooms_for_guests: false
 
 
-## Account Validity ##
-
-# Optional account validity configuration. This allows for accounts to be denied
-# any request after a given period.
-#
-# Once this feature is enabled, Synapse will look for registered users without an
-# expiration date at startup and will add one to every account it found using the
-# current settings at that time.
-# This means that, if a validity period is set, and Synapse is restarted (it will
-# then derive an expiration date from the current validity period), and some time
-# after that the validity period changes and Synapse is restarted, the users'
-# expiration dates won't be updated unless their account is manually renewed. This
-# date will be randomly selected within a range [now + period - d ; now + period],
-# where d is equal to 10% of the validity period.
-#
-account_validity:
-  # The account validity feature is disabled by default. Uncomment the
-  # following line to enable it.
-  #
-  #enabled: true
-
-  # The period after which an account is valid after its registration. When
-  # renewing the account, its validity period will be extended by this amount
-  # of time. This parameter is required when using the account validity
-  # feature.
-  #
-  #period: 6w
-
-  # The amount of time before an account's expiry date at which Synapse will
-  # send an email to the account's email address with a renewal link. By
-  # default, no such emails are sent.
-  #
-  # If you enable this setting, you will also need to fill out the 'email' and
-  # 'public_baseurl' configuration sections.
-  #
-  #renew_at: 1w
-
-  # The subject of the email sent out with the renewal link. '%(app)s' can be
-  # used as a placeholder for the 'app_name' parameter from the 'email'
-  # section.
-  #
-  # Note that the placeholder must be written '%(app)s', including the
-  # trailing 's'.
-  #
-  # If this is not set, a default value is used.
-  #
-  #renew_email_subject: &quot;Renew your %(app)s account&quot;
-
-  # Directory in which Synapse will try to find templates for the HTML files to
-  # serve to the user when trying to renew an account. If not set, default
-  # templates from within the Synapse package will be used.
-  #
-  # The currently available templates are:
-  #
-  # * account_renewed.html: Displayed to the user after they have successfully
-  #       renewed their account.
-  #
-  # * account_previously_renewed.html: Displayed to the user if they attempt to
-  #       renew their account with a token that is valid, but that has already
-  #       been used. In this case the account is not renewed again.
-  #
-  # * invalid_token.html: Displayed to the user when they try to renew an account
-  #       with an unknown or invalid renewal token.
-  #
-  # See https://github.com/matrix-org/synapse/tree/master/synapse/res/templates for
-  # default template contents.
-  #
-  # The file name of some of these templates can be configured below for legacy
-  # reasons.
-  #
-  #template_dir: &quot;res/templates&quot;
-
-  # A custom file name for the 'account_renewed.html' template.
-  #
-  # If not set, the file is assumed to be named &quot;account_renewed.html&quot;.
-  #
-  #account_renewed_html_path: &quot;account_renewed.html&quot;
-
-  # A custom file name for the 'invalid_token.html' template.
-  #
-  # If not set, the file is assumed to be named &quot;invalid_token.html&quot;.
-  #
-  #invalid_token_html_path: &quot;invalid_token.html&quot;
-
-
 ## Metrics ###
 
 # Enable collection and rendering of performance metrics
@@ -7392,7 +7307,7 @@ that the configuration is correct, and raise an instance of
 <h3 id="registering-a-web-resource"><a class="header" href="#registering-a-web-resource">Registering a web resource</a></h3>
 <p>Modules can register web resources onto Synapse's web server using the following module
 API method:</p>
-<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource)
+<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource) -&gt; None
 </code></pre>
 <p>The path is the full absolute path to register the resource at. For example, if you
 register a resource for the path <code>/_synapse/client/my_super_module/say_hello</code>, Synapse
@@ -7413,11 +7328,15 @@ Synapse will call when performing specific actions. Callbacks must be asynchrono
 are split in categories. A single module may implement callbacks from multiple categories,
 and is under no obligation to implement all callbacks from the categories it registers
 callbacks for.</p>
+<p>Modules can register callbacks using one of the module API's <code>register_[...]_callbacks</code>
+methods. The callback functions are passed to these methods as keyword arguments, with
+the callback name as the argument name and the function as its value. This is demonstrated
+in the example below. A <code>register_[...]_callbacks</code> method exists for each module type
+documented in this section.</p>
 <h4 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h4>
-<p>To register one of the callbacks described in this section, a module needs to use the
-module API's <code>register_spam_checker_callbacks</code> method. The callback functions are passed
-to <code>register_spam_checker_callbacks</code> as keyword arguments, with the callback name as the
-argument name and the function as its value. This is demonstrated in the example below.</p>
+<p>Spam checker callbacks allow module developers to implement spam mitigation actions for
+Synapse instances. Spam checker callbacks can be registered using the module API's
+<code>register_spam_checker_callbacks</code> method.</p>
 <p>The available spam checker callbacks are:</p>
 <pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
@@ -7429,7 +7348,7 @@ forward to clients.</p>
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (i.e. <code>@alice:example.com</code>).</p>
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
@@ -7483,6 +7402,26 @@ used during the registration process.</li>
 </code></pre>
 <p>Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.</p>
+<h4 id="account-validity-callbacks"><a class="header" href="#account-validity-callbacks">Account validity callbacks</a></h4>
+<p>Account validity callbacks allow module developers to add extra steps to verify the
+validity on an account, i.e. see if a user can be granted access to their account on the
+Synapse instance. Account validity callbacks can be registered using the module API's
+<code>register_account_validity_callbacks</code> method.</p>
+<p>The available account validity callbacks are:</p>
+<pre><code class="language-python">async def is_user_expired(user: str) -&gt; Optional[bool]
+</code></pre>
+<p>Called when processing any authenticated request (except for logout requests). The module
+can return a <code>bool</code> to indicate whether the user has expired and should be locked out of
+their account, or <code>None</code> if the module wasn't able to figure it out. The user is
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<p>If the module returns <code>True</code>, the current request will be denied with the error code
+<code>ORG_MATRIX_EXPIRED_ACCOUNT</code> and the HTTP status code 403. Note that this doesn't
+invalidate the user's access token.</p>
+<pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
+</code></pre>
+<p>Called after successfully registering a user, in case the module needs to perform extra
+operations to keep track of them. (e.g. add them to a database table). The user is
+represented by their Matrix user ID.</p>
 <h3 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h3>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>

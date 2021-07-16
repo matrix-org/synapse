@@ -226,7 +226,7 @@ that the configuration is correct, and raise an instance of
 <h3 id="registering-a-web-resource"><a class="header" href="#registering-a-web-resource">Registering a web resource</a></h3>
 <p>Modules can register web resources onto Synapse's web server using the following module
 API method:</p>
-<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource)
+<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource) -&gt; None
 </code></pre>
 <p>The path is the full absolute path to register the resource at. For example, if you
 register a resource for the path <code>/_synapse/client/my_super_module/say_hello</code>, Synapse
@@ -247,11 +247,15 @@ Synapse will call when performing specific actions. Callbacks must be asynchrono
 are split in categories. A single module may implement callbacks from multiple categories,
 and is under no obligation to implement all callbacks from the categories it registers
 callbacks for.</p>
+<p>Modules can register callbacks using one of the module API's <code>register_[...]_callbacks</code>
+methods. The callback functions are passed to these methods as keyword arguments, with
+the callback name as the argument name and the function as its value. This is demonstrated
+in the example below. A <code>register_[...]_callbacks</code> method exists for each module type
+documented in this section.</p>
 <h4 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h4>
-<p>To register one of the callbacks described in this section, a module needs to use the
-module API's <code>register_spam_checker_callbacks</code> method. The callback functions are passed
-to <code>register_spam_checker_callbacks</code> as keyword arguments, with the callback name as the
-argument name and the function as its value. This is demonstrated in the example below.</p>
+<p>Spam checker callbacks allow module developers to implement spam mitigation actions for
+Synapse instances. Spam checker callbacks can be registered using the module API's
+<code>register_spam_checker_callbacks</code> method.</p>
 <p>The available spam checker callbacks are:</p>
 <pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
@@ -263,7 +267,7 @@ forward to clients.</p>
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (i.e. <code>@alice:example.com</code>).</p>
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
@@ -317,6 +321,26 @@ used during the registration process.</li>
 </code></pre>
 <p>Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.</p>
+<h4 id="account-validity-callbacks"><a class="header" href="#account-validity-callbacks">Account validity callbacks</a></h4>
+<p>Account validity callbacks allow module developers to add extra steps to verify the
+validity on an account, i.e. see if a user can be granted access to their account on the
+Synapse instance. Account validity callbacks can be registered using the module API's
+<code>register_account_validity_callbacks</code> method.</p>
+<p>The available account validity callbacks are:</p>
+<pre><code class="language-python">async def is_user_expired(user: str) -&gt; Optional[bool]
+</code></pre>
+<p>Called when processing any authenticated request (except for logout requests). The module
+can return a <code>bool</code> to indicate whether the user has expired and should be locked out of
+their account, or <code>None</code> if the module wasn't able to figure it out. The user is
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<p>If the module returns <code>True</code>, the current request will be denied with the error code
+<code>ORG_MATRIX_EXPIRED_ACCOUNT</code> and the HTTP status code 403. Note that this doesn't
+invalidate the user's access token.</p>
+<pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
+</code></pre>
+<p>Called after successfully registering a user, in case the module needs to perform extra
+operations to keep track of them. (e.g. add them to a database table). The user is
+represented by their Matrix user ID.</p>
 <h3 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h3>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>
