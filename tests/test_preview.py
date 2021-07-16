@@ -325,6 +325,18 @@ class MediaEncodingTestCase(unittest.TestCase):
         )
         self.assertEqual(encoding, "ascii")
 
+        """A character encoding contains underscore."""
+        encoding = get_html_media_encoding(
+            b"""
+        <html>
+        <head><meta charset="Shift_JIS">
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "Shift_JIS")
+
     def test_xml_encoding(self):
         """A character encoding is found via the meta tag."""
         encoding = get_html_media_encoding(
