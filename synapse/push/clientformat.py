@@ -26,10 +26,10 @@ def format_push_rules_for_user(user: UserID, ruleslist) -> Dict[str, Dict[str, l
     # We're going to be mutating this a lot, so do a deep copy
     ruleslist = copy.deepcopy(ruleslist)
 
-    rules = {
+    rules: Dict[str, Dict[str, List[Dict[str, Any]]]] = {
         "global": {},
         "device": {},
-    }  # type: Dict[str, Dict[str, List[Dict[str, Any]]]]
+    }
 
     rules["global"] = _add_empty_priority_class_arrays(rules["global"])
 

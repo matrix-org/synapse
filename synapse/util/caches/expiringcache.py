@@ -27,7 +27,7 @@ from synapse.util.caches import register_cache
 logger = logging.getLogger(__name__)
 
 
-SENTINEL = object()  # type: Any
+SENTINEL: Any = object()
 
 
 T = TypeVar("T")
@@ -71,7 +71,7 @@ class ExpiringCache(Generic[KT, VT]):
         self._expiry_ms = expiry_ms
         self._reset_expiry_on_get = reset_expiry_on_get
 
-        self._cache = OrderedDict()  # type: OrderedDict[KT, _CacheEntry]
+        self._cache: OrderedDict[KT, _CacheEntry] = OrderedDict()
 
         self.iterable = iterable
 
