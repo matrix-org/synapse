@@ -121,7 +121,7 @@ class AccountValidityHandler:
         #
         # Once the email-account-validity module is loaded, it will take control of account
         # validity by moving the rows from our `account_validity` table into its own table.
-        # 
+        #
         # Therefore, we need to allow modules (in practice just the one implementing the
         # email-based account validity) to temporarily hook into the legacy endpoints so we
         # can route the traffic coming into the old endpoints into the module, which is
