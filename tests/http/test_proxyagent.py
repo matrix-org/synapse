@@ -60,14 +60,14 @@ class ProxyParserTests(TestCase):
             #     b"http",
             #     b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
             #     1080,
-            #     None
+            #     None,
             # ],
             # [
             #     b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
             #     b"http",
             #     b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
             #     1080,
-            #     None
+            #     None,
             # ],
             # [b"::1", b"http", b"::1", 1080, None],
             # [b"::ffff:0.0.0.0", b"http", b"::ffff:0.0.0.0", 1080, None],
@@ -77,14 +77,14 @@ class ProxyParserTests(TestCase):
                 b"http",
                 b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
                 1080,
-                None
+                None,
             ],
             [
                 b"[2001:0db8:85a3:0000:0000:8a2e:0370:1234]",
                 b"http",
                 b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
                 1080,
-                None
+                None,
             ],
             [b"[::1]", b"http", b"::1", 1080, None],
             [b"[::ffff:0.0.0.0]", b"http", b"::ffff:0.0.0.0", 1080, None],
