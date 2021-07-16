@@ -190,7 +190,7 @@ whether the given file can be stored in the homeserver's media store.
 
 #### Third party rules callbacks
 
-Third party rules callbacks allow modules developers to add extra checks to verify the
+Third party rules callbacks allow module developers to add extra checks to verify the
 validity of incoming events. Third party event rules callbacks can be registered using
 the module API's `register_third_party_rules_callbacks` method.
 
@@ -207,7 +207,7 @@ async def check_event_allowed(
 This callback is very experimental and can and will break without notice.
 </span>**
 
-Called when processing any incoming event, with the event and the a `StateMap`
+Called when processing any incoming event, with the event and a `StateMap`
 representing the current state of the room the event is being sent into. A `StateMap` is
 a dictionary indexed on tuples containing an event type and a state key; for example
 retrieving the room's `m.room.create` event from the `state_events` argument looks like
@@ -216,7 +216,7 @@ indicating whether the event can be allowed.
 
 Note that this callback function processes incoming events coming via federation
 traffic (on top of client traffic). This means denying an event might cause the local
-copy of the room's history to diverge from the ones of remote servers. This may cause
+copy of the room's history to diverge from that of remote servers. This may cause
 federation issues in the room. It is strongly recommended to only deny events using this
 callback function if the sender is a local user, or in a private federation in which all
 servers are using the same module, with the same configuration.

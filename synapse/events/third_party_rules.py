@@ -39,10 +39,10 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
     """Wrapper that loads a third party event rules module configured using the old
     configuration, and registers the hooks they implement.
     """
-    if hs.config.third_party_event_rules:
-        module, config = hs.config.third_party_event_rules
-    else:
+    if hs.config.third_party_event_rules is None:
         return
+
+    module, config = hs.config.third_party_event_rules
 
     api = hs.get_module_api()
     third_party_rules = module(config=config, module_api=api)
@@ -154,7 +154,7 @@ class ThirdPartyEventRules:
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
     ):
-        """Register callbacks from module for each hook."""
+        """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
             self._check_event_allowed_callbacks.append(check_event_allowed)
 
@@ -190,7 +190,7 @@ class ThirdPartyEventRules:
         Returns:
             The result from the ThirdPartyRules module, as above.
         """
-        # Bail out early without hitting the store if we don't have any callback
+        # Bail out early without hitting the store if we don't have any callbacks to run.
         if len(self._check_event_allowed_callbacks) == 0:
             return True, None
 
@@ -243,7 +243,7 @@ class ThirdPartyEventRules:
         Returns:
             True if the 3PID can be invited, False if not.
         """
-        # Bail out early without hitting the store if we don't have any callback
+        # Bail out early without hitting the store if we don't have any callbacks to run.
         if len(self._check_threepid_can_be_invited_callbacks) == 0:
             return True
 

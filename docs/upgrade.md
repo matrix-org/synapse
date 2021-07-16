@@ -96,7 +96,7 @@ to [this documentation](modules.md#porting-an-existing-module-that-uses-the-old-
 to update their modules. Synapse administrators can refer to [this documentation](modules.md#using-modules)
 to update their configuration once the modules they are using have been updated.
 
-We plan to remove support for the current spam checker interface in September 2021.
+We plan to remove support for the current third-party rules interface in September 2021.
 
 
 # Upgrading to v1.38.0
