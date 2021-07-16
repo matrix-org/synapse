@@ -36,6 +36,7 @@ from typing import (
 
 import attr
 from prometheus_client import Counter
+from typing_extensions import TypedDict
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
@@ -79,7 +80,12 @@ class InvalidResponseError(RuntimeError):
     we couldn't parse
     """
 
-    pass
+
+class SendJoinResult(TypedDict):
+    event: EventBase
+    origin: str
+    state: List[EventBase]
+    auth_chain: List[EventBase]
 
 
 class FederationClient(FederationBase):
@@ -677,7 +683,7 @@ class FederationClient(FederationBase):
 
     async def send_join(
         self, destinations: Iterable[str], pdu: EventBase, room_version: RoomVersion
-    ) -> Dict[str, Any]:
+    ) -> SendJoinResult:
         """Sends a join event to one of a list of homeservers.
 
         Doing so will cause the remote server to add the event to the graph,
@@ -691,17 +697,40 @@ class FederationClient(FederationBase):
                 did the make_join)
 
         Returns:
-            a dict with members ``origin`` (a string
-            giving the server the event was sent to, ``state`` (?) and
-            ``auth_chain``.
+            a dict with members:
+                event: The event to persist.
+                origin: A string giving the server the event was sent to.
+                state (?)
+                auth_chain
 
         Raises:
             SynapseError: if the chosen remote server returns a 300/400 code, or
                 no servers successfully handle the request.
         """
 
-        async def send_request(destination) -> Dict[str, Any]:
+        async def send_request(destination) -> SendJoinResult:
             response = await self._do_send_join(room_version, destination, pdu)
+
+            # If an event was returned:
+            #
+            # * Ensure it has the same event ID.
+            # * Ensure the signatures are good.
+            #
+            # Otherwise, fallback to the provided event.
+            if response.event:
+                event = response.event
+
+                valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
+                    pdu=event,
+                    origin=destination,
+                    outlier=True,
+                    room_version=room_version,
+                )
+
+                if valid_pdu is None or event.event_id != pdu.event_id:
+                    raise InvalidResponseError("Returned an invalid join event")
+            else:
+                event = pdu
 
             state = response.state
             auth_chain = response.auth_events
@@ -785,6 +814,7 @@ class FederationClient(FederationBase):
                 )
 
             return {
+                "event": event,
                 "state": signed_state,
                 "auth_chain": signed_auth,
                 "origin": destination,

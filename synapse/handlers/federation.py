@@ -1494,6 +1494,7 @@ class FederationHandler(BaseHandler):
                 host_list, event, room_version_obj
             )
 
+            event = ret["event"]
             origin = ret["origin"]
             state = ret["state"]
             auth_chain = ret["auth_chain"]
@@ -1997,7 +1998,7 @@ class FederationHandler(BaseHandler):
     @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase, room_version: RoomVersion
-    ) -> EventContext:
+    ) -> Tuple[EventBase, EventContext]:
         """
         We have received a join/leave/knock event for a room via send_join/leave/knock.
 
@@ -2021,7 +2022,7 @@ class FederationHandler(BaseHandler):
             room_version: The room version object for the event's room.
 
         Returns:
-            The context of the event after inserting it into the room graph.
+            The event and context of the event after inserting it into the room graph.
 
         Raises:
             SynapseError if the event is not accepted into the room
@@ -2077,7 +2078,7 @@ class FederationHandler(BaseHandler):
 
         # all looks good, we can persist the event.
         await self._run_push_actions_and_persist_event(event, context)
-        return context
+        return event, context
 
     async def _check_join_restrictions(
         self, context: EventContext, event: EventBase

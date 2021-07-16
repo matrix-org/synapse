@@ -587,7 +587,7 @@ class FederationServer(FederationBase):
     async def on_send_join_request(
         self, origin: str, content: JsonDict, room_id: str
     ) -> Dict[str, Any]:
-        context = await self._on_send_membership_event(
+        event, context = await self._on_send_membership_event(
             origin, content, Membership.JOIN, room_id
         )
 
@@ -598,6 +598,7 @@ class FederationServer(FederationBase):
 
         time_now = self._clock.time_msec()
         return {
+            "event": event.get_pdu_json(),
             "state": [p.get_pdu_json(time_now) for p in state.values()],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
         }
@@ -682,7 +683,7 @@ class FederationServer(FederationBase):
         Returns:
             The stripped room state.
         """
-        event_context = await self._on_send_membership_event(
+        _, context = await self._on_send_membership_event(
             origin, content, Membership.KNOCK, room_id
         )
 
@@ -691,14 +692,14 @@ class FederationServer(FederationBase):
         # related to the room while the knock request is pending.
         stripped_room_state = (
             await self.store.get_stripped_room_state_from_event_context(
-                event_context, self._room_prejoin_state_types
+                context, self._room_prejoin_state_types
             )
         )
         return {"knock_state_events": stripped_room_state}
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
-    ) -> EventContext:
+    ) -> Tuple[EventBase, EventContext]:
         """Handle an on_send_{join,leave,knock} request
 
         Does some preliminary validation before passing the request on to the
@@ -713,7 +714,7 @@ class FederationServer(FederationBase):
                 in the event
 
         Returns:
-            The context of the event after inserting it into the room graph.
+            The event and context of the event after inserting it into the room graph.
 
         Raises:
             SynapseError if there is a problem with the request, including things like
