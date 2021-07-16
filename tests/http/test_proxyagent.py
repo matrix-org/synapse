@@ -23,6 +23,7 @@ from parameterized import parameterized
 
 from twisted.internet import interfaces  # noqa: F401
 from twisted.internet.endpoints import HostnameEndpoint, _WrapperEndpoint
+from twisted.internet.interfaces import IProtocol, IProtocolFactory
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web.http import HTTPChannel
