@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, TypeVar
 import bleach
 import jinja2
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
 from synapse.config.emailconfig import EmailSubjectConfig
 from synapse.events import EventBase
@@ -599,6 +599,22 @@ class Mailer:
                     "person": inviter_name,
                     "app": self.app_name,
                 }
+
+            # If the room is a space, it gets a slightly different topic.
+            create_event_id = room_state_ids.get(("m.room.create", ""))
+            if create_event_id:
+                create_event = await self.store.get_event(
+                    create_event_id, allow_none=True
+                )
+                if (
+                    create_event
+                    and create_event.content.get("room_type") == RoomTypes.SPACE
+                ):
+                    return self.email_subjects.invite_from_person_to_space % {
+                        "person": inviter_name,
+                        "space": room_name,
+                        "app": self.app_name,
+                    }
 
             return self.email_subjects.invite_from_person_to_room % {
                 "person": inviter_name,
