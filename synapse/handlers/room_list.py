@@ -381,9 +381,13 @@ class RoomListHandler(BaseHandler):
                     Codes.UNRECOGNIZED,
                     Codes.NOT_FOUND,
                 ):
+                    # Not an error that should trigger a fallback.
                     logger.debug("Falling back to locally-filtered /publicRooms")
                 else:
-                    raise  # Not an error that should trigger a fallback.
+                    # Not an error that should trigger a fallback.
+                    raise SynapseError(502, "Failed to fetch room list")
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to fetch room list")
 
             # if we reach this point, then we fall back to the situation where
             # we currently don't support searching across federation, so we have
