@@ -106,6 +106,18 @@ def check(
             if not event.signatures.get(event_id_domain):
                 raise AuthError(403, "Event not signed by sending server")
 
+        is_invite_via_allow_rule = (
+            event.type == EventTypes.Member
+            and event.membership == Membership.JOIN
+            and "join_authorised_via_users_server" in event.content
+        )
+        if is_invite_via_allow_rule:
+            authoriser_domain = get_domain_from_id(
+                event.content["join_authorised_via_users_server"]
+            )
+            if not event.signatures.get(authoriser_domain):
+                raise AuthError(403, "Event not signed by authorising server")
+
     # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
     #
     # 1. If type is m.room.create:
@@ -363,18 +375,20 @@ def _is_membership_change_allowed(
             # not need to meet the allow rules.
             if not caller_in_room and not caller_invited:
                 authorising_user = event.content.get("join_authorised_via_users_server")
-                authorising_user_level = get_user_power_level(
-                    authorising_user, auth_events
-                )
 
-                # The authorising user cannot issue invites!
-                if authorising_user_level < invite_level:
-                    raise AuthError(403, "Join event authorised by invalid server.")
+                if authorising_user is None:
+                    raise AuthError(403, "Join event is missing authorising user.")
 
                 # The authorising user must be in the room.
                 key = (EventTypes.Member, authorising_user)
                 member_event = auth_events.get(key)
                 _check_joined_room(member_event, authorising_user, event.room_id)
+
+                authorising_user_level = get_user_power_level(
+                    authorising_user, auth_events
+                )
+                if authorising_user_level < invite_level:
+                    raise AuthError(403, "Join event authorised by invalid server.")
 
         elif join_rule == JoinRules.INVITE or (
             room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
