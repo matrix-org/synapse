@@ -305,27 +305,6 @@ def _http_proxy_endpoint(
     return proxy_endpoint, credentials
 
 
-def parse_username_password(proxy: bytes) -> Tuple[Optional[ProxyCredentials], bytes]:
-    """
-    Parses the username and password from a proxy declaration e.g
-    username:password@hostname:port.
-
-    Args:
-        proxy: The proxy connection string.
-
-    Returns
-        An instance of ProxyCredentials and the proxy connection string with any credentials
-        stripped, i.e u:p@host:port -> host:port. If no credentials were found, the
-        ProxyCredentials instance is replaced with None.
-    """
-    if proxy and b"@" in proxy:
-        # We use rsplit here as the password could contain an @ character
-        credentials, proxy_without_credentials = proxy.rsplit(b"@", 1)
-        return ProxyCredentials(credentials), proxy_without_credentials
-
-    return None, proxy
-
-
 def parse_proxy(
     proxy: bytes, default_scheme: bytes = b"http", default_port: int = 1080
 ) -> Tuple[bytes, bytes, int, Optional[ProxyCredentials]]:
