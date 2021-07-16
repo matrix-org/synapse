@@ -77,7 +77,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         sqlite3 \
         libpq-dev \
         xmlsec1 \
-        dh-virtualenv \
+        dh-virtualenv
 
 #COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
 
