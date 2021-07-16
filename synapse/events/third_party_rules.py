@@ -118,7 +118,7 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
         for hook in third_party_event_rules_methods
     }
 
-    api.register_spam_checker_callbacks(**hooks)
+    api.register_third_party_rules_callbacks(**hooks)
 
 
 class ThirdPartyEventRules:
@@ -133,17 +133,6 @@ class ThirdPartyEventRules:
         self.third_party_rules = None
 
         self.store = hs.get_datastore()
-
-        module = None
-        config = None
-        if hs.config.third_party_event_rules:
-            module, config = hs.config.third_party_event_rules
-
-        if module is not None:
-            self.third_party_rules = module(
-                config=config,
-                module_api=hs.get_module_api(),
-            )
 
         self._check_event_allowed_callbacks: List[CHECK_EVENT_ALLOWED_CALLBACK] = []
         self._on_create_room_callbacks: List[ON_CREATE_ROOM_CALLBACK] = []

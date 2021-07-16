@@ -203,6 +203,10 @@ async def check_event_allowed(
 ) -> Tuple[bool, Optional[dict]]
 ```
 
+**<span style="color:red">
+This callback is very experimental and can and will break without notice.
+</span>**
+
 Called when processing any incoming event, with the event and the a `StateMap`
 representing the current state of the room the event is being sent into. A `StateMap` is
 a dictionary indexed on tuples containing an event type and a state key; for example
