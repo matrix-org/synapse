@@ -65,6 +65,9 @@ class EventValidator:
             # checked, since we trust the portions of the event we created.
             validate_canonicaljson(event.content)
 
+        if not 0 < event.origin_server_ts < 2 ** 53:
+            raise SynapseError(400, "Event timestamp is out of range")
+
         if event.type == EventTypes.Aliases:
             if "aliases" in event.content:
                 for alias in event.content["aliases"]:
