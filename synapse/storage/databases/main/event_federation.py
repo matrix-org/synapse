@@ -666,26 +666,48 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
     async def get_oldest_events_with_depth_in_room(self, room_id):
+        def get_oldest_events_with_depth_in_room_txn(txn, room_id):
+            sql = (
+                "SELECT b.event_id, MAX(e.depth) FROM events as e"
+                " INNER JOIN event_edges as g"
+                " ON g.event_id = e.event_id"
+                " INNER JOIN event_backward_extremities as b"
+                " ON g.prev_event_id = b.event_id"
+                " WHERE b.room_id = ? AND g.is_state is ?"
+                " GROUP BY b.event_id"
+            )
+
+            txn.execute(sql, (room_id, False))
+
+            return dict(txn)
+
         return await self.db_pool.runInteraction(
             "get_oldest_events_with_depth_in_room",
-            self.get_oldest_events_with_depth_in_room_txn,
+            get_oldest_events_with_depth_in_room_txn,
             room_id,
         )
 
-    def get_oldest_events_with_depth_in_room_txn(self, txn, room_id):
-        sql = (
-            "SELECT b.event_id, MAX(e.depth) FROM events as e"
-            " INNER JOIN event_edges as g"
-            " ON g.event_id = e.event_id"
-            " INNER JOIN event_backward_extremities as b"
-            " ON g.prev_event_id = b.event_id"
-            " WHERE b.room_id = ? AND g.is_state is ?"
-            " GROUP BY b.event_id"
+    async def get_insertion_event_backwards_extremities_in_room(self, room_id):
+        def get_insertion_event_backwards_extremities_in_room_txn(txn, room_id):
+            sql = """
+                SELECT b.event_id, MAX(e.depth) FROM insertion_events as i
+                /* We only want insertion events that are also marked as backwards extremities */
+                INNER JOIN event_backward_extremities as b USING (event_id)
+                /* Get the depth of the insertion event from the events table */
+                INNER JOIN events AS e USING (event_id)
+                WHERE b.room_id = ?
+                GROUP BY b.event_id
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return dict(txn)
+
+        return await self.db_pool.runInteraction(
+            "get_insertion_event_backwards_extremities_in_room",
+            get_insertion_event_backwards_extremities_in_room_txn,
+            room_id,
         )
-
-        txn.execute(sql, (room_id, False))
-
-        return dict(txn)
 
     async def get_max_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
         """Returns the event ID and depth for the event that has the max depth from a set of event IDs
@@ -929,7 +951,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return sorted(events, key=lambda e: -e.depth)
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
-        logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
+        logger.info("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
 
         event_results = set()
 
@@ -1120,6 +1142,21 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         await self.db_pool.runInteraction(
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
+        )
+
+    async def insert_backward_extremity(self, event_id: str, room_id: str) -> None:
+        def _insert_backward_extremity_txn(txn):
+            self.db_pool.simple_insert_txn(
+                txn,
+                table="event_backward_extremities",
+                values={
+                    "event_id": event_id,
+                    "room_id": room_id,
+                },
+            )
+
+        await self.db_pool.runInteraction(
+            "_insert_backward_extremity_txn", _insert_backward_extremity_txn
         )
 
     async def insert_received_event_to_staging(

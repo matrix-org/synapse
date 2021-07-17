@@ -926,7 +926,9 @@ class FederationHandler(BaseHandler):
             [insertion_event_id],
         )
 
-        insertion_event = await self.store.get_event(insertion_event_id, allow_none=True)
+        insertion_event = await self.store.get_event(
+            insertion_event_id, allow_none=True
+        )
         if insertion_event is None:
             logger.warning(
                 "_handle_marker_event: server %s didn't return insertion event %s for marker %s",
@@ -940,6 +942,10 @@ class FederationHandler(BaseHandler):
             "_handle_marker_event: Succesfully backfilled insertion event %s from marker event %s",
             insertion_event,
             marker_event,
+        )
+
+        await self.store.insert_backward_extremity(
+            insertion_event_id, marker_event.room_id
         )
 
     async def _resync_device(self, sender: str) -> None:
@@ -1110,7 +1116,12 @@ class FederationHandler(BaseHandler):
     async def _maybe_backfill_inner(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
-        extremities = await self.store.get_oldest_events_with_depth_in_room(room_id)
+        oldest_events = await self.store.get_oldest_events_with_depth_in_room(room_id)
+        insertion_events_to_be_backfilled = (
+            await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
+        )
+        extremities = {**oldest_events, **insertion_events_to_be_backfilled}
+        logger.info("_maybe_backfill_inner: extremities %s", extremities)
 
         if not extremities:
             logger.debug("Not backfilling as no extremeties found.")
@@ -1143,12 +1154,14 @@ class FederationHandler(BaseHandler):
         #   types have.
 
         forward_events = await self.store.get_successor_events(list(extremities))
+        logger.info("_maybe_backfill_inner: forward_events %s", forward_events)
 
         extremities_events = await self.store.get_events(
             forward_events,
             redact_behaviour=EventRedactBehaviour.AS_IS,
             get_prev_content=False,
         )
+        logger.info("_maybe_backfill_inner: extremities_events %s", extremities_events)
 
         # We set `check_history_visibility_only` as we might otherwise get false
         # positives from users having been erased.
@@ -1158,6 +1171,9 @@ class FederationHandler(BaseHandler):
             list(extremities_events.values()),
             redact=False,
             check_history_visibility_only=True,
+        )
+        logger.info(
+            "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
         if not filtered_extremities:
@@ -1177,7 +1193,7 @@ class FederationHandler(BaseHandler):
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
         if current_depth - 2 * limit > max_depth:
-            logger.debug(
+            logger.info(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
                 max_depth,
                 current_depth,
@@ -1185,7 +1201,7 @@ class FederationHandler(BaseHandler):
             )
             return False
 
-        logger.debug(
+        logger.info(
             "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
             room_id,
             current_depth,

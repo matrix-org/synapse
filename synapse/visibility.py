@@ -366,13 +366,21 @@ async def filter_events_for_server(
         if erased_senders:
             to_return = []
             for e in events:
-                if not is_sender_erased(e, erased_senders):
+                erased = is_sender_erased(e, erased_senders)
+                logger.info(
+                    "filter_events_for_server: (all_open) %s erased=%s", e, erased
+                )
+                if not erased:
                     to_return.append(e)
                 elif redact:
                     to_return.append(prune_event(e))
 
+            logger.info("filter_events_for_server: (all_open) to_return=%s", to_return)
             return to_return
 
+        logger.info(
+            "filter_events_for_server: all_open and no erased senders %s", events
+        )
         # If there are no erased users then we can just return the given list
         # of events without having to copy it.
         return events
@@ -429,6 +437,9 @@ async def filter_events_for_server(
     for e in events:
         erased = is_sender_erased(e, erased_senders)
         visible = check_event_is_visible(e, event_to_state[e.event_id])
+        logger.info(
+            "filter_events_for_server: %s erased=%s visible=%s", e, erased, visible
+        )
         if visible and not erased:
             to_return.append(e)
         elif redact:
