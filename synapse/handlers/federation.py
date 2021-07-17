@@ -944,7 +944,7 @@ class FederationHandler(BaseHandler):
             marker_event,
         )
 
-        await self.store.insert_backward_extremity(
+        await self.store.insert_insertion_extremity(
             insertion_event_id, marker_event.room_id
         )
 

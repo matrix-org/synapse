@@ -692,7 +692,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             sql = """
                 SELECT b.event_id, MAX(e.depth) FROM insertion_events as i
                 /* We only want insertion events that are also marked as backwards extremities */
-                INNER JOIN event_backward_extremities as b USING (event_id)
+                INNER JOIN insertion_event_extremities as b USING (event_id)
                 /* Get the depth of the insertion event from the events table */
                 INNER JOIN events AS e USING (event_id)
                 WHERE b.room_id = ?
@@ -1144,11 +1144,11 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             _delete_old_forward_extrem_cache_txn,
         )
 
-    async def insert_backward_extremity(self, event_id: str, room_id: str) -> None:
-        def _insert_backward_extremity_txn(txn):
+    async def insert_insertion_extremity(self, event_id: str, room_id: str) -> None:
+        def _insert_insertion_extremity_txn(txn):
             self.db_pool.simple_insert_txn(
                 txn,
-                table="event_backward_extremities",
+                table="insertion_event_extremities",
                 values={
                     "event_id": event_id,
                     "room_id": room_id,
@@ -1156,7 +1156,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             )
 
         await self.db_pool.runInteraction(
-            "_insert_backward_extremity_txn", _insert_backward_extremity_txn
+            "_insert_insertion_extremity_txn", _insert_insertion_extremity_txn
         )
 
     async def insert_received_event_to_staging(

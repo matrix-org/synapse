@@ -1831,6 +1831,18 @@ class PersistEventsStore:
             },
         )
 
+        # When we receive an event with a `chunk_id` referencing the
+        # `next_chunk_id` of the insertion event, we can remove it from the
+        # `insertion_event_extremities` table.
+        sql = """
+            DELETE FROM insertion_event_extremities WHERE event_id IN (
+                SELECT event_id FROM insertion_events
+                WHERE next_chunk_id = ?
+            )
+        """
+
+        txn.execute(sql, (chunk_id,))
+
     def _handle_redaction(self, txn, redacted_event_id):
         """Handles receiving a redaction and checking whether we need to remove
         any redacted relations from the database.
