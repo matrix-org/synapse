@@ -1116,14 +1116,19 @@ class FederationHandler(BaseHandler):
     async def _maybe_backfill_inner(
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
-        oldest_events = await self.store.get_oldest_events_with_depth_in_room(room_id)
+        oldest_events_with_depth = (
+            await self.store.get_oldest_events_with_depth_in_room(room_id)
+        )
         insertion_events_to_be_backfilled = (
             await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
         )
-        extremities = {**oldest_events, **insertion_events_to_be_backfilled}
-        logger.info("_maybe_backfill_inner: extremities %s", extremities)
+        logger.info(
+            "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
+            oldest_events_with_depth,
+            insertion_events_to_be_backfilled,
+        )
 
-        if not extremities:
+        if not oldest_events_with_depth and not insertion_events_to_be_backfilled:
             logger.debug("Not backfilling as no extremeties found.")
             return False
 
@@ -1153,11 +1158,13 @@ class FederationHandler(BaseHandler):
         #   state *before* the event, ignoring the special casing certain event
         #   types have.
 
-        forward_events = await self.store.get_successor_events(list(extremities))
-        logger.info("_maybe_backfill_inner: forward_events %s", forward_events)
+        forward_event_ids = await self.store.get_successor_events(
+            list(oldest_events_with_depth)
+        )
+        logger.info("_maybe_backfill_inner: forward_event_ids=%s", forward_event_ids)
 
         extremities_events = await self.store.get_events(
-            forward_events,
+            forward_event_ids,
             redact_behaviour=EventRedactBehaviour.AS_IS,
             get_prev_content=False,
         )
@@ -1176,8 +1183,14 @@ class FederationHandler(BaseHandler):
             "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
-        if not filtered_extremities:
+        if not filtered_extremities and not insertion_events_to_be_backfilled:
             return False
+
+        extremities = {
+            **oldest_events_with_depth,
+            # TODO: insertion_events_to_be_backfilled is currently skipping the filtered_extremities checks
+            **insertion_events_to_be_backfilled,
+        }
 
         # Check if we reached a point where we should start backfilling.
         sorted_extremeties_tuple = sorted(extremities.items(), key=lambda e: -int(e[1]))
