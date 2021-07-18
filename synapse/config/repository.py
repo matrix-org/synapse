@@ -16,7 +16,7 @@ import logging
 import os
 from collections import namedtuple
 from typing import Dict, List
-from urllib.request import getproxies_environment
+from urllib.request import getproxies_environment  # type: ignore
 
 from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
