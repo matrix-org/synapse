@@ -11,7 +11,7 @@
   - [Delegation](delegate.md)
 
 # Upgrading
-  - [Upgrading between Synapse Versions](upgrading/README.md)
+  - [Upgrading between Synapse Versions](upgrade.md)
   - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
 
 # Usage

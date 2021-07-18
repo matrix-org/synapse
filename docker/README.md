@@ -45,7 +45,7 @@ docker run -it --rm \
 ```
 
 For information on picking a suitable server name, see
-https://github.com/matrix-org/synapse/blob/master/INSTALL.md.
+https://matrix-org.github.io/synapse/latest/setup/installation.html.
 
 The above command will generate a `homeserver.yaml` in (typically)
 `/var/lib/docker/volumes/synapse-data/_data`. You should check this file, and
@@ -139,7 +139,7 @@ For documentation on using a reverse proxy, see
 https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
 
 For more information on enabling TLS support in synapse itself, see
-https://github.com/matrix-org/synapse/blob/master/INSTALL.md#tls-certificates. Of
+https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates. Of
 course, you will need to expose the TLS port from the container with a `-p`
 argument to `docker run`.
 

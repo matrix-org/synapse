@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 
 import attr
 from nacl.signing import SigningKey
 
-from synapse.api.auth import Auth
 from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import UnsupportedRoomVersionError
 from synapse.api.room_versions import (
@@ -34,10 +33,14 @@ from synapse.types import EventID, JsonDict
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
+if TYPE_CHECKING:
+    from synapse.handlers.event_auth import EventAuthHandler
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, cmp=False, frozen=True)
+@attr.s(slots=True, cmp=False, frozen=True, auto_attribs=True)
 class EventBuilder:
     """A format independent event builder used to build up the event content
     before signing the event.
@@ -62,31 +65,30 @@ class EventBuilder:
         _signing_key: The signing key to use to sign the event as the server
     """
 
-    _state = attr.ib(type=StateHandler)
-    _auth = attr.ib(type=Auth)
-    _store = attr.ib(type=DataStore)
-    _clock = attr.ib(type=Clock)
-    _hostname = attr.ib(type=str)
-    _signing_key = attr.ib(type=SigningKey)
+    _state: StateHandler
+    _event_auth_handler: "EventAuthHandler"
+    _store: DataStore
+    _clock: Clock
+    _hostname: str
+    _signing_key: SigningKey
 
-    room_version = attr.ib(type=RoomVersion)
+    room_version: RoomVersion
 
-    room_id = attr.ib(type=str)
-    type = attr.ib(type=str)
-    sender = attr.ib(type=str)
+    room_id: str
+    type: str
+    sender: str
 
-    content = attr.ib(default=attr.Factory(dict), type=JsonDict)
-    unsigned = attr.ib(default=attr.Factory(dict), type=JsonDict)
+    content: JsonDict = attr.Factory(dict)
+    unsigned: JsonDict = attr.Factory(dict)
 
     # These only exist on a subset of events, so they raise AttributeError if
     # someone tries to get them when they don't exist.
-    _state_key = attr.ib(default=None, type=Optional[str])
-    _redacts = attr.ib(default=None, type=Optional[str])
-    _origin_server_ts = attr.ib(default=None, type=Optional[int])
+    _state_key: Optional[str] = None
+    _redacts: Optional[str] = None
+    _origin_server_ts: Optional[int] = None
 
-    internal_metadata = attr.ib(
-        default=attr.Factory(lambda: _EventInternalMetadata({})),
-        type=_EventInternalMetadata,
+    internal_metadata: _EventInternalMetadata = attr.Factory(
+        lambda: _EventInternalMetadata({})
     )
 
     @property
@@ -123,7 +125,9 @@ class EventBuilder:
             state_ids = await self._state.get_current_state_ids(
                 self.room_id, prev_event_ids
             )
-            auth_event_ids = self._auth.compute_auth_events(self, state_ids)
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                self, state_ids
+            )
 
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
@@ -184,24 +188,23 @@ class EventBuilder:
 
 
 class EventBuilderFactory:
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.clock = hs.get_clock()
         self.hostname = hs.hostname
         self.signing_key = hs.signing_key
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
-        self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
-    def new(self, room_version, key_values):
+    def new(self, room_version: str, key_values: dict) -> EventBuilder:
         """Generate an event builder appropriate for the given room version
 
         Deprecated: use for_room_version with a RoomVersion object instead
 
         Args:
-            room_version (str): Version of the room that we're creating an event builder
-                for
-            key_values (dict): Fields used as the basis of the new event
+            room_version: Version of the room that we're creating an event builder for
+            key_values: Fields used as the basis of the new event
 
         Returns:
             EventBuilder
@@ -212,13 +215,15 @@ class EventBuilderFactory:
             raise UnsupportedRoomVersionError()
         return self.for_room_version(v, key_values)
 
-    def for_room_version(self, room_version, key_values):
+    def for_room_version(
+        self, room_version: RoomVersion, key_values: dict
+    ) -> EventBuilder:
         """Generate an event builder appropriate for the given room version
 
         Args:
-            room_version (synapse.api.room_versions.RoomVersion):
+            room_version:
                 Version of the room that we're creating an event builder for
-            key_values (dict): Fields used as the basis of the new event
+            key_values: Fields used as the basis of the new event
 
         Returns:
             EventBuilder
@@ -226,7 +231,7 @@ class EventBuilderFactory:
         return EventBuilder(
             store=self.store,
             state=self.state,
-            auth=self.auth,
+            event_auth_handler=self._event_auth_handler,
             clock=self.clock,
             hostname=self.hostname,
             signing_key=self.signing_key,
@@ -286,15 +291,15 @@ def create_local_event_from_event_dict(
 _event_id_counter = 0
 
 
-def _create_event_id(clock, hostname):
+def _create_event_id(clock: Clock, hostname: str) -> str:
     """Create a new event ID
 
     Args:
-        clock (Clock)
-        hostname (str): The server name for the event ID
+        clock
+        hostname: The server name for the event ID
 
     Returns:
-        str
+        The new event ID
     """
 
     global _event_id_counter

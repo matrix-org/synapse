@@ -22,7 +22,7 @@ DEFAULT_CONFIG = """\
 # User Consent configuration
 #
 # for detailed instructions, see
-# https://github.com/matrix-org/synapse/blob/master/docs/consent_tracking.md
+# https://matrix-org.github.io/synapse/latest/consent_tracking.html
 #
 # Parts of this section are required if enabling the 'consent' resource under
 # 'listeners', in particular 'template_dir' and 'version'.
