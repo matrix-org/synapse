@@ -187,9 +187,10 @@ class ReceiptEventSource:
                     hidden = user_rr.get("hidden", False)
                     if not hidden or rr_user_id == user_id:
                         new_users[rr_user_id] = user_rr.copy()
-                        if hidden:
+                        # If hidden has a value replace hidden with the correct prefixed key
+                        if user_rr.get("hidden", None) is not None:
                             new_users[rr_user_id].pop("hidden")
-                            new_users[rr_user_id]["org.matrix.msc2285.hidden"] = True
+                            new_users[rr_user_id]["org.matrix.msc2285.hidden"] = hidden
 
                 # Set new users unless empty
                 if len(new_users.keys()) > 0:
