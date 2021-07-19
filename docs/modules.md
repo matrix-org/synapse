@@ -63,7 +63,7 @@ Modules can register web resources onto Synapse's web server using the following
 API method:
 
 ```python
-def ModuleApi.register_web_resource(path: str, resource: IResource)
+def ModuleApi.register_web_resource(path: str, resource: IResource) -> None
 ```
 
 The path is the full absolute path to register the resource at. For example, if you
@@ -91,12 +91,17 @@ are split in categories. A single module may implement callbacks from multiple c
 and is under no obligation to implement all callbacks from the categories it registers
 callbacks for.
 
+Modules can register callbacks using one of the module API's `register_[...]_callbacks`
+methods. The callback functions are passed to these methods as keyword arguments, with
+the callback name as the argument name and the function as its value. This is demonstrated
+in the example below. A `register_[...]_callbacks` method exists for each module type
+documented in this section.
+
 #### Spam checker callbacks
 
-To register one of the callbacks described in this section, a module needs to use the
-module API's `register_spam_checker_callbacks` method. The callback functions are passed
-to `register_spam_checker_callbacks` as keyword arguments, with the callback name as the
-argument name and the function as its value. This is demonstrated in the example below.
+Spam checker callbacks allow module developers to implement spam mitigation actions for
+Synapse instances. Spam checker callbacks can be registered using the module API's
+`register_spam_checker_callbacks` method.
 
 The available spam checker callbacks are:
 
@@ -115,7 +120,7 @@ async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 
 Called when processing an invitation. The module must return a `bool` indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (i.e. `@alice:example.com`).
+represented by their Matrix user ID (e.g. `@alice:example.com`).
 
 ```python
 async def user_may_create_room(user: str) -> bool
@@ -187,6 +192,36 @@ async def check_media_file_for_spam(
 
 Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.
+
+#### Account validity callbacks
+
+Account validity callbacks allow module developers to add extra steps to verify the
+validity on an account, i.e. see if a user can be granted access to their account on the
+Synapse instance. Account validity callbacks can be registered using the module API's
+`register_account_validity_callbacks` method.
+
+The available account validity callbacks are:
+
+```python
+async def is_user_expired(user: str) -> Optional[bool]
+```
+
+Called when processing any authenticated request (except for logout requests). The module
+can return a `bool` to indicate whether the user has expired and should be locked out of
+their account, or `None` if the module wasn't able to figure it out. The user is
+represented by their Matrix user ID (e.g. `@alice:example.com`).
+
+If the module returns `True`, the current request will be denied with the error code
+`ORG_MATRIX_EXPIRED_ACCOUNT` and the HTTP status code 403. Note that this doesn't
+invalidate the user's access token.
+
+```python
+async def on_user_registration(user: str) -> None
+```
+
+Called after successfully registering a user, in case the module needs to perform extra
+operations to keep track of them. (e.g. add them to a database table). The user is
+represented by their Matrix user ID.
 
 ### Porting an existing module that uses the old interface
 
