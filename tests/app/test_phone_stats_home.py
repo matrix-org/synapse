@@ -5,6 +5,7 @@ from synapse.rest.client.v1 import login, room
 from tests import unittest
 from tests.unittest import HomeserverTestCase
 
+FIVE_MINUTES_IN_SECONDS = 300
 ONE_DAY_IN_SECONDS = 86400
 
 
@@ -191,8 +192,8 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token)
         first_post_at = self.hs.get_clock().time()
 
-        # (give time for tables to be updated)
-        self.reactor.advance(300)
+        # (give time for user_daily_visits table to be updated)
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         store = self.hs.get_datastore()
 
@@ -206,8 +207,8 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # (R30v2 includes users with **more** than 30 days between the two visits,
         #  and user_daily_visits records the timestamp as the start of the day.)
         self.reactor.advance(31 * ONE_DAY_IN_SECONDS)
-        # Also advance 10 minutes to let another user_daily_visits update occur
-        self.reactor.advance(600)
+        # Also advance 5 minutes to let another user_daily_visits update occur
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # (Make sure the user isn't somehow counted by this point.)
         r30_results = self.get_success(store.count_r30v2_users())
@@ -218,9 +219,9 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # Send a message (this counts as activity)
         self.helper.send(room_id, "message2", tok=access_token)
 
-        # We have to wait up a few minutes for the user_daily_visits table to
+        # We have to wait a few minutes for the user_daily_visits table to
         # be updated by a background process.
-        self.reactor.advance(300)
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # *Now* the user is counted.
         r30_results = self.get_success(store.count_r30v2_users())
@@ -230,7 +231,6 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # Advance to JUST under 60 days after the user's first post
         self._advance_to(first_post_at + 60 * ONE_DAY_IN_SECONDS - 5)
-        self.reactor.advance(1)
 
         # Check the user is still counted.
         r30_results = self.get_success(store.count_r30v2_users())
@@ -253,6 +253,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         before appearing in the R30v2 statistic, even if they post every day
         during that time!
         """
+
         # set a custom user-agent to impersonate Element/Android.
         headers = (
             (
@@ -269,7 +270,8 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         )
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
-        self.reactor.advance(400)
+        # give time for user_daily_visits to update
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         store = self.hs.get_datastore()
 
@@ -281,12 +283,13 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         for _ in range(30):
             # This loop posts a message every day for 30 days
-            self.reactor.advance(ONE_DAY_IN_SECONDS - 400)
+            self.reactor.advance(ONE_DAY_IN_SECONDS - FIVE_MINUTES_IN_SECONDS)
             self.helper.send(
                 room_id, "I'm still here", tok=access_token, custom_headers=headers
             )
 
-            self.reactor.advance(400)
+            # give time for user_daily_visits to update
+            self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
             # Notice that the user *still* does not contribute to R30!
             r30_results = self.get_success(store.count_r30v2_users())
@@ -294,14 +297,14 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
                 r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
             )
 
-        # (This advance needs to be split up into multiple advances
-        #  because otherwise strict inequality hits.)
+        # advance yet another day with more activity
         self.reactor.advance(ONE_DAY_IN_SECONDS)
         self.helper.send(
             room_id, "Still here!", tok=access_token, custom_headers=headers
         )
 
-        self.reactor.advance(400)
+        # give time for user_daily_visits to update
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # *Now* the user appears in R30.
         r30_results = self.get_success(store.count_r30v2_users())
@@ -339,7 +342,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
         # (give time for tables to update)
-        self.reactor.advance(300)
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # Check that the user does not contribute to R30v2, even though it's been
         # more than 30 days since registration.
@@ -360,7 +363,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
         # (give time for tables to update)
-        self.reactor.advance(300)
+        self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # Check the user now satisfies the requirements to appear in R30v2.
         r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
