@@ -249,7 +249,9 @@ class ThirdPartyEventRules:
                 # raise an exception to deny the creation of the room; instead make sure
                 # it's a SynapseError we can send to clients.
                 if not isinstance(e, SynapseError):
-                    e = SynapseError(403, "Room creation forbidden with these parameters")
+                    e = SynapseError(
+                        403, "Room creation forbidden with these parameters"
+                    )
 
                 raise e
 
