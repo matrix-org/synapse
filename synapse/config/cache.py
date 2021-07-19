@@ -25,7 +25,7 @@ from ._base import Config, ConfigError
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 
 # Map from canonicalised cache name to cache.
-_CACHES = {}  # type: Dict[str, Callable[[float], None]]
+_CACHES: Dict[str, Callable[[float], None]] = {}
 
 # a lock on the contents of _CACHES
 _CACHES_LOCK = threading.Lock()
@@ -157,7 +157,7 @@ class CacheConfig(Config):
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
-        self.cache_factors = {}  # type: Dict[str, float]
+        self.cache_factors: Dict[str, float] = {}
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get(

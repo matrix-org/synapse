@@ -22,7 +22,7 @@ class FederationConfig(Config):
 
     def read_config(self, config, **kwargs):
         # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None  # type: Optional[dict]
+        self.federation_domain_whitelist: Optional[dict] = None
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
 
         if federation_domain_whitelist is not None:

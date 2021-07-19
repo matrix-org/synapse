@@ -80,25 +80,25 @@ class DeferredCache(Generic[KT, VT]):
         cache_type = TreeCache if tree else dict
 
         # _pending_deferred_cache maps from the key value to a `CacheEntry` object.
-        self._pending_deferred_cache = (
-            cache_type()
-        )  # type: Union[TreeCache, MutableMapping[KT, CacheEntry]]
+        self._pending_deferred_cache: Union[
+            TreeCache, "MutableMapping[KT, CacheEntry]"
+        ] = cache_type()
 
         def metrics_cb():
             cache_pending_metric.labels(name).set(len(self._pending_deferred_cache))
 
         # cache is used for completed results and maps to the result itself, rather than
         # a Deferred.
-        self.cache = LruCache(
+        self.cache: LruCache[KT, VT] = LruCache(
             max_size=max_entries,
             cache_name=name,
             cache_type=cache_type,
             size_callback=(lambda d: len(d) or 1) if iterable else None,
             metrics_collection_callback=metrics_cb,
             apply_cache_factor_from_config=apply_cache_factor_from_config,
-        )  # type: LruCache[KT, VT]
+        )
 
-        self.thread = None  # type: Optional[threading.Thread]
+        self.thread: Optional[threading.Thread] = None
 
     @property
     def max_entries(self):

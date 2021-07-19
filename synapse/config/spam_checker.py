@@ -34,7 +34,7 @@ class SpamCheckerConfig(Config):
     section = "spamchecker"
 
     def read_config(self, config, **kwargs):
-        self.spam_checkers = []  # type: List[Tuple[Any, Dict]]
+        self.spam_checkers: List[Tuple[Any, Dict]] = []
 
         spam_checkers = config.get("spam_checker") or []
         if isinstance(spam_checkers, dict):

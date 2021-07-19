@@ -39,7 +39,7 @@ class SSOConfig(Config):
     section = "sso"
 
     def read_config(self, config, **kwargs):
-        sso_config = config.get("sso") or {}  # type: Dict[str, Any]
+        sso_config: Dict[str, Any] = config.get("sso") or {}
 
         # The sso-specific template_dir
         self.sso_template_dir = sso_config.get("template_dir")

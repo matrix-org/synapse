@@ -256,7 +256,7 @@ def _setup_new_database(
         for database in databases
     )
 
-    directory_entries = []  # type: List[_DirectoryListing]
+    directory_entries: List[_DirectoryListing] = []
     for directory in directories:
         directory_entries.extend(
             _DirectoryListing(file_name, os.path.join(directory, file_name))
@@ -424,10 +424,10 @@ def _upgrade_existing_database(
             directories.append(os.path.join(schema_path, database, "delta", str(v)))
 
         # Used to check if we have any duplicate file names
-        file_name_counter = Counter()  # type: CounterType[str]
+        file_name_counter: CounterType[str] = Counter()
 
         # Now find which directories have anything of interest.
-        directory_entries = []  # type: List[_DirectoryListing]
+        directory_entries: List[_DirectoryListing] = []
         for directory in directories:
             logger.debug("Looking for schema deltas in %s", directory)
             try:

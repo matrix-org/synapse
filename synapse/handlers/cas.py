@@ -171,7 +171,7 @@ class CasHandler:
 
         # Iterate through the nodes and pull out the user and any extra attributes.
         user = None
-        attributes = {}  # type: Dict[str, List[Optional[str]]]
+        attributes: Dict[str, List[Optional[str]]] = {}
         for child in root[0]:
             if child.tag.endswith("user"):
                 user = child.text

@@ -117,7 +117,7 @@ class ConsentResource(DirectServeHtmlResource):
         has_consented = False
         public_version = username == ""
         if not public_version:
-            args = request.args  # type: Dict[bytes, List[bytes]]
+            args: Dict[bytes, List[bytes]] = request.args
             userhmac_bytes = parse_bytes_from_args(args, "h", required=True)
 
             self._check_hash(username, userhmac_bytes)
@@ -154,7 +154,7 @@ class ConsentResource(DirectServeHtmlResource):
         """
         version = parse_string(request, "v", required=True)
         username = parse_string(request, "u", required=True)
-        args = request.args  # type: Dict[bytes, List[bytes]]
+        args: Dict[bytes, List[bytes]] = request.args
         userhmac = parse_bytes_from_args(args, "h", required=True)
 
         self._check_hash(username, userhmac)

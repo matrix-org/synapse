@@ -83,7 +83,7 @@ class SamlHandler(BaseHandler):
         self.unstable_idp_brand = None
 
         # a map from saml session id to Saml2SessionData object
-        self._outstanding_requests_dict = {}  # type: Dict[str, Saml2SessionData]
+        self._outstanding_requests_dict: Dict[str, Saml2SessionData] = {}
 
         self._sso_handler = hs.get_sso_handler()
         self._sso_handler.register_identity_provider(self)
@@ -386,10 +386,10 @@ def dot_replace_for_mxid(username: str) -> str:
     return username
 
 
-MXID_MAPPER_MAP = {
+MXID_MAPPER_MAP: Dict[str, Callable[[str], str]] = {
     "hexencode": map_username_to_mxid_localpart,
     "dotreplace": dot_replace_for_mxid,
-}  # type: Dict[str, Callable[[str], str]]
+}
 
 
 @attr.s

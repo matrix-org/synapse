@@ -61,11 +61,11 @@ class UploadResource(DirectServeJsonResource):
                 errcode=Codes.TOO_LARGE,
             )
 
-        args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
         upload_name_bytes = parse_bytes_from_args(args, "filename")
         if upload_name_bytes:
             try:
-                upload_name = upload_name_bytes.decode("utf8")  # type: Optional[str]
+                upload_name: Optional[str] = upload_name_bytes.decode("utf8")
             except UnicodeDecodeError:
                 raise SynapseError(
                     msg="Invalid UTF-8 filename parameter: %r" % (upload_name), code=400
@@ -89,7 +89,7 @@ class UploadResource(DirectServeJsonResource):
         # TODO(markjh): parse content-dispostion
 
         try:
-            content = request.content  # type: IO  # type: ignore
+            content: IO = request.content  # type: ignore
             content_uri = await self.media_repo.create_content(
                 media_type, upload_name, content, content_length, requester.user
             )

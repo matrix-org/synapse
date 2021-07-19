@@ -707,9 +707,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         See accept_invite, join_group.
         """
         if not self.hs.is_mine_id(user_id):
-            local_attestation = self.attestations.create_attestation(
-                group_id, user_id
-            )  # type: Optional[JsonDict]
+            local_attestation: Optional[
+                JsonDict
+            ] = self.attestations.create_attestation(group_id, user_id)
 
             remote_attestation = content["attestation"]
 
@@ -868,9 +868,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 remote_attestation, user_id=requester_user_id, group_id=group_id
             )
 
-            local_attestation = self.attestations.create_attestation(
-                group_id, requester_user_id
-            )  # type: Optional[JsonDict]
+            local_attestation: Optional[
+                JsonDict
+            ] = self.attestations.create_attestation(group_id, requester_user_id)
         else:
             local_attestation = None
             remote_attestation = None
