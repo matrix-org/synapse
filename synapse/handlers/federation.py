@@ -1715,18 +1715,12 @@ class FederationHandler(BaseHandler):
                     )
 
                 if include_auth_user_id:
-                    authorised_user_id = (
-                        await self._event_auth_handler.get_user_which_could_invite(
-                            room_id,
-                            state_ids,
-                        )
+                    event_content[
+                        "join_authorised_via_users_server"
+                    ] = await self._event_auth_handler.get_user_which_could_invite(
+                        room_id,
+                        state_ids,
                     )
-                    if authorised_user_id:
-                        event_content[
-                            "join_authorised_via_users_server"
-                        ] = authorised_user_id
-
-                    # TODO What if there's no authorised user?
 
         builder = self.event_builder_factory.new(
             room_version.identifier,

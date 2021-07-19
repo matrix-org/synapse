@@ -20,7 +20,7 @@ from synapse.api.constants import (
     Membership,
     RestrictedJoinRuleTypes,
 )
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
@@ -92,7 +92,7 @@ class EventAuthHandler:
 
     async def get_user_which_could_invite(
         self, room_id: str, current_state_ids: StateMap[str]
-    ) -> Optional[str]:
+    ) -> str:
         """
         Searches the room state for a local user who has the power level necessary
         to invite other users.
@@ -132,8 +132,8 @@ class EventAuthHandler:
         if chosen_user:
             return chosen_user
 
-        # TODO What to do if no user is found?
-        return None
+        # No user was found.
+        raise SynapseError(400, "Unable to find a user which could issue an invite")
 
     async def check_host_in_room(self, room_id: str, host: str) -> bool:
         with Measure(self._clock, "check_host_in_room"):

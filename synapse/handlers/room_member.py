@@ -916,13 +916,12 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # If this is going to be a local join, additional information must
         # be included in the event content in order to efficiently validate
         # the event.
-        authorised_user_id = await self.event_auth_handler.get_user_which_could_invite(
+        content[
+            "join_authorised_via_users_server"
+        ] = await self.event_auth_handler.get_user_which_could_invite(
             room_id,
             current_state_ids,
         )
-        if authorised_user_id:
-            content["join_authorised_via_users_server"] = authorised_user_id
-        # TODO If no authorised user is found then something bad happened.
 
         return False, []
 
