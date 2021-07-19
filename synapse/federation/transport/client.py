@@ -1135,8 +1135,8 @@ class SendJoinResponse:
 
 @ijson.coroutine
 def _event_parser(event_dict: JsonDict):
-    """Helper function for use with `ijson.items_coro` to parse an array of
-    events and add them to the given list.
+    """Helper function for use with `ijson.kvitems_coro` to parse key-value pairs
+    to add them to a given dictionary.
     """
 
     while True:
