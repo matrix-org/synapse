@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Collection, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Collection, List, Optional, Union
 
 from synapse import event_auth
 from synapse.api.constants import (
@@ -122,17 +122,15 @@ class EventAuthHandler:
 
         # Find the user with the highest power level.
         users_in_room = await self._store.get_users_in_room(room_id)
-        # A tuple of the chosen user's MXID and power level.
-        chosen_user: Optional[Tuple[str, int]] = None
-        for user in users_in_room:
-            user_level = users.get(user, users_default_level)
-            if user_level >= invite_level:
-                if chosen_user is None or user_level >= chosen_user[1]:
-                    chosen_user = (user, user_level)
+        chosen_user = max(
+            users_in_room,
+            key=lambda user: users.get(user, users_default_level),
+            default=None,
+        )
 
         # Return the chosen user.
         if chosen_user:
-            return chosen_user[0]
+            return chosen_user
 
         # TODO What to do if no user is found?
         return None
