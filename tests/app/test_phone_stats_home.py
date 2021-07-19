@@ -194,8 +194,10 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # (give time for tables to be updated)
         self.reactor.advance(300)
 
+        store = self.hs.get_datastore()
+
         # Check the R30 results do not count that user.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
@@ -208,7 +210,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(600)
 
         # (Make sure the user isn't somehow counted by this point.)
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
@@ -221,7 +223,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(300)
 
         # *Now* the user is counted.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 1, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
@@ -231,7 +233,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(1)
 
         # Check the user is still counted.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 1, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
@@ -240,7 +242,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self._advance_to(first_post_at + 60 * ONE_DAY_IN_SECONDS + 5)
 
         # Check the user is now no longer counted in R30.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
@@ -269,8 +271,10 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         self.reactor.advance(400)
 
+        store = self.hs.get_datastore()
+
         # Check the user does not contribute to R30 yet.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
@@ -285,7 +289,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
             self.reactor.advance(400)
 
             # Notice that the user *still* does not contribute to R30!
-            r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+            r30_results = self.get_success(store.count_r30v2_users())
             self.assertEqual(
                 r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
             )
@@ -300,7 +304,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(400)
 
         # *Now* the user appears in R30.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 1, "android": 1, "electron": 0, "ios": 0, "web": 0}
         )
