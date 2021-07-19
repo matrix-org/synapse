@@ -3,7 +3,7 @@ import time
 from logging import Handler, LogRecord
 from logging.handlers import MemoryHandler
 from threading import Thread
-from typing import Optional
+from typing import Any, Optional
 
 from twisted.internet import reactor
 
@@ -39,11 +39,17 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         def on_reactor_running():
             self._reactor_started = True
 
-        reactor.callWhenRunning(on_reactor_running)
+        # XXX this ugly dummy assignment appeases mypy, otherwise mypy says:
+        # (error: Module has no attribute "callWhenRunning" [attr-defined])
+        _reactor: Any = reactor
+
+        # call our hook when the reactor start up
+        _reactor.callWhenRunning(on_reactor_running)
 
     def shouldFlush(self, record: LogRecord) -> bool:
         """
         Before reactor start-up, log everything immediately.
+        Otherwise, fall back to original behaviour of waiting for the buffer to fill.
         """
 
         if self._reactor_started:
