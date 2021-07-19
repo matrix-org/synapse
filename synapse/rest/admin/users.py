@@ -357,7 +357,7 @@ class UserRegisterServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
-        self.nonces = {}  # type: Dict[str, int]
+        self.nonces: Dict[str, int] = {}
         self.hs = hs
 
     def _clear_old_nonces(self):

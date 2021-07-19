@@ -89,7 +89,7 @@ class ModuleApi:
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
         self._state = hs.get_state_handler()
-        self._clock = hs.get_clock()  # type: Clock
+        self._clock: Clock = hs.get_clock()
         self._send_email_handler = hs.get_send_email_handler()
 
         try:

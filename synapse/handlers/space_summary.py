@@ -90,14 +90,14 @@ class SpaceSummaryHandler:
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
         # rooms we have already processed
-        processed_rooms = set()  # type: Set[str]
+        processed_rooms: Set[str] = set()
 
         # events we have already processed. We don't necessarily have their event ids,
         # so instead we key on (room id, state key)
-        processed_events = set()  # type: Set[Tuple[str, str]]
+        processed_events: Set[Tuple[str, str]] = set()
 
-        rooms_result = []  # type: List[JsonDict]
-        events_result = []  # type: List[JsonDict]
+        rooms_result: List[JsonDict] = []
+        events_result: List[JsonDict] = []
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             queue_entry = room_queue.popleft()
@@ -272,10 +272,10 @@ class SpaceSummaryHandler:
         # the set of rooms that we should not walk further. Initialise it with the
         # excluded-rooms list; we will add other rooms as we process them so that
         # we do not loop.
-        processed_rooms = set(exclude_rooms)  # type: Set[str]
+        processed_rooms: Set[str] = set(exclude_rooms)
 
-        rooms_result = []  # type: List[JsonDict]
-        events_result = []  # type: List[JsonDict]
+        rooms_result: List[JsonDict] = []
+        events_result: List[JsonDict] = []
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             room_id = room_queue.popleft()
@@ -353,7 +353,7 @@ class SpaceSummaryHandler:
             max_children = MAX_ROOMS_PER_SPACE
 
         now = self._clock.time_msec()
-        events_result = []  # type: List[JsonDict]
+        events_result: List[JsonDict] = []
         for edge_event in itertools.islice(child_events, max_children):
             events_result.append(
                 await self._event_serializer.serialize_event(
