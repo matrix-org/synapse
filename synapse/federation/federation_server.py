@@ -765,8 +765,7 @@ class FederationServer(FederationBase):
             if authorising_server != self.server_name:
                 raise SynapseError(
                     400,
-                    "Cannot authorise request from resident server: %s"
-                    % (authorising_server,),
+                    f"Cannot authorise request from resident server: {authorising_server}",
                 )
 
             event.signatures.update(
