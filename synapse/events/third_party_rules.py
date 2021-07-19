@@ -245,7 +245,13 @@ class ThirdPartyEventRules:
             try:
                 await callback(requester, config, is_requester_admin)
             except Exception as e:
-                logger.warning("Failed to run callback %s: %s", callback, e)
+                # Don't silence the errors raised by this callback since we expect it to
+                # raise an exception to deny the creation of the room; instead make sure
+                # it's a SynapseError we can send to clients.
+                if not isinstance(e, SynapseError):
+                    e = SynapseError(403, "Room creation forbidden with these parameters")
+
+                raise e
 
     async def check_threepid_can_be_invited(
         self, medium: str, address: str, room_id: str

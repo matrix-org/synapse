@@ -134,7 +134,19 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {"x": "x"},
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"500", channel.result)
+        # check_event_allowed has some error handling, so it shouldn't 500 just because a
+        # module did something bad.
+        self.assertEqual(channel.code, 200, channel.result)
+        event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        ev = channel.json_body
+        self.assertEqual(ev["content"]["x"], "x")
 
     def test_modify_event(self):
         """The module can return a modified version of the event"""
