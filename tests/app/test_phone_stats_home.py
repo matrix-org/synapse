@@ -347,16 +347,18 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
+        store = self.hs.get_datastore()
+
         # Check that the user does not contribute to R30v2, even though it's been
         # more than 30 days since registration.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
 
         # Check that this is a situation where old R30 differs:
         # old R30 DOES count this as 'retained'.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30_users())
+        r30_results = self.get_success(store.count_r30_users())
         self.assertEqual(r30_results, {"all": 1, "ios": 1})
 
         # Now we want to check that the user will still be able to appear in
@@ -369,7 +371,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # Check the user now satisfies the requirements to appear in R30v2.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 1, "ios": 1, "android": 0, "electron": 0, "web": 0}
         )
@@ -378,7 +380,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(27.5 * ONE_DAY_IN_SECONDS)
 
         # Check the user still appears in R30v2.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 1, "ios": 1, "android": 0, "electron": 0, "web": 0}
         )
@@ -387,7 +389,7 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.reactor.advance(ONE_DAY_IN_SECONDS)
 
         # Check the user no longer appears in R30v2.
-        r30_results = self.get_success(self.hs.get_datastore().count_r30v2_users())
+        r30_results = self.get_success(store.count_r30v2_users())
         self.assertEqual(
             r30_results, {"all": 0, "android": 0, "electron": 0, "ios": 0, "web": 0}
         )
