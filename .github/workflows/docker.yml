@@ -6,7 +6,7 @@ on:
   push:
     tags: ["v*"]
     branches: [ master, main ]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
