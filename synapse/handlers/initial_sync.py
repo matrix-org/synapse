@@ -21,6 +21,7 @@ from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
+from synapse.handlers.receipts import ReceiptEventSource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
@@ -126,6 +127,7 @@ class InitialSyncHandler(BaseHandler):
             joined_rooms,
             to_key=int(now_token.receipt_key),
         )
+        receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -422,8 +424,8 @@ class InitialSyncHandler(BaseHandler):
                 room_id, to_key=now_token.receipt_key
             )
             if not receipts:
-                receipts = []
-            return receipts
+                return []
+            return ReceiptEventSource.filter_out_hidden(receipts, user_id)
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
             defer.gatherResults(
