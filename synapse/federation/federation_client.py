@@ -708,13 +708,14 @@ class FederationClient(FederationBase):
         async def send_request(destination) -> SendJoinResult:
             response = await self._do_send_join(room_version, destination, pdu)
 
-            # If an event was returned:
+            # If an event was returned (and expected to be returned):
             #
-            # * Ensure it has the same event ID.
+            # * Ensure it has the same event ID (note that the event ID is a hash
+            #   of the event fields for versions which support MSC3083).
             # * Ensure the signatures are good.
             #
             # Otherwise, fallback to the provided event.
-            if response.event:
+            if room_version.msc3083_join_rules and response.event:
                 event = response.event
 
                 valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
