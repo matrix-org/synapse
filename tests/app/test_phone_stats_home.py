@@ -192,7 +192,8 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         self.helper.send(room_id, "message", tok=access_token)
         first_post_at = self.hs.get_clock().time()
 
-        # (give time for user_daily_visits table to be updated)
+        # Give time for user_daily_visits table to be updated.
+        # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         store = self.hs.get_datastore()
@@ -270,7 +271,8 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         )
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
-        # give time for user_daily_visits to update
+        # Give time for user_daily_visits table to be updated.
+        # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         store = self.hs.get_datastore()
@@ -341,7 +343,8 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         # the user returns for one day, perhaps just to check out a new feature
         self.helper.send(room_id, "message", tok=access_token, custom_headers=headers)
 
-        # (give time for tables to update)
+        # Give time for user_daily_visits table to be updated.
+        # (user_daily_visits is updated every 5 minutes using a looping call.)
         self.reactor.advance(FIVE_MINUTES_IN_SECONDS)
 
         # Check that the user does not contribute to R30v2, even though it's been
