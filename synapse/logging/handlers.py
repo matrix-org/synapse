@@ -1,9 +1,11 @@
 import logging
 import time
-from logging import Handler
+from logging import Handler, LogRecord
 from logging.handlers import MemoryHandler
 from threading import Thread
 from typing import Optional
+
+from twisted.internet import reactor
 
 
 class PeriodicallyFlushingMemoryHandler(MemoryHandler):
@@ -26,12 +28,28 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
 
         self._flush_period: float = period
         self._active: bool = True
+        self._reactor_started = False
 
         self._flushing_thread: Thread = Thread(
             name="PeriodicallyFlushingMemoryHandler flushing thread",
             target=self._flush_periodically,
         )
         self._flushing_thread.start()
+
+        def on_reactor_running():
+            self._reactor_started = True
+
+        reactor.callWhenRunning(on_reactor_running)
+
+    def shouldFlush(self, record: LogRecord) -> bool:
+        """
+        Before reactor start-up, log everything immediately.
+        """
+
+        if self._reactor_started:
+            return super().shouldFlush(record)
+        else:
+            return True
 
     def _flush_periodically(self):
         """
