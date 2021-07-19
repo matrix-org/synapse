@@ -38,7 +38,29 @@ class LegacyThirdPartyRulesTestModule:
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
     ):
+        return True
+
+    async def check_event_allowed(self, event: EventBase, state: StateMap[EventBase]):
+        return True
+
+    @staticmethod
+    def parse_config(config):
+        return config
+
+
+class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
+    def __init__(self, config: Dict, module_api: ModuleApi):
+        super().__init__(config, module_api)
+
+    def on_create_room(
+        self, requester: Requester, config: dict, is_requester_admin: bool
+    ):
         return False
+
+
+class LegacyChangeEvents(LegacyThirdPartyRulesTestModule):
+    def __init__(self, config: Dict, module_api: ModuleApi):
+        super().__init__(config, module_api)
 
     async def check_event_allowed(self, event: EventBase, state: StateMap[EventBase]):
         d = event.get_dict()
@@ -46,10 +68,6 @@ class LegacyThirdPartyRulesTestModule:
         content["foo"] = "bar"
         d["content"] = content
         return d
-
-    @staticmethod
-    def parse_config(config):
-        return config
 
 
 class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
@@ -264,7 +282,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {
             "third_party_event_rules": {
-                "module": __name__ + ".LegacyThirdPartyRulesTestModule",
+                "module": __name__ + ".LegacyChangeEvents",
                 "config": {},
             }
         }
@@ -299,7 +317,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
     @unittest.override_config(
         {
             "third_party_event_rules": {
-                "module": __name__ + ".LegacyThirdPartyRulesTestModule",
+                "module": __name__ + ".LegacyDenyNewRooms",
                 "config": {},
             }
         }
