@@ -5,7 +5,7 @@ from logging.handlers import MemoryHandler
 from threading import Thread
 from typing import Optional
 
-from twisted.internet import reactor
+from twisted.internet.interfaces import IReactorCore
 
 
 class PeriodicallyFlushingMemoryHandler(MemoryHandler):
@@ -14,6 +14,9 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
     thread to periodically flush the buffer.
 
     This prevents messages from being buffered for too long.
+
+    Additionally, all messages will be immediately flushed if the reactor has
+    not yet been started.
     """
 
     def __init__(
@@ -23,7 +26,16 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         target: Optional[Handler] = None,
         flushOnClose: bool = True,
         period: float = 5.0,
+        reactor: Optional[IReactorCore] = None,
     ) -> None:
+        """
+        period: the period between automatic flushes
+
+        reactor: if specified, a custom reactor to use. If not specifies,
+            defaults to the globally-installed reactor.
+            Log entries will be flushed immediately until this reactor has
+            started.
+        """
         super().__init__(capacity, flushLevel, target, flushOnClose)
 
         self._flush_period: float = period
@@ -39,8 +51,16 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         def on_reactor_running():
             self._reactor_started = True
 
+        reactor_to_use: IReactorCore
+        if reactor is None:
+            from twisted.internet import reactor as global_reactor
+
+            reactor_to_use = global_reactor  # type: ignore[assignment]
+        else:
+            reactor_to_use = reactor
+
         # call our hook when the reactor start up
-        reactor.callWhenRunning(on_reactor_running)  # type: ignore[attr-defined]
+        reactor_to_use.callWhenRunning(on_reactor_running)
 
     def shouldFlush(self, record: LogRecord) -> bool:
         """
