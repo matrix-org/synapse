@@ -161,10 +161,10 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
         login.register_servlets,
     ]
 
-    def _advance_to(self, desired_time: float):
+    def _advance_to(self, desired_time_secs: float):
         now = self.hs.get_clock().time()
-        assert now < desired_time
-        self.reactor.advance(desired_time - now)
+        assert now < desired_time_secs
+        self.reactor.advance(desired_time_secs - now)
 
     def make_homeserver(self, reactor, clock):
         hs = super(PhoneHomeR30V2TestCase, self).make_homeserver(reactor, clock)
