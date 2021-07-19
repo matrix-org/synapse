@@ -344,3 +344,15 @@ jobs:
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement
+
+  # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
+  tests-done:
+    needs:
+      - trial
+      - trial-olddeps
+      - sytest
+      - portdb
+      - complement
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"    
