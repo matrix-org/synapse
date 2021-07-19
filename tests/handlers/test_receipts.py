@@ -286,5 +286,5 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
         """Tests that the _filter_out_hidden returns the expected output"""
-        filtered_events = self.event_source._filter_out_hidden(events, "@me:server.org")
+        filtered_events = self.event_source.filter_out_hidden(events, "@me:server.org")
         self.assertEquals(filtered_events, expected_output)

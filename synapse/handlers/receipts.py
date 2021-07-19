@@ -162,9 +162,8 @@ class ReceiptEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
-    def _filter_out_hidden(
-        self, events: List[JsonDict], user_id: str
-    ) -> List[JsonDict]:
+    @staticmethod
+    def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
         visible_events = []
 
         # filter out hidden receipts the user shouldn't see
@@ -214,7 +213,7 @@ class ReceiptEventSource:
         events = await self.store.get_linearized_receipts_for_rooms(
             room_ids, from_key=from_key, to_key=to_key
         )
-        filtered_events = self._filter_out_hidden(events, user.to_string())
+        filtered_events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
         return (filtered_events, to_key)
 
