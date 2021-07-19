@@ -376,14 +376,14 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                         FROM
                             user_daily_visits
                         WHERE
-                            timestamp > (CAST(? AS BIGINT) * 1000)
+                            timestamp > ?
                             AND
-                            timestamp < (CAST(? AS BIGINT) * 1000)
+                            timestamp < ?
                         GROUP BY
                             user_id,
                             client_type
                         HAVING
-                            max(timestamp) - min(timestamp) > (CAST(? AS BIGINT) * 1000)
+                            max(timestamp) - min(timestamp) > ?
                     ) AS temp
                 GROUP BY
                     client_type
@@ -395,7 +395,11 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
             results = {"ios": 0, "android": 0, "web": 0, "electron": 0}
             txn.execute(
                 sql,
-                (sixty_days_ago_in_secs, one_day_from_now_in_secs, thirty_days_in_secs),
+                (
+                    sixty_days_ago_in_secs * 1000,
+                    one_day_from_now_in_secs * 1000,
+                    thirty_days_in_secs * 1000,
+                ),
             )
 
             for row in txn:
@@ -411,13 +415,13 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     FROM
                         user_daily_visits
                     WHERE
-                        timestamp > CAST(? AS BIGINT)
+                        timestamp > ?
                         AND
-                        timestamp < CAST(? AS BIGINT)
+                        timestamp < ?
                     GROUP BY
                         user_id
                     HAVING
-                        max(timestamp) - min(timestamp) > CAST(? AS BIGINT)
+                        max(timestamp) - min(timestamp) > ?
                 ) AS r30_users
             """
 
