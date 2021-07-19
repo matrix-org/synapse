@@ -1122,9 +1122,14 @@ def _create_v2_path(path, *args):
 class SendJoinResponse:
     """The parsed response of a `/send_join` request."""
 
+    # The list of auth events from the /send_join response.
     auth_events: List[EventBase]
+    # The list of state from the /send_join response.
     state: List[EventBase]
+    # The raw join event from the /send_join response.
     event_dict: JsonDict
+    # The parsed join event from the /send_join response. This will be None if
+    # "event" is not included in the response.
     event: Optional[EventBase] = None
 
 
