@@ -52,7 +52,7 @@
       - [Purge History](admin_api/purge_history_api.md)
       - [Purge Rooms](admin_api/purge_room.md)
       - [Register Users](admin_api/register_api.md)
-      - [Registration Tokens](admin_api/registration_tokens.md)
+      - [Registration Tokens](usage/administration/admin_api/registration_tokens.md)
       - [Manipulate Room Membership](admin_api/room_membership.md)
       - [Rooms](admin_api/rooms.md)
       - [Server Notices](admin_api/server_notices.md)
