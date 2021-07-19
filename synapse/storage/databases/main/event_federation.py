@@ -1252,17 +1252,39 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         referenced_events: Set[str] = set()
         seen_events: Set[str] = set()
         for row in rows:
-            seen_events.add(row["event_id"])
+            event_id = row["event_id"]
+            seen_events.add(event_id)
             event_d = db_to_json(row["event_json"])
 
             # We don't bother parsing the dicts into full blown event objects,
             # as that is needlessly expensive.
+
+            # We haven't checked that the `prev_events` have the right format
+            # yet, so we check as we go.
+            prev_events = event_d.get("prev_events", [])
+            if not isinstance(prev_events, list):
+                logger.info("Invalid prev_events for %s", event_id)
+                continue
+
             if room_version.event_format == EventFormatVersions.V1:
-                referenced_events.update(
-                    event_id for event_id, _ in event_d.get("prev_events", [])
-                )
+                for prev_event_tuple in prev_events:
+                    if not isinstance(prev_event_tuple, list) or len(prev_events) != 2:
+                        logger.info("Invalid prev_events for %s", event_id)
+                        break
+
+                    prev_event_id = prev_event_tuple[0]
+                    if not isinstance(prev_event_id, str):
+                        logger.info("Invalid prev_events for %s", event_id)
+                        break
+
+                    referenced_events.add(prev_event_id)
             else:
-                referenced_events.update(event_d.get("prev_events", []))
+                for prev_event_id in prev_events:
+                    if not isinstance(prev_event_id, str):
+                        logger.info("Invalid prev_events for %s", event_id)
+                        break
+
+                    referenced_events.add(prev_event_id)
 
         to_delete = referenced_events & seen_events
         if not to_delete:
