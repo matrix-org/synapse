@@ -1238,7 +1238,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # If the queue is too large, then we want clear the entire queue,
         # keeping only the forward extremities (i.e. the events not referenced
-        # by other events in the queue). We do this as that we can always
+        # by other events in the queue). We do this so that we can always
         # backpaginate in all the events we have dropped.
         rows = await self.db_pool.simple_select_list(
             table="federation_inbound_events_staging",
