@@ -75,6 +75,9 @@ class Codes:
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     BAD_ALIAS = "M_BAD_ALIAS"
+    # For restricted join rules.
+    UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
+    CANNOT_ALLOW = "M_CANNOT_ALLOW"
 
 
 class CodeMessageException(RuntimeError):

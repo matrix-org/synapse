@@ -20,11 +20,11 @@ from synapse.api.constants import (
     Membership,
     RestrictedJoinRuleTypes,
 )
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.types import StateMap
+from synapse.types import StateMap, get_domain_from_id
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -39,6 +39,7 @@ class EventAuthHandler:
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self._store = hs.get_datastore()
+        self._server_name = hs.hostname
 
     async def check_from_context(
         self, room_version: str, event, context, do_sig_check=True
@@ -133,7 +134,9 @@ class EventAuthHandler:
             return chosen_user
 
         # No user was found.
-        raise SynapseError(400, "Unable to find a user which could issue an invite")
+        raise SynapseError(
+            400, "Unable to find a user which could issue an invite", Codes.CANNOT_ALLOW
+        )
 
     async def check_host_in_room(self, room_id: str, host: str) -> bool:
         with Measure(self._clock, "check_host_in_room"):
@@ -179,6 +182,18 @@ class EventAuthHandler:
         # in any of them.
         allowed_rooms = await self.get_rooms_that_allow_join(state_ids)
         if not await self.is_user_in_rooms(allowed_rooms, user_id):
+
+            # If this is a remote request, the user might be in an allowed room
+            # that we do not know about.
+            if get_domain_from_id(user_id) != self._server_name:
+                for room_id in allowed_rooms:
+                    if not await self._store.is_host_joined(room_id, self._server_name):
+                        raise SynapseError(
+                            400,
+                            f"Unable to check if {user_id} is in allowed rooms.",
+                            Codes.UNABLE_AUTHORISE_JOIN,
+                        )
+
             raise AuthError(
                 403,
                 "You do not belong to any of the required rooms to join this room.",
