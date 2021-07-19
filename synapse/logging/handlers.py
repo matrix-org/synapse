@@ -39,6 +39,7 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         """
 
         while self._active:
+            # flush is thread-safe; it acquires and releases the lock internally
             self.flush()
             time.sleep(self._flush_period)
 
