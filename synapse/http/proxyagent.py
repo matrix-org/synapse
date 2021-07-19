@@ -244,7 +244,7 @@ class ProxyAgent(_AgentBase):
                 self._reactor, parsed_uri.host, parsed_uri.port, **self._endpoint_kwargs
             )
 
-        logger.debug(f"Requesting {uri} via {endpoint}")
+        logger.debug(f"Requesting {uri !s} via {endpoint !s}")
 
         if parsed_uri.scheme == b"https":
             tls_connection_creator = self._policy_for_https.creatorForNetloc(
@@ -338,7 +338,7 @@ def parse_proxy(
 
     if url.scheme not in (b"http", b"https"):
         raise RuntimeError(
-            f"Unknown proxy scheme {url.scheme}; only 'http' and 'https' is supported."
+            f"Unknown proxy scheme {url.scheme !s}; only 'http' and 'https' is supported."
         )
 
     credentials = None

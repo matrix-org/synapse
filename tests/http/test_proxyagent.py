@@ -247,7 +247,7 @@ class MatrixFederationAgentTests(TestCase):
             self.assertEqual(
                 server_name,
                 expected_sni,
-                f"Expected SNI {expected_sni} but got {server_name}",
+                f"Expected SNI {expected_sni !s} but got {server_name !s}",
             )
 
         return http_protocol
@@ -583,7 +583,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            f"Expected SNI {expected_sni} but got {server_name}",
+            f"Expected SNI {expected_sni !s} but got {server_name !s}",
         )
 
         # now there should be a pending request
@@ -720,7 +720,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            f"Expected SNI {expected_sni} but got {server_name}",
+            f"Expected SNI {expected_sni !s} but got {server_name !s}",
         )
 
         # now there should be a pending request
