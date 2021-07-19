@@ -68,8 +68,6 @@ ENV LANG C.UTF-8
 #
 # NB: keep this list in sync with the list of build-deps in debian/control
 # TODO: it would be nice to do that automatically.
-# TODO: Remove the dh-systemd stanza after dropping support for Ubuntu xenial
-#       it's a transitional package on all other, more recent releases
 RUN apt-get update -qq -o Acquire::Languages=none \
     && env DEBIAN_FRONTEND=noninteractive apt-get install \
         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
@@ -85,10 +83,7 @@ RUN apt-get update -qq -o Acquire::Languages=none \
         python3-venv \
         sqlite3 \
         libpq-dev \
-        xmlsec1 \
-    && ( env DEBIAN_FRONTEND=noninteractive apt-get install \
-         -yqq --no-install-recommends -o Dpkg::Options::=--force-unsafe-io \
-         dh-systemd || true )
+        xmlsec1
 
 COPY --from=builder /dh-virtualenv_1.2~dev-1_all.deb /
 
