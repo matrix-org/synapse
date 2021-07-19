@@ -384,8 +384,6 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                     ) AS temp
                 GROUP BY
                     client_type
-                ORDER BY
-                    client_type
                 ;
             """
 
