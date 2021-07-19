@@ -180,7 +180,12 @@ async def _check_sigs_on_pdu(
 
     # If this is a join event for a restricted room it may have been authorised
     # via a different server from the sending server. Check those signatures.
-    if room_version.msc3083_join_rules and _is_invite_via_allow_rule(pdu):
+    if (
+        room_version.msc3083_join_rules
+        and pdu.type == EventTypes.Member
+        and pdu.membership == Membership.JOIN
+        and "join_authorised_via_users_server" in pdu.content
+    ):
         authorising_server = get_domain_from_id(
             pdu.content["join_authorised_via_users_server"]
         )
@@ -207,14 +212,6 @@ def _is_invite_via_3pid(event: EventBase) -> bool:
         event.type == EventTypes.Member
         and event.membership == Membership.INVITE
         and "third_party_invite" in event.content
-    )
-
-
-def _is_invite_via_allow_rule(event: EventBase) -> bool:
-    return (
-        event.type == EventTypes.Member
-        and event.membership == Membership.JOIN
-        and "join_authorised_via_users_server" in event.content
     )
 
 
