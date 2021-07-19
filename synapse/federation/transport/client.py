@@ -1189,7 +1189,8 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
         return len(data)
 
     def finish(self) -> SendJoinResponse:
-        self._response.event = make_event_from_dict(
-            self._response.event_dict, self._room_version
-        )
+        if self._response.event_dict:
+            self._response.event = make_event_from_dict(
+                self._response.event_dict, self._room_version
+            )
         return self._response
