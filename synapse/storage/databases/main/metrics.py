@@ -346,10 +346,6 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
                             user_id,
                             CASE
                                 WHEN
-                                    user_agent IS NULL OR
-                                    user_agent = ''
-                                    THEN 'unknown'
-                                WHEN
                                     LOWER(user_agent) LIKE '%%riot%%' OR
                                     LOWER(user_agent) LIKE '%%element%%'
                                     THEN CASE
