@@ -326,7 +326,14 @@ class ServerMetricsStore(EventPushActionsWorkerStore, SQLBaseStore):
         (This is the second version of this metric, hence R30'v2')
 
         Returns:
-             A mapping of counts globally as well as broken out by platform.
+             A mapping from client type to the number of 30-day retained users for that client.
+
+             The dict keys are:
+              - "all" (a combined number of users across any and all clients)
+              - "android" (Element Android)
+              - "ios" (Element iOS)
+              - "electron" (Element Desktop)
+              - "web" (any web application -- it's not possible to distinguish Element Web here)
         """
 
         def _count_r30v2_users(txn):
