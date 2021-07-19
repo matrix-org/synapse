@@ -175,8 +175,6 @@ class PhoneHomeR30V2TestCase(HomeserverTestCase):
 
         # This starts the needed data collection that we rely on to calculate
         # R30v2 metrics.
-        # REVIEW: would I be better off just starting the looping call for
-        # populating user_daily_visits itself?
         start_phone_stats_home(hs)
         return hs
 
