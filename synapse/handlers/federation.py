@@ -1494,10 +1494,10 @@ class FederationHandler(BaseHandler):
                 host_list, event, room_version_obj
             )
 
-            event = ret["event"]
-            origin = ret["origin"]
-            state = ret["state"]
-            auth_chain = ret["auth_chain"]
+            event = ret.event
+            origin = ret.origin
+            state = ret.state
+            auth_chain = ret.auth_chain
             auth_chain.sort(key=lambda e: e.depth)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)

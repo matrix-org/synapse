@@ -35,7 +35,6 @@ from typing import (
 
 import attr
 from prometheus_client import Counter
-from typing_extensions import TypedDict
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import (
@@ -80,8 +79,11 @@ class InvalidResponseError(RuntimeError):
     """
 
 
-class SendJoinResult(TypedDict):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class SendJoinResult:
+    # The event to persist.
     event: EventBase
+    # A string giving the server the event was sent to.
     origin: str
     state: List[EventBase]
     auth_chain: List[EventBase]
@@ -696,11 +698,7 @@ class FederationClient(FederationBase):
                 did the make_join)
 
         Returns:
-            a dict with members:
-                event: The event to persist.
-                origin: A string giving the server the event was sent to.
-                state (?)
-                auth_chain
+            The result of the send join request.
 
         Raises:
             SynapseError: if the chosen remote server returns a 300/400 code, or
@@ -812,12 +810,12 @@ class FederationClient(FederationBase):
                     % (auth_chain_create_events,)
                 )
 
-            return {
-                "event": event,
-                "state": signed_state,
-                "auth_chain": signed_auth,
-                "origin": destination,
-            }
+            return SendJoinResult(
+                event=event,
+                state=signed_state,
+                auth_chain=signed_auth,
+                origin=destination,
+            )
 
         return await self._try_destination_list("send_join", destinations, send_request)
 
