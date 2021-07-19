@@ -209,7 +209,7 @@ def parse_string(
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
-    args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+    args: Dict[bytes, List[bytes]] = request.args  # type: ignore
     return parse_string_from_args(
         args,
         name,
