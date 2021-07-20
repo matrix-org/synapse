@@ -43,6 +43,16 @@ HTTPFactory = Factory.forProtocol(HTTPChannel)
 class ProxyParserTests(TestCase):
     @parameterized.expand(
         [
+            """
+            Values for test
+            [
+                proxy_string,
+                expected_scheme,
+                expected_hostname,
+                expected_port,
+                expected_credentials,
+            ]
+            """
             # host
             [b"localhost", b"http", b"localhost", 1080, None],
             [b"localhost:9988", b"http", b"localhost", 9988, None],
@@ -166,16 +176,34 @@ class ProxyParserTests(TestCase):
     )
     def test_parse_proxy(
         self,
-        proxy: bytes,
-        scheme: bytes,
-        hostname: bytes,
-        port: int,
-        credentials: Optional[bytes],
+        proxy_string: bytes,
+        expected_scheme: bytes,
+        expected_hostname: bytes,
+        expected_port: int,
+        expected_credentials: Optional[bytes],
     ):
-        cred = None
-        if credentials:
-            cred = ProxyCredentials(credentials)
-        self.assertEqual((scheme, hostname, port, cred), parse_proxy(proxy))
+        """
+        Tests that a given proxy URL will be broken into the components.
+        Args:
+            proxy_string: The proxy connection string.
+            expected_scheme: Expected value of proxy scheme.
+            expected_hostname: Expected value of proxy hostname.
+            expected_port: Expected value of proxy port.
+            expected_credentials: Expected value of credentials.
+                Must be in form '<username>:<password>' or None
+        """
+        proxy_cred = None
+        if expected_credentials:
+            proxy_cred = ProxyCredentials(expected_credentials)
+        self.assertEqual(
+            (
+                expected_scheme,
+                expected_hostname,
+                expected_port,
+                proxy_cred,
+            ),
+            parse_proxy(proxy_string),
+        )
 
 
 class MatrixFederationAgentTests(TestCase):

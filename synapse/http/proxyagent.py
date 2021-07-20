@@ -14,9 +14,12 @@
 import base64
 import logging
 import re
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlparse
-from urllib.request import getproxies_environment, proxy_bypass_environment
+from urllib.request import (  # type: ignore[attr-defined]
+    getproxies_environment,
+    proxy_bypass_environment,
+)
 
 import attr
 from zope.interface import implementer
@@ -112,7 +115,7 @@ class ProxyAgent(_AgentBase):
         else:
             self.proxy_reactor = proxy_reactor
 
-        self._endpoint_kwargs = {}
+        self._endpoint_kwargs: Dict[str, Any] = {}
         if connectTimeout is not None:
             self._endpoint_kwargs["timeout"] = connectTimeout
         if bindAddress is not None:
@@ -243,7 +246,7 @@ class ProxyAgent(_AgentBase):
                 self._reactor, parsed_uri.host, parsed_uri.port, **self._endpoint_kwargs
             )
 
-        logger.debug(f"Requesting {uri !s} via {endpoint !s}")
+        logger.debug("Requesting %s via %s", uri, endpoint)
 
         if parsed_uri.scheme == b"https":
             tls_connection_creator = self._policy_for_https.creatorForNetloc(
@@ -309,7 +312,7 @@ def parse_proxy(
 ) -> Tuple[bytes, bytes, int, Optional[ProxyCredentials]]:
     """
     Parse a proxy connection string.
-    
+
     Given a HTTP proxy URL, breaks it down into components and checks that it
     has a hostname (otherwise it is not useful to us when trying to find a
     proxy) and asserts that the URL has a scheme we support.
