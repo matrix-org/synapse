@@ -1,0 +1,1 @@
+Fix error while dropping locks on shutdown. Introduced in v1.38.0.
