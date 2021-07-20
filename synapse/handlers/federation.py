@@ -1934,7 +1934,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
 
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
+        event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
         if not event_allowed:
@@ -2026,7 +2026,7 @@ class FederationHandler(BaseHandler):
         # for knock events, we run the third-party event rules. It's not entirely clear
         # why we don't do this for other sorts of membership events.
         if event.membership == Membership.KNOCK:
-            event_allowed = await self.third_party_event_rules.check_event_allowed(
+            event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
                 event, context
             )
             if not event_allowed:
