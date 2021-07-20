@@ -307,7 +307,6 @@ def _parse_string_value(
 def parse_strings_from_args(
     args: Mapping[bytes, Sequence[bytes]],
     name: str,
-    default: Optional[List[str]] = None,
     *,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
@@ -319,7 +318,18 @@ def parse_strings_from_args(
 def parse_strings_from_args(
     args: Mapping[bytes, Sequence[bytes]],
     name: str,
-    default: Optional[List[str]] = None,
+    default: List[str],
+    *,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> List[str]:
+    ...
+
+
+@overload
+def parse_strings_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
     *,
     required: Literal[True],
     allowed_values: Optional[Iterable[str]] = None,
