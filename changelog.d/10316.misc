@@ -1,1 +1,0 @@
-Rebuild event context and auth when processing specific results from `ThirdPartyEventRules` modules.

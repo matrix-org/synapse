@@ -98,3 +98,16 @@ class LockTestCase(unittest.HomeserverTestCase):
 
         lock2 = self.get_success(self.store.try_acquire_lock("name", "key"))
         self.assertIsNotNone(lock2)
+
+    def test_shutdown(self):
+        """Test that shutting down Synapse releases the locks"""
+        # Acquire two locks
+        lock = self.get_success(self.store.try_acquire_lock("name", "key1"))
+        self.assertIsNotNone(lock)
+        lock2 = self.get_success(self.store.try_acquire_lock("name", "key2"))
+        self.assertIsNotNone(lock2)
+
+        # Now call the shutdown code
+        self.get_success(self.store._on_shutdown())
+
+        self.assertEqual(self.store._live_tokens, {})
