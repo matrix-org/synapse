@@ -381,12 +381,12 @@ class RoomListHandler(BaseHandler):
                     Codes.UNRECOGNIZED,
                     Codes.NOT_FOUND,
                 ):
-                    # Not an error that should trigger a fallback.
                     logger.debug("Falling back to locally-filtered /publicRooms")
                 else:
                     # Not an error that should trigger a fallback.
                     raise SynapseError(502, "Failed to fetch room list")
             except RequestSendFailed:
+                # Not an error that should trigger a fallback.
                 raise SynapseError(502, "Failed to fetch room list")
 
             # if we reach this point, then we fall back to the situation where
