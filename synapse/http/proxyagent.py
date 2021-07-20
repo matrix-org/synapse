@@ -93,7 +93,8 @@ class ProxyAgent(_AgentBase):
             from conventional environment variables.
 
     Raises:
-        ValueError if use_proxy is set and the environment variables contain an invalid proxy specification.
+        RuntimeError if use_proxy is set and the environment variables
+            contain an invalid proxy specification.
     """
 
     def __init__(
@@ -290,6 +291,9 @@ def _http_proxy_endpoint(
         a tuple of
             endpoint to use to connect to the proxy, or None
             ProxyCredentials or if no credentials were found, or None
+
+    Raise:
+        RuntimeError if proxy has no hostname or unsupported scheme.
     """
     if proxy is None:
         return None, None

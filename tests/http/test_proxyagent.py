@@ -41,18 +41,18 @@ HTTPFactory = Factory.forProtocol(HTTPChannel)
 
 
 class ProxyParserTests(TestCase):
+    """
+    Values for test
+    [
+        proxy_string,
+        expected_scheme,
+        expected_hostname,
+        expected_port,
+        expected_credentials,
+    ]
+    """
     @parameterized.expand(
         [
-            """
-            Values for test
-            [
-                proxy_string,
-                expected_scheme,
-                expected_hostname,
-                expected_port,
-                expected_credentials,
-            ]
-            """
             # host
             [b"localhost", b"http", b"localhost", 1080, None],
             [b"localhost:9988", b"http", b"localhost", 9988, None],
