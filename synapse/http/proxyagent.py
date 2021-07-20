@@ -88,10 +88,9 @@ class ProxyAgent(_AgentBase):
 
         use_proxy: Whether proxy settings should be discovered and used
             from conventional environment variables.
-            A proxy without scheme is assumed to be http.
 
     Raises:
-        ValueError if given a proxy with a scheme we don't support.
+        ValueError if use_proxy is set and the environment variables contain an invalid proxy specification.
     """
 
     def __init__(
@@ -309,10 +308,12 @@ def parse_proxy(
     proxy: bytes, default_scheme: bytes = b"http", default_port: int = 1080
 ) -> Tuple[bytes, bytes, int, Optional[ProxyCredentials]]:
     """
+    Parse a proxy connection string.
+    
     Given a HTTP proxy URL, breaks it down into components and checks that it
-    has a hostname (otherwise it is not right useful to us trying to find a
-    proxy) and asserts that the URL has the scheme as that is all we support.
-    Parse the scheme, username, password, hostname and port from a proxy connection byte string.
+    has a hostname (otherwise it is not useful to us when trying to find a
+    proxy) and asserts that the URL has a scheme we support.
+
 
     Args:
         proxy: The proxy connection string. Must be in the form '[scheme://][<username>:<password>@]host[:port]'.
