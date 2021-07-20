@@ -984,7 +984,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         chunk_connection_query = """
             SELECT e.depth, c.event_id FROM insertion_events AS i
             /* Find the chunk that connects to the given insertion event */
-            INNER JOIN chunk_edges AS c
+            INNER JOIN chunk_events AS c
             ON i.next_chunk_id = c.chunk_id
             /* Get the depth of the chunk start event from the events table */
             INNER JOIN events AS e USING (event_id)
