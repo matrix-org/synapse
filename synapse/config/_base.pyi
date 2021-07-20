@@ -19,6 +19,7 @@ from synapse.config import (
     logger,
     metrics,
     modules,
+    oembed,
     oidc,
     password_auth_providers,
     push,
@@ -91,6 +92,7 @@ class RootConfig:
     modules: modules.ModulesConfig
     caches: cache.CacheConfig
     federation: federation.FederationConfig
+    oembed: oembed.OembedConfig
 
     config_classes: List = ...
     def __init__(self) -> None: ...

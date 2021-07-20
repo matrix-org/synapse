@@ -71,49 +71,6 @@ OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
 
-# A map of globs to API endpoints.
-_oembed_globs = {
-    # Twitter.
-    "https://publish.twitter.com/oembed": [
-        "https://twitter.com/*/status/*",
-        "https://*.twitter.com/*/status/*",
-        "https://twitter.com/*/moments/*",
-        "https://*.twitter.com/*/moments/*",
-        # Include the HTTP versions too.
-        "http://twitter.com/*/status/*",
-        "http://*.twitter.com/*/status/*",
-        "http://twitter.com/*/moments/*",
-        "http://*.twitter.com/*/moments/*",
-    ],
-}
-# Convert the globs to regular expressions.
-_oembed_patterns = {}
-for endpoint, globs in _oembed_globs.items():
-    for glob in globs:
-        # Convert the glob into a sane regular expression to match against. The
-        # rules followed will be slightly different for the domain portion vs.
-        # the rest.
-        #
-        # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
-        # 2. The domain can have globs, but we limit it to characters that can
-        #    reasonably be a domain part.
-        #    TODO: This does not attempt to handle Unicode domain names.
-        # 3. Other parts allow a glob to be any one, or more, characters.
-        results = urlparse.urlparse(glob)
-
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
-        if results.scheme not in {"http", "https"}:
-            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
-
-        pattern = urlparse.urlunparse(
-            [
-                results.scheme,
-                re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-            ]
-            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-        )
-        _oembed_patterns[re.compile(pattern)] = endpoint
-
 
 @attr.s(slots=True)
 class OEmbedResult:
@@ -144,6 +101,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
+        self.oembed_patterns = hs.config.oembed_patterns
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SimpleHttpClient(
@@ -377,7 +335,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         Returns:
             A URL to use instead or None if the original URL should be used.
         """
-        for url_pattern, endpoint in _oembed_patterns.items():
+        for url_pattern, endpoint in self.oembed_patterns.items():
             if url_pattern.fullmatch(url):
                 return endpoint
 

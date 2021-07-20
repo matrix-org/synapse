@@ -2605,3 +2605,14 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
+
+
+## Oembed ##
+# A map of globs to API endpoints.
+
+### Twitter.
+"https://publish.twitter.com/oembed":
+  - "https://twitter.com/*/status/*"
+  - "https://*.twitter.com/*/status/*"
+  - "https://twitter.com/*/moments/*"
+  - "https://*.twitter.com/*/moments/*"

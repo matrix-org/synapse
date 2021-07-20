@@ -30,6 +30,7 @@ from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
 from .modules import ModulesConfig
+from .oembed import OembedConfig
 from .oidc import OIDCConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
@@ -94,5 +95,6 @@ class HomeServerConfig(RootConfig):
         TracerConfig,
         WorkerConfig,
         RedisConfig,
+        OembedConfig,
         ExperimentalConfig,
     ]
