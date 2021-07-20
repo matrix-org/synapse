@@ -1877,7 +1877,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 # Select valid tokens only
                 sql = (
                     "SELECT * FROM registration_tokens WHERE "
-                    "(uses_allowed > pending + completed OR uses_allowed IS NULL)"
+                    "(uses_allowed > pending + completed OR uses_allowed IS NULL) "
                     "AND (expiry_time > ? OR expiry_time IS NULL)"
                 )
                 txn.execute(sql, [now])
