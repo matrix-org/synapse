@@ -32,14 +32,11 @@ Improved Documentation
 
 - Updated installation dependencies for newer macOS versions and ARM Macs. Contributed by Luke Walsh. ([\#9971](https://github.com/matrix-org/synapse/issues/9971))
 - Simplify structure of room admin API. ([\#10313](https://github.com/matrix-org/synapse/issues/10313))
-- Fix a broken link in the admin api docs. ([\#10322](https://github.com/matrix-org/synapse/issues/10322))
-- Fix formatting in the logcontext documentation. ([\#10337](https://github.com/matrix-org/synapse/issues/10337))
-- Refresh the logcontext dev documentation. ([\#10353](https://github.com/matrix-org/synapse/issues/10353))
+- Refresh the logcontext dev documentation. ([\#10353](https://github.com/matrix-org/synapse/issues/10353)), ([\#10337](https://github.com/matrix-org/synapse/issues/10337))
 - Add delegation example for caddy in the reverse proxy documentation. Contributed by @moritzdietz. ([\#10368](https://github.com/matrix-org/synapse/issues/10368))
-- Fix some links in `docs` and `contrib`. ([\#10370](https://github.com/matrix-org/synapse/issues/10370))
+- Fix and clarify some links in `docs` and `contrib`. ([\#10370](https://github.com/matrix-org/synapse/issues/10370)), ([\#10322](https://github.com/matrix-org/synapse/issues/10322)), ([\#10399](https://github.com/matrix-org/synapse/issues/10399))
 - Make deprecation notice of the spam checker doc more obvious. ([\#10395](https://github.com/matrix-org/synapse/issues/10395))
-- Add instructructions on installing Debian packages for release candidates. ([\#10396](https://github.com/matrix-org/synapse/issues/10396))
-- Rewrite the text of links to be clearer in the documentation. ([\#10399](https://github.com/matrix-org/synapse/issues/10399))
+- Add instructions on installing Debian packages for release candidates. ([\#10396](https://github.com/matrix-org/synapse/issues/10396))
 
 
 Deprecations and Removals
