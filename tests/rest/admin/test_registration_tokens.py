@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import random
+import string
+
 import synapse.rest.admin
 from synapse.api.errors import Codes
 from synapse.rest.client.v1 import login
@@ -26,6 +29,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     ]
 
     def prepare(self, reactor, clock, hs):
+        self.store = hs.get_datastore()
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
@@ -34,15 +38,25 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
 
         self.url = "/_synapse/admin/v1/registration_tokens"
 
-    def _new_token(self, data):
+    def _new_token(self, **kwargs):
         """Helper function to create a token."""
-        channel = self.make_request(
-            "POST",
-            self.url + "/new",
-            data,
-            access_token=self.admin_user_tok,
+        token = kwargs.get(
+            "token",
+            "".join(random.choices(string.ascii_letters, k=8)),
         )
-        return channel.json_body["token"]
+        self.get_success(
+            self.store.db_pool.simple_insert(
+                "registration_tokens",
+                {
+                    "token": token,
+                    "uses_allowed": kwargs.get("uses_allowed", None),
+                    "pending": kwargs.get("pending", 0),
+                    "completed": kwargs.get("completed", 0),
+                    "expiry_time": kwargs.get("expiry_time", None),
+                },
+            )
+        )
+        return token
 
     # CREATION
 
@@ -84,7 +98,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         data = {
             "token": "abcd",
             "uses_allowed": 1,
-            "expiry_time": 1626427432000,
+            "expiry_time": self.clock.time_msec() + 1000000,
         }
 
         channel = self.make_request(
@@ -97,7 +111,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["token"], "abcd")
         self.assertEqual(channel.json_body["uses_allowed"], 1)
-        self.assertEqual(channel.json_body["expiry_time"], 1626427432000)
+        self.assertEqual(channel.json_body["expiry_time"], data["expiry_time"])
         self.assertEqual(channel.json_body["pending"], 0)
         self.assertEqual(channel.json_body["completed"], 0)
 
@@ -175,6 +189,112 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel2.result["code"]), msg=channel2.result["body"])
         self.assertEqual(channel2.json_body["errcode"], Codes.INVALID_PARAM)
 
+    def test_create_uses_allowed(self):
+        """Check you can only create a token with good values for uses_allowed."""
+        # Should work with 0 (token is invalid from the start)
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"uses_allowed": 0},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["uses_allowed"], 0)
+
+        # Should fail with negative integer
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"uses_allowed": -5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail with float
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"uses_allowed": 1.5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+    def test_create_expiry_time(self):
+        """Check you can't create a token with an invalid expiry_time."""
+        # Should fail with a time in the past
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"expiry_time": self.clock.time_msec() - 10000},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail with float
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"expiry_time": self.clock.time_msec() + 1000000.5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+    def test_create_length(self):
+        """Check you can only generate a token with a valid length."""
+        # Should work with 64
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"length": 64},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(len(channel.json_body["token"]), 64)
+
+        # Should fail with 0
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"length": 0},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail with a negative integer
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"length": -5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail with a float
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"length": 8.5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail with 65
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"length": 65},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
     # UPDATING
 
     def test_update_no_auth(self):
@@ -213,43 +333,119 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     def test_update_uses_allowed(self):
         """Test updating just uses_allowed."""
         # Create new token using default values
-        token = self._new_token({})
+        token = self._new_token()
 
+        # Should succeed with 1
         channel = self.make_request(
             "PUT",
             self.url + "/" + token,
             {"uses_allowed": 1},
             access_token=self.admin_user_tok,
         )
-
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["uses_allowed"], 1)
         self.assertIsNone(channel.json_body["expiry_time"])
 
-    def test_update_expiry_time(self):
-        """Test updating just expiry_time."""
-        # Create new token using default values
-        token = self._new_token({})
-
+        # Should succeed with 0 (makes token invalid)
         channel = self.make_request(
             "PUT",
             self.url + "/" + token,
-            {"expiry_time": 1626430124000},
+            {"uses_allowed": 0},
             access_token=self.admin_user_tok,
         )
-
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["expiry_time"], 1626430124000)
+        self.assertEqual(channel.json_body["uses_allowed"], 0)
+        self.assertIsNone(channel.json_body["expiry_time"])
+
+        # Should succeed with null
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"uses_allowed": None},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertIsNone(channel.json_body["uses_allowed"])
+        self.assertIsNone(channel.json_body["expiry_time"])
+
+        # Should fail with a float
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"uses_allowed": 1.5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail with a negative integer
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"uses_allowed": -5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+    def test_update_expiry_time(self):
+        """Test updating just expiry_time."""
+        # Create new token using default values
+        token = self._new_token()
+        new_expiry_time = self.clock.time_msec() + 1000000
+
+        # Should succeed with a time in the future
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"expiry_time": new_expiry_time},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["expiry_time"], new_expiry_time)
+        self.assertIsNone(channel.json_body["uses_allowed"])
+
+        # Should succeed with null
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"expiry_time": None},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertIsNone(channel.json_body["expiry_time"])
+        self.assertIsNone(channel.json_body["uses_allowed"])
+
+        # Should fail with a time in the past
+        past_time = self.clock.time_msec() - 10000
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"expiry_time": past_time},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
+
+        # Should fail a float
+        channel = self.make_request(
+            "PUT",
+            self.url + "/" + token,
+            {"expiry_time": new_expiry_time + 0.5},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], Codes.INVALID_PARAM)
 
     def test_update_both(self):
         """Test updating both uses_allowed and expiry_time."""
         # Create new token using default values
-        token = self._new_token({})
+        token = self._new_token()
+        new_expiry_time = self.clock.time_msec() + 1000000
 
         data = {
             "uses_allowed": 1,
-            "expiry_time": 1626430124000,
+            "expiry_time": new_expiry_time,
         }
 
         channel = self.make_request(
@@ -261,12 +457,12 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(channel.json_body["uses_allowed"], 1)
-        self.assertEqual(channel.json_body["expiry_time"], 1626430124000)
+        self.assertEqual(channel.json_body["expiry_time"], new_expiry_time)
 
     def test_update_invalid_type(self):
         """Test using invalid types doesn't work."""
         # Create new token using default values
-        token = self._new_token({})
+        token = self._new_token()
 
         data = {
             "uses_allowed": False,
@@ -321,7 +517,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     def test_delete(self):
         """Test deleting a token."""
         # Create new token using default values
-        token = self._new_token({})
+        token = self._new_token()
 
         channel = self.make_request(
             "DELETE",
@@ -370,7 +566,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     def test_get(self):
         """Test getting a token."""
         # Create new token using default values
-        token = self._new_token({})
+        token = self._new_token()
 
         channel = self.make_request(
             "GET",
@@ -408,7 +604,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
     def test_list_all(self):
         """Test listing all tokens."""
         # Create new token using default values
-        token = self._new_token({})
+        token = self._new_token()
 
         channel = self.make_request(
             "GET",
@@ -437,34 +633,32 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
 
-    def test_list_valid(self):
-        """Test listing just valid tokens."""
+    def _test_list_query_parameter(self, valid):
+        """Helper used to test both valid=true and valid=false."""
+        # Create 2 valid and 2 invalid tokens.
         now = self.hs.get_clock().time_msec()
         # Create always valid token
-        token_valid_1 = self._new_token({})
+        valid1 = self._new_token()
         # Create token that hasn't been used up
-        token_valid_2 = self._new_token({"uses_allowed": 1})
+        valid2 = self._new_token(uses_allowed=1)
         # Create token that has expired
-        self._new_token({"expiry_time": now - 10000})
+        invalid1 = self._new_token(expiry_time=now - 10000)
         # Create token that has been used up but hasn't expired
-        # Can't use API because it doesn't allow changing pending or completed
-        store = self.hs.get_datastore()
-        self.get_success(
-            store.db_pool.simple_insert(
-                "registration_tokens",
-                {
-                    "token": "invalid_2",
-                    "uses_allowed": 2,
-                    "pending": 1,
-                    "completed": 1,
-                    "expiry_time": now + 1000000,
-                },
-            )
+        invalid2 = self._new_token(
+            uses_allowed=2,
+            pending=1,
+            completed=1,
+            expiry_time=now + 1000000,
         )
+
+        if valid == "true":
+            tokens = [valid1, valid2]
+        else:
+            tokens = [invalid1, invalid2]
 
         channel = self.make_request(
             "GET",
-            self.url + "?valid=true",
+            self.url + "?valid=" + valid,
             {},
             access_token=self.admin_user_tok,
         )
@@ -473,45 +667,13 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(channel.json_body["registration_tokens"]), 2)
         token_info_1 = channel.json_body["registration_tokens"][0]
         token_info_2 = channel.json_body["registration_tokens"][1]
-        self.assertIn(token_info_1["token"], (token_valid_1, token_valid_2))
-        self.assertIn(token_info_2["token"], (token_valid_1, token_valid_2))
+        self.assertIn(token_info_1["token"], tokens)
+        self.assertIn(token_info_2["token"], tokens)
+
+    def test_list_valid(self):
+        """Test listing just valid tokens."""
+        self._test_list_query_parameter(valid="true")
 
     def test_list_invalid(self):
         """Test listing just invalid tokens."""
-        now = self.hs.get_clock().time_msec()
-        # Create always valid token
-        self._new_token({})
-        # Create token that hasn't been used up
-        self._new_token({"uses_allowed": 1})
-        # Create token that has expired
-        token_invalid_1 = self._new_token({"expiry_time": now - 10000})
-        # Create token that has been used up but hasn't expired
-        # Can't use API because it doesn't allow changing pending or completed
-        token_invalid_2 = "invalid_2"
-        store = self.hs.get_datastore()
-        self.get_success(
-            store.db_pool.simple_insert(
-                "registration_tokens",
-                {
-                    "token": token_invalid_2,
-                    "uses_allowed": 2,
-                    "pending": 1,
-                    "completed": 1,
-                    "expiry_time": now + 1000000,
-                },
-            )
-        )
-
-        channel = self.make_request(
-            "GET",
-            self.url + "?valid=false",
-            {},
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(len(channel.json_body["registration_tokens"]), 2)
-        token_info_1 = channel.json_body["registration_tokens"][0]
-        token_info_2 = channel.json_body["registration_tokens"][1]
-        self.assertIn(token_info_1["token"], (token_invalid_1, token_invalid_2))
-        self.assertIn(token_info_2["token"], (token_invalid_1, token_invalid_2))
+        self._test_list_query_parameter(valid="false")

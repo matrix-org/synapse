@@ -110,6 +110,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.clock = hs.get_clock()
         # A string of all the characters allowed to be in a registration_token
         self.allowed_chars = string.ascii_letters + string.digits + "-_"
         self.allowed_chars_set = set(self.allowed_chars)
@@ -122,10 +123,10 @@ class NewRegistrationTokenRestServlet(RestServlet):
             token = body["token"]
             if not isinstance(token, str):
                 raise SynapseError(400, "token must be a string", Codes.INVALID_PARAM)
-            if len(token) > 64:
+            if not (0 < len(token) <= 64):
                 raise SynapseError(
                     400,
-                    "token must be no longer than 64 characters long",
+                    "token must not be empty and must not be longer than 64 characters",
                     Codes.INVALID_PARAM,
                 )
             if not set(token).issubset(self.allowed_chars_set):
@@ -142,24 +143,35 @@ class NewRegistrationTokenRestServlet(RestServlet):
                 raise SynapseError(
                     400, "length must be an integer", Codes.INVALID_PARAM
                 )
-            if length > 64:
+            if not (0 < length <= 64):
                 raise SynapseError(
-                    400, "length must not be greater than 64", Codes.INVALID_PARAM
+                    400,
+                    "length must be greater than zero and not greater than 64",
+                    Codes.INVALID_PARAM,
                 )
 
             # Generate token
             token = "".join(random.choices(self.allowed_chars, k=length))
 
         uses_allowed = body.get("uses_allowed", None)
-        if not isinstance(uses_allowed, (int, type(None))):
+        if not (
+            uses_allowed is None
+            or (isinstance(uses_allowed, int) and uses_allowed >= 0)
+        ):
             raise SynapseError(
-                400, "uses_allowed must be an integer or null", Codes.INVALID_PARAM
+                400,
+                "uses_allowed must be a non-negative integer or null",
+                Codes.INVALID_PARAM,
             )
 
         expiry_time = body.get("expiry_time", None)
         if not isinstance(expiry_time, (int, type(None))):
             raise SynapseError(
                 400, "expiry_time must be an integer or null", Codes.INVALID_PARAM
+            )
+        if isinstance(expiry_time, int) and expiry_time < self.clock.time_msec():
+            raise SynapseError(
+                400, "expiry_time must not be in the past", Codes.INVALID_PARAM
             )
 
         res = await self.store.create_registration_token(
@@ -233,6 +245,7 @@ class RegistrationTokenRestServlet(RestServlet):
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
+        self.clock = hs.get_clock()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
 
@@ -255,18 +268,26 @@ class RegistrationTokenRestServlet(RestServlet):
 
         # Only add uses_allowed to updatevalues if it is present and valid
         if "uses_allowed" in body:
-            if not isinstance(body["uses_allowed"], (int, type(None))):
+            ua = body["uses_allowed"]
+            if not (ua is None or (isinstance(ua, int) and ua >= 0)):
                 raise SynapseError(
-                    400, "uses_allowed must be an integer or null", Codes.INVALID_PARAM
+                    400,
+                    "uses_allowed must be a non-negative integer or null",
+                    Codes.INVALID_PARAM,
                 )
-            updatevalues["uses_allowed"] = body["uses_allowed"]
+            updatevalues["uses_allowed"] = ua
 
         if "expiry_time" in body:
-            if not isinstance(body["expiry_time"], (int, type(None))):
+            et = body["expiry_time"]
+            if not isinstance(et, (int, type(None))):
                 raise SynapseError(
                     400, "expiry_time must be an integer or null", Codes.INVALID_PARAM
                 )
-            updatevalues["expiry_time"] = body["expiry_time"]
+            if isinstance(et, int) and et < self.clock.time_msec():
+                raise SynapseError(
+                    400, "expiry_time must not be in the past", Codes.INVALID_PARAM
+                )
+            updatevalues["expiry_time"] = et
 
         if len(updatevalues) == 0:
             raise SynapseError(400, "Nothing to update", Codes.MISSING_PARAM)
