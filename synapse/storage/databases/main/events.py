@@ -1505,7 +1505,7 @@ class PersistEventsStore:
             self._handle_event_relations(txn, event)
 
             self._handle_insertion_event(txn, event)
-            self._handle_chunk_id(txn, event)
+            self._handle_chunk_event(txn, event)
 
             # Store the labels for this event.
             labels = event.content.get(EventContentFields.LABELS)
@@ -1804,26 +1804,30 @@ class PersistEventsStore:
                 },
             )
 
-    def _handle_chunk_id(self, txn: LoggingTransaction, event: EventBase):
-        """Handles inserting the chunk edges/connections between the event at the
-        start of a chunk and an insertion event. Part of MSC2716.
+    def _handle_chunk_event(self, txn: LoggingTransaction, event: EventBase):
+        """Handles inserting the chunk edges/connections between the chunk event
+        and an insertion event. Part of MSC2716.
 
         Args:
             txn: The database transaction object
             event: The event to process
         """
 
-        chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
-        if chunk_id is None:
-            # No chunk connection to persist
+        if event.type != EventTypes.MSC2716_CHUNK:
+            # Not a chunk event
             return
 
-        logger.debug("_handle_chunk_id %s %s", chunk_id, event)
+        chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
+        if chunk_id is None:
+            # Invalid chunk event without a chunk ID
+            return
+
+        logger.debug("_handle_chunk_event chunk_id=%s %s", chunk_id, event)
 
         # Keep track of the insertion event and the chunk ID
         self.db_pool.simple_insert_txn(
             txn,
-            table="chunk_edges",
+            table="chunk_events",
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,

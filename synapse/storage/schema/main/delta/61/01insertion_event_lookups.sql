@@ -41,12 +41,12 @@ CREATE INDEX IF NOT EXISTS insertion_event_edges_event_id ON insertion_event_edg
 CREATE INDEX IF NOT EXISTS insertion_event_edges_insertion_prev_event_id ON insertion_event_edges(insertion_prev_event_id);
 
 -- Add a table that keeps track of how each chunk is labeled. The chunks are
--- connected together based insertion points `next_chunk_id`.
-CREATE TABLE IF NOT EXISTS chunk_edges(
+-- connected together based on an insertion events `next_chunk_id`.
+CREATE TABLE IF NOT EXISTS chunk_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
     chunk_id TEXT NOT NULL,
     UNIQUE (event_id)
 );
 
-CREATE INDEX IF NOT EXISTS chunk_edges_chunk_id ON chunk_edges(chunk_id);
+CREATE INDEX IF NOT EXISTS chunk_events_chunk_id ON chunk_events(chunk_id);
