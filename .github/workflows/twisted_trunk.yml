@@ -1,0 +1,55 @@
+name: Twisted Trunk
+
+on:
+  schedule:
+    - cron: 0 8 * * *
+
+  workflow_dispatch:
+
+jobs:
+  mypy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+      - run: |
+          pip install tox
+          tox --notest -e mypy
+          .tox/env/mypy/bin/pip install git+https://github.com/twisted/twisted
+          tox -e mypy
+
+  trial:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: 3.6
+          
+      - run: |
+          pip install tox
+          tox --notest -e py
+          .tox/env/mypy/bin/pip install git+https://github.com/twisted/twisted
+          tox -e py
+
+      - name: Dump logs
+        # Note: Dumps to workflow logs instead of using actions/upload-artifact
+        #       This keeps logs colocated with failing jobs
+        #       It also ignores find's exit code; this is a best effort affair
+        run: >-
+          find _trial_temp -name '*.log'
+          -exec echo "::group::{}" \;
+          -exec cat {} \;
+          -exec echo "::endgroup::" \;
+          || true
+
+  sytest:
+    runs-on: ubuntu-latest
+    container:
+        image: matrixdotorg/sytest-synapse:bionic
+
+    steps:
+      - uses: actions/checkout@v2
+        
