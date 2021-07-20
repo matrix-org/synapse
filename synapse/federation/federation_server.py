@@ -562,8 +562,7 @@ class FederationServer(FederationBase):
             raise IncompatibleRoomVersionError(room_version=room_version)
 
         pdu = await self.handler.on_make_join_request(origin, room_id, user_id)
-        time_now = self._clock.time_msec()
-        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
+        return {"event": pdu.get_templated_pdu_json(), "room_version": room_version}
 
     async def on_invite_request(
         self, origin: str, content: JsonDict, room_version_id: str
@@ -611,8 +610,7 @@ class FederationServer(FederationBase):
 
         room_version = await self.store.get_room_version_id(room_id)
 
-        time_now = self._clock.time_msec()
-        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
+        return {"event": pdu.get_templated_pdu_json(), "room_version": room_version}
 
     async def on_send_leave_request(
         self, origin: str, content: JsonDict, room_id: str
@@ -659,9 +657,8 @@ class FederationServer(FederationBase):
             )
 
         pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
-        time_now = self._clock.time_msec()
         return {
-            "event": pdu.get_pdu_json(time_now),
+            "event": pdu.get_templated_pdu_json(),
             "room_version": room_version.identifier,
         }
 

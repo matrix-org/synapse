@@ -138,7 +138,6 @@ def iterate_tree_cache_entry(d):
     """
     if isinstance(d, TreeCacheNode):
         for value_d in d.values():
-            for value in iterate_tree_cache_entry(value_d):
-                yield value
+            yield from iterate_tree_cache_entry(value_d)
     else:
         yield d

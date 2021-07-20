@@ -38,10 +38,10 @@ class BaseHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
-        self.store = hs.get_datastore()  # type: synapse.storage.DataStore
+        self.store = hs.get_datastore()
         self.auth = hs.get_auth()
         self.notifier = hs.get_notifier()
-        self.state_handler = hs.get_state_handler()  # type: synapse.state.StateHandler
+        self.state_handler = hs.get_state_handler()
         self.distributor = hs.get_distributor()
         self.clock = hs.get_clock()
         self.hs = hs
@@ -55,12 +55,12 @@ class BaseHandler:
         # Check whether ratelimiting room admin message redaction is enabled
         # by the presence of rate limits in the config
         if self.hs.config.rc_admin_redaction:
-            self.admin_redaction_ratelimiter = Ratelimiter(
+            self.admin_redaction_ratelimiter: Optional[Ratelimiter] = Ratelimiter(
                 store=self.store,
                 clock=self.clock,
                 rate_hz=self.hs.config.rc_admin_redaction.per_second,
                 burst_count=self.hs.config.rc_admin_redaction.burst_count,
-            )  # type: Optional[Ratelimiter]
+            )
         else:
             self.admin_redaction_ratelimiter = None
 
