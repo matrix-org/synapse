@@ -745,7 +745,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             if server:
                 raise e
 
-        limit = parse_integer(request, "limit", 0)
+        limit: Optional[int] = parse_integer(request, "limit", 0)
         since_token = parse_string(request, "since", None)
 
         if limit == 0:

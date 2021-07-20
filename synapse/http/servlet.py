@@ -26,35 +26,73 @@ from synapse.util import json_decoder
 logger = logging.getLogger(__name__)
 
 
-def parse_integer(request, name, default=None, required=False):
+@overload
+def parse_integer(request: Request, name: str, default: int) -> int:
+    ...
+
+
+@overload
+def parse_integer(request: Request, name: str, *, required: Literal[True]) -> int:
+    ...
+
+
+@overload
+def parse_integer(
+    request: Request, name: str, default: Optional[int] = None, required: bool = False
+) -> Optional[int]:
+    ...
+
+
+def parse_integer(
+    request: Request, name: str, default: Optional[int] = None, required: bool = False
+) -> Optional[int]:
     """Parse an integer parameter from the request string
 
     Args:
         request: the twisted HTTP request.
-        name (bytes/unicode): the name of the query parameter.
-        default (int|None): value to use if the parameter is absent, defaults
-            to None.
-        required (bool): whether to raise a 400 SynapseError if the
-            parameter is absent, defaults to False.
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the parameter is absent,
+            defaults to False.
 
     Returns:
-        int|None: An int value or the default.
+        An int value or the default.
 
     Raises:
         SynapseError: if the parameter is absent and required, or if the
             parameter is present and not an integer.
     """
-    return parse_integer_from_args(request.args, name, default, required)
+    args: Mapping[bytes, Sequence[bytes]] = request.args  # type: ignore
+    return parse_integer_from_args(args, name, default, required)
 
 
-def parse_integer_from_args(args, name, default=None, required=False):
+def parse_integer_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[int] = None,
+    required: bool = False,
+) -> Optional[int]:
+    """Parse an integer parameter from the request string
 
-    if not isinstance(name, bytes):
-        name = name.encode("ascii")
+    Args:
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the parameter is absent,
+            defaults to False.
 
-    if name in args:
+    Returns:
+        An int value or the default.
+
+    Raises:
+        SynapseError: if the parameter is absent and required, or if the
+            parameter is present and not an integer.
+    """
+    name_bytes = name.encode("ascii")
+
+    if name_bytes in args:
         try:
-            return int(args[name][0])
+            return int(args[name_bytes][0])
         except Exception:
             message = "Query parameter %r must be an integer" % (name,)
             raise SynapseError(400, message, errcode=Codes.INVALID_PARAM)
