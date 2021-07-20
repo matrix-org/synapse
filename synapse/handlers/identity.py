@@ -870,7 +870,7 @@ class IdentityHandler(BaseHandler):
             "sender": inviter_user_id,
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
-            "org.matrix.mscxxxx.room_type": room_type,  # MSCXXXX
+            "org.matrix.msc3288.room_type": room_type,  # MSC3288
         }
         # If a custom web client location is available, include it in the request.
         if self._web_client_location:

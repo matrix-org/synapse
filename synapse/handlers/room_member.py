@@ -19,7 +19,12 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from synapse import types
-from synapse.api.constants import AccountDataTypes, EventTypes, Membership
+from synapse.api.constants import (
+    AccountDataTypes,
+    EventContentFields,
+    EventTypes,
+    Membership,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -1141,7 +1146,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_type = ""
         room_create_event = room_state.get((EventTypes.Create, ""))
         if room_create_event:
-            room_type = room_create_event.content.get("type", "")
+            room_type = room_create_event.content.get(EventContentFields.ROOM_TYPE, "")
 
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
