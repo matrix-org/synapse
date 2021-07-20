@@ -135,7 +135,9 @@ class EventAuthHandler:
 
         # No user was found.
         raise SynapseError(
-            400, "Unable to find a user which could issue an invite", Codes.CANNOT_ALLOW
+            400,
+            "Unable to find a user which could issue an invite",
+            Codes.UNABLE_TO_GRANT_JOIN,
         )
 
     async def check_host_in_room(self, room_id: str, host: str) -> bool:

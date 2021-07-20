@@ -77,7 +77,7 @@ class Codes:
     BAD_ALIAS = "M_BAD_ALIAS"
     # For restricted join rules.
     UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
-    CANNOT_ALLOW = "M_CANNOT_ALLOW"
+    UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
 
 
 class CodeMessageException(RuntimeError):
