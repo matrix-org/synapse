@@ -14,7 +14,7 @@
 
 """ This module contains base REST classes for constructing REST servlets. """
 import logging
-from typing import Dict, Iterable, List, Optional, overload
+from typing import Iterable, List, Mapping, Optional, Sequence, overload
 
 from typing_extensions import Literal
 
@@ -66,36 +66,102 @@ def parse_integer_from_args(args, name, default=None, required=False):
             return default
 
 
-def parse_boolean(request, name, default=None, required=False):
+@overload
+def parse_boolean(request: Request, name: str, default: bool) -> bool:
+    ...
+
+
+@overload
+def parse_boolean(request: Request, name: str, *, required: Literal[True]) -> bool:
+    ...
+
+
+@overload
+def parse_boolean(
+    request: Request, name: str, default: Optional[bool] = None, required: bool = False
+) -> Optional[bool]:
+    ...
+
+
+def parse_boolean(
+    request: Request, name: str, default: Optional[bool] = None, required: bool = False
+) -> Optional[bool]:
     """Parse a boolean parameter from the request query string
 
     Args:
         request: the twisted HTTP request.
-        name (bytes/unicode): the name of the query parameter.
-        default (bool|None): value to use if the parameter is absent, defaults
-            to None.
-        required (bool): whether to raise a 400 SynapseError if the
-            parameter is absent, defaults to False.
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the parameter is absent,
+            defaults to False.
 
     Returns:
-        bool|None: A bool value or the default.
+        A bool value or the default.
 
     Raises:
         SynapseError: if the parameter is absent and required, or if the
             parameter is present and not one of "true" or "false".
     """
+    args: Mapping[bytes, Sequence[bytes]] = request.args  # type: ignore
+    return parse_boolean_from_args(args, name, default, required)
 
-    return parse_boolean_from_args(request.args, name, default, required)
+
+@overload
+def parse_boolean_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: bool,
+) -> bool:
+    ...
 
 
-def parse_boolean_from_args(args, name, default=None, required=False):
+@overload
+def parse_boolean_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    *,
+    required: Literal[True],
+) -> bool:
+    ...
 
-    if not isinstance(name, bytes):
-        name = name.encode("ascii")
 
-    if name in args:
+@overload
+def parse_boolean_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[bool] = None,
+    required: bool = False,
+) -> Optional[bool]:
+    ...
+
+
+def parse_boolean_from_args(
+    args: Mapping[bytes, Sequence[bytes]],
+    name: str,
+    default: Optional[bool] = None,
+    required: bool = False,
+) -> Optional[bool]:
+    """Parse a boolean parameter from the request query string
+
+    Args:
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the parameter is absent,
+            defaults to False.
+
+    Returns:
+        A bool value or the default.
+
+    Raises:
+        SynapseError: if the parameter is absent and required, or if the
+            parameter is present and not one of "true" or "false".
+    """
+    name_bytes = name.encode("ascii")
+
+    if name_bytes in args:
         try:
-            return {b"true": True, b"false": False}[args[name][0]]
+            return {b"true": True, b"false": False}[args[name_bytes][0]]
         except Exception:
             message = (
                 "Boolean query parameter %r must be one of ['true', 'false']"
@@ -111,7 +177,7 @@ def parse_boolean_from_args(args, name, default=None, required=False):
 
 @overload
 def parse_bytes_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[bytes] = None,
 ) -> Optional[bytes]:
@@ -120,7 +186,7 @@ def parse_bytes_from_args(
 
 @overload
 def parse_bytes_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Literal[None] = None,
     *,
@@ -131,7 +197,7 @@ def parse_bytes_from_args(
 
 @overload
 def parse_bytes_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[bytes] = None,
     required: bool = False,
@@ -140,7 +206,7 @@ def parse_bytes_from_args(
 
 
 def parse_bytes_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[bytes] = None,
     required: bool = False,
@@ -205,7 +271,7 @@ def parse_string(
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
-    args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+    args: Mapping[bytes, Sequence[bytes]] = request.args  # type: ignore
     return parse_string_from_args(
         args,
         name,
@@ -239,7 +305,7 @@ def _parse_string_value(
 
 @overload
 def parse_strings_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[List[str]] = None,
     *,
@@ -251,7 +317,7 @@ def parse_strings_from_args(
 
 @overload
 def parse_strings_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[List[str]] = None,
     *,
@@ -264,7 +330,7 @@ def parse_strings_from_args(
 
 @overload
 def parse_strings_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[List[str]] = None,
     *,
@@ -276,7 +342,7 @@ def parse_strings_from_args(
 
 
 def parse_strings_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[List[str]] = None,
     required: bool = False,
@@ -325,7 +391,7 @@ def parse_strings_from_args(
 
 @overload
 def parse_string_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[str] = None,
     *,
@@ -337,7 +403,7 @@ def parse_string_from_args(
 
 @overload
 def parse_string_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[str] = None,
     *,
@@ -350,7 +416,7 @@ def parse_string_from_args(
 
 @overload
 def parse_string_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[str] = None,
     required: bool = False,
@@ -361,7 +427,7 @@ def parse_string_from_args(
 
 
 def parse_string_from_args(
-    args: Dict[bytes, List[bytes]],
+    args: Mapping[bytes, Sequence[bytes]],
     name: str,
     default: Optional[str] = None,
     required: bool = False,

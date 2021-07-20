@@ -984,7 +984,7 @@ class PublicRoomList(BaseFederationServlet):
         limit = parse_integer_from_args(query, "limit", 0)
         since_token = parse_string_from_args(query, "since", None)
         include_all_networks = parse_boolean_from_args(
-            query, "include_all_networks", False
+            query, "include_all_networks", default=False
         )
         third_party_instance_id = parse_string_from_args(
             query, "third_party_instance_id", None
