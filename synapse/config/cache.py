@@ -165,7 +165,6 @@ class CacheConfig(Config):
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
-<<<<<<< HEAD
 
         self.external_event_cache_expiry_ms = config.get(
             "external_event_cache_expiry_ms", _DEFAULT_EXTERNAL_CACHE_EXPIRY_MS
@@ -173,10 +172,7 @@ class CacheConfig(Config):
         if not isinstance(self.external_event_cache_expiry_ms, (int, float)):
             raise ConfigError("external_event_cache_expiry_ms must be a number.")
 
-        self.cache_factors = {}  # type: Dict[str, float]
-=======
         self.cache_factors: Dict[str, float] = {}
->>>>>>> origin/develop
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get(
