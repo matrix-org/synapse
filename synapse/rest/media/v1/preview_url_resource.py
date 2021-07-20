@@ -191,7 +191,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
-        url = parse_string(request, "url")
+        url = parse_string(request, "url", required=True)
         if b"ts" in request.args:
             ts = parse_integer(request, "ts")
         else:

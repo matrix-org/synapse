@@ -172,6 +172,42 @@ def parse_bytes_from_args(
     return default
 
 
+@overload
+def parse_string(
+    request: Request,
+    name: str,
+    default: str,
+    *,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> str:
+    ...
+
+
+@overload
+def parse_string(
+    request: Request,
+    name: str,
+    *,
+    required: Literal[True],
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> str:
+    ...
+
+
+@overload
+def parse_string(
+    request: Request,
+    name: str,
+    *,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[str]:
+    ...
+
+
 def parse_string(
     request: Request,
     name: str,
@@ -179,7 +215,7 @@ def parse_string(
     required: bool = False,
     allowed_values: Optional[Iterable[str]] = None,
     encoding: str = "ascii",
-):
+) -> Optional[str]:
     """
     Parse a string parameter from the request query string.
 
