@@ -34,7 +34,36 @@ logger = logging.getLogger(__name__)
 
 
 class ListRegistrationTokensRestServlet(RestServlet):
-    """List registration tokens."""
+    """List registration tokens.
+
+    To list all tokens:
+
+        GET /_synapse/admin/v1/registration_tokens
+
+        200 OK
+
+        {
+            "registration_tokens": [
+                {
+                    "token": "abcd",
+                    "uses_allowed": 3,
+                    "pending": 0,
+                    "completed": 1,
+                    "expiry_time": null
+                },
+                {
+                    "token": "wxyz",
+                    "uses_allowed": null,
+                    "pending": 0,
+                    "completed": 9,
+                    "expiry_time": 1625394937000
+                }
+            ]
+        }
+
+    The optional query parameter `valid` is used to the response to only
+    valid or invalid tokens. It can be `true` or `false`.
+    """
 
     PATTERNS = admin_patterns("/registration_tokens$")
 
@@ -51,7 +80,29 @@ class ListRegistrationTokensRestServlet(RestServlet):
 
 
 class NewRegistrationTokenRestServlet(RestServlet):
-    """Create a new registration token."""
+    """Create a new registration token.
+
+    For example, to create a token specifying some fields:
+
+        POST /_synapse/admin/v1/registration_tokens/new
+
+        {
+            "token": "defg",
+            "uses_allowed": 1
+        }
+
+        200 OK
+
+        {
+            "token": "defg",
+            "uses_allowed": 1,
+            "pending": 0,
+            "completed": 0,
+            "expiry_time": null
+        }
+
+    Defaults are used for any fields not specified.
+    """
 
     PATTERNS = admin_patterns("/registration_tokens/new$")
 
@@ -131,7 +182,52 @@ class NewRegistrationTokenRestServlet(RestServlet):
 
 
 class RegistrationTokenRestServlet(RestServlet):
-    """Retrieve, update, or delete the given token."""
+    """Retrieve, update, or delete the given token.
+
+    For example,
+
+    to retrieve a token:
+
+        GET /_synapse/admin/v1/registration_tokens/abcd
+
+        200 OK
+
+        {
+            "token": "abcd",
+            "uses_allowed": 3,
+            "pending": 0,
+            "completed": 1,
+            "expiry_time": null
+        }
+
+
+    to update a token:
+
+        PUT /_synapse/admin/v1/registration_tokens/defg
+
+        {
+            "expiry_time": 4781243146000
+        }
+
+        200 OK
+
+        {
+            "token": "defg",
+            "uses_allowed": 1,
+            "pending": 0,
+            "completed": 0,
+            "expiry_time": 4781243146000
+        }
+
+
+    to delete a token:
+
+        DELETE /_synapse/admin/v1/registration_tokens/wxyz
+
+        200 OK
+
+        {}
+    """
 
     PATTERNS = admin_patterns("/registration_tokens/(?P<token>[^/]*)$")
 
