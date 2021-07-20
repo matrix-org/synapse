@@ -949,10 +949,10 @@ class EventCreationHandler:
         if requester:
             context.app_service = requester.app_service
 
-        third_party_result = await self.third_party_event_rules.check_event_allowed(
+        res, new_content = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
-        if not third_party_result:
+        if res is False:
             logger.info(
                 "Event %s forbidden by third-party rules",
                 event,
@@ -960,11 +960,11 @@ class EventCreationHandler:
             raise SynapseError(
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
             )
-        elif isinstance(third_party_result, dict):
+        elif new_content is not None:
             # the third-party rules want to replace the event. We'll need to build a new
             # event.
             event, context = await self._rebuild_event_after_third_party_rules(
-                third_party_result, event
+                new_content, event
             )
 
         self.validator.validate_new(event, self.config)
