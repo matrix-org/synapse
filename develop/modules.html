@@ -316,7 +316,7 @@ used during the registration process.</li>
 </ul>
 <pre><code class="language-python">async def check_media_file_for_spam(
     file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
-    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;
+    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
 ) -&gt; bool
 </code></pre>
 <p>Called when storing a local or remote file. The module must return a boolean indicating
@@ -341,6 +341,51 @@ invalidate the user's access token.</p>
 <p>Called after successfully registering a user, in case the module needs to perform extra
 operations to keep track of them. (e.g. add them to a database table). The user is
 represented by their Matrix user ID.</p>
+<h4 id="third-party-rules-callbacks"><a class="header" href="#third-party-rules-callbacks">Third party rules callbacks</a></h4>
+<p>Third party rules callbacks allow module developers to add extra checks to verify the
+validity of incoming events. Third party event rules callbacks can be registered using
+the module API's <code>register_third_party_rules_callbacks</code> method.</p>
+<p>The available third party rules callbacks are:</p>
+<pre><code class="language-python">async def check_event_allowed(
+    event: &quot;synapse.events.EventBase&quot;,
+    state_events: &quot;synapse.types.StateMap&quot;,
+) -&gt; Tuple[bool, Optional[dict]]
+</code></pre>
+<p><strong><span style="color:red">
+This callback is very experimental and can and will break without notice. Module developers
+are encouraged to implement <code>check_event_for_spam</code> from the spam checker category instead.
+</span></strong></p>
+<p>Called when processing any incoming event, with the event and a <code>StateMap</code>
+representing the current state of the room the event is being sent into. A <code>StateMap</code> is
+a dictionary that maps tuples containing an event type and a state key to the
+corresponding state event. For example retrieving the room's <code>m.room.create</code> event from
+the <code>state_events</code> argument would look like this: <code>state_events.get((&quot;m.room.create&quot;, &quot;&quot;))</code>.
+The module must return a boolean indicating whether the event can be allowed.</p>
+<p>Note that this callback function processes incoming events coming via federation
+traffic (on top of client traffic). This means denying an event might cause the local
+copy of the room's history to diverge from that of remote servers. This may cause
+federation issues in the room. It is strongly recommended to only deny events using this
+callback function if the sender is a local user, or in a private federation in which all
+servers are using the same module, with the same configuration.</p>
+<p>If the boolean returned by the module is <code>True</code>, it may also tell Synapse to replace the
+event with new data by returning the new event's data as a dictionary. In order to do
+that, it is recommended the module calls <code>event.get_dict()</code> to get the current event as a
+dictionary, and modify the returned dictionary accordingly.</p>
+<p>Note that replacing the event only works for events sent by local users, not for events
+received over federation.</p>
+<pre><code class="language-python">async def on_create_room(
+    requester: &quot;synapse.types.Requester&quot;,
+    request_content: dict,
+    is_requester_admin: bool,
+) -&gt; None
+</code></pre>
+<p>Called when processing a room creation request, with the <code>Requester</code> object for the user
+performing the request, a dictionary representing the room creation request's JSON body
+(see <a href="https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-createroom">the spec</a>
+for a list of possible parameters), and a boolean indicating whether the user performing
+the request is a server admin.</p>
+<p>Modules can modify the <code>request_content</code> (by e.g. adding events to its <code>initial_state</code>),
+or deny the room's creation by raising a <code>module_api.errors.SynapseError</code>.</p>
 <h3 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h3>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>
