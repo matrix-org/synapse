@@ -20,7 +20,12 @@ import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
-from synapse.api.errors import Codes, HttpResponseException
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.response_cache import ResponseCache
@@ -42,12 +47,12 @@ class RoomListHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.enable_room_list_search = hs.config.enable_room_list_search
-        self.response_cache = ResponseCache(
-            hs.get_clock(), "room_list"
-        )  # type: ResponseCache[Tuple[Optional[int], Optional[str], Optional[ThirdPartyInstanceID]]]
-        self.remote_response_cache = ResponseCache(
-            hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000
-        )  # type: ResponseCache[Tuple[str, Optional[int], Optional[str], bool, Optional[str]]]
+        self.response_cache: ResponseCache[
+            Tuple[Optional[int], Optional[str], Optional[ThirdPartyInstanceID]]
+        ] = ResponseCache(hs.get_clock(), "room_list")
+        self.remote_response_cache: ResponseCache[
+            Tuple[str, Optional[int], Optional[str], bool, Optional[str]]
+        ] = ResponseCache(hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000)
 
     async def get_local_public_room_list(
         self,
@@ -134,10 +139,10 @@ class RoomListHandler(BaseHandler):
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
 
-            bounds = (
+            bounds: Optional[Tuple[int, str]] = (
                 batch_token.last_joined_members,
                 batch_token.last_room_id,
-            )  # type: Optional[Tuple[int, str]]
+            )
             forwards = batch_token.direction_is_forward
             has_batch_token = True
         else:
@@ -177,7 +182,7 @@ class RoomListHandler(BaseHandler):
 
         results = [build_room_entry(r) for r in results]
 
-        response = {}  # type: JsonDict
+        response: JsonDict = {}
         num_results = len(results)
         if limit is not None:
             more_to_come = num_results == probing_limit
@@ -417,14 +422,17 @@ class RoomListHandler(BaseHandler):
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            return await repl_layer.get_public_rooms(
-                server_name,
-                limit=limit,
-                since_token=since_token,
-                search_filter=search_filter,
-                include_all_networks=include_all_networks,
-                third_party_instance_id=third_party_instance_id,
-            )
+            try:
+                return await repl_layer.get_public_rooms(
+                    server_name,
+                    limit=limit,
+                    since_token=since_token,
+                    search_filter=search_filter,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
+                )
+            except (RequestSendFailed, HttpResponseException):
+                raise SynapseError(502, "Failed to fetch room list")
 
         key = (
             server_name,

@@ -76,7 +76,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
     """Wrapper that loads spam checkers configured using the old configuration, and
     registers the spam checker hooks they implement.
     """
-    spam_checkers = []  # type: List[Any]
+    spam_checkers: List[Any] = []
     api = hs.get_module_api()
     for module, config in hs.config.spam_checkers:
         # Older spam checkers don't accept the `api` argument, so we
@@ -239,7 +239,7 @@ class SpamChecker:
             will be used as the error message returned to the user.
         """
         for callback in self._check_event_for_spam_callbacks:
-            res = await callback(event)  # type: Union[bool, str]
+            res: Union[bool, str] = await callback(event)
             if res:
                 return res
 

@@ -30,6 +30,8 @@ class ReceiptsHandler(BaseHandler):
 
         self.server_name = hs.config.server_name
         self.store = hs.get_datastore()
+        self.event_auth_handler = hs.get_event_auth_handler()
+
         self.hs = hs
 
         # We only need to poke the federation sender explicitly if its on the
@@ -59,6 +61,19 @@ class ReceiptsHandler(BaseHandler):
         """Called when we receive an EDU of type m.receipt from a remote HS."""
         receipts = []
         for room_id, room_values in content.items():
+            # If we're not in the room just ditch the event entirely. This is
+            # probably an old server that has come back and thinks we're still in
+            # the room (or we've been rejoined to the room by a state reset).
+            is_in_room = await self.event_auth_handler.check_host_in_room(
+                room_id, self.server_name
+            )
+            if not is_in_room:
+                logger.info(
+                    "Ignoring receipt from %s as we're not in the room",
+                    origin,
+                )
+                continue
+
             for receipt_type, users in room_values.items():
                 for user_id, user_values in users.items():
                     if get_domain_from_id(user_id) != origin:
@@ -83,8 +98,8 @@ class ReceiptsHandler(BaseHandler):
 
     async def _handle_new_receipts(self, receipts: List[ReadReceipt]) -> bool:
         """Takes a list of receipts, stores them and informs the notifier."""
-        min_batch_id = None  # type: Optional[int]
-        max_batch_id = None  # type: Optional[int]
+        min_batch_id: Optional[int] = None
+        max_batch_id: Optional[int] = None
 
         for receipt in receipts:
             res = await self.store.insert_receipt(

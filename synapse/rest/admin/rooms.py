@@ -402,9 +402,9 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
         # Get the room ID from the identifier.
         try:
-            remote_room_hosts = [
+            remote_room_hosts: Optional[List[str]] = [
                 x.decode("ascii") for x in request.args[b"server_name"]
-            ]  # type: Optional[List[str]]
+            ]
         except Exception:
             remote_room_hosts = None
         room_id, remote_room_hosts = await self.resolve_room_id(
@@ -462,6 +462,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state_handler = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -500,7 +501,13 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             admin_user_id = None
 
             for admin_user in reversed(admin_users):
-                if room_state.get((EventTypes.Member, admin_user)):
+                (
+                    current_membership_type,
+                    _,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    admin_user, room_id
+                )
+                if current_membership_type == "join":
                     admin_user_id = admin_user
                     break
 
@@ -652,9 +659,7 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(
-                json_decoder.decode(filter_json)
-            )  # type: Optional[Filter]
+            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
         else:
             event_filter = None
 

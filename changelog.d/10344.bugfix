@@ -1,0 +1,1 @@
+Fix the user directory becoming broken (and noisy errors being logged) when knocking and room statistics are in use.

@@ -43,7 +43,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def test_generates_and_loads_macaroon_secret_key(self):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
@@ -120,7 +120,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def generate_config_and_remove_lines_containing(self, needle):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             contents = f.readlines()
         contents = [line for line in contents if needle not in line]
         with open(self.file, "w") as f:

@@ -16,7 +16,7 @@ this document.
     summaries.
 
 -   If Synapse was installed using [prebuilt
-    packages](../setup/INSTALL.md#prebuilt-packages), you will need to follow the
+    packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
 -   If Synapse was installed from source, then:
@@ -84,7 +84,45 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
-    
+
+
+# Upgrading to v1.38.0
+
+## Re-indexing of `events` table on Postgres databases
+
+This release includes a database schema update which requires re-indexing one of
+the larger tables in the database, `events`. This could result in increased
+disk I/O for several hours or days after upgrading while the migration
+completes. Furthermore, because we have to keep the old indexes until the new
+indexes are ready, it could result in a significant, temporary, increase in
+disk space.
+
+To get a rough idea of the disk space required, check the current size of one
+of the indexes. For example, from a `psql` shell, run the following sql:
+
+```sql
+SELECT pg_size_pretty(pg_relation_size('events_order_room'));
+```
+
+We need to rebuild **four** indexes, so you will need to multiply this result
+by four to give an estimate of the disk space required. For example, on one
+particular server:
+
+```
+synapse=# select pg_size_pretty(pg_relation_size('events_order_room'));
+ pg_size_pretty
+----------------
+ 288 MB
+(1 row)
+```
+
+On this server, it would be wise to ensure that at least 1152MB are free.
+
+The additional disk space will be freed once the migration completes.
+
+SQLite databases are unaffected by this change.
+
+
 # Upgrading to v1.37.0
 
 ## Deprecation of the current spam checker interface

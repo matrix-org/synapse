@@ -24,6 +24,7 @@ from synapse.api.constants import (
     EventContentFields,
     EventTypes,
     HistoryVisibility,
+    JoinRules,
     Membership,
     RoomTypes,
 )
@@ -89,14 +90,14 @@ class SpaceSummaryHandler:
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
         # rooms we have already processed
-        processed_rooms = set()  # type: Set[str]
+        processed_rooms: Set[str] = set()
 
         # events we have already processed. We don't necessarily have their event ids,
         # so instead we key on (room id, state key)
-        processed_events = set()  # type: Set[Tuple[str, str]]
+        processed_events: Set[Tuple[str, str]] = set()
 
-        rooms_result = []  # type: List[JsonDict]
-        events_result = []  # type: List[JsonDict]
+        rooms_result: List[JsonDict] = []
+        events_result: List[JsonDict] = []
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             queue_entry = room_queue.popleft()
@@ -150,14 +151,21 @@ class SpaceSummaryHandler:
                     # The room should only be included in the summary if:
                     #     a. the user is in the room;
                     #     b. the room is world readable; or
-                    #     c. the user is in a space that has been granted access to
-                    #        the room.
+                    #     c. the user could join the room, e.g. the join rules
+                    #        are set to public or the user is in a space that
+                    #        has been granted access to the room.
                     #
                     # Note that we know the user is not in the root room (which is
                     # why the remote call was made in the first place), but the user
                     # could be in one of the children rooms and we just didn't know
                     # about the link.
-                    include_room = room.get("world_readable") is True
+
+                    # The API doesn't return the room version so assume that a
+                    # join rule of knock is valid.
+                    include_room = (
+                        room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+                        or room.get("world_readable") is True
+                    )
 
                     # Check if the user is a member of any of the allowed spaces
                     # from the response.
@@ -264,10 +272,10 @@ class SpaceSummaryHandler:
         # the set of rooms that we should not walk further. Initialise it with the
         # excluded-rooms list; we will add other rooms as we process them so that
         # we do not loop.
-        processed_rooms = set(exclude_rooms)  # type: Set[str]
+        processed_rooms: Set[str] = set(exclude_rooms)
 
-        rooms_result = []  # type: List[JsonDict]
-        events_result = []  # type: List[JsonDict]
+        rooms_result: List[JsonDict] = []
+        events_result: List[JsonDict] = []
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             room_id = room_queue.popleft()
@@ -345,7 +353,7 @@ class SpaceSummaryHandler:
             max_children = MAX_ROOMS_PER_SPACE
 
         now = self._clock.time_msec()
-        events_result = []  # type: List[JsonDict]
+        events_result: List[JsonDict] = []
         for edge_event in itertools.islice(child_events, max_children):
             events_result.append(
                 await self._event_serializer.serialize_event(
@@ -420,9 +428,8 @@ class SpaceSummaryHandler:
 
         It should be included if:
 
-        * The requester is joined or invited to the room.
-        * The requester can join without an invite (per MSC3083).
-        * The origin server has any user that is joined or invited to the room.
+        * The requester is joined or can join the room (per MSC3173).
+        * The origin server has any user that is joined or can join the room.
         * The history visibility is set to world readable.
 
         Args:
@@ -441,13 +448,39 @@ class SpaceSummaryHandler:
 
         # If there's no state for the room, it isn't known.
         if not state_ids:
+            # The user might have a pending invite for the room.
+            if requester and await self._store.get_invite_for_local_user_in_room(
+                requester, room_id
+            ):
+                return True
+
             logger.info("room %s is unknown, omitting from summary", room_id)
             return False
 
         room_version = await self._store.get_room_version(room_id)
 
-        # if we have an authenticated requesting user, first check if they are able to view
-        # stripped state in the room.
+        # Include the room if it has join rules of public or knock.
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
+        if join_rules_event_id:
+            join_rules_event = await self._store.get_event(join_rules_event_id)
+            join_rule = join_rules_event.content.get("join_rule")
+            if join_rule == JoinRules.PUBLIC or (
+                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+            ):
+                return True
+
+        # Include the room if it is peekable.
+        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+        if hist_vis_event_id:
+            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
+            hist_vis = hist_vis_ev.content.get("history_visibility")
+            if hist_vis == HistoryVisibility.WORLD_READABLE:
+                return True
+
+        # Otherwise we need to check information specific to the user or server.
+
+        # If we have an authenticated requesting user, check if they are a member
+        # of the room (or can join the room).
         if requester:
             member_event_id = state_ids.get((EventTypes.Member, requester), None)
 
@@ -470,9 +503,11 @@ class SpaceSummaryHandler:
                     return True
 
         # If this is a request over federation, check if the host is in the room or
-        # is in one of the spaces specified via the join rules.
+        # has a user who could join the room.
         elif origin:
-            if await self._auth.check_host_in_room(room_id, origin):
+            if await self._event_auth_handler.check_host_in_room(
+                room_id, origin
+            ) or await self._store.is_host_invited(room_id, origin):
                 return True
 
             # Alternately, if the host has a user in any of the spaces specified
@@ -485,21 +520,15 @@ class SpaceSummaryHandler:
                     await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
                 )
                 for space_id in allowed_rooms:
-                    if await self._auth.check_host_in_room(space_id, origin):
+                    if await self._event_auth_handler.check_host_in_room(
+                        space_id, origin
+                    ):
                         return True
 
-        # otherwise, check if the room is peekable
-        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""), None)
-        if hist_vis_event_id:
-            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
-            hist_vis = hist_vis_ev.content.get("history_visibility")
-            if hist_vis == HistoryVisibility.WORLD_READABLE:
-                return True
-
         logger.info(
-            "room %s is unpeekable and user %s is not a member / not allowed to join, omitting from summary",
+            "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
             room_id,
-            requester,
+            requester or origin,
         )
         return False
 
@@ -533,6 +562,7 @@ class SpaceSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            "join_rules": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),

@@ -56,7 +56,7 @@ services:
       - POSTGRES_USER=synapse
       - POSTGRES_PASSWORD=changeme
       # ensure the database gets created correctly
-      # https://github.com/matrix-org/synapse/blob/master/docs/postgres.md#set-up-database
+      # https://matrix-org.github.io/synapse/latest/postgres.html#set-up-database
       - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
     volumes:
       # You may store the database tables in a local folder..
