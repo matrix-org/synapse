@@ -218,7 +218,7 @@ class ThirdPartyEventRules:
             try:
                 res, replacement_data = await callback(event, state_events)
             except Exception as e:
-                logger.warning("Failed to run callback %s: %s", callback, e)
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
 
             # Return if the event shouldn't be allowed or if the module came up with a
@@ -279,7 +279,7 @@ class ThirdPartyEventRules:
                 if await callback(medium, address, state_events) is False:
                     return False
             except Exception as e:
-                logger.warning("Failed to run callback %s: %s", callback, e)
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
 
         return True
 
@@ -307,7 +307,7 @@ class ThirdPartyEventRules:
                 if await callback(room_id, state_events, new_visibility) is False:
                     return False
             except Exception as e:
-                logger.warning("Failed to run callback %s: %s", callback, e)
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
 
         return True
 
