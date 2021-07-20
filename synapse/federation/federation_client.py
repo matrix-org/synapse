@@ -818,6 +818,15 @@ class FederationClient(FederationBase):
                 origin=destination,
             )
 
+        if room_version.msc3083_join_rules:
+            # If the join is being authorised via allow rules, we need to send
+            # the /send_join back to the same server that was originally used
+            # with /make_join.
+            if "join_authorised_via_users_server" in pdu.content:
+                destinations = [
+                    get_domain_from_id(pdu.content["join_authorised_via_users_server"])
+                ]
+
         return await self._try_destination_list("send_join", destinations, send_request)
 
     async def _do_send_join(
