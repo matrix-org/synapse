@@ -21,6 +21,7 @@ from typing_extensions import Literal
 from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
+from synapse.types import JsonDict
 from synapse.util import json_decoder
 
 logger = logging.getLogger(__name__)
@@ -523,13 +524,14 @@ def parse_string_from_args(
     return strings[0]
 
 
-def parse_json_value_from_request(request, allow_empty_body=False):
+def parse_json_value_from_request(
+    request: Request, allow_empty_body: bool = False
+) -> Optional[JsonDict]:
     """Parse a JSON value from the body of a twisted HTTP request.
 
     Args:
         request: the twisted HTTP request.
-        allow_empty_body (bool): if True, an empty body will be accepted and
-            turned into None
+        allow_empty_body: if True, an empty body will be accepted and turned into None
 
     Returns:
         The JSON value.
@@ -538,7 +540,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
         SynapseError if the request body couldn't be decoded as JSON.
     """
     try:
-        content_bytes = request.content.read()
+        content_bytes = request.content.read()  # type: ignore
     except Exception:
         raise SynapseError(400, "Error reading JSON content.")
 
@@ -554,13 +556,15 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     return content
 
 
-def parse_json_object_from_request(request, allow_empty_body=False):
+def parse_json_object_from_request(
+    request: Request, allow_empty_body: bool = False
+) -> JsonDict:
     """Parse a JSON object from the body of a twisted HTTP request.
 
     Args:
         request: the twisted HTTP request.
-        allow_empty_body (bool): if True, an empty body will be accepted and
-            turned into an empty dict.
+        allow_empty_body: if True, an empty body will be accepted and turned into
+            an empty dict.
 
     Raises:
         SynapseError if the request body couldn't be decoded as JSON or
@@ -571,14 +575,14 @@ def parse_json_object_from_request(request, allow_empty_body=False):
     if allow_empty_body and content is None:
         return {}
 
-    if type(content) != dict:
+    if not isinstance(content, dict):
         message = "Content must be a JSON object."
         raise SynapseError(400, message, errcode=Codes.BAD_JSON)
 
     return content
 
 
-def assert_params_in_dict(body, required):
+def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:
     absent = []
     for k in required:
         if k not in body:
