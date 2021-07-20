@@ -51,6 +51,7 @@ class ProxyParserTests(TestCase):
         expected_credentials,
     ]
     """
+
     @parameterized.expand(
         [
             # host
