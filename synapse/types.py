@@ -577,10 +577,10 @@ class RoomStreamToken:
             entries = []
             for name, pos in self.instance_map.items():
                 instance_id = await store.get_id_for_instance(name)
-                entries.append("{}.{}".format(instance_id, pos))
+                entries.append(f"{instance_id}.{pos}")
 
             encoded_map = "~".join(entries)
-            return "m{}~{}".format(self.stream, encoded_map)
+            return f"m{self.stream}~{encoded_map}"
         else:
             return "s%d" % (self.stream,)
 

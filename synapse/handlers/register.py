@@ -55,15 +55,12 @@ login_counter = Counter(
     ["guest", "auth_provider"],
 )
 
-LoginDict = TypedDict(
-    "LoginDict",
-    {
-        "device_id": str,
-        "access_token": str,
-        "valid_until_ms": Optional[int],
-        "refresh_token": Optional[str],
-    },
-)
+
+class LoginDict(TypedDict):
+    device_id: str
+    access_token: str
+    valid_until_ms: Optional[int]
+    refresh_token: Optional[str]
 
 
 class RegistrationHandler(BaseHandler):
