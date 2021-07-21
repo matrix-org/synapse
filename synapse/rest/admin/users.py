@@ -62,6 +62,7 @@ class UsersRestServletV2(RestServlet):
     The parameter `name` can be used to filter by user id or display name.
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
+    The parameter `order_by` can be used to order the result.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -108,6 +109,7 @@ class UsersRestServletV2(RestServlet):
                 UserSortOrder.USER_TYPE.value,
                 UserSortOrder.AVATAR_URL.value,
                 UserSortOrder.SHADOW_BANNED.value,
+                UserSortOrder.CREATION_TS.value,
             ),
         )
 
