@@ -277,10 +277,14 @@ def _is_membership_change_allowed(
 
     key = (EventTypes.JoinRules, "")
     join_rule_event = auth_events.get(key)
+    logger.error("join_rule_event ggre %s", join_rule_event)
     if join_rule_event:
         join_rule = join_rule_event.content.get("join_rule", JoinRules.INVITE)
     else:
         join_rule = JoinRules.INVITE
+
+    # TODO: remove. The auth_rules don't have the join_rules for the given even we're trying auth
+    join_rule = JoinRules.PUBLIC
 
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
@@ -341,6 +345,7 @@ def _is_membership_change_allowed(
             if user_level < invite_level:
                 raise AuthError(403, "You don't have permission to invite users")
     elif Membership.JOIN == membership:
+        logger.error("join_rule fefefeafw %s", join_rule)
         # Joins are valid iff caller == target and:
         # * They are not banned.
         # * They are accepting a previously sent invitation.

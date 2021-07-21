@@ -15,6 +15,9 @@ import logging
 from unittest import TestCase
 from unittest.mock import Mock
 from twisted.internet import defer
+from typing import (
+    List,
+)
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
@@ -48,6 +51,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastore()
         self.state_store = hs.get_storage().state
+        self._event_auth_handler = hs.get_event_auth_handler()
         return hs
 
     def test_exchange_revoked_invite(self):
@@ -207,13 +211,36 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         Regression test, see #10439.
         """
+
+        def filter_auth_events_on_event(event: EventBase, auth_events: List[EventBase]):
+            # Create a StateMap[str]
+            auth_event_state_map = {
+                (e.type, e.state_key): e.event_id for e in auth_events
+            }
+            # Actually strip down and use the necessary auth events
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
+                event=event,
+                current_state_ids=auth_event_state_map,
+                for_verification=False,
+            )
+
+            # Replace the auth_events with the stripped down ones
+            event.auth_events = auth_event_ids
+
         OTHER_SERVER = "otherserver"
         OTHER_USER = "@otheruser:" + OTHER_SERVER
 
         # create the room
         user_id = self.register_user("kermit", "test")
         tok = self.login("kermit", "test")
-        room_id = self.helper.create_room_as(room_creator=user_id, tok=tok)
+        room_id = self.helper.create_room_as(
+            room_creator=user_id,
+            is_public=True,
+            tok=tok,
+            extra_content={
+                "preset": "public_chat",
+            },
+        )
         room_version = self.get_success(self.store.get_room_version(room_id))
 
         prev_event_ids = self.get_success(self.store.get_prev_events_for_room(room_id))
@@ -231,6 +258,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         auth_events = list(
             self.get_success(self.store.get_events(auth_event_ids)).values()
         )
+        logger.error("auth_events gresegrsegrb %s", auth_events)
 
         # build a floating outlier member state event
         fake_prev_event_id = "$" + random_string(43)
@@ -254,9 +282,13 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
             outlier=True,
         )
+        logger.error("member_event before auth_events=%s", member_event.auth_events)
+        filter_auth_events_on_event(member_event, auth_events)
+        logger.error("member_event after auth_events=%s", member_event.auth_events)
 
         # build and send an event authed based on the member event
-        ev = event_from_pdu_json(
+        raw_auth_events = auth_events + [member_event]
+        message_event = event_from_pdu_json(
             {
                 "type": EventTypes.Message,
                 "content": {},
@@ -264,7 +296,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 "sender": OTHER_USER,
                 "depth": most_recent_prev_event_depth,
                 "prev_events": prev_event_ids.copy(),
-                "auth_events": auth_event_ids.copy() + [member_event.event_id],
+                "auth_events": [ev.event_id for ev in raw_auth_events],
                 "origin_server_ts": self.clock.time_msec(),
                 "signatures": {
                     OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}
@@ -272,32 +304,30 @@ class FederationTestCase(unittest.HomeserverTestCase):
             },
             room_version,
         )
+        logger.error("message_event before auth_events=%s", message_event.auth_events)
+        filter_auth_events_on_event(message_event, raw_auth_events)
+        logger.error("message_event after auth_events=%s", message_event.auth_events)
 
         # Stub the /event_auth response from the OTHER_SERVER
-        self.handler.federation_client.get_event_auth = (
-            lambda destination, room_id, event_id: defer.succeed(
-                auth_events + [member_event]
-            )
+        self.handler.federation_client.get_event_auth = lambda destination, room_id, event_id: defer.succeed(
+            # After we filtered the auth events, convert the message auth event
+            # ID's back into full fledged EventBases
+            [
+                auth_event
+                for auth_event in raw_auth_events
+                if auth_event.event_id in message_event.auth_events
+            ]
         )
-        # Stub the /backfill response from the OTHER_SERVER
-        res = Transaction(
-            origin=OTHER_SERVER,
-            pdus=[member_event],
-            origin_server_ts=self.clock.time_msec(),
-            destination=None,
-        ).get_dict()
-        self.mock_federation_client.get_json.return_value = defer.succeed((200, res))
 
-        with LoggingContext("backfill"):
+        with LoggingContext("receive_pdu"):
             d = run_in_background(
-                self.handler.maybe_backfill, room_id, most_recent_prev_event_depth, 100
+                self.handler.on_receive_pdu, OTHER_SERVER, message_event
             )
-        did_backfill = self.get_success(d)
-        self.assertTrue(did_backfill)
+        self.get_success(d)
 
         # Try and get the events
         stored_event = self.get_success(
-            self.store.get_event(ev.event_id, allow_none=True)
+            self.store.get_event(message_event.event_id, allow_none=True)
         )
         self.assertTrue(stored_event is not None)
 
