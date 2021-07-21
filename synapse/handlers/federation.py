@@ -2733,14 +2733,16 @@ class FederationHandler(BaseHandler):
                             event.event_id,
                             context.state_group,
                         )
-                        context = await self.state_handler.compute_event_context(e)
+                        missing_auth_event_context = (
+                            await self.state_handler.compute_event_context(e)
+                        )
                         logger.error(
                             "_update_auth_events_and_context_for_auth after1 event_id=%s state_group=%s",
                             event.event_id,
                             context.state_group,
                         )
                         await self._auth_and_persist_event(
-                            origin, e, context, auth_events=auth
+                            origin, e, missing_auth_event_context, auth_events=auth
                         )
                         logger.error(
                             "_update_auth_events_and_context_for_auth after2 event_id=%s state_group=%s",
