@@ -413,7 +413,7 @@ class DeferredCacheListDescriptor(_CacheDescriptorBase):
                 # relevant result for that key.
                 deferreds_map = {}
                 for arg in missing:
-                    deferred = defer.Deferred()
+                    deferred: defer.Deferred[Any] = defer.Deferred()
                     deferreds_map[arg] = deferred
                     key = arg_to_cache_key(arg)
                     cache.set(key, deferred, callback=invalidate_callback)

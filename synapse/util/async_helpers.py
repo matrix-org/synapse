@@ -49,6 +49,8 @@ from synapse.util import Clock, unwrapFirstError
 
 logger = logging.getLogger(__name__)
 
+_T = TypeVar("_T")
+
 
 class ObservableDeferred:
     """Wraps a deferred object so that we can add observer deferreds. These
@@ -121,7 +123,7 @@ class ObservableDeferred:
         effect the underlying deferred.
         """
         if not self._result:
-            d = defer.Deferred()
+            d: defer.Deferred[Any] = defer.Deferred()
 
             def remove(r):
                 self._observers.discard(d)
@@ -415,7 +417,7 @@ class ReadWriteLock:
         self.key_to_current_writer: Dict[str, defer.Deferred] = {}
 
     async def read(self, key: str) -> ContextManager:
-        new_defer = defer.Deferred()
+        new_defer: defer.Deferred[None] = defer.Deferred()
 
         curr_readers = self.key_to_current_readers.setdefault(key, set())
         curr_writer = self.key_to_current_writer.get(key, None)
@@ -438,7 +440,7 @@ class ReadWriteLock:
         return _ctx_manager()
 
     async def write(self, key: str) -> ContextManager:
-        new_defer = defer.Deferred()
+        new_defer: defer.Deferred[None] = defer.Deferred()
 
         curr_readers = self.key_to_current_readers.get(key, set())
         curr_writer = self.key_to_current_writer.get(key, None)
@@ -471,10 +473,8 @@ R = TypeVar("R")
 
 
 def timeout_deferred(
-    deferred: defer.Deferred,
-    timeout: float,
-    reactor: IReactorTime,
-) -> defer.Deferred:
+    deferred: defer.Deferred[_T], timeout: float, reactor: IReactorTime
+) -> defer.Deferred[_T]:
     """The in built twisted `Deferred.addTimeout` fails to time out deferreds
     that have a canceller that throws exceptions. This method creates a new
     deferred that wraps and times out the given deferred, correctly handling
@@ -497,7 +497,7 @@ def timeout_deferred(
     Returns:
         A new Deferred, which will errback with defer.TimeoutError on timeout.
     """
-    new_d = defer.Deferred()
+    new_d: defer.Deferred[_T] = defer.Deferred()
 
     timed_out = [False]
 
