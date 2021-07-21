@@ -12,12 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import List
 from unittest import TestCase
 from unittest.mock import Mock
+
 from twisted.internet import defer
-from typing import (
-    List,
-)
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError, Codes, LimitExceededError, SynapseError
