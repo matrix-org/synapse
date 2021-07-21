@@ -960,9 +960,9 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
         event_to_types = {row[0]: (row[1], row[2]) for row in rows}
 
         # Calculate the new last position we've processed up to.
-        new_last_depth = rows[-1][3] if rows else last_depth  # type: int
-        new_last_stream = rows[-1][4] if rows else last_stream  # type: int
-        new_last_room_id = rows[-1][5] if rows else ""  # type: str
+        new_last_depth: int = rows[-1][3] if rows else last_depth
+        new_last_stream: int = rows[-1][4] if rows else last_stream
+        new_last_room_id: str = rows[-1][5] if rows else ""
 
         # Map from room_id to last depth/stream_ordering processed for the room,
         # excluding the last room (which we're likely still processing). We also
@@ -989,7 +989,7 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             retcols=("event_id", "auth_id"),
         )
 
-        event_to_auth_chain = {}  # type: Dict[str, List[str]]
+        event_to_auth_chain: Dict[str, List[str]] = {}
         for row in auth_events:
             event_to_auth_chain.setdefault(row["event_id"], []).append(row["auth_id"])
 
@@ -1145,6 +1145,16 @@ class EventsBackgroundUpdatesStore(SQLBaseStore):
             for sql in _REPLACE_STREAM_ORDERING_SQL_COMMANDS:
                 logger.info("completing stream_ordering migration: %s", sql)
                 txn.execute(sql)
+
+        # ANALYZE the new column to build stats on it, to encourage PostgreSQL to use the
+        # indexes on it.
+        # We need to pass execute a dummy function to handle the txn's result otherwise
+        # it tries to call fetchall() on it and fails because there's no result to fetch.
+        await self.db_pool.execute(
+            "background_analyze_new_stream_ordering_column",
+            lambda txn: None,
+            "ANALYZE events(stream_ordering2)",
+        )
 
         await self.db_pool.runInteraction(
             "_background_replace_stream_ordering_column", process

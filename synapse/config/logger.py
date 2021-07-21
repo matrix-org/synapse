@@ -49,7 +49,7 @@ DEFAULT_LOG_CONFIG = Template(
 # be ingested by ELK stacks. See [2] for details.
 #
 # [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-# [2]: https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md
+# [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
 

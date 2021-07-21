@@ -16,7 +16,7 @@ this document.
     summaries.
 
 -   If Synapse was installed using [prebuilt
-    packages](../setup/INSTALL.md#prebuilt-packages), you will need to follow the
+    packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
 -   If Synapse was installed from source, then:
@@ -97,7 +97,57 @@ Remove old Room Admin API:
 The new [Delete Room Admin API](https://matrix-org.github.io/synapse/develop/admin_api/rooms.html#delete-room-api)
 is accessible under `POST /_synapse/admin/v1/rooms/<room_id>/delete`.
 
-The deprecation of the old endpoints was announced with Synapse 1.25.0 (released on 2020-xx-xx).
+The deprecation of the old endpoints was announced with Synapse 1.25.0 (released on 2021-01-13).
+
+
+# Upgrading to v1.39.0
+
+## Deprecation of the current third-party rules module interface
+
+The current third-party rules module interface is deprecated in favour of the new generic
+modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
+to [this documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
+to update their modules. Synapse administrators can refer to [this documentation](modules.md#using-modules)
+to update their configuration once the modules they are using have been updated.
+
+We plan to remove support for the current third-party rules interface in September 2021.
+
+
+# Upgrading to v1.38.0
+
+## Re-indexing of `events` table on Postgres databases
+
+This release includes a database schema update which requires re-indexing one of
+the larger tables in the database, `events`. This could result in increased
+disk I/O for several hours or days after upgrading while the migration
+completes. Furthermore, because we have to keep the old indexes until the new
+indexes are ready, it could result in a significant, temporary, increase in
+disk space.
+
+To get a rough idea of the disk space required, check the current size of one
+of the indexes. For example, from a `psql` shell, run the following sql:
+
+```sql
+SELECT pg_size_pretty(pg_relation_size('events_order_room'));
+```
+
+We need to rebuild **four** indexes, so you will need to multiply this result
+by four to give an estimate of the disk space required. For example, on one
+particular server:
+
+```
+synapse=# select pg_size_pretty(pg_relation_size('events_order_room'));
+ pg_size_pretty
+----------------
+ 288 MB
+(1 row)
+```
+
+On this server, it would be wise to ensure that at least 1152MB are free.
+
+The additional disk space will be freed once the migration completes.
+
+SQLite databases are unaffected by this change.
 
 
 # Upgrading to v1.37.0

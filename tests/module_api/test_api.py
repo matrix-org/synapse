@@ -100,9 +100,9 @@ class ModuleApiTestCase(HomeserverTestCase):
             "content": content,
             "sender": user_id,
         }
-        event = self.get_success(
+        event: EventBase = self.get_success(
             self.module_api.create_and_send_event_into_room(event_dict)
-        )  # type: EventBase
+        )
         self.assertEqual(event.sender, user_id)
         self.assertEqual(event.type, "m.room.message")
         self.assertEqual(event.room_id, room_id)
@@ -136,9 +136,9 @@ class ModuleApiTestCase(HomeserverTestCase):
             "sender": user_id,
             "state_key": "",
         }
-        event = self.get_success(
+        event: EventBase = self.get_success(
             self.module_api.create_and_send_event_into_room(event_dict)
-        )  # type: EventBase
+        )
         self.assertEqual(event.sender, user_id)
         self.assertEqual(event.type, "m.room.power_levels")
         self.assertEqual(event.room_id, room_id)
@@ -281,7 +281,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         )
         for call in calls:
             call_args = call[0]
-            federation_transaction = call_args[0]  # type: Transaction
+            federation_transaction: Transaction = call_args[0]
 
             # Get the sent EDUs in this transaction
             edus = federation_transaction.get_dict()["edus"]
@@ -390,7 +390,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update = presence_updates[0]  # type: UserPresenceState
+    presence_update: UserPresenceState = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 
@@ -443,7 +443,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update = presence_updates[0]  # type: UserPresenceState
+    presence_update: UserPresenceState = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 
@@ -454,7 +454,7 @@ def _test_sending_local_online_presence_to_local_user(
     )
     test_case.assertEqual(len(presence_updates), 1)
 
-    presence_update = presence_updates[0]  # type: UserPresenceState
+    presence_update: UserPresenceState = presence_updates[0]
     test_case.assertEqual(presence_update.user_id, test_case.presence_sender_id)
     test_case.assertEqual(presence_update.state, "online")
 

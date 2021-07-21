@@ -8,7 +8,8 @@
 #
 # It is *not* intended to be copied and used as the basis for a real
 # homeserver.yaml. Instead, if you are starting from scratch, please generate
-# a fresh config using Synapse by following the instructions in INSTALL.md.
+# a fresh config using Synapse by following the instructions in
+# https://matrix-org.github.io/synapse/latest/setup/installation.html.
 
 # Configuration options that take a time period can be set using a number
 # followed by a letter. Letters have the following meanings:
@@ -36,7 +37,7 @@
 
 # Server admins can expand Synapse's functionality with external modules.
 #
-# See https://matrix-org.github.io/synapse/develop/modules.html for more
+# See https://matrix-org.github.io/synapse/latest/modules.html for more
 # documentation on how to configure or create custom modules for Synapse.
 #
 modules:
@@ -58,7 +59,7 @@ modules:
 # In most cases you should avoid using a matrix specific subdomain such as
 # matrix.example.com or synapse.example.com as the server_name for the same
 # reasons you wouldn't use user@email.example.com as your email address.
-# See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+# See https://matrix-org.github.io/synapse/latest/delegate.html
 # for information on how to host Synapse on a subdomain while preserving
 # a clean server_name.
 #
@@ -253,9 +254,9 @@ presence:
 #       'all local interfaces'.
 #
 #   type: the type of listener. Normally 'http', but other valid options are:
-#       'manhole' (see docs/manhole.md),
-#       'metrics' (see docs/metrics-howto.md),
-#       'replication' (see docs/workers.md).
+#       'manhole' (see https://matrix-org.github.io/synapse/latest/manhole.html),
+#       'metrics' (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
+#       'replication' (see https://matrix-org.github.io/synapse/latest/workers.html).
 #
 #   tls: set to true to enable TLS for this listener. Will use the TLS
 #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -280,8 +281,8 @@ presence:
 #   client: the client-server API (/_matrix/client), and the synapse admin
 #       API (/_synapse/admin). Also implies 'media' and 'static'.
 #
-#   consent: user consent forms (/_matrix/consent). See
-#       docs/consent_tracking.md.
+#   consent: user consent forms (/_matrix/consent).
+#       See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
 #
 #   federation: the server-server API (/_matrix/federation). Also implies
 #       'media', 'keys', 'openid'
@@ -290,12 +291,13 @@ presence:
 #
 #   media: the media API (/_matrix/media).
 #
-#   metrics: the metrics interface. See docs/metrics-howto.md.
+#   metrics: the metrics interface.
+#       See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
 #
 #   openid: OpenID authentication.
 #
-#   replication: the HTTP replication API (/_synapse/replication). See
-#       docs/workers.md.
+#   replication: the HTTP replication API (/_synapse/replication).
+#       See https://matrix-org.github.io/synapse/latest/workers.html.
 #
 #   static: static resources under synapse/static (/_matrix/static). (Mostly
 #       useful for 'fallback authentication'.)
@@ -319,7 +321,7 @@ listeners:
   # that unwraps TLS.
   #
   # If you plan to use a reverse proxy, please see
-  # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
+  # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
   #
   - port: 8008
     tls: false
@@ -673,35 +675,41 @@ retention:
 #event_cache_size: 10K
 
 caches:
-   # Controls the global cache factor, which is the default cache factor
-   # for all caches if a specific factor for that cache is not otherwise
-   # set.
-   #
-   # This can also be set by the "SYNAPSE_CACHE_FACTOR" environment
-   # variable. Setting by environment variable takes priority over
-   # setting through the config file.
-   #
-   # Defaults to 0.5, which will half the size of all caches.
-   #
-   #global_factor: 1.0
+  # Controls the global cache factor, which is the default cache factor
+  # for all caches if a specific factor for that cache is not otherwise
+  # set.
+  #
+  # This can also be set by the "SYNAPSE_CACHE_FACTOR" environment
+  # variable. Setting by environment variable takes priority over
+  # setting through the config file.
+  #
+  # Defaults to 0.5, which will half the size of all caches.
+  #
+  #global_factor: 1.0
 
-   # A dictionary of cache name to cache factor for that individual
-   # cache. Overrides the global cache factor for a given cache.
-   #
-   # These can also be set through environment variables comprised
-   # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
-   # letters and underscores. Setting by environment variable
-   # takes priority over setting through the config file.
-   # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
-   #
-   # Some caches have '*' and other characters that are not
-   # alphanumeric or underscores. These caches can be named with or
-   # without the special characters stripped. For example, to specify
-   # the cache factor for `*stateGroupCache*` via an environment
-   # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
-   #
-   per_cache_factors:
-     #get_users_who_share_room_with_user: 2.0
+  # A dictionary of cache name to cache factor for that individual
+  # cache. Overrides the global cache factor for a given cache.
+  #
+  # These can also be set through environment variables comprised
+  # of "SYNAPSE_CACHE_FACTOR_" + the name of the cache in capital
+  # letters and underscores. Setting by environment variable
+  # takes priority over setting through the config file.
+  # Ex. SYNAPSE_CACHE_FACTOR_GET_USERS_WHO_SHARE_ROOM_WITH_USER=2.0
+  #
+  # Some caches have '*' and other characters that are not
+  # alphanumeric or underscores. These caches can be named with or
+  # without the special characters stripped. For example, to specify
+  # the cache factor for `*stateGroupCache*` via an environment
+  # variable would be `SYNAPSE_CACHE_FACTOR_STATEGROUPCACHE=2.0`.
+  #
+  per_cache_factors:
+    #get_users_who_share_room_with_user: 2.0
+
+  # Controls how long an entry can be in a cache without having been
+  # accessed before being evicted. Defaults to None, which means
+  # entries are never evicted based on time.
+  #
+  #expiry_time: 30m
 
 
 ## Database ##
@@ -741,7 +749,8 @@ caches:
 #    cp_min: 5
 #    cp_max: 10
 #
-# For more information on using Synapse with Postgres, see `docs/postgres.md`.
+# For more information on using Synapse with Postgres,
+# see https://matrix-org.github.io/synapse/latest/postgres.html.
 #
 database:
   name: sqlite3
@@ -894,7 +903,7 @@ media_store_path: "DATADIR/media_store"
 #
 # If you are using a reverse proxy you may also need to set this value in
 # your reverse proxy's config. Notably Nginx has a small max body size by default.
-# See https://matrix-org.github.io/synapse/develop/reverse_proxy.html.
+# See https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
 #
 #max_upload_size: 50M
 
@@ -1299,91 +1308,6 @@ account_threepid_delegates:
 # Defaults to true.
 #
 #auto_join_rooms_for_guests: false
-
-
-## Account Validity ##
-
-# Optional account validity configuration. This allows for accounts to be denied
-# any request after a given period.
-#
-# Once this feature is enabled, Synapse will look for registered users without an
-# expiration date at startup and will add one to every account it found using the
-# current settings at that time.
-# This means that, if a validity period is set, and Synapse is restarted (it will
-# then derive an expiration date from the current validity period), and some time
-# after that the validity period changes and Synapse is restarted, the users'
-# expiration dates won't be updated unless their account is manually renewed. This
-# date will be randomly selected within a range [now + period - d ; now + period],
-# where d is equal to 10% of the validity period.
-#
-account_validity:
-  # The account validity feature is disabled by default. Uncomment the
-  # following line to enable it.
-  #
-  #enabled: true
-
-  # The period after which an account is valid after its registration. When
-  # renewing the account, its validity period will be extended by this amount
-  # of time. This parameter is required when using the account validity
-  # feature.
-  #
-  #period: 6w
-
-  # The amount of time before an account's expiry date at which Synapse will
-  # send an email to the account's email address with a renewal link. By
-  # default, no such emails are sent.
-  #
-  # If you enable this setting, you will also need to fill out the 'email' and
-  # 'public_baseurl' configuration sections.
-  #
-  #renew_at: 1w
-
-  # The subject of the email sent out with the renewal link. '%(app)s' can be
-  # used as a placeholder for the 'app_name' parameter from the 'email'
-  # section.
-  #
-  # Note that the placeholder must be written '%(app)s', including the
-  # trailing 's'.
-  #
-  # If this is not set, a default value is used.
-  #
-  #renew_email_subject: "Renew your %(app)s account"
-
-  # Directory in which Synapse will try to find templates for the HTML files to
-  # serve to the user when trying to renew an account. If not set, default
-  # templates from within the Synapse package will be used.
-  #
-  # The currently available templates are:
-  #
-  # * account_renewed.html: Displayed to the user after they have successfully
-  #       renewed their account.
-  #
-  # * account_previously_renewed.html: Displayed to the user if they attempt to
-  #       renew their account with a token that is valid, but that has already
-  #       been used. In this case the account is not renewed again.
-  #
-  # * invalid_token.html: Displayed to the user when they try to renew an account
-  #       with an unknown or invalid renewal token.
-  #
-  # See https://github.com/matrix-org/synapse/tree/master/synapse/res/templates for
-  # default template contents.
-  #
-  # The file name of some of these templates can be configured below for legacy
-  # reasons.
-  #
-  #template_dir: "res/templates"
-
-  # A custom file name for the 'account_renewed.html' template.
-  #
-  # If not set, the file is assumed to be named "account_renewed.html".
-  #
-  #account_renewed_html_path: "account_renewed.html"
-
-  # A custom file name for the 'invalid_token.html' template.
-  #
-  # If not set, the file is assumed to be named "invalid_token.html".
-  #
-  #invalid_token_html_path: "invalid_token.html"
 
 
 ## Metrics ###
@@ -1834,7 +1758,7 @@ saml2_config:
 #
 #       module: The class name of a custom mapping module. Default is
 #           'synapse.handlers.oidc.JinjaOidcMappingProvider'.
-#           See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
+#           See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
 #           for information on implementing a custom mapping provider.
 #
 #       config: Configuration for the mapping provider module. This section will
@@ -1885,7 +1809,7 @@ saml2_config:
 #     - attribute: groups
 #       value: "admin"
 #
-# See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+# See https://matrix-org.github.io/synapse/latest/openid.html
 # for information on how to configure these options.
 #
 # For backwards compatibility, it is also possible to configure a single OIDC
@@ -2163,7 +2087,7 @@ sso:
 # Note that this is a non-standard login type and client support is
 # expected to be non-existent.
 #
-# See https://github.com/matrix-org/synapse/blob/master/docs/jwt.md.
+# See https://matrix-org.github.io/synapse/latest/jwt.html.
 #
 #jwt_config:
     # Uncomment the following to enable authorization using JSON web
@@ -2463,7 +2387,7 @@ email:
 # ex. LDAP, external tokens, etc.
 #
 # For more information and known implementations, please see
-# https://github.com/matrix-org/synapse/blob/master/docs/password_auth_providers.md
+# https://matrix-org.github.io/synapse/latest/password_auth_providers.html
 #
 # Note: instances wishing to use SAML or CAS authentication should
 # instead use the `saml2_config` or `cas_config` options,
@@ -2565,7 +2489,7 @@ user_directory:
     #
     # If you set it true, you'll have to rebuild the user_directory search
     # indexes, see:
-    # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
+    # https://matrix-org.github.io/synapse/latest/user_directory.html
     #
     # Uncomment to return search results containing all known users, even if that
     # user does not share a room with the requester.
@@ -2585,7 +2509,7 @@ user_directory:
 # User Consent configuration
 #
 # for detailed instructions, see
-# https://github.com/matrix-org/synapse/blob/master/docs/consent_tracking.md
+# https://matrix-org.github.io/synapse/latest/consent_tracking.html
 #
 # Parts of this section are required if enabling the 'consent' resource under
 # 'listeners', in particular 'template_dir' and 'version'.
@@ -2635,7 +2559,7 @@ user_directory:
 
 
 # Settings for local room and user statistics collection. See
-# docs/room_and_user_statistics.md.
+# https://matrix-org.github.io/synapse/latest/room_and_user_statistics.html.
 #
 stats:
   # Uncomment the following to disable room and user statistics. Note that doing
@@ -2643,11 +2567,6 @@ stats:
   # correctly.
   #
   #enabled: false
-
-  # The size of each timeslice in the room_stats_historical and
-  # user_stats_historical tables, as a time period. Defaults to "1d".
-  #
-  #bucket_size: 1h
 
 
 # Server Notices room configuration
@@ -2735,19 +2654,6 @@ stats:
 #    action: allow
 
 
-# Server admins can define a Python module that implements extra rules for
-# allowing or denying incoming events. In order to work, this module needs to
-# override the methods defined in synapse/events/third_party_rules.py.
-#
-# This feature is designed to be used in closed federations only, where each
-# participating server enforces the same rules.
-#
-#third_party_event_rules:
-#  module: "my_custom_project.SuperRulesSet"
-#  config:
-#    example_option: 'things'
-
-
 ## Opentracing ##
 
 # These settings enable opentracing, which implements distributed tracing.
@@ -2762,7 +2668,7 @@ opentracing:
     #enabled: true
 
     # The list of homeservers we wish to send and receive span contexts and span baggage.
-    # See docs/opentracing.rst.
+    # See https://matrix-org.github.io/synapse/latest/opentracing.html.
     #
     # This is a list of regexes which are matched against the server_name of the
     # homeserver.
