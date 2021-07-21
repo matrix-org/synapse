@@ -127,7 +127,8 @@ class EventAuthHandler:
         # Find the user with the highest power level.
         users_in_room = await self._store.get_users_in_room(room_id)
         chosen_user = max(
-            users_in_room,
+            # Only interested in local users.
+            filter(lambda u: get_domain_from_id(u) == self._server_name, users_in_room),
             key=lambda user: users.get(user, users_default_level),
             default=None,
         )
