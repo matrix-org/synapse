@@ -66,7 +66,7 @@ class ResponseCache(Generic[KV]):
         # This is poorly-named: it includes both complete and incomplete results.
         # We keep complete results rather than switching to absolute values because
         # that makes it easier to cache Failure results.
-        self.pending_result_cache = {}  # type: Dict[KV, ObservableDeferred]
+        self.pending_result_cache: Dict[KV, ObservableDeferred] = {}
 
         self.clock = clock
         self.timeout_sec = timeout_ms / 1000.0

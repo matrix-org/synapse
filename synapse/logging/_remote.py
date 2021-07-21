@@ -110,9 +110,9 @@ class RemoteHandler(logging.Handler):
         self.port = port
         self.maximum_buffer = maximum_buffer
 
-        self._buffer = deque()  # type: Deque[logging.LogRecord]
-        self._connection_waiter = None  # type: Optional[Deferred]
-        self._producer = None  # type: Optional[LogProducer]
+        self._buffer: Deque[logging.LogRecord] = deque()
+        self._connection_waiter: Optional[Deferred] = None
+        self._producer: Optional[LogProducer] = None
 
         # Connect without DNS lookups if it's a direct IP.
         if _reactor is None:
@@ -123,9 +123,9 @@ class RemoteHandler(logging.Handler):
         try:
             ip = ip_address(self.host)
             if isinstance(ip, IPv4Address):
-                endpoint = TCP4ClientEndpoint(
+                endpoint: IStreamClientEndpoint = TCP4ClientEndpoint(
                     _reactor, self.host, self.port
-                )  # type: IStreamClientEndpoint
+                )
             elif isinstance(ip, IPv6Address):
                 endpoint = TCP6ClientEndpoint(_reactor, self.host, self.port)
             else:
@@ -165,7 +165,7 @@ class RemoteHandler(logging.Handler):
         def writer(result: Protocol) -> None:
             # Force recognising transport as a Connection and not the more
             # generic ITransport.
-            transport = result.transport  # type: Connection  # type: ignore
+            transport: Connection = result.transport  # type: ignore
 
             # We have a connection. If we already have a producer, and its
             # transport is the same, just trigger a resumeProducing.
@@ -188,7 +188,7 @@ class RemoteHandler(logging.Handler):
             self._producer.resumeProducing()
             self._connection_waiter = None
 
-        deferred = self._service.whenConnected(failAfterFailures=1)  # type: Deferred
+        deferred: Deferred = self._service.whenConnected(failAfterFailures=1)
         deferred.addCallbacks(writer, fail)
         self._connection_waiter = deferred
 
