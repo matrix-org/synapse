@@ -45,7 +45,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, UserID, create_requester
+from synapse.types import JsonDict, Requester, User, UserID, create_requester
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -174,15 +174,33 @@ class ModuleApi:
         """The application name configured in the homeserver's configuration."""
         return self._hs.config.email.email_app_name
 
-    def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user by user_id
+    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+        """Get User by user_id
 
         Args:
             user_id: Fully qualified user id.
         Returns:
-            the user dictionary or None if not found.
+            User object if a user was found, otherwise None
         """
-        return self._store.get_user_by_id(user_id)
+        user_data = await self._store.get_user_by_id(user_id)
+        if user_data:
+            app_service = None
+            if user_data.get("appservice_id"):
+                app_service = self._store.get_app_service_by_id(
+                    user_data.get("appservice_id")
+                )
+            return User(
+                user=UserID.from_string(user_data.get("name")),
+                creation_ts=user_data.get("creation_ts"),
+                consent_version=user_data.get("consent_version"),
+                consent_server_notice_sent=user_data.get("consent_server_notice_sent"),
+                app_service=app_service,
+                shadow_banned=user_data.get("shadow_banned"),
+                deactivated=user_data.get("deactivated"),
+                is_guest=user_data.get("is_guest"),
+                admin=user_data.get("admin"),
+                user_type=user_data.get("user_type"),
+            )
 
     async def get_user_by_req(
         self,

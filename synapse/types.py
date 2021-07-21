@@ -751,3 +751,32 @@ def get_verify_key_from_cross_signing_key(key_info):
     # and return that one key
     for key_id, key_data in keys.items():
         return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+
+
+@attr.s(frozen=True, slots=True)
+class User:
+    """Represents a user object.
+
+    Attributes:
+        user:  ID of the user.
+        admin:  True if the user is an admin.
+        app_service:  Application service that created this user.
+        consent_server_notice_sent:  Version of policy documents the user has been sent.
+        consent_version:  Version of policy documents the user has consented to.
+        creation_ts:  Creation timestamp of the user.
+        deactivated:  True if the user has been deactivated.
+        is_guest:  True if the user is a guest user.
+        shadow_banned:  True if the user has been shadow-banned.
+        user_type:  User type (None for normal user, 'support' and 'bot' other options).
+    """
+
+    user = attr.ib(type="UserID")
+    admin = attr.ib(type=bool, default=False, converter=bool)
+    app_service = attr.ib(type=Optional["ApplicationService"], default=None)
+    consent_server_notice_sent = attr.ib(type=Optional[str], default=None)
+    consent_version = attr.ib(type=Optional[str], default=None)
+    creation_ts = attr.ib(type=int, default=0)
+    deactivated = attr.ib(type=bool, default=False, converter=bool)
+    is_guest = attr.ib(type=bool, default=False, converter=bool)
+    shadow_banned = attr.ib(type=bool, default=False, converter=bool)
+    user_type = attr.ib(type=str, default=None)

@@ -82,7 +82,12 @@ class ModuleApiTestCase(HomeserverTestCase):
     def test_get_user_by_id(self):
         user_id = self.register_user("alice", "1234")
         found_user = self.get_success(self.module_api.get_user_by_id(user_id))
-        self.assertTrue(found_user.get("name"), user_id)
+        self.assertEqual(found_user.user.to_string(), user_id)
+        self.assertIdentical(found_user.admin, False)
+
+    def test_get_user_by_id__no_user_found(self):
+        found_user = self.get_success(self.module_api.get_user_by_id("@alice:test"))
+        self.assertIsNone(found_user)
 
     def test_sending_events_into_room(self):
         """Tests that a module can send events into a room"""
