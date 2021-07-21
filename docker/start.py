@@ -3,6 +3,7 @@
 import codecs
 import glob
 import os
+import platform
 import subprocess
 import sys
 
@@ -213,6 +214,13 @@ def main(args, environ):
     if "-m" not in args:
         args = ["-m", synapse_worker] + args
 
+    jemallocpath = "/usr/lib/%s-linux-gnu/libjemalloc.so.2" % (platform.machine(),)
+
+    if os.path.isfile(jemallocpath):
+        environ["LD_PRELOAD"] = jemallocpath
+    else:
+        log("Could not find %s, will not use" % (jemallocpath,))
+
     # if there are no config files passed to synapse, try adding the default file
     if not any(p.startswith("--config-path") or p.startswith("-c") for p in args):
         config_dir = environ.get("SYNAPSE_CONFIG_DIR", "/data")
@@ -248,9 +256,9 @@ running with 'migrate_config'. See the README for more details.
     args = ["python"] + args
     if ownership is not None:
         args = ["gosu", ownership] + args
-        os.execv("/usr/sbin/gosu", args)
+        os.execve("/usr/sbin/gosu", args, environ)
     else:
-        os.execv("/usr/local/bin/python", args)
+        os.execve("/usr/local/bin/python", args, environ)
 
 
 if __name__ == "__main__":

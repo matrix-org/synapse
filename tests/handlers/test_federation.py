@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -223,7 +222,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 room_version,
             )
 
-        for i in range(3):
+        for _ in range(3):
             event = create_invite()
             self.get_success(
                 self.handler.on_invite_request(
@@ -252,7 +251,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
         join_event.signatures[other_server] = {"x": "y"}
         with LoggingContext("send_join"):
             d = run_in_background(
-                self.handler.on_send_join_request, other_server, join_event
+                self.handler.on_send_membership_event, other_server, join_event
             )
         self.get_success(d)
 

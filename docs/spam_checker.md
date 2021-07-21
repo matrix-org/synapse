@@ -1,3 +1,9 @@
+<h2 style="color:red">
+This page of the Synapse documentation is now deprecated. For up to date
+documentation on setting up or writing a spam checker module, please see
+<a href="modules.md">this page</a>.
+</h2>
+
 # Handling spam in Synapse
 
 Synapse has support to customize spam checking behavior. It can plug into a
@@ -14,6 +20,7 @@ The Python class is instantiated with two objects:
 * An instance of `synapse.module_api.ModuleApi`.
 
 It then implements methods which return a boolean to alter behavior in Synapse.
+All the methods must be defined.
 
 There's a generic method for checking every event (`check_event_for_spam`), as
 well as some specific methods:
@@ -24,12 +31,17 @@ well as some specific methods:
 * `user_may_publish_room`
 * `check_username_for_spam`
 * `check_registration_for_spam`
+* `check_media_file_for_spam`
 
 The details of each of these methods (as well as their inputs and outputs)
 are documented in the `synapse.events.spamcheck.SpamChecker` class.
 
 The `ModuleApi` class provides a way for the custom spam checker class to
 call back into the homeserver internals.
+
+Additionally, a `parse_config` method is mandatory and receives the plugin config
+dictionary. After parsing, It must return an object which will be
+passed to `__init__` later.
 
 ### Example
 
@@ -41,6 +53,10 @@ class ExampleSpamChecker:
         self.config = config
         self.api = api
 
+    @staticmethod
+    def parse_config(config):
+        return config
+        
     async def check_event_for_spam(self, foo):
         return False  # allow all events
 
@@ -59,7 +75,13 @@ class ExampleSpamChecker:
     async def check_username_for_spam(self, user_profile):
         return False  # allow all usernames
 
-    async def check_registration_for_spam(self, email_threepid, username, request_info):
+    async def check_registration_for_spam(
+        self,
+        email_threepid,
+        username,
+        request_info,
+        auth_provider_id,
+    ):
         return RegistrationBehaviour.ALLOW  # allow all registrations
 
     async def check_media_file_for_spam(self, file_wrapper, file_info):

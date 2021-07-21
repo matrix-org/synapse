@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -406,7 +405,6 @@ class RootConfig:
         listeners=None,
         tls_certificate_path=None,
         tls_private_key_path=None,
-        acme_domain=None,
     ):
         """
         Build a default configuration file
@@ -458,9 +456,6 @@ class RootConfig:
 
             tls_private_key_path (str|None): The path to the tls private key.
 
-            acme_domain (str|None): The domain acme will try to validate. If
-                specified acme will be enabled.
-
         Returns:
             str: the yaml config file
         """
@@ -478,7 +473,6 @@ class RootConfig:
                 listeners=listeners,
                 tls_certificate_path=tls_certificate_path,
                 tls_private_key_path=tls_private_key_path,
-                acme_domain=acme_domain,
             ).values()
         )
 

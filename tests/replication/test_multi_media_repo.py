@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 import logging
 import os
 from binascii import unhexlify
-from typing import Tuple
+from typing import Optional, Tuple
 
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
@@ -32,7 +31,7 @@ from tests.server import FakeChannel, FakeSite, FakeTransport, make_request
 
 logger = logging.getLogger(__name__)
 
-test_server_connection_factory = None
+test_server_connection_factory: Optional[TestServerTLSConnectionFactory] = None
 
 
 class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
@@ -71,7 +70,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             FakeSite(resource),
             "GET",
-            "/{}/{}".format(target, media_id),
+            f"/{target}/{media_id}",
             shorthand=False,
             access_token=self.access_token,
             await_result=False,
@@ -114,7 +113,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(request.method, b"GET")
         self.assertEqual(
             request.path,
-            "/_matrix/media/r0/download/{}/{}".format(target, media_id).encode("utf-8"),
+            f"/_matrix/media/r0/download/{target}/{media_id}".encode("utf-8"),
         )
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"host"), [target.encode("utf-8")]

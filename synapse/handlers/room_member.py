@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016-2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import abc
 import logging
 import random
@@ -31,7 +30,15 @@ from synapse.api.errors import (
 from synapse.api.ratelimiting import Ratelimiter
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
-from synapse.types import JsonDict, Requester, RoomAlias, RoomID, StateMap, UserID
+from synapse.types import (
+    JsonDict,
+    Requester,
+    RoomAlias,
+    RoomID,
+    StateMap,
+    UserID,
+    get_domain_from_id,
+)
 from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
@@ -64,6 +71,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.profile_handler = hs.get_profile_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.account_data_handler = hs.get_account_data_handler()
+        self.event_auth_handler = hs.get_event_auth_handler()
 
         self.member_linearizer = Linearizer(name="member")
 
@@ -75,22 +83,26 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_joins_local.per_second,
             burst_count=hs.config.ratelimiting.rc_joins_local.burst_count,
         )
         self._join_rate_limiter_remote = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_joins_remote.per_second,
             burst_count=hs.config.ratelimiting.rc_joins_remote.burst_count,
         )
 
         self._invites_per_room_limiter = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_room.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_room.burst_count,
         )
         self._invites_per_user_limiter = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=hs.config.ratelimiting.rc_invites_per_user.per_second,
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
@@ -122,6 +134,24 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def remote_knock(
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
+    ) -> Tuple[str, int]:
+        """Try and knock on a room that this server is not in
+
+        Args:
+            remote_room_hosts: List of servers that can be used to knock via.
+            room_id: Room that we are trying to knock on.
+            user: User who is trying to knock.
+            content: A dict that should be used as the content of the knock event.
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def remote_reject_invite(
         self,
         invite_event_id: str,
@@ -145,6 +175,27 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
     @abc.abstractmethod
+    async def remote_rescind_knock(
+        self,
+        knock_event_id: str,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ) -> Tuple[str, int]:
+        """Rescind a local knock made on a remote room.
+
+        Args:
+            knock_event_id: The ID of the knock event to rescind.
+            txn_id: An optional transaction ID supplied by the client.
+            requester: The user making the request, according to the access token.
+            content: The content of the generated leave event.
+
+        Returns:
+            A tuple containing (event_id, stream_id of the leave event).
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Notifies distributor on master process that the user has left the
         room.
@@ -155,15 +206,49 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    def ratelimit_invite(self, room_id: Optional[str], invitee_user_id: str):
+    @abc.abstractmethod
+    async def forget(self, user: UserID, room_id: str) -> None:
+        raise NotImplementedError()
+
+    async def ratelimit_multiple_invites(
+        self,
+        requester: Optional[Requester],
+        room_id: Optional[str],
+        n_invites: int,
+        update: bool = True,
+    ):
+        """Ratelimit more than one invite sent by the given requester in the given room.
+
+        Args:
+            requester: The requester sending the invites.
+            room_id: The room the invites are being sent in.
+            n_invites: The amount of invites to ratelimit for.
+            update: Whether to update the ratelimiter's cache.
+
+        Raises:
+            LimitExceededError: The requester can't send that many invites in the room.
+        """
+        await self._invites_per_room_limiter.ratelimit(
+            requester,
+            room_id,
+            update=update,
+            n_actions=n_invites,
+        )
+
+    async def ratelimit_invite(
+        self,
+        requester: Optional[Requester],
+        room_id: Optional[str],
+        invitee_user_id: str,
+    ):
         """Ratelimit invites by room and by target user.
 
         If room ID is missing then we just rate limit by target user.
         """
         if room_id:
-            self._invites_per_room_limiter.ratelimit(room_id)
+            await self._invites_per_room_limiter.ratelimit(requester, room_id)
 
-        self._invites_per_user_limiter.ratelimit(invitee_user_id)
+        await self._invites_per_user_limiter.ratelimit(requester, invitee_user_id)
 
     async def _local_membership_update(
         self,
@@ -172,11 +257,42 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: str,
         membership: str,
         prev_event_ids: List[str],
+        auth_event_ids: Optional[List[str]] = None,
         txn_id: Optional[str] = None,
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
+        outlier: bool = False,
     ) -> Tuple[str, int]:
+        """
+        Internal membership update function to get an existing event or create
+        and persist a new event for the new membership change.
+
+        Args:
+            requester:
+            target:
+            room_id:
+            membership:
+            prev_event_ids: The event IDs to use as the prev events
+
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
+            txn_id:
+            ratelimit:
+            content:
+            require_consent:
+
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+
+        Returns:
+            Tuple of event ID and stream ordering position
+        """
+
         user_id = target.to_string()
 
         if content is None:
@@ -213,7 +329,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             },
             txn_id=txn_id,
             prev_event_ids=prev_event_ids,
+            auth_event_ids=auth_event_ids,
             require_consent=require_consent,
+            outlier=outlier,
         )
 
         prev_state_ids = await context.get_prev_state_ids()
@@ -222,9 +340,15 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         if event.membership == Membership.JOIN:
             newly_joined = True
+            prev_member_event = None
             if prev_member_event_id:
                 prev_member_event = await self.store.get_event(prev_member_event_id)
                 newly_joined = prev_member_event.membership != Membership.JOIN
+
+            # Check if the member should be allowed access via membership in a space.
+            await self.event_auth_handler.check_restricted_join_rules(
+                prev_state_ids, event.room_version, user_id, prev_member_event
+            )
 
             # Only rate-limit if the user actually joined the room, otherwise we'll end
             # up blocking profile updates.
@@ -233,7 +357,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 (
                     allowed,
                     time_allowed,
-                ) = self._join_rate_limiter_local.can_requester_do_action(requester)
+                ) = await self._join_rate_limiter_local.can_do_action(requester)
 
                 if not allowed:
                     raise LimitExceededError(
@@ -308,6 +432,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
+        outlier: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Update a user's membership in a room.
 
@@ -322,6 +449,14 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             ratelimit: Whether to rate limit the request.
             content: The content of the created event.
             require_consent: Whether consent is required.
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            prev_event_ids: The event IDs to use as the prev events
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
 
         Returns:
             A tuple of the new event ID and stream ID.
@@ -348,6 +483,9 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 ratelimit=ratelimit,
                 content=content,
                 require_consent=require_consent,
+                outlier=outlier,
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
             )
 
         return result
@@ -364,10 +502,36 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         ratelimit: bool = True,
         content: Optional[dict] = None,
         require_consent: bool = True,
+        outlier: bool = False,
+        prev_event_ids: Optional[List[str]] = None,
+        auth_event_ids: Optional[List[str]] = None,
     ) -> Tuple[str, int]:
         """Helper for update_membership.
 
         Assumes that the membership linearizer is already held for the room.
+
+        Args:
+            requester:
+            target:
+            room_id:
+            action:
+            txn_id:
+            remote_room_hosts:
+            third_party_signed:
+            ratelimit:
+            content:
+            require_consent:
+            outlier: Indicates whether the event is an `outlier`, i.e. if
+                it's from an arbitrary point and floating in the DAG as
+                opposed to being inline with the current DAG.
+            prev_event_ids: The event IDs to use as the prev events
+            auth_event_ids:
+                The event ids to use as the auth_events for the new event.
+                Should normally be left as None, which will cause them to be calculated
+                based on the room state at the prev_events.
+
+        Returns:
+            A tuple of the new event ID and stream ID.
         """
         content_specified = bool(content)
         if content is None:
@@ -417,9 +581,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if effective_membership_state == Membership.INVITE:
             target_id = target.to_string()
             if ratelimit:
-                # Don't ratelimit application services.
-                if not requester.app_service or requester.app_service.is_rate_limited():
-                    self.ratelimit_invite(room_id, target_id)
+                await self.ratelimit_invite(requester, room_id, target_id)
 
             # block any attempts to invite the server notices mxid
             if target_id == self._server_notices_mxid:
@@ -453,6 +615,21 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
             if block_invite:
                 raise SynapseError(403, "Invites have been disabled on this server")
+
+        if prev_event_ids:
+            return await self._local_membership_update(
+                requester=requester,
+                target=target,
+                room_id=room_id,
+                membership=effective_membership_state,
+                txn_id=txn_id,
+                ratelimit=ratelimit,
+                prev_event_ids=prev_event_ids,
+                auth_event_ids=auth_event_ids,
+                content=content,
+                require_consent=require_consent,
+                outlier=outlier,
+            )
 
         latest_event_ids = await self.store.get_prev_events_for_room(room_id)
 
@@ -530,7 +707,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     (
                         allowed,
                         time_allowed,
-                    ) = self._join_rate_limiter_remote.can_requester_do_action(
+                    ) = await self._join_rate_limiter_remote.can_do_action(
                         requester,
                     )
 
@@ -561,53 +738,79 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
         elif effective_membership_state == Membership.LEAVE:
             if not is_host_in_room:
-                # perhaps we've been invited
+                # Figure out the user's current membership state for the room
                 (
                     current_membership_type,
                     current_membership_event_id,
                 ) = await self.store.get_local_current_membership_for_user_in_room(
                     target.to_string(), room_id
                 )
-                if (
-                    current_membership_type != Membership.INVITE
-                    or not current_membership_event_id
-                ):
+                if not current_membership_type or not current_membership_event_id:
                     logger.info(
                         "%s sent a leave request to %s, but that is not an active room "
-                        "on this server, and there is no pending invite",
+                        "on this server, or there is no pending invite or knock",
                         target,
                         room_id,
                     )
 
                     raise SynapseError(404, "Not a known room")
 
-                invite = await self.store.get_event(current_membership_event_id)
-                logger.info(
-                    "%s rejects invite to %s from %s", target, room_id, invite.sender
-                )
-
-                if not self.hs.is_mine_id(invite.sender):
-                    # send the rejection to the inviter's HS (with fallback to
-                    # local event)
-                    return await self.remote_reject_invite(
-                        invite.event_id,
-                        txn_id,
-                        requester,
-                        content,
+                # perhaps we've been invited
+                if current_membership_type == Membership.INVITE:
+                    invite = await self.store.get_event(current_membership_event_id)
+                    logger.info(
+                        "%s rejects invite to %s from %s",
+                        target,
+                        room_id,
+                        invite.sender,
                     )
 
-                # the inviter was on our server, but has now left. Carry on
-                # with the normal rejection codepath, which will also send the
-                # rejection out to any other servers we believe are still in the room.
+                    if not self.hs.is_mine_id(invite.sender):
+                        # send the rejection to the inviter's HS (with fallback to
+                        # local event)
+                        return await self.remote_reject_invite(
+                            invite.event_id,
+                            txn_id,
+                            requester,
+                            content,
+                        )
 
-                # thanks to overzealous cleaning up of event_forward_extremities in
-                # `delete_old_current_state_events`, it's possible to end up with no
-                # forward extremities here. If that happens, let's just hang the
-                # rejection off the invite event.
-                #
-                # see: https://github.com/matrix-org/synapse/issues/7139
-                if len(latest_event_ids) == 0:
-                    latest_event_ids = [invite.event_id]
+                    # the inviter was on our server, but has now left. Carry on
+                    # with the normal rejection codepath, which will also send the
+                    # rejection out to any other servers we believe are still in the room.
+
+                    # thanks to overzealous cleaning up of event_forward_extremities in
+                    # `delete_old_current_state_events`, it's possible to end up with no
+                    # forward extremities here. If that happens, let's just hang the
+                    # rejection off the invite event.
+                    #
+                    # see: https://github.com/matrix-org/synapse/issues/7139
+                    if len(latest_event_ids) == 0:
+                        latest_event_ids = [invite.event_id]
+
+                # or perhaps this is a remote room that a local user has knocked on
+                elif current_membership_type == Membership.KNOCK:
+                    knock = await self.store.get_event(current_membership_event_id)
+                    return await self.remote_rescind_knock(
+                        knock.event_id, txn_id, requester, content
+                    )
+
+        elif effective_membership_state == Membership.KNOCK:
+            if not is_host_in_room:
+                # The knock needs to be sent over federation instead
+                remote_room_hosts.append(get_domain_from_id(room_id))
+
+                content["membership"] = Membership.KNOCK
+
+                profile = self.profile_handler
+                if "displayname" not in content:
+                    content["displayname"] = await profile.get_displayname(target)
+                if "avatar_url" not in content:
+                    content["avatar_url"] = await profile.get_avatar_url(target)
+
+                return await self.remote_knock(
+                    remote_room_hosts, room_id, target, content
+                )
 
         return await self._local_membership_update(
             requester=requester,
@@ -617,8 +820,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             txn_id=txn_id,
             ratelimit=ratelimit,
             prev_event_ids=latest_event_ids,
+            auth_event_ids=auth_event_ids,
             content=content,
             require_consent=require_consent,
+            outlier=outlier,
         )
 
     async def transfer_room_state_on_room_upgrade(
@@ -1017,7 +1222,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
 
 
 class RoomMemberMasterHandler(RoomMemberHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         self.distributor = hs.get_distributor()
@@ -1167,6 +1372,35 @@ class RoomMemberMasterHandler(RoomMemberHandler):
                 invite_event, txn_id, requester, content
             )
 
+    async def remote_rescind_knock(
+        self,
+        knock_event_id: str,
+        txn_id: Optional[str],
+        requester: Requester,
+        content: JsonDict,
+    ) -> Tuple[str, int]:
+        """
+        Rescinds a local knock made on a remote room
+
+        Args:
+            knock_event_id: The ID of the knock event to rescind.
+            txn_id: The transaction ID to use.
+            requester: The originator of the request.
+            content: The content of the leave event.
+
+        Implements RoomMemberHandler.remote_rescind_knock
+        """
+        # TODO: We don't yet support rescinding knocks over federation
+        # as we don't know which homeserver to send it to. An obvious
+        # candidate is the remote homeserver we originally knocked through,
+        # however we don't currently store that information.
+
+        # Just rescind the knock locally
+        knock_event = await self.store.get_event(knock_event_id)
+        return await self._generate_local_out_of_band_leave(
+            knock_event, txn_id, requester, content
+        )
+
     async def _generate_local_out_of_band_leave(
         self,
         previous_membership_event: EventBase,
@@ -1229,6 +1463,36 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         assert result_event.internal_metadata.stream_ordering
 
         return result_event.event_id, result_event.internal_metadata.stream_ordering
+
+    async def remote_knock(
+        self,
+        remote_room_hosts: List[str],
+        room_id: str,
+        user: UserID,
+        content: dict,
+    ) -> Tuple[str, int]:
+        """Sends a knock to a room. Attempts to do so via one remote out of a given list.
+
+        Args:
+            remote_room_hosts: A list of homeservers to try knocking through.
+            room_id: The ID of the room to knock on.
+            user: The user to knock on behalf of.
+            content: The content of the knock event.
+
+        Returns:
+            A tuple of (event ID, stream ID).
+        """
+        # filter ourselves out of remote_room_hosts
+        remote_room_hosts = [
+            host for host in remote_room_hosts if host != self.hs.hostname
+        ]
+
+        if len(remote_room_hosts) == 0:
+            raise SynapseError(404, "No known servers")
+
+        return await self.federation_handler.do_knock(
+            remote_room_hosts, room_id, user.to_string(), content=content
+        )
 
     async def _user_left_room(self, target: UserID, room_id: str) -> None:
         """Implements RoomMemberHandler._user_left_room"""

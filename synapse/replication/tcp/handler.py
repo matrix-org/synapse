@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -48,7 +47,7 @@ from synapse.replication.tcp.commands import (
     UserIpCommand,
     UserSyncCommand,
 )
-from synapse.replication.tcp.protocol import AbstractConnection
+from synapse.replication.tcp.protocol import IReplicationConnection
 from synapse.replication.tcp.streams import (
     STREAMS_MAP,
     AccountDataStream,
@@ -56,6 +55,8 @@ from synapse.replication.tcp.streams import (
     CachesStream,
     EventsStream,
     FederationStream,
+    PresenceFederationStream,
+    PresenceStream,
     ReceiptsStream,
     Stream,
     TagAccountDataStream,
@@ -82,7 +83,7 @@ user_ip_cache_counter = Counter("synapse_replication_tcp_resource_user_ip_cache"
 
 # the type of the entries in _command_queues_by_stream
 _StreamCommandQueue = Deque[
-    Tuple[Union[RdataCommand, PositionCommand], AbstractConnection]
+    Tuple[Union[RdataCommand, PositionCommand], IReplicationConnection]
 ]
 
 
@@ -100,12 +101,16 @@ class ReplicationCommandHandler:
         self._instance_id = hs.get_instance_id()
         self._instance_name = hs.get_instance_name()
 
-        self._streams = {
+        self._is_presence_writer = (
+            hs.get_instance_name() in hs.config.worker.writers.presence
+        )
+
+        self._streams: Dict[str, Stream] = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
-        }  # type: Dict[str, Stream]
+        }
 
         # List of streams that this instance is the source of
-        self._streams_to_replicate = []  # type: List[Stream]
+        self._streams_to_replicate: List[Stream] = []
 
         for stream in self._streams.values():
             if hs.config.redis.redis_enabled and stream.NAME == CachesStream.NAME:
@@ -154,6 +159,14 @@ class ReplicationCommandHandler:
 
                 continue
 
+            if isinstance(stream, (PresenceStream, PresenceFederationStream)):
+                # Only add PresenceStream as a source on the instance in charge
+                # of presence.
+                if self._is_presence_writer:
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
             # Only add any other streams if we're on master.
             if hs.config.worker_app is not None:
                 continue
@@ -167,14 +180,14 @@ class ReplicationCommandHandler:
 
         # Map of stream name to batched updates. See RdataCommand for info on
         # how batching works.
-        self._pending_batches = {}  # type: Dict[str, List[Any]]
+        self._pending_batches: Dict[str, List[Any]] = {}
 
         # The factory used to create connections.
-        self._factory = None  # type: Optional[ReconnectingClientFactory]
+        self._factory: Optional[ReconnectingClientFactory] = None
 
         # The currently connected connections. (The list of places we need to send
         # outgoing replication commands to.)
-        self._connections = []  # type: List[AbstractConnection]
+        self._connections: List[IReplicationConnection] = []
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -187,7 +200,7 @@ class ReplicationCommandHandler:
         # them in order in a separate background process.
 
         # the streams which are currently being processed by _unsafe_process_queue
-        self._processing_streams = set()  # type: Set[str]
+        self._processing_streams: Set[str] = set()
 
         # for each stream, a queue of commands that are awaiting processing, and the
         # connection that they arrived on.
@@ -197,7 +210,7 @@ class ReplicationCommandHandler:
 
         # For each connection, the incoming stream names that have received a POSITION
         # from that connection.
-        self._streams_by_connection = {}  # type: Dict[AbstractConnection, Set[str]]
+        self._streams_by_connection: Dict[IReplicationConnection, Set[str]] = {}
 
         LaterGauge(
             "synapse_replication_tcp_command_queue",
@@ -220,7 +233,7 @@ class ReplicationCommandHandler:
             self._server_notices_sender = hs.get_server_notices_sender()
 
     def _add_command_to_stream_queue(
-        self, conn: AbstractConnection, cmd: Union[RdataCommand, PositionCommand]
+        self, conn: IReplicationConnection, cmd: Union[RdataCommand, PositionCommand]
     ) -> None:
         """Queue the given received command for processing
 
@@ -267,7 +280,7 @@ class ReplicationCommandHandler:
     async def _process_command(
         self,
         cmd: Union[PositionCommand, RdataCommand],
-        conn: AbstractConnection,
+        conn: IReplicationConnection,
         stream_name: str,
     ) -> None:
         if isinstance(cmd, PositionCommand):
@@ -302,7 +315,7 @@ class ReplicationCommandHandler:
                 hs, outbound_redis_connection
             )
             hs.get_reactor().connectTCP(
-                hs.config.redis.redis_host,
+                hs.config.redis.redis_host.encode(),
                 hs.config.redis.redis_port,
                 self._factory,
             )
@@ -311,7 +324,7 @@ class ReplicationCommandHandler:
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
             host = hs.config.worker_replication_host
             port = hs.config.worker_replication_port
-            hs.get_reactor().connectTCP(host, port, self._factory)
+            hs.get_reactor().connectTCP(host.encode(), port, self._factory)
 
     def get_streams(self) -> Dict[str, Stream]:
         """Get a map from stream name to all streams."""
@@ -321,10 +334,10 @@ class ReplicationCommandHandler:
         """Get a list of streams that this instances replicates."""
         return self._streams_to_replicate
 
-    def on_REPLICATE(self, conn: AbstractConnection, cmd: ReplicateCommand):
+    def on_REPLICATE(self, conn: IReplicationConnection, cmd: ReplicateCommand):
         self.send_positions_to_connection(conn)
 
-    def send_positions_to_connection(self, conn: AbstractConnection):
+    def send_positions_to_connection(self, conn: IReplicationConnection):
         """Send current position of all streams this process is source of to
         the connection.
         """
@@ -347,11 +360,11 @@ class ReplicationCommandHandler:
             )
 
     def on_USER_SYNC(
-        self, conn: AbstractConnection, cmd: UserSyncCommand
+        self, conn: IReplicationConnection, cmd: UserSyncCommand
     ) -> Optional[Awaitable[None]]:
         user_sync_counter.inc()
 
-        if self._is_master:
+        if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_row(
                 cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
             )
@@ -359,21 +372,23 @@ class ReplicationCommandHandler:
             return None
 
     def on_CLEAR_USER_SYNC(
-        self, conn: AbstractConnection, cmd: ClearUserSyncsCommand
+        self, conn: IReplicationConnection, cmd: ClearUserSyncsCommand
     ) -> Optional[Awaitable[None]]:
-        if self._is_master:
+        if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_clear(cmd.instance_id)
         else:
             return None
 
-    def on_FEDERATION_ACK(self, conn: AbstractConnection, cmd: FederationAckCommand):
+    def on_FEDERATION_ACK(
+        self, conn: IReplicationConnection, cmd: FederationAckCommand
+    ):
         federation_ack_counter.inc()
 
         if self._federation_sender:
             self._federation_sender.federation_ack(cmd.instance_name, cmd.token)
 
     def on_USER_IP(
-        self, conn: AbstractConnection, cmd: UserIpCommand
+        self, conn: IReplicationConnection, cmd: UserIpCommand
     ) -> Optional[Awaitable[None]]:
         user_ip_cache_counter.inc()
 
@@ -395,7 +410,7 @@ class ReplicationCommandHandler:
         assert self._server_notices_sender is not None
         await self._server_notices_sender.on_user_ip(cmd.user_id)
 
-    def on_RDATA(self, conn: AbstractConnection, cmd: RdataCommand):
+    def on_RDATA(self, conn: IReplicationConnection, cmd: RdataCommand):
         if cmd.instance_name == self._instance_name:
             # Ignore RDATA that are just our own echoes
             return
@@ -412,7 +427,7 @@ class ReplicationCommandHandler:
         self._add_command_to_stream_queue(conn, cmd)
 
     async def _process_rdata(
-        self, stream_name: str, conn: AbstractConnection, cmd: RdataCommand
+        self, stream_name: str, conn: IReplicationConnection, cmd: RdataCommand
     ) -> None:
         """Process an RDATA command
 
@@ -486,7 +501,7 @@ class ReplicationCommandHandler:
             stream_name, instance_name, token, rows
         )
 
-    def on_POSITION(self, conn: AbstractConnection, cmd: PositionCommand):
+    def on_POSITION(self, conn: IReplicationConnection, cmd: PositionCommand):
         if cmd.instance_name == self._instance_name:
             # Ignore POSITION that are just our own echoes
             return
@@ -496,7 +511,7 @@ class ReplicationCommandHandler:
         self._add_command_to_stream_queue(conn, cmd)
 
     async def _process_position(
-        self, stream_name: str, conn: AbstractConnection, cmd: PositionCommand
+        self, stream_name: str, conn: IReplicationConnection, cmd: PositionCommand
     ) -> None:
         """Process a POSITION command
 
@@ -553,8 +568,10 @@ class ReplicationCommandHandler:
 
         self._streams_by_connection.setdefault(conn, set()).add(stream_name)
 
-    def on_REMOTE_SERVER_UP(self, conn: AbstractConnection, cmd: RemoteServerUpCommand):
-        """"Called when get a new REMOTE_SERVER_UP command."""
+    def on_REMOTE_SERVER_UP(
+        self, conn: IReplicationConnection, cmd: RemoteServerUpCommand
+    ):
+        """Called when get a new REMOTE_SERVER_UP command."""
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
         self._notifier.notify_remote_server_up(cmd.data)
@@ -576,7 +593,7 @@ class ReplicationCommandHandler:
         # between two instances, but that is not currently supported).
         self.send_command(cmd, ignore_conn=conn)
 
-    def new_connection(self, connection: AbstractConnection):
+    def new_connection(self, connection: IReplicationConnection):
         """Called when we have a new connection."""
         self._connections.append(connection)
 
@@ -603,7 +620,7 @@ class ReplicationCommandHandler:
                 UserSyncCommand(self._instance_id, user_id, True, now)
             )
 
-    def lost_connection(self, connection: AbstractConnection):
+    def lost_connection(self, connection: IReplicationConnection):
         """Called when a connection is closed/lost."""
         # we no longer need _streams_by_connection for this connection.
         streams = self._streams_by_connection.pop(connection, None)
@@ -624,7 +641,7 @@ class ReplicationCommandHandler:
         return bool(self._connections)
 
     def send_command(
-        self, cmd: Command, ignore_conn: Optional[AbstractConnection] = None
+        self, cmd: Command, ignore_conn: Optional[IReplicationConnection] = None
     ):
         """Send a command to all connected connections.
 

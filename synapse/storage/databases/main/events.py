@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -110,10 +109,8 @@ class PersistEventsStore:
 
         # Ideally we'd move these ID gens here, unfortunately some other ID
         # generators are chained off them so doing so is a bit of a PITA.
-        self._backfill_id_gen = (
-            self.store._backfill_id_gen
-        )  # type: MultiWriterIdGenerator
-        self._stream_id_gen = self.store._stream_id_gen  # type: MultiWriterIdGenerator
+        self._backfill_id_gen: MultiWriterIdGenerator = self.store._backfill_id_gen
+        self._stream_id_gen: MultiWriterIdGenerator = self.store._stream_id_gen
 
         # This should only exist on instances that are configured to write
         assert (
@@ -171,7 +168,7 @@ class PersistEventsStore:
             )
 
         async with stream_ordering_manager as stream_orderings:
-            for (event, context), stream in zip(events_and_contexts, stream_orderings):
+            for (event, _), stream in zip(events_and_contexts, stream_orderings):
                 event.internal_metadata.stream_ordering = stream
 
             await self.db_pool.runInteraction(
@@ -222,7 +219,7 @@ class PersistEventsStore:
         Returns:
             Filtered event ids
         """
-        results = []  # type: List[str]
+        results: List[str] = []
 
         def _get_events_which_are_prevs_txn(txn, batch):
             sql = """
@@ -298,7 +295,7 @@ class PersistEventsStore:
                 txn.execute(sql + clause, args)
                 to_recursively_check = []
 
-                for event_id, prev_event_id, metadata, rejected in txn:
+                for _, prev_event_id, metadata, rejected in txn:
                     if prev_event_id in existing_prevs:
                         continue
 
@@ -320,8 +317,8 @@ class PersistEventsStore:
         txn: LoggingTransaction,
         events_and_contexts: List[Tuple[EventBase, EventContext]],
         backfilled: bool,
-        state_delta_for_room: Dict[str, DeltaState] = {},
-        new_forward_extremeties: Dict[str, List[str]] = {},
+        state_delta_for_room: Optional[Dict[str, DeltaState]] = None,
+        new_forward_extremeties: Optional[Dict[str, List[str]]] = None,
     ):
         """Insert some number of room events into the necessary database tables.
 
@@ -342,6 +339,9 @@ class PersistEventsStore:
                 extremities.
 
         """
+        state_delta_for_room = state_delta_for_room or {}
+        new_forward_extremeties = new_forward_extremeties or {}
+
         all_events_and_contexts = events_and_contexts
 
         min_stream_order = events_and_contexts[0][0].internal_metadata.stream_ordering
@@ -506,7 +506,7 @@ class PersistEventsStore:
         """
 
         # Map from event ID to chain ID/sequence number.
-        chain_map = {}  # type: Dict[str, Tuple[int, int]]
+        chain_map: Dict[str, Tuple[int, int]] = {}
 
         # Set of event IDs to calculate chain ID/seq numbers for.
         events_to_calc_chain_id_for = set(event_to_room_id)
@@ -815,8 +815,8 @@ class PersistEventsStore:
         #      new chain if the sequence number has already been allocated.
         #
 
-        existing_chains = set()  # type: Set[int]
-        tree = []  # type: List[Tuple[str, Optional[str]]]
+        existing_chains: Set[int] = set()
+        tree: List[Tuple[str, Optional[str]]] = []
 
         # We need to do this in a topologically sorted order as we want to
         # generate chain IDs/sequence numbers of an event's auth events before
@@ -846,7 +846,7 @@ class PersistEventsStore:
         )
         txn.execute(sql % (clause,), args)
 
-        chain_to_max_seq_no = {row[0]: row[1] for row in txn}  # type: Dict[Any, int]
+        chain_to_max_seq_no: Dict[Any, int] = {row[0]: row[1] for row in txn}
 
         # Allocate the new events chain ID/sequence numbers.
         #
@@ -856,8 +856,8 @@ class PersistEventsStore:
         # number of new chain IDs in one call, replacing all temporary
         # objects with real allocated chain IDs.
 
-        unallocated_chain_ids = set()  # type: Set[object]
-        new_chain_tuples = {}  # type: Dict[str, Tuple[Any, int]]
+        unallocated_chain_ids: Set[object] = set()
+        new_chain_tuples: Dict[str, Tuple[Any, int]] = {}
         for event_id, auth_event_id in tree:
             # If we reference an auth_event_id we fetch the allocated chain ID,
             # either from the existing `chain_map` or the newly generated
@@ -868,7 +868,7 @@ class PersistEventsStore:
                 if not existing_chain_id:
                     existing_chain_id = chain_map[auth_event_id]
 
-            new_chain_tuple = None  # type: Optional[Tuple[Any, int]]
+            new_chain_tuple: Optional[Tuple[Any, int]] = None
             if existing_chain_id:
                 # We found a chain ID/sequence number candidate, check its
                 # not already taken.
@@ -895,9 +895,9 @@ class PersistEventsStore:
         )
 
         # Map from potentially temporary chain ID to real chain ID
-        chain_id_to_allocated_map = dict(
+        chain_id_to_allocated_map: Dict[Any, int] = dict(
             zip(unallocated_chain_ids, newly_allocated_chain_ids)
-        )  # type: Dict[Any, int]
+        )
         chain_id_to_allocated_map.update((c, c) for c in existing_chains)
 
         return {
@@ -1125,7 +1125,7 @@ class PersistEventsStore:
     def _update_forward_extremities_txn(
         self, txn, new_forward_extremities, max_stream_order
     ):
-        for room_id, new_extrem in new_forward_extremities.items():
+        for room_id in new_forward_extremities.keys():
             self.db_pool.simple_delete_txn(
                 txn, table="event_forward_extremities", keyvalues={"room_id": room_id}
             )
@@ -1173,9 +1173,9 @@ class PersistEventsStore:
         Returns:
             list[(EventBase, EventContext)]: filtered list
         """
-        new_events_and_contexts = (
-            OrderedDict()
-        )  # type: OrderedDict[str, Tuple[EventBase, EventContext]]
+        new_events_and_contexts: OrderedDict[
+            str, Tuple[EventBase, EventContext]
+        ] = OrderedDict()
         for event, context in events_and_contexts:
             prev_event_context = new_events_and_contexts.get(event.event_id)
             if prev_event_context:
@@ -1203,7 +1203,7 @@ class PersistEventsStore:
                 we are persisting
             backfilled (bool): True if the events were backfilled
         """
-        depth_updates = {}  # type: Dict[str, int]
+        depth_updates: Dict[str, int] = {}
         for event, context in events_and_contexts:
             # Remove the any existing cache entries for the event_ids
             txn.call_after(self.store._invalidate_get_event_cache, event.event_id)
@@ -1270,8 +1270,10 @@ class PersistEventsStore:
                     logger.exception("")
                     raise
 
+                # update the stored internal_metadata to update the "outlier" flag.
+                # TODO: This is unused as of Synapse 1.31. Remove it once we are happy
+                #  to drop backwards-compatibility with 1.30.
                 metadata_json = json_encoder.encode(event.internal_metadata.get_dict())
-
                 sql = "UPDATE event_json SET internal_metadata = ? WHERE event_id = ?"
                 txn.execute(sql, (metadata_json, event.event_id))
 
@@ -1319,6 +1321,19 @@ class PersistEventsStore:
             d.pop("redacted_because", None)
             return d
 
+        def get_internal_metadata(event):
+            im = event.internal_metadata.get_dict()
+
+            # temporary hack for database compatibility with Synapse 1.30 and earlier:
+            # store the `outlier` flag inside the internal_metadata json as well as in
+            # the `events` table, so that if anyone rolls back to an older Synapse,
+            # things keep working. This can be removed once we are happy to drop support
+            # for that
+            if event.internal_metadata.is_outlier():
+                im["outlier"] = True
+
+            return im
+
         self.db_pool.simple_insert_many_txn(
             txn,
             table="event_json",
@@ -1327,7 +1342,7 @@ class PersistEventsStore:
                     "event_id": event.event_id,
                     "room_id": event.room_id,
                     "internal_metadata": json_encoder.encode(
-                        event.internal_metadata.get_dict()
+                        get_internal_metadata(event)
                     ),
                     "json": json_encoder.encode(event_dict(event)),
                     "format_version": event.format_version,
@@ -1361,24 +1376,28 @@ class PersistEventsStore:
             ],
         )
 
-        for event, _ in events_and_contexts:
-            if not event.internal_metadata.is_redacted():
-                # If we're persisting an unredacted event we go and ensure
-                # that we mark any redactions that reference this event as
-                # requiring censoring.
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="redactions",
-                    keyvalues={"redacts": event.event_id},
-                    updatevalues={"have_censored": False},
+        # If we're persisting an unredacted event we go and ensure
+        # that we mark any redactions that reference this event as
+        # requiring censoring.
+        sql = "UPDATE redactions SET have_censored = ? WHERE redacts = ?"
+        txn.execute_batch(
+            sql,
+            (
+                (
+                    False,
+                    event.event_id,
                 )
+                for event, _ in events_and_contexts
+                if not event.internal_metadata.is_redacted()
+            ),
+        )
 
         state_events_and_contexts = [
             ec for ec in events_and_contexts if ec[0].is_state()
         ]
 
         state_values = []
-        for event, context in state_events_and_contexts:
+        for event, _ in state_events_and_contexts:
             vals = {
                 "event_id": event.event_id,
                 "room_id": event.room_id,
@@ -1447,7 +1466,7 @@ class PersistEventsStore:
             # nothing to do here
             return
 
-        for event, context in events_and_contexts:
+        for event, _ in events_and_contexts:
             if event.type == EventTypes.Redaction and event.redacts is not None:
                 # Remove the entries in the event_push_actions table for the
                 # redacted event.
@@ -1559,11 +1578,11 @@ class PersistEventsStore:
         # invalidate the cache for the redacted event
         txn.call_after(self.store._invalidate_get_event_cache, event.redacts)
 
-        self.db_pool.simple_insert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="redactions",
+            keyvalues={"event_id": event.event_id},
             values={
-                "event_id": event.event_id,
                 "redacts": event.redacts,
                 "received_ts": self._clock.time_msec(),
             },
@@ -1727,9 +1746,9 @@ class PersistEventsStore:
             },
         )
 
-        txn.call_after(self.store.get_relations_for_event.invalidate_many, (parent_id,))
+        txn.call_after(self.store.get_relations_for_event.invalidate, (parent_id,))
         txn.call_after(
-            self.store.get_aggregation_groups_for_event.invalidate_many, (parent_id,)
+            self.store.get_aggregation_groups_for_event.invalidate, (parent_id,)
         )
 
         if rel_type == RelationTypes.REPLACE:
@@ -1864,19 +1883,27 @@ class PersistEventsStore:
                 ),
             )
 
-        for event, _ in events_and_contexts:
-            user_ids = self.db_pool.simple_select_onecol_txn(
-                txn,
-                table="event_push_actions_staging",
-                keyvalues={"event_id": event.event_id},
-                retcol="user_id",
-            )
+            room_to_event_ids: Dict[str, List[str]] = {}
+            for e, _ in events_and_contexts:
+                room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
 
-            for uid in user_ids:
-                txn.call_after(
-                    self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
-                    (event.room_id, uid),
+            for room_id, event_ids in room_to_event_ids.items():
+                rows = self.db_pool.simple_select_many_txn(
+                    txn,
+                    table="event_push_actions_staging",
+                    column="event_id",
+                    iterable=event_ids,
+                    keyvalues={},
+                    retcols=("user_id",),
                 )
+
+                user_ids = {row["user_id"] for row in rows}
+
+                for user_id in user_ids:
+                    txn.call_after(
+                        self.store.get_unread_event_push_actions_by_room_for_user.invalidate,
+                        (room_id, user_id),
+                    )
 
         # Now we delete the staging area for *all* events that were being
         # persisted.
@@ -1888,7 +1915,7 @@ class PersistEventsStore:
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
         # Sad that we have to blow away the cache for the whole room here
         txn.call_after(
-            self.store.get_unread_event_push_actions_by_room_for_user.invalidate_many,
+            self.store.get_unread_event_push_actions_by_room_for_user.invalidate,
             (room_id,),
         )
         txn.execute(
@@ -1983,10 +2010,6 @@ class PersistEventsStore:
 
         Forward extremities are handled when we first start persisting the events.
         """
-        events_by_room = {}  # type: Dict[str, List[EventBase]]
-        for ev in events:
-            events_by_room.setdefault(ev.room_id, []).append(ev)
-
         query = (
             "INSERT INTO event_backward_extremities (event_id, room_id)"
             " SELECT ?, ? WHERE NOT EXISTS ("

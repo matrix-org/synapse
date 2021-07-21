@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,16 +45,17 @@ indicate which side is sending, these are *not* included on the wire::
     > ERROR server stopping
     * connection closed by server *
 """
-import abc
 import fcntl
 import logging
 import struct
 from inspect import isawaitable
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Collection, List, Optional
 
 from prometheus_client import Counter
+from zope.interface import Interface, implementer
 
 from twisted.internet import task
+from twisted.internet.tcp import Connection
 from twisted.protocols.basic import LineOnlyReceiver
 from twisted.python.failure import Failure
 
@@ -76,7 +76,6 @@ from synapse.replication.tcp.commands import (
     ServerCommand,
     parse_command_from_line,
 )
-from synapse.types import Collection
 from synapse.util import Clock
 from synapse.util.stringutils import random_string
 
@@ -103,7 +102,7 @@ tcp_outbound_commands_counter = Counter(
 
 # A list of all connected protocols. This allows us to send metrics about the
 # connections.
-connected_connections = []
+connected_connections: "List[BaseReplicationStreamProtocol]" = []
 
 
 logger = logging.getLogger(__name__)
@@ -121,6 +120,14 @@ class ConnectionStates:
     CLOSED = "closed"
 
 
+class IReplicationConnection(Interface):
+    """An interface for replication connections."""
+
+    def send_command(cmd: Command):
+        """Send the command down the connection"""
+
+
+@implementer(IReplicationConnection)
 class BaseReplicationStreamProtocol(LineOnlyReceiver):
     """Base replication protocol shared between client and server.
 
@@ -137,13 +144,17 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     (if they send a `PING` command)
     """
 
+    # The transport is going to be an ITCPTransport, but that doesn't have the
+    # (un)registerProducer methods, those are only on the implementation.
+    transport: Connection
+
     delimiter = b"\n"
 
     # Valid commands we expect to receive
-    VALID_INBOUND_COMMANDS = []  # type: Collection[str]
+    VALID_INBOUND_COMMANDS: Collection[str] = []
 
     # Valid commands we can send
-    VALID_OUTBOUND_COMMANDS = []  # type: Collection[str]
+    VALID_OUTBOUND_COMMANDS: Collection[str] = []
 
     max_line_buffer = 10000
 
@@ -154,7 +165,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.last_received_command = self.clock.time_msec()
         self.last_sent_command = 0
         # When we requested the connection be closed
-        self.time_we_closed = None  # type: Optional[int]
+        self.time_we_closed: Optional[int] = None
 
         self.received_ping = False  # Have we received a ping from the other side
 
@@ -164,15 +175,16 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
         self.conn_id = random_string(5)  # To dedupe in case of name clashes.
 
         # List of pending commands to send once we've established the connection
-        self.pending_commands = []  # type: List[Command]
+        self.pending_commands: List[Command] = []
 
         # The LoopingCall for sending pings.
-        self._send_ping_loop = None  # type: Optional[task.LoopingCall]
+        self._send_ping_loop: Optional[task.LoopingCall] = None
 
         # a logcontext which we use for processing incoming commands. We declare it as a
         # background process so that the CPU stats get reported to prometheus.
-        ctx_name = "replication-conn-%s" % self.conn_id
-        self._logging_context = BackgroundProcessLoggingContext(ctx_name, ctx_name)
+        self._logging_context = BackgroundProcessLoggingContext(
+            "replication-conn", self.conn_id
+        )
 
     def connectionMade(self):
         logger.info("[%s] Connection established", self.id())
@@ -181,6 +193,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
 
         connected_connections.append(self)  # Register connection for metrics
 
+        assert self.transport is not None
         self.transport.registerProducer(self, True)  # For the *Producing callbacks
 
         self._send_pending_commands()
@@ -205,6 +218,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
                 logger.info(
                     "[%s] Failed to close connection gracefully, aborting", self.id()
                 )
+                assert self.transport is not None
                 self.transport.abortConnection()
         else:
             if now - self.last_sent_command >= PING_TIME:
@@ -294,6 +308,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def close(self):
         logger.warning("[%s] Closing connection", self.id())
         self.time_we_closed = self.clock.time_msec()
+        assert self.transport is not None
         self.transport.loseConnection()
         self.on_connection_closed()
 
@@ -391,6 +406,7 @@ class BaseReplicationStreamProtocol(LineOnlyReceiver):
     def connectionLost(self, reason):
         logger.info("[%s] Replication connection closed: %r", self.id(), reason)
         if isinstance(reason, Failure):
+            assert reason.type is not None
             connection_close_counter.labels(reason.type.__name__).inc()
         else:
             connection_close_counter.labels(reason.__class__.__name__).inc()
@@ -493,20 +509,6 @@ class ClientReplicationStreamProtocol(BaseReplicationStreamProtocol):
         logger.info("[%s] Subscribing to replication streams", self.id())
 
         self.send_command(ReplicateCommand())
-
-
-class AbstractConnection(abc.ABC):
-    """An interface for replication connections."""
-
-    @abc.abstractmethod
-    def send_command(self, cmd: Command):
-        """Send the command down the connection"""
-        pass
-
-
-# This tells python that `BaseReplicationStreamProtocol` implements the
-# interface.
-AbstractConnection.register(BaseReplicationStreamProtocol)
 
 
 # The following simply registers metrics for the replication connections

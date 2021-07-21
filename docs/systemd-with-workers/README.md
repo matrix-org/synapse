@@ -6,16 +6,20 @@ well as a `matrix-synapse-worker@` service template for any workers you
 require. Additionally, to group the required services, it sets up a
 `matrix-synapse.target`.
 
-See the folder [system](system) for the systemd unit files.
+See the folder [system](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/)
+for the systemd unit files.
 
-The folder [workers](workers) contains an example configuration for the
-`federation_reader` worker.
+The folder [workers](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/)
+contains an example configuration for the `federation_reader` worker.
 
 ## Synapse configuration files
 
-See [workers.md](../workers.md) for information on how to set up the
-configuration files and reverse-proxy correctly. You can find an example worker
-config in the [workers](workers) folder.
+See [the worker documentation](../workers.md) for information on how to set up the
+configuration files and reverse-proxy correctly.
+Below is a sample `federation_reader` worker configuration file.
+```yaml
+{{#include workers/federation_reader.yaml}}
+```
 
 Systemd manages daemonization itself, so ensure that none of the configuration
 files set either `daemonize` or `worker_daemonize`.
@@ -29,8 +33,8 @@ There is no need for a separate configuration file for the master process.
 ## Set up
 
 1. Adjust synapse configuration files as above.
-1. Copy the `*.service` and `*.target` files in [system](system) to
-`/etc/systemd/system`.
+1. Copy the `*.service` and `*.target` files in [system](https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/system/)
+to `/etc/systemd/system`.
 1. Run `systemctl daemon-reload` to tell systemd to load the new unit files.
 1. Run `systemctl enable matrix-synapse.service`. This will configure the
 synapse master process to be started as part of the `matrix-synapse.target`
@@ -65,3 +69,33 @@ systemctl restart matrix-synapse-worker@federation_reader.service
 systemctl enable matrix-synapse-worker@federation_writer.service
 systemctl restart matrix-synapse.target
 ```
+
+## Hardening
+
+**Optional:** If further hardening is desired, the file
+`override-hardened.conf` may be copied from
+[contrib/systemd/override-hardened.conf](https://github.com/matrix-org/synapse/tree/develop/contrib/systemd/)
+in this repository to the location
+`/etc/systemd/system/matrix-synapse.service.d/override-hardened.conf` (the
+directory may have to be created). It enables certain sandboxing features in
+systemd to further secure the synapse service. You may read the comments to
+understand what the override file is doing. The same file will need to be copied to
+`/etc/systemd/system/matrix-synapse-worker@.service.d/override-hardened-worker.conf`
+(this directory may also have to be created) in order to apply the same
+hardening options to any worker processes.
+
+Once these files have been copied to their appropriate locations, simply reload
+systemd's manager config files and restart all Synapse services to apply the hardening options. They will automatically
+be applied at every restart as long as the override files are present at the
+specified locations.
+
+```sh
+systemctl daemon-reload
+
+# Restart services
+systemctl restart matrix-synapse.target
+```
+
+In order to see their effect, you may run `systemd-analyze security
+matrix-synapse.service` before and after applying the hardening options to see
+the changes being applied at a glance.

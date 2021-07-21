@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +19,7 @@ from io import StringIO
 
 import yaml
 
+from synapse.config import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 
 from tests import unittest
@@ -35,15 +35,15 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
     def test_load_fails_if_server_name_missing(self):
         self.generate_config_and_remove_lines_containing("server_name")
-        with self.assertRaises(Exception):
+        with self.assertRaises(ConfigError):
             HomeServerConfig.load_config("", ["-c", self.file])
-        with self.assertRaises(Exception):
+        with self.assertRaises(ConfigError):
             HomeServerConfig.load_or_generate_config("", ["-c", self.file])
 
     def test_generates_and_loads_macaroon_secret_key(self):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
@@ -120,7 +120,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def generate_config_and_remove_lines_containing(self, needle):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             contents = f.readlines()
         contents = [line for line in contents if needle not in line]
         with open(self.file, "w") as f:

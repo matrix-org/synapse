@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -98,7 +97,7 @@ class DefaultDictProperty(DictProperty):
 
 
 class _EventInternalMetadata:
-    __slots__ = ["_dict", "stream_ordering"]
+    __slots__ = ["_dict", "stream_ordering", "outlier"]
 
     def __init__(self, internal_metadata_dict: JsonDict):
         # we have to copy the dict, because it turns out that the same dict is
@@ -106,30 +105,34 @@ class _EventInternalMetadata:
         self._dict = dict(internal_metadata_dict)
 
         # the stream ordering of this event. None, until it has been persisted.
-        self.stream_ordering = None  # type: Optional[int]
+        self.stream_ordering: Optional[int] = None
 
-    outlier = DictProperty("outlier")  # type: bool
-    out_of_band_membership = DictProperty("out_of_band_membership")  # type: bool
-    send_on_behalf_of = DictProperty("send_on_behalf_of")  # type: str
-    recheck_redaction = DictProperty("recheck_redaction")  # type: bool
-    soft_failed = DictProperty("soft_failed")  # type: bool
-    proactively_send = DictProperty("proactively_send")  # type: bool
-    redacted = DictProperty("redacted")  # type: bool
-    txn_id = DictProperty("txn_id")  # type: str
-    token_id = DictProperty("token_id")  # type: str
+        # whether this event is an outlier (ie, whether we have the state at that point
+        # in the DAG)
+        self.outlier = False
+
+    out_of_band_membership: bool = DictProperty("out_of_band_membership")
+    send_on_behalf_of: str = DictProperty("send_on_behalf_of")
+    recheck_redaction: bool = DictProperty("recheck_redaction")
+    soft_failed: bool = DictProperty("soft_failed")
+    proactively_send: bool = DictProperty("proactively_send")
+    redacted: bool = DictProperty("redacted")
+    txn_id: str = DictProperty("txn_id")
+    token_id: int = DictProperty("token_id")
+    historical: bool = DictProperty("historical")
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before = DictProperty("before")  # type: RoomStreamToken
-    after = DictProperty("after")  # type: RoomStreamToken
-    order = DictProperty("order")  # type: Tuple[int, int]
+    before: RoomStreamToken = DictProperty("before")
+    after: RoomStreamToken = DictProperty("after")
+    order: Tuple[int, int] = DictProperty("order")
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)
 
     def is_outlier(self) -> bool:
-        return self._dict.get("outlier", False)
+        return self.outlier
 
     def is_out_of_band_membership(self) -> bool:
         """Whether this is an out of band membership, like an invite or an invite
@@ -201,6 +204,14 @@ class _EventInternalMetadata:
             bool
         """
         return self._dict.get("redacted", False)
+
+    def is_historical(self) -> bool:
+        """Whether this is a historical message.
+        This is used by the batchsend historical message endpoint and
+        is needed to and mark the event as backfilled and skip some checks
+        like push notifications.
+        """
+        return self._dict.get("historical", False)
 
 
 class EventBase(metaclass=abc.ABCMeta):
@@ -280,6 +291,20 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return pdu_json
 
+    def get_templated_pdu_json(self) -> JsonDict:
+        """
+        Return a JSON object suitable for a templated event, as used in the
+        make_{join,leave,knock} workflow.
+        """
+        # By using _dict directly we don't pull in signatures/unsigned.
+        template_json = dict(self._dict)
+        # The hashes (similar to the signature) need to be recalculated by the
+        # joining/leaving/knocking server after (potentially) modifying the
+        # event.
+        template_json.pop("hashes")
+
+        return template_json
+
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
@@ -327,9 +352,11 @@ class FrozenEvent(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
+
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -383,9 +410,11 @@ class FrozenEventV2(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
+
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -504,9 +533,11 @@ def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
 def make_event_from_dict(
     event_dict: JsonDict,
     room_version: RoomVersion = RoomVersions.V1,
-    internal_metadata_dict: JsonDict = {},
+    internal_metadata_dict: Optional[JsonDict] = None,
     rejected_reason: Optional[str] = None,
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""
     event_type = _event_type_from_format_version(room_version.event_format)
-    return event_type(event_dict, room_version, internal_metadata_dict, rejected_reason)
+    return event_type(
+        event_dict, room_version, internal_metadata_dict or {}, rejected_reason
+    )

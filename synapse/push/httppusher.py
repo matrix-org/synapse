@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -31,7 +30,7 @@ from synapse.push import Pusher, PusherConfig, PusherConfigException
 from . import push_rule_evaluator, push_tools
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ class HttpPusher(Pusher):
         self.data = pusher_config.data
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
         self.failing_since = pusher_config.failing_since
-        self.timed_call = None  # type: Optional[IDelayedCall]
+        self.timed_call: Optional[IDelayedCall] = None
         self._is_processing = False
         self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
         self._pusherpool = hs.get_pusherpool()
@@ -290,7 +289,7 @@ class HttpPusher(Pusher):
         if rejected is False:
             return False
 
-        if isinstance(rejected, list) or isinstance(rejected, tuple):
+        if isinstance(rejected, (list, tuple)):
             for pk in rejected:
                 if pk != self.pushkey:
                     # for sanity, we only remove the pushkey if it

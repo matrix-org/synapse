@@ -2,7 +2,7 @@ import json
 import logging
 from collections import deque
 from io import SEEK_END, BytesIO
-from typing import Callable, Iterable, MutableMapping, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, MutableMapping, Optional, Tuple, Union
 
 import attr
 from typing_extensions import Deque
@@ -13,9 +13,13 @@ from twisted.internet._resolver import SimpleResolverComplexifier
 from twisted.internet.defer import Deferred, fail, succeed
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import (
+    IHostnameResolver,
+    IProtocol,
+    IPullProducer,
+    IPushProducer,
     IReactorPluggableNameResolver,
-    IReactorTCP,
     IResolverSimple,
+    ITransport,
 )
 from twisted.python.failure import Failure
 from twisted.test.proto_helpers import AccumulatingProtocol, MemoryReactorClock
@@ -44,11 +48,11 @@ class FakeChannel:
     wire).
     """
 
-    site = attr.ib(type=Site)
+    site = attr.ib(type=Union[Site, "FakeSite"])
     _reactor = attr.ib()
     result = attr.ib(type=dict, default=attr.Factory(dict))
     _ip = attr.ib(type=str, default="127.0.0.1")
-    _producer = None
+    _producer: Optional[Union[IPullProducer, IPushProducer]] = None
 
     @property
     def json_body(self):
@@ -134,21 +138,19 @@ class FakeChannel:
     def transport(self):
         return self
 
-    def await_result(self, timeout: int = 100) -> None:
+    def await_result(self, timeout_ms: int = 1000) -> None:
         """
         Wait until the request is finished.
         """
+        end_time = self._reactor.seconds() + timeout_ms / 1000.0
         self._reactor.run()
-        x = 0
 
         while not self.is_finished():
             # If there's a producer, tell it to resume producing so we get content
             if self._producer:
                 self._producer.resumeProducing()
 
-            x += 1
-
-            if x > timeout:
+            if self._reactor.seconds() > end_time:
                 raise TimedOutException("Timed out waiting for request to finish.")
 
             self._reactor.advance(0.1)
@@ -158,7 +160,11 @@ class FakeChannel:
 
         Any cookines found are added to the given dict
         """
-        for h in self.headers.getRawHeaders("Set-Cookie"):
+        headers = self.headers.getRawHeaders("Set-Cookie")
+        if not headers:
+            return
+
+        for h in headers:
             parts = h.split(";")
             k, v = parts[0].split("=", maxsplit=1)
             cookies[k] = v
@@ -310,8 +316,10 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
         self._tcp_callbacks = {}
         self._udp = []
-        lookups = self.lookups = {}
-        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]()
+        self.lookups: Dict[str, str] = {}
+        self._thread_callbacks: Deque[Callable[[], None]] = deque()
+
+        lookups = self.lookups
 
         @implementer(IResolverSimple)
         class FakeResolver:
@@ -322,6 +330,9 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
         self.nameResolver = SimpleResolverComplexifier(FakeResolver())
         super().__init__()
+
+    def installNameResolver(self, resolver: IHostnameResolver) -> IHostnameResolver:
+        raise NotImplementedError()
 
     def listenUDP(self, port, protocol, interface="", maxPacketSize=8196):
         p = udp.Port(port, protocol, interface, maxPacketSize, self)
@@ -467,6 +478,7 @@ def get_clock():
     return clock, hs_clock
 
 
+@implementer(ITransport)
 @attr.s(cmp=False)
 class FakeTransport:
     """
@@ -591,12 +603,6 @@ class FakeTransport:
         if self.disconnected:
             return
 
-        if getattr(self.other, "transport") is None:
-            # the other has no transport yet; reschedule
-            if self.autoflush:
-                self._reactor.callLater(0.0, self.flush)
-            return
-
         if maxbytes is not None:
             to_write = self.buffer[:maxbytes]
         else:
@@ -619,7 +625,9 @@ class FakeTransport:
             self.disconnected = True
 
 
-def connect_client(reactor: IReactorTCP, client_id: int) -> AccumulatingProtocol:
+def connect_client(
+    reactor: ThreadedMemoryReactorClock, client_id: int
+) -> Tuple[IProtocol, AccumulatingProtocol]:
     """
     Connect a client to a fake TCP transport.
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
@@ -25,7 +24,7 @@ from synapse.replication.http.account_data import (
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 
 class AccountDataHandler:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -71,8 +70,8 @@ WELL_KNOWN_RETRY_ATTEMPTS = 3
 logger = logging.getLogger(__name__)
 
 
-_well_known_cache = TTLCache("well-known")
-_had_valid_well_known_cache = TTLCache("had-valid-well-known")
+_well_known_cache: TTLCache[bytes, Optional[bytes]] = TTLCache("well-known")
+_had_valid_well_known_cache: TTLCache[bytes, bool] = TTLCache("had-valid-well-known")
 
 
 @attr.s(slots=True, frozen=True)
@@ -88,8 +87,8 @@ class WellKnownResolver:
         reactor: IReactorTime,
         agent: IAgent,
         user_agent: bytes,
-        well_known_cache: Optional[TTLCache] = None,
-        had_well_known_cache: Optional[TTLCache] = None,
+        well_known_cache: Optional[TTLCache[bytes, Optional[bytes]]] = None,
+        had_well_known_cache: Optional[TTLCache[bytes, bool]] = None,
     ):
         self._reactor = reactor
         self._clock = Clock(reactor)
@@ -129,9 +128,10 @@ class WellKnownResolver:
         # requests for the same server in parallel?
         try:
             with Measure(self._clock, "get_well_known"):
-                result, cache_period = await self._fetch_well_known(
-                    server_name
-                )  # type: Optional[bytes], float
+                result: Optional[bytes]
+                cache_period: float
+
+                result, cache_period = await self._fetch_well_known(server_name)
 
         except _FetchWellKnownFailure as e:
             if prev_result and e.temporary:

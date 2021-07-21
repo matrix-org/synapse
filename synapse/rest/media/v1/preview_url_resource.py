@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -39,6 +38,7 @@ from synapse.http.server import (
     respond_with_json_bytes,
 )
 from synapse.http.servlet import parse_integer, parse_string
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
@@ -53,8 +53,8 @@ from ._base import FileInfo
 if TYPE_CHECKING:
     from lxml import etree
 
-    from synapse.app.homeserver import HomeServer
     from synapse.rest.media.v1.media_repository import MediaRepository
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -169,7 +169,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
-        self._cache = ExpiringCache(
+        self._cache: ExpiringCache[str, ObservableDeferred] = ExpiringCache(
             cache_name="url_previews",
             clock=self.clock,
             # don't spider URLs more often than once an hour
@@ -185,7 +185,9 @@ class PreviewUrlResource(DirectServeJsonResource):
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 
-    async def _async_render_GET(self, request: Request) -> None:
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
 
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
@@ -458,7 +460,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         # If this URL can be accessed via oEmbed, use that instead.
-        url_to_download = url  # type: Optional[str]
+        url_to_download: Optional[str] = url
         oembed_url = self._get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
@@ -786,7 +788,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     # "og:video:height" : "720",
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
-    og = {}  # type: Dict[str, Optional[str]]
+    og: Dict[str, Optional[str]] = {}
     for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
         if "content" in tag.attrib:
             # if we've got more than 50 tags, someone is taking the piss

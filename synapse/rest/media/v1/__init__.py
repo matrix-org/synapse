@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@ import PIL.Image
 # check for JPEG support.
 try:
     PIL.Image._getdecoder("rgb", "jpeg", None)
-except IOError as e:
+except OSError as e:
     if str(e).startswith("decoder jpeg not available"):
         raise Exception(
             "FATAL: jpeg codec not supported. Install pillow correctly! "
@@ -33,7 +32,7 @@ except Exception:
 # check for PNG support.
 try:
     PIL.Image._getdecoder("rgb", "zip", None)
-except IOError as e:
+except OSError as e:
     if str(e).startswith("decoder zip not available"):
         raise Exception(
             "FATAL: zip codec not supported. Install pillow correctly! "

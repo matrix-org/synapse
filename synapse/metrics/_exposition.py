@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015-2019 Prometheus Python Client Developers
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
@@ -35,7 +34,7 @@ from twisted.web.resource import Resource
 
 from synapse.util import caches
 
-CONTENT_TYPE_LATEST = str("text/plain; version=0.0.4; charset=utf-8")
+CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
 INF = float("inf")
@@ -56,8 +55,8 @@ def floatToGoString(d):
         # Go switches to exponents sooner than Python.
         # We only need to care about positive values for le/quantile.
         if d > 0 and dot > 6:
-            mantissa = "{0}.{1}{2}".format(s[0], s[1:dot], s[dot + 1 :]).rstrip("0.")
-            return "{0}e+0{1}".format(mantissa, dot - 1)
+            mantissa = f"{s[0]}.{s[1:dot]}{s[dot + 1 :]}".rstrip("0.")
+            return f"{mantissa}e+0{dot - 1}"
         return s
 
 
@@ -66,7 +65,7 @@ def sample_line(line, name):
         labelstr = "{{{0}}}".format(
             ",".join(
                 [
-                    '{0}="{1}"'.format(
+                    '{}="{}"'.format(
                         k,
                         v.replace("\\", r"\\").replace("\n", r"\n").replace('"', r"\""),
                     )
@@ -79,10 +78,8 @@ def sample_line(line, name):
     timestamp = ""
     if line.timestamp is not None:
         # Convert to milliseconds.
-        timestamp = " {0:d}".format(int(float(line.timestamp) * 1000))
-    return "{0}{1} {2}{3}\n".format(
-        name, labelstr, floatToGoString(line.value), timestamp
-    )
+        timestamp = f" {int(float(line.timestamp) * 1000):d}"
+    return "{}{} {}{}\n".format(name, labelstr, floatToGoString(line.value), timestamp)
 
 
 def generate_latest(registry, emit_help=False):
@@ -119,14 +116,14 @@ def generate_latest(registry, emit_help=False):
         # Output in the old format for compatibility.
         if emit_help:
             output.append(
-                "# HELP {0} {1}\n".format(
+                "# HELP {} {}\n".format(
                     mname,
                     metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                 )
             )
-        output.append("# TYPE {0} {1}\n".format(mname, mtype))
+        output.append(f"# TYPE {mname} {mtype}\n")
 
-        om_samples = {}  # type: Dict[str, List[str]]
+        om_samples: Dict[str, List[str]] = {}
         for s in metric.samples:
             for suffix in ["_created", "_gsum", "_gcount"]:
                 if s.name == metric.name + suffix:
@@ -144,13 +141,13 @@ def generate_latest(registry, emit_help=False):
         for suffix, lines in sorted(om_samples.items()):
             if emit_help:
                 output.append(
-                    "# HELP {0}{1} {2}\n".format(
+                    "# HELP {}{} {}\n".format(
                         metric.name,
                         suffix,
                         metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                     )
                 )
-            output.append("# TYPE {0}{1} gauge\n".format(metric.name, suffix))
+            output.append(f"# TYPE {metric.name}{suffix} gauge\n")
             output.extend(lines)
 
         # Get rid of the weird colon things while we're at it
@@ -164,12 +161,12 @@ def generate_latest(registry, emit_help=False):
         # Also output in the new format, if it's different.
         if emit_help:
             output.append(
-                "# HELP {0} {1}\n".format(
+                "# HELP {} {}\n".format(
                     mnewname,
                     metric.documentation.replace("\\", r"\\").replace("\n", r"\n"),
                 )
             )
-        output.append("# TYPE {0} {1}\n".format(mnewname, mtype))
+        output.append(f"# TYPE {mnewname} {mtype}\n")
 
         for s in metric.samples:
             # Get rid of the OpenMetrics specific samples (we should already have

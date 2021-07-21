@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
@@ -18,9 +17,9 @@
 import logging
 from typing import List, Optional, Tuple
 
-from synapse.api.constants import PresenceState
 from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import DatabasePool
+from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import (
     IdGenerator,
@@ -47,11 +46,12 @@ from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
+from .lock import LockStore
 from .media_repository import MediaRepositoryStore
 from .metrics import ServerMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
 from .openid import OpenIdStore
-from .presence import PresenceStore, UserPresenceState
+from .presence import PresenceStore
 from .profile import ProfileStore
 from .purge_events import PurgeEventsStore
 from .push_rule import PushRuleStore
@@ -68,7 +68,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
-from .transactions import TransactionStore
+from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
@@ -84,7 +84,7 @@ class DataStore(
     StreamStore,
     ProfileStore,
     PresenceStore,
-    TransactionStore,
+    TransactionWorkerStore,
     DirectoryStore,
     KeyStore,
     StateStore,
@@ -120,15 +120,13 @@ class DataStore(
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
     EventForwardExtremitiesStore,
+    LockStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        self._presence_id_gen = StreamIdGenerator(
-            db_conn, "presence_stream", "stream_id"
-        )
         self._public_room_id_gen = StreamIdGenerator(
             db_conn, "public_room_list_stream", "stream_id"
         )
@@ -177,21 +175,6 @@ class DataStore(
 
         super().__init__(database, db_conn, hs)
 
-        self._presence_on_startup = self._get_active_presence(db_conn)
-
-        presence_cache_prefill, min_presence_val = self.db_pool.get_cache_dict(
-            db_conn,
-            "presence_stream",
-            entity_column="user_id",
-            stream_column="stream_id",
-            max_value=self._presence_id_gen.get_current_token(),
-        )
-        self.presence_stream_cache = StreamChangeCache(
-            "PresenceStreamChangeCache",
-            min_presence_val,
-            prefilled_cache=presence_cache_prefill,
-        )
-
         device_list_max = self._device_list_id_gen.get_current_token()
         self._device_list_stream_cache = StreamChangeCache(
             "DeviceListStreamChangeCache", device_list_max
@@ -238,32 +221,6 @@ class DataStore(
     def get_device_stream_token(self) -> int:
         return self._device_list_id_gen.get_current_token()
 
-    def take_presence_startup_info(self):
-        active_on_startup = self._presence_on_startup
-        self._presence_on_startup = None
-        return active_on_startup
-
-    def _get_active_presence(self, db_conn):
-        """Fetch non-offline presence from the database so that we can register
-        the appropriate time outs.
-        """
-
-        sql = (
-            "SELECT user_id, state, last_active_ts, last_federation_update_ts,"
-            " last_user_sync_ts, status_msg, currently_active FROM presence_stream"
-            " WHERE state != ?"
-        )
-
-        txn = db_conn.cursor()
-        txn.execute(sql, (PresenceState.OFFLINE,))
-        rows = self.db_pool.cursor_to_dict(txn)
-        txn.close()
-
-        for row in rows:
-            row["currently_active"] = bool(row["currently_active"])
-
-        return [UserPresenceState(**row) for row in rows]
-
     async def get_users(self) -> List[JsonDict]:
         """Function to retrieve a list of users in users table.
 
@@ -292,6 +249,8 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
+        order_by: UserSortOrder = UserSortOrder.USER_ID.value,
+        direction: str = "f",
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
         users list. This will return a json list of users and the
@@ -304,6 +263,8 @@ class DataStore(
             name: search for local part of user_id or display name
             guests: whether to in include guest users
             deactivated: whether to include deactivated users
+            order_by: the sort order of the returned list
+            direction: sort ascending or descending
         Returns:
             A tuple of a list of mappings from user to information and a count of total users.
         """
@@ -311,6 +272,14 @@ class DataStore(
         def get_users_paginate_txn(txn):
             filters = []
             args = [self.hs.config.server_name]
+
+            # Set ordering
+            order_by_column = UserSortOrder(order_by).value
+
+            if direction == "b":
+                order = "DESC"
+            else:
+                order = "ASC"
 
             # `name` is in database already in lower case
             if name:
@@ -339,10 +308,15 @@ class DataStore(
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
-            sql = (
-                "SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url "
-                + sql_base
-                + " ORDER BY u.name LIMIT ? OFFSET ?"
+            sql = """
+                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url
+                {sql_base}
+                ORDER BY {order_by_column} {order}, u.name ASC
+                LIMIT ? OFFSET ?
+            """.format(
+                sql_base=sql_base,
+                order_by_column=order_by_column,
+                order=order,
             )
             args += [limit, start]
             txn.execute(sql, args)

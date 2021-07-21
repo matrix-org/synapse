@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Runs linting scripts over the local Synapse checkout
 # isort - sorts import statements
@@ -80,8 +80,22 @@ else
   # then lint everything!
   if [[ -z ${files+x} ]]; then
     # Lint all source code files and directories
-    # Note: this list aims the mirror the one in tox.ini
-    files=("synapse" "docker" "tests" "scripts-dev" "scripts" "contrib" "synctl" "setup.py" "synmark" "stubs" ".buildkite")
+    # Note: this list aims to mirror the one in tox.ini
+      files=(
+          "synapse" "docker" "tests"
+          # annoyingly, black doesn't find these so we have to list them
+          "scripts/export_signing_key"
+          "scripts/generate_config"
+          "scripts/generate_log_config"
+          "scripts/hash_password"
+          "scripts/register_new_matrix_user"
+          "scripts/synapse_port_db"
+          "scripts-dev"
+          "scripts-dev/build_debian_packages"
+          "scripts-dev/sign_json"
+          "scripts-dev/update_database"
+          "contrib" "synctl" "setup.py" "synmark" "stubs" ".buildkite"
+      )
   fi
 fi
 

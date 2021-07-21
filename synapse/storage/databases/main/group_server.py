@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -28,8 +27,11 @@ from synapse.util import json_encoder
 _DEFAULT_CATEGORY_ID = ""
 _DEFAULT_ROLE_ID = ""
 
+
 # A room in a group.
-_RoomInGroup = TypedDict("_RoomInGroup", {"room_id": str, "is_public": bool})
+class _RoomInGroup(TypedDict):
+    room_id: str
+    is_public: bool
 
 
 class GroupServerWorkerStore(SQLBaseStore):
@@ -93,6 +95,7 @@ class GroupServerWorkerStore(SQLBaseStore):
               "is_public": False                    # Whether this is a public room or not
             }
         """
+
         # TODO: Pagination
 
         def _get_rooms_in_group_txn(txn):
@@ -1027,8 +1030,8 @@ class GroupServerStore(GroupServerWorkerStore):
         user_id: str,
         is_admin: bool = False,
         is_public: bool = True,
-        local_attestation: dict = None,
-        remote_attestation: dict = None,
+        local_attestation: Optional[dict] = None,
+        remote_attestation: Optional[dict] = None,
     ) -> None:
         """Add a user to the group server.
 
@@ -1171,7 +1174,7 @@ class GroupServerStore(GroupServerWorkerStore):
         user_id: str,
         membership: str,
         is_admin: bool = False,
-        content: JsonDict = {},
+        content: Optional[JsonDict] = None,
         local_attestation: Optional[dict] = None,
         remote_attestation: Optional[dict] = None,
         is_publicised: bool = False,
@@ -1191,6 +1194,8 @@ class GroupServerStore(GroupServerWorkerStore):
                 attestation from the group, else None.
             is_publicised: Whether this should be publicised.
         """
+
+        content = content or {}
 
         def _register_user_group_membership_txn(txn, next_id):
             # TODO: Upsert?

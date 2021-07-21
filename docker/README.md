@@ -2,13 +2,16 @@
 
 This Docker image will run Synapse as a single process. By default it uses a
 sqlite database; for production use you should connect it to a separate
-postgres database.
+postgres database. The image also does *not* provide a TURN server.
 
-The image also does *not* provide a TURN server.
+This image should work on all platforms that are supported by Docker upstream.
+Note that Docker's WS1-backend Linux Containers on Windows
+platform is [experimental](https://github.com/docker/for-win/issues/6470) and
+is not supported by this image.
 
 ## Volumes
 
-By default, the image expects a single volume, located at ``/data``, that will hold:
+By default, the image expects a single volume, located at `/data`, that will hold:
 
 * configuration files;
 * uploaded media and thumbnails;
@@ -16,11 +19,11 @@ By default, the image expects a single volume, located at ``/data``, that will h
 * the appservices configuration.
 
 You are free to use separate volumes depending on storage endpoints at your
-disposal. For instance, ``/data/media`` could be stored on a large but low
+disposal. For instance, `/data/media` could be stored on a large but low
 performance hdd storage while other files could be stored on high performance
 endpoints.
 
-In order to setup an application service, simply create an ``appservices``
+In order to setup an application service, simply create an `appservices`
 directory in the data volume and write the application service Yaml
 configuration file there. Multiple application services are supported.
 
@@ -42,7 +45,7 @@ docker run -it --rm \
 ```
 
 For information on picking a suitable server name, see
-https://github.com/matrix-org/synapse/blob/master/INSTALL.md.
+https://matrix-org.github.io/synapse/latest/setup/installation.html.
 
 The above command will generate a `homeserver.yaml` in (typically)
 `/var/lib/docker/volumes/synapse-data/_data`. You should check this file, and
@@ -53,6 +56,8 @@ The following environment variables are supported in `generate` mode:
 * `SYNAPSE_SERVER_NAME` (mandatory): the server public hostname.
 * `SYNAPSE_REPORT_STATS` (mandatory, `yes` or `no`): whether to enable
   anonymous statistics reporting.
+* `SYNAPSE_HTTP_PORT`: the port Synapse should listen on for http traffic.
+      Defaults to `8008`.
 * `SYNAPSE_CONFIG_DIR`: where additional config files (such as the log config
   and event signing key) will be stored. Defaults to `/data`.
 * `SYNAPSE_CONFIG_PATH`: path to the file to be generated. Defaults to
@@ -72,6 +77,8 @@ docker run -d --name synapse \
     -p 8008:8008 \
     matrixdotorg/synapse:latest
 ```
+
+(assuming 8008 is the port Synapse is configured to listen on for http traffic.)
 
 You can then check that it has started correctly with:
 
@@ -132,7 +139,7 @@ For documentation on using a reverse proxy, see
 https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
 
 For more information on enabling TLS support in synapse itself, see
-https://github.com/matrix-org/synapse/blob/master/INSTALL.md#tls-certificates. Of
+https://matrix-org.github.io/synapse/latest/setup/installation.html#tls-certificates. Of
 course, you will need to expose the TLS port from the container with a `-p`
 argument to `docker run`.
 
@@ -184,6 +191,16 @@ whilst running the above `docker run` commands.
 ```
    --no-healthcheck
 ```
+
+## Disabling the healthcheck in docker-compose file
+
+If you wish to disable the healthcheck via docker-compose, append the following to your service configuration.
+
+```
+  healthcheck:
+    disable: true
+```
+
 ## Setting custom healthcheck on docker run
 
 If you wish to point the healthcheck at a different port with docker command, add the following
@@ -195,12 +212,18 @@ If you wish to point the healthcheck at a different port with docker command, ad
 ## Setting the healthcheck in docker-compose file
 
 You can add the following to set a custom healthcheck in a docker compose file.
-You will need version >2.1 for this to work. 
+You will need docker-compose version >2.1 for this to work. 
 
 ```
 healthcheck:
   test: ["CMD", "curl", "-fSs", "http://localhost:8008/health"]
-  interval: 1m
-  timeout: 10s
+  interval: 15s
+  timeout: 5s
   retries: 3
+  start_period: 5s
 ```
+
+## Using jemalloc
+
+Jemalloc is embedded in the image and will be used instead of the default allocator.
+You can read about jemalloc by reading the Synapse [README](../README.rst).

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -64,7 +63,7 @@ def parse_drain_configs(
             DrainType.CONSOLE_JSON,
             DrainType.FILE_JSON,
         ):
-            formatter = "json"  # type: Optional[str]
+            formatter: Optional[str] = "json"
         elif logging_type in (
             DrainType.CONSOLE_JSON_TERSE,
             DrainType.NETWORK_JSON_TERSE,

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -83,11 +82,9 @@ async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **k
     retry_timings = await store.get_destination_retry_timings(destination)
 
     if retry_timings:
-        failure_ts = retry_timings["failure_ts"]
-        retry_last_ts, retry_interval = (
-            retry_timings["retry_last_ts"],
-            retry_timings["retry_interval"],
-        )
+        failure_ts = retry_timings.failure_ts
+        retry_last_ts = retry_timings.retry_last_ts
+        retry_interval = retry_timings.retry_interval
 
         now = int(clock.time_msec())
 

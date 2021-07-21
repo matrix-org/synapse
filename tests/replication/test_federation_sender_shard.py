@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes, Membership
 from synapse.events.builder import EventBuilderFactory
@@ -226,9 +224,11 @@ class FederationSenderTestCase(BaseMultiWorkerStreamTestCase):
         }
 
         builder = factory.for_room_version(room_version, event_dict)
-        join_event = self.get_success(builder.build(prev_event_ids, None))
+        join_event = self.get_success(
+            builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
+        )
 
-        self.get_success(federation.on_send_join_request(remote_server, join_event))
+        self.get_success(federation.on_send_membership_event(remote_server, join_event))
         self.replicate()
 
         return room

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Michael Telatynski <7t3chguy@gmail.com>
@@ -25,7 +24,7 @@ from synapse.types import GroupID, JsonDict, RoomID, UserID, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -708,9 +707,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
         See accept_invite, join_group.
         """
         if not self.hs.is_mine_id(user_id):
-            local_attestation = self.attestations.create_attestation(
-                group_id, user_id
-            )  # type: Optional[JsonDict]
+            local_attestation: Optional[
+                JsonDict
+            ] = self.attestations.create_attestation(group_id, user_id)
 
             remote_attestation = content["attestation"]
 
@@ -869,9 +868,9 @@ class GroupsServerHandler(GroupsServerWorkerHandler):
                 remote_attestation, user_id=requester_user_id, group_id=group_id
             )
 
-            local_attestation = self.attestations.create_attestation(
-                group_id, requester_user_id
-            )  # type: Optional[JsonDict]
+            local_attestation: Optional[
+                JsonDict
+            ] = self.attestations.create_attestation(group_id, requester_user_id)
         else:
             local_attestation = None
             remote_attestation = None

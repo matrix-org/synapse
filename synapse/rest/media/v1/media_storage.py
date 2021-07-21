@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -192,7 +191,7 @@ class MediaStorage:
 
         for provider in self.storage_providers:
             for path in paths:
-                res = await provider.fetch(path, file_info)  # type: Any
+                res: Any = await provider.fetch(path, file_info)
                 if res:
                     logger.debug("Streaming %s from %s", path, provider)
                     return res
@@ -234,7 +233,7 @@ class MediaStorage:
             os.makedirs(dirname)
 
         for provider in self.storage_providers:
-            res = await provider.fetch(path, file_info)  # type: Any
+            res: Any = await provider.fetch(path, file_info)
             if res:
                 with res:
                     consumer = BackgroundFileConsumer(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +17,7 @@ import logging
 from hashlib import sha256
 from http import HTTPStatus
 from os import path
+from typing import Dict, List
 
 import jinja2
 from jinja2 import TemplateNotFound
@@ -25,21 +25,13 @@ from jinja2 import TemplateNotFound
 from synapse.api.errors import NotFoundError, StoreError, SynapseError
 from synapse.config import ConfigError
 from synapse.http.server import DirectServeHtmlResource, respond_with_html
-from synapse.http.servlet import parse_string
+from synapse.http.servlet import parse_bytes_from_args, parse_string
 from synapse.types import UserID
 
 # language to use for the templates. TODO: figure this out from Accept-Language
 TEMPLATE_LANGUAGE = "en"
 
 logger = logging.getLogger(__name__)
-
-# use hmac.compare_digest if we have it (python 2.7.7), else just use equality
-if hasattr(hmac, "compare_digest"):
-    compare_digest = hmac.compare_digest
-else:
-
-    def compare_digest(a, b):
-        return a == b
 
 
 class ConsentResource(DirectServeHtmlResource):
@@ -125,7 +117,8 @@ class ConsentResource(DirectServeHtmlResource):
         has_consented = False
         public_version = username == ""
         if not public_version:
-            userhmac_bytes = parse_string(request, "h", required=True, encoding=None)
+            args: Dict[bytes, List[bytes]] = request.args
+            userhmac_bytes = parse_bytes_from_args(args, "h", required=True)
 
             self._check_hash(username, userhmac_bytes)
 
@@ -161,7 +154,8 @@ class ConsentResource(DirectServeHtmlResource):
         """
         version = parse_string(request, "v", required=True)
         username = parse_string(request, "u", required=True)
-        userhmac = parse_string(request, "h", required=True, encoding=None)
+        args: Dict[bytes, List[bytes]] = request.args
+        userhmac = parse_bytes_from_args(args, "h", required=True)
 
         self._check_hash(username, userhmac)
 
@@ -210,5 +204,5 @@ class ConsentResource(DirectServeHtmlResource):
             .encode("ascii")
         )
 
-        if not compare_digest(want_mac, userhmac):
+        if not hmac.compare_digest(want_mac, userhmac):
             raise SynapseError(HTTPStatus.FORBIDDEN, "HMAC incorrect")

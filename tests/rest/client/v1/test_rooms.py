@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -19,9 +18,9 @@
 """Tests REST events for /rooms paths."""
 
 import json
+from typing import Iterable
+from unittest.mock import Mock
 from urllib import parse as urlparse
-
-from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
@@ -65,7 +64,7 @@ class RoomBase(unittest.HomeserverTestCase):
 
 
 class RoomPermissionsTestCase(RoomBase):
-    """ Tests room permissions. """
+    """Tests room permissions."""
 
     user_id = "@sid1:red"
     rmcreator_id = "@notme:red"
@@ -207,7 +206,9 @@ class RoomPermissionsTestCase(RoomBase):
         )
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
-    def _test_get_membership(self, room=None, members=[], expect_code=None):
+    def _test_get_membership(
+        self, room=None, members: Iterable = frozenset(), expect_code=None
+    ):
         for member in members:
             path = "/rooms/%s/state/m.room.member/%s" % (room, member)
             channel = self.make_request("GET", path)
@@ -376,7 +377,7 @@ class RoomPermissionsTestCase(RoomBase):
 
 
 class RoomsMemberListTestCase(RoomBase):
-    """ Tests /rooms/$room_id/members/list REST events."""
+    """Tests /rooms/$room_id/members/list REST events."""
 
     user_id = "@sid1:red"
 
@@ -415,7 +416,7 @@ class RoomsMemberListTestCase(RoomBase):
 
 
 class RoomsCreateTestCase(RoomBase):
-    """ Tests /rooms and /rooms/$room_id REST events. """
+    """Tests /rooms and /rooms/$room_id REST events."""
 
     user_id = "@sid1:red"
 
@@ -462,9 +463,46 @@ class RoomsCreateTestCase(RoomBase):
         )
         self.assertEquals(400, channel.code)
 
+    @unittest.override_config({"rc_invites": {"per_room": {"burst_count": 3}}})
+    def test_post_room_invitees_ratelimit(self):
+        """Test that invites sent when creating a room are ratelimited by a RateLimiter,
+        which ratelimits them correctly, including by not limiting when the requester is
+        exempt from ratelimiting.
+        """
+
+        # Build the request's content. We use local MXIDs because invites over federation
+        # are more difficult to mock.
+        content = json.dumps(
+            {
+                "invite": [
+                    "@alice1:red",
+                    "@alice2:red",
+                    "@alice3:red",
+                    "@alice4:red",
+                ]
+            }
+        ).encode("utf8")
+
+        # Test that the invites are correctly ratelimited.
+        channel = self.make_request("POST", "/createRoom", content)
+        self.assertEqual(400, channel.code)
+        self.assertEqual(
+            "Cannot invite so many users at once",
+            channel.json_body["error"],
+        )
+
+        # Add the current user to the ratelimit overrides, allowing them no ratelimiting.
+        self.get_success(
+            self.hs.get_datastore().set_ratelimit_for_user(self.user_id, 0, 0)
+        )
+
+        # Test that the invites aren't ratelimited anymore.
+        channel = self.make_request("POST", "/createRoom", content)
+        self.assertEqual(200, channel.code)
+
 
 class RoomTopicTestCase(RoomBase):
-    """ Tests /rooms/$room_id/topic REST events. """
+    """Tests /rooms/$room_id/topic REST events."""
 
     user_id = "@sid1:red"
 
@@ -528,7 +566,7 @@ class RoomTopicTestCase(RoomBase):
 
 
 class RoomMemberStateTestCase(RoomBase):
-    """ Tests /rooms/$room_id/members/$user_id/state REST events. """
+    """Tests /rooms/$room_id/members/$user_id/state REST events."""
 
     user_id = "@sid1:red"
 
@@ -645,7 +683,7 @@ class RoomInviteRatelimitTestCase(RoomBase):
     def test_invites_by_users_ratelimit(self):
         """Tests that invites to a specific user are actually rate-limited."""
 
-        for i in range(3):
+        for _ in range(3):
             room_id = self.helper.create_room_as(self.user_id)
             self.helper.invite(room_id, self.user_id, "@other-users:red")
 
@@ -667,7 +705,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
     )
     def test_join_local_ratelimit(self):
         """Tests that local joins are actually rate-limited."""
-        for i in range(3):
+        for _ in range(3):
             self.helper.create_room_as(self.user_id)
 
         self.helper.create_room_as(self.user_id, expect_code=429)
@@ -732,7 +770,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
         for path in paths_to_test:
             # Make sure we send more requests than the rate-limiting config would allow
             # if all of these requests ended up joining the user to a room.
-            for i in range(4):
+            for _ in range(4):
                 channel = self.make_request("POST", path % room_id, {})
                 self.assertEquals(channel.code, 200)
 
@@ -752,7 +790,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
 
 
 class RoomMessagesTestCase(RoomBase):
-    """ Tests /rooms/$room_id/messages/$user_id/$msg_id REST events. """
+    """Tests /rooms/$room_id/messages/$user_id/$msg_id REST events."""
 
     user_id = "@sid1:red"
 
@@ -800,7 +838,7 @@ class RoomMessagesTestCase(RoomBase):
 
 
 class RoomInitialSyncTestCase(RoomBase):
-    """ Tests /rooms/$room_id/initialSync. """
+    """Tests /rooms/$room_id/initialSync."""
 
     user_id = "@sid1:red"
 
@@ -841,7 +879,7 @@ class RoomInitialSyncTestCase(RoomBase):
 
 
 class RoomMessageListTestCase(RoomBase):
-    """ Tests /rooms/$room_id/messages REST events. """
+    """Tests /rooms/$room_id/messages REST events."""
 
     user_id = "@sid1:red"
 
@@ -1168,7 +1206,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/join",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1182,7 +1220,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1196,7 +1234,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.second_tok,
         )
@@ -1210,7 +1248,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/ban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1222,7 +1260,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/unban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1234,7 +1272,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/invite",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1253,7 +1291,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1842,8 +1880,7 @@ class RoomAliasListTestCase(unittest.HomeserverTestCase):
         """Calls the endpoint under test. returns the json response object."""
         channel = self.make_request(
             "GET",
-            "/_matrix/client/unstable/org.matrix.msc2432/rooms/%s/aliases"
-            % (self.room_id,),
+            "/_matrix/client/r0/rooms/%s/aliases" % (self.room_id,),
             access_token=access_token,
         )
         self.assertEqual(channel.code, expected_code, channel.result)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -105,7 +104,13 @@ class Measure:
         "start",
     ]
 
-    def __init__(self, clock, name):
+    def __init__(self, clock, name: str):
+        """
+        Args:
+            clock: A n object with a "time()" method, which returns the current
+                time in seconds.
+            name: The name of the metric to report.
+        """
         self.clock = clock
         self.name = name
         curr_context = current_context()
@@ -118,10 +123,8 @@ class Measure:
         else:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
-        self._logging_context = LoggingContext(
-            "Measure[%s]" % (self.name,), parent_context
-        )
-        self.start = None
+        self._logging_context = LoggingContext(str(curr_context), parent_context)
+        self.start: Optional[int] = None
 
     def __enter__(self) -> "Measure":
         if self.start is not None:
@@ -130,11 +133,16 @@ class Measure:
         self.start = self.clock.time()
         self._logging_context.__enter__()
         in_flight.register((self.name,), self._update_in_flight)
+
+        logger.debug("Entering block %s", self.name)
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.start is None:
             raise RuntimeError("Measure() block exited without being entered")
+
+        logger.debug("Exiting block %s", self.name)
 
         duration = self.clock.time() - self.start
         usage = self.get_resource_usage()

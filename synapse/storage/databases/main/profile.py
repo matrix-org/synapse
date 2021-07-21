@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -74,20 +73,20 @@ class ProfileWorkerStore(SQLBaseStore):
     async def set_profile_displayname(
         self, user_localpart: str, new_displayname: Optional[str]
     ) -> None:
-        await self.db_pool.simple_update_one(
+        await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"displayname": new_displayname},
+            values={"displayname": new_displayname},
             desc="set_profile_displayname",
         )
 
     async def set_profile_avatar_url(
         self, user_localpart: str, new_avatar_url: Optional[str]
     ) -> None:
-        await self.db_pool.simple_update_one(
+        await self.db_pool.simple_upsert(
             table="profiles",
             keyvalues={"user_id": user_localpart},
-            updatevalues={"avatar_url": new_avatar_url},
+            values={"avatar_url": new_avatar_url},
             desc="set_profile_avatar_url",
         )
 

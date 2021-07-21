@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,11 +14,10 @@
 
 import logging
 import math
-from typing import Dict, FrozenSet, List, Mapping, Optional, Set, Union
+from typing import Collection, Dict, FrozenSet, List, Mapping, Optional, Set, Union
 
 from sortedcontainers import SortedDict
 
-from synapse.types import Collection
 from synapse.util import caches
 
 logger = logging.getLogger(__name__)
@@ -47,10 +45,10 @@ class StreamChangeCache:
     ):
         self._original_max_size = max_size
         self._max_size = math.floor(max_size)
-        self._entity_to_key = {}  # type: Dict[EntityType, int]
+        self._entity_to_key: Dict[EntityType, int] = {}
 
         # map from stream id to the a set of entities which changed at that stream id.
-        self._cache = SortedDict()  # type: SortedDict[int, Set[EntityType]]
+        self._cache: SortedDict[int, Set[EntityType]] = SortedDict()
 
         # the earliest stream_pos for which we can reliably answer
         # get_all_entities_changed. In other words, one less than the earliest
@@ -157,7 +155,7 @@ class StreamChangeCache:
         if stream_pos < self._earliest_known_stream_pos:
             return None
 
-        changed_entities = []  # type: List[EntityType]
+        changed_entities: List[EntityType] = []
 
         for k in self._cache.islice(start=self._cache.bisect_right(stream_pos)):
             changed_entities.extend(self._cache[k])

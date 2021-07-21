@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from parameterized import parameterized
 
@@ -110,7 +109,7 @@ class SynapseHomeserverOpenIDListenerTests(HomeserverTestCase):
         }
 
         # Listen with the config
-        self.hs._listener_http(self.hs.get_config(), parse_listener_def(config))
+        self.hs._listener_http(self.hs.config, parse_listener_def(config))
 
         # Grab the resource from the site that was told to listen
         site = self.reactor.tcpServers[0][1]

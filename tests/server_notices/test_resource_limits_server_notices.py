@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018, 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -307,8 +306,9 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
 
         channel = self.make_request("GET", "/sync?timeout=0", access_token=tok)
 
-        invites = channel.json_body["rooms"]["invite"]
-        self.assertEqual(len(invites), 0, invites)
+        self.assertNotIn(
+            "rooms", channel.json_body, "Got invites without server notice"
+        )
 
     def test_invite_with_notice(self):
         """Tests that, if the MAU limit is hit, the server notices user invites each user
@@ -365,7 +365,8 @@ class TestResourceLimitsServerNoticesWithRealRooms(unittest.HomeserverTestCase):
             # We could also pick another user and sync with it, which would return an
             # invite to a system notices room, but it doesn't matter which user we're
             # using so we use the last one because it saves us an extra sync.
-            invites = channel.json_body["rooms"]["invite"]
+            if "rooms" in channel.json_body:
+                invites = channel.json_body["rooms"]["invite"]
 
         # Make sure we have an invite to process.
         self.assertEqual(len(invites), 1, invites)

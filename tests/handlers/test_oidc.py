@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,9 +13,8 @@
 # limitations under the License.
 import json
 import os
+from unittest.mock import ANY, Mock, patch
 from urllib.parse import parse_qs, urlparse
-
-from mock import ANY, Mock, patch
 
 import pymacaroons
 
@@ -501,7 +499,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.assertRenderedError("fetch_error")
 
         # Handle code exchange failure
-        from synapse.handlers.oidc_handler import OidcError
+        from synapse.handlers.oidc import OidcError
 
         self.provider._exchange_code = simple_async_mock(
             raises=OidcError("invalid_request")
@@ -585,7 +583,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
                 body=b'{"error": "foo", "error_description": "bar"}',
             )
         )
-        from synapse.handlers.oidc_handler import OidcError
+        from synapse.handlers.oidc import OidcError
 
         exc = self.get_failure(self.provider._exchange_code(code), OidcError)
         self.assertEqual(exc.value.error, "foo")
@@ -989,6 +987,138 @@ class OidcHandlerTestCase(HomeserverTestCase):
         self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
         self.assertRenderedError("mapping_error", "localpart is invalid: ")
 
+    @override_config(
+        {
+            "oidc_config": {
+                **DEFAULT_CONFIG,
+                "attribute_requirements": [{"attribute": "test", "value": "foobar"}],
+            }
+        }
+    )
+    def test_attribute_requirements(self):
+        """The required attributes must be met from the OIDC userinfo response."""
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
+
+        # userinfo lacking "test": "foobar" attribute should fail.
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": "foobar" attribute should succeed.
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": "foobar",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+
+        # check that the auth handler got called as expected
+        auth_handler.complete_sso_login.assert_called_once_with(
+            "@tester:test", "oidc", ANY, ANY, None, new_user=True
+        )
+
+    @override_config(
+        {
+            "oidc_config": {
+                **DEFAULT_CONFIG,
+                "attribute_requirements": [{"attribute": "test", "value": "foobar"}],
+            }
+        }
+    )
+    def test_attribute_requirements_contains(self):
+        """Test that auth succeeds if userinfo attribute CONTAINS required value"""
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
+        # userinfo with "test": ["foobar", "foo", "bar"] attribute should succeed.
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": ["foobar", "foo", "bar"],
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+
+        # check that the auth handler got called as expected
+        auth_handler.complete_sso_login.assert_called_once_with(
+            "@tester:test", "oidc", ANY, ANY, None, new_user=True
+        )
+
+    @override_config(
+        {
+            "oidc_config": {
+                **DEFAULT_CONFIG,
+                "attribute_requirements": [{"attribute": "test", "value": "foobar"}],
+            }
+        }
+    )
+    def test_attribute_requirements_mismatch(self):
+        """
+        Test that auth fails if attributes exist but don't match,
+        or are non-string values.
+        """
+        auth_handler = self.hs.get_auth_handler()
+        auth_handler.complete_sso_login = simple_async_mock()
+        # userinfo with "test": "not_foobar" attribute should fail
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": "not_foobar",
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": ["foo", "bar"] attribute should fail
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": ["foo", "bar"],
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": False attribute should fail
+        # this is largely just to ensure we don't crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": False,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": None attribute should fail
+        # a value of None breaks the OIDC spec, but it's important to not crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": None,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": 1 attribute should fail
+        # this is largely just to ensure we don't crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": 1,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
+        # userinfo with "test": 3.14 attribute should fail
+        # this is largely just to ensure we don't crash here
+        userinfo = {
+            "sub": "tester",
+            "username": "tester",
+            "test": 3.14,
+        }
+        self.get_success(_make_callback_with_userinfo(self.hs, userinfo))
+        auth_handler.complete_sso_login.assert_not_called()
+
     def _generate_oidc_session_token(
         self,
         state: str,
@@ -996,7 +1126,7 @@ class OidcHandlerTestCase(HomeserverTestCase):
         client_redirect_url: str,
         ui_auth_session_id: str = "",
     ) -> str:
-        from synapse.handlers.oidc_handler import OidcSessionData
+        from synapse.handlers.oidc import OidcSessionData
 
         return self.handler._token_generator.generate_oidc_session_token(
             state=state,
@@ -1022,7 +1152,7 @@ async def _make_callback_with_userinfo(
         userinfo: the OIDC userinfo dict
         client_redirect_url: the URL to redirect to on success.
     """
-    from synapse.handlers.oidc_handler import OidcSessionData
+    from synapse.handlers.oidc import OidcSessionData
 
     handler = hs.get_oidc_handler()
     provider = handler._providers["oidc"]

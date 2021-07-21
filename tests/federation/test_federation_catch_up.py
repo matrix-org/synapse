@@ -1,12 +1,13 @@
 from typing import List, Tuple
+from unittest.mock import Mock
 
-from mock import Mock
-
+from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.federation.sender import PerDestinationQueue, TransactionManager
 from synapse.federation.units import Edu
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
+from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable
 from tests.unittest import FederatingHomeserverTestCase, override_config
@@ -49,7 +50,7 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         else:
             data = json_cb()
             self.failed_pdus.extend(data["pdus"])
-            raise IOError("Failed to connect because this is a test!")
+            raise NotRetryingDestination(0, 24 * 60 * 60 * 1000, txn.destination)
 
     def get_destination_room(self, room: str, destination: str = "host2") -> dict:
         """
@@ -420,3 +421,51 @@ class FederationCatchUpTestCases(FederatingHomeserverTestCase):
         self.assertNotIn("zzzerver", woken)
         # - all destinations are woken exactly once; they appear once in woken.
         self.assertCountEqual(woken, server_names[:-1])
+
+    @override_config({"send_federation": True})
+    def test_not_latest_event(self):
+        """Test that we send the latest event in the room even if its not ours."""
+
+        per_dest_queue, sent_pdus = self.make_fake_destination_queue()
+
+        # Make a room with a local user, and two servers. One will go offline
+        # and one will send some events.
+        self.register_user("u1", "you the one")
+        u1_token = self.login("u1", "you the one")
+        room_1 = self.helper.create_room_as("u1", tok=u1_token)
+
+        self.get_success(
+            event_injection.inject_member_event(self.hs, room_1, "@user:host2", "join")
+        )
+        event_1 = self.get_success(
+            event_injection.inject_member_event(self.hs, room_1, "@user:host3", "join")
+        )
+
+        # First we send something from the local server, so that we notice the
+        # remote is down and go into catchup mode.
+        self.helper.send(room_1, "you hear me!!", tok=u1_token)
+
+        # Now simulate us receiving an event from the still online remote.
+        event_2 = self.get_success(
+            event_injection.inject_event(
+                self.hs,
+                type=EventTypes.Message,
+                sender="@user:host3",
+                room_id=room_1,
+                content={"msgtype": "m.text", "body": "Hello"},
+            )
+        )
+
+        self.get_success(
+            self.hs.get_datastore().set_destination_last_successful_stream_ordering(
+                "host2", event_1.internal_metadata.stream_ordering
+            )
+        )
+
+        self.get_success(per_dest_queue._catch_up_transmission_loop())
+
+        # We expect only the last message from the remote, event_2, to have been
+        # sent, rather than the last *local* event that was sent.
+        self.assertEqual(len(sent_pdus), 1)
+        self.assertEqual(sent_pdus[0].event_id, event_2.event_id)
+        self.assertFalse(per_dest_queue._catching_up)

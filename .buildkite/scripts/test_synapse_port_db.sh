@@ -1,10 +1,10 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
-# Test script for 'synapse_port_db', which creates a virtualenv, installs Synapse along
-# with additional dependencies needed for the test (such as coverage or the PostgreSQL
-# driver), update the schema of the test SQLite database and run background updates on it,
-# create an empty test database in PostgreSQL, then run the 'synapse_port_db' script to
-# test porting the SQLite database to the PostgreSQL database (with coverage).
+# Test script for 'synapse_port_db'.
+#   - sets up synapse and deps
+#   - runs the port script on a prepopulated test sqlite db
+#   - also runs it against an new sqlite db
+
 
 set -xe
 cd `dirname $0`/../..
@@ -22,15 +22,36 @@ echo "--- Generate the signing key"
 # Generate the server's signing key.
 python -m synapse.app.homeserver --generate-keys -c .buildkite/sqlite-config.yaml
 
-echo "--- Prepare the databases"
+echo "--- Prepare test database"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
 scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
 
 # Create the PostgreSQL database.
-./.buildkite/scripts/create_postgres_db.py
+./.buildkite/scripts/postgres_exec.py "CREATE DATABASE synapse"
 
-echo "+++ Run synapse_port_db"
+echo "+++ Run synapse_port_db against test database"
+coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
 
-# Run the script
+# We should be able to run twice against the same database.
+echo "+++ Run synapse_port_db a second time"
+coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
+
+#####
+
+# Now do the same again, on an empty database.
+
+echo "--- Prepare empty SQLite database"
+
+# we do this by deleting the sqlite db, and then doing the same again.
+rm .buildkite/test_db.db
+
+scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
+
+# re-create the PostgreSQL database.
+./.buildkite/scripts/postgres_exec.py \
+  "DROP DATABASE synapse" \
+  "CREATE DATABASE synapse"
+
+echo "+++ Run synapse_port_db against empty database"
 coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml

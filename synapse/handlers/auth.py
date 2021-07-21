@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2019 - 2020 The Matrix.org Foundation C.I.C.
@@ -18,6 +17,7 @@ import logging
 import time
 import unicodedata
 import urllib.parse
+from binascii import crc32
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -30,11 +30,13 @@ from typing import (
     Optional,
     Tuple,
     Union,
+    cast,
 )
 
 import attr
 import bcrypt
 import pymacaroons
+import unpaddedbase64
 
 from twisted.web.server import Request
 
@@ -67,10 +69,12 @@ from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.rest.client.v1.login import LoginResponse
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -187,7 +191,7 @@ class AuthHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.checkers = {}  # type: Dict[str, UserInteractiveAuthChecker]
+        self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
@@ -238,6 +242,7 @@ class AuthHandler(BaseHandler):
         # Ratelimiter for failed auth during UIA. Uses same ratelimit config
         # as per `rc_login.failed_attempts`.
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
+            store=self.store,
             clock=self.clock,
             rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
@@ -248,6 +253,7 @@ class AuthHandler(BaseHandler):
 
         # Ratelimitier for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
+            store=self.store,
             clock=hs.get_clock(),
             rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
             burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
@@ -290,7 +296,7 @@ class AuthHandler(BaseHandler):
 
         # A mapping of user ID to extra attributes to include in the login
         # response.
-        self._extra_attributes = {}  # type: Dict[str, SsoLoginExtraAttributes]
+        self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
 
     async def validate_user_via_ui_auth(
         self,
@@ -298,6 +304,7 @@ class AuthHandler(BaseHandler):
         request: SynapseRequest,
         request_body: Dict[str, Any],
         description: str,
+        can_skip_ui_auth: bool = False,
     ) -> Tuple[dict, Optional[str]]:
         """
         Checks that the user is who they claim to be, via a UI auth.
@@ -315,6 +322,10 @@ class AuthHandler(BaseHandler):
 
             description: A human readable string to be displayed to the user that
                          describes the operation happening on their account.
+
+            can_skip_ui_auth: True if the UI auth session timeout applies this
+                              action. Should be set to False for any "dangerous"
+                              actions (e.g. deactivating an account).
 
         Returns:
             A tuple of (params, session_id).
@@ -337,8 +348,9 @@ class AuthHandler(BaseHandler):
                 user is too high to proceed
 
         """
-
-        if self._ui_auth_session_timeout:
+        if not requester.access_token_id:
+            raise ValueError("Cannot validate a user without an access token")
+        if can_skip_ui_auth and self._ui_auth_session_timeout:
             last_validated = await self.store.get_access_token_last_validated(
                 requester.access_token_id
             )
@@ -351,7 +363,7 @@ class AuthHandler(BaseHandler):
         requester_user_id = requester.user.to_string()
 
         # Check if we should be ratelimited due to too many previous failed attempts
-        self._failed_uia_attempts_ratelimiter.ratelimit(requester_user_id, update=False)
+        await self._failed_uia_attempts_ratelimiter.ratelimit(requester, update=False)
 
         # build a list of supported flows
         supported_ui_auth_types = await self._get_available_ui_auth_types(
@@ -372,7 +384,9 @@ class AuthHandler(BaseHandler):
             )
         except LoginError:
             # Update the ratelimiter to say we failed (`can_do_action` doesn't raise).
-            self._failed_uia_attempts_ratelimiter.can_do_action(requester_user_id)
+            await self._failed_uia_attempts_ratelimiter.can_do_action(
+                requester,
+            )
             raise
 
         # find the completed login type
@@ -486,7 +500,7 @@ class AuthHandler(BaseHandler):
                 all the stages in any of the permitted flows.
         """
 
-        sid = None  # type: Optional[str]
+        sid: Optional[str] = None
         authdict = clientdict.pop("auth", {})
         if "session" in authdict:
             sid = authdict["session"]
@@ -574,9 +588,9 @@ class AuthHandler(BaseHandler):
             )
 
         # check auth type currently being presented
-        errordict = {}  # type: Dict[str, Any]
+        errordict: Dict[str, Any] = {}
         if "type" in authdict:
-            login_type = authdict["type"]  # type: str
+            login_type: str = authdict["type"]
             try:
                 result = await self._check_auth_dict(authdict, clientip)
                 if result:
@@ -752,7 +766,7 @@ class AuthHandler(BaseHandler):
             LoginType.TERMS: self._get_params_terms,
         }
 
-        params = {}  # type: Dict[str, Any]
+        params: Dict[str, Any] = {}
 
         for f in public_flows:
             for stage in f:
@@ -765,6 +779,108 @@ class AuthHandler(BaseHandler):
             "params": params,
         }
 
+    async def refresh_token(
+        self,
+        refresh_token: str,
+        valid_until_ms: Optional[int],
+    ) -> Tuple[str, str]:
+        """
+        Consumes a refresh token and generate both a new access token and a new refresh token from it.
+
+        The consumed refresh token is considered invalid after the first use of the new access token or the new refresh token.
+
+        Args:
+            refresh_token: The token to consume.
+            valid_until_ms: The expiration timestamp of the new access token.
+
+        Returns:
+            A tuple containing the new access token and refresh token
+        """
+
+        # Verify the token signature first before looking up the token
+        if not self._verify_refresh_token(refresh_token):
+            raise SynapseError(401, "invalid refresh token", Codes.UNKNOWN_TOKEN)
+
+        existing_token = await self.store.lookup_refresh_token(refresh_token)
+        if existing_token is None:
+            raise SynapseError(401, "refresh token does not exist", Codes.UNKNOWN_TOKEN)
+
+        if (
+            existing_token.has_next_access_token_been_used
+            or existing_token.has_next_refresh_token_been_refreshed
+        ):
+            raise SynapseError(
+                403, "refresh token isn't valid anymore", Codes.FORBIDDEN
+            )
+
+        (
+            new_refresh_token,
+            new_refresh_token_id,
+        ) = await self.get_refresh_token_for_user_id(
+            user_id=existing_token.user_id, device_id=existing_token.device_id
+        )
+        access_token = await self.get_access_token_for_user_id(
+            user_id=existing_token.user_id,
+            device_id=existing_token.device_id,
+            valid_until_ms=valid_until_ms,
+            refresh_token_id=new_refresh_token_id,
+        )
+        await self.store.replace_refresh_token(
+            existing_token.token_id, new_refresh_token_id
+        )
+        return access_token, new_refresh_token
+
+    def _verify_refresh_token(self, token: str) -> bool:
+        """
+        Verifies the shape of a refresh token.
+
+        Args:
+            token: The refresh token to verify
+
+        Returns:
+            Whether the token has the right shape
+        """
+        parts = token.split("_", maxsplit=4)
+        if len(parts) != 4:
+            return False
+
+        type, localpart, rand, crc = parts
+
+        # Refresh tokens are prefixed by "syr_", let's check that
+        if type != "syr":
+            return False
+
+        # Check the CRC
+        base = f"{type}_{localpart}_{rand}"
+        expected_crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        if crc != expected_crc:
+            return False
+
+        return True
+
+    async def get_refresh_token_for_user_id(
+        self,
+        user_id: str,
+        device_id: str,
+    ) -> Tuple[str, int]:
+        """
+        Creates a new refresh token for the user with the given user ID.
+
+        Args:
+            user_id: canonical user ID
+            device_id: the device ID to associate with the token.
+
+        Returns:
+            The newly created refresh token and its ID in the database
+        """
+        refresh_token = self.generate_refresh_token(UserID.from_string(user_id))
+        refresh_token_id = await self.store.add_refresh_token_to_user(
+            user_id=user_id,
+            token=refresh_token,
+            device_id=device_id,
+        )
+        return refresh_token, refresh_token_id
+
     async def get_access_token_for_user_id(
         self,
         user_id: str,
@@ -772,6 +888,7 @@ class AuthHandler(BaseHandler):
         valid_until_ms: Optional[int],
         puppets_user_id: Optional[str] = None,
         is_appservice_ghost: bool = False,
+        refresh_token_id: Optional[int] = None,
     ) -> str:
         """
         Creates a new access token for the user with the given user ID.
@@ -789,6 +906,8 @@ class AuthHandler(BaseHandler):
             valid_until_ms: when the token is valid until. None for
                 no expiry.
             is_appservice_ghost: Whether the user is an application ghost user
+            refresh_token_id: the refresh token ID that will be associated with
+                this access token.
         Returns:
               The access token for the user's session.
         Raises:
@@ -804,10 +923,12 @@ class AuthHandler(BaseHandler):
             logger.info(
                 "Logging in user %s as %s%s", user_id, puppets_user_id, fmt_expiry
             )
+            target_user_id_obj = UserID.from_string(puppets_user_id)
         else:
             logger.info(
                 "Logging in user %s on device %s%s", user_id, device_id, fmt_expiry
             )
+            target_user_id_obj = UserID.from_string(user_id)
 
         if (
             not is_appservice_ghost
@@ -815,13 +936,14 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
-        access_token = self.macaroon_gen.generate_access_token(user_id)
+        access_token = self.generate_access_token(target_user_id_obj)
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
             device_id=device_id,
             valid_until_ms=valid_until_ms,
             puppets_user_id=puppets_user_id,
+            refresh_token_id=refresh_token_id,
         )
 
         # the device *should* have been registered before we got here; however,
@@ -885,6 +1007,19 @@ class AuthHandler(BaseHandler):
             )
         return result
 
+    def can_change_password(self) -> bool:
+        """Get whether users on this server are allowed to change or set a password.
+
+        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+
+        Note that any account (even SSO accounts) are allowed to add passwords if the above
+        is true.
+
+        Returns:
+            Whether users on this server are allowed to change or set a password
+        """
+        return self._password_enabled and self._password_localdb_enabled
+
     def get_supported_login_types(self) -> Iterable[str]:
         """Get a the login types supported for the /login API
 
@@ -901,7 +1036,7 @@ class AuthHandler(BaseHandler):
         self,
         login_submission: Dict[str, Any],
         ratelimit: bool = False,
-    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
+    ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Authenticates the user for the /login API
 
         Also used by the user-interactive auth flow to validate auth types which don't
@@ -968,8 +1103,8 @@ class AuthHandler(BaseHandler):
             # We also apply account rate limiting using the 3PID as a key, as
             # otherwise using 3PID bypasses the ratelimiting based on user ID.
             if ratelimit:
-                self._failed_login_attempts_ratelimiter.ratelimit(
-                    (medium, address), update=False
+                await self._failed_login_attempts_ratelimiter.ratelimit(
+                    None, (medium, address), update=False
                 )
 
             # Check for login providers that support 3pid login types
@@ -1002,8 +1137,8 @@ class AuthHandler(BaseHandler):
                 # this code path, which is fine as then the per-user ratelimit
                 # will kick in below.
                 if ratelimit:
-                    self._failed_login_attempts_ratelimiter.can_do_action(
-                        (medium, address)
+                    await self._failed_login_attempts_ratelimiter.can_do_action(
+                        None, (medium, address)
                     )
                 raise LoginError(403, "", errcode=Codes.FORBIDDEN)
 
@@ -1025,8 +1160,8 @@ class AuthHandler(BaseHandler):
 
         # Check if we've hit the failed ratelimit (but don't update it)
         if ratelimit:
-            self._failed_login_attempts_ratelimiter.ratelimit(
-                qualified_user_id.lower(), update=False
+            await self._failed_login_attempts_ratelimiter.ratelimit(
+                None, qualified_user_id.lower(), update=False
             )
 
         try:
@@ -1037,8 +1172,8 @@ class AuthHandler(BaseHandler):
             # exception and masking the LoginError. The actual ratelimiting
             # should have happened above.
             if ratelimit:
-                self._failed_login_attempts_ratelimiter.can_do_action(
-                    qualified_user_id.lower()
+                await self._failed_login_attempts_ratelimiter.can_do_action(
+                    None, qualified_user_id.lower()
                 )
             raise
 
@@ -1046,7 +1181,7 @@ class AuthHandler(BaseHandler):
         self,
         username: str,
         login_submission: Dict[str, Any],
-    ) -> Tuple[str, Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
+    ) -> Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Helper for validate_login
 
         Handles login, once we've mapped 3pids onto userids
@@ -1124,7 +1259,7 @@ class AuthHandler(BaseHandler):
 
     async def check_password_provider_3pid(
         self, medium: str, address: str, password: str
-    ) -> Tuple[Optional[str], Optional[Callable[[Dict[str, str]], Awaitable[None]]]]:
+    ) -> Tuple[Optional[str], Optional[Callable[["LoginResponse"], Awaitable[None]]]]:
         """Check if a password provider is able to validate a thirdparty login
 
         Args:
@@ -1175,6 +1310,32 @@ class AuthHandler(BaseHandler):
             return None
         return user_id
 
+    def generate_access_token(self, for_user: UserID) -> str:
+        """Generates an opaque string, for use as an access token"""
+
+        # we use the following format for access tokens:
+        #    syt_<base64 local part>_<random string>_<base62 crc check>
+
+        b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))
+        random_string = stringutils.random_string(20)
+        base = f"syt_{b64local}_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
+
+    def generate_refresh_token(self, for_user: UserID) -> str:
+        """Generates an opaque string, for use as a refresh token"""
+
+        # we use the following format for refresh tokens:
+        #    syr_<base64 local part>_<random string>_<base62 crc check>
+
+        b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))
+        random_string = stringutils.random_string(20)
+        base = f"syr_{b64local}_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
+
     async def validate_short_term_login_token(
         self, login_token: str
     ) -> LoginTokenAttributes:
@@ -1213,7 +1374,7 @@ class AuthHandler(BaseHandler):
     async def delete_access_tokens_for_user(
         self,
         user_id: str,
-        except_token_id: Optional[str] = None,
+        except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
     ):
         """Invalidate access tokens belonging to a user
@@ -1231,7 +1392,7 @@ class AuthHandler(BaseHandler):
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
-            for token, token_id, device_id in tokens_and_devices:
+            for token, _, device_id in tokens_and_devices:
                 await provider.on_logged_out(
                     user_id=user_id, device_id=device_id, access_token=token
                 )
@@ -1369,9 +1530,9 @@ class AuthHandler(BaseHandler):
         except StoreError:
             raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-        user_id_to_verify = await self.get_session_data(
+        user_id_to_verify: str = await self.get_session_data(
             session_id, UIAuthSessionDataConstants.REQUEST_USER_ID
-        )  # type: str
+        )
 
         idps = await self.hs.get_sso_handler().get_identity_providers_for_user(
             user_id_to_verify
@@ -1523,7 +1684,7 @@ class AuthHandler(BaseHandler):
         )
         respond_with_html(request, 200, html)
 
-    async def _sso_login_callback(self, login_result: JsonDict) -> None:
+    async def _sso_login_callback(self, login_result: "LoginResponse") -> None:
         """
         A login callback which might add additional attributes to the login response.
 
@@ -1537,7 +1698,8 @@ class AuthHandler(BaseHandler):
 
         extra_attributes = self._extra_attributes.get(login_result["user_id"])
         if extra_attributes:
-            login_result.update(extra_attributes.extra_attributes)
+            login_result_dict = cast(Dict[str, Any], login_result)
+            login_result_dict.update(extra_attributes.extra_attributes)
 
     def _expire_sso_extra_attributes(self) -> None:
         """
@@ -1568,10 +1730,7 @@ class MacaroonGenerator:
 
     hs = attr.ib()
 
-    def generate_access_token(
-        self, user_id: str, extra_caveats: Optional[List[str]] = None
-    ) -> str:
-        extra_caveats = extra_caveats or []
+    def generate_guest_access_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
         # Include a nonce, to make sure that each login gets a different
@@ -1579,8 +1738,7 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat(
             "nonce = %s" % (stringutils.random_string_with_symbols(16),)
         )
-        for caveat in extra_caveats:
-            macaroon.add_first_party_caveat(caveat)
+        macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
 
     def generate_short_term_login_token(

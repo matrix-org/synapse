@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -160,7 +159,7 @@ def _seperate(
     """
     state_set_iterator = iter(state_sets)
     unconflicted_state = dict(next(state_set_iterator))
-    conflicted_state = {}  # type: MutableStateMap[Set[str]]
+    conflicted_state: MutableStateMap[Set[str]] = {}
 
     for state_set in state_set_iterator:
         for key, value in state_set.items():

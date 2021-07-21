@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +18,7 @@ import logging
 from typing import (
     Any,
     Callable,
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -38,7 +38,7 @@ from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
-from synapse.types import Collection, MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateMap
 from synapse.util import Clock
 
 logger = logging.getLogger(__name__)
@@ -276,7 +276,7 @@ async def _get_auth_chain_difference(
     # event IDs if they appear in the `event_map`. This is the intersection of
     # the event's auth chain with the events in the `event_map` *plus* their
     # auth event IDs.
-    events_to_auth_chain = {}  # type: Dict[str, Set[str]]
+    events_to_auth_chain: Dict[str, Set[str]] = {}
     for event in event_map.values():
         chain = {event.event_id}
         events_to_auth_chain[event.event_id] = chain
@@ -301,17 +301,17 @@ async def _get_auth_chain_difference(
         # ((type, state_key)->event_id) mappings; and (b) we have stripped out
         # unpersisted events and replaced them with the persisted events in
         # their auth chain.
-        state_sets_ids = []  # type: List[Set[str]]
+        state_sets_ids: List[Set[str]] = []
 
         # For each state set, the unpersisted event IDs reachable (by their auth
         # chain) from the events in that set.
-        unpersisted_set_ids = []  # type: List[Set[str]]
+        unpersisted_set_ids: List[Set[str]] = []
 
         for state_set in state_sets:
-            set_ids = set()  # type: Set[str]
+            set_ids: Set[str] = set()
             state_sets_ids.append(set_ids)
 
-            unpersisted_ids = set()  # type: Set[str]
+            unpersisted_ids: Set[str] = set()
             unpersisted_set_ids.append(unpersisted_ids)
 
             for event_id in state_set.values():
@@ -334,7 +334,7 @@ async def _get_auth_chain_difference(
         union = unpersisted_set_ids[0].union(*unpersisted_set_ids[1:])
         intersection = unpersisted_set_ids[0].intersection(*unpersisted_set_ids[1:])
 
-        difference_from_event_map = union - intersection  # type: Collection[str]
+        difference_from_event_map: Collection[str] = union - intersection
     else:
         difference_from_event_map = ()
         state_sets_ids = [set(state_set.values()) for state_set in state_sets]
@@ -458,7 +458,7 @@ async def _reverse_topological_power_sort(
         The sorted list
     """
 
-    graph = {}  # type: Dict[str, Set[str]]
+    graph: Dict[str, Set[str]] = {}
     for idx, event_id in enumerate(event_ids, start=1):
         await _add_event_and_auth_chain_to_graph(
             graph, room_id, event_id, event_map, state_res_store, auth_diff
@@ -657,7 +657,7 @@ async def _get_mainline_depth_for_event(
     """
 
     room_id = event.room_id
-    tmp_event = event  # type: Optional[EventBase]
+    tmp_event: Optional[EventBase] = event
 
     # We do an iterative search, replacing `event with the power level in its
     # auth events (if any)
@@ -767,7 +767,7 @@ def lexicographical_topological_sort(
     # outgoing edges, c.f.
     # https://en.wikipedia.org/wiki/Topological_sorting#Kahn's_algorithm
     outdegree_map = graph
-    reverse_graph = {}  # type: Dict[str, Set[str]]
+    reverse_graph: Dict[str, Set[str]] = {}
 
     # Lists of nodes with zero out degree. Is actually a tuple of
     # `(key(node), node)` so that sorting does the right thing

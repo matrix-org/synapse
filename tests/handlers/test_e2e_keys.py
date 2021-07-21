@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -14,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import mock
+from unittest import mock
 
 from signedjson import key as key, sign as sign
 
@@ -258,7 +257,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys2))
 
         devices = self.get_success(
-            self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
+            self.handler.query_devices(
+                {"device_keys": {local_user: []}}, 0, local_user, "device123"
+            )
         )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
@@ -358,7 +359,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         device_key_1["signatures"][local_user]["ed25519:abc"] = "base64+signature"
         device_key_2["signatures"][local_user]["ed25519:def"] = "base64+signature"
         devices = self.get_success(
-            self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
+            self.handler.query_devices(
+                {"device_keys": {local_user: []}}, 0, local_user, "device123"
+            )
         )
         del devices["device_keys"][local_user]["abc"]["unsigned"]
         del devices["device_keys"][local_user]["def"]["unsigned"]
@@ -592,7 +595,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # fetch the signed keys/devices and make sure that the signatures are there
         ret = self.get_success(
             self.handler.query_devices(
-                {"device_keys": {local_user: [], other_user: []}}, 0, local_user
+                {"device_keys": {local_user: [], other_user: []}},
+                0,
+                local_user,
+                "device123",
             )
         )
 

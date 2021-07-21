@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -23,7 +22,7 @@ from synapse.types import Requester, UserID, create_requester
 from ._base import BaseHandler
 
 if TYPE_CHECKING:
-    from synapse.app.homeserver import HomeServer
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,9 @@ class DeactivateAccountHandler(BaseHandler):
         if hs.config.run_background_tasks:
             hs.get_reactor().callWhenRunning(self._start_user_parting)
 
-        self._account_validity_enabled = hs.config.account_validity.enabled
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
 
     async def deactivate_account(
         self,

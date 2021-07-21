@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,29 +11,33 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Iterable, Union
+from typing import TYPE_CHECKING, Iterable, Union
 
 from synapse.server_notices.consent_server_notices import ConsentServerNotices
 from synapse.server_notices.resource_limits_server_notices import (
     ResourceLimitsServerNotices,
 )
+from synapse.server_notices.worker_server_notices_sender import (
+    WorkerServerNoticesSender,
+)
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
-class ServerNoticesSender:
+class ServerNoticesSender(WorkerServerNoticesSender):
     """A centralised place which sends server notices automatically when
     Certain Events take place
     """
 
-    def __init__(self, hs):
-        """
-
-        Args:
-            hs (synapse.server.HomeServer):
-        """
-        self._server_notices = (
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self._server_notices: Iterable[
+            Union[ConsentServerNotices, ResourceLimitsServerNotices]
+        ] = (
             ConsentServerNotices(hs),
             ResourceLimitsServerNotices(hs),
-        )  # type: Iterable[Union[ConsentServerNotices, ResourceLimitsServerNotices]]
+        )
 
     async def on_user_syncing(self, user_id: str) -> None:
         """Called when the user performs a sync operation.

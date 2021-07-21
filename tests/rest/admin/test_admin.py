@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +16,7 @@ import json
 import os
 import urllib.parse
 from binascii import unhexlify
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
 
@@ -68,7 +66,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         # Create a new group
         channel = self.make_request(
             "POST",
-            "/create_group".encode("ascii"),
+            b"/create_group",
             access_token=self.admin_user_tok,
             content={"localpart": "test"},
         )
@@ -131,9 +129,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)"""
-        channel = self.make_request(
-            "GET", "/joined_groups".encode("ascii"), access_token=access_token
-        )
+        channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 

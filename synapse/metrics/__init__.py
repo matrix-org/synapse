@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +46,7 @@ logger = logging.getLogger(__name__)
 METRICS_PREFIX = "/_synapse/metrics"
 
 running_on_pypy = platform.python_implementation() == "PyPy"
-all_gauges = {}  # type: Dict[str, Union[LaterGauge, InFlightGauge]]
+all_gauges: "Dict[str, Union[LaterGauge, InFlightGauge]]" = {}
 
 HAVE_PROC_SELF_STAT = os.path.exists("/proc/self/stat")
 
@@ -131,7 +130,7 @@ class InFlightGauge:
         )
 
         # Counts number of in flight blocks for a given set of label values
-        self._registrations = {}  # type: Dict
+        self._registrations: Dict = {}
 
         # Protects access to _registrations
         self._lock = threading.Lock()
@@ -214,7 +213,12 @@ class GaugeBucketCollector:
     Prometheus, and optimise for that case.
     """
 
-    __slots__ = ("_name", "_documentation", "_bucket_bounds", "_metric")
+    __slots__ = (
+        "_name",
+        "_documentation",
+        "_bucket_bounds",
+        "_metric",
+    )
 
     def __init__(
         self,
@@ -242,11 +246,16 @@ class GaugeBucketCollector:
         if self._bucket_bounds[-1] != float("inf"):
             self._bucket_bounds.append(float("inf"))
 
-        self._metric = self._values_to_metric([])
+        # We initially set this to None. We won't report metrics until
+        # this has been initialised after a successful data update
+        self._metric: Optional[GaugeHistogramMetricFamily] = None
+
         registry.register(self)
 
     def collect(self):
-        yield self._metric
+        # Don't report metrics unless we've already collected some data
+        if self._metric is not None:
+            yield self._metric
 
     def update_data(self, values: Iterable[float]):
         """Update the data to be reported by the metric
@@ -526,6 +535,13 @@ class ReactorLastSeenMetric:
 
 REGISTRY.register(ReactorLastSeenMetric())
 
+# The minimum time in seconds between GCs for each generation, regardless of the current GC
+# thresholds and counts.
+MIN_TIME_BETWEEN_GCS = (1.0, 10.0, 30.0)
+
+# The time (in seconds since the epoch) of the last time we did a GC for each generation.
+_last_gc = [0.0, 0.0, 0.0]
+
 
 def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
@@ -566,11 +582,16 @@ def runUntilCurrentTimer(reactor, func):
             return ret
 
         # Check if we need to do a manual GC (since its been disabled), and do
-        # one if necessary.
+        # one if necessary. Note we go in reverse order as e.g. a gen 1 GC may
+        # promote an object into gen 2, and we don't want to handle the same
+        # object multiple times.
         threshold = gc.get_threshold()
         counts = gc.get_count()
         for i in (2, 1, 0):
-            if threshold[i] < counts[i]:
+            # We check if we need to do one based on a straightforward
+            # comparison between the threshold and count. We also do an extra
+            # check to make sure that we don't a GC too often.
+            if threshold[i] < counts[i] and MIN_TIME_BETWEEN_GCS[i] < end - _last_gc[i]:
                 if i == 0:
                     logger.debug("Collecting gc %d", i)
                 else:
@@ -579,6 +600,8 @@ def runUntilCurrentTimer(reactor, func):
                 start = time.time()
                 unreachable = gc.collect(i)
                 end = time.time()
+
+                _last_gc[i] = end
 
                 gc_time.labels(i).observe(end - start)
                 gc_unreachable.labels(i).set(unreachable)
@@ -605,6 +628,7 @@ try:
         gc.disable()
 except AttributeError:
     pass
+
 
 __all__ = [
     "MetricsResource",

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,21 +14,35 @@
 import itertools
 import logging
 from queue import Empty, PriorityQueue
-from typing import Dict, Iterable, List, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
+from prometheus_client import Gauge
+
+from synapse.api.constants import MAX_DEPTH
 from synapse.api.errors import StoreError
-from synapse.events import EventBase
+from synapse.api.room_versions import RoomVersion
+from synapse.events import EventBase, make_event_from_dict
 from synapse.metrics.background_process_metrics import wrap_as_background_process
-from synapse.storage._base import SQLBaseStore, make_in_list_sql_clause
+from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.signatures import SignatureWorkerStore
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.types import Cursor
-from synapse.types import Collection
+from synapse.util import json_encoder
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.iterutils import batch_iter
+
+oldest_pdu_in_federation_staging = Gauge(
+    "synapse_federation_server_oldest_inbound_pdu_in_staging",
+    "The age in seconds since we received the oldest pdu in the federation staging area",
+)
+
+number_pdus_in_federation_queue = Gauge(
+    "synapse_federation_server_number_inbound_pdu_in_staging",
+    "The total number of events in the inbound federation staging",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,16 +62,19 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             )
 
         # Cache of event ID to list of auth event IDs and their depths.
-        self._event_auth_cache = LruCache(
+        self._event_auth_cache: LruCache[str, List[Tuple[str, int]]] = LruCache(
             500000, "_event_auth_cache", size_callback=len
-        )  # type: LruCache[str, List[Tuple[str, int]]]
+        )
+
+        self._clock.looping_call(self._get_stats_for_federation_staging, 30 * 1000)
 
     async def get_auth_chain(
-        self, event_ids: Collection[str], include_given: bool = False
+        self, room_id: str, event_ids: Collection[str], include_given: bool = False
     ) -> List[EventBase]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
+            room_id: The room the event is in.
             event_ids: state events
             include_given: include the given events in result
 
@@ -66,24 +82,44 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             list of events
         """
         event_ids = await self.get_auth_chain_ids(
-            event_ids, include_given=include_given
+            room_id, event_ids, include_given=include_given
         )
         return await self.get_events_as_list(event_ids)
 
     async def get_auth_chain_ids(
         self,
+        room_id: str,
         event_ids: Collection[str],
         include_given: bool = False,
     ) -> List[str]:
         """Get auth events for given event_ids. The events *must* be state events.
 
         Args:
+            room_id: The room the event is in.
             event_ids: state events
             include_given: include the given events in result
 
         Returns:
-            An awaitable which resolve to a list of event_ids
+            list of event_ids
         """
+
+        # Check if we have indexed the room so we can use the chain cover
+        # algorithm.
+        room = await self.get_room(room_id)
+        if room["has_auth_chain_index"]:
+            try:
+                return await self.db_pool.runInteraction(
+                    "get_auth_chain_ids_chains",
+                    self._get_auth_chain_ids_using_cover_index_txn,
+                    room_id,
+                    event_ids,
+                    include_given,
+                )
+            except _NoChainCoverIndex:
+                # For whatever reason we don't actually have a chain cover index
+                # for the events in question, so we fall back to the old method.
+                pass
+
         return await self.db_pool.runInteraction(
             "get_auth_chain_ids",
             self._get_auth_chain_ids_txn,
@@ -91,9 +127,130 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             include_given,
         )
 
+    def _get_auth_chain_ids_using_cover_index_txn(
+        self, txn: Cursor, room_id: str, event_ids: Collection[str], include_given: bool
+    ) -> List[str]:
+        """Calculates the auth chain IDs using the chain index."""
+
+        # First we look up the chain ID/sequence numbers for the given events.
+
+        initial_events = set(event_ids)
+
+        # All the events that we've found that are reachable from the events.
+        seen_events: Set[str] = set()
+
+        # A map from chain ID to max sequence number of the given events.
+        event_chains: Dict[int, int] = {}
+
+        sql = """
+            SELECT event_id, chain_id, sequence_number
+            FROM event_auth_chains
+            WHERE %s
+        """
+        for batch in batch_iter(initial_events, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "event_id", batch
+            )
+            txn.execute(sql % (clause,), args)
+
+            for event_id, chain_id, sequence_number in txn:
+                seen_events.add(event_id)
+                event_chains[chain_id] = max(
+                    sequence_number, event_chains.get(chain_id, 0)
+                )
+
+        # Check that we actually have a chain ID for all the events.
+        events_missing_chain_info = initial_events.difference(seen_events)
+        if events_missing_chain_info:
+            # This can happen due to e.g. downgrade/upgrade of the server. We
+            # raise an exception and fall back to the previous algorithm.
+            logger.info(
+                "Unexpectedly found that events don't have chain IDs in room %s: %s",
+                room_id,
+                events_missing_chain_info,
+            )
+            raise _NoChainCoverIndex(room_id)
+
+        # Now we look up all links for the chains we have, adding chains that
+        # are reachable from any event.
+        sql = """
+            SELECT
+                origin_chain_id, origin_sequence_number,
+                target_chain_id, target_sequence_number
+            FROM event_auth_chain_links
+            WHERE %s
+        """
+
+        # A map from chain ID to max sequence number *reachable* from any event ID.
+        chains: Dict[int, int] = {}
+
+        # Add all linked chains reachable from initial set of chains.
+        for batch in batch_iter(event_chains, 1000):
+            clause, args = make_in_list_sql_clause(
+                txn.database_engine, "origin_chain_id", batch
+            )
+            txn.execute(sql % (clause,), args)
+
+            for (
+                origin_chain_id,
+                origin_sequence_number,
+                target_chain_id,
+                target_sequence_number,
+            ) in txn:
+                # chains are only reachable if the origin sequence number of
+                # the link is less than the max sequence number in the
+                # origin chain.
+                if origin_sequence_number <= event_chains.get(origin_chain_id, 0):
+                    chains[target_chain_id] = max(
+                        target_sequence_number,
+                        chains.get(target_chain_id, 0),
+                    )
+
+        # Add the initial set of chains, excluding the sequence corresponding to
+        # initial event.
+        for chain_id, seq_no in event_chains.items():
+            chains[chain_id] = max(seq_no - 1, chains.get(chain_id, 0))
+
+        # Now for each chain we figure out the maximum sequence number reachable
+        # from *any* event ID. Events with a sequence less than that are in the
+        # auth chain.
+        if include_given:
+            results = initial_events
+        else:
+            results = set()
+
+        if isinstance(self.database_engine, PostgresEngine):
+            # We can use `execute_values` to efficiently fetch the gaps when
+            # using postgres.
+            sql = """
+                SELECT event_id
+                FROM event_auth_chains AS c, (VALUES ?) AS l(chain_id, max_seq)
+                WHERE
+                    c.chain_id = l.chain_id
+                    AND sequence_number <= max_seq
+            """
+
+            rows = txn.execute_values(sql, chains.items())
+            results.update(r for r, in rows)
+        else:
+            # For SQLite we just fall back to doing a noddy for loop.
+            sql = """
+                SELECT event_id FROM event_auth_chains
+                WHERE chain_id = ? AND sequence_number <= ?
+            """
+            for chain_id, max_no in chains.items():
+                txn.execute(sql, (chain_id, max_no))
+                results.update(r for r, in txn)
+
+        return list(results)
+
     def _get_auth_chain_ids_txn(
         self, txn: LoggingTransaction, event_ids: Collection[str], include_given: bool
     ) -> List[str]:
+        """Calculates the auth chain IDs.
+
+        This is used when we don't have a cover index for the room.
+        """
         if include_given:
             results = set(event_ids)
         else:
@@ -196,14 +353,14 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         initial_events = set(state_sets[0]).union(*state_sets[1:])
 
         # Map from event_id -> (chain ID, seq no)
-        chain_info = {}  # type: Dict[str, Tuple[int, int]]
+        chain_info: Dict[str, Tuple[int, int]] = {}
 
         # Map from chain ID -> seq no -> event Id
-        chain_to_event = {}  # type: Dict[int, Dict[int, str]]
+        chain_to_event: Dict[int, Dict[int, str]] = {}
 
         # All the chains that we've found that are reachable from the state
         # sets.
-        seen_chains = set()  # type: Set[int]
+        seen_chains: Set[int] = set()
 
         sql = """
             SELECT event_id, chain_id, sequence_number
@@ -235,9 +392,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # Corresponds to `state_sets`, except as a map from chain ID to max
         # sequence number reachable from the state set.
-        set_to_chain = []  # type: List[Dict[int, int]]
+        set_to_chain: List[Dict[int, int]] = []
         for state_set in state_sets:
-            chains = {}  # type: Dict[int, int]
+            chains: Dict[int, int] = {}
             set_to_chain.append(chains)
 
             for event_id in state_set:
@@ -289,7 +446,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         # Mapping from chain ID to the range of sequence numbers that should be
         # pulled from the database.
-        chain_to_gap = {}  # type: Dict[int, Tuple[int, int]]
+        chain_to_gap: Dict[int, Tuple[int, int]] = {}
 
         for chain_id in seen_chains:
             min_seq_no = min(chains.get(chain_id, 0) for chains in set_to_chain)
@@ -398,7 +555,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         }
 
         # The sorted list of events whose auth chains we should walk.
-        search = []  # type: List[Tuple[int, str]]
+        search: List[Tuple[int, str]] = []
 
         # We need to get the depth of the initial events for sorting purposes.
         sql = """
@@ -421,7 +578,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         search.sort()
 
         # Map from event to its auth events
-        event_to_auth_events = {}  # type: Dict[str, Set[str]]
+        event_to_auth_events: Dict[str, Set[str]] = {}
 
         base_sql = """
             SELECT a.event_id, auth_id, depth
@@ -530,8 +687,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return dict(txn)
 
-    async def get_max_depth_of(self, event_ids: List[str]) -> int:
-        """Returns the max depth of a set of event IDs
+    async def get_max_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
+        """Returns the event ID and depth for the event that has the max depth from a set of event IDs
 
         Args:
             event_ids: The event IDs to calculate the max depth of.
@@ -540,14 +697,53 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             table="events",
             column="event_id",
             iterable=event_ids,
-            retcols=("depth",),
+            retcols=(
+                "event_id",
+                "depth",
+            ),
             desc="get_max_depth_of",
         )
 
         if not rows:
-            return 0
+            return None, 0
         else:
-            return max(row["depth"] for row in rows)
+            max_depth_event_id = ""
+            current_max_depth = 0
+            for row in rows:
+                if row["depth"] > current_max_depth:
+                    max_depth_event_id = row["event_id"]
+                    current_max_depth = row["depth"]
+
+            return max_depth_event_id, current_max_depth
+
+    async def get_min_depth_of(self, event_ids: List[str]) -> Tuple[str, int]:
+        """Returns the event ID and depth for the event that has the min depth from a set of event IDs
+
+        Args:
+            event_ids: The event IDs to calculate the max depth of.
+        """
+        rows = await self.db_pool.simple_select_many_batch(
+            table="events",
+            column="event_id",
+            iterable=event_ids,
+            retcols=(
+                "event_id",
+                "depth",
+            ),
+            desc="get_min_depth_of",
+        )
+
+        if not rows:
+            return None, 0
+        else:
+            min_depth_event_id = ""
+            current_min_depth = MAX_DEPTH
+            for row in rows:
+                if row["depth"] < current_min_depth:
+                    min_depth_event_id = row["event_id"]
+                    current_min_depth = row["depth"]
+
+            return min_depth_event_id, current_min_depth
 
     async def get_prev_events_for_room(self, room_id: str) -> List[str]:
         """
@@ -651,7 +847,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
         return int(min_depth) if min_depth is not None else None
 
-    async def get_forward_extremeties_for_room(
+    async def get_forward_extremities_for_room_at_stream_ordering(
         self, room_id: str, stream_ordering: int
     ) -> List[str]:
         """For a given room_id and stream_ordering, return the forward
@@ -863,6 +1059,189 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             "_delete_old_forward_extrem_cache",
             _delete_old_forward_extrem_cache_txn,
         )
+
+    async def insert_received_event_to_staging(
+        self, origin: str, event: EventBase
+    ) -> None:
+        """Insert a newly received event from federation into the staging area."""
+
+        # We use an upsert here to handle the case where we see the same event
+        # from the same server multiple times.
+        await self.db_pool.simple_upsert(
+            table="federation_inbound_events_staging",
+            keyvalues={
+                "origin": origin,
+                "event_id": event.event_id,
+            },
+            values={},
+            insertion_values={
+                "room_id": event.room_id,
+                "received_ts": self._clock.time_msec(),
+                "event_json": json_encoder.encode(event.get_dict()),
+                "internal_metadata": json_encoder.encode(
+                    event.internal_metadata.get_dict()
+                ),
+            },
+            desc="insert_received_event_to_staging",
+        )
+
+    async def remove_received_event_from_staging(
+        self,
+        origin: str,
+        event_id: str,
+    ) -> Optional[int]:
+        """Remove the given event from the staging area.
+
+        Returns:
+            The received_ts of the row that was deleted, if any.
+        """
+        if self.db_pool.engine.supports_returning:
+
+            def _remove_received_event_from_staging_txn(txn):
+                sql = """
+                    DELETE FROM federation_inbound_events_staging
+                    WHERE origin = ? AND event_id = ?
+                    RETURNING received_ts
+                """
+
+                txn.execute(sql, (origin, event_id))
+                return txn.fetchone()
+
+            row = await self.db_pool.runInteraction(
+                "remove_received_event_from_staging",
+                _remove_received_event_from_staging_txn,
+                db_autocommit=True,
+            )
+            if row is None:
+                return None
+
+            return row[0]
+
+        else:
+
+            def _remove_received_event_from_staging_txn(txn):
+                received_ts = self.db_pool.simple_select_one_onecol_txn(
+                    txn,
+                    table="federation_inbound_events_staging",
+                    keyvalues={
+                        "origin": origin,
+                        "event_id": event_id,
+                    },
+                    retcol="received_ts",
+                    allow_none=True,
+                )
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    table="federation_inbound_events_staging",
+                    keyvalues={
+                        "origin": origin,
+                        "event_id": event_id,
+                    },
+                )
+
+                return received_ts
+
+            return await self.db_pool.runInteraction(
+                "remove_received_event_from_staging",
+                _remove_received_event_from_staging_txn,
+            )
+
+    async def get_next_staged_event_id_for_room(
+        self,
+        room_id: str,
+    ) -> Optional[Tuple[str, str]]:
+        """Get the next event ID in the staging area for the given room."""
+
+        def _get_next_staged_event_id_for_room_txn(txn):
+            sql = """
+                SELECT origin, event_id
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        return await self.db_pool.runInteraction(
+            "get_next_staged_event_id_for_room", _get_next_staged_event_id_for_room_txn
+        )
+
+    async def get_next_staged_event_for_room(
+        self,
+        room_id: str,
+        room_version: RoomVersion,
+    ) -> Optional[Tuple[str, EventBase]]:
+        """Get the next event in the staging area for the given room."""
+
+        def _get_next_staged_event_for_room_txn(txn):
+            sql = """
+                SELECT event_json, internal_metadata, origin
+                FROM federation_inbound_events_staging
+                WHERE room_id = ?
+                ORDER BY received_ts ASC
+                LIMIT 1
+            """
+            txn.execute(sql, (room_id,))
+
+            return txn.fetchone()
+
+        row = await self.db_pool.runInteraction(
+            "get_next_staged_event_for_room", _get_next_staged_event_for_room_txn
+        )
+
+        if not row:
+            return None
+
+        event_d = db_to_json(row[0])
+        internal_metadata_d = db_to_json(row[1])
+        origin = row[2]
+
+        event = make_event_from_dict(
+            event_dict=event_d,
+            room_version=room_version,
+            internal_metadata_dict=internal_metadata_d,
+        )
+
+        return origin, event
+
+    async def get_all_rooms_with_staged_incoming_events(self) -> List[str]:
+        """Get the room IDs of all events currently staged."""
+        return await self.db_pool.simple_select_onecol(
+            table="federation_inbound_events_staging",
+            keyvalues={},
+            retcol="DISTINCT room_id",
+            desc="get_all_rooms_with_staged_incoming_events",
+        )
+
+    @wrap_as_background_process("_get_stats_for_federation_staging")
+    async def _get_stats_for_federation_staging(self):
+        """Update the prometheus metrics for the inbound federation staging area."""
+
+        def _get_stats_for_federation_staging_txn(txn):
+            txn.execute(
+                "SELECT coalesce(count(*), 0) FROM federation_inbound_events_staging"
+            )
+            (count,) = txn.fetchone()
+
+            txn.execute(
+                "SELECT coalesce(min(received_ts), 0) FROM federation_inbound_events_staging"
+            )
+
+            (received_ts,) = txn.fetchone()
+
+            age = self._clock.time_msec() - received_ts
+
+            return count, age
+
+        count, age = await self.db_pool.runInteraction(
+            "_get_stats_for_federation_staging", _get_stats_for_federation_staging_txn
+        )
+
+        number_pdus_in_federation_queue.set(count)
+        oldest_pdu_in_federation_staging.set(age)
 
 
 class EventFederationStore(EventFederationWorkerStore):

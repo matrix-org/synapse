@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -20,9 +19,8 @@ import json
 import re
 import time
 import urllib.parse
-from typing import Any, Dict, Mapping, MutableMapping, Optional
-
-from mock import patch
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, Tuple, Union
+from unittest.mock import patch
 
 import attr
 
@@ -54,6 +52,10 @@ class RestHelper:
         room_version: str = None,
         tok: str = None,
         expect_code: int = 200,
+        extra_content: Optional[Dict] = None,
+        custom_headers: Optional[
+            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+        ] = None,
     ) -> str:
         """
         Create a room.
@@ -74,7 +76,7 @@ class RestHelper:
         temp_id = self.auth_user_id
         self.auth_user_id = room_creator
         path = "/_matrix/client/r0/createRoom"
-        content = {}
+        content = extra_content or {}
         if not is_public:
             content["visibility"] = "private"
         if room_version:
@@ -88,6 +90,7 @@ class RestHelper:
             "POST",
             path,
             json.dumps(content).encode("utf8"),
+            custom_headers=custom_headers,
         )
 
         assert channel.result["code"] == b"%d" % expect_code, channel.result
@@ -132,7 +135,7 @@ class RestHelper:
         src: str,
         targ: str,
         membership: str,
-        extra_data: dict = {},
+        extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
     ) -> None:
@@ -156,7 +159,7 @@ class RestHelper:
             path = path + "?access_token=%s" % tok
 
         data = {"membership": membership}
-        data.update(extra_data)
+        data.update(extra_data or {})
 
         channel = make_request(
             self.hs.get_reactor(),
@@ -176,18 +179,43 @@ class RestHelper:
 
         self.auth_user_id = temp_id
 
-    def send(self, room_id, body=None, txn_id=None, tok=None, expect_code=200):
+    def send(
+        self,
+        room_id,
+        body=None,
+        txn_id=None,
+        tok=None,
+        expect_code=200,
+        custom_headers: Optional[
+            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+        ] = None,
+    ):
         if body is None:
             body = "body_text_here"
 
         content = {"msgtype": "m.text", "body": body}
 
         return self.send_event(
-            room_id, "m.room.message", content, txn_id, tok, expect_code
+            room_id,
+            "m.room.message",
+            content,
+            txn_id,
+            tok,
+            expect_code,
+            custom_headers=custom_headers,
         )
 
     def send_event(
-        self, room_id, type, content={}, txn_id=None, tok=None, expect_code=200
+        self,
+        room_id,
+        type,
+        content: Optional[dict] = None,
+        txn_id=None,
+        tok=None,
+        expect_code=200,
+        custom_headers: Optional[
+            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+        ] = None,
     ):
         if txn_id is None:
             txn_id = "m%s" % (str(time.time()))
@@ -201,7 +229,8 @@ class RestHelper:
             self.site,
             "PUT",
             path,
-            json.dumps(content).encode("utf8"),
+            json.dumps(content or {}).encode("utf8"),
+            custom_headers=custom_headers,
         )
 
         assert (

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +17,7 @@ server protocol.
 """
 
 import logging
+from typing import Optional
 
 import attr
 
@@ -98,7 +98,7 @@ class Transaction(JsonEncodedObject):
         "pdus",
     ]
 
-    def __init__(self, transaction_id=None, pdus=[], **kwargs):
+    def __init__(self, transaction_id=None, pdus: Optional[list] = None, **kwargs):
         """If we include a list of pdus then we decode then as PDU's
         automatically.
         """
@@ -107,7 +107,7 @@ class Transaction(JsonEncodedObject):
         if "edus" in kwargs and not kwargs["edus"]:
             del kwargs["edus"]
 
-        super().__init__(transaction_id=transaction_id, pdus=pdus, **kwargs)
+        super().__init__(transaction_id=transaction_id, pdus=pdus or [], **kwargs)
 
     @staticmethod
     def create_new(pdus, **kwargs):

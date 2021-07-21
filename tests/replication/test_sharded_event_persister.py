@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from mock import patch
+from unittest.mock import patch
 
 from synapse.api.room_versions import RoomVersion
 from synapse.rest import admin
@@ -32,7 +30,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
     """Checks event persisting sharding works"""
 
     # Event persister sharding requires postgres (due to needing
-    # `MutliWriterIdGenerator`).
+    # `MultiWriterIdGenerator`).
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
 
@@ -213,7 +211,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             sync_hs_site,
             "GET",
-            "/sync?since={}".format(next_batch),
+            f"/sync?since={next_batch}",
             access_token=access_token,
         )
 
@@ -243,7 +241,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             sync_hs_site,
             "GET",
-            "/sync?since={}".format(vector_clock_token),
+            f"/sync?since={vector_clock_token}",
             access_token=access_token,
         )
 
@@ -268,7 +266,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
             self.reactor,
             sync_hs_site,
             "GET",
-            "/sync?since={}".format(next_batch),
+            f"/sync?since={next_batch}",
             access_token=access_token,
         )
 
