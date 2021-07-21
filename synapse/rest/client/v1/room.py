@@ -413,7 +413,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         assert_params_in_dict(body, ["state_events_at_start", "events"])
 
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
-        chunk_id_from_query = parse_string(request, "chunk_id", default=None)
+        chunk_id_from_query = parse_string(request, "chunk_id")
 
         if prev_events_from_query is None:
             raise SynapseError(
@@ -553,9 +553,18 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             ]
 
         # Connect this current chunk to the insertion event from the previous chunk
-        last_event_in_chunk["content"][
-            EventContentFields.MSC2716_CHUNK_ID
-        ] = chunk_id_to_connect_to
+        chunk_event = {
+            "type": EventTypes.MSC2716_CHUNK,
+            "sender": requester.user.to_string(),
+            "room_id": room_id,
+            "content": {EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to},
+            # Since the chunk event is put at the end of the chunk,
+            # where the newest-in-time event is, copy the origin_server_ts from
+            # the last event we're inserting
+            "origin_server_ts": last_event_in_chunk["origin_server_ts"],
+        }
+        # Add the chunk event to the end of the chunk (newest-in-time)
+        events_to_create.append(chunk_event)
 
         # Add an "insertion" event to the start of each chunk (next to the oldest-in-time
         # event in the chunk) so the next chunk can be connected to this one.
@@ -567,7 +576,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             # the first event we're inserting
             origin_server_ts=events_to_create[0]["origin_server_ts"],
         )
-        # Prepend the insertion event to the start of the chunk
+        # Prepend the insertion event to the start of the chunk (oldest-in-time)
         events_to_create = [insertion_event] + events_to_create
 
         event_ids = []
@@ -726,7 +735,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
-        server = parse_string(request, "server", default=None)
+        server = parse_string(request, "server")
 
         try:
             await self.auth.get_user_by_req(request, allow_guest=True)
@@ -746,7 +755,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 raise e
 
         limit: Optional[int] = parse_integer(request, "limit", 0)
-        since_token = parse_string(request, "since", None)
+        since_token = parse_string(request, "since")
 
         if limit == 0:
             # zero is a special value which corresponds to no limit.
@@ -780,7 +789,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        server = parse_string(request, "server", default=None)
+        server = parse_string(request, "server")
         content = parse_json_object_from_request(request)
 
         limit: Optional[int] = int(content.get("limit", 100))

@@ -112,7 +112,7 @@ class SyncRestServlet(RestServlet):
             default="online",
             allowed_values=self.ALLOWED_PRESENCE,
         )
-        filter_id = parse_string(request, "filter", default=None)
+        filter_id = parse_string(request, "filter")
         full_state = parse_boolean(request, "full_state", default=False)
 
         logger.debug(
