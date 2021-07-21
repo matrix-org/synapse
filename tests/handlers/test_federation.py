@@ -199,12 +199,13 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(sg, sg2)
 
-    def test_floating_outlier_membership_auth(self):
+    def test_backfill_floating_outlier_membership_auth(self):
         """
-        Check that we can properly process an event with auth_events that
-        include a floating membership event.
+        As the remote federated homeserver, check that we can properly process
+        an event with auth_events that include a floating membership event from
+        the OTHER_SERVER.
 
-        Regression test for #TODO(PR).
+        Regression test, see #10439.
         """
         OTHER_SERVER = "otherserver"
         OTHER_USER = "@otheruser:" + OTHER_SERVER
@@ -272,15 +273,13 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
         )
 
-        # Stub the event_auth responds from the OTHER_SERVER
+        # Stub the /event_auth response from the OTHER_SERVER
         self.handler.federation_client.get_event_auth = (
             lambda destination, room_id, event_id: defer.succeed(
                 auth_events + [member_event]
             )
         )
-        # self.handler.federation_client.get_event_auth = Mock(
-        #     return_value=defer.succeed(None)
-        # )
+        # Stub the /backfill response from the OTHER_SERVER
         res = Transaction(
             origin=OTHER_SERVER,
             pdus=[member_event],
@@ -289,9 +288,12 @@ class FederationTestCase(unittest.HomeserverTestCase):
         ).get_dict()
         self.mock_federation_client.get_json.return_value = defer.succeed((200, res))
 
-        # TODO: need to do backfill request instead
-        d = run_in_background(self.handler.on_receive_pdu, OTHER_SERVER, ev)
-        self.get_success(d)
+        with LoggingContext("backfill"):
+            d = run_in_background(
+                self.handler.maybe_backfill, room_id, most_recent_prev_event_depth, 100
+            )
+        did_backfill = self.get_success(d)
+        self.assertTrue(did_backfill)
 
         # Try and get the events
         stored_event = self.get_success(
