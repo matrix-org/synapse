@@ -111,3 +111,45 @@ class MapUsernameTestCase(unittest.TestCase):
         # this should work with either a unicode or a bytes
         self.assertEqual(map_username_to_mxid_localpart("têst"), "t=c3=aast")
         self.assertEqual(map_username_to_mxid_localpart("têst".encode()), "t=c3=aast")
+
+
+class UserTestCase(unittest.TestCase):
+    def test_build(self):
+        user = User(user=UserID.from_string("@alice:test"),)
+        self.assertEqual(user.user.to_string(), "@alice:test")
+        self.assertEqual(user.creation_ts, 0)
+        self.assertIsNone(user.consent_version)
+        self.assertIsNone(user.consent_server_notice_sent)
+        self.assertIsNone(user.app_service)
+        self.assertIdentical(user.shadow_banned, False)
+        self.assertIdentical(user.deactivated, False)
+        self.assertIdentical(user.is_guest, False)
+        self.assertIdentical(user.admin, False)
+        self.assertIsNone(user.user_type)
+
+    def test_build__all_values(self):
+        appservice = ApplicationService(
+            None, "test", id="foo", rate_limited=True, sender="@as:test",
+        )
+        user = User(
+            user=UserID.from_string("@alice:test"),
+            creation_ts=1234567890,
+            consent_version="1.0",
+            consent_server_notice_sent="2.0",
+            app_service=appservice,
+            shadow_banned=True,
+            deactivated=True,
+            is_guest=True,
+            admin=True,
+            user_type="support",
+        )
+        self.assertEqual(user.user.to_string(), "@alice:test")
+        self.assertEqual(user.creation_ts, 1234567890)
+        self.assertEqual(user.consent_version, "1.0")
+        self.assertEqual(user.consent_server_notice_sent, "2.0")
+        self.assertEqual(user.app_service, appservice)
+        self.assertIdentical(user.shadow_banned, True)
+        self.assertIdentical(user.deactivated, True)
+        self.assertIdentical(user.is_guest, True)
+        self.assertIdentical(user.admin, True)
+        self.assertEqual(user.user_type, "support")
