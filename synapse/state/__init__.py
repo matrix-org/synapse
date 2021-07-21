@@ -324,13 +324,6 @@ class StateHandler:
             entry = await self.resolve_state_groups_for_events(
                 event.room_id, event.prev_event_ids()
             )
-            logger.info(
-                "compute_event_context: resolve_state_groups_for_events\nstate_ids_before_event=%s\nstate_group_before_event=%s\nstate_group_before_event_prev_group=%s\ndeltas_to_state_group_before_event=%s",
-                entry.state,
-                entry.state_group,
-                entry.prev_group,
-                entry.delta_ids,
-            )
 
             state_ids_before_event = entry.state
             state_group_before_event = entry.state_group
@@ -366,10 +359,6 @@ class StateHandler:
         #
 
         if not event.is_state():
-            logger.info(
-                "compute_event_context: returning with state_group_before_event=%s",
-                state_group_before_event,
-            )
             return EventContext.with_state(
                 state_group_before_event=state_group_before_event,
                 state_group=state_group_before_event,
@@ -399,11 +388,6 @@ class StateHandler:
             prev_group=state_group_before_event,
             delta_ids=delta_ids,
             current_state_ids=state_ids_after_event,
-        )
-
-        logger.info(
-            "compute_event_context: after\nstate_group_after_event=%s",
-            state_group_after_event,
         )
 
         return EventContext.with_state(

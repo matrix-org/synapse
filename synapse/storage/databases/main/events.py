@@ -2032,13 +2032,6 @@ class PersistEventsStore:
     ):
         state_groups = {}
         for event, context in events_and_contexts:
-
-            logger.info(
-                "creating state_groups grsesegr event_id=%s outlier=%s %s",
-                event.event_id,
-                event.internal_metadata.is_outlier(),
-                event,
-            )
             if event.internal_metadata.is_outlier():
                 continue
 
@@ -2049,8 +2042,6 @@ class PersistEventsStore:
                 continue
 
             state_groups[event.event_id] = context.state_group
-
-        logger.info("state_groups asdfasdf %s", state_groups)
 
         self.db_pool.simple_insert_many_txn(
             txn,
