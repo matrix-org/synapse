@@ -31,10 +31,14 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
     def make_homeserver(self, reactor, clock):
         self.url = b"/_matrix/client/r0/capabilities"
         hs = self.setup_test_homeserver()
-        self.store = hs.get_datastore()
         self.config = hs.config
         self.auth_handler = hs.get_auth_handler()
         return hs
+
+    def prepare(self, reactor, clock, hs):
+        self.localpart = "user"
+        self.password = "pass"
+        self.user = self.register_user(self.localpart, self.password)
 
     def test_check_auth_required(self):
         channel = self.make_request("GET", self.url)
@@ -42,8 +46,7 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 401)
 
     def test_get_room_version_capabilities(self):
-        self.register_user("user", "pass")
-        access_token = self.login("user", "pass")
+        access_token = self.login(self.localpart, self.password)
 
         channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
@@ -58,58 +61,60 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         )
 
     def test_get_change_password_capabilities_password_login(self):
-        localpart = "user"
-        password = "pass"
-        user = self.register_user(localpart, password)
-        access_token = self.login(user, password)
+        access_token = self.login(self.localpart, self.password)
+
+        self._test_capability("m.change_password", access_token, True)
+
+    @override_config({"password_config": {"localdb_enabled": False}})
+    def test_get_change_password_capabilities_localdb_disabled(self):
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                self.user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        self._test_capability("m.change_password", access_token, False)
+
+    @override_config({"password_config": {"enabled": False}})
+    def test_get_change_password_capabilities_password_disabled(self):
+        access_token = self.get_success(
+            self.auth_handler.get_access_token_for_user_id(
+                self.user, device_id=None, valid_until_ms=None
+            )
+        )
+
+        self._test_capability("m.change_password", access_token, False)
+
+    def test_get_change_users_attributes_capabilities(self):
+        """
+        Test that per default server returns `m.change_password`
+        but not `org.matrix.msc3283.set_displayname`.
+        In feature we can add further capabilites.
+        If MSC3283 is in spec, the test must be updated to test that server reponds
+        with `m.enable_set_displayname` per default.
+        """
+        access_token = self.login(self.localpart, self.password)
 
         channel = self.make_request("GET", self.url, access_token=access_token)
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(capabilities["m.change_password"]["enabled"])
+        self.assertNotIn("org.matrix.msc3283.set_displayname", capabilities)
 
-    @override_config({"password_config": {"localdb_enabled": False}})
-    def test_get_change_password_capabilities_localdb_disabled(self):
-        localpart = "user"
-        password = "pass"
-        user = self.register_user(localpart, password)
-        access_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
-                user, device_id=None, valid_until_ms=None
-            )
-        )
+    @override_config({"enable_set_displayname": False})
+    def test_get_set_displayname_capabilities_displayname_disabled(self):
+        """
+        Test if set displayname is disabled that the server responds it.
+        """
+        access_token = self.login(self.localpart, self.password)
 
-        channel = self.make_request("GET", self.url, access_token=access_token)
-        capabilities = channel.json_body["capabilities"]
-
-        self.assertEqual(channel.code, 200)
-        self.assertFalse(capabilities["m.change_password"]["enabled"])
-
-    @override_config({"password_config": {"enabled": False}})
-    def test_get_change_password_capabilities_password_disabled(self):
-        localpart = "user"
-        password = "pass"
-        user = self.register_user(localpart, password)
-        access_token = self.get_success(
-            self.auth_handler.get_access_token_for_user_id(
-                user, device_id=None, valid_until_ms=None
-            )
-        )
-
-        channel = self.make_request("GET", self.url, access_token=access_token)
-        capabilities = channel.json_body["capabilities"]
-
-        self.assertEqual(channel.code, 200)
-        self.assertFalse(capabilities["m.change_password"]["enabled"])
+        self._test_capability("org.matrix.msc3283.set_displayname", access_token, False)
 
     def test_get_does_not_include_msc3244_fields_by_default(self):
-        localpart = "user"
-        password = "pass"
-        user = self.register_user(localpart, password)
         access_token = self.get_success(
             self.auth_handler.get_access_token_for_user_id(
-                user, device_id=None, valid_until_ms=None
+                self.user, device_id=None, valid_until_ms=None
             )
         )
 
@@ -123,12 +128,9 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
     @override_config({"experimental_features": {"msc3244_enabled": True}})
     def test_get_does_include_msc3244_fields_when_enabled(self):
-        localpart = "user"
-        password = "pass"
-        user = self.register_user(localpart, password)
         access_token = self.get_success(
             self.auth_handler.get_access_token_for_user_id(
-                user, device_id=None, valid_until_ms=None
+                self.user, device_id=None, valid_until_ms=None
             )
         )
 
@@ -148,3 +150,17 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             self.assertGreater(len(details["support"]), 0)
             for room_version in details["support"]:
                 self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, str(room_version))
+
+    def _test_capability(self, capability: str, access_token: str, expect_success=True):
+        """
+        Requests the capabilities from server and check if the value is expected.
+        """
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+
+        if expect_success:
+            self.assertTrue(capabilities[capability]["enabled"])
+        else:
+            self.assertFalse(capabilities[capability]["enabled"])
