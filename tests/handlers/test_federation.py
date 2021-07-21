@@ -258,7 +258,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
         auth_events = list(
             self.get_success(self.store.get_events(auth_event_ids)).values()
         )
-        logger.error("auth_events gresegrsegrb %s", auth_events)
 
         # build a floating outlier member state event
         fake_prev_event_id = "$" + random_string(43)
@@ -282,14 +281,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
             outlier=True,
         )
-        logger.error("member_event event_id=%s", member_event.event_id)
-        logger.error(
-            "member_event before event_id=%s auth_events=%s",
-            member_event.event_id,
-            member_event.auth_events,
-        )
         filter_auth_events_on_event(member_event, auth_events)
-        logger.error("member_event after auth_events=%s", member_event.auth_events)
 
         # build and send an event authed based on the member event
         raw_auth_events = auth_events + [member_event]
@@ -309,10 +301,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
             },
             room_version,
         )
-        logger.error("message_event event_id=%s", message_event.event_id)
-        logger.error("message_event before auth_events=%s", message_event.auth_events)
         filter_auth_events_on_event(message_event, raw_auth_events.copy())
-        logger.error("message_event after auth_events=%s", message_event.auth_events)
 
         # Stub the /event_auth response from the OTHER_SERVER
         async def get_event_auth(destination, room_id, event_id):
