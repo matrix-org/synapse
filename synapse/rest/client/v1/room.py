@@ -413,7 +413,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         assert_params_in_dict(body, ["state_events_at_start", "events"])
 
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
-        chunk_id_from_query = parse_string(request, "chunk_id", default=None)
+        chunk_id_from_query = parse_string(request, "chunk_id")
 
         if prev_events_from_query is None:
             raise SynapseError(
@@ -735,7 +735,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
-        server = parse_string(request, "server", default=None)
+        server = parse_string(request, "server")
 
         try:
             await self.auth.get_user_by_req(request, allow_guest=True)
@@ -755,7 +755,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                 raise e
 
         limit = parse_integer(request, "limit", 0)
-        since_token = parse_string(request, "since", None)
+        since_token = parse_string(request, "since")
 
         if limit == 0:
             # zero is a special value which corresponds to no limit.
@@ -789,7 +789,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        server = parse_string(request, "server", default=None)
+        server = parse_string(request, "server")
         content = parse_json_object_from_request(request)
 
         limit: Optional[int] = int(content.get("limit", 100))

@@ -47,20 +47,22 @@ class PaginationConfig:
     ) -> "PaginationConfig":
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
-        from_tok = parse_string(request, "from")
-        to_tok = parse_string(request, "to")
+        from_tok_str = parse_string(request, "from")
+        to_tok_str = parse_string(request, "to")
 
         try:
-            if from_tok == "END":
+            from_tok = None
+            if from_tok_str == "END":
                 from_tok = None  # For backwards compat.
-            elif from_tok:
-                from_tok = await StreamToken.from_string(store, from_tok)
+            elif from_tok_str:
+                from_tok = await StreamToken.from_string(store, from_tok_str)
         except Exception:
             raise SynapseError(400, "'from' parameter is invalid")
 
         try:
-            if to_tok:
-                to_tok = await StreamToken.from_string(store, to_tok)
+            to_tok = None
+            if to_tok_str:
+                to_tok = await StreamToken.from_string(store, to_tok_str)
         except Exception:
             raise SynapseError(400, "'to' parameter is invalid")
 
