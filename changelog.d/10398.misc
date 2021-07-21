@@ -1,1 +1,0 @@
-Stagger sending of presence update to remote servers, reducing CPU spikes caused by starting many connections to remote servers at once.

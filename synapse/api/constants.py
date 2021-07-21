@@ -120,6 +120,7 @@ class EventTypes:
     SpaceParent = "m.space.parent"
 
     MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_CHUNK = "org.matrix.msc2716.chunk"
     MSC2716_MARKER = "org.matrix.msc2716.marker"
 
 
@@ -190,9 +191,10 @@ class EventContentFields:
 
     # Used on normal messages to indicate they were historically imported after the fact
     MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
-    # For "insertion" events
+    # For "insertion" events to indicate what the next chunk ID should be in
+    # order to connect to it
     MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
-    # Used on normal message events to indicate where the chunk connects to
+    # Used on "chunk" events to indicate which insertion event it connects to
     MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
     # For "marker" events
     MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"

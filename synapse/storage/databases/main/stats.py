@@ -647,7 +647,7 @@ class StatsStore(StateDeltasStore):
         limit: int,
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
-        order_by: Optional[UserSortOrder] = UserSortOrder.USER_ID.value,
+        order_by: Optional[str] = UserSortOrder.USER_ID.value,
         direction: Optional[str] = "f",
         search_term: Optional[str] = None,
     ) -> Tuple[List[JsonDict], Dict[str, int]]:

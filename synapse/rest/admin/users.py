@@ -90,8 +90,8 @@ class UsersRestServletV2(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        user_id = parse_string(request, "user_id", default=None)
-        name = parse_string(request, "name", default=None)
+        user_id = parse_string(request, "user_id")
+        name = parse_string(request, "name")
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 

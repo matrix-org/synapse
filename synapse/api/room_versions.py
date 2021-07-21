@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 import attr
 
@@ -208,5 +208,39 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC3083,
         RoomVersions.V7,
     )
-    # Note that we do not include MSC2043 here unless it is enabled in the config.
+}
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomVersionCapability:
+    """An object which describes the unique attributes of a room version."""
+
+    identifier: str  # the identifier for this capability
+    preferred_version: Optional[RoomVersion]
+    support_check_lambda: Callable[[RoomVersion], bool]
+
+
+MSC3244_CAPABILITIES = {
+    cap.identifier: {
+        "preferred": cap.preferred_version.identifier
+        if cap.preferred_version is not None
+        else None,
+        "support": [
+            v.identifier
+            for v in KNOWN_ROOM_VERSIONS.values()
+            if cap.support_check_lambda(v)
+        ],
+    }
+    for cap in (
+        RoomVersionCapability(
+            "knock",
+            RoomVersions.V7,
+            lambda room_version: room_version.msc2403_knocking,
+        ),
+        RoomVersionCapability(
+            "restricted",
+            None,
+            lambda room_version: room_version.msc3083_join_rules,
+        ),
+    )
 }
