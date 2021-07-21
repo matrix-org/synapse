@@ -832,31 +832,16 @@ class DatabasePool:
         self,
         table: str,
         values: Dict[str, Any],
-        or_ignore: bool = False,
         desc: str = "simple_insert",
-    ) -> bool:
+    ):
         """Executes an INSERT query on the named table.
 
         Args:
             table: string giving the table name
             values: dict of new column names and values for them
-            or_ignore: bool stating whether an exception should be raised
-                when a conflicting row already exists. If True, False will be
-                returned by the function instead
             desc: description of the transaction, for logging and metrics
-
-        Returns:
-             Whether the row was inserted or not. Only useful when `or_ignore` is True
         """
-        try:
-            await self.runInteraction(desc, self.simple_insert_txn, table, values)
-        except self.engine.module.IntegrityError:
-            # We have to do or_ignore flag at this layer, since we can't reuse
-            # a cursor after we receive an error from the db.
-            if not or_ignore:
-                raise
-            return False
-        return True
+        await self.runInteraction(desc, self.simple_insert_txn, table, values)
 
     @staticmethod
     def simple_insert_txn(

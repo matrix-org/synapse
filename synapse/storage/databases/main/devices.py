@@ -1078,16 +1078,18 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             return False
 
         try:
-            inserted = await self.db_pool.simple_insert(
+            inserted = await self.db_pool.simple_upsert(
                 "devices",
-                values={
+                keyvalues={
                     "user_id": user_id,
                     "device_id": device_id,
+                },
+                values={},
+                insertion_values={
                     "display_name": initial_device_display_name,
                     "hidden": False,
                 },
                 desc="store_device",
-                or_ignore=True,
             )
             if not inserted:
                 # if the device already exists, check if it's a real device, or
@@ -1099,6 +1101,7 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
                 )
                 if hidden:
                     raise StoreError(400, "The device ID is in use", Codes.FORBIDDEN)
+
             self.device_id_exists_cache.set(key, True)
             return inserted
         except StoreError:

@@ -134,16 +134,17 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
             response_dict: The response, to be encoded into JSON.
         """
 
-        await self.db_pool.simple_insert(
+        await self.db_pool.simple_upsert(
             table="received_transactions",
-            values={
+            keyvalues={
                 "transaction_id": transaction_id,
                 "origin": origin,
+            },
+            values={
                 "response_code": code,
                 "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
             },
-            or_ignore=True,
             desc="set_received_txn_response",
         )
 
