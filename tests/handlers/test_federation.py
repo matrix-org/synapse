@@ -227,9 +227,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
         # List of state event ID's
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
-
-        auth_events = self.get_success(self.store.get_events(auth_event_ids))
-        logger.info("auth_event_ids %s\nauth_events=%s", auth_event_ids, auth_events)
+        auth_events = list(
+            self.get_success(self.store.get_events(auth_event_ids)).values()
+        )
 
         # build a floating outlier member state event
         fake_prev_event_id = "$" + random_string(43)
@@ -251,6 +251,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
                 },
             },
             room_version,
+            outlier=True,
         )
 
         # build and send an event authed based on the member event
@@ -273,7 +274,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         # Stub the event_auth responds from the OTHER_SERVER
         self.handler.federation_client.get_event_auth = (
-            lambda destination, room_id, event_id: defer.succeed([member_event])
+            lambda destination, room_id, event_id: defer.succeed(
+                auth_events + [member_event]
+            )
         )
         # self.handler.federation_client.get_event_auth = Mock(
         #     return_value=defer.succeed(None)
@@ -291,8 +294,10 @@ class FederationTestCase(unittest.HomeserverTestCase):
         self.get_success(d)
 
         # Try and get the events
-        stored_event = self.get_success(self.store.get_event(ev.event_id))
-        self.assertEqual(stored_event.event_id, ev.event_id)
+        stored_event = self.get_success(
+            self.store.get_event(ev.event_id, allow_none=True)
+        )
+        self.assertTrue(stored_event is not None)
 
     @unittest.override_config(
         {"rc_invites": {"per_user": {"per_second": 0.5, "burst_count": 3}}}
