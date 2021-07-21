@@ -3,28 +3,33 @@
 name: Build release artifacts
 
 on:
+  # we build on PRs and develop to (hopefully) get early warning
+  # of things breaking (but only build one set of debs)
+  pull_request:
   push:
-    # we build on develop and release branches to (hopefully) get early warning
-    # of things breaking
-    branches: ["develop", "release-*"]
+    branches: ["develop"]
 
-    # we also rebuild on tags, so that we can be sure of picking the artifacts
-    # from the right tag.
+    # we do the full build on tags.
     tags: ["v*"]
 
 permissions:
   contents: write
 
 jobs:
-  # first get the list of distros to build for.
   get-distros:
+    name: "Calculate list of debian distros"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - id: set-distros
         run: |
-          echo "::set-output name=distros::$(scripts-dev/build_debian_packages --show-dists-json)"
+          # if we're running from a tag, get the full list of distros; otherwise just use debian:sid
+          dists='["debian:sid"]'
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+              dists=$(scripts-dev/build_debian_packages --show-dists-json)
+          fi
+          echo "::set-output name=distros::$dists"
     # map the step outputs to job outputs
     outputs:
       distros: ${{ steps.set-distros.outputs.distros }}
@@ -66,7 +71,7 @@ jobs:
   # if it's a tag, create a release and attach the artifacts to it
   attach-assets:
     name: "Attach assets to release"
-    if: startsWith(github.ref, 'refs/tags/')
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     needs:
       - build-debs
       - build-sdist

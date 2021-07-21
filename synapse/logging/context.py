@@ -113,13 +113,13 @@ class ContextResourceUsage:
             self.reset()
         else:
             # FIXME: mypy can't infer the types set via reset() above, so specify explicitly for now
-            self.ru_utime = copy_from.ru_utime  # type: float
-            self.ru_stime = copy_from.ru_stime  # type: float
-            self.db_txn_count = copy_from.db_txn_count  # type: int
+            self.ru_utime: float = copy_from.ru_utime
+            self.ru_stime: float = copy_from.ru_stime
+            self.db_txn_count: int = copy_from.db_txn_count
 
-            self.db_txn_duration_sec = copy_from.db_txn_duration_sec  # type: float
-            self.db_sched_duration_sec = copy_from.db_sched_duration_sec  # type: float
-            self.evt_db_fetch_count = copy_from.evt_db_fetch_count  # type: int
+            self.db_txn_duration_sec: float = copy_from.db_txn_duration_sec
+            self.db_sched_duration_sec: float = copy_from.db_sched_duration_sec
+            self.evt_db_fetch_count: int = copy_from.evt_db_fetch_count
 
     def copy(self) -> "ContextResourceUsage":
         return ContextResourceUsage(copy_from=self)
@@ -289,12 +289,12 @@ class LoggingContext:
 
         # The thread resource usage when the logcontext became active. None
         # if the context is not currently active.
-        self.usage_start = None  # type: Optional[resource._RUsage]
+        self.usage_start: Optional[resource._RUsage] = None
 
         self.main_thread = get_thread_id()
         self.request = None
         self.tag = ""
-        self.scope = None  # type: Optional[_LogContextScope]
+        self.scope: Optional["_LogContextScope"] = None
 
         # keep track of whether we have hit the __exit__ block for this context
         # (suggesting that the the thing that created the context thinks it should

@@ -14,7 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, MSC3244_CAPABILITIES
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
@@ -55,6 +55,12 @@ class CapabilitiesRestServlet(RestServlet):
                 "m.change_password": {"enabled": change_password},
             }
         }
+
+        if self.config.experimental.msc3244_enabled:
+            response["capabilities"]["m.room_versions"][
+                "org.matrix.msc3244.room_capabilities"
+            ] = MSC3244_CAPABILITIES
+
         return 200, response
 
 

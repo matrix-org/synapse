@@ -71,6 +71,8 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     # General statistics
     #
 
+    store = hs.get_datastore()
+
     stats["homeserver"] = hs.config.server_name
     stats["server_context"] = hs.config.server_context
     stats["timestamp"] = now
@@ -79,33 +81,37 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     stats["python_version"] = "{}.{}.{}".format(
         version.major, version.minor, version.micro
     )
-    stats["total_users"] = await hs.get_datastore().count_all_users()
+    stats["total_users"] = await store.count_all_users()
 
-    total_nonbridged_users = await hs.get_datastore().count_nonbridged_users()
+    total_nonbridged_users = await store.count_nonbridged_users()
     stats["total_nonbridged_users"] = total_nonbridged_users
 
-    daily_user_type_results = await hs.get_datastore().count_daily_user_type()
+    daily_user_type_results = await store.count_daily_user_type()
     for name, count in daily_user_type_results.items():
         stats["daily_user_type_" + name] = count
 
-    room_count = await hs.get_datastore().get_room_count()
+    room_count = await store.get_room_count()
     stats["total_room_count"] = room_count
 
-    stats["daily_active_users"] = await hs.get_datastore().count_daily_users()
-    stats["monthly_active_users"] = await hs.get_datastore().count_monthly_users()
-    daily_active_e2ee_rooms = await hs.get_datastore().count_daily_active_e2ee_rooms()
+    stats["daily_active_users"] = await store.count_daily_users()
+    stats["monthly_active_users"] = await store.count_monthly_users()
+    daily_active_e2ee_rooms = await store.count_daily_active_e2ee_rooms()
     stats["daily_active_e2ee_rooms"] = daily_active_e2ee_rooms
-    stats["daily_e2ee_messages"] = await hs.get_datastore().count_daily_e2ee_messages()
-    daily_sent_e2ee_messages = await hs.get_datastore().count_daily_sent_e2ee_messages()
+    stats["daily_e2ee_messages"] = await store.count_daily_e2ee_messages()
+    daily_sent_e2ee_messages = await store.count_daily_sent_e2ee_messages()
     stats["daily_sent_e2ee_messages"] = daily_sent_e2ee_messages
-    stats["daily_active_rooms"] = await hs.get_datastore().count_daily_active_rooms()
-    stats["daily_messages"] = await hs.get_datastore().count_daily_messages()
-    daily_sent_messages = await hs.get_datastore().count_daily_sent_messages()
+    stats["daily_active_rooms"] = await store.count_daily_active_rooms()
+    stats["daily_messages"] = await store.count_daily_messages()
+    daily_sent_messages = await store.count_daily_sent_messages()
     stats["daily_sent_messages"] = daily_sent_messages
 
-    r30_results = await hs.get_datastore().count_r30_users()
+    r30_results = await store.count_r30_users()
     for name, count in r30_results.items():
         stats["r30_users_" + name] = count
+
+    r30v2_results = await store.count_r30_users()
+    for name, count in r30v2_results.items():
+        stats["r30v2_users_" + name] = count
 
     stats["cache_factor"] = hs.config.caches.global_factor
     stats["event_cache_size"] = hs.config.caches.event_cache_size
@@ -115,8 +121,8 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     #
 
     # This only reports info about the *main* database.
-    stats["database_engine"] = hs.get_datastore().db_pool.engine.module.__name__
-    stats["database_server_version"] = hs.get_datastore().db_pool.engine.server_version
+    stats["database_engine"] = store.db_pool.engine.module.__name__
+    stats["database_server_version"] = store.db_pool.engine.server_version
 
     #
     # Logging configuration
