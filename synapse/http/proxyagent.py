@@ -172,7 +172,7 @@ class ProxyAgent(_AgentBase):
         """
         uri = uri.strip()
         if not _VALID_URI.match(uri):
-            raise ValueError("Invalid URI {!r}".format(uri))
+            raise ValueError(f"Invalid URI {uri!r}")
 
         parsed_uri = URI.fromBytes(uri)
         pool_key = (parsed_uri.scheme, parsed_uri.host, parsed_uri.port)

@@ -78,7 +78,11 @@ class LockStore(SQLBaseStore):
         """Called when the server is shutting down"""
         logger.info("Dropping held locks due to shutdown")
 
-        for (lock_name, lock_key), token in self._live_tokens.items():
+        # We need to take a copy of the tokens dict as dropping the locks will
+        # cause the dictionary to change.
+        tokens = dict(self._live_tokens)
+
+        for (lock_name, lock_key), token in tokens.items():
             await self._drop_lock(lock_name, lock_key, token)
 
         logger.info("Dropped locks due to shutdown")
