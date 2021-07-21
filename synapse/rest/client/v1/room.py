@@ -553,9 +553,18 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             ]
 
         # Connect this current chunk to the insertion event from the previous chunk
-        last_event_in_chunk["content"][
-            EventContentFields.MSC2716_CHUNK_ID
-        ] = chunk_id_to_connect_to
+        chunk_event = {
+            "type": EventTypes.MSC2716_CHUNK,
+            "sender": requester.user.to_string(),
+            "room_id": room_id,
+            "content": {EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to},
+            # Since the chunk event is put at the end of the chunk,
+            # where the newest-in-time event is, copy the origin_server_ts from
+            # the last event we're inserting
+            "origin_server_ts": last_event_in_chunk["origin_server_ts"],
+        }
+        # Add the chunk event to the end of the chunk (newest-in-time)
+        events_to_create.append(chunk_event)
 
         # Add an "insertion" event to the start of each chunk (next to the oldest-in-time
         # event in the chunk) so the next chunk can be connected to this one.
@@ -567,7 +576,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             # the first event we're inserting
             origin_server_ts=events_to_create[0]["origin_server_ts"],
         )
-        # Prepend the insertion event to the start of the chunk
+        # Prepend the insertion event to the start of the chunk (oldest-in-time)
         events_to_create = [insertion_event] + events_to_create
 
         event_ids = []
