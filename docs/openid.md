@@ -410,7 +410,7 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
-## Apple
+### Apple
 
 Configuring "Sign in with Apple" (SiWA) requires an Apple Developer account.
 
