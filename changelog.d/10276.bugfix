@@ -1,1 +1,0 @@
-Fix historical batch send endpoint (MSC2716) rejecting batches with messages from multiple senders.

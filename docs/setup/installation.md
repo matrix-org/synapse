@@ -166,12 +166,15 @@ sudo dnf groupinstall "Development Tools"
 
 Installing prerequisites on macOS:
 
+You may need to install the latest Xcode developer tools:
 ```sh
 xcode-select --install
-sudo easy_install pip
-sudo pip install virtualenv
-brew install pkg-config libffi
 ```
+
+On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
+```sh
+ brew install jpeg
+ ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform `pip` about it so that `psycopg2` builds:
@@ -412,7 +415,7 @@ instead. Advantages include:
 - allowing the DB to be run on separate hardware
 
 For information on how to install and use PostgreSQL in Synapse, please see
-[docs/postgres.md](../postgres.md)
+[Using Postgres](../postgres.md)
 
 SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
@@ -427,7 +430,7 @@ over HTTPS.
 
 The recommended way to do so is to set up a reverse proxy on port
 `8448`. You can find documentation on doing so in
-[docs/reverse_proxy.md](../reverse_proxy.md).
+[the reverse proxy documentation](../reverse_proxy.md).
 
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
@@ -454,7 +457,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
-[federate.md](../federate.md).
+[Federation](../federate.md).
 
 ### Client Well-Known URI
 
@@ -566,9 +569,7 @@ on your server even if `enable_registration` is `false`.
 ### Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See
-[docs/turn-howto.md](../turn-howto.md)
-for details.
+a TURN server. See [TURN setup](../turn-howto.md) for details.
 
 ### URL previews
 

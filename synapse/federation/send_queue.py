@@ -71,34 +71,32 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # We may have multiple federation sender instances, so we need to track
         # their positions separately.
         self._sender_instances = hs.config.worker.federation_shard_config.instances
-        self._sender_positions = {}  # type: Dict[str, int]
+        self._sender_positions: Dict[str, int] = {}
 
         # Pending presence map user_id -> UserPresenceState
-        self.presence_map = {}  # type: Dict[str, UserPresenceState]
+        self.presence_map: Dict[str, UserPresenceState] = {}
 
         # Stores the destinations we need to explicitly send presence to about a
         # given user.
         # Stream position -> (user_id, destinations)
-        self.presence_destinations = (
-            SortedDict()
-        )  # type: SortedDict[int, Tuple[str, Iterable[str]]]
+        self.presence_destinations: SortedDict[
+            int, Tuple[str, Iterable[str]]
+        ] = SortedDict()
 
         # (destination, key) -> EDU
-        self.keyed_edu = {}  # type: Dict[Tuple[str, tuple], Edu]
+        self.keyed_edu: Dict[Tuple[str, tuple], Edu] = {}
 
         # stream position -> (destination, key)
-        self.keyed_edu_changed = (
-            SortedDict()
-        )  # type: SortedDict[int, Tuple[str, tuple]]
+        self.keyed_edu_changed: SortedDict[int, Tuple[str, tuple]] = SortedDict()
 
-        self.edus = SortedDict()  # type: SortedDict[int, Edu]
+        self.edus: SortedDict[int, Edu] = SortedDict()
 
         # stream ID for the next entry into keyed_edu_changed/edus.
         self.pos = 1
 
         # map from stream ID to the time that stream entry was generated, so that we
         # can clear out entries after a while
-        self.pos_time = SortedDict()  # type: SortedDict[int, int]
+        self.pos_time: SortedDict[int, int] = SortedDict()
 
         # EVERYTHING IS SAD. In particular, python only makes new scopes when
         # we make a new function, so we need to make a new function so the inner
@@ -291,7 +289,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         # list of tuple(int, BaseFederationRow), where the first is the position
         # of the federation stream.
-        rows = []  # type: List[Tuple[int, BaseFederationRow]]
+        rows: List[Tuple[int, BaseFederationRow]] = []
 
         # Fetch presence to send to destinations
         i = self.presence_destinations.bisect_right(from_token)
@@ -445,11 +443,11 @@ class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
         buff.edus.setdefault(self.edu.destination, []).append(self.edu)
 
 
-_rowtypes = (
+_rowtypes: Tuple[Type[BaseFederationRow], ...] = (
     PresenceDestinationsRow,
     KeyedEduRow,
     EduRow,
-)  # type: Tuple[Type[BaseFederationRow], ...]
+)
 
 TypeToRow = {Row.TypeId: Row for Row in _rowtypes}
 
