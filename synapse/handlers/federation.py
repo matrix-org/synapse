@@ -2566,11 +2566,6 @@ class FederationHandler(BaseHandler):
         room_version = await self.store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
-        logger.error(
-            "_check_event_auth before event_id=%s auth_events=%s",
-            event.event_id,
-            auth_events,
-        )
         if not auth_events:
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self._event_auth_handler.compute_auth_events(
@@ -2578,11 +2573,6 @@ class FederationHandler(BaseHandler):
             )
             auth_events_x = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
-        logger.error(
-            "_check_event_auth after event_id=%s auth_events=%s",
-            event.event_id,
-            auth_events,
-        )
 
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
@@ -2714,13 +2704,6 @@ class FederationHandler(BaseHandler):
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
                         }
-                        logger.error(
-                            "_check_event_auth cvcxvxcbs event_id=%s e.event_id=%s auth_ids=%s auth=%s",
-                            event.event_id,
-                            e.event_id,
-                            auth_ids,
-                            auth,
-                        )
                         e.internal_metadata.outlier = True
 
                         logger.debug(
@@ -2728,26 +2711,11 @@ class FederationHandler(BaseHandler):
                             event.event_id,
                             e.event_id,
                         )
-                        logger.error(
-                            "_update_auth_events_and_context_for_auth before event_id=%s state_group=%s",
-                            event.event_id,
-                            context.state_group,
-                        )
                         missing_auth_event_context = (
                             await self.state_handler.compute_event_context(e)
                         )
-                        logger.error(
-                            "_update_auth_events_and_context_for_auth after1 event_id=%s state_group=%s",
-                            event.event_id,
-                            context.state_group,
-                        )
                         await self._auth_and_persist_event(
                             origin, e, missing_auth_event_context, auth_events=auth
-                        )
-                        logger.error(
-                            "_update_auth_events_and_context_for_auth after2 event_id=%s state_group=%s",
-                            event.event_id,
-                            context.state_group,
                         )
 
                         if e.event_id in event_auth_events:
@@ -2759,11 +2727,6 @@ class FederationHandler(BaseHandler):
                 logger.exception("Failed to get auth chain")
 
         if event.internal_metadata.is_outlier():
-            logger.error(
-                "_update_auth_events_and_context_for_auth is outlier event_id=%s state_group=%s",
-                event.event_id,
-                context.state_group,
-            )
             # XXX: given that, for an outlier, we'll be working with the
             # event's *claimed* auth events rather than those we calculated:
             # (a) is there any point in this test, since different_auth below will
@@ -2776,22 +2739,7 @@ class FederationHandler(BaseHandler):
             e.event_id for e in auth_events.values()
         )
 
-        if different_auth:
-            logger.error(
-                "_update_auth_events_and_context_for_auth different_auth! event_id=%s state_group=%s\ndifferent_auth=%s\nevent_auth_events=%s\nauth_events=%s",
-                event.event_id,
-                context.state_group,
-                different_auth,
-                event_auth_events,
-                auth_events,
-            )
-
         if not different_auth:
-            logger.error(
-                "_update_auth_events_and_context_for_auth no different_auth event_id=%s state_group=%s",
-                event.event_id,
-                context.state_group,
-            )
             return context
 
         logger.info(
@@ -2846,11 +2794,6 @@ class FederationHandler(BaseHandler):
 
         context = await self._update_context_for_auth_events(
             event, context, auth_events
-        )
-        logger.error(
-            "_update_auth_events_and_context_for_auth after3 event_id=%s state_group=%s",
-            event.event_id,
-            context.state_group,
         )
 
         return context
