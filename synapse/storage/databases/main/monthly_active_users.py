@@ -307,7 +307,7 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
         # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = self.db_pool.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
@@ -321,8 +321,6 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         self._invalidate_cache_and_stream(
             txn, self.user_last_seen_monthly_active, (user_id,)
         )
-
-        return is_insert
 
     async def populate_monthly_active_users(self, user_id):
         """Checks on the state of monthly active user limits and optionally
