@@ -347,7 +347,12 @@ jobs:
 
   # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
   tests-done:
+    if: ${{ always() }}
     needs:
+      - lint
+      - lint-crlf
+      - lint-newsfile
+      - lint-sdist
       - trial
       - trial-olddeps
       - sytest
@@ -355,4 +360,16 @@ jobs:
       - complement
     runs-on: ubuntu-latest
     steps:
-      - run: "true"    
+      - name: Set build result
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        # the `jq` incantation dumps out a series of "<job> <result>" lines
+        run: |
+          set -o pipefail
+          jq -r 'to_entries[] | [.key,.value.result] | join(" ")' \
+                          <<< $NEEDS_CONTEXT |
+              while read job result; do
+                  if [ "$result" != "success" ]; then
+                      echo "::set-failed ::Job $job returned $result"
+                  fi
+              done
