@@ -1,0 +1,1 @@
+Initial support for MSC3288, sending room_type to the identity server for 3pid invites over the /store-invite API.
