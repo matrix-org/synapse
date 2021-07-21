@@ -195,7 +195,7 @@ class FederationServer(FederationBase):
                 origin, room_id, versions, limit
             )
 
-            res = self._transaction_from_pdus(pdus).get_dict()
+            res = self._transaction_dict_from_pdus(pdus)
 
         return 200, res
 
@@ -538,7 +538,7 @@ class FederationServer(FederationBase):
         pdu = await self.handler.get_persisted_pdu(origin, event_id)
 
         if pdu:
-            return 200, self._transaction_from_pdus([pdu]).get_dict()
+            return 200, self._transaction_dict_from_pdus([pdu])
         else:
             return 404, ""
 
@@ -879,7 +879,7 @@ class FederationServer(FederationBase):
         ts_now_ms = self._clock.time_msec()
         return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
 
-    def _transaction_from_pdus(self, pdu_list: List[EventBase]) -> Transaction:
+    def _transaction_dict_from_pdus(self, pdu_list: List[EventBase]) -> JsonDict:
         """Returns a new Transaction containing the given PDUs suitable for
         transmission.
         """
@@ -890,7 +890,7 @@ class FederationServer(FederationBase):
             pdus=pdus,
             origin_server_ts=int(time_now),
             destination=None,
-        )
+        ).get_dict()
 
     async def _handle_received_pdu(self, origin: str, pdu: EventBase) -> None:
         """Process a PDU received in a federation /send/ transaction.
