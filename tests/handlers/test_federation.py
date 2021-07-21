@@ -43,11 +43,7 @@ class FederationTestCase(unittest.HomeserverTestCase):
     ]
 
     def make_homeserver(self, reactor, clock):
-        # we mock out the federation client too
-        self.mock_federation_client = Mock()
-        hs = self.setup_test_homeserver(
-            federation_http_client=self.mock_federation_client
-        )
+        hs = self.setup_test_homeserver(federation_http_client=None)
         self.handler = hs.get_federation_handler()
         self.store = hs.get_datastore()
         self.state_store = hs.get_storage().state
