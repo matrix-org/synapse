@@ -16,7 +16,16 @@
 
 import enum
 import threading
-from typing import Callable, Generic, Iterable, MutableMapping, Optional, TypeVar, Union
+from typing import (
+    Callable,
+    Generic,
+    Iterable,
+    MutableMapping,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from prometheus_client import Gauge
 
@@ -166,7 +175,7 @@ class DeferredCache(Generic[KT, VT]):
     def set(
         self,
         key: KT,
-        value: defer.Deferred,
+        value: defer.Deferred[VT],
         callback: Optional[Callable[[], None]] = None,
     ) -> defer.Deferred:
         """Adds a new entry to the cache (or updates an existing one).
@@ -214,7 +223,7 @@ class DeferredCache(Generic[KT, VT]):
         if value.called:
             result = value.result
             if not isinstance(result, failure.Failure):
-                self.cache.set(key, result, callbacks)
+                self.cache.set(key, cast(VT, result), callbacks)
             return value
 
         # otherwise, we'll add an entry to the _pending_deferred_cache for now,
