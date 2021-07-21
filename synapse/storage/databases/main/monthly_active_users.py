@@ -297,10 +297,6 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         Args:
             txn (cursor):
             user_id (str): user to add/update
-
-        Returns:
-            bool: True if a new entry was created, False if an
-            existing one was updated.
         """
 
         # Am consciously deciding to lock the table on the basis that is ought

@@ -833,7 +833,7 @@ class DatabasePool:
         table: str,
         values: Dict[str, Any],
         desc: str = "simple_insert",
-    ):
+    ) -> None:
         """Executes an INSERT query on the named table.
 
         Args:
