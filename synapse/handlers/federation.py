@@ -2566,6 +2566,11 @@ class FederationHandler(BaseHandler):
         room_version = await self.store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
+        logger.error(
+            "_check_event_auth before event_id=%s auth_events=%s",
+            event.event_id,
+            auth_events,
+        )
         if not auth_events:
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self._event_auth_handler.compute_auth_events(
@@ -2573,6 +2578,11 @@ class FederationHandler(BaseHandler):
             )
             auth_events_x = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
+        logger.error(
+            "_check_event_auth after event_id=%s auth_events=%s",
+            event.event_id,
+            auth_events,
+        )
 
         # This is a hack to fix some old rooms where the initial join event
         # didn't reference the create event in its auth events.
@@ -2704,6 +2714,13 @@ class FederationHandler(BaseHandler):
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
                         }
+                        logger.error(
+                            "_check_event_auth cvcxvxcbs event_id=%s e.event_id=%s auth_ids=%s auth=%s",
+                            event.event_id,
+                            e.event_id,
+                            auth_ids,
+                            auth,
+                        )
                         e.internal_metadata.outlier = True
 
                         logger.debug(

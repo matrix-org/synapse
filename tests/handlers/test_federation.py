@@ -282,7 +282,12 @@ class FederationTestCase(unittest.HomeserverTestCase):
             room_version,
             outlier=True,
         )
-        logger.error("member_event before auth_events=%s", member_event.auth_events)
+        logger.error("member_event event_id=%s", member_event.event_id)
+        logger.error(
+            "member_event before event_id=%s auth_events=%s",
+            member_event.event_id,
+            member_event.auth_events,
+        )
         filter_auth_events_on_event(member_event, auth_events)
         logger.error("member_event after auth_events=%s", member_event.auth_events)
 
@@ -304,20 +309,26 @@ class FederationTestCase(unittest.HomeserverTestCase):
             },
             room_version,
         )
+        logger.error("message_event event_id=%s", message_event.event_id)
         logger.error("message_event before auth_events=%s", message_event.auth_events)
-        filter_auth_events_on_event(message_event, raw_auth_events)
+        filter_auth_events_on_event(message_event, raw_auth_events.copy())
         logger.error("message_event after auth_events=%s", message_event.auth_events)
 
         # Stub the /event_auth response from the OTHER_SERVER
-        self.handler.federation_client.get_event_auth = lambda destination, room_id, event_id: defer.succeed(
-            # After we filtered the auth events, convert the message auth event
-            # ID's back into full fledged EventBases
-            [
+        async def get_event_auth(destination, room_id, event_id):
+            return [
                 auth_event
                 for auth_event in raw_auth_events
-                if auth_event.event_id in message_event.auth_events
+                if auth_event.type is EventTypes.Create
+                or auth_event.type is EventTypes.PowerLevels
+                or auth_event.type is EventTypes.JoinRules
+                or (
+                    auth_event.type is EventTypes.Member
+                    and auth_event.state_key == message_event.sender
+                )
             ]
-        )
+
+        self.handler.federation_client.get_event_auth = get_event_auth
 
         with LoggingContext("receive_pdu"):
             d = run_in_background(

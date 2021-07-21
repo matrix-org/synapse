@@ -277,14 +277,21 @@ def _is_membership_change_allowed(
 
     key = (EventTypes.JoinRules, "")
     join_rule_event = auth_events.get(key)
-    logger.error("join_rule_event ggre %s", join_rule_event)
+    logger.error(
+        "_is_membership_change_allowed: event_id=%s join_rule_event=%s event=%s event.auth_events=%s auth_events=%s",
+        event.event_id,
+        join_rule_event,
+        event,
+        event.auth_events,
+        auth_events,
+    )
     if join_rule_event:
         join_rule = join_rule_event.content.get("join_rule", JoinRules.INVITE)
     else:
         join_rule = JoinRules.INVITE
 
     # TODO: remove. The auth_rules don't have the join_rules for the given even we're trying auth
-    join_rule = JoinRules.PUBLIC
+    # join_rule = JoinRules.PUBLIC
 
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
