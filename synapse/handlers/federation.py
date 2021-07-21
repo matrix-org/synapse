@@ -924,7 +924,11 @@ class FederationHandler(BaseHandler):
             origin,
             marker_event.room_id,
             [insertion_event_id],
+            # outlier=False,
         )
+        # await self._get_state_after_missing_prev_event(
+        #     origin, marker_event.room_id, insertion_event_id
+        # )
 
         insertion_event = await self.store.get_event(
             insertion_event_id, allow_none=True
@@ -1078,15 +1082,27 @@ class FederationHandler(BaseHandler):
         # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
 
+        logger.info("backfill: events=%s", events)
         for event in events:
             if event in events_to_state:
                 continue
 
             # For paranoia we ensure that these events are marked as
             # non-outliers
+            logger.info(
+                "backfill: persist event_id=%s (%s) outlier=%s",
+                event.event_id,
+                event.type,
+                event.internal_metadata.is_outlier(),
+            )
             assert not event.internal_metadata.is_outlier()
 
             context = await self.state_handler.compute_event_context(event)
+            logger.info(
+                "backfill: context event_id=%s state_group=%s",
+                event.event_id,
+                context.state_group,
+            )
 
             # We store these one at a time since each event depends on the
             # previous to work out the state.
@@ -1383,7 +1399,12 @@ class FederationHandler(BaseHandler):
         return False
 
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, events: Iterable[str]
+        self,
+        destination: str,
+        room_id: str,
+        events: Iterable[str],
+        # TODO: check if still used
+        outlier: bool = True,
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
@@ -1405,7 +1426,7 @@ class FederationHandler(BaseHandler):
                         [destination],
                         event_id,
                         room_version,
-                        outlier=True,
+                        outlier=outlier,
                     )
                     if event is None:
                         logger.warning(
@@ -2278,6 +2299,11 @@ class FederationHandler(BaseHandler):
                 server.
             backfilled: True if the event was backfilled.
         """
+        logger.info(
+            "_auth_and_persist_event: before event_id=%s state_group=%s",
+            event.event_id,
+            context.state_group,
+        )
         context = await self._check_event_auth(
             origin,
             event,
@@ -2285,6 +2311,11 @@ class FederationHandler(BaseHandler):
             state=state,
             auth_events=auth_events,
             backfilled=backfilled,
+        )
+        logger.info(
+            "_auth_and_persist_event: after event_id=%s state_group=%s",
+            event.event_id,
+            context.state_group,
         )
 
         await self._run_push_actions_and_persist_event(event, context, backfilled)
@@ -2667,8 +2698,18 @@ class FederationHandler(BaseHandler):
                     auth_events[(c.type, c.state_key)] = c
 
         try:
+            logger.info(
+                "_check_event_auth: before event_id=%s state_group=%s",
+                event.event_id,
+                context.state_group,
+            )
             context = await self._update_auth_events_and_context_for_auth(
                 origin, event, context, auth_events
+            )
+            logger.info(
+                "_check_event_auth: after event_id=%s state_group=%s",
+                event.event_id,
+                context.state_group,
             )
         except Exception:
             # We don't really mind if the above fails, so lets not fail
@@ -2756,7 +2797,11 @@ class FederationHandler(BaseHandler):
 
         if missing_auth:
             # If we don't have all the auth events, we need to get them.
-            logger.info("auth_events contains unknown events: %s", missing_auth)
+            logger.info(
+                "auth_events contains unknown events for event_id=%s, missing_auth=%s",
+                event.event_id,
+                missing_auth,
+            )
             try:
                 try:
                     remote_auth_chain = await self.federation_client.get_event_auth(
@@ -2793,9 +2838,13 @@ class FederationHandler(BaseHandler):
                             event.event_id,
                             e.event_id,
                         )
-                        context = await self.state_handler.compute_event_context(e)
+                        # XXX: Main fix is here. It was computing context for the missing auth event
+                        # and re-assigning to the `context` variable used for the main event
+                        missing_auth_context = (
+                            await self.state_handler.compute_event_context(e)
+                        )
                         await self._auth_and_persist_event(
-                            origin, e, context, auth_events=auth
+                            origin, e, missing_auth_context, auth_events=auth
                         )
 
                         if e.event_id in event_auth_events:
@@ -2806,13 +2855,20 @@ class FederationHandler(BaseHandler):
             except Exception:
                 logger.exception("Failed to get auth chain")
 
+        logger.info(
+            "_update_auth_events_and_context_for_auth: check outlier event_id=%s outlier=%s",
+            event.event_id,
+            event.internal_metadata.is_outlier(),
+        )
         if event.internal_metadata.is_outlier():
             # XXX: given that, for an outlier, we'll be working with the
             # event's *claimed* auth events rather than those we calculated:
             # (a) is there any point in this test, since different_auth below will
             # obviously be empty
             # (b) alternatively, why don't we do it earlier?
-            logger.info("Skipping auth_event fetch for outlier")
+            logger.info(
+                "Skipping auth_event fetch for outlier event_id=%s", event.event_id
+            )
             return context
 
         different_auth = event_auth_events.difference(
