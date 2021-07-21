@@ -131,6 +131,7 @@ def check(
         return
 
     # 3. If event does not have a m.room.create in its auth_events, reject.
+    logger.info("event_auth: event_id=%s auth_events=%s", event.event_id, auth_events)
     creation_event = auth_events.get((EventTypes.Create, ""), None)
     if not creation_event:
         raise AuthError(403, "No create event in auth events")

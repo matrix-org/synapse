@@ -2680,6 +2680,8 @@ class FederationHandler(BaseHandler):
                     remote_auth_chain = await self.federation_client.get_event_auth(
                         origin, event.room_id, event.event_id
                     )
+                    logger.info("remote_auth_chain %s", remote_auth_chain)
+                    logger.info("asdf %s", remote_auth_chain[0].auth_events)
                 except RequestSendFailed as e1:
                     # The other side isn't around or doesn't implement the
                     # endpoint, so lets just bail out.
@@ -2711,9 +2713,11 @@ class FederationHandler(BaseHandler):
                             event.event_id,
                             e.event_id,
                         )
-                        context = await self.state_handler.compute_event_context(e)
+                        missing_auth_context = (
+                            await self.state_handler.compute_event_context(e)
+                        )
                         await self._auth_and_persist_event(
-                            origin, e, context, auth_events=auth
+                            origin, e, missing_auth_context, auth_events=auth
                         )
 
                         if e.event_id in event_auth_events:
