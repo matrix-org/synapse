@@ -129,7 +129,11 @@ class UserTestCase(unittest.TestCase):
 
     def test_build__all_values(self):
         appservice = ApplicationService(
-            None, "test", id="foo", rate_limited=True, sender="@as:test",
+            None,
+            "test",
+            id="foo",
+            rate_limited=True,
+            sender="@as:test",
         )
         user = User(
             user=UserID.from_string("@alice:test"),
