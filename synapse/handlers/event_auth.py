@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import TYPE_CHECKING, Collection, List, Optional, Union
 
 from synapse import event_auth
@@ -29,6 +30,8 @@ from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+logger = logging.getLogger(__name__)
 
 
 class EventAuthHandler:
@@ -109,7 +112,7 @@ class EventAuthHandler:
             SynapseError if no appropriate user is found.
         """
         power_level_event_id = current_state_ids.get((EventTypes.PowerLevels, ""))
-        invite_level = 50
+        invite_level = 0
         users_default_level = 0
         if power_level_event_id:
             power_level_event = await self._store.get_event(power_level_event_id)
@@ -129,8 +132,15 @@ class EventAuthHandler:
             default=None,
         )
 
-        # Return the chosen user.
-        if chosen_user:
+        # Return the chosen if they can issue invites.
+        user_power_level = users.get(chosen_user, users_default_level)
+        if chosen_user and user_power_level >= invite_level:
+            logger.error(
+                "Found a user who can issue invites  %s with power level %d >= invite level %d",
+                chosen_user,
+                user_power_level,
+                invite_level,
+            )
             return chosen_user
 
         # No user was found.
