@@ -252,10 +252,13 @@ class SyncRestServlet(RestServlet):
         if sync_result.device_lists.left:
             response["device_lists"]["left"] = list(sync_result.device_lists.left)
 
-        if sync_result.device_one_time_keys_count:
-            response[
-                "device_one_time_keys_count"
-            ] = sync_result.device_one_time_keys_count
+        # We always include this because https://github.com/vector-im/element-android/issues/3725
+        # The spec isn't terribly clear on when this can be omitted and how a client would tell
+        # the difference between "no keys present" and "nothing changed" in terms of whole field
+        # absent / individual key type entry absent
+        # Corresponding synapse issue: https://github.com/matrix-org/synapse/issues/10456
+        response["device_one_time_keys_count"] = sync_result.device_one_time_keys_count
+
         if sync_result.device_unused_fallback_key_types:
             response[
                 "org.matrix.msc2732.device_unused_fallback_key_types"
