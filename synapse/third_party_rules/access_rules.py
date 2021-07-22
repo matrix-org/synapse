@@ -14,7 +14,7 @@
 # limitations under the License.
 import email.utils
 import logging
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Union
 
 from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
@@ -22,10 +22,12 @@ from synapse.config._base import ConfigError
 from synapse.events import EventBase
 from synapse.module_api import ModuleApi
 from synapse.types import Requester, StateMap, UserID, get_domain_from_id
+from synapse.util.frozenutils import unfreeze
 
 logger = logging.getLogger(__name__)
 
 ACCESS_RULES_TYPE = "im.vector.room.access_rules"
+FROZEN_STATE_TYPE = "io.element.room.frozen"
 
 
 class AccessRules:
@@ -108,7 +110,7 @@ class RoomAccessRules(object):
             ConfigError: If there was an issue with the provided module configuration.
         """
         if "id_server" not in config:
-            raise ConfigError("No IS for event rules TchapEventRules")
+            raise ConfigError("No IS for event rules RoomAccessRules")
 
         return config
 
@@ -320,7 +322,7 @@ class RoomAccessRules(object):
         self,
         event: EventBase,
         state_events: StateMap[EventBase],
-    ) -> bool:
+    ) -> Union[bool, dict]:
         """Implements synapse.events.ThirdPartyEventRules.check_event_allowed.
 
         Checks the event's type and the current rule and calls the right function to
@@ -332,8 +334,18 @@ class RoomAccessRules(object):
                 State events in the room the event originated from.
 
         Returns:
-            True if the event can be allowed, False otherwise.
+            True if the event should be allowed, False if it should be rejected, or a dictionary if the
+            event needs to be rebuilt (containing the event's new content).
         """
+        if event.type == FROZEN_STATE_TYPE:
+            return await self._on_frozen_state_change(event, state_events)
+
+        # If the room is frozen, we allow a very small number of events to go through
+        # (unfreezing, leaving, etc.).
+        frozen_state = state_events.get((FROZEN_STATE_TYPE, ""))
+        if frozen_state and frozen_state.content.get("frozen", False):
+            return await self._on_event_when_frozen(event, state_events)
+
         if event.type == ACCESS_RULES_TYPE:
             return await self._on_rules_change(event, state_events)
 
@@ -394,6 +406,129 @@ class RoomAccessRules(object):
         # published to the public rooms directory.
         return True
 
+    async def _on_event_when_frozen(
+        self,
+        event: EventBase,
+        state_events: StateMap[EventBase],
+    ) -> Union[bool, dict]:
+        """Check if the provided event is allowed when the room is frozen.
+
+        The only events allowed are for a member to leave the room, and for the room to
+        be (un)frozen. In the latter case, also attempt to unfreeze the room.
+
+
+        Args:
+            event: The event to allow or deny.
+            state_events: A dict mapping (event type, state key) to state event.
+                State events in the room before the event was sent.
+        Returns:
+            A boolean indicating whether the event is allowed, or a dict if the event is
+            allowed but the state of the room has been modified (i.e. the room has been
+            unfrozen). This is because returning a dict of the event forces Synapse to
+            rebuild it, which is needed if the state of the room has changed.
+        """
+        # Allow users to leave the room; don't allow kicks though.
+        if (
+            event.type == EventTypes.Member
+            and event.membership == Membership.LEAVE
+            and event.sender == event.state_key
+        ):
+            return True
+
+        if event.type == EventTypes.PowerLevels:
+            # Check if the power level event is associated with a room unfreeze (because
+            # the power level events will be sent before the frozen state event). This
+            # means we check that the users_default is back to 0 and the sender set
+            # themselves as admin.
+            current_power_levels = state_events.get((EventTypes.PowerLevels, ""))
+            if current_power_levels:
+                old_content = current_power_levels.content.copy()
+                old_content["users_default"] = 0
+
+                new_content = unfreeze(event.content)
+                sender_pl = new_content.get("users", {}).get(event.sender, 0)
+
+                # We don't care about the users section as long as the new event gives
+                # full power to the sender.
+                del old_content["users"]
+                del new_content["users"]
+
+                if new_content == old_content and sender_pl == 100:
+                    return True
+
+        return False
+
+    async def _on_frozen_state_change(
+        self,
+        event: EventBase,
+        state_events: StateMap[EventBase],
+    ) -> Union[bool, dict]:
+        frozen = event.content.get("frozen", None)
+        if not isinstance(frozen, bool):
+            # Invalid event: frozen is either missing or not a boolean.
+            return False
+
+        # If the event was sent from a restricted homeserver, don't allow the state
+        # change.
+        if (
+            UserID.from_string(event.sender).domain
+            in self.domains_forbidden_when_restricted
+        ):
+            return False
+
+        current_frozen_state = state_events.get(
+            (FROZEN_STATE_TYPE, ""),
+        )  # type: EventBase
+
+        if (
+            current_frozen_state is not None
+            and current_frozen_state.content.get("frozen") == frozen
+        ):
+            # This is a noop, accept the new event but don't do anything more.
+            return True
+
+        # If the event was received over federation, we want to accept it but not to
+        # change the power levels.
+        if not self._is_local_user(event.sender):
+            return True
+
+        current_power_levels = state_events.get(
+            (EventTypes.PowerLevels, ""),
+        )  # type: EventBase
+
+        power_levels_content = unfreeze(current_power_levels.content)
+
+        if not frozen:
+            # We're unfreezing the room: enforce the right value for the power levels so
+            # the room isn't in a weird/broken state afterwards.
+            users = power_levels_content.setdefault("users", {})
+            users[event.sender] = 100
+            power_levels_content["users_default"] = 0
+        else:
+            # Send a new power levels event with a similar content to the previous one
+            # except users_default is 100 to allow any user to unfreeze the room.
+            power_levels_content["users_default"] = 100
+
+            # Just to be safe, also delete all users that don't have a power level of
+            # 100, in order to prevent anyone from being unable to unfreeze the room.
+            users = {}
+            for user, level in power_levels_content["users"].items():
+                if level == 100:
+                    users[user] = level
+            power_levels_content["users"] = users
+
+        await self.module_api.create_and_send_event_into_room(
+            {
+                "room_id": event.room_id,
+                "sender": event.sender,
+                "type": EventTypes.PowerLevels,
+                "content": power_levels_content,
+                "state_key": "",
+            }
+        )
+
+        return event.get_dict()
+
     async def _on_rules_change(
         self, event: EventBase, state_events: StateMap[EventBase]
     ):
@@ -448,7 +583,7 @@ class RoomAccessRules(object):
         event: EventBase,
         rule: str,
         state_events: StateMap[EventBase],
-    ) -> bool:
+    ) -> Union[bool, dict]:
         """Applies the correct rule for incoming m.room.member and
         m.room.third_party_invite events.
 
@@ -459,7 +594,10 @@ class RoomAccessRules(object):
                 The state of the room before the event was sent.
 
         Returns:
-            True if the event can be allowed, False otherwise.
+            A boolean indicating whether the event is allowed, or a dict if the event is
+            allowed but the state of the room has been modified (i.e. the room has been
+            frozen). This is because returning a dict of the event forces Synapse to
+            rebuild it, which is needed if the state of the room has changed.
         """
         if rule == AccessRules.RESTRICTED:
             ret = self._on_membership_or_invite_restricted(event)
@@ -472,7 +610,7 @@ class RoomAccessRules(object):
             # might want to change that in the future.
             ret = self._on_membership_or_invite_restricted(event)
 
-        if event.type == "m.room.member":
+        if event.type == EventTypes.Member:
             # If this is an admin leaving, and they are the last admin in the room,
             # raise the power levels of the room so that the room is 'frozen'.
             #
@@ -484,6 +622,9 @@ class RoomAccessRules(object):
                 and event.membership == Membership.LEAVE
             ):
                 await self._freeze_room_if_last_admin_is_leaving(event, state_events)
+                if ret:
+                    # Return an event dict to force Synapse into rebuilding the event.
+                    return event.get_dict()
 
         return ret
 
@@ -535,88 +676,13 @@ class RoomAccessRules(object):
         # Freeze the room by raising the required power level to send events to 100
         logger.info("Freezing room '%s'", event.room_id)
 
-        # Modify the existing power levels to raise all required types to 100
-        #
-        # This changes a power level state event's content from something like:
-        # {
-        #     "redact": 50,
-        #     "state_default": 50,
-        #     "ban": 50,
-        #     "notifications": {
-        #         "room": 50
-        #     },
-        #     "events": {
-        #         "m.room.avatar": 50,
-        #         "m.room.encryption": 50,
-        #         "m.room.canonical_alias": 50,
-        #         "m.room.name": 50,
-        #         "im.vector.modular.widgets": 50,
-        #         "m.room.topic": 50,
-        #         "m.room.tombstone": 50,
-        #         "m.room.history_visibility": 100,
-        #         "m.room.power_levels": 100
-        #     },
-        #     "users_default": 0,
-        #     "events_default": 0,
-        #     "users": {
-        #         "@admin:example.com": 100,
-        #     },
-        #     "kick": 50,
-        #     "invite": 0
-        # }
-        #
-        # to
-        #
-        # {
-        #     "redact": 100,
-        #     "state_default": 100,
-        #     "ban": 100,
-        #     "notifications": {
-        #         "room": 50
-        #     },
-        #     "events": {}
-        #     "users_default": 0,
-        #     "events_default": 100,
-        #     "users": {
-        #         "@admin:example.com": 100,
-        #     },
-        #     "kick": 100,
-        #     "invite": 100
-        # }
-        new_content = {}
-        for key, value in power_level_content.items():
-            # Do not change "users_default", as that key specifies the default power
-            # level of new users
-            if isinstance(value, int) and key != "users_default":
-                value = 100
-            new_content[key] = value
-
-        # Set some values in case they are missing from the original
-        # power levels event content
-        new_content.update(
-            {
-                # Clear out any special-cased event keys
-                "events": {},
-                # Ensure state_default and events_default keys exist and are 100.
-                # Otherwise a lower PL user could potentially send state events that
-                # aren't explicitly mentioned elsewhere in the power level dict
-                "state_default": 100,
-                "events_default": 100,
-                # Membership events default to 50 if they aren't present. Set them
-                # to 100 here, as they would be set to 100 if they were present anyways
-                "ban": 100,
-                "kick": 100,
-                "invite": 100,
-                "redact": 100,
-            }
-        )
-
+        # Mark the room as frozen
         await self.module_api.create_and_send_event_into_room(
             {
                 "room_id": event.room_id,
                 "sender": user_id,
-                "type": EventTypes.PowerLevels,
-                "content": new_content,
+                "type": FROZEN_STATE_TYPE,
+                "content": {"frozen": True},
                 "state_key": "",
             }
         )

@@ -43,7 +43,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs, auth_handler):
+    def __init__(self, hs: "HomeServer", auth_handler):
         self._hs = hs
 
         self._store = hs.get_datastore()
