@@ -782,9 +782,9 @@ class UsersListTestCase(unittest.HomeserverTestCase):
         """
 
         # make sure that the users do not have the same timestamps
-        self.reactor.advance
+        self.reactor.advance(10)
         user1 = self.register_user("user1", "pass1", admin=False, displayname="Name Z")
-        self.reactor.advance
+        self.reactor.advance(10)
         user2 = self.register_user("user2", "pass2", admin=False, displayname="Name Y")
 
         # Modify user
@@ -2545,11 +2545,11 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
         # create media and make sure they do not have the same timestamp
         media1 = self._create_media_and_access(other_user_tok, image_data1, "image.png")
-        self.reactor.advance
+        self.reactor.advance(10)
         media2 = self._create_media_and_access(other_user_tok, image_data2, "image.gif")
-        self.reactor.advance
+        self.reactor.advance(10)
         media3 = self._create_media_and_access(other_user_tok, image_data3, "image.bmp")
-        self.reactor.advance
+        self.reactor.advance(10)
 
         # Mark one media as safe from quarantine.
         self.get_success(self.store.mark_local_media_as_safe(media2))

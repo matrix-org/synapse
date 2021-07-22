@@ -145,7 +145,7 @@ A response body like the following is returned:
             "shadow_banned": 0,
             "displayname": "<User One>",
             "avatar_url": null,
-            "creation_ts": 1560432668
+            "creation_ts": 1560432668000
         }, {
             "name": "<user_id2>",
             "is_guest": 0,
@@ -155,7 +155,7 @@ A response body like the following is returned:
             "shadow_banned": 0,
             "displayname": "<User Two>",
             "avatar_url": "<avatar_url>",
-            "creation_ts": 1561550621
+            "creation_ts": 1561550621000
         }
     ],
     "next_token": "100",
@@ -199,7 +199,7 @@ The following parameters should be set in the URL:
   - `shadow_banned` - Users are ordered by `shadow_banned` status.
   - `displayname` - Users are ordered alphabetically by `displayname`.
   - `avatar_url` - Users are ordered alphabetically by avatar URL.
-  - `creation_ts` - Users are ordered by when the users was created in s (Unix timestamp).
+  - `creation_ts` - Users are ordered by when the users was created in ms.
 
 - `dir` - Direction of media order. Either `f` for forwards or `b` for backwards.
   Setting this value to `b` will reverse the above sort order. Defaults to `f`.
@@ -225,7 +225,7 @@ The following fields are returned in the JSON response body:
   - `shadow_banned` - bool - Status if that user has been marked as shadow banned.
   - `displayname` - string - The user's display name if they have set one.
   - `avatar_url` - string -  The user's avatar URL if they have set one.
-  - `creation_ts` - integer - The user's creation timestamp in s (Unix timestamp).
+  - `creation_ts` - integer - The user's creation timestamp in ms.
 
 - `next_token`: string representing a positive integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.

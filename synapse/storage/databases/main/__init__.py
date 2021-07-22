@@ -307,8 +307,8 @@ class DataStore(
             count = txn.fetchone()[0]
 
             sql = f"""
-                SELECT name, user_type, is_guest, admin, deactivated,
-                shadow_banned, displayname, avatar_url, creation_ts
+                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
+                displayname, avatar_url, creation_ts * 1000 as creation_ts
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
