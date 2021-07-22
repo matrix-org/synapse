@@ -307,7 +307,8 @@ server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
             &quot;deactivated&quot;: 0,
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User One&gt;&quot;,
-            &quot;avatar_url&quot;: null
+            &quot;avatar_url&quot;: null,
+            &quot;creation_ts&quot;: 1560432668000
         }, {
             &quot;name&quot;: &quot;&lt;user_id2&gt;&quot;,
             &quot;is_guest&quot;: 0,
@@ -316,7 +317,8 @@ server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
             &quot;deactivated&quot;: 0,
             &quot;shadow_banned&quot;: 0,
             &quot;displayname&quot;: &quot;&lt;User Two&gt;&quot;,
-            &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;
+            &quot;avatar_url&quot;: &quot;&lt;avatar_url&gt;&quot;,
+            &quot;creation_ts&quot;: 1561550621000
         }
     ],
     &quot;next_token&quot;: &quot;100&quot;,
@@ -369,6 +371,7 @@ which guarantees a stable ordering. Valid values are:</p>
 <li><code>shadow_banned</code> - Users are ordered by <code>shadow_banned</code> status.</li>
 <li><code>displayname</code> - Users are ordered alphabetically by <code>displayname</code>.</li>
 <li><code>avatar_url</code> - Users are ordered alphabetically by avatar URL.</li>
+<li><code>creation_ts</code> - Users are ordered by when the users was created in ms.</li>
 </ul>
 </li>
 <li>
@@ -376,7 +379,7 @@ which guarantees a stable ordering. Valid values are:</p>
 Setting this value to <code>b</code> will reverse the above sort order. Defaults to <code>f</code>.</p>
 </li>
 </ul>
-<p>Caution. The database only has indexes on the columns <code>name</code> and <code>created_ts</code>.
+<p>Caution. The database only has indexes on the columns <code>name</code> and <code>creation_ts</code>.
 This means that if a different sort order is used (<code>is_guest</code>, <code>admin</code>,
 <code>user_type</code>, <code>deactivated</code>, <code>shadow_banned</code>, <code>avatar_url</code> or <code>displayname</code>),
 this can cause a large load on the database, especially for large environments.</p>
@@ -396,6 +399,7 @@ This allows user type specific behaviour. There are also types <code>support</co
 <li><code>shadow_banned</code> - bool - Status if that user has been marked as shadow banned.</li>
 <li><code>displayname</code> - string - The user's display name if they have set one.</li>
 <li><code>avatar_url</code> - string -  The user's avatar URL if they have set one.</li>
+<li><code>creation_ts</code> - integer - The user's creation timestamp in ms.</li>
 </ul>
 </li>
 <li>
