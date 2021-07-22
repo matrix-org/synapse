@@ -75,6 +75,7 @@ class UserSortOrder(Enum):
     USER_TYPE = ordered alphabetically by `user_type`
     AVATAR_URL = ordered alphabetically by `avatar_url`
     SHADOW_BANNED = ordered by `shadow_banned`
+    CREATION_TS = ordered by `creation_ts`
     """
 
     MEDIA_LENGTH = "media_length"
@@ -88,6 +89,7 @@ class UserSortOrder(Enum):
     USER_TYPE = "user_type"
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
+    CREATION_TS = "creation_ts"
 
 
 class StatsStore(StateDeltasStore):
