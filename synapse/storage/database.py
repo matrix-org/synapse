@@ -397,6 +397,7 @@ class DatabasePool:
     ):
         self.hs = hs
         self._clock = hs.get_clock()
+        self._txn_limit = database_config.config.get("txn_limit", 0)
         self._database_config = database_config
         self._db_pool = make_pool(hs.get_reactor(), database_config, engine)
 
@@ -405,8 +406,9 @@ class DatabasePool:
         self._previous_txn_total_time = 0.0
         self._current_txn_total_time = 0.0
         self._previous_loop_ts = 0.0
-        self._txn_counters: Dict[int, int] = {}
-        self._txn_limit = database_config.config.get("txn_limit", 0)
+
+        # Transaction counter: key is the twisted thread id, value is the current count
+        self._txn_counters: Dict[int, int] = defaultdict(int)
 
         # TODO(paul): These can eventually be removed once the metrics code
         #   is running in mainline, and we have some nice monitoring frontends
@@ -754,8 +756,6 @@ class DatabasePool:
 
                     if self._txn_limit > 0:
                         tid = self._db_pool.threadID()
-                        if tid not in self._txn_counters:
-                            self._txn_counters[tid] = 0
                         self._txn_counters[tid] += 1
 
                         if self._txn_counters[tid] > self._txn_limit:
@@ -763,15 +763,15 @@ class DatabasePool:
                                 "Reconnecting database connection over transaction limit"
                             )
                             conn.reconnect()
-                            opentracing.log_kv({"message": "reconnected"})
-                            self._txn_counters[tid] = 0
+                            opentracing.log_kv({"message": "reconnected due to txn limit"})
+                            self._txn_counters[tid] = 1
 
                     if self.engine.is_connection_closed(conn):
                         logger.debug("Reconnecting closed database connection")
                         conn.reconnect()
                         opentracing.log_kv({"message": "reconnected"})
                         if self._txn_limit > 0:
-                            self._txn_counters[tid] = 0
+                            self._txn_counters[tid] = 1
 
                     try:
                         if db_autocommit:

@@ -34,7 +34,7 @@ DEFAULT_CONFIG = """\
 # 'psycopg2' (for PostgreSQL).
 #
 # 'txn_limit' gives the maximum number of transactions to run per connection
-# before reconnecting
+# before reconnecting. Defaults to 0, which means no limit.
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
