@@ -101,6 +101,8 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertTrue(capabilities["m.change_password"]["enabled"])
         self.assertNotIn("org.matrix.msc3283.set_displayname", capabilities)
+        self.assertNotIn("org.matrix.msc3283.set_avatar_url", capabilities)
+        self.assertNotIn("org.matrix.msc3283.3pid_changes", capabilities)
 
     @override_config({"enable_set_displayname": False})
     def test_get_set_displayname_capabilities_displayname_disabled(self):
@@ -110,6 +112,24 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         access_token = self.login(self.localpart, self.password)
 
         self._test_capability("org.matrix.msc3283.set_displayname", access_token, False)
+
+    @override_config({"enable_set_avatar_url": False})
+    def test_get_set_avatar_url_capabilities_avatar_url_disabled(self):
+        """
+        Test if set avatar_url is disabled that the server responds it.
+        """
+        access_token = self.login(self.localpart, self.password)
+
+        self._test_capability("org.matrix.msc3283.set_avatar_url", access_token, False)
+
+    @override_config({"enable_3pid_changes": False})
+    def test_change_3pid_capabilities_3pid_disabled(self):
+        """
+        Test if change 3pid is disabled that the server responds it.
+        """
+        access_token = self.login(self.localpart, self.password)
+
+        self._test_capability("org.matrix.msc3283.3pid_changes", access_token, False)
 
     def test_get_does_not_include_msc3244_fields_by_default(self):
         access_token = self.get_success(

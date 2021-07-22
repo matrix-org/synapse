@@ -68,6 +68,14 @@ class CapabilitiesRestServlet(RestServlet):
             response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
                 "enabled": self.config.enable_set_displayname
             }
+        if not self.config.enable_set_avatar_url:
+            response["capabilities"]["org.matrix.msc3283.set_avatar_url"] = {
+                "enabled": self.config.enable_set_avatar_url
+            }
+        if not self.config.enable_3pid_changes:
+            response["capabilities"]["org.matrix.msc3283.3pid_changes"] = {
+                "enabled": self.config.enable_3pid_changes
+            }
 
         return 200, response
 
