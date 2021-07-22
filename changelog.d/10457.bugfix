@@ -1,1 +1,0 @@
-Always include `device_one_time_keys_count` key in `/sync` response to work around a bug in Element Android that broke encryption for new devices.
