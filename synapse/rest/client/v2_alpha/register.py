@@ -713,6 +713,13 @@ class RegisterRestServlet(RestServlet):
             if registration_token:
                 # Increment the `completed` counter for the token
                 await self.store.use_registration_token(registration_token)
+                # Indicate that the token has been successfully used so that
+                # pending is not decremented again when expiring old UIA sessions.
+                await self.store.mark_ui_auth_stage_complete(
+                    session_id,
+                    LoginType.REGISTRATION_TOKEN,
+                    True,
+                )
 
             await self.registration_handler.post_registration_actions(
                 user_id=registered_user_id,

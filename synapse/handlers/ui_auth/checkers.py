@@ -278,7 +278,7 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
                     400, "Registration token has changed", Codes.INVALID_PARAM
                 )
             else:
-                return True
+                return token
 
         if await self.store.registration_token_is_valid(token):
             # Increment pending counter, so that if token has limited uses it
@@ -291,7 +291,10 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
                 UIAuthSessionDataConstants.REGISTRATION_TOKEN,
                 token,
             )
-            return True
+            # The token will be stored as the result of the authentication stage
+            # in ui_auth_sessions_credentials. This allows the pending counter
+            # for tokens to be decremented when expired sessions are deleted.
+            return token
         else:
             raise LoginError(
                 401, "Invalid registration token", errcode=Codes.UNAUTHORIZED
