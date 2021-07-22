@@ -15,6 +15,7 @@
 # limitations under the License.
 import logging
 import time
+from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
@@ -763,7 +764,9 @@ class DatabasePool:
                                 "Reconnecting database connection over transaction limit"
                             )
                             conn.reconnect()
-                            opentracing.log_kv({"message": "reconnected due to txn limit"})
+                            opentracing.log_kv(
+                                {"message": "reconnected due to txn limit"}
+                            )
                             self._txn_counters[tid] = 1
 
                     if self.engine.is_connection_closed(conn):
