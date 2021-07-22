@@ -1,0 +1,376 @@
+<!DOCTYPE HTML>
+<html lang="en" class="sidebar-visible no-js light">
+    <head>
+        <!-- Book generated using mdBook -->
+        <meta charset="UTF-8">
+        <title>Git Usage - Synapse</title>
+        
+        
+
+
+        <!-- Custom HTML head -->
+        
+
+
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <meta name="description" content="">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#ffffff" />
+
+        
+        <link rel="icon" href="../favicon.svg">
+        
+        
+        <link rel="shortcut icon" href="../favicon.png">
+        
+        <link rel="stylesheet" href="../css/variables.css">
+        <link rel="stylesheet" href="../css/general.css">
+        <link rel="stylesheet" href="../css/chrome.css">
+        
+        <link rel="stylesheet" href="../css/print.css" media="print">
+        
+
+        <!-- Fonts -->
+        <link rel="stylesheet" href="../FontAwesome/css/font-awesome.css">
+        
+        <link rel="stylesheet" href="../fonts/fonts.css">
+        
+
+        <!-- Highlight.js Stylesheets -->
+        <link rel="stylesheet" href="../highlight.css">
+        <link rel="stylesheet" href="../tomorrow-night.css">
+        <link rel="stylesheet" href="../ayu-highlight.css">
+
+        <!-- Custom theme stylesheets -->
+        
+        <link rel="stylesheet" href="../docs/website_files/table-of-contents.css">
+        
+        <link rel="stylesheet" href="../docs/website_files/remove-nav-buttons.css">
+        
+        <link rel="stylesheet" href="../docs/website_files/indent-section-headers.css">
+        
+
+        
+    </head>
+    <body>
+        <!-- Provide site root to javascript -->
+        <script type="text/javascript">
+            var path_to_root = "../";
+            var default_theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "navy" : "light";
+        </script>
+
+        <!-- Work around some values being stored in localStorage wrapped in quotes -->
+        <script type="text/javascript">
+            try {
+                var theme = localStorage.getItem('mdbook-theme');
+                var sidebar = localStorage.getItem('mdbook-sidebar');
+                if (theme.startsWith('"') && theme.endsWith('"')) {
+                    localStorage.setItem('mdbook-theme', theme.slice(1, theme.length - 1));
+                }
+                if (sidebar.startsWith('"') && sidebar.endsWith('"')) {
+                    localStorage.setItem('mdbook-sidebar', sidebar.slice(1, sidebar.length - 1));
+                }
+            } catch (e) { }
+        </script>
+
+        <!-- Set the theme before any content is loaded, prevents flash -->
+        <script type="text/javascript">
+            var theme;
+            try { theme = localStorage.getItem('mdbook-theme'); } catch(e) { }
+            if (theme === null || theme === undefined) { theme = default_theme; }
+            var html = document.querySelector('html');
+            html.classList.remove('no-js')
+            html.classList.remove('light')
+            html.classList.add(theme);
+            html.classList.add('js');
+        </script>
+
+        <!-- Hide / unhide sidebar before it is displayed -->
+        <script type="text/javascript">
+            var html = document.querySelector('html');
+            var sidebar = 'hidden';
+            if (document.body.clientWidth >= 1080) {
+                try { sidebar = localStorage.getItem('mdbook-sidebar'); } catch(e) { }
+                sidebar = sidebar || 'visible';
+            }
+            html.classList.remove('sidebar-visible');
+            html.classList.add("sidebar-" + sidebar);
+        </script>
+
+        <nav id="sidebar" class="sidebar" aria-label="Table of contents">
+            <div class="sidebar-scrollbox">
+                <ol class="chapter"><li class="chapter-item expanded affix "><li class="part-title">Introduction</li><li class="chapter-item expanded "><a href="../welcome_and_overview.html">Welcome and Overview</a></li><li class="chapter-item expanded affix "><li class="part-title">Setup</li><li class="chapter-item expanded "><a href="../setup/installation.html">Installation</a></li><li class="chapter-item expanded "><a href="../postgres.html">Using Postgres</a></li><li class="chapter-item expanded "><a href="../reverse_proxy.html">Configuring a Reverse Proxy</a></li><li class="chapter-item expanded "><a href="../turn-howto.html">Configuring a Turn Server</a></li><li class="chapter-item expanded "><a href="../delegate.html">Delegation</a></li><li class="chapter-item expanded affix "><li class="part-title">Upgrading</li><li class="chapter-item expanded "><a href="../upgrade.html">Upgrading between Synapse Versions</a></li><li class="chapter-item expanded "><a href="../MSC1711_certificates_FAQ.html">Upgrading from pre-Synapse 1.0</a></li><li class="chapter-item expanded affix "><li class="part-title">Usage</li><li class="chapter-item expanded "><a href="../federate.html">Federation</a></li><li class="chapter-item expanded "><a href="../usage/configuration/index.html">Configuration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/configuration/homeserver_sample_config.html">Homeserver Sample Config File</a></li><li class="chapter-item expanded "><a href="../usage/configuration/logging_sample_config.html">Logging Sample Config File</a></li><li class="chapter-item expanded "><a href="../structured_logging.html">Structured Logging</a></li><li class="chapter-item expanded "><a href="../usage/configuration/user_authentication/index.html">User Authentication</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single-Sign On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../openid.html">OpenID Connect</a></li><li class="chapter-item expanded "><div>SAML</div></li><li class="chapter-item expanded "><div>CAS</div></li><li class="chapter-item expanded "><a href="../sso_mapping_providers.html">SSO Mapping Providers</a></li></ol></li><li class="chapter-item expanded "><a href="../password_auth_providers.html">Password Auth Providers</a></li><li class="chapter-item expanded "><a href="../jwt.html">JSON Web Tokens</a></li></ol></li><li class="chapter-item expanded "><a href="../CAPTCHA_SETUP.html">Registration Captcha</a></li><li class="chapter-item expanded "><a href="../application_services.html">Application Services</a></li><li class="chapter-item expanded "><a href="../server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../consent_tracking.html">Consent Tracking</a></li><li class="chapter-item expanded "><a href="../url_previews.html">URL Previews</a></li><li class="chapter-item expanded "><a href="../user_directory.html">User Directory</a></li><li class="chapter-item expanded "><a href="../message_retention_policies.html">Message Retention Policies</a></li><li class="chapter-item expanded "><a href="../modules.html">Pluggable Modules</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Third Party Rules</div></li><li class="chapter-item expanded "><a href="../spam_checker.html">Spam Checker</a></li><li class="chapter-item expanded "><a href="../presence_router_module.html">Presence Router</a></li><li class="chapter-item expanded "><div>Media Storage Providers</div></li></ol></li><li class="chapter-item expanded "><a href="../workers.html">Workers</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../synctl_workers.html">Using synctl with Workers</a></li><li class="chapter-item expanded "><a href="../systemd-with-workers/index.html">Systemd</a></li></ol></li></ol></li><li class="chapter-item expanded "><a href="../usage/administration/index.html">Administration</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../usage/administration/admin_api/index.html">Admin API</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../admin_api/account_validity.html">Account Validity</a></li><li class="chapter-item expanded "><a href="../admin_api/delete_group.html">Delete Group</a></li><li class="chapter-item expanded "><a href="../admin_api/event_reports.html">Event Reports</a></li><li class="chapter-item expanded "><a href="../admin_api/media_admin_api.html">Media</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_history_api.html">Purge History</a></li><li class="chapter-item expanded "><a href="../admin_api/purge_room.html">Purge Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/register_api.html">Register Users</a></li><li class="chapter-item expanded "><a href="../admin_api/room_membership.html">Manipulate Room Membership</a></li><li class="chapter-item expanded "><a href="../admin_api/rooms.html">Rooms</a></li><li class="chapter-item expanded "><a href="../admin_api/server_notices.html">Server Notices</a></li><li class="chapter-item expanded "><a href="../admin_api/shutdown_room.html">Shutdown Room</a></li><li class="chapter-item expanded "><a href="../admin_api/statistics.html">Statistics</a></li><li class="chapter-item expanded "><a href="../admin_api/user_admin_api.html">Users</a></li><li class="chapter-item expanded "><a href="../admin_api/version_api.html">Server Version</a></li></ol></li><li class="chapter-item expanded "><a href="../manhole.html">Manhole</a></li><li class="chapter-item expanded "><a href="../metrics-howto.html">Monitoring</a></li><li class="chapter-item expanded "><a href="../usage/administration/request_log.html">Request log format</a></li><li class="chapter-item expanded "><div>Scripts</div></li></ol></li><li class="chapter-item expanded "><li class="part-title">Development</li><li class="chapter-item expanded "><a href="../development/contributing_guide.html">Contributing Guide</a></li><li class="chapter-item expanded "><a href="../code_style.html">Code Style</a></li><li class="chapter-item expanded "><a href="../development/git.html" class="active">Git Usage</a></li><li class="chapter-item expanded "><div>Testing</div></li><li class="chapter-item expanded "><a href="../opentracing.html">OpenTracing</a></li><li class="chapter-item expanded "><a href="../development/database_schema.html">Database Schemas</a></li><li class="chapter-item expanded "><div>Synapse Architecture</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../log_contexts.html">Log Contexts</a></li><li class="chapter-item expanded "><a href="../replication.html">Replication</a></li><li class="chapter-item expanded "><a href="../tcp_replication.html">TCP Replication</a></li></ol></li><li class="chapter-item expanded "><a href="../development/internal_documentation/index.html">Internal Documentation</a></li><li><ol class="section"><li class="chapter-item expanded "><div>Single Sign-On</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../development/saml.html">SAML</a></li><li class="chapter-item expanded "><a href="../development/cas.html">CAS</a></li></ol></li><li class="chapter-item expanded "><div>State Resolution</div></li><li><ol class="section"><li class="chapter-item expanded "><a href="../auth_chain_difference_algorithm.html">The Auth Chain Difference Algorithm</a></li></ol></li><li class="chapter-item expanded "><a href="../media_repository.html">Media Repository</a></li><li class="chapter-item expanded "><a href="../room_and_user_statistics.html">Room and User Statistics</a></li></ol></li><li class="chapter-item expanded "><div>Scripts</div></li><li class="chapter-item expanded affix "><li class="part-title">Other</li><li class="chapter-item expanded "><a href="../deprecation_policy.html">Dependency Deprecation Policy</a></li></ol>
+            </div>
+            <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
+        </nav>
+
+        <div id="page-wrapper" class="page-wrapper">
+
+            <div class="page">
+                
+                <div id="menu-bar-hover-placeholder"></div>
+                <div id="menu-bar" class="menu-bar sticky bordered">
+                    <div class="left-buttons">
+                        <button id="sidebar-toggle" class="icon-button" type="button" title="Toggle Table of Contents" aria-label="Toggle Table of Contents" aria-controls="sidebar">
+                            <i class="fa fa-bars"></i>
+                        </button>
+                        <button id="theme-toggle" class="icon-button" type="button" title="Change theme" aria-label="Change theme" aria-haspopup="true" aria-expanded="false" aria-controls="theme-list">
+                            <i class="fa fa-paint-brush"></i>
+                        </button>
+                        <ul id="theme-list" class="theme-popup" aria-label="Themes" role="menu">
+                            <li role="none"><button role="menuitem" class="theme" id="light">Light (default)</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="rust">Rust</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="coal">Coal</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="navy">Navy</button></li>
+                            <li role="none"><button role="menuitem" class="theme" id="ayu">Ayu</button></li>
+                        </ul>
+                        
+                        <button id="search-toggle" class="icon-button" type="button" title="Search. (Shortkey: s)" aria-label="Toggle Searchbar" aria-expanded="false" aria-keyshortcuts="S" aria-controls="searchbar">
+                            <i class="fa fa-search"></i>
+                        </button>
+                        
+                    </div>
+
+                    <h1 class="menu-title">Synapse</h1>
+
+                    <div class="right-buttons">
+                        
+                        <a href="../print.html" title="Print this book" aria-label="Print this book">
+                            <i id="print-button" class="fa fa-print"></i>
+                        </a>
+                        
+                        
+                        <a href="https://github.com/matrix-org/synapse" title="Git repository" aria-label="Git repository">
+                            <i id="git-repository-button" class="fa fa-github"></i>
+                        </a>
+                        
+                        
+                        <a href="https://github.com/matrix-org/synapse/edit/develop/docs/development/git.md" title="Suggest an edit" aria-label="Suggest an edit">
+                            <i id="git-edit-button" class="fa fa-edit"></i>
+                        </a>
+                        
+
+                    </div>
+                </div>
+
+                
+                <div id="search-wrapper" class="hidden">
+                    <form id="searchbar-outer" class="searchbar-outer">
+                        <input type="search" id="searchbar" name="searchbar" placeholder="Search this book ..." aria-controls="searchresults-outer" aria-describedby="searchresults-header">
+                    </form>
+                    <div id="searchresults-outer" class="searchresults-outer hidden">
+                        <div id="searchresults-header" class="searchresults-header"></div>
+                        <ul id="searchresults">
+                        </ul>
+                    </div>
+                </div>
+                
+
+                <!-- Apply ARIA attributes after the sidebar and the sidebar toggle button are added to the DOM -->
+                <script type="text/javascript">
+                    document.getElementById('sidebar-toggle').setAttribute('aria-expanded', sidebar === 'visible');
+                    document.getElementById('sidebar').setAttribute('aria-hidden', sidebar !== 'visible');
+                    Array.from(document.querySelectorAll('#sidebar a')).forEach(function(link) {
+                        link.setAttribute('tabIndex', sidebar === 'visible' ? 0 : -1);
+                    });
+                </script>
+
+                <div id="content" class="content">
+                    <main>
+                        <!-- Page table of contents -->
+                        <div class="sidetoc">
+                            <nav class="pagetoc"></nav>
+                        </div>
+
+                        <h1 id="some-notes-on-how-we-use-git"><a class="header" href="#some-notes-on-how-we-use-git">Some notes on how we use git</a></h1>
+<h2 id="on-keeping-the-commit-history-clean"><a class="header" href="#on-keeping-the-commit-history-clean">On keeping the commit history clean</a></h2>
+<p>In an ideal world, our git commit history would be a linear progression of
+commits each of which contains a single change building on what came
+before. Here, by way of an arbitrary example, is the top of <code>git log --graph b2dba0607</code>:</p>
+<img src="img/git/clean.png" alt="clean git graph" width="500px">
+<p>Note how the commit comment explains clearly what is changing and why. Also
+note the <em>absence</em> of merge commits, as well as the absence of commits called
+things like (to pick a few culprits):
+<a href="https://github.com/matrix-org/synapse/commit/84691da6c">“pep8”</a>, <a href="https://github.com/matrix-org/synapse/commit/474810d9d">“fix broken
+test”</a>,
+<a href="https://github.com/matrix-org/synapse/commit/c9d72e457">“oops”</a>,
+<a href="https://github.com/matrix-org/synapse/commit/836358823">“typo”</a>, or <a href="https://github.com/matrix-org/synapse/commit/707374d5d">“Who's
+the president?”</a>.</p>
+<p>There are a number of reasons why keeping a clean commit history is a good
+thing:</p>
+<ul>
+<li>
+<p>From time to time, after a change lands, it turns out to be necessary to
+revert it, or to backport it to a release branch. Those operations are
+<em>much</em> easier when the change is contained in a single commit.</p>
+</li>
+<li>
+<p>Similarly, it's much easier to answer questions like “is the fix for
+<code>/publicRooms</code> on the release branch?” if that change consists of a single
+commit.</p>
+</li>
+<li>
+<p>Likewise: “what has changed on this branch in the last week?” is much
+clearer without merges and “pep8” commits everywhere.</p>
+</li>
+<li>
+<p>Sometimes we need to figure out where a bug got introduced, or some
+behaviour changed. One way of doing that is with <code>git bisect</code>: pick an
+arbitrary commit between the known good point and the known bad point, and
+see how the code behaves. However, that strategy fails if the commit you
+chose is the middle of someone's epic branch in which they broke the world
+before putting it back together again.</p>
+</li>
+</ul>
+<p>One counterargument is that it is sometimes useful to see how a PR evolved as
+it went through review cycles. This is true, but that information is always
+available via the GitHub UI (or via the little-known <a href="https://help.github.com/en/github/collaborating-with-issues-and-pull-requests/checking-out-pull-requests-locally">refs/pull
+namespace</a>).</p>
+<p>Of course, in reality, things are more complicated than that. We have release
+branches as well as <code>develop</code> and <code>master</code>, and we deliberately merge changes
+between them. Bugs often slip through and have to be fixed later. That's all
+fine: this not a cast-iron rule which must be obeyed, but an ideal to aim
+towards.</p>
+<h2 id="merges-squashes-rebases-wtf"><a class="header" href="#merges-squashes-rebases-wtf">Merges, squashes, rebases: wtf?</a></h2>
+<p>Ok, so that's what we'd like to achieve. How do we achieve it?</p>
+<p>The TL;DR is: when you come to merge a pull request, you <em>probably</em> want to
+“squash and merge”:</p>
+<p><img src="img/git/squash.png" alt="squash and merge" />.</p>
+<p>(This applies whether you are merging your own PR, or that of another
+contributor.)</p>
+<p>“Squash and merge”<sup id="a1"><a href="#f1">1</a></sup> takes all of the changes in the
+PR, and bundles them into a single commit. GitHub gives you the opportunity to
+edit the commit message before you confirm, and normally you should do so,
+because the default will be useless (again: <code>* woops typo</code> is not a useful
+thing to keep in the historical record).</p>
+<p>The main problem with this approach comes when you have a series of pull
+requests which build on top of one another: as soon as you squash-merge the
+first PR, you'll end up with a stack of conflicts to resolve in all of the
+others. In general, it's best to avoid this situation in the first place by
+trying not to have multiple related PRs in flight at the same time. Still,
+sometimes that's not possible and doing a regular merge is the lesser evil.</p>
+<p>Another occasion in which a regular merge makes more sense is a PR where you've
+deliberately created a series of commits each of which makes sense in its own
+right. For example: <a href="https://github.com/matrix-org/synapse/pull/6837">a PR which gradually propagates a refactoring operation
+through the codebase</a>, or <a href="https://github.com/matrix-org/synapse/pull/5987">a
+PR which is the culmination of several other
+PRs</a>. In this case the ability
+to figure out when a particular change/bug was introduced could be very useful.</p>
+<p>Ultimately: <strong>this is not a hard-and-fast-rule</strong>. If in doubt, ask yourself “do
+each of the commits I am about to merge make sense in their own right”, but
+remember that we're just doing our best to balance “keeping the commit history
+clean” with other factors.</p>
+<h2 id="git-branching-model"><a class="header" href="#git-branching-model">Git branching model</a></h2>
+<p>A <a href="https://nvie.com/posts/a-successful-git-branching-model/">lot</a>
+<a href="http://scottchacon.com/2011/08/31/github-flow.html">of</a>
+<a href="https://www.endoflineblog.com/gitflow-considered-harmful">words</a> have been
+written in the past about git branching models (no really, <a href="https://martinfowler.com/articles/branching-patterns.html">a
+lot</a>). I tend to
+think the whole thing is overblown. Fundamentally, it's not that
+complicated. Here's how we do it.</p>
+<p>Let's start with a picture:</p>
+<p><img src="img/git/branches.jpg" alt="branching model" /></p>
+<p>It looks complicated, but it's really not. There's one basic rule: <em>anyone</em> is
+free to merge from <em>any</em> more-stable branch to <em>any</em> less-stable branch at
+<em>any</em> time<sup id="a2"><a href="#f2">2</a></sup>. (The principle behind this is that if a
+change is good enough for the more-stable branch, then it's also good enough go
+put in a less-stable branch.)</p>
+<p>Meanwhile, merging (or squashing, as per the above) from a less-stable to a
+more-stable branch is a deliberate action in which you want to publish a change
+or a set of changes to (some subset of) the world: for example, this happens
+when a PR is landed, or as part of our release process.</p>
+<p>So, what counts as a more- or less-stable branch? A little reflection will show
+that our active branches are ordered thus, from more-stable to less-stable:</p>
+<ul>
+<li><code>master</code> (tracks our last release).</li>
+<li><code>release-vX.Y</code> (the branch where we prepare the next release)<sup
+   id="a3"><a href="#f3">3</a></sup>.</li>
+<li>PR branches which are targeting the release.</li>
+<li><code>develop</code> (our &quot;mainline&quot; branch containing our bleeding-edge).</li>
+<li>regular PR branches.</li>
+</ul>
+<p>The corollary is: if you have a bugfix that needs to land in both
+<code>release-vX.Y</code> <em>and</em> <code>develop</code>, then you should base your PR on
+<code>release-vX.Y</code>, get it merged there, and then merge from <code>release-vX.Y</code> to
+<code>develop</code>. (If a fix lands in <code>develop</code> and we later need it in a
+release-branch, we can of course cherry-pick it, but landing it in the release
+branch first helps reduce the chance of annoying conflicts.)</p>
+<hr />
+<p><b id="f1">[1]</b>: “Squash and merge” is GitHub's term for this
+operation. Given that there is no merge involved, I'm not convinced it's the
+most intuitive name. <a href="#a1">^</a></p>
+<p><b id="f2">[2]</b>: Well, anyone with commit access.<a href="#a2">^</a></p>
+<p><b id="f3">[3]</b>: Very, very occasionally (I think this has happened once in
+the history of Synapse), we've had two releases in flight at once. Obviously,
+<code>release-v1.2</code> is more-stable than <code>release-v1.3</code>. <a href="#a3">^</a></p>
+
+                    </main>
+
+                    <nav class="nav-wrapper" aria-label="Page navigation">
+                        <!-- Mobile navigation buttons -->
+                        
+                            <a rel="prev" href="../code_style.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <i class="fa fa-angle-left"></i>
+                            </a>
+                        
+
+                        
+                            <a rel="next" href="../opentracing.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <i class="fa fa-angle-right"></i>
+                            </a>
+                        
+
+                        <div style="clear: both"></div>
+                    </nav>
+                </div>
+            </div>
+
+            <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                
+                    <a rel="prev" href="../code_style.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <i class="fa fa-angle-left"></i>
+                    </a>
+                
+
+                
+                    <a rel="next" href="../opentracing.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <i class="fa fa-angle-right"></i>
+                    </a>
+                
+            </nav>
+
+        </div>
+
+        
+
+        
+
+        
+
+        
+        <script type="text/javascript">
+            window.playground_copyable = true;
+        </script>
+        
+
+        
+
+        
+        <script src="../elasticlunr.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../mark.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../searcher.js" type="text/javascript" charset="utf-8"></script>
+        
+
+        <script src="../clipboard.min.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../highlight.js" type="text/javascript" charset="utf-8"></script>
+        <script src="../book.js" type="text/javascript" charset="utf-8"></script>
+
+        <!-- Custom JS scripts -->
+        
+        <script type="text/javascript" src="../docs/website_files/table-of-contents.js"></script>
+        
+
+        
+
+    </body>
+</html>
