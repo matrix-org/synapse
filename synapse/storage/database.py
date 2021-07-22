@@ -1096,7 +1096,7 @@ class DatabasePool:
         insertion_values: Optional[Dict[str, Any]] = None,
     ) -> bool:
         """
-        Use the native UPSERT functionality in recent PostgreSQL versions.
+        Use the native UPSERT functionality in PostgreSQL.
 
         Args:
             table: The table to upsert into
