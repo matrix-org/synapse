@@ -140,7 +140,8 @@ class TransactionWorkerStore(CacheInvalidationWorkerStore):
                 "transaction_id": transaction_id,
                 "origin": origin,
             },
-            values={
+            values={},
+            insertion_values={
                 "response_code": code,
                 "response_json": db_binary_type(encode_canonical_json(response_dict)),
                 "ts": self._clock.time_msec(),
