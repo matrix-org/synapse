@@ -139,7 +139,7 @@ class EventAuthHandler:
         # Return the chosen if they can issue invites.
         user_power_level = users.get(chosen_user, users_default_level)
         if chosen_user and user_power_level >= invite_level:
-            logger.error(
+            logger.debug(
                 "Found a user who can issue invites  %s with power level %d >= invite level %d",
                 chosen_user,
                 user_power_level,
