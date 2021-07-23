@@ -88,6 +88,15 @@ process, for example:
 
 # Upgrading to v1.39.0
 
+## Deprecation of `additional_resources`
+
+The `additional_resources` section of the listener configuration is deprecated in favour
+of the new modules system introduced in Synapse v1.37.0. Authors of modules using this
+configuration can refer to [this documentation](https://matrix-org.github.io/synapse/latest/modules.html#registering-a-web-resource)
+for more information about how to register a web resource from within their modules.
+
+We plan to remove support for the `additional_resources` configuration in September 2021.
+
 ## Deprecation of the current third-party rules module interface
 
 The current third-party rules module interface is deprecated in favour of the new generic

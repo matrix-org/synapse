@@ -1,0 +1,1 @@
+The `additional_resources` section of the listener configuration is deprecated in favour of the new module interface introduced in Synapse v1.37.0. See [the upgrade notes](https://matrix-org.github.io/synapse/latest/upgrade.html#deprecation-of-additional_resources) for more information.
