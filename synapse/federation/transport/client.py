@@ -1183,7 +1183,8 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
             prefix + "auth_chain.item",
         )
         self._coro_event = ijson.kvitems_coro(
-            _event_parser(self._response.event_dict), prefix + "event"
+            _event_parser(self._response.event_dict),
+            prefix + "org.matrix.msc3083.v2.event",
         )
 
     def write(self, data: bytes) -> int:
