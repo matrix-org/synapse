@@ -13,6 +13,15 @@ Internal Changes
 - Move docker image build to Github Actions. ([\#10416](https://github.com/matrix-org/synapse/issues/10416))
 
 
+Synapse 1.38.1 (2021-07-22)
+===========================
+
+Bugfixes
+--------
+
+- Always include `device_one_time_keys_count` key in `/sync` response to work around a bug in Element Android that broke encryption for new devices. ([\#10457](https://github.com/matrix-org/synapse/issues/10457))
+
+
 Synapse 1.39.0rc1 (2021-07-20)
 ==============================
 
