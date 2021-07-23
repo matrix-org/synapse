@@ -633,7 +633,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
 
-    def _test_list_query_parameter(self, valid):
+    def _test_list_query_parameter(self, valid: str):
         """Helper used to test both valid=true and valid=false."""
         # Create 2 valid and 2 invalid tokens.
         now = self.hs.get_clock().time_msec()
