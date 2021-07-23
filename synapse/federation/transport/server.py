@@ -984,7 +984,7 @@ class PublicRoomList(BaseFederationServlet):
         limit = parse_integer_from_args(query, "limit", 0)
         since_token = parse_string_from_args(query, "since", None)
         include_all_networks = parse_boolean_from_args(
-            query, "include_all_networks", False
+            query, "include_all_networks", default=False
         )
         third_party_instance_id = parse_string_from_args(
             query, "third_party_instance_id", None
@@ -1013,7 +1013,7 @@ class PublicRoomList(BaseFederationServlet):
         if not self.allow_access:
             raise FederationDeniedError(origin)
 
-        limit = int(content.get("limit", 100))  # type: Optional[int]
+        limit: Optional[int] = int(content.get("limit", 100))
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
@@ -1908,16 +1908,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
         suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
         max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
 
-        exclude_rooms = []
-        if b"exclude_rooms" in query:
-            try:
-                exclude_rooms = [
-                    room_id.decode("ascii") for room_id in query[b"exclude_rooms"]
-                ]
-            except Exception:
-                raise SynapseError(
-                    400, "Bad query parameter for exclude_rooms", Codes.INVALID_PARAM
-                )
+        exclude_rooms = parse_strings_from_args(query, "exclude_rooms", default=[])
 
         return 200, await self.handler.federation_space_summary(
             origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
@@ -1991,7 +1982,7 @@ class RoomComplexityServlet(BaseFederationServlet):
         return 200, complexity
 
 
-FEDERATION_SERVLET_CLASSES = (
+FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationSendServlet,
     FederationEventServlet,
     FederationStateV1Servlet,
@@ -2019,15 +2010,13 @@ FEDERATION_SERVLET_CLASSES = (
     FederationSpaceSummaryServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
-)  # type: Tuple[Type[BaseFederationServlet], ...]
+)
 
-OPENID_SERVLET_CLASSES = (
-    OpenIdUserInfo,
-)  # type: Tuple[Type[BaseFederationServlet], ...]
+OPENID_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (OpenIdUserInfo,)
 
-ROOM_LIST_CLASSES = (PublicRoomList,)  # type: Tuple[Type[PublicRoomList], ...]
+ROOM_LIST_CLASSES: Tuple[Type[PublicRoomList], ...] = (PublicRoomList,)
 
-GROUP_SERVER_SERVLET_CLASSES = (
+GROUP_SERVER_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationGroupsProfileServlet,
     FederationGroupsSummaryServlet,
     FederationGroupsRoomsServlet,
@@ -2046,19 +2035,19 @@ GROUP_SERVER_SERVLET_CLASSES = (
     FederationGroupsAddRoomsServlet,
     FederationGroupsAddRoomsConfigServlet,
     FederationGroupsSettingJoinPolicyServlet,
-)  # type: Tuple[Type[BaseFederationServlet], ...]
+)
 
 
-GROUP_LOCAL_SERVLET_CLASSES = (
+GROUP_LOCAL_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationGroupsLocalInviteServlet,
     FederationGroupsRemoveLocalUserServlet,
     FederationGroupsBulkPublicisedServlet,
-)  # type: Tuple[Type[BaseFederationServlet], ...]
+)
 
 
-GROUP_ATTESTATION_SERVLET_CLASSES = (
+GROUP_ATTESTATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationGroupsRenewAttestaionServlet,
-)  # type: Tuple[Type[BaseFederationServlet], ...]
+)
 
 
 DEFAULT_SERVLET_GROUPS = (

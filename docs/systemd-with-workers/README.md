@@ -14,7 +14,7 @@ contains an example configuration for the `federation_reader` worker.
 
 ## Synapse configuration files
 
-See [workers.md](../workers.md) for information on how to set up the
+See [the worker documentation](../workers.md) for information on how to set up the
 configuration files and reverse-proxy correctly.
 Below is a sample `federation_reader` worker configuration file.
 ```yaml

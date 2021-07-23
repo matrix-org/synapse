@@ -169,12 +169,12 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
-        self._cache = ExpiringCache(
+        self._cache: ExpiringCache[str, ObservableDeferred] = ExpiringCache(
             cache_name="url_previews",
             clock=self.clock,
             # don't spider URLs more often than once an hour
             expiry_ms=ONE_HOUR,
-        )  # type: ExpiringCache[str, ObservableDeferred]
+        )
 
         if self._worker_run_media_background_jobs:
             self._cleaner_loop = self.clock.looping_call(
@@ -186,15 +186,11 @@ class PreviewUrlResource(DirectServeJsonResource):
         respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
-        url = parse_string(request, "url")
-        if b"ts" in request.args:
-            ts = parse_integer(request, "ts")
-        else:
+        url = parse_string(request, "url", required=True)
+        ts = parse_integer(request, "ts")
+        if ts is None:
             ts = self.clock.time_msec()
 
         # XXX: we could move this into _do_preview if we wanted.
@@ -460,7 +456,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         # If this URL can be accessed via oEmbed, use that instead.
-        url_to_download = url  # type: Optional[str]
+        url_to_download: Optional[str] = url
         oembed_url = self._get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
@@ -788,7 +784,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     # "og:video:height" : "720",
     # "og:video:secure_url": "https://www.youtube.com/v/LXDBoHyjmtw?version=3",
 
-    og = {}  # type: Dict[str, Optional[str]]
+    og: Dict[str, Optional[str]] = {}
     for tag in tree.xpath("//*/meta[starts-with(@property, 'og:')]"):
         if "content" in tag.attrib:
             # if we've got more than 50 tags, someone is taking the piss

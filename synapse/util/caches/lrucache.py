@@ -90,8 +90,7 @@ def enumerate_leaves(node, depth):
         yield node
     else:
         for n in node.values():
-            for m in enumerate_leaves(n, depth - 1):
-                yield m
+            yield from enumerate_leaves(n, depth - 1)
 
 
 P = TypeVar("P")
@@ -226,7 +225,7 @@ class _Node:
         # footprint down. Storing `None` is free as its a singleton, while empty
         # lists are 56 bytes (and empty sets are 216 bytes, if we did the naive
         # thing and used sets).
-        self.callbacks = None  # type: Optional[List[Callable[[], None]]]
+        self.callbacks: Optional[List[Callable[[], None]]] = None
 
         self.add_callbacks(callbacks)
 
@@ -362,15 +361,15 @@ class LruCache(Generic[KT, VT]):
 
         # register_cache might call our "set_cache_factor" callback; there's nothing to
         # do yet when we get resized.
-        self._on_resize = None  # type: Optional[Callable[[],None]]
+        self._on_resize: Optional[Callable[[], None]] = None
 
         if cache_name is not None:
-            metrics = register_cache(
+            metrics: Optional[CacheMetric] = register_cache(
                 "lru_cache",
                 cache_name,
                 self,
                 collect_callback=metrics_collection_callback,
-            )  # type: Optional[CacheMetric]
+            )
         else:
             metrics = None
 
