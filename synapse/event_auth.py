@@ -189,7 +189,7 @@ def check(
     # https://github.com/vector-im/vector-web/issues/1208 hopefully
     if event.type == EventTypes.ThirdPartyInvite:
         user_level = get_user_power_level(event.user_id, auth_events)
-        invite_level = _get_named_level(auth_events, "invite", 0)
+        invite_level = get_named_level(auth_events, "invite", 0)
 
         if user_level < invite_level:
             raise AuthError(403, "You don't have permission to invite users")
@@ -297,8 +297,8 @@ def _is_membership_change_allowed(
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
 
-    invite_level = _get_named_level(auth_events, "invite", 0)
-    ban_level = _get_named_level(auth_events, "ban", 50)
+    invite_level = get_named_level(auth_events, "invite", 0)
+    ban_level = get_named_level(auth_events, "ban", 50)
 
     logger.debug(
         "_is_membership_change_allowed: %s",
@@ -404,7 +404,7 @@ def _is_membership_change_allowed(
         if target_banned and user_level < ban_level:
             raise AuthError(403, "You cannot unban user %s." % (target_user_id,))
         elif target_user_id != event.user_id:
-            kick_level = _get_named_level(auth_events, "kick", 50)
+            kick_level = get_named_level(auth_events, "kick", 50)
 
             if user_level < kick_level or user_level <= target_level:
                 raise AuthError(403, "You cannot kick user %s." % target_user_id)
@@ -480,7 +480,7 @@ def get_send_level(
 
 
 def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
-    power_levels_event = _get_power_level_event(auth_events)
+    power_levels_event = get_power_level_event(auth_events)
 
     send_level = get_send_level(event.type, event.get("state_key"), power_levels_event)
     user_level = get_user_power_level(event.user_id, auth_events)
@@ -520,7 +520,7 @@ def check_redaction(
     """
     user_level = get_user_power_level(event.user_id, auth_events)
 
-    redact_level = _get_named_level(auth_events, "redact", 50)
+    redact_level = get_named_level(auth_events, "redact", 50)
 
     if user_level >= redact_level:
         return False
@@ -635,7 +635,7 @@ def _check_power_levels(
             )
 
 
-def _get_power_level_event(auth_events: StateMap[EventBase]) -> Optional[EventBase]:
+def get_power_level_event(auth_events: StateMap[EventBase]) -> Optional[EventBase]:
     return auth_events.get((EventTypes.PowerLevels, ""))
 
 
@@ -651,7 +651,7 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
     Returns:
         the user's power level in this room.
     """
-    power_level_event = _get_power_level_event(auth_events)
+    power_level_event = get_power_level_event(auth_events)
     if power_level_event:
         level = power_level_event.content.get("users", {}).get(user_id)
         if not level:
@@ -675,68 +675,8 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
             return 0
 
 
-def get_users_which_can_issue_invite(auth_events: StateMap[EventBase]) -> List[str]:
-    """
-    Return the list of users which can issue invites.
-
-    This is done by exploring the joined users and comparing their power levels
-    to the necessyar power level to issue an invite.
-
-    Args:
-        auth_events: state in force at this point in the room
-
-    Returns:
-        The users which can issue invites.
-    """
-    invite_level = _get_named_level(auth_events, "invite", 0)
-    users_default_level = _get_named_level(auth_events, "users_default", 0)
-    power_level_event = _get_power_level_event(auth_events)
-
-    # Custom power-levels for users.
-    if power_level_event:
-        users = power_level_event.content.get("users", {})
-    else:
-        users = {}
-
-    result = []
-
-    # Check which members are able to invite by ensuring they're joined and have
-    # the necessary power level.
-    for (event_type, state_key), event in auth_events.items():
-        if event_type != EventTypes.Member:
-            continue
-
-        if event.membership != Membership.JOIN:
-            continue
-
-        # Check if the user has a custom power level.
-        if users.get(state_key, users_default_level) >= invite_level:
-            result.append(state_key)
-
-    return result
-
-
-def get_servers_from_users(users: List[str]) -> Set[str]:
-    """
-    Resolve a list of users into their servers.
-
-    Args:
-        users: A list of users.
-
-    Returns:
-        A set of servers.
-    """
-    servers = set()
-    for user in users:
-        try:
-            servers.add(get_domain_from_id(user))
-        except SynapseError:
-            pass
-    return servers
-
-
-def _get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:
-    power_level_event = _get_power_level_event(auth_events)
+def get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:
+    power_level_event = get_power_level_event(auth_events)
 
     if not power_level_event:
         return default

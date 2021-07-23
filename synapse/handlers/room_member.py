@@ -16,7 +16,7 @@ import abc
 import logging
 import random
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
 
 from synapse import types
 from synapse.api.constants import AccountDataTypes, EventTypes, Membership
@@ -28,7 +28,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.event_auth import get_servers_from_users, get_users_which_can_issue_invite
+from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.types import (
@@ -1613,3 +1613,63 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         if membership:
             await self.store.forget(user_id, room_id)
+
+
+def get_users_which_can_issue_invite(auth_events: StateMap[EventBase]) -> List[str]:
+    """
+    Return the list of users which can issue invites.
+
+    This is done by exploring the joined users and comparing their power levels
+    to the necessyar power level to issue an invite.
+
+    Args:
+        auth_events: state in force at this point in the room
+
+    Returns:
+        The users which can issue invites.
+    """
+    invite_level = get_named_level(auth_events, "invite", 0)
+    users_default_level = get_named_level(auth_events, "users_default", 0)
+    power_level_event = get_power_level_event(auth_events)
+
+    # Custom power-levels for users.
+    if power_level_event:
+        users = power_level_event.content.get("users", {})
+    else:
+        users = {}
+
+    result = []
+
+    # Check which members are able to invite by ensuring they're joined and have
+    # the necessary power level.
+    for (event_type, state_key), event in auth_events.items():
+        if event_type != EventTypes.Member:
+            continue
+
+        if event.membership != Membership.JOIN:
+            continue
+
+        # Check if the user has a custom power level.
+        if users.get(state_key, users_default_level) >= invite_level:
+            result.append(state_key)
+
+    return result
+
+
+def get_servers_from_users(users: List[str]) -> Set[str]:
+    """
+    Resolve a list of users into their servers.
+
+    Args:
+        users: A list of users.
+
+    Returns:
+        A set of servers.
+    """
+    servers = set()
+    for user in users:
+        try:
+            servers.add(get_domain_from_id(user))
+        except SynapseError:
+            pass
+    return servers
