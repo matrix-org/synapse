@@ -823,7 +823,9 @@ def get_public_keys(invite_event: EventBase) -> List[Dict[str, Any]]:
     return public_keys
 
 
-def auth_types_for_event(event: Union[EventBase, EventBuilder]) -> Set[Tuple[str, str]]:
+def auth_types_for_event(
+    room_version: RoomVersion, event: Union[EventBase, EventBuilder]
+) -> Set[Tuple[str, str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what
     would actually be required depending on the full state of the room.
@@ -855,8 +857,7 @@ def auth_types_for_event(event: Union[EventBase, EventBuilder]) -> Set[Tuple[str
                 )
                 auth_types.add(key)
 
-        # TODO Should this be limited to only MSC3083 rooms.
-        if membership == Membership.JOIN:
+        if room_version.msc3083_join_rules and membership == Membership.JOIN:
             if "join_authorised_via_users_server" in event.content:
                 key = (
                     EventTypes.Member,

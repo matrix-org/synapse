@@ -2507,7 +2507,7 @@ class FederationHandler(BaseHandler):
         )
 
         # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(event)
+        auth_types = auth_types_for_event(room_version_obj, event)
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]

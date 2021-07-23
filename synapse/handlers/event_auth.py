@@ -85,9 +85,10 @@ class EventAuthHandler:
         # introduce undesirable "state reset" behaviour.
         #
         # All of which sounds a bit tricky so we don't bother for now.
-
         auth_ids = []
-        for etype, state_key in event_auth.auth_types_for_event(event):
+        for etype, state_key in event_auth.auth_types_for_event(
+            event.room_version, event
+        ):
             auth_ev_id = current_state_ids.get((etype, state_key))
             if auth_ev_id:
                 auth_ids.append(auth_ev_id)

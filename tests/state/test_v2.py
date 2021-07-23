@@ -496,7 +496,7 @@ class StateTestCase(unittest.TestCase):
             if fake_event.state_key is not None:
                 state_after[(fake_event.type, fake_event.state_key)] = event_id
 
-            auth_types = set(auth_types_for_event(fake_event))
+            auth_types = set(auth_types_for_event(RoomVersions.V6, fake_event))
 
             auth_events = []
             for key in auth_types:
