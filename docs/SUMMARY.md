@@ -69,6 +69,7 @@
   - [Code Style](code_style.md)
   - [Git Usage](dev/git.md)
   - [Testing]()
+  - [Developer FAQ](development/faq.md)
   - [OpenTracing](opentracing.md)
   - [Database Schemas](development/database_schema.md)
   - [Synapse Architecture]()
