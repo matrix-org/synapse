@@ -83,12 +83,6 @@ def run():
     if current_version.pre:
         # If the current version is an RC we don't need to bump any of the
         # version numbers (other than the RC number).
-        base_version = "{}.{}.{}".format(
-            current_version.major,
-            current_version.minor,
-            current_version.micro,
-        )
-
         if rc:
             new_version = "{}.{}.{}rc{}".format(
                 current_version.major,
@@ -97,38 +91,43 @@ def run():
                 current_version.pre[1] + 1,
             )
         else:
-            new_version = base_version
+            new_version = "{}.{}.{}".format(
+                current_version.major,
+                current_version.minor,
+                current_version.micro,
+            )
     else:
-        # If this is a new release cycle then we need to know if its a major
-        # version bump or a hotfix.
+        # If this is a new release cycle then we need to know if it's a minor
+        # or a patch version bump.
         release_type = click.prompt(
             "Release type",
-            type=click.Choice(("major", "hotfix")),
+            type=click.Choice(("minor", "patch")),
             show_choices=True,
-            default="major",
+            default="minor",
         )
 
-        if release_type == "major":
-            base_version = new_version = "{}.{}.{}".format(
-                current_version.major,
-                current_version.minor + 1,
-                0,
-            )
+        if release_type == "minor":
             if rc:
                 new_version = "{}.{}.{}rc1".format(
                     current_version.major,
                     current_version.minor + 1,
                     0,
                 )
-
+            else:
+                new_version = "{}.{}.{}".format(
+                    current_version.major,
+                    current_version.minor + 1,
+                    0,
+                )
         else:
-            base_version = new_version = "{}.{}.{}".format(
-                current_version.major,
-                current_version.minor,
-                current_version.micro + 1,
-            )
             if rc:
                 new_version = "{}.{}.{}rc1".format(
+                    current_version.major,
+                    current_version.minor,
+                    current_version.micro + 1,
+                )
+            else:
+                new_version = "{}.{}.{}".format(
                     current_version.major,
                     current_version.minor,
                     current_version.micro + 1,
@@ -139,7 +138,10 @@ def run():
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    release_branch_name = f"release-v{base_version}"
+    parsed_new_version = version.parse(new_version)
+    release_branch_name = (
+        f"release-v{parsed_new_version.major}.{parsed_new_version.minor}"
+    )
     release_branch = find_ref(repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():
@@ -153,7 +155,7 @@ def run():
         # release type.
         if current_version.is_prerelease:
             default = release_branch_name
-        elif release_type == "major":
+        elif release_type == "minor":
             default = "develop"
         else:
             default = "master"

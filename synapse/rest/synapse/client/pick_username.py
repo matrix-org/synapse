@@ -118,9 +118,9 @@ class AccountDetailsResource(DirectServeHtmlResource):
             use_display_name = parse_boolean(request, "use_display_name", default=False)
 
             try:
-                emails_to_use = [
+                emails_to_use: List[str] = [
                     val.decode("utf-8") for val in request.args.get(b"use_email", [])
-                ]  # type: List[str]
+                ]
             except ValueError:
                 raise SynapseError(400, "Query parameter use_email must be utf-8")
         except SynapseError as e:

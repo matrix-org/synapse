@@ -81,7 +81,7 @@ def return_json_error(f: failure.Failure, request: SynapseRequest) -> None:
 
     if f.check(SynapseError):
         # mypy doesn't understand that f.check asserts the type.
-        exc = f.value  # type: SynapseError  # type: ignore
+        exc: SynapseError = f.value  # type: ignore
         error_code = exc.code
         error_dict = exc.error_dict()
 
@@ -132,7 +132,7 @@ def return_html_error(
     """
     if f.check(CodeMessageException):
         # mypy doesn't understand that f.check asserts the type.
-        cme = f.value  # type: CodeMessageException  # type: ignore
+        cme: CodeMessageException = f.value  # type: ignore
         code = cme.code
         msg = cme.msg
 
@@ -404,7 +404,7 @@ class JsonResource(DirectServeJsonResource):
             key word arguments to pass to the callback
         """
         # At this point the path must be bytes.
-        request_path_bytes = request.path  # type: bytes  # type: ignore
+        request_path_bytes: bytes = request.path  # type: ignore
         request_path = request_path_bytes.decode("ascii")
         # Treat HEAD requests as GET requests.
         request_method = request.method
@@ -557,7 +557,7 @@ class _ByteProducer:
         request: Request,
         iterator: Iterator[bytes],
     ):
-        self._request = request  # type: Optional[Request]
+        self._request: Optional[Request] = request
         self._iterator = iterator
         self._paused = False
 
@@ -728,7 +728,7 @@ def set_cors_headers(request: Request):
     )
     request.setHeader(
         b"Access-Control-Allow-Headers",
-        b"Origin, X-Requested-With, Content-Type, Accept, Authorization, Date",
+        b"X-Requested-With, Content-Type, Authorization, Date",
     )
 
 

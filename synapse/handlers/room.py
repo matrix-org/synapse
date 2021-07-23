@@ -32,7 +32,14 @@ from synapse.api.constants import (
     RoomCreationPreset,
     RoomEncryptionAlgorithms,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    LimitExceededError,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+)
 from synapse.api.filtering import Filter
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
@@ -76,10 +83,11 @@ class RoomCreationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.room_member_handler = hs.get_room_member_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self.config = hs.config
 
         # Room state based off defined presets
-        self._presets_dict = {
+        self._presets_dict: Dict[str, Dict[str, Any]] = {
             RoomCreationPreset.PRIVATE_CHAT: {
                 "join_rules": JoinRules.INVITE,
                 "history_visibility": HistoryVisibility.SHARED,
@@ -101,7 +109,7 @@ class RoomCreationHandler(BaseHandler):
                 "guest_can_join": False,
                 "power_level_content_override": {},
             },
-        }  # type: Dict[str, Dict[str, Any]]
+        }
 
         # Modify presets to selectively enable encryption by default per homeserver config
         for preset_name, preset_config in self._presets_dict.items():
@@ -119,16 +127,12 @@ class RoomCreationHandler(BaseHandler):
         # If a user tries to update the same room multiple times in quick
         # succession, only process the first attempt and return its result to
         # subsequent requests
-        self._upgrade_response_cache = ResponseCache(
+        self._upgrade_response_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
-        )  # type: ResponseCache[Tuple[str, str]]
+        )
         self._server_notices_mxid = hs.config.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
-
-        self._invite_burst_count = (
-            hs.config.ratelimiting.rc_invites_per_room.burst_count
-        )
 
     async def upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
@@ -223,7 +227,7 @@ class RoomCreationHandler(BaseHandler):
             },
         )
         old_room_version = await self.store.get_room_version_id(old_room_id)
-        await self.auth.check_from_context(
+        await self._event_auth_handler.check_from_context(
             old_room_version, tombstone_event, tombstone_context
         )
 
@@ -373,10 +377,10 @@ class RoomCreationHandler(BaseHandler):
         if not await self.spam_checker.user_may_create_room(user_id):
             raise SynapseError(403, "You are not permitted to create rooms")
 
-        creation_content = {
+        creation_content: JsonDict = {
             "room_version": new_room_version.identifier,
             "predecessor": {"room_id": old_room_id, "event_id": tombstone_event_id},
-        }  # type: JsonDict
+        }
 
         # Check if old room was non-federatable
 
@@ -614,15 +618,11 @@ class RoomCreationHandler(BaseHandler):
         else:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
 
-        # Check whether the third party rules allows/changes the room create
-        # request.
-        event_allowed = await self.third_party_event_rules.on_create_room(
+        # Let the third party rules modify the room creation config if needed, or abort
+        # the room creation entirely with an exception.
+        await self.third_party_event_rules.on_create_room(
             requester, config, is_requester_admin=is_requester_admin
         )
-        if not event_allowed:
-            raise SynapseError(
-                403, "You are not permitted to create rooms", Codes.FORBIDDEN
-            )
 
         if not is_requester_admin and not await self.spam_checker.user_may_create_room(
             user_id
@@ -676,8 +676,18 @@ class RoomCreationHandler(BaseHandler):
             invite_3pid_list = []
             invite_list = []
 
-        if len(invite_list) + len(invite_3pid_list) > self._invite_burst_count:
-            raise SynapseError(400, "Cannot invite so many users at once")
+        if invite_list or invite_3pid_list:
+            try:
+                # If there are invites in the request, see if the ratelimiting settings
+                # allow that number of invites to be sent from the current user.
+                await self.room_member_handler.ratelimit_multiple_invites(
+                    requester,
+                    room_id=None,
+                    n_invites=len(invite_list) + len(invite_3pid_list),
+                    update=False,
+                )
+            except LimitExceededError:
+                raise SynapseError(400, "Cannot invite so many users at once")
 
         await self.event_creation_handler.assert_accepted_privacy_policy(requester)
 
@@ -922,7 +932,7 @@ class RoomCreationHandler(BaseHandler):
                 etype=EventTypes.PowerLevels, content=pl_content
             )
         else:
-            power_level_content = {
+            power_level_content: JsonDict = {
                 "users": {creator_id: 100},
                 "users_default": 0,
                 "events": {
@@ -941,7 +951,7 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 50,
-            }  # type: JsonDict
+            }
 
             if config["original_invitees_have_ops"]:
                 for invitee in invite_list:
@@ -1327,7 +1337,7 @@ class RoomShutdownHandler:
             new_room_id = None
             logger.info("Shutting down room %r", room_id)
 
-        users = await self.state.get_current_users_in_room(room_id)
+        users = await self.store.get_users_in_room(room_id)
         kicked_users = []
         failed_to_kick_users = []
         for user_id in users:

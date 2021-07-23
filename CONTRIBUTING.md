@@ -173,11 +173,18 @@ source ./env/bin/activate
 trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_invite
 ```
 
-If your tests fail, you may wish to look at the logs:
+If your tests fail, you may wish to look at the logs (the default log level is `ERROR`):
 
 ```sh
 less _trial_temp/test.log
 ```
+
+To increase the log level for the tests, set `SYNAPSE_TEST_LOG_LEVEL`:
+
+```sh
+SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
+```
+
 
 ## Run the integration tests.
 
@@ -385,7 +392,7 @@ By now, you know the drill!
 # Notes for maintainers on merging PRs etc
 
 There are some notes for those with commit access to the project on how we
-manage git [here](docs/dev/git.md).
+manage git [here](docs/development/git.md).
 
 # Conclusion
 

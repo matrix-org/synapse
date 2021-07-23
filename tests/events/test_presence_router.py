@@ -152,7 +152,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         )
         self.assertEqual(len(presence_updates), 1)
 
-        presence_update = presence_updates[0]  # type: UserPresenceState
+        presence_update: UserPresenceState = presence_updates[0]
         self.assertEqual(presence_update.user_id, self.other_user_one_id)
         self.assertEqual(presence_update.state, "online")
         self.assertEqual(presence_update.status_msg, "boop")
@@ -274,7 +274,7 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         presence_updates, _ = sync_presence(self, self.other_user_id)
         self.assertEqual(len(presence_updates), 1)
 
-        presence_update = presence_updates[0]  # type: UserPresenceState
+        presence_update: UserPresenceState = presence_updates[0]
         self.assertEqual(presence_update.user_id, self.other_user_id)
         self.assertEqual(presence_update.state, "online")
         self.assertEqual(presence_update.status_msg, "I'm online!")
@@ -284,6 +284,10 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
         self.assertEqual(len(presence_updates), 3)
         presence_updates, _ = sync_presence(self, self.presence_receiving_user_two_id)
         self.assertEqual(len(presence_updates), 3)
+
+        # We stagger sending of presence, so we need to wait a bit for them to
+        # get sent out.
+        self.reactor.advance(60)
 
         # Test that sending to a remote user works
         remote_user_id = "@far_away_person:island"
@@ -301,19 +305,30 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
             self.module_api.send_local_online_presence_to([remote_user_id])
         )
 
+        # We stagger sending of presence, so we need to wait a bit for them to
+        # get sent out.
+        self.reactor.advance(60)
+
         # Check that the expected presence updates were sent
-        expected_users = [
+        # We explicitly compare using sets as we expect that calling
+        # module_api.send_local_online_presence_to will create a presence
+        # update that is a duplicate of the specified user's current presence.
+        # These are sent to clients and will be picked up below, thus we use a
+        # set to deduplicate. We're just interested that non-offline updates were
+        # sent out for each user ID.
+        expected_users = {
             self.other_user_id,
             self.presence_receiving_user_one_id,
             self.presence_receiving_user_two_id,
-        ]
+        }
+        found_users = set()
 
         calls = (
             self.hs.get_federation_transport_client().send_transaction.call_args_list
         )
         for call in calls:
             call_args = call[0]
-            federation_transaction = call_args[0]  # type: Transaction
+            federation_transaction: Transaction = call_args[0]
 
             # Get the sent EDUs in this transaction
             edus = federation_transaction.get_dict()["edus"]
@@ -326,12 +341,12 @@ class PresenceRouterTestCase(FederatingHomeserverTestCase):
                 # EDUs can contain multiple presence updates
                 for presence_update in edu["content"]["push"]:
                     # Check for presence updates that contain the user IDs we're after
-                    expected_users.remove(presence_update["user_id"])
+                    found_users.add(presence_update["user_id"])
 
                     # Ensure that no offline states are being sent out
                     self.assertNotEqual(presence_update["presence"], "offline")
 
-        self.assertEqual(len(expected_users), 0)
+        self.assertEqual(found_users, expected_users)
 
 
 def send_presence_update(

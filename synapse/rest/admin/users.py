@@ -62,6 +62,7 @@ class UsersRestServletV2(RestServlet):
     The parameter `name` can be used to filter by user id or display name.
     The parameter `guests` can be used to exclude guest users.
     The parameter `deactivated` can be used to include deactivated users.
+    The parameter `order_by` can be used to order the result.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -90,8 +91,8 @@ class UsersRestServletV2(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        user_id = parse_string(request, "user_id", default=None)
-        name = parse_string(request, "name", default=None)
+        user_id = parse_string(request, "user_id")
+        name = parse_string(request, "name")
         guests = parse_boolean(request, "guests", default=True)
         deactivated = parse_boolean(request, "deactivated", default=False)
 
@@ -108,6 +109,7 @@ class UsersRestServletV2(RestServlet):
                 UserSortOrder.USER_TYPE.value,
                 UserSortOrder.AVATAR_URL.value,
                 UserSortOrder.SHADOW_BANNED.value,
+                UserSortOrder.CREATION_TS.value,
             ),
         )
 
@@ -357,7 +359,7 @@ class UserRegisterServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.auth_handler = hs.get_auth_handler()
         self.reactor = hs.get_reactor()
-        self.nonces = {}  # type: Dict[str, int]
+        self.nonces: Dict[str, int] = {}
         self.hs = hs
 
     def _clear_old_nonces(self):
@@ -478,13 +480,12 @@ class UserRegisterServlet(RestServlet):
 
 class WhoisRestServlet(RestServlet):
     path_regex = "/whois/(?P<user_id>[^/]*)$"
-    PATTERNS = (
-        admin_patterns(path_regex)
-        +
+    PATTERNS = [
+        *admin_patterns(path_regex),
         # URL for spec reason
         # https://matrix.org/docs/spec/client_server/r0.6.1#get-matrix-client-r0-admin-whois-userid
-        client_patterns("/admin" + path_regex, v1=True)
-    )
+        *client_patterns("/admin" + path_regex, v1=True),
+    ]
 
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -553,11 +554,7 @@ class DeactivateAccountRestServlet(RestServlet):
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = admin_patterns("/account_validity/validity$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
@@ -565,16 +562,24 @@ class AccountValidityRenewServlet(RestServlet):
     async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
-        body = parse_json_object_from_request(request)
+        if self.account_activity_handler.on_legacy_admin_request_callback:
+            expiration_ts = await (
+                self.account_activity_handler.on_legacy_admin_request_callback(request)
+            )
+        else:
+            body = parse_json_object_from_request(request)
 
-        if "user_id" not in body:
-            raise SynapseError(400, "Missing property 'user_id' in the request body")
+            if "user_id" not in body:
+                raise SynapseError(
+                    400,
+                    "Missing property 'user_id' in the request body",
+                )
 
-        expiration_ts = await self.account_activity_handler.renew_account_for_user(
-            body["user_id"],
-            body.get("expiration_ts"),
-            not body.get("enable_renewal_emails", True),
-        )
+            expiration_ts = await self.account_activity_handler.renew_account_for_user(
+                body["user_id"],
+                body.get("expiration_ts"),
+                not body.get("enable_renewal_emails", True),
+            )
 
         res = {"expiration_ts": expiration_ts}
         return 200, res

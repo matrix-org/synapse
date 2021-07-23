@@ -40,12 +40,21 @@ class Thumbnailer:
 
     FORMATS = {"image/jpeg": "JPEG", "image/png": "PNG"}
 
+    @staticmethod
+    def set_limits(max_image_pixels: int):
+        Image.MAX_IMAGE_PIXELS = max_image_pixels
+
     def __init__(self, input_path: str):
         try:
             self.image = Image.open(input_path)
         except OSError as e:
             # If an error occurs opening the image, a thumbnail won't be able to
             # be generated.
+            raise ThumbnailError from e
+        except Image.DecompressionBombError as e:
+            # If an image decompression bomb error occurs opening the image,
+            # then the image exceeds the pixel limit and a thumbnail won't
+            # be able to be generated.
             raise ThumbnailError from e
 
         self.width, self.height = self.image.size

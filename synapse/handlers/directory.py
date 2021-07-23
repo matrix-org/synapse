@@ -22,6 +22,7 @@ from synapse.api.errors import (
     CodeMessageException,
     Codes,
     NotFoundError,
+    RequestSendFailed,
     ShadowBanError,
     StoreError,
     SynapseError,
@@ -78,7 +79,7 @@ class DirectoryHandler(BaseHandler):
         # TODO(erikj): Add transactions.
         # TODO(erikj): Check if there is a current association.
         if not servers:
-            users = await self.state.get_current_users_in_room(room_id)
+            users = await self.store.get_users_in_room(room_id)
             servers = {get_domain_from_id(u) for u in users}
 
         if not servers:
@@ -236,9 +237,9 @@ class DirectoryHandler(BaseHandler):
     async def get_association(self, room_alias: RoomAlias) -> JsonDict:
         room_id = None
         if self.hs.is_mine(room_alias):
-            result = await self.get_association_from_room_alias(
-                room_alias
-            )  # type: Optional[RoomAliasMapping]
+            result: Optional[
+                RoomAliasMapping
+            ] = await self.get_association_from_room_alias(room_alias)
 
             if result:
                 room_id = result.room_id
@@ -252,12 +253,14 @@ class DirectoryHandler(BaseHandler):
                     retry_on_dns_fail=False,
                     ignore_backoff=True,
                 )
+            except RequestSendFailed:
+                raise SynapseError(502, "Failed to fetch alias")
             except CodeMessageException as e:
                 logging.warning("Error retrieving alias")
                 if e.code == 404:
                     fed_result = None
                 else:
-                    raise
+                    raise SynapseError(502, "Failed to fetch alias")
 
             if fed_result and "room_id" in fed_result and "servers" in fed_result:
                 room_id = fed_result["room_id"]
@@ -270,7 +273,7 @@ class DirectoryHandler(BaseHandler):
                 Codes.NOT_FOUND,
             )
 
-        users = await self.state.get_current_users_in_room(room_id)
+        users = await self.store.get_users_in_room(room_id)
         extra_servers = {get_domain_from_id(u) for u in users}
         servers = set(extra_servers) | set(servers)
 

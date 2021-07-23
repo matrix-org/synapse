@@ -21,13 +21,11 @@ from synapse.api.constants import UserTypes
 from synapse.api.errors import (
     AuthError,
     Codes,
-    InvalidClientCredentialsError,
     InvalidClientTokenError,
     MissingClientTokenError,
     ResourceLimitError,
 )
 from synapse.storage.databases.main.registration import TokenLookupResult
-from synapse.types import UserID
 
 from tests import unittest
 from tests.test_utils import simple_async_mock
@@ -60,6 +58,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
             user_id=self.test_user, token_id=5, device_id="device"
         )
         self.store.get_user_by_access_token = simple_async_mock(user_info)
+        self.store.mark_access_token_as_used = simple_async_mock(None)
 
         request = Mock(args={})
         request.args[b"access_token"] = [self.test_token]
@@ -252,67 +251,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.assertEqual(user_id, user_info.user_id)
         self.assertTrue(user_info.is_guest)
         self.store.get_user_by_id.assert_called_with(user_id)
-
-    def test_cannot_use_regular_token_as_guest(self):
-        USER_ID = "@percy:matrix.org"
-        self.store.add_access_token_to_user = simple_async_mock(None)
-        self.store.get_device = simple_async_mock(None)
-
-        token = self.get_success(
-            self.hs.get_auth_handler().get_access_token_for_user_id(
-                USER_ID, "DEVICE", valid_until_ms=None
-            )
-        )
-        self.store.add_access_token_to_user.assert_called_with(
-            user_id=USER_ID,
-            token=token,
-            device_id="DEVICE",
-            valid_until_ms=None,
-            puppets_user_id=None,
-        )
-
-        async def get_user(tok):
-            if token != tok:
-                return None
-            return TokenLookupResult(
-                user_id=USER_ID,
-                is_guest=False,
-                token_id=1234,
-                device_id="DEVICE",
-            )
-
-        self.store.get_user_by_access_token = get_user
-        self.store.get_user_by_id = simple_async_mock({"is_guest": False})
-
-        # check the token works
-        request = Mock(args={})
-        request.args[b"access_token"] = [token.encode("ascii")]
-        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-        requester = self.get_success(
-            self.auth.get_user_by_req(request, allow_guest=True)
-        )
-        self.assertEqual(UserID.from_string(USER_ID), requester.user)
-        self.assertFalse(requester.is_guest)
-
-        # add an is_guest caveat
-        mac = pymacaroons.Macaroon.deserialize(token)
-        mac.add_first_party_caveat("guest = true")
-        guest_tok = mac.serialize()
-
-        # the token should *not* work now
-        request = Mock(args={})
-        request.args[b"access_token"] = [guest_tok.encode("ascii")]
-        request.requestHeaders.getRawHeaders = mock_getRawHeaders()
-
-        cm = self.get_failure(
-            self.auth.get_user_by_req(request, allow_guest=True),
-            InvalidClientCredentialsError,
-        )
-
-        self.assertEqual(401, cm.value.code)
-        self.assertEqual("Guest access token used for regular user", cm.value.msg)
-
-        self.store.get_user_by_id.assert_called_with(USER_ID)
 
     def test_blocking_mau(self):
         self.auth_blocking._limit_usage_by_mau = False

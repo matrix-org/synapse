@@ -1,0 +1,42 @@
+@media only screen and (max-width:1439px) {
+    .sidetoc {
+        display: none;
+    }
+}
+
+@media only screen and (min-width:1440px) {
+    main {
+        position: relative;
+        margin-left: 100px !important;
+    }
+    .sidetoc {
+        margin-left: auto;
+        margin-right: auto;
+        left: calc(100% + (var(--content-max-width))/4 - 140px);
+        position: absolute;
+        text-align: right;
+    }
+    .pagetoc {
+        position: fixed;
+        width: 250px;
+        overflow: auto;
+        right: 20px;
+        height: calc(100% - var(--menu-bar-height));
+    }
+    .pagetoc a {
+        color: var(--fg) !important;
+        display: block;
+        padding: 5px 15px 5px 10px;
+        text-align: left;
+        text-decoration: none;
+    }
+    .pagetoc a:hover,
+    .pagetoc a.active {
+        background: var(--sidebar-bg) !important;
+        color: var(--sidebar-fg) !important;
+    }
+    .pagetoc .active {
+        background: var(--sidebar-bg);
+        color: var(--sidebar-fg);
+    }
+}

@@ -25,7 +25,7 @@ class PasswordAuthProviderConfig(Config):
     section = "authproviders"
 
     def read_config(self, config, **kwargs):
-        self.password_providers = []  # type: List[Any]
+        self.password_providers: List[Any] = []
         providers = []
 
         # We want to be backwards compatible with the old `ldap_config`
@@ -57,7 +57,7 @@ class PasswordAuthProviderConfig(Config):
         # ex. LDAP, external tokens, etc.
         #
         # For more information and known implementations, please see
-        # https://github.com/matrix-org/synapse/blob/master/docs/password_auth_providers.md
+        # https://matrix-org.github.io/synapse/latest/password_auth_providers.html
         #
         # Note: instances wishing to use SAML or CAS authentication should
         # instead use the `saml2_config` or `cas_config` options,

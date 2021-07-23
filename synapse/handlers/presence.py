@@ -222,9 +222,21 @@ class BasePresenceHandler(abc.ABC):
 
     @abc.abstractmethod
     async def set_state(
-        self, target_user: UserID, state: JsonDict, ignore_status_msg: bool = False
+        self,
+        target_user: UserID,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user. """
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
 
     @abc.abstractmethod
     async def bump_presence_active_time(self, user: UserID):
@@ -287,14 +299,59 @@ class BasePresenceHandler(abc.ABC):
         if not states:
             return
 
-        hosts_and_states = await get_interested_remotes(
+        hosts_to_states = await get_interested_remotes(
             self.store,
             self.presence_router,
             states,
         )
 
-        for destinations, states in hosts_and_states:
-            self._federation.send_presence_to_destinations(states, destinations)
+        for destination, host_states in hosts_to_states.items():
+            self._federation.send_presence_to_destinations(host_states, [destination])
+
+    async def send_full_presence_to_users(self, user_ids: Collection[str]):
+        """
+        Adds to the list of users who should receive a full snapshot of presence
+        upon their next sync. Note that this only works for local users.
+
+        Then, grabs the current presence state for a given set of users and adds it
+        to the top of the presence stream.
+
+        Args:
+            user_ids: The IDs of the local users to send full presence to.
+        """
+        # Retrieve one of the users from the given set
+        if not user_ids:
+            raise Exception(
+                "send_full_presence_to_users must be called with at least one user"
+            )
+        user_id = next(iter(user_ids))
+
+        # Mark all users as receiving full presence on their next sync
+        await self.store.add_users_to_send_full_presence_to(user_ids)
+
+        # Add a new entry to the presence stream. Since we use stream tokens to determine whether a
+        # local user should receive a full snapshot of presence when they sync, we need to bump the
+        # presence stream so that subsequent syncs with no presence activity in between won't result
+        # in the client receiving multiple full snapshots of presence.
+        #
+        # If we bump the stream ID, then the user will get a higher stream token next sync, and thus
+        # correctly won't receive a second snapshot.
+
+        # Get the current presence state for one of the users (defaults to offline if not found)
+        current_presence_state = await self.get_state(UserID.from_string(user_id))
+
+        # Convert the UserPresenceState object into a serializable dict
+        state = {
+            "presence": current_presence_state.state,
+            "status_message": current_presence_state.status_msg,
+        }
+
+        # Copy the presence state to the tip of the presence stream.
+
+        # We set force_notify=True here so that this presence update is guaranteed to
+        # increment the presence stream ID (which resending the current user's presence
+        # otherwise would not do).
+        await self.set_state(UserID.from_string(user_id), state, force_notify=True)
 
 
 class _NullContextManager(ContextManager[None]):
@@ -321,14 +378,14 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         # The number of ongoing syncs on this process, by user id.
         # Empty if _presence_enabled is false.
-        self._user_to_num_current_syncs = {}  # type: Dict[str, int]
+        self._user_to_num_current_syncs: Dict[str, int] = {}
 
         self.notifier = hs.get_notifier()
         self.instance_id = hs.get_instance_id()
 
         # user_id -> last_sync_ms. Lists the users that have stopped syncing but
         # we haven't notified the presence writer of that yet
-        self.users_going_offline = {}  # type: Dict[str, int]
+        self.users_going_offline: Dict[str, int] = {}
 
         self._bump_active_client = ReplicationBumpPresenceActiveTime.make_client(hs)
         self._set_state_client = ReplicationPresenceSetState.make_client(hs)
@@ -438,9 +495,6 @@ class WorkerPresenceHandler(BasePresenceHandler):
             users=users_to_states.keys(),
         )
 
-        # If this is a federation sender, notify about presence updates.
-        await self.maybe_send_presence_to_interested_destinations(states)
-
     async def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: list
     ):
@@ -462,11 +516,27 @@ class WorkerPresenceHandler(BasePresenceHandler):
             for row in rows
         ]
 
-        for state in states:
-            self.user_to_current_state[state.user_id] = state
+        # The list of states to notify sync streams and remote servers about.
+        # This is calculated by comparing the old and new states for each user
+        # using `should_notify(..)`.
+        #
+        # Note that this is necessary as the presence writer will periodically
+        # flush presence state changes that should not be notified about to the
+        # DB, and so will be sent over the replication stream.
+        state_to_notify = []
+
+        for new_state in states:
+            old_state = self.user_to_current_state.get(new_state.user_id)
+            self.user_to_current_state[new_state.user_id] = new_state
+
+            if not old_state or should_notify(old_state, new_state):
+                state_to_notify.append(new_state)
 
         stream_id = token
-        await self.notify_from_replication(states, stream_id)
+        await self.notify_from_replication(state_to_notify, stream_id)
+
+        # If this is a federation sender, notify about presence updates.
+        await self.maybe_send_presence_to_interested_destinations(state_to_notify)
 
     def get_currently_syncing_users_for_replication(self) -> Iterable[str]:
         return [
@@ -480,8 +550,17 @@ class WorkerPresenceHandler(BasePresenceHandler):
         target_user: UserID,
         state: JsonDict,
         ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user."""
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
         presence = state["presence"]
 
         valid_presence = (
@@ -508,6 +587,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
             user_id=user_id,
             state=state,
             ignore_status_msg=ignore_status_msg,
+            force_notify=force_notify,
         )
 
     async def bump_presence_active_time(self, user: UserID) -> None:
@@ -570,7 +650,7 @@ class PresenceHandler(BasePresenceHandler):
 
         # Set of users who have presence in the `user_to_current_state` that
         # have not yet been persisted
-        self.unpersisted_users_changes = set()  # type: Set[str]
+        self.unpersisted_users_changes: Set[str] = set()
 
         hs.get_reactor().addSystemEventTrigger(
             "before",
@@ -584,7 +664,7 @@ class PresenceHandler(BasePresenceHandler):
 
         # Keeps track of the number of *ongoing* syncs on this process. While
         # this is non zero a user will never go offline.
-        self.user_to_num_current_syncs = {}  # type: Dict[str, int]
+        self.user_to_num_current_syncs: Dict[str, int] = {}
 
         # Keeps track of the number of *ongoing* syncs on other processes.
         # While any sync is ongoing on another process the user will never
@@ -594,8 +674,8 @@ class PresenceHandler(BasePresenceHandler):
         # we assume that all the sync requests on that process have stopped.
         # Stored as a dict from process_id to set of user_id, and a dict of
         # process_id to millisecond timestamp last updated.
-        self.external_process_to_current_syncs = {}  # type: Dict[str, Set[str]]
-        self.external_process_last_updated_ms = {}  # type: Dict[str, int]
+        self.external_process_to_current_syncs: Dict[str, Set[str]] = {}
+        self.external_process_last_updated_ms: Dict[str, int] = {}
 
         self.external_sync_linearizer = Linearizer(name="external_sync_linearizer")
 
@@ -677,13 +757,19 @@ class PresenceHandler(BasePresenceHandler):
                 [self.user_to_current_state[user_id] for user_id in unpersisted]
             )
 
-    async def _update_states(self, new_states: Iterable[UserPresenceState]) -> None:
+    async def _update_states(
+        self, new_states: Iterable[UserPresenceState], force_notify: bool = False
+    ) -> None:
         """Updates presence of users. Sets the appropriate timeouts. Pokes
         the notifier and federation if and only if the changed presence state
         should be sent to clients/servers.
 
         Args:
             new_states: The new user presence state updates to process.
+            force_notify: Whether to force notifying clients of this presence state update,
+                even if it doesn't change the state of a user's presence (e.g online -> online).
+                This is currently used to bump the max presence stream ID without changing any
+                user's presence (see PresenceHandler.add_users_to_send_full_presence_to).
         """
         now = self.clock.time_msec()
 
@@ -720,6 +806,9 @@ class PresenceHandler(BasePresenceHandler):
                     now=now,
                 )
 
+                if force_notify:
+                    should_notify = True
+
                 self.user_to_current_state[user_id] = new_state
 
                 if should_notify:
@@ -753,15 +842,15 @@ class PresenceHandler(BasePresenceHandler):
             if to_federation_ping:
                 federation_presence_out_counter.inc(len(to_federation_ping))
 
-                hosts_and_states = await get_interested_remotes(
+                hosts_to_states = await get_interested_remotes(
                     self.store,
                     self.presence_router,
                     list(to_federation_ping.values()),
                 )
 
-                for destinations, states in hosts_and_states:
+                for destination, states in hosts_to_states.items():
                     self._federation_queue.send_presence_to_destinations(
-                        states, destinations
+                        states, [destination]
                     )
 
     async def _handle_timeouts(self) -> None:
@@ -1058,9 +1147,21 @@ class PresenceHandler(BasePresenceHandler):
             await self._update_states(updates)
 
     async def set_state(
-        self, target_user: UserID, state: JsonDict, ignore_status_msg: bool = False
+        self,
+        target_user: UserID,
+        state: JsonDict,
+        ignore_status_msg: bool = False,
+        force_notify: bool = False,
     ) -> None:
-        """Set the presence state of the user."""
+        """Set the presence state of the user.
+
+        Args:
+            target_user: The ID of the user to set the presence state of.
+            state: The presence state as a JSON dictionary.
+            ignore_status_msg: True to ignore the "status_msg" field of the `state` dict.
+                If False, the user's current status will be updated.
+            force_notify: Whether to force notification of the update to clients.
+        """
         status_msg = state.get("status_msg", None)
         presence = state["presence"]
 
@@ -1091,7 +1192,9 @@ class PresenceHandler(BasePresenceHandler):
         ):
             new_fields["last_active_ts"] = self.clock.time_msec()
 
-        await self._update_states([prev_state.copy_and_replace(**new_fields)])
+        await self._update_states(
+            [prev_state.copy_and_replace(**new_fields)], force_notify=force_notify
+        )
 
     async def is_visible(self, observed_user: UserID, observer_user: UserID) -> bool:
         """Returns whether a user can see another user's presence."""
@@ -1183,7 +1286,16 @@ class PresenceHandler(BasePresenceHandler):
                 max_pos, deltas = await self.store.get_current_state_deltas(
                     self._event_pos, room_max_stream_ordering
                 )
-                await self._handle_state_delta(deltas)
+
+                # We may get multiple deltas for different rooms, but we want to
+                # handle them on a room by room basis, so we batch them up by
+                # room.
+                deltas_by_room: Dict[str, List[JsonDict]] = {}
+                for delta in deltas:
+                    deltas_by_room.setdefault(delta["room_id"], []).append(delta)
+
+                for room_id, deltas_for_room in deltas_by_room.items():
+                    await self._handle_state_delta(room_id, deltas_for_room)
 
                 self._event_pos = max_pos
 
@@ -1192,17 +1304,21 @@ class PresenceHandler(BasePresenceHandler):
                     max_pos
                 )
 
-    async def _handle_state_delta(self, deltas: List[JsonDict]) -> None:
-        """Process current state deltas to find new joins that need to be
-        handled.
+    async def _handle_state_delta(self, room_id: str, deltas: List[JsonDict]) -> None:
+        """Process current state deltas for the room to find new joins that need
+        to be handled.
         """
-        # A map of destination to a set of user state that they should receive
-        presence_destinations = {}  # type: Dict[str, Set[UserPresenceState]]
+
+        # Sets of newly joined users. Note that if the local server is
+        # joining a remote room for the first time we'll see both the joining
+        # user and all remote users as newly joined.
+        newly_joined_users = set()
 
         for delta in deltas:
+            assert room_id == delta["room_id"]
+
             typ = delta["type"]
             state_key = delta["state_key"]
-            room_id = delta["room_id"]
             event_id = delta["event_id"]
             prev_event_id = delta["prev_event_id"]
 
@@ -1231,72 +1347,55 @@ class PresenceHandler(BasePresenceHandler):
                     # Ignore changes to join events.
                     continue
 
-            # Retrieve any user presence state updates that need to be sent as a result,
-            # and the destinations that need to receive it
-            destinations, user_presence_states = await self._on_user_joined_room(
-                room_id, state_key
-            )
+            newly_joined_users.add(state_key)
 
-            # Insert the destinations and respective updates into our destinations dict
-            for destination in destinations:
-                presence_destinations.setdefault(destination, set()).update(
-                    user_presence_states
-                )
+        if not newly_joined_users:
+            # If nobody has joined then there's nothing to do.
+            return
 
-        # Send out user presence updates for each destination
-        for destination, user_state_set in presence_destinations.items():
-            self._federation_queue.send_presence_to_destinations(
-                destinations=[destination], states=user_state_set
-            )
+        # We want to send:
+        #   1. presence states of all local users in the room to newly joined
+        #      remote servers
+        #   2. presence states of newly joined users to all remote servers in
+        #      the room.
+        #
+        # TODO: Only send presence states to remote hosts that don't already
+        # have them (because they already share rooms).
 
-    async def _on_user_joined_room(
-        self, room_id: str, user_id: str
-    ) -> Tuple[List[str], List[UserPresenceState]]:
-        """Called when we detect a user joining the room via the current state
-        delta stream. Returns the destinations that need to be updated and the
-        presence updates to send to them.
+        # Get all the users who were already in the room, by fetching the
+        # current users in the room and removing the newly joined users.
+        users = await self.store.get_users_in_room(room_id)
+        prev_users = set(users) - newly_joined_users
 
-        Args:
-            room_id: The ID of the room that the user has joined.
-            user_id: The ID of the user that has joined the room.
+        # Construct sets for all the local users and remote hosts that were
+        # already in the room
+        prev_local_users = []
+        prev_remote_hosts = set()
+        for user_id in prev_users:
+            if self.is_mine_id(user_id):
+                prev_local_users.append(user_id)
+            else:
+                prev_remote_hosts.add(get_domain_from_id(user_id))
 
-        Returns:
-            A tuple of destinations and presence updates to send to them.
-        """
-        if self.is_mine_id(user_id):
-            # If this is a local user then we need to send their presence
-            # out to hosts in the room (who don't already have it)
+        # Similarly, construct sets for all the local users and remote hosts
+        # that were *not* already in the room. Care needs to be taken with the
+        # calculating the remote hosts, as a host may have already been in the
+        # room even if there is a newly joined user from that host.
+        newly_joined_local_users = []
+        newly_joined_remote_hosts = set()
+        for user_id in newly_joined_users:
+            if self.is_mine_id(user_id):
+                newly_joined_local_users.append(user_id)
+            else:
+                host = get_domain_from_id(user_id)
+                if host not in prev_remote_hosts:
+                    newly_joined_remote_hosts.add(host)
 
-            # TODO: We should be able to filter the hosts down to those that
-            # haven't previously seen the user
-
-            remote_hosts = await self.state.get_current_hosts_in_room(room_id)
-
-            # Filter out ourselves.
-            filtered_remote_hosts = [
-                host for host in remote_hosts if host != self.server_name
-            ]
-
-            state = await self.current_state_for_user(user_id)
-            return filtered_remote_hosts, [state]
-        else:
-            # A remote user has joined the room, so we need to:
-            #   1. Check if this is a new server in the room
-            #   2. If so send any presence they don't already have for
-            #      local users in the room.
-
-            # TODO: We should be able to filter the users down to those that
-            # the server hasn't previously seen
-
-            # TODO: Check that this is actually a new server joining the
-            # room.
-
-            remote_host = get_domain_from_id(user_id)
-
-            users = await self.state.get_current_users_in_room(room_id)
-            user_ids = list(filter(self.is_mine_id, users))
-
-            states_d = await self.current_state_for_users(user_ids)
+        # Send presence states of all local users in the room to newly joined
+        # remote servers. (We actually only send states for local users already
+        # in the room, as we'll send states for newly joined local users below.)
+        if prev_local_users and newly_joined_remote_hosts:
+            local_states = await self.current_state_for_users(prev_local_users)
 
             # Filter out old presence, i.e. offline presence states where
             # the user hasn't been active for a week. We can change this
@@ -1306,13 +1405,27 @@ class PresenceHandler(BasePresenceHandler):
             now = self.clock.time_msec()
             states = [
                 state
-                for state in states_d.values()
+                for state in local_states.values()
                 if state.state != PresenceState.OFFLINE
                 or now - state.last_active_ts < 7 * 24 * 60 * 60 * 1000
                 or state.status_msg is not None
             ]
 
-            return [remote_host], states
+            self._federation_queue.send_presence_to_destinations(
+                destinations=newly_joined_remote_hosts,
+                states=states,
+            )
+
+        # Send presence states of newly joined users to all remote servers in
+        # the room
+        if newly_joined_local_users and (
+            prev_remote_hosts or newly_joined_remote_hosts
+        ):
+            local_states = await self.current_state_for_users(newly_joined_local_users)
+            self._federation_queue.send_presence_to_destinations(
+                destinations=prev_remote_hosts | newly_joined_remote_hosts,
+                states=list(local_states.values()),
+            )
 
 
 def should_notify(old_state: UserPresenceState, new_state: UserPresenceState) -> bool:
@@ -1379,11 +1492,10 @@ class PresenceEventSource:
         #
         #   Presence -> Notifier -> PresenceEventSource -> Presence
         #
-        # Same with get_module_api, get_presence_router
+        # Same with get_presence_router:
         #
         #   AuthHandler -> Notifier -> PresenceEventSource -> ModuleApi -> AuthHandler
         self.get_presence_handler = hs.get_presence_handler
-        self.get_module_api = hs.get_module_api
         self.get_presence_router = hs.get_presence_router
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
@@ -1414,15 +1526,20 @@ class PresenceEventSource:
         stream_change_cache = self.store.presence_stream_cache
 
         with Measure(self.clock, "presence.get_new_events"):
-            if user_id in self.get_module_api()._send_full_presence_to_local_users:
-                # This user has been specified by a module to receive all current, online
-                # user presence. Removing from_key and setting include_offline to false
-                # will do effectively this.
-                from_key = None
-                include_offline = False
-
             if from_key is not None:
                 from_key = int(from_key)
+
+                # Check if this user should receive all current, online user presence. We only
+                # bother to do this if from_key is set, as otherwise the user will receive all
+                # user presence anyways.
+                if await self.store.should_user_receive_full_presence_with_token(
+                    user_id, from_key
+                ):
+                    # This user has been specified by a module to receive all current, online
+                    # user presence. Removing from_key and setting include_offline to false
+                    # will do effectively this.
+                    from_key = None
+                    include_offline = False
 
             max_token = self.store.get_current_presence_token()
             if from_key == max_token:
@@ -1457,12 +1574,6 @@ class PresenceEventSource:
                     user_id, include_offline, from_key
                 )
 
-                # Remove the user from the list of users to receive all presence
-                if user_id in self.get_module_api()._send_full_presence_to_local_users:
-                    self.get_module_api()._send_full_presence_to_local_users.remove(
-                        user_id
-                    )
-
                 return presence_updates, max_token
 
             # Make mypy happy. users_interested_in should now be a set
@@ -1470,9 +1581,7 @@ class PresenceEventSource:
 
             # The set of users that we're interested in and that have had a presence update.
             # We'll actually pull the presence updates for these users at the end.
-            interested_and_updated_users = (
-                set()
-            )  # type: Union[Set[str], FrozenSet[str]]
+            interested_and_updated_users: Union[Set[str], FrozenSet[str]] = set()
 
             if from_key:
                 # First get all users that have had a presence update
@@ -1511,10 +1620,6 @@ class PresenceEventSource:
                 interested_and_updated_users
             )
             presence_updates = list(users_to_state.values())
-
-        # Remove the user from the list of users to receive all presence
-        if user_id in self.get_module_api()._send_full_presence_to_local_users:
-            self.get_module_api()._send_full_presence_to_local_users.remove(user_id)
 
         if not include_offline:
             # Filter out offline presence states
@@ -1843,8 +1948,8 @@ async def get_interested_parties(
         A 2-tuple of `(room_ids_to_states, users_to_states)`,
         with each item being a dict of `entity_name` -> `[UserPresenceState]`
     """
-    room_ids_to_states = {}  # type: Dict[str, List[UserPresenceState]]
-    users_to_states = {}  # type: Dict[str, List[UserPresenceState]]
+    room_ids_to_states: Dict[str, List[UserPresenceState]] = {}
+    users_to_states: Dict[str, List[UserPresenceState]] = {}
     for state in states:
         room_ids = await store.get_rooms_for_user(state.user_id)
         for room_id in room_ids:
@@ -1868,7 +1973,7 @@ async def get_interested_remotes(
     store: DataStore,
     presence_router: PresenceRouter,
     states: List[UserPresenceState],
-) -> List[Tuple[Collection[str], List[UserPresenceState]]]:
+) -> Dict[str, Set[UserPresenceState]]:
     """Given a list of presence states figure out which remote servers
     should be sent which.
 
@@ -1880,11 +1985,9 @@ async def get_interested_remotes(
         states: A list of incoming user presence updates.
 
     Returns:
-        A list of 2-tuples of destinations and states, where for
-        each tuple the list of UserPresenceState should be sent to each
-        destination
+        A map from destinations to presence states to send to that destination.
     """
-    hosts_and_states = []  # type: List[Tuple[Collection[str], List[UserPresenceState]]]
+    hosts_and_states: Dict[str, Set[UserPresenceState]] = {}
 
     # First we look up the rooms each user is in (as well as any explicit
     # subscriptions), then for each distinct room we look up the remote
@@ -1896,11 +1999,12 @@ async def get_interested_remotes(
     for room_id, states in room_ids_to_states.items():
         user_ids = await store.get_users_in_room(room_id)
         hosts = {get_domain_from_id(user_id) for user_id in user_ids}
-        hosts_and_states.append((hosts, states))
+        for host in hosts:
+            hosts_and_states.setdefault(host, set()).update(states)
 
     for user_id, states in users_to_states.items():
         host = get_domain_from_id(user_id)
-        hosts_and_states.append(([host], states))
+        hosts_and_states.setdefault(host, set()).update(states)
 
     return hosts_and_states
 
@@ -1957,12 +2061,12 @@ class PresenceFederationQueue:
         # stream_id, destinations, user_ids)`. We don't store the full states
         # for efficiency, and remote workers will already have the full states
         # cached.
-        self._queue = []  # type: List[Tuple[int, int, Collection[str], Set[str]]]
+        self._queue: List[Tuple[int, int, Collection[str], Set[str]]] = []
 
         self._next_id = 1
 
         # Map from instance name to current token
-        self._current_tokens = {}  # type: Dict[str, int]
+        self._current_tokens: Dict[str, int] = {}
 
         if self._queue_presence_updates:
             self._clock.looping_call(self._clear_queue, self._CLEAR_ITEMS_EVERY_MS)
@@ -2062,7 +2166,7 @@ class PresenceFederationQueue:
         # handle the case where `from_token` stream ID has already been dropped.
         start_idx = max(from_token + 1 - self._next_id, -len(self._queue))
 
-        to_send = []  # type: List[Tuple[int, Tuple[str, str]]]
+        to_send: List[Tuple[int, Tuple[str, str]]] = []
         limited = False
         new_id = upto_token
         for _, stream_id, destinations, user_ids in self._queue[start_idx:]:
@@ -2110,7 +2214,7 @@ class PresenceFederationQueue:
         if not self._federation:
             return
 
-        hosts_to_users = {}  # type: Dict[str, Set[str]]
+        hosts_to_users: Dict[str, Set[str]] = {}
         for row in rows:
             hosts_to_users.setdefault(row.destination, set()).add(row.user_id)
 

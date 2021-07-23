@@ -160,9 +160,12 @@ class KeyQueryServlet(RestServlet):
     async def on_POST(self, request):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
         user_id = requester.user.to_string()
+        device_id = requester.device_id
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
-        result = await self.e2e_keys_handler.query_devices(body, timeout, user_id)
+        result = await self.e2e_keys_handler.query_devices(
+            body, timeout, user_id, device_id
+        )
         return 200, result
 
 
@@ -191,7 +194,7 @@ class KeyChangesServlet(RestServlet):
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        from_token_string = parse_string(request, "from")
+        from_token_string = parse_string(request, "from", required=True)
         set_tag("from", from_token_string)
 
         # We want to enforce they do pass us one, but we ignore it and return
@@ -274,6 +277,9 @@ class SigningKeyUploadServlet(RestServlet):
             request,
             body,
             "add a device signing key to your account",
+            # Allow skipping of UI auth since this is frequently called directly
+            # after login and it is silly to ask users to re-auth immediately.
+            can_skip_ui_auth=True,
         )
 
         result = await self.e2e_keys_handler.upload_signing_keys_for_user(user_id, body)

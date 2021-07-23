@@ -40,6 +40,7 @@ from twisted.enterprise import adbapi
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
+from synapse.logging import opentracing
 from synapse.logging.context import (
     LoggingContext,
     current_context,
@@ -90,12 +91,18 @@ def make_pool(
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
 
+    def _on_new_connection(conn):
+        # Ensure we have a logging context so we can correctly track queries,
+        # etc.
+        with LoggingContext("db.on_new_connection"):
+            engine.on_new_connection(
+                LoggingDatabaseConnection(conn, engine, "on_new_connection")
+            )
+
     return adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
-        cp_openfun=lambda conn: engine.on_new_connection(
-            LoggingDatabaseConnection(conn, engine, "on_new_connection")
-        ),
+        cp_openfun=_on_new_connection,
         **db_args,
     )
 
@@ -104,7 +111,7 @@ def make_conn(
     db_config: DatabaseConnectionConfig,
     engine: BaseDatabaseEngine,
     default_txn_name: str,
-) -> Connection:
+) -> "LoggingDatabaseConnection":
     """Make a new connection to the database and return it.
 
     Returns:
@@ -313,7 +320,14 @@ class LoggingTransaction:
         start = time.time()
 
         try:
-            return func(sql, *args)
+            with opentracing.start_active_span(
+                "db.query",
+                tags={
+                    opentracing.tags.DATABASE_TYPE: "sql",
+                    opentracing.tags.DATABASE_STATEMENT: sql,
+                },
+            ):
+                return func(sql, *args)
         except Exception as e:
             sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
@@ -525,9 +539,17 @@ class DatabasePool:
                     exception_callbacks=exception_callbacks,
                 )
                 try:
-                    r = func(cursor, *args, **kwargs)
-                    conn.commit()
-                    return r
+                    with opentracing.start_active_span(
+                        "db.txn",
+                        tags={
+                            opentracing.SynapseTags.DB_TXN_DESC: desc,
+                            opentracing.SynapseTags.DB_TXN_ID: name,
+                        },
+                    ):
+                        r = func(cursor, *args, **kwargs)
+                        opentracing.log_kv({"message": "commit"})
+                        conn.commit()
+                        return r
                 except self.engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.
@@ -541,7 +563,8 @@ class DatabasePool:
                     if i < N:
                         i += 1
                         try:
-                            conn.rollback()
+                            with opentracing.start_active_span("db.rollback"):
+                                conn.rollback()
                         except self.engine.module.Error as e1:
                             transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
@@ -554,7 +577,8 @@ class DatabasePool:
                         if i < N:
                             i += 1
                             try:
-                                conn.rollback()
+                                with opentracing.start_active_span("db.rollback"):
+                                    conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
                                     "[TXN EROLL] {%s} %s",
@@ -646,23 +670,24 @@ class DatabasePool:
         Returns:
             The result of func
         """
-        after_callbacks = []  # type: List[_CallbackListEntry]
-        exception_callbacks = []  # type: List[_CallbackListEntry]
+        after_callbacks: List[_CallbackListEntry] = []
+        exception_callbacks: List[_CallbackListEntry] = []
 
         if not current_context():
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
-            result = await self.runWithConnection(
-                self.new_transaction,
-                desc,
-                after_callbacks,
-                exception_callbacks,
-                func,
-                *args,
-                db_autocommit=db_autocommit,
-                **kwargs,
-            )
+            with opentracing.start_active_span(f"db.{desc}"):
+                result = await self.runWithConnection(
+                    self.new_transaction,
+                    desc,
+                    after_callbacks,
+                    exception_callbacks,
+                    func,
+                    *args,
+                    db_autocommit=db_autocommit,
+                    **kwargs,
+                )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
@@ -718,25 +743,29 @@ class DatabasePool:
             with LoggingContext(
                 str(curr_context), parent_context=parent_context
             ) as context:
-                sched_duration_sec = monotonic_time() - start_time
-                sql_scheduling_timer.observe(sched_duration_sec)
-                context.add_database_scheduled(sched_duration_sec)
+                with opentracing.start_active_span(
+                    operation_name="db.connection",
+                ):
+                    sched_duration_sec = monotonic_time() - start_time
+                    sql_scheduling_timer.observe(sched_duration_sec)
+                    context.add_database_scheduled(sched_duration_sec)
 
-                if self.engine.is_connection_closed(conn):
-                    logger.debug("Reconnecting closed database connection")
-                    conn.reconnect()
+                    if self.engine.is_connection_closed(conn):
+                        logger.debug("Reconnecting closed database connection")
+                        conn.reconnect()
+                        opentracing.log_kv({"message": "reconnected"})
 
-                try:
-                    if db_autocommit:
-                        self.engine.attempt_to_set_autocommit(conn, True)
+                    try:
+                        if db_autocommit:
+                            self.engine.attempt_to_set_autocommit(conn, True)
 
-                    db_conn = LoggingDatabaseConnection(
-                        conn, self.engine, "runWithConnection"
-                    )
-                    return func(db_conn, *args, **kwargs)
-                finally:
-                    if db_autocommit:
-                        self.engine.attempt_to_set_autocommit(conn, False)
+                        db_conn = LoggingDatabaseConnection(
+                            conn, self.engine, "runWithConnection"
+                        )
+                        return func(db_conn, *args, **kwargs)
+                    finally:
+                        if db_autocommit:
+                            self.engine.attempt_to_set_autocommit(conn, False)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)
@@ -803,31 +832,16 @@ class DatabasePool:
         self,
         table: str,
         values: Dict[str, Any],
-        or_ignore: bool = False,
         desc: str = "simple_insert",
-    ) -> bool:
+    ) -> None:
         """Executes an INSERT query on the named table.
 
         Args:
             table: string giving the table name
             values: dict of new column names and values for them
-            or_ignore: bool stating whether an exception should be raised
-                when a conflicting row already exists. If True, False will be
-                returned by the function instead
             desc: description of the transaction, for logging and metrics
-
-        Returns:
-             Whether the row was inserted or not. Only useful when `or_ignore` is True
         """
-        try:
-            await self.runInteraction(desc, self.simple_insert_txn, table, values)
-        except self.engine.module.IntegrityError:
-            # We have to do or_ignore flag at this layer, since we can't reuse
-            # a cursor after we receive an error from the db.
-            if not or_ignore:
-                raise
-            return False
-        return True
+        await self.runInteraction(desc, self.simple_insert_txn, table, values)
 
     @staticmethod
     def simple_insert_txn(
@@ -878,7 +892,7 @@ class DatabasePool:
         # The sort is to ensure that we don't rely on dictionary iteration
         # order.
         keys, vals = zip(
-            *[zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i]
+            *(zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i)
         )
 
         for k in keys:
@@ -901,7 +915,7 @@ class DatabasePool:
         insertion_values: Optional[Dict[str, Any]] = None,
         desc: str = "simple_upsert",
         lock: bool = True,
-    ) -> Optional[bool]:
+    ) -> bool:
         """
 
         `lock` should generally be set to True (the default), but can be set
@@ -922,8 +936,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
             lock: True to lock the table when doing the upsert.
         Returns:
-            Native upserts always return None. Emulated upserts return True if a
-            new entry was created, False if an existing one was updated.
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
@@ -966,7 +980,7 @@ class DatabasePool:
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
         lock: bool = True,
-    ) -> Optional[bool]:
+    ) -> bool:
         """
         Pick the UPSERT method which works best on the platform. Either the
         native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
@@ -979,16 +993,15 @@ class DatabasePool:
             insertion_values: additional key/values to use only when inserting
             lock: True to lock the table when doing the upsert.
         Returns:
-            Native upserts always return None. Emulated upserts return True if a
-            new entry was created, False if an existing one was updated.
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
-            self.simple_upsert_txn_native_upsert(
+            return self.simple_upsert_txn_native_upsert(
                 txn, table, keyvalues, values, insertion_values=insertion_values
             )
-            return None
         else:
             return self.simple_upsert_txn_emulated(
                 txn,
@@ -1016,8 +1029,8 @@ class DatabasePool:
             insertion_values: additional key/values to use only when inserting
             lock: True to lock the table when doing the upsert.
         Returns:
-            Returns True if a new entry was created, False if an existing
-            one was updated.
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
@@ -1057,11 +1070,10 @@ class DatabasePool:
 
             txn.execute(sql, sqlargs)
             if txn.rowcount > 0:
-                # successfully updated at least one row.
-                return False
+                return True
 
         # We didn't find any existing rows, so insert a new one
-        allvalues = {}  # type: Dict[str, Any]
+        allvalues: Dict[str, Any] = {}
         allvalues.update(keyvalues)
         allvalues.update(values)
         allvalues.update(insertion_values)
@@ -1082,17 +1094,21 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> bool:
         """
-        Use the native UPSERT functionality in recent PostgreSQL versions.
+        Use the native UPSERT functionality in PostgreSQL.
 
         Args:
             table: The table to upsert into
             keyvalues: The unique key tables and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+
+        Returns:
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
-        allvalues = {}  # type: Dict[str, Any]
+        allvalues: Dict[str, Any] = {}
         allvalues.update(keyvalues)
         allvalues.update(insertion_values or {})
 
@@ -1110,6 +1126,8 @@ class DatabasePool:
             latter,
         )
         txn.execute(sql, list(allvalues.values()))
+
+        return bool(txn.rowcount)
 
     async def simple_upsert_many(
         self,
@@ -1228,7 +1246,7 @@ class DatabasePool:
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
         """
-        allnames = []  # type: List[str]
+        allnames: List[str] = []
         allnames.extend(key_names)
         allnames.extend(value_names)
 
@@ -1537,7 +1555,7 @@ class DatabasePool:
         """
         keyvalues = keyvalues or {}
 
-        results = []  # type: List[Dict[str, Any]]
+        results: List[Dict[str, Any]] = []
 
         if not iterable:
             return results
@@ -1949,7 +1967,7 @@ class DatabasePool:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
         where_clause = "WHERE " if filters or keyvalues or exclude_keyvalues else ""
-        arg_list = []  # type: List[Any]
+        arg_list: List[Any] = []
         if filters:
             where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
             arg_list += list(filters.values())

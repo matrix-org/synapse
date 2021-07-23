@@ -17,11 +17,13 @@
 
 import logging
 import platform
+from typing import TYPE_CHECKING, Optional, Tuple
 
 import synapse
 from synapse.api.errors import Codes, NotFoundError, SynapseError
-from synapse.http.server import JsonResource
+from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.rest.admin.devices import (
     DeleteDevicesRestServlet,
@@ -66,8 +68,11 @@ from synapse.rest.admin.users import (
     UserTokenRestServlet,
     WhoisRestServlet,
 )
-from synapse.types import RoomStreamToken
+from synapse.types import JsonDict, RoomStreamToken
 from synapse.util.versionstring import get_version_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -75,13 +80,13 @@ logger = logging.getLogger(__name__)
 class VersionServlet(RestServlet):
     PATTERNS = admin_patterns("/server_version$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.res = {
             "server_version": get_version_string(synapse),
             "python_version": platform.python_version(),
         }
 
-    def on_GET(self, request):
+    def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         return 200, self.res
 
 
@@ -90,17 +95,14 @@ class PurgeHistoryRestServlet(RestServlet):
         "/purge_history/(?P<room_id>[^/]*)(/(?P<event_id>[^/]+))?"
     )
 
-    def __init__(self, hs):
-        """
-
-        Args:
-            hs (synapse.server.HomeServer)
-        """
+    def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()
         self.store = hs.get_datastore()
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, room_id, event_id):
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str, event_id: Optional[str]
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         body = parse_json_object_from_request(request, allow_empty_body=True)
@@ -119,6 +121,8 @@ class PurgeHistoryRestServlet(RestServlet):
             if event.room_id != room_id:
                 raise SynapseError(400, "Event is for wrong room.")
 
+            # RoomStreamToken expects [int] not Optional[int]
+            assert event.internal_metadata.stream_ordering is not None
             room_token = RoomStreamToken(
                 event.depth, event.internal_metadata.stream_ordering
             )
@@ -173,16 +177,13 @@ class PurgeHistoryRestServlet(RestServlet):
 class PurgeHistoryStatusRestServlet(RestServlet):
     PATTERNS = admin_patterns("/purge_history_status/(?P<purge_id>[^/]+)")
 
-    def __init__(self, hs):
-        """
-
-        Args:
-            hs (synapse.server.HomeServer)
-        """
+    def __init__(self, hs: "HomeServer"):
         self.pagination_handler = hs.get_pagination_handler()
         self.auth = hs.get_auth()
 
-    async def on_GET(self, request, purge_id):
+    async def on_GET(
+        self, request: SynapseRequest, purge_id: str
+    ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 
         purge_status = self.pagination_handler.get_purge_status(purge_id)
@@ -203,12 +204,12 @@ class PurgeHistoryStatusRestServlet(RestServlet):
 class AdminRestResource(JsonResource):
     """The REST resource which gets mounted at /_synapse/admin"""
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         JsonResource.__init__(self, hs, canonical_json=False)
         register_servlets(hs, self)
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     """
     Register all the admin servlets.
     """
@@ -242,7 +243,9 @@ def register_servlets(hs, http_server):
     RateLimitRestServlet(hs).register(http_server)
 
 
-def register_servlets_for_client_rest_resource(hs, http_server):
+def register_servlets_for_client_rest_resource(
+    hs: "HomeServer", http_server: HttpServer
+) -> None:
     """Register only the servlets which need to be exposed on /_matrix/client/xxx"""
     WhoisRestServlet(hs).register(http_server)
     PurgeHistoryStatusRestServlet(hs).register(http_server)
