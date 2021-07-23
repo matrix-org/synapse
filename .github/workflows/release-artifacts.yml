@@ -12,6 +12,10 @@ on:
     # we do the full build on tags.
     tags: ["v*"]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+  
 permissions:
   contents: write
 
