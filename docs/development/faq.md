@@ -5,7 +5,9 @@
 An `outlier` is an arbitrary floating event in the DAG (as opposed to being
 inline with the current DAG). It also means that we don't have the state events
 backfilled on the homeserver and we trust the events *claimed* auth events rather
-than those we calculate and verify to be correct.
+than those we calculate and verify to be correct. 
+
+An event can be unmarked as an `outlier` once we fetch all of its `prev_events` (you will see some `ex_outlier` code around this).
 
 
 ## What is a `state_group`?
