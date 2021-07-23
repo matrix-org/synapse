@@ -902,7 +902,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             get_users_which_can_issue_invite(current_state)
         )
 
-        # If the local server isnot  one of allowed servers, then a remote
+        # If the local server is not one of allowed servers, then a remote
         # join must be done. Return the list of prospective servers based on
         # which can issue invites.
         if self.hs.hostname not in allowed_servers:
