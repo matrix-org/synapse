@@ -504,7 +504,6 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
 
         events_to_create = body["events"]
 
-        prev_event_ids = prev_events_from_query
         inherited_depth = await self._inherit_depth_from_prev_ids(
             prev_events_from_query
         )
@@ -516,6 +515,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         chunk_id_to_connect_to = chunk_id_from_query
         base_insertion_event = None
         if chunk_id_from_query:
+            #  All but the first base insertion event should point at a fake
+            #  event, which causes the HS to ask for the state at the start of
+            #  the chunk later.
+            prev_event_ids = [fake_prev_event_id]
             # TODO: Verify the chunk_id_from_query corresponds to an insertion event
             pass
         # Otherwise, create an insertion event to act as a starting point.
@@ -526,6 +529,8 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # an insertion event), in which case we just create a new insertion event
         # that can then get pointed to by a "marker" event later.
         else:
+            prev_event_ids = prev_events_from_query
+
             base_insertion_event_dict = self._create_insertion_event_dict(
                 sender=requester.user.to_string(),
                 room_id=room_id,
