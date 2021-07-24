@@ -258,13 +258,13 @@ class MatrixHostnameEndpoint:
 
     Args:
         reactor: twisted reactor to use for underlying requests
+        proxy_reactor: twisted reactor to use for connections to the proxy server
+           reactor might have some blacklisting applied (i.e. for DNS queries),
+           but we need unblocked access to the proxy.
         tls_client_options_factory:
             factory to use for fetching client tls options, or none to disable TLS.
         srv_resolver: The SRV resolver to use
         parsed_uri: The parsed URI that we're wanting to connect to.
-        proxy_reactor: twisted reactor to use for connections to the proxy server
-           reactor might have some blacklisting applied (i.e. for DNS queries),
-           but we need unblocked access to the proxy.
     """
 
     def __init__(
