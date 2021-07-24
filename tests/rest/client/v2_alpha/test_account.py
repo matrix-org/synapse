@@ -477,7 +477,7 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         self.assertEqual(whoami, {"user_id": user_id, "device_id": device_id})
 
     def test_GET_whoami_appservices(self):
-        user_id = "@as_user_kermit:test"
+        user_id = "@as:test"
         as_token = "i_am_an_app_service"
 
         appservice = ApplicationService(
@@ -485,7 +485,7 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             self.hs.config.server_name,
             id="1234",
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
-            sender="@as:test",
+            sender=user_id,
         )
         self.hs.get_datastore().services_cache.append(appservice)
 
