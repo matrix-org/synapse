@@ -95,7 +95,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
 
     def _make_connection(
-        self, client_factory: IProtocolFactory, expected_sni: bytes = None
+        self,
+        client_factory: IProtocolFactory,
+        ssl: bool = True,
+        expected_sni: bytes = None,
+        tls_sanlist: Optional[Iterable[bytes]] = None,
     ) -> HTTPChannel:
         """Builds a test server, and completes the outgoing client connection
         Args:
@@ -103,15 +107,24 @@ class MatrixFederationAgentTests(unittest.TestCase):
                 application is trying to use to make the outbound connection. We will
                 invoke it to build the client Protocol
 
+            ssl: If true, we will expect an ssl connection and wrap
+                server_factory with a TLSMemoryBIOFactory
+                False is set only for connection via http_proxy
+
             expected_sni: the expected SNI value
+
+            tls_sanlist: list of SAN entries for the TLS cert presented by the server.
 
         Returns:
             the server Protocol returned by server_factory
         """
 
         # build the test server
-        server_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
-        server_tls_protocol = server_factory.buildProtocol(None)
+        server_factory = _get_test_protocol_factory()
+        if ssl:
+            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
+
+        server_protocol = server_factory.buildProtocol(None)
 
         # now, tell the client protocol factory to build the client protocol (it will be a
         # _WrappingProtocol, around a TLSMemoryBIOProtocol, around an
@@ -122,26 +135,29 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # stubbing that out here.
         client_protocol = client_factory.buildProtocol(None)
         client_protocol.makeConnection(
-            FakeTransport(server_tls_protocol, self.reactor, client_protocol)
+            FakeTransport(server_protocol, self.reactor, client_protocol)
         )
 
-        # tell the server tls protocol to send its stuff back to the client, too
-        server_tls_protocol.makeConnection(
-            FakeTransport(client_protocol, self.reactor, server_tls_protocol)
+        # tell the server protocol to send its stuff back to the client, too
+        server_protocol.makeConnection(
+            FakeTransport(client_protocol, self.reactor, server_protocol)
         )
 
-        # grab a hold of the TLS connection, in case it gets torn down
-        server_tls_connection = server_tls_protocol._tlsConnection
-
-        # fish the test server back out of the server-side TLS protocol.
-        http_protocol = server_tls_protocol.wrappedProtocol
+        if ssl:
+            # fish the test server back out of the server-side TLS protocol.
+            http_protocol = server_protocol.wrappedProtocol
+            # grab a hold of the TLS connection, in case it gets torn down
+            tls_connection = server_protocol._tlsConnection
+        else:
+            http_protocol = server_protocol
+            tls_connection = None
 
         # give the reactor a pump to get the TLS juices flowing (if needed)
         self.reactor.advance(0)
 
         # check the SNI
         if expected_sni is not None:
-            server_name = server_tls_connection.get_servername()
+            server_name = tls_connection.get_servername()
             self.assertEqual(
                 server_name,
                 expected_sni,
