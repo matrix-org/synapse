@@ -22,7 +22,7 @@ from synapse.api.errors import NotFoundError, UnsupportedRoomVersionError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.storage.databases.main.roommember import RoomMemberWorkerStore
 from synapse.storage.state import StateFilter
@@ -66,7 +66,29 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
                 Typically this happens if support for the room's version has been
                 removed from Synapse.
         """
-        room_version_id = await self.get_room_version_id(room_id)
+        return await self.db_pool.runInteraction(
+            "get_room_version_txn",
+            self.get_room_version_txn,
+            room_id,
+        )
+
+    def get_room_version_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> RoomVersion:
+        """Get the room_version of a given room
+
+        Args:
+            txn: Transaction object
+            room_id: The room_id of the room you are trying to get the version for
+
+        Raises:
+            NotFoundError: if the room is unknown
+
+            UnsupportedRoomVersionError: if the room uses an unknown room version.
+                Typically this happens if support for the room's version has been
+                removed from Synapse.
+        """
+        room_version_id = self.get_room_version_id_txn(txn, room_id)
         v = KNOWN_ROOM_VERSIONS.get(room_version_id)
 
         if not v:
@@ -84,27 +106,43 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             NotFoundError: if the room is unknown
         """
+        return await self.db_pool.runInteraction(
+            "get_room_version_id_txn",
+            self.get_room_version_id_txn,
+            room_id,
+        )
+
+    def get_room_version_id_txn(self, txn: LoggingTransaction, room_id: str) -> str:
+        """Get the room_version of a given room
+
+        Args:
+            txn: Transaction object
+            room_id: The room_id of the room you are trying to get the version for
+
+        Raises:
+            NotFoundError: if the room is unknown
+        """
 
         # First we try looking up room version from the database, but for old
         # rooms we might not have added the room version to it yet so we fall
         # back to previous behaviour and look in current state events.
-
+        #
         # We really should have an entry in the rooms table for every room we
         # care about, but let's be a bit paranoid (at least while the background
         # update is happening) to avoid breaking existing rooms.
-        version = await self.db_pool.simple_select_one_onecol(
+        room_version = self.db_pool.simple_select_one_onecol_txn(
+            txn,
             table="rooms",
             keyvalues={"room_id": room_id},
             retcol="room_version",
-            desc="get_room_version",
             allow_none=True,
         )
 
-        if version is not None:
-            return version
+        if room_version is not None:
+            return room_version
 
         # Retrieve the room's create event
-        create_event = await self.get_create_event_for_room(room_id)
+        create_event = self.get_create_event_for_room_txn(txn, room_id)
         return create_event.content.get("room_version", "1")
 
     async def get_room_predecessor(self, room_id: str) -> Optional[dict]:
@@ -150,7 +188,29 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             NotFoundError if the room is unknown
         """
-        state_ids = await self.get_current_state_ids(room_id)
+        return await self.db_pool.runInteraction(
+            "get_create_event_for_room_txn",
+            self.get_create_event_for_room_txn,
+            room_id,
+        )
+
+    def get_create_event_for_room_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> EventBase:
+        """Get the create state event for a room.
+
+        Args:
+            txn: Transaction object
+            room_id: The room ID.
+
+        Returns:
+            The room creation event.
+
+        Raises:
+            NotFoundError if the room is unknown
+        """
+
+        state_ids = self.get_current_state_ids_txn(txn, room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
@@ -158,7 +218,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             raise NotFoundError("Unknown room %s" % (room_id,))
 
         # Retrieve the room's create event and return
-        create_event = await self.get_event(create_id)
+        create_event = self.get_event_txn(txn, create_id)
         return create_event
 
     @cached(max_entries=100000, iterable=True)
@@ -173,19 +233,34 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             The current state of the room.
         """
 
-        def _get_current_state_ids_txn(txn):
-            txn.execute(
-                """SELECT type, state_key, event_id FROM current_state_events
-                WHERE room_id = ?
-                """,
-                (room_id,),
-            )
-
-            return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
-
         return await self.db_pool.runInteraction(
-            "get_current_state_ids", _get_current_state_ids_txn
+            "get_current_state_ids_txn",
+            self.get_current_state_ids_txn,
+            room_id,
         )
+
+    def get_current_state_ids_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> StateMap[str]:
+        """Get the current state event ids for a room based on the
+        current_state_events table.
+
+        Args:
+            txn: Transaction object
+            room_id: The room to get the state IDs of.
+
+        Returns:
+            The current state of the room.
+        """
+
+        txn.execute(
+            """SELECT type, state_key, event_id FROM current_state_events
+            WHERE room_id = ?
+            """,
+            (room_id,),
+        )
+
+        return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
     # FIXME: how should this be cached?
     async def get_filtered_current_state_ids(
