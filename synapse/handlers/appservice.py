@@ -87,7 +87,8 @@ class ApplicationServicesHandler:
             self.is_processing = True
             try:
                 limit = 100
-                while True:
+                upper_bound = -1
+                while upper_bound < self.current_max:
                     (
                         upper_bound,
                         events,
@@ -95,10 +96,7 @@ class ApplicationServicesHandler:
                         self.current_max, limit
                     )
 
-                    if not events:
-                        break
-
-                    events_by_room = {}  # type: Dict[str, List[EventBase]]
+                    events_by_room: Dict[str, List[EventBase]] = {}
                     for event in events:
                         events_by_room.setdefault(event.room_id, []).append(event)
 
@@ -153,9 +151,6 @@ class ApplicationServicesHandler:
 
                     await self.store.set_appservice_last_pos(upper_bound)
 
-                    now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
-
                     synapse.metrics.event_processing_positions.labels(
                         "appservice_sender"
                     ).set(upper_bound)
@@ -168,12 +163,16 @@ class ApplicationServicesHandler:
 
                     event_processing_loop_counter.labels("appservice_sender").inc()
 
-                    synapse.metrics.event_processing_lag.labels(
-                        "appservice_sender"
-                    ).set(now - ts)
-                    synapse.metrics.event_processing_last_ts.labels(
-                        "appservice_sender"
-                    ).set(ts)
+                    if events:
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(events[-1].event_id)
+
+                        synapse.metrics.event_processing_lag.labels(
+                            "appservice_sender"
+                        ).set(now - ts)
+                        synapse.metrics.event_processing_last_ts.labels(
+                            "appservice_sender"
+                        ).set(ts)
             finally:
                 self.is_processing = False
 
@@ -276,7 +275,7 @@ class ApplicationServicesHandler:
     async def _handle_presence(
         self, service: ApplicationService, users: Collection[Union[str, UserID]]
     ) -> List[JsonDict]:
-        events = []  # type: List[JsonDict]
+        events: List[JsonDict] = []
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
@@ -376,7 +375,7 @@ class ApplicationServicesHandler:
         self, only_protocol: Optional[str] = None
     ) -> Dict[str, JsonDict]:
         services = self.store.get_app_services()
-        protocols = {}  # type: Dict[str, List[JsonDict]]
+        protocols: Dict[str, List[JsonDict]] = {}
 
         # Collect up all the individual protocol responses out of the ASes
         for s in services:

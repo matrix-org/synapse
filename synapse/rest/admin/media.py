@@ -17,6 +17,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_boolean, parse_integer
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
@@ -37,12 +38,11 @@ class QuarantineMediaInRoom(RestServlet):
     this server.
     """
 
-    PATTERNS = (
-        admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine")
-        +
+    PATTERNS = [
+        *admin_patterns("/room/(?P<room_id>[^/]+)/media/quarantine"),
         # This path kept around for legacy reasons
-        admin_patterns("/quarantine_media/(?P<room_id>[^/]+)")
-    )
+        *admin_patterns("/quarantine_media/(?P<room_id>[^/]+)"),
+    ]
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
@@ -120,6 +120,35 @@ class QuarantineMediaByID(RestServlet):
         return 200, {}
 
 
+class UnquarantineMediaByID(RestServlet):
+    """Quarantines local or remote media by a given ID so that no one can download
+    it via this server.
+    """
+
+    PATTERNS = admin_patterns(
+        "/media/unquarantine/(?P<server_name>[^/]+)/(?P<media_id>[^/]+)"
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(
+        self, request: SynapseRequest, server_name: str, media_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info(
+            "Remove from quarantine local media by ID: %s/%s", server_name, media_id
+        )
+
+        # Remove from quarantine this media id
+        await self.store.quarantine_media_by_id(server_name, media_id, None)
+
+        return 200, {}
+
+
 class ProtectMediaByID(RestServlet):
     """Protect local media from being quarantined."""
 
@@ -137,8 +166,31 @@ class ProtectMediaByID(RestServlet):
 
         logging.info("Protecting local media by ID: %s", media_id)
 
-        # Quarantine this media id
-        await self.store.mark_local_media_as_safe(media_id)
+        # Protect this media id
+        await self.store.mark_local_media_as_safe(media_id, safe=True)
+
+        return 200, {}
+
+
+class UnprotectMediaByID(RestServlet):
+    """Unprotect local media from being quarantined."""
+
+    PATTERNS = admin_patterns("/media/unprotect/(?P<media_id>[^/]+)")
+
+    def __init__(self, hs: "HomeServer"):
+        self.store = hs.get_datastore()
+        self.auth = hs.get_auth()
+
+    async def on_POST(
+        self, request: SynapseRequest, media_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self.auth.get_user_by_req(request)
+        await assert_user_is_admin(self.auth, requester.user)
+
+        logging.info("Unprotecting local media by ID: %s", media_id)
+
+        # Unprotect this media id
+        await self.store.mark_local_media_as_safe(media_id, safe=False)
 
         return 200, {}
 
@@ -260,15 +312,17 @@ class DeleteMediaByDateSize(RestServlet):
         return 200, {"deleted_media": deleted_media, "total": total}
 
 
-def register_servlets_for_media_repo(hs: "HomeServer", http_server):
+def register_servlets_for_media_repo(hs: "HomeServer", http_server: HttpServer) -> None:
     """
     Media repo specific APIs.
     """
     PurgeMediaCacheRestServlet(hs).register(http_server)
     QuarantineMediaInRoom(hs).register(http_server)
     QuarantineMediaByID(hs).register(http_server)
+    UnquarantineMediaByID(hs).register(http_server)
     QuarantineMediaByUser(hs).register(http_server)
     ProtectMediaByID(hs).register(http_server)
+    UnprotectMediaByID(hs).register(http_server)
     ListMediaInRoom(hs).register(http_server)
     DeleteMediaByID(hs).register(http_server)
     DeleteMediaByDateSize(hs).register(http_server)

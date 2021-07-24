@@ -1,5 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +29,7 @@ from .jwt import JWTConfig
 from .key import KeyConfig
 from .logger import LoggingConfig
 from .metrics import MetricsConfig
+from .modules import ModulesConfig
 from .oidc import OIDCConfig
 from .password_auth_providers import PasswordAuthProviderConfig
 from .push import PushConfig
@@ -56,8 +56,8 @@ from .workers import WorkerConfig
 class HomeServerConfig(RootConfig):
 
     config_classes = [
+        ModulesConfig,
         ServerConfig,
-        ExperimentalConfig,
         TlsConfig,
         FederationConfig,
         CacheConfig,
@@ -94,4 +94,5 @@ class HomeServerConfig(RootConfig):
         TracerConfig,
         WorkerConfig,
         RedisConfig,
+        ExperimentalConfig,
     ]

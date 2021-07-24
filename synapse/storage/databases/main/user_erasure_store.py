@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Dict, Iterable
+
 from synapse.storage._base import SQLBaseStore
 from synapse.util.caches.descriptors import cached, cachedList
 
@@ -37,21 +39,16 @@ class UserErasureWorkerStore(SQLBaseStore):
         return bool(result)
 
     @cachedList(cached_method_name="is_user_erased", list_name="user_ids")
-    async def are_users_erased(self, user_ids):
+    async def are_users_erased(self, user_ids: Iterable[str]) -> Dict[str, bool]:
         """
         Checks which users in a list have requested erasure
 
         Args:
-            user_ids (iterable[str]): full user id to check
+            user_ids: full user ids to check
 
         Returns:
-            dict[str, bool]:
-                for each user, whether the user has requested erasure.
+            for each user, whether the user has requested erasure.
         """
-        # this serves the dual purpose of (a) making sure we can do len and
-        # iterate it multiple times, and (b) avoiding duplicates.
-        user_ids = tuple(set(user_ids))
-
         rows = await self.db_pool.simple_select_many_batch(
             table="erased_users",
             column="user_id",

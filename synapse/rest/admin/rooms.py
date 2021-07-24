@@ -37,8 +37,10 @@ from synapse.types import JsonDict, RoomAlias, RoomID, UserID, create_requester
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
+    from synapse.api.auth import Auth
+    from synapse.handlers.pagination import PaginationHandler
+    from synapse.handlers.room import RoomShutdownHandler
     from synapse.server import HomeServer
-
 
 logger = logging.getLogger(__name__)
 
@@ -146,49 +148,13 @@ class DeleteRoomRestServlet(RestServlet):
     async def on_POST(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
-        await assert_user_is_admin(self.auth, requester.user)
-
-        content = parse_json_object_from_request(request)
-
-        block = content.get("block", False)
-        if not isinstance(block, bool):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Param 'block' must be a boolean, if given",
-                Codes.BAD_JSON,
-            )
-
-        purge = content.get("purge", True)
-        if not isinstance(purge, bool):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Param 'purge' must be a boolean, if given",
-                Codes.BAD_JSON,
-            )
-
-        force_purge = content.get("force_purge", False)
-        if not isinstance(force_purge, bool):
-            raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
-                "Param 'force_purge' must be a boolean, if given",
-                Codes.BAD_JSON,
-            )
-
-        ret = await self.room_shutdown_handler.shutdown_room(
-            room_id=room_id,
-            new_room_user_id=content.get("new_room_user_id"),
-            new_room_name=content.get("room_name"),
-            message=content.get("message"),
-            requester_user_id=requester.user.to_string(),
-            block=block,
+        return await _delete_room(
+            request,
+            room_id,
+            self.auth,
+            self.room_shutdown_handler,
+            self.pagination_handler,
         )
-
-        # Purge room
-        if purge:
-            await self.pagination_handler.purge_room(room_id, force=force_purge)
-
-        return (200, ret)
 
 
 class ListRoomRestServlet(RestServlet):
@@ -282,7 +248,22 @@ class ListRoomRestServlet(RestServlet):
 
 
 class RoomRestServlet(RestServlet):
-    """Get room details.
+    """Manage a room.
+
+    On GET : Get details of a room.
+
+    On DELETE : Delete a room from server.
+
+    It is a combination and improvement of shutdown and purge room.
+
+    Shuts down a room by removing all local users from the room.
+    Blocking all future invites and joins to the room is optional.
+
+    If desired any local aliases will be repointed to a new room
+    created by `new_room_user_id` and kicked users will be auto-
+    joined to the new room.
+
+    If 'purge' is true, it will remove all traces of a room from the database.
 
     TODO: Add on_POST to allow room creation without joining the room
     """
@@ -293,6 +274,8 @@ class RoomRestServlet(RestServlet):
         self.hs = hs
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.room_shutdown_handler = hs.get_room_shutdown_handler()
+        self.pagination_handler = hs.get_pagination_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -307,6 +290,17 @@ class RoomRestServlet(RestServlet):
         ret["joined_local_devices"] = await self.store.count_devices_by_users(members)
 
         return (200, ret)
+
+    async def on_DELETE(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        return await _delete_room(
+            request,
+            room_id,
+            self.auth,
+            self.room_shutdown_handler,
+            self.pagination_handler,
+        )
 
 
 class RoomMembersRestServlet(RestServlet):
@@ -408,9 +402,9 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
         # Get the room ID from the identifier.
         try:
-            remote_room_hosts = [
+            remote_room_hosts: Optional[List[str]] = [
                 x.decode("ascii") for x in request.args[b"server_name"]
-            ]  # type: Optional[List[str]]
+            ]
         except Exception:
             remote_room_hosts = None
         room_id, remote_room_hosts = await self.resolve_room_id(
@@ -468,6 +462,7 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
         super().__init__(hs)
         self.hs = hs
         self.auth = hs.get_auth()
+        self.store = hs.get_datastore()
         self.event_creation_handler = hs.get_event_creation_handler()
         self.state_handler = hs.get_state_handler()
         self.is_mine_id = hs.is_mine_id
@@ -506,7 +501,13 @@ class MakeRoomAdminRestServlet(ResolveRoomIdMixin, RestServlet):
             admin_user_id = None
 
             for admin_user in reversed(admin_users):
-                if room_state.get((EventTypes.Member, admin_user)):
+                (
+                    current_membership_type,
+                    _,
+                ) = await self.store.get_local_current_membership_for_user_in_room(
+                    admin_user, room_id
+                )
+                if current_membership_type == "join":
                     admin_user_id = admin_user
                     break
 
@@ -655,12 +656,10 @@ class RoomEventContextServlet(RestServlet):
         limit = parse_integer(request, "limit", default=10)
 
         # picking the API shape for symmetry with /messages
-        filter_str = parse_string(request, b"filter", encoding="utf-8")
+        filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(
-                json_decoder.decode(filter_json)
-            )  # type: Optional[Filter]
+            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
         else:
             event_filter = None
 
@@ -694,3 +693,55 @@ class RoomEventContextServlet(RestServlet):
         )
 
         return 200, results
+
+
+async def _delete_room(
+    request: SynapseRequest,
+    room_id: str,
+    auth: "Auth",
+    room_shutdown_handler: "RoomShutdownHandler",
+    pagination_handler: "PaginationHandler",
+) -> Tuple[int, JsonDict]:
+    requester = await auth.get_user_by_req(request)
+    await assert_user_is_admin(auth, requester.user)
+
+    content = parse_json_object_from_request(request)
+
+    block = content.get("block", False)
+    if not isinstance(block, bool):
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST,
+            "Param 'block' must be a boolean, if given",
+            Codes.BAD_JSON,
+        )
+
+    purge = content.get("purge", True)
+    if not isinstance(purge, bool):
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST,
+            "Param 'purge' must be a boolean, if given",
+            Codes.BAD_JSON,
+        )
+
+    force_purge = content.get("force_purge", False)
+    if not isinstance(force_purge, bool):
+        raise SynapseError(
+            HTTPStatus.BAD_REQUEST,
+            "Param 'force_purge' must be a boolean, if given",
+            Codes.BAD_JSON,
+        )
+
+    ret = await room_shutdown_handler.shutdown_room(
+        room_id=room_id,
+        new_room_user_id=content.get("new_room_user_id"),
+        new_room_name=content.get("room_name"),
+        message=content.get("message"),
+        requester_user_id=requester.user.to_string(),
+        block=block,
+    )
+
+    # Purge room
+    if purge:
+        await pagination_handler.purge_room(room_id, force=force_purge)
+
+    return (200, ret)

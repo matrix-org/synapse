@@ -164,7 +164,13 @@ class SAML2Config(Config):
         config_path = saml2_config.get("config_path", None)
         if config_path is not None:
             mod = load_python_module(config_path)
-            _dict_merge(merge_dict=mod.CONFIG, into_dict=saml2_config_dict)
+            config = getattr(mod, "CONFIG", None)
+            if config is None:
+                raise ConfigError(
+                    "Config path specified by saml2_config.config_path does not "
+                    "have a CONFIG property."
+                )
+            _dict_merge(merge_dict=config, into_dict=saml2_config_dict)
 
         import saml2.config
 

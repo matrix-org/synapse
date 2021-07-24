@@ -1,1 +1,0 @@
-Reduce CPU usage of the user directory by reusing existing calculated room membership.

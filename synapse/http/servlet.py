@@ -13,8 +13,12 @@
 # limitations under the License.
 
 """ This module contains base REST classes for constructing REST servlets. """
-
 import logging
+from typing import Dict, Iterable, List, Optional, overload
+
+from typing_extensions import Literal
+
+from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.util import json_decoder
@@ -105,14 +109,76 @@ def parse_boolean_from_args(args, name, default=None, required=False):
             return default
 
 
+@overload
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[bytes] = None,
+) -> Optional[bytes]:
+    ...
+
+
+@overload
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Literal[None] = None,
+    *,
+    required: Literal[True],
+) -> bytes:
+    ...
+
+
+@overload
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[bytes] = None,
+    required: bool = False,
+) -> Optional[bytes]:
+    ...
+
+
+def parse_bytes_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[bytes] = None,
+    required: bool = False,
+) -> Optional[bytes]:
+    """
+    Parse a string parameter as bytes from the request query string.
+
+    Args:
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent,
+            defaults to None. Must be bytes if encoding is None.
+        required: whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+    Returns:
+        Bytes or the default value.
+
+    Raises:
+        SynapseError if the parameter is absent and required.
+    """
+    name_bytes = name.encode("ascii")
+
+    if name_bytes in args:
+        return args[name_bytes][0]
+    elif required:
+        message = "Missing string query parameter %s" % (name,)
+        raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
+
+    return default
+
+
 def parse_string(
-    request,
-    name,
-    default=None,
-    required=False,
-    allowed_values=None,
-    param_type="string",
-    encoding="ascii",
+    request: Request,
+    name: str,
+    default: Optional[str] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
 ):
     """
     Parse a string parameter from the request query string.
@@ -122,72 +188,225 @@ def parse_string(
 
     Args:
         request: the twisted HTTP request.
-        name (bytes|unicode): the name of the query parameter.
-        default (bytes|unicode|None): value to use if the parameter is absent,
-            defaults to None. Must be bytes if encoding is None.
-        required (bool): whether to raise a 400 SynapseError if the
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the
             parameter is absent, defaults to False.
-        allowed_values (list[bytes|unicode]): List of allowed values for the
+        allowed_values: List of allowed values for the
             string, or None if any value is allowed, defaults to None. Must be
             the same type as name, if given.
-        encoding (str|None): The encoding to decode the string content with.
+        encoding: The encoding to decode the string content with.
 
     Returns:
-        bytes/unicode|None: A string value or the default. Unicode if encoding
-        was given, bytes otherwise.
+        A string value or the default.
 
     Raises:
         SynapseError if the parameter is absent and required, or if the
             parameter is present, must be one of a list of allowed values and
             is not one of those allowed values.
     """
+    args: Dict[bytes, List[bytes]] = request.args  # type: ignore
     return parse_string_from_args(
-        request.args, name, default, required, allowed_values, param_type, encoding
+        args,
+        name,
+        default,
+        required=required,
+        allowed_values=allowed_values,
+        encoding=encoding,
     )
 
 
-def parse_string_from_args(
-    args,
-    name,
-    default=None,
-    required=False,
-    allowed_values=None,
-    param_type="string",
-    encoding="ascii",
-):
+def _parse_string_value(
+    value: bytes,
+    allowed_values: Optional[Iterable[str]],
+    name: str,
+    encoding: str,
+) -> str:
+    try:
+        value_str = value.decode(encoding)
+    except ValueError:
+        raise SynapseError(400, "Query parameter %r must be %s" % (name, encoding))
 
-    if not isinstance(name, bytes):
-        name = name.encode("ascii")
+    if allowed_values is not None and value_str not in allowed_values:
+        message = "Query parameter %r must be one of [%s]" % (
+            name,
+            ", ".join(repr(v) for v in allowed_values),
+        )
+        raise SynapseError(400, message)
+    else:
+        return value_str
 
-    if name in args:
-        value = args[name][0]
 
-        if encoding:
-            try:
-                value = value.decode(encoding)
-            except ValueError:
-                raise SynapseError(
-                    400, "Query parameter %r must be %s" % (name, encoding)
-                )
+@overload
+def parse_strings_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[List[str]] = None,
+    *,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[List[str]]:
+    ...
 
-        if allowed_values is not None and value not in allowed_values:
-            message = "Query parameter %r must be one of [%s]" % (
-                name,
-                ", ".join(repr(v) for v in allowed_values),
-            )
-            raise SynapseError(400, message)
-        else:
-            return value
+
+@overload
+def parse_strings_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[List[str]] = None,
+    *,
+    required: Literal[True],
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> List[str]:
+    ...
+
+
+@overload
+def parse_strings_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[List[str]] = None,
+    *,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[List[str]]:
+    ...
+
+
+def parse_strings_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[List[str]] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[List[str]]:
+    """
+    Parse a string parameter from the request query string list.
+
+    The content of the query param will be decoded to Unicode using the encoding.
+
+    Args:
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+        allowed_values: List of allowed values for the
+            string, or None if any value is allowed, defaults to None.
+        encoding: The encoding to decode the string content with.
+
+    Returns:
+        A string value or the default.
+
+    Raises:
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present, must be one of a list of allowed values and
+            is not one of those allowed values.
+    """
+    name_bytes = name.encode("ascii")
+
+    if name_bytes in args:
+        values = args[name_bytes]
+
+        return [
+            _parse_string_value(value, allowed_values, name=name, encoding=encoding)
+            for value in values
+        ]
     else:
         if required:
-            message = "Missing %s query parameter %r" % (param_type, name)
+            message = "Missing string query parameter %r" % (name,)
             raise SynapseError(400, message, errcode=Codes.MISSING_PARAM)
-        else:
 
-            if encoding and isinstance(default, bytes):
-                return default.decode(encoding)
+        return default
 
-            return default
+
+@overload
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    *,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[str]:
+    ...
+
+
+@overload
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    *,
+    required: Literal[True],
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> str:
+    ...
+
+
+@overload
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[str]:
+    ...
+
+
+def parse_string_from_args(
+    args: Dict[bytes, List[bytes]],
+    name: str,
+    default: Optional[str] = None,
+    required: bool = False,
+    allowed_values: Optional[Iterable[str]] = None,
+    encoding: str = "ascii",
+) -> Optional[str]:
+    """
+    Parse the string parameter from the request query string list
+    and return the first result.
+
+    The content of the query param will be decoded to Unicode using the encoding.
+
+    Args:
+        args: A mapping of request args as bytes to a list of bytes (e.g. request.args).
+        name: the name of the query parameter.
+        default: value to use if the parameter is absent, defaults to None.
+        required: whether to raise a 400 SynapseError if the
+            parameter is absent, defaults to False.
+        allowed_values: List of allowed values for the
+            string, or None if any value is allowed, defaults to None. Must be
+            the same type as name, if given.
+        encoding: The encoding to decode the string content with.
+
+    Returns:
+        A string value or the default.
+
+    Raises:
+        SynapseError if the parameter is absent and required, or if the
+            parameter is present, must be one of a list of allowed values and
+            is not one of those allowed values.
+    """
+
+    strings = parse_strings_from_args(
+        args,
+        name,
+        default=[default] if default is not None else None,
+        required=required,
+        allowed_values=allowed_values,
+        encoding=encoding,
+    )
+
+    if strings is None:
+        return None
+
+    return strings[0]
 
 
 def parse_json_value_from_request(request, allow_empty_body=False):
@@ -215,7 +434,7 @@ def parse_json_value_from_request(request, allow_empty_body=False):
     try:
         content = json_decoder.decode(content_bytes.decode("utf-8"))
     except Exception as e:
-        logger.warning("Unable to parse JSON: %s", e)
+        logger.warning("Unable to parse JSON: %s (%s)", e, content_bytes)
         raise SynapseError(400, "Content not JSON.", errcode=Codes.NOT_JSON)
 
     return content
@@ -277,10 +496,9 @@ class RestServlet:
     """
 
     def register(self, http_server):
-        """ Register this servlet with the given HTTP server. """
-        if hasattr(self, "PATTERNS"):
-            patterns = self.PATTERNS
-
+        """Register this servlet with the given HTTP server."""
+        patterns = getattr(self, "PATTERNS", None)
+        if patterns:
             for method in ("GET", "PUT", "POST", "DELETE"):
                 if hasattr(self, "on_%s" % (method,)):
                     servlet_classname = self.__class__.__name__

@@ -1,1 +1,0 @@
-Move some replication processing out of `generic_worker`.

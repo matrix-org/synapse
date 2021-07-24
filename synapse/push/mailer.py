@@ -12,12 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import email.mime.multipart
-import email.utils
 import logging
 import urllib.parse
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, TypeVar
 
 import bleach
@@ -27,7 +23,6 @@ from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.config.emailconfig import EmailSubjectConfig
 from synapse.events import EventBase
-from synapse.logging.context import make_deferred_yieldable
 from synapse.push.presentable_names import (
     calculate_room_name,
     descriptor_from_member_events,
@@ -108,14 +103,14 @@ class Mailer:
         self.template_html = template_html
         self.template_text = template_text
 
-        self.sendmail = self.hs.get_sendmail()
+        self.send_email_handler = hs.get_send_email_handler()
         self.store = self.hs.get_datastore()
         self.state_store = self.hs.get_storage().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
         self.app_name = app_name
-        self.email_subjects = hs.config.email_subjects  # type: EmailSubjectConfig
+        self.email_subjects: EmailSubjectConfig = hs.config.email_subjects
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -235,7 +230,7 @@ class Mailer:
             [pa["event_id"] for pa in push_actions]
         )
 
-        notifs_by_room = {}  # type: Dict[str, List[Dict[str, Any]]]
+        notifs_by_room: Dict[str, List[Dict[str, Any]]] = {}
         for pa in push_actions:
             notifs_by_room.setdefault(pa["room_id"], []).append(pa)
 
@@ -310,17 +305,6 @@ class Mailer:
         self, email_address: str, subject: str, extra_template_vars: Dict[str, Any]
     ) -> None:
         """Send an email with the given information and template text"""
-        try:
-            from_string = self.hs.config.email_notif_from % {"app": self.app_name}
-        except TypeError:
-            from_string = self.hs.config.email_notif_from
-
-        raw_from = email.utils.parseaddr(from_string)[1]
-        raw_to = email.utils.parseaddr(email_address)[1]
-
-        if raw_to == "":
-            raise RuntimeError("Invalid 'to' address")
-
         template_vars = {
             "app_name": self.app_name,
             "server_name": self.hs.config.server.server_name,
@@ -329,35 +313,14 @@ class Mailer:
         template_vars.update(extra_template_vars)
 
         html_text = self.template_html.render(**template_vars)
-        html_part = MIMEText(html_text, "html", "utf8")
-
         plain_text = self.template_text.render(**template_vars)
-        text_part = MIMEText(plain_text, "plain", "utf8")
 
-        multipart_msg = MIMEMultipart("alternative")
-        multipart_msg["Subject"] = subject
-        multipart_msg["From"] = from_string
-        multipart_msg["To"] = email_address
-        multipart_msg["Date"] = email.utils.formatdate()
-        multipart_msg["Message-ID"] = email.utils.make_msgid()
-        multipart_msg.attach(text_part)
-        multipart_msg.attach(html_part)
-
-        logger.info("Sending email to %s" % email_address)
-
-        await make_deferred_yieldable(
-            self.sendmail(
-                self.hs.config.email_smtp_host,
-                raw_from,
-                raw_to,
-                multipart_msg.as_string().encode("utf8"),
-                reactor=self.hs.get_reactor(),
-                port=self.hs.config.email_smtp_port,
-                requireAuthentication=self.hs.config.email_smtp_user is not None,
-                username=self.hs.config.email_smtp_user,
-                password=self.hs.config.email_smtp_pass,
-                requireTransportSecurity=self.hs.config.require_transport_security,
-            )
+        await self.send_email_handler.send_email(
+            email_address=email_address,
+            subject=subject,
+            app_name=self.app_name,
+            html=html_text,
+            text=plain_text,
         )
 
     async def _get_room_vars(
@@ -393,13 +356,13 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
-        room_vars = {
+        room_vars: Dict[str, Any] = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
-        }  # type: Dict[str, Any]
+        }
 
         if not is_invite:
             for n in notifs:
@@ -497,9 +460,9 @@ class Mailer:
         type_state_key = ("m.room.member", event.sender)
         sender_state_event_id = room_state_ids.get(type_state_key)
         if sender_state_event_id:
-            sender_state_event = await self.store.get_event(
+            sender_state_event: Optional[EventBase] = await self.store.get_event(
                 sender_state_event_id
-            )  # type: Optional[EventBase]
+            )
         else:
             # Attempt to check the historical state for the room.
             historical_state = await self.state_store.get_state_for_event(

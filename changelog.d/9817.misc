@@ -1,1 +1,0 @@
-Fix a long-standing bug which caused `max_upload_size` to not be correctly enforced.

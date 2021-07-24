@@ -15,6 +15,7 @@
 
 import collections
 import inspect
+import itertools
 import logging
 from contextlib import contextmanager
 from typing import (
@@ -160,8 +161,11 @@ class ObservableDeferred:
         )
 
 
+T = TypeVar("T")
+
+
 def concurrently_execute(
-    func: Callable, args: Iterable[Any], limit: int
+    func: Callable[[T], Any], args: Iterable[T], limit: int
 ) -> defer.Deferred:
     """Executes the function with each argument concurrently while limiting
     the number of concurrent executions.
@@ -173,20 +177,27 @@ def concurrently_execute(
         limit: Maximum number of conccurent executions.
 
     Returns:
-        Deferred[list]: Resolved when all function invocations have finished.
+        Deferred: Resolved when all function invocations have finished.
     """
     it = iter(args)
 
-    async def _concurrently_execute_inner():
+    async def _concurrently_execute_inner(value: T) -> None:
         try:
             while True:
-                await maybe_awaitable(func(next(it)))
+                await maybe_awaitable(func(value))
+                value = next(it)
         except StopIteration:
             pass
 
+    # We use `itertools.islice` to handle the case where the number of args is
+    # less than the limit, avoiding needlessly spawning unnecessary background
+    # tasks.
     return make_deferred_yieldable(
         defer.gatherResults(
-            [run_in_background(_concurrently_execute_inner) for _ in range(limit)],
+            [
+                run_in_background(_concurrently_execute_inner, value)
+                for value in itertools.islice(it, limit)
+            ],
             consumeErrors=True,
         )
     ).addErrback(unwrapFirstError)
@@ -246,7 +257,7 @@ class Linearizer:
             max_count: The maximum number of concurrent accesses
         """
         if name is None:
-            self.name = id(self)  # type: Union[str, int]
+            self.name: Union[str, int] = id(self)
         else:
             self.name = name
 
@@ -258,7 +269,7 @@ class Linearizer:
         self.max_count = max_count
 
         # key_to_defer is a map from the key to a _LinearizerEntry.
-        self.key_to_defer = {}  # type: Dict[Hashable, _LinearizerEntry]
+        self.key_to_defer: Dict[Hashable, _LinearizerEntry] = {}
 
     def is_queued(self, key: Hashable) -> bool:
         """Checks whether there is a process queued up waiting"""
@@ -398,10 +409,10 @@ class ReadWriteLock:
 
     def __init__(self):
         # Latest readers queued
-        self.key_to_current_readers = {}  # type: Dict[str, Set[defer.Deferred]]
+        self.key_to_current_readers: Dict[str, Set[defer.Deferred]] = {}
 
         # Latest writer queued
-        self.key_to_current_writer = {}  # type: Dict[str, defer.Deferred]
+        self.key_to_current_writer: Dict[str, defer.Deferred] = {}
 
     async def read(self, key: str) -> ContextManager:
         new_defer = defer.Deferred()

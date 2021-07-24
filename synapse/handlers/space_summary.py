@@ -14,13 +14,20 @@
 
 import itertools
 import logging
+import re
 from collections import deque
-from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple, cast
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
-from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
-from synapse.api.errors import AuthError
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    HistoryVisibility,
+    JoinRules,
+    Membership,
+    RoomTypes,
+)
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -31,7 +38,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # number of rooms to return. We'll stop once we hit this limit.
-# TODO: allow clients to reduce this with a request param.
 MAX_ROOMS = 50
 
 # max number of events to return per room.
@@ -45,8 +51,7 @@ class SpaceSummaryHandler:
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self._auth = hs.get_auth()
-        self._room_list_handler = hs.get_room_list_handler()
-        self._state_handler = hs.get_state_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
@@ -85,14 +90,14 @@ class SpaceSummaryHandler:
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
         # rooms we have already processed
-        processed_rooms = set()  # type: Set[str]
+        processed_rooms: Set[str] = set()
 
         # events we have already processed. We don't necessarily have their event ids,
         # so instead we key on (room id, state key)
-        processed_events = set()  # type: Set[Tuple[str, str]]
+        processed_events: Set[Tuple[str, str]] = set()
 
-        rooms_result = []  # type: List[JsonDict]
-        events_result = []  # type: List[JsonDict]
+        rooms_result: List[JsonDict] = []
+        events_result: List[JsonDict] = []
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             queue_entry = room_queue.popleft()
@@ -111,28 +116,95 @@ class SpaceSummaryHandler:
             max_children = max_rooms_per_space if processed_rooms else None
 
             if is_in_room:
-                rooms, events = await self._summarize_local_room(
-                    requester, room_id, suggested_only, max_children
+                room, events = await self._summarize_local_room(
+                    requester, None, room_id, suggested_only, max_children
                 )
+
+                logger.debug(
+                    "Query of local room %s returned events %s",
+                    room_id,
+                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
+                )
+
+                if room:
+                    rooms_result.append(room)
             else:
-                rooms, events = await self._summarize_remote_room(
+                fed_rooms, fed_events = await self._summarize_remote_room(
                     queue_entry,
                     suggested_only,
                     max_children,
                     exclude_rooms=processed_rooms,
                 )
 
-            logger.debug(
-                "Query of %s returned rooms %s, events %s",
-                queue_entry.room_id,
-                [room.get("room_id") for room in rooms],
-                ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
-            )
+                # The results over federation might include rooms that the we,
+                # as the requesting server, are allowed to see, but the requesting
+                # user is not permitted see.
+                #
+                # Filter the returned results to only what is accessible to the user.
+                room_ids = set()
+                events = []
+                for room in fed_rooms:
+                    fed_room_id = room.get("room_id")
+                    if not fed_room_id or not isinstance(fed_room_id, str):
+                        continue
 
-            rooms_result.extend(rooms)
+                    # The room should only be included in the summary if:
+                    #     a. the user is in the room;
+                    #     b. the room is world readable; or
+                    #     c. the user could join the room, e.g. the join rules
+                    #        are set to public or the user is in a space that
+                    #        has been granted access to the room.
+                    #
+                    # Note that we know the user is not in the root room (which is
+                    # why the remote call was made in the first place), but the user
+                    # could be in one of the children rooms and we just didn't know
+                    # about the link.
 
-            # any rooms returned don't need visiting again
-            processed_rooms.update(cast(str, room.get("room_id")) for room in rooms)
+                    # The API doesn't return the room version so assume that a
+                    # join rule of knock is valid.
+                    include_room = (
+                        room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+                        or room.get("world_readable") is True
+                    )
+
+                    # Check if the user is a member of any of the allowed spaces
+                    # from the response.
+                    allowed_rooms = room.get("allowed_spaces")
+                    if (
+                        not include_room
+                        and allowed_rooms
+                        and isinstance(allowed_rooms, list)
+                    ):
+                        include_room = await self._event_auth_handler.is_user_in_rooms(
+                            allowed_rooms, requester
+                        )
+
+                    # Finally, if this isn't the requested room, check ourselves
+                    # if we can access the room.
+                    if not include_room and fed_room_id != queue_entry.room_id:
+                        include_room = await self._is_room_accessible(
+                            fed_room_id, requester, None
+                        )
+
+                    # The user can see the room, include it!
+                    if include_room:
+                        rooms_result.append(room)
+                        room_ids.add(fed_room_id)
+
+                    # All rooms returned don't need visiting again (even if the user
+                    # didn't have access to them).
+                    processed_rooms.add(fed_room_id)
+
+                for event in fed_events:
+                    if event.get("room_id") in room_ids:
+                        events.append(event)
+
+                logger.debug(
+                    "Query of %s returned rooms %s, events %s",
+                    room_id,
+                    [room.get("room_id") for room in fed_rooms],
+                    ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in fed_events],
+                )
 
             # the room we queried may or may not have been returned, but don't process
             # it again, anyway.
@@ -158,10 +230,16 @@ class SpaceSummaryHandler:
                 )
                 processed_events.add(ev_key)
 
+        # Before returning to the client, remove the allowed_spaces key for any
+        # rooms.
+        for room in rooms_result:
+            room.pop("allowed_spaces", None)
+
         return {"rooms": rooms_result, "events": events_result}
 
     async def federation_space_summary(
         self,
+        origin: str,
         room_id: str,
         suggested_only: bool,
         max_rooms_per_space: Optional[int],
@@ -171,6 +249,8 @@ class SpaceSummaryHandler:
         Implementation of the space summary Federation API
 
         Args:
+            origin: The server requesting the spaces summary.
+
             room_id: room id to start the summary at
 
             suggested_only: whether we should only return children with the "suggested"
@@ -192,10 +272,10 @@ class SpaceSummaryHandler:
         # the set of rooms that we should not walk further. Initialise it with the
         # excluded-rooms list; we will add other rooms as we process them so that
         # we do not loop.
-        processed_rooms = set(exclude_rooms)  # type: Set[str]
+        processed_rooms: Set[str] = set(exclude_rooms)
 
-        rooms_result = []  # type: List[JsonDict]
-        events_result = []  # type: List[JsonDict]
+        rooms_result: List[JsonDict] = []
+        events_result: List[JsonDict] = []
 
         while room_queue and len(rooms_result) < MAX_ROOMS:
             room_id = room_queue.popleft()
@@ -205,14 +285,15 @@ class SpaceSummaryHandler:
 
             logger.debug("Processing room %s", room_id)
 
-            rooms, events = await self._summarize_local_room(
-                None, room_id, suggested_only, max_rooms_per_space
+            room, events = await self._summarize_local_room(
+                None, origin, room_id, suggested_only, max_rooms_per_space
             )
 
             processed_rooms.add(room_id)
 
-            rooms_result.extend(rooms)
-            events_result.extend(events)
+            if room:
+                rooms_result.append(room)
+                events_result.extend(events)
 
             # add any children to the queue
             room_queue.extend(edge_event["state_key"] for edge_event in events)
@@ -222,16 +303,46 @@ class SpaceSummaryHandler:
     async def _summarize_local_room(
         self,
         requester: Optional[str],
+        origin: Optional[str],
         room_id: str,
         suggested_only: bool,
         max_children: Optional[int],
-    ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
-        if not await self._is_room_accessible(room_id, requester):
-            return (), ()
+    ) -> Tuple[Optional[JsonDict], Sequence[JsonDict]]:
+        """
+        Generate a room entry and a list of event entries for a given room.
+
+        Args:
+            requester:
+                The user requesting the summary, if it is a local request. None
+                if this is a federation request.
+            origin:
+                The server requesting the summary, if it is a federation request.
+                None if this is a local request.
+            room_id: The room ID to summarize.
+            suggested_only: True if only suggested children should be returned.
+                Otherwise, all children are returned.
+            max_children:
+                The maximum number of children rooms to include. This is capped
+                to a server-set limit.
+
+        Returns:
+            A tuple of:
+                The room information, if the room should be returned to the
+                user. None, otherwise.
+
+                An iterable of the sorted children events. This may be limited
+                to a maximum size or may include all children.
+        """
+        if not await self._is_room_accessible(room_id, requester, origin):
+            return None, ()
 
         room_entry = await self._build_room_entry(room_id)
 
-        # look for child rooms/spaces.
+        # If the room is not a space, return just the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE:
+            return room_entry, ()
+
+        # Otherwise, look for child rooms/spaces.
         child_events = await self._get_child_events(room_id)
 
         if suggested_only:
@@ -242,7 +353,7 @@ class SpaceSummaryHandler:
             max_children = MAX_ROOMS_PER_SPACE
 
         now = self._clock.time_msec()
-        events_result = []  # type: List[JsonDict]
+        events_result: List[JsonDict] = []
         for edge_event in itertools.islice(child_events, max_children):
             events_result.append(
                 await self._event_serializer.serialize_event(
@@ -251,7 +362,8 @@ class SpaceSummaryHandler:
                     event_format=format_event_for_client_v2,
                 )
             )
-        return (room_entry,), events_result
+
+        return room_entry, events_result
 
     async def _summarize_remote_room(
         self,
@@ -260,6 +372,26 @@ class SpaceSummaryHandler:
         max_children: Optional[int],
         exclude_rooms: Iterable[str],
     ) -> Tuple[Sequence[JsonDict], Sequence[JsonDict]]:
+        """
+        Request room entries and a list of event entries for a given room by querying a remote server.
+
+        Args:
+            room: The room to summarize.
+            suggested_only: True if only suggested children should be returned.
+                Otherwise, all children are returned.
+            max_children:
+                The maximum number of children rooms to include. This is capped
+                to a server-set limit.
+            exclude_rooms:
+                Rooms IDs which do not need to be summarized.
+
+        Returns:
+            A tuple of:
+                An iterable of rooms.
+
+                An iterable of the sorted children events. This may be limited
+                to a maximum size or may include all children.
+        """
         room_id = room.room_id
         logger.info("Requesting summary for %s via %s", room_id, room.via)
 
@@ -285,34 +417,118 @@ class SpaceSummaryHandler:
             return (), ()
 
         return res.rooms, tuple(
-            ev.data
-            for ev in res.events
-            if ev.event_type == EventTypes.MSC1772_SPACE_CHILD
+            ev.data for ev in res.events if ev.event_type == EventTypes.SpaceChild
         )
 
-    async def _is_room_accessible(self, room_id: str, requester: Optional[str]) -> bool:
-        # if we have an authenticated requesting user, first check if they are in the
-        # room
-        if requester:
-            try:
-                await self._auth.check_user_in_room(room_id, requester)
+    async def _is_room_accessible(
+        self, room_id: str, requester: Optional[str], origin: Optional[str]
+    ) -> bool:
+        """
+        Calculate whether the room should be shown in the spaces summary.
+
+        It should be included if:
+
+        * The requester is joined or can join the room (per MSC3173).
+        * The origin server has any user that is joined or can join the room.
+        * The history visibility is set to world readable.
+
+        Args:
+            room_id: The room ID to summarize.
+            requester:
+                The user requesting the summary, if it is a local request. None
+                if this is a federation request.
+            origin:
+                The server requesting the summary, if it is a federation request.
+                None if this is a local request.
+
+        Returns:
+             True if the room should be included in the spaces summary.
+        """
+        state_ids = await self._store.get_current_state_ids(room_id)
+
+        # If there's no state for the room, it isn't known.
+        if not state_ids:
+            # The user might have a pending invite for the room.
+            if requester and await self._store.get_invite_for_local_user_in_room(
+                requester, room_id
+            ):
                 return True
-            except AuthError:
-                pass
 
-        # otherwise, check if the room is peekable
-        hist_vis_ev = await self._state_handler.get_current_state(
-            room_id, EventTypes.RoomHistoryVisibility, ""
-        )
-        if hist_vis_ev:
+            logger.info("room %s is unknown, omitting from summary", room_id)
+            return False
+
+        room_version = await self._store.get_room_version(room_id)
+
+        # Include the room if it has join rules of public or knock.
+        join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))
+        if join_rules_event_id:
+            join_rules_event = await self._store.get_event(join_rules_event_id)
+            join_rule = join_rules_event.content.get("join_rule")
+            if join_rule == JoinRules.PUBLIC or (
+                room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+            ):
+                return True
+
+        # Include the room if it is peekable.
+        hist_vis_event_id = state_ids.get((EventTypes.RoomHistoryVisibility, ""))
+        if hist_vis_event_id:
+            hist_vis_ev = await self._store.get_event(hist_vis_event_id)
             hist_vis = hist_vis_ev.content.get("history_visibility")
             if hist_vis == HistoryVisibility.WORLD_READABLE:
                 return True
 
+        # Otherwise we need to check information specific to the user or server.
+
+        # If we have an authenticated requesting user, check if they are a member
+        # of the room (or can join the room).
+        if requester:
+            member_event_id = state_ids.get((EventTypes.Member, requester), None)
+
+            # If they're in the room they can see info on it.
+            if member_event_id:
+                member_event = await self._store.get_event(member_event_id)
+                if member_event.membership in (Membership.JOIN, Membership.INVITE):
+                    return True
+
+            # Otherwise, check if they should be allowed access via membership in a space.
+            if await self._event_auth_handler.has_restricted_join_rules(
+                state_ids, room_version
+            ):
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
+                )
+                if await self._event_auth_handler.is_user_in_rooms(
+                    allowed_rooms, requester
+                ):
+                    return True
+
+        # If this is a request over federation, check if the host is in the room or
+        # has a user who could join the room.
+        elif origin:
+            if await self._event_auth_handler.check_host_in_room(
+                room_id, origin
+            ) or await self._store.is_host_invited(room_id, origin):
+                return True
+
+            # Alternately, if the host has a user in any of the spaces specified
+            # for access, then the host can see this room (and should do filtering
+            # if the requester cannot see it).
+            if await self._event_auth_handler.has_restricted_join_rules(
+                state_ids, room_version
+            ):
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(state_ids)
+                )
+                for space_id in allowed_rooms:
+                    if await self._event_auth_handler.check_host_in_room(
+                        space_id, origin
+                    ):
+                        return True
+
         logger.info(
-            "room %s is unpeekable and user %s is not a member, omitting from summary",
+            "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
             room_id,
-            requester,
+            requester or origin,
         )
         return False
 
@@ -330,8 +546,14 @@ class SpaceSummaryHandler:
             current_state_ids[(EventTypes.Create, "")]
         )
 
-        # TODO: update once MSC1772 lands
-        room_type = create_event.content.get(EventContentFields.MSC1772_ROOM_TYPE)
+        room_version = await self._store.get_room_version(room_id)
+        allowed_rooms = None
+        if await self._event_auth_handler.has_restricted_join_rules(
+            current_state_ids, room_version
+        ):
+            allowed_rooms = await self._event_auth_handler.get_rooms_that_allow_join(
+                current_state_ids
+            )
 
         entry = {
             "room_id": stats["room_id"],
@@ -340,11 +562,14 @@ class SpaceSummaryHandler:
             "canonical_alias": stats["canonical_alias"],
             "num_joined_members": stats["joined_members"],
             "avatar_url": stats["avatar"],
+            "join_rules": stats["join_rules"],
             "world_readable": (
                 stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
             ),
             "guest_can_join": stats["guest_access"] == "can_join",
-            "room_type": room_type,
+            "creation_ts": create_event.origin_server_ts,
+            "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
+            "allowed_spaces": allowed_rooms,
         }
 
         # Filter out Nones – rather omit the field altogether
@@ -353,6 +578,18 @@ class SpaceSummaryHandler:
         return room_entry
 
     async def _get_child_events(self, room_id: str) -> Iterable[EventBase]:
+        """
+        Get the child events for a given room.
+
+        The returned results are sorted for stability.
+
+        Args:
+            room_id: The room id to get the children of.
+
+        Returns:
+            An iterable of sorted child events.
+        """
+
         # look for child rooms/spaces.
         current_state_ids = await self._store.get_current_state_ids(room_id)
 
@@ -360,13 +597,13 @@ class SpaceSummaryHandler:
             [
                 event_id
                 for key, event_id in current_state_ids.items()
-                # TODO: update once MSC1772 lands
-                if key[0] == EventTypes.MSC1772_SPACE_CHILD
+                if key[0] == EventTypes.SpaceChild
             ]
         )
 
-        # filter out any events without a "via" (which implies it has been redacted)
-        return (e for e in events if _has_valid_via(e))
+        # filter out any events without a "via" (which implies it has been redacted),
+        # and order to ensure we return stable results.
+        return sorted(filter(_has_valid_via, events), key=_child_events_comparison_key)
 
 
 @attr.s(frozen=True, slots=True)
@@ -392,3 +629,39 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
         return True
     logger.debug("Ignorning not-suggested child %s", edge_event.state_key)
     return False
+
+
+# Order may only contain characters in the range of \x20 (space) to \x7E (~) inclusive.
+_INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7E]")
+
+
+def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str], str]:
+    """
+    Generate a value for comparing two child events for ordering.
+
+    The rules for ordering are supposed to be:
+
+    1. The 'order' key, if it is valid.
+    2. The 'origin_server_ts' of the 'm.room.create' event.
+    3. The 'room_id'.
+
+    But we skip step 2 since we may not have any state from the room.
+
+    Args:
+        child: The event for generating a comparison key.
+
+    Returns:
+        The comparison key as a tuple of:
+            False if the ordering is valid.
+            The ordering field.
+            The room ID.
+    """
+    order = child.content.get("order")
+    # If order is not a string or doesn't meet the requirements, ignore it.
+    if not isinstance(order, str):
+        order = None
+    elif len(order) > 50 or _INVALID_ORDER_CHARS_RE.search(order):
+        order = None
+
+    # Items without an order come last.
+    return (order is None, order, child.room_id)

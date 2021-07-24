@@ -1,1 +1,0 @@
-Fixes the OIDC SSO flow when using a `public_baseurl` value including a non-root URL path.

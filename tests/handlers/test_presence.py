@@ -32,13 +32,19 @@ from synapse.handlers.presence import (
     handle_timeout,
     handle_update,
 )
+from synapse.rest import admin
 from synapse.rest.client.v1 import room
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest
 
 
-class PresenceUpdateTestCase(unittest.TestCase):
+class PresenceUpdateTestCase(unittest.HomeserverTestCase):
+    servlets = [admin.register_servlets]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
+
     def test_offline_to_online(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
@@ -292,6 +298,45 @@ class PresenceUpdateTestCase(unittest.TestCase):
             any_order=True,
         )
 
+    def test_persisting_presence_updates(self):
+        """Tests that the latest presence state for each user is persisted correctly"""
+        # Create some test users and presence states for them
+        presence_states = []
+        for i in range(5):
+            user_id = self.register_user(f"user_{i}", "password")
+
+            presence_state = UserPresenceState(
+                user_id=user_id,
+                state="online",
+                last_active_ts=1,
+                last_federation_update_ts=1,
+                last_user_sync_ts=1,
+                status_msg="I'm online!",
+                currently_active=True,
+            )
+            presence_states.append(presence_state)
+
+        # Persist these presence updates to the database
+        self.get_success(self.store.update_presence(presence_states))
+
+        # Check that each update is present in the database
+        db_presence_states = self.get_success(
+            self.store.get_all_presence_updates(
+                instance_name="master",
+                last_id=0,
+                current_id=len(presence_states) + 1,
+                limit=len(presence_states),
+            )
+        )
+
+        # Extract presence update user ID and state information into lists of tuples
+        db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states[0]]
+        presence_states = [(ps.user_id, ps.state) for ps in presence_states]
+
+        # Compare what we put into the storage with what we got out.
+        # They should be identical.
+        self.assertEqual(presence_states, db_presence_states)
+
 
 class PresenceTimeoutTestCase(unittest.TestCase):
     def test_idle_timer(self):
@@ -509,6 +554,14 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
 
         self.assertCountEqual(rows, expected_rows)
 
+        now_token = self.queue.get_current_token(self.instance_name)
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", upto_token, now_token, 10)
+        )
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+        self.assertCountEqual(rows, [])
+
     def test_send_and_get_split(self):
         state1 = UserPresenceState.default("@user1:test")
         state2 = UserPresenceState.default("@user2:test")
@@ -534,6 +587,20 @@ class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
             (1, ("dest2", "@user1:test")),
             (1, ("dest1", "@user2:test")),
             (1, ("dest2", "@user2:test")),
+        ]
+
+        self.assertCountEqual(rows, expected_rows)
+
+        now_token = self.queue.get_current_token(self.instance_name)
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", upto_token, now_token, 10)
+        )
+
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (2, ("dest3", "@user3:test")),
         ]
 
         self.assertCountEqual(rows, expected_rows)
@@ -667,7 +734,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
-        self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
         # We don't actually check signatures in tests, so lets just create a
         # random key to use.
@@ -707,7 +774,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=["server2"], states={expected_state}
+            destinations={"server2"}, states=[expected_state]
         )
 
         #
@@ -718,7 +785,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self._add_new_user(room_id, "@bob:server3")
 
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
-            destinations=["server3"], states={expected_state}
+            destinations={"server3"}, states=[expected_state]
         )
 
     def test_remote_gets_presence_when_local_user_joins(self):
@@ -766,14 +833,8 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.presence_handler.current_state_for_user("@test2:server")
         )
         self.assertEqual(expected_state.state, PresenceState.ONLINE)
-        self.assertEqual(
-            self.federation_sender.send_presence_to_destinations.call_count, 2
-        )
-        self.federation_sender.send_presence_to_destinations.assert_any_call(
-            destinations=["server3"], states={expected_state}
-        )
-        self.federation_sender.send_presence_to_destinations.assert_any_call(
-            destinations=["server2"], states={expected_state}
+        self.federation_sender.send_presence_to_destinations.assert_called_once_with(
+            destinations={"server2", "server3"}, states=[expected_state]
         )
 
     def _add_new_user(self, room_id, user_id):
@@ -785,7 +846,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         builder = EventBuilder(
             state=self.state,
-            auth=self.auth,
+            event_auth_handler=self._event_auth_handler,
             store=self.store,
             clock=self.clock,
             hostname=hostname,
@@ -802,7 +863,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(room_id)
         )
 
-        event = self.get_success(builder.build(prev_event_ids, None))
+        event = self.get_success(
+            builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
+        )
 
         self.get_success(self.federation_handler.on_receive_pdu(hostname, event))
 

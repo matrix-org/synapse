@@ -62,9 +62,16 @@ class AdminHandler(BaseHandler):
         if ret:
             profile = await self.store.get_profileinfo(user.localpart)
             threepids = await self.store.user_get_threepids(user.to_string())
+            external_ids = [
+                ({"auth_provider": auth_provider, "external_id": external_id})
+                for auth_provider, external_id in await self.store.get_external_ids_by_user(
+                    user.to_string()
+                )
+            ]
             ret["displayname"] = profile.display_name
             ret["avatar_url"] = profile.avatar_url
             ret["threepids"] = threepids
+            ret["external_ids"] = external_ids
         return ret
 
     async def export_user_data(self, user_id: str, writer: "ExfiltrationWriter") -> Any:
@@ -132,7 +139,7 @@ class AdminHandler(BaseHandler):
             to_key = RoomStreamToken(None, stream_ordering)
 
             # Events that we've processed in this room
-            written_events = set()  # type: Set[str]
+            written_events: Set[str] = set()
 
             # We need to track gaps in the events stream so that we can then
             # write out the state at those events. We do this by keeping track
@@ -145,7 +152,7 @@ class AdminHandler(BaseHandler):
             # The reverse mapping to above, i.e. map from unseen event to events
             # that have the unseen event in their prev_events, i.e. the unseen
             # events "children".
-            unseen_to_child_events = {}  # type: Dict[str, Set[str]]
+            unseen_to_child_events: Dict[str, Set[str]] = {}
 
             # We fetch events in the room the user could see by fetching *all*
             # events that we have and then filtering, this isn't the most

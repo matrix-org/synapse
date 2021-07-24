@@ -68,7 +68,7 @@ class SlavedDeviceStore(EndToEndKeyWorkerStore, DeviceWorkerStore, BaseSlavedSto
             if row.entity.startswith("@"):
                 self._device_list_stream_cache.entity_has_changed(row.entity, token)
                 self.get_cached_devices_for_user.invalidate((row.entity,))
-                self._get_cached_user_device.invalidate_many((row.entity,))
+                self._get_cached_user_device.invalidate((row.entity,))
                 self.get_device_list_last_stream_id_for_remote.invalidate((row.entity,))
 
             else:

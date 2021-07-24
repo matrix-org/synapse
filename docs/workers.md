@@ -16,7 +16,7 @@ workers only work with PostgreSQL-based Synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.
 
-See also https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability
+See also [Matrix.org blog post](https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability)
 for a higher level overview.
 
 ## Main process/worker communication
@@ -73,7 +73,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-[reverse_proxy.md](reverse_proxy.md) for information on setting up a reverse
+[the reverse proxy documentation](reverse_proxy.md) for information on setting up a reverse
 proxy.
 
 When using workers, each worker process has its own configuration file which
@@ -170,8 +170,8 @@ Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
 recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
-[systemd-with-workers](systemd-with-workers). To use `synctl`, see
-[synctl_workers.md](synctl_workers.md).
+[Systemd with Workers](systemd-with-workers). To use `synctl`, see
+[Using synctl with Workers](synctl_workers.md).
 
 
 ## Available worker applications
@@ -228,6 +228,9 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/joined_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups$
     ^/_matrix/client/(api/v1|r0|unstable)/publicised_groups/
+    ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/event/
+    ^/_matrix/client/(api/v1|r0|unstable)/joined_rooms$
+    ^/_matrix/client/(api/v1|r0|unstable)/search$
 
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$

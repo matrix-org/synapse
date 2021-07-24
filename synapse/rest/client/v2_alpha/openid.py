@@ -85,7 +85,7 @@ class IdTokenServlet(RestServlet):
                 "access_token": token,
                 "token_type": "Bearer",
                 "matrix_server_name": self.server_name,
-                "expires_in": self.EXPIRES_MS / 1000,
+                "expires_in": self.EXPIRES_MS // 1000,
             },
         )
 

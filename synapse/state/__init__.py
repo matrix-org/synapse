@@ -213,10 +213,15 @@ class StateHandler:
         return ret.state
 
     async def get_current_users_in_room(
-        self, room_id: str, latest_event_ids: Optional[List[str]] = None
+        self, room_id: str, latest_event_ids: List[str]
     ) -> Dict[str, ProfileInfo]:
         """
         Get the users who are currently in a room.
+
+        Note: This is much slower than using the equivalent method
+        `DataStore.get_users_in_room` or `DataStore.get_users_in_room_with_profiles`,
+        so this should only be used when wanting the users at a particular point
+        in the room.
 
         Args:
             room_id: The ID of the room.
@@ -224,8 +229,7 @@ class StateHandler:
         Returns:
             Dictionary of user IDs to their profileinfo.
         """
-        if not latest_event_ids:
-            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+
         assert latest_event_ids is not None
 
         logger.debug("calling resolve_state_groups from get_current_users_in_room")
@@ -305,9 +309,9 @@ class StateHandler:
 
         if old_state:
             # if we're given the state before the event, then we use that
-            state_ids_before_event = {
+            state_ids_before_event: StateMap[str] = {
                 (s.type, s.state_key): s.event_id for s in old_state
-            }  # type: StateMap[str]
+            }
             state_group_before_event = None
             state_group_before_event_prev_group = None
             deltas_to_state_group_before_event = None
@@ -509,23 +513,25 @@ class StateResolutionHandler:
         self.resolve_linearizer = Linearizer(name="state_resolve_lock")
 
         # dict of set of event_ids -> _StateCacheEntry.
-        self._state_cache = ExpiringCache(
+        self._state_cache: ExpiringCache[
+            FrozenSet[int], _StateCacheEntry
+        ] = ExpiringCache(
             cache_name="state_cache",
             clock=self.clock,
             max_len=100000,
             expiry_ms=EVICTION_TIMEOUT_SECONDS * 1000,
             iterable=True,
             reset_expiry_on_get=True,
-        )  # type: ExpiringCache[FrozenSet[int], _StateCacheEntry]
+        )
 
         #
         # stuff for tracking time spent on state-res by room
         #
 
         # tracks the amount of work done on state res per room
-        self._state_res_metrics = defaultdict(
+        self._state_res_metrics: DefaultDict[str, _StateResMetrics] = defaultdict(
             _StateResMetrics
-        )  # type: DefaultDict[str, _StateResMetrics]
+        )
 
         self.clock.looping_call(self._report_metrics, 120 * 1000)
 
@@ -696,9 +702,9 @@ class StateResolutionHandler:
         items = self._state_res_metrics.items()
 
         # log the N biggest rooms
-        biggest = heapq.nlargest(
+        biggest: List[Tuple[str, _StateResMetrics]] = heapq.nlargest(
             n_to_log, items, key=lambda i: extract_key(i[1])
-        )  # type: List[Tuple[str, _StateResMetrics]]
+        )
         metrics_logger.debug(
             "%i biggest rooms for state-res by %s: %s",
             len(biggest),
@@ -750,7 +756,7 @@ def _make_state_cache_entry(
 
     # failing that, look for the closest match.
     prev_group = None
-    delta_ids = None  # type: Optional[StateMap[str]]
+    delta_ids: Optional[StateMap[str]] = None
 
     for old_group, old_state in state_groups_ids.items():
         n_delta_ids = {k: v for k, v in new_state.items() if old_state.get(k) != v}

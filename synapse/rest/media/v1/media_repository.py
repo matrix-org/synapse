@@ -76,16 +76,18 @@ class MediaRepository:
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
 
-        self.primary_base_path = hs.config.media_store_path  # type: str
-        self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
+        Thumbnailer.set_limits(self.max_image_pixels)
+
+        self.primary_base_path: str = hs.config.media_store_path
+        self.filepaths: MediaFilePaths = MediaFilePaths(self.primary_base_path)
 
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
 
         self.remote_media_linearizer = Linearizer(name="media_remote")
 
-        self.recently_accessed_remotes = set()  # type: Set[Tuple[str, str]]
-        self.recently_accessed_locals = set()  # type: Set[str]
+        self.recently_accessed_remotes: Set[Tuple[str, str]] = set()
+        self.recently_accessed_locals: Set[str] = set()
 
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
@@ -709,7 +711,7 @@ class MediaRepository:
 
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.
-        thumbnails = {}  # type: Dict[Tuple[int, int, str], str]
+        thumbnails: Dict[Tuple[int, int, str], str] = {}
         for r_width, r_height, r_method, r_type in requirements:
             if r_method == "crop":
                 thumbnails.setdefault((r_width, r_height, r_type), r_method)

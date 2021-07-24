@@ -51,7 +51,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 # How long we allow callers to wait for replication updates before timing out.
 _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 30
 
@@ -122,13 +121,13 @@ class ReplicationDataHandler:
         self._pusher_pool = hs.get_pusherpool()
         self._presence_handler = hs.get_presence_handler()
 
-        self.send_handler = None  # type: Optional[FederationSenderHandler]
+        self.send_handler: Optional[FederationSenderHandler] = None
         if hs.should_send_federation():
             self.send_handler = FederationSenderHandler(hs)
 
         # Map from stream to list of deferreds waiting for the stream to
         # arrive at a particular position. The lists are sorted by stream position.
-        self._streams_to_waiters = {}  # type: Dict[str, List[Tuple[int, Deferred]]]
+        self._streams_to_waiters: Dict[str, List[Tuple[int, Deferred]]] = {}
 
     async def on_rdata(
         self, stream_name: str, instance_name: str, token: int, rows: list
@@ -174,7 +173,7 @@ class ReplicationDataHandler:
             if entities:
                 self.notifier.on_new_event("to_device_key", token, users=entities)
         elif stream_name == DeviceListsStream.NAME:
-            all_room_ids = set()  # type: Set[str]
+            all_room_ids: Set[str] = set()
             for row in rows:
                 if row.entity.startswith("@"):
                     room_ids = await self.store.get_rooms_for_user(row.entity)
@@ -202,7 +201,7 @@ class ReplicationDataHandler:
                 if row.data.rejected:
                     continue
 
-                extra_users = ()  # type: Tuple[UserID, ...]
+                extra_users: Tuple[UserID, ...] = ()
                 if row.data.type == EventTypes.Member and row.data.state_key:
                     extra_users = (UserID.from_string(row.data.state_key),)
 
@@ -349,7 +348,7 @@ class FederationSenderHandler:
 
         # Stores the latest position in the federation stream we've gotten up
         # to. This is always set before we use it.
-        self.federation_position = None  # type: Optional[int]
+        self.federation_position: Optional[int] = None
 
         self._fed_position_linearizer = Linearizer(name="_fed_position_linearizer")
 

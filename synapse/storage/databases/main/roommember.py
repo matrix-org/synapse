@@ -90,7 +90,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 60 * 1000,
             )
             self.hs.get_clock().call_later(
-                1000,
+                1,
                 self._count_known_servers,
             )
             LaterGauge(
@@ -205,8 +205,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         def _get_users_in_room_with_profiles(txn) -> Dict[str, ProfileInfo]:
             sql = """
-                SELECT user_id, display_name, avatar_url FROM room_memberships
-                WHERE room_id = ? AND membership = ?
+                SELECT state_key, display_name, avatar_url FROM room_memberships as m
+                INNER JOIN current_state_events as c
+                ON m.event_id = c.event_id
+                AND m.room_id = c.room_id
+                AND m.user_id = c.state_key
+                WHERE c.type = 'm.room.member' AND c.room_id = ? AND m.membership = ?
             """
             txn.execute(sql, (room_id, Membership.JOIN))
 
@@ -645,7 +649,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             event_to_memberships = await self._get_joined_profiles_from_event_ids(
                 missing_member_event_ids
             )
-            users_in_room.update((row for row in event_to_memberships.values() if row))
+            users_in_room.update(row for row in event_to_memberships.values() if row)
 
         if event is not None and event.type == EventTypes.Member:
             if event.membership == Membership.JOIN:
@@ -699,13 +703,22 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
     @cached(max_entries=10000)
     async def is_host_joined(self, room_id: str, host: str) -> bool:
+        return await self._check_host_room_membership(room_id, host, Membership.JOIN)
+
+    @cached(max_entries=10000)
+    async def is_host_invited(self, room_id: str, host: str) -> bool:
+        return await self._check_host_room_membership(room_id, host, Membership.INVITE)
+
+    async def _check_host_room_membership(
+        self, room_id: str, host: str, membership: str
+    ) -> bool:
         if "%" in host or "_" in host:
             raise Exception("Invalid host name")
 
         sql = """
             SELECT state_key FROM current_state_events AS c
             INNER JOIN room_memberships AS m USING (event_id)
-            WHERE m.membership = 'join'
+            WHERE m.membership = ?
                 AND type = 'm.room.member'
                 AND c.room_id = ?
                 AND state_key LIKE ?
@@ -718,7 +731,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         like_clause = "%:" + host
 
         rows = await self.db_pool.execute(
-            "is_host_joined", None, sql, room_id, like_clause
+            "is_host_joined", None, sql, membership, room_id, like_clause
         )
 
         if not rows:

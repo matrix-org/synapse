@@ -16,12 +16,17 @@ from unittest.mock import Mock
 import pymacaroons
 
 from synapse.api.errors import AuthError, ResourceLimitError
+from synapse.rest import admin
 
 from tests import unittest
 from tests.test_utils import make_awaitable
 
 
 class AuthTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets,
+    ]
+
     def prepare(self, reactor, clock, hs):
         self.auth_handler = hs.get_auth_handler()
         self.macaroon_generator = hs.get_macaroon_generator()
@@ -35,16 +40,10 @@ class AuthTestCase(unittest.HomeserverTestCase):
         self.small_number_of_users = 1
         self.large_number_of_users = 100
 
-    def test_token_is_a_macaroon(self):
-        token = self.macaroon_generator.generate_access_token("some_user")
-        # Check that we can parse the thing with pymacaroons
-        macaroon = pymacaroons.Macaroon.deserialize(token)
-        # The most basic of sanity checks
-        if "some_user" not in macaroon.inspect():
-            self.fail("some_user was not in %s" % macaroon.inspect())
+        self.user1 = self.register_user("a_user", "pass")
 
     def test_macaroon_caveats(self):
-        token = self.macaroon_generator.generate_access_token("a_user")
+        token = self.macaroon_generator.generate_guest_access_token("a_user")
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         def verify_gen(caveat):
@@ -59,19 +58,23 @@ class AuthTestCase(unittest.HomeserverTestCase):
         def verify_nonce(caveat):
             return caveat.startswith("nonce =")
 
+        def verify_guest(caveat):
+            return caveat == "guest = true"
+
         v = pymacaroons.Verifier()
         v.satisfy_general(verify_gen)
         v.satisfy_general(verify_user)
         v.satisfy_general(verify_type)
         v.satisfy_general(verify_nonce)
+        v.satisfy_general(verify_guest)
         v.verify(macaroon, self.hs.config.macaroon_secret_key)
 
     def test_short_term_login_token_gives_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            "a_user", "", 5000
+            self.user1, "", 5000
         )
         res = self.get_success(self.auth_handler.validate_short_term_login_token(token))
-        self.assertEqual("a_user", res.user_id)
+        self.assertEqual(self.user1, res.user_id)
         self.assertEqual("", res.auth_provider_id)
 
         # when we advance the clock, the token should be rejected
@@ -83,22 +86,22 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def test_short_term_login_token_gives_auth_provider(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            "a_user", auth_provider_id="my_idp"
+            self.user1, auth_provider_id="my_idp"
         )
         res = self.get_success(self.auth_handler.validate_short_term_login_token(token))
-        self.assertEqual("a_user", res.user_id)
+        self.assertEqual(self.user1, res.user_id)
         self.assertEqual("my_idp", res.auth_provider_id)
 
     def test_short_term_login_token_cannot_replace_user_id(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            "a_user", "", 5000
+            self.user1, "", 5000
         )
         macaroon = pymacaroons.Macaroon.deserialize(token)
 
         res = self.get_success(
             self.auth_handler.validate_short_term_login_token(macaroon.serialize())
         )
-        self.assertEqual("a_user", res.user_id)
+        self.assertEqual(self.user1, res.user_id)
 
         # add another "user_id" caveat, which might allow us to override the
         # user_id.
@@ -114,7 +117,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # Ensure does not throw exception
         self.get_success(
             self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+                self.user1, device_id=None, valid_until_ms=None
             )
         )
 
@@ -132,7 +135,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         self.get_failure(
             self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+                self.user1, device_id=None, valid_until_ms=None
             ),
             ResourceLimitError,
         )
@@ -160,7 +163,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # If not in monthly active cohort
         self.get_failure(
             self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+                self.user1, device_id=None, valid_until_ms=None
             ),
             ResourceLimitError,
         )
@@ -177,7 +180,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         )
         self.get_success(
             self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+                self.user1, device_id=None, valid_until_ms=None
             )
         )
         self.get_success(
@@ -195,7 +198,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
         # Ensure does not raise exception
         self.get_success(
             self.auth_handler.get_access_token_for_user_id(
-                "user_a", device_id=None, valid_until_ms=None
+                self.user1, device_id=None, valid_until_ms=None
             )
         )
 
@@ -210,6 +213,6 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
     def _get_macaroon(self):
         token = self.macaroon_generator.generate_short_term_login_token(
-            "user_a", "", 5000
+            self.user1, "", 5000
         )
         return pymacaroons.Macaroon.deserialize(token)

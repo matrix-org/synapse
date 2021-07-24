@@ -65,6 +65,12 @@ class JoinRules:
     MSC3083_RESTRICTED = "restricted"
 
 
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
+
+
 class LoginType:
     PASSWORD = "m.login.password"
     EMAIL_IDENTITY = "m.login.email.identity"
@@ -110,13 +116,20 @@ class EventTypes:
 
     Dummy = "org.matrix.dummy_event"
 
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+    SpaceChild = "m.space.child"
+    SpaceParent = "m.space.parent"
+
+    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_CHUNK = "org.matrix.msc2716.chunk"
+    MSC2716_MARKER = "org.matrix.msc2716.marker"
+
+
+class ToDeviceEventTypes:
+    RoomKeyRequest = "m.room_key_request"
 
 
 class EduTypes:
     Presence = "m.presence"
-    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:
@@ -174,7 +187,26 @@ class EventContentFields:
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
+    ROOM_TYPE = "type"
+
+    # Used on normal messages to indicate they were historically imported after the fact
+    MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
+    # For "insertion" events to indicate what the next chunk ID should be in
+    # order to connect to it
+    MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
+    # Used on "chunk" events to indicate which insertion event it connects to
+    MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
+    # For "marker" events
+    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+    MSC2716_MARKER_INSERTION_PREV_EVENTS = (
+        "org.matrix.msc2716.marker.insertion_prev_events"
+    )
+
+
+class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
+    SPACE = "m.space"
 
 
 class RoomEncryptionAlgorithms:

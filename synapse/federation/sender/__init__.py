@@ -14,19 +14,14 @@
 
 import abc
 import logging
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    Hashable,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Tuple,
-)
+from collections import OrderedDict
+from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set, Tuple
 
+import attr
 from prometheus_client import Counter
+from typing_extensions import Literal
+
+from twisted.internet import defer
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
@@ -34,14 +29,19 @@ from synapse.events import EventBase
 from synapse.federation.sender.per_destination_queue import PerDestinationQueue
 from synapse.federation.sender.transaction_manager import TransactionManager
 from synapse.federation.units import Edu
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics import (
     LaterGauge,
     event_processing_loop_counter,
     event_processing_loop_room_count,
     events_processed_counter,
 )
-from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.types import JsonDict, ReadReceipt, RoomStreamToken
+from synapse.util import Clock
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -144,6 +144,84 @@ class AbstractFederationSender(metaclass=abc.ABCMeta):
         raise NotImplementedError()
 
 
+@attr.s
+class _PresenceQueue:
+    """A queue of destinations that need to be woken up due to new presence
+    updates.
+
+    Staggers waking up of per destination queues to ensure that we don't attempt
+    to start TLS connections with many hosts all at once, leading to pinned CPU.
+    """
+
+    # The maximum duration in seconds between queuing up a destination and it
+    # being woken up.
+    _MAX_TIME_IN_QUEUE = 30.0
+
+    # The maximum duration in seconds between waking up consecutive destination
+    # queues.
+    _MAX_DELAY = 0.1
+
+    sender: "FederationSender" = attr.ib()
+    clock: Clock = attr.ib()
+    queue: "OrderedDict[str, Literal[None]]" = attr.ib(factory=OrderedDict)
+    processing: bool = attr.ib(default=False)
+
+    def add_to_queue(self, destination: str) -> None:
+        """Add a destination to the queue to be woken up."""
+
+        self.queue[destination] = None
+
+        if not self.processing:
+            self._handle()
+
+    @wrap_as_background_process("_PresenceQueue.handle")
+    async def _handle(self) -> None:
+        """Background process to drain the queue."""
+
+        if not self.queue:
+            return
+
+        assert not self.processing
+        self.processing = True
+
+        try:
+            # We start with a delay that should drain the queue quickly enough that
+            # we process all destinations in the queue in _MAX_TIME_IN_QUEUE
+            # seconds.
+            #
+            # We also add an upper bound to the delay, to gracefully handle the
+            # case where the queue only has a few entries in it.
+            current_sleep_seconds = min(
+                self._MAX_DELAY, self._MAX_TIME_IN_QUEUE / len(self.queue)
+            )
+
+            while self.queue:
+                destination, _ = self.queue.popitem(last=False)
+
+                queue = self.sender._get_per_destination_queue(destination)
+
+                if not queue._new_data_to_send:
+                    # The per destination queue has already been woken up.
+                    continue
+
+                queue.attempt_new_transaction()
+
+                await self.clock.sleep(current_sleep_seconds)
+
+                if not self.queue:
+                    break
+
+                # More destinations may have been added to the queue, so we may
+                # need to reduce the delay to ensure everything gets processed
+                # within _MAX_TIME_IN_QUEUE seconds.
+                current_sleep_seconds = min(
+                    current_sleep_seconds, self._MAX_TIME_IN_QUEUE / len(self.queue)
+                )
+
+        finally:
+            self.processing = False
+
+
 class FederationSender(AbstractFederationSender):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
@@ -155,14 +233,14 @@ class FederationSender(AbstractFederationSender):
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
-        self._presence_router = None  # type: Optional[PresenceRouter]
+        self._presence_router: Optional["PresenceRouter"] = None
         self._transaction_manager = TransactionManager(hs)
 
         self._instance_name = hs.get_instance_name()
         self._federation_shard_config = hs.config.worker.federation_shard_config
 
         # map from destination to PerDestinationQueue
-        self._per_destination_queues = {}  # type: Dict[str, PerDestinationQueue]
+        self._per_destination_queues: Dict[str, PerDestinationQueue] = {}
 
         LaterGauge(
             "synapse_federation_transaction_queue_pending_destinations",
@@ -199,9 +277,7 @@ class FederationSender(AbstractFederationSender):
         # awaiting a call to flush_read_receipts_for_room. The presence of an entry
         # here for a given room means that we are rate-limiting RR flushes to that room,
         # and that there is a pending call to _flush_rrs_for_room in the system.
-        self._queues_awaiting_rr_flush_by_room = (
-            {}
-        )  # type: Dict[str, Set[PerDestinationQueue]]
+        self._queues_awaiting_rr_flush_by_room: Dict[str, Set[PerDestinationQueue]] = {}
 
         self._rr_txn_interval_per_room_ms = (
             1000.0 / hs.config.federation_rr_transactions_per_room_per_second
@@ -216,6 +292,8 @@ class FederationSender(AbstractFederationSender):
         )
 
         self._external_cache = hs.get_external_cache()
+
+        self._presence_queue = _PresenceQueue(self, self.clock)
 
     def _get_per_destination_queue(self, destination: str) -> PerDestinationQueue:
         """Get or create a PerDestinationQueue for the given destination
@@ -262,29 +340,17 @@ class FederationSender(AbstractFederationSender):
                 if not events and next_token >= self._last_poked_id:
                     break
 
-                async def get_destinations_for_event(
-                    event: EventBase,
-                ) -> Collection[str]:
-                    """Computes the destinations to which this event must be sent.
-
-                    This returns an empty tuple when there are no destinations to send to,
-                    or if this event is not from this homeserver and it is not sending
-                    it on behalf of another server.
-
-                    Will also filter out destinations which this sender is not responsible for,
-                    if multiple federation senders exist.
-                    """
-
+                async def handle_event(event: EventBase) -> None:
                     # Only send events for this server.
                     send_on_behalf_of = event.internal_metadata.get_send_on_behalf_of()
                     is_mine = self.is_mine_id(event.sender)
                     if not is_mine and send_on_behalf_of is None:
-                        return ()
+                        return
 
                     if not event.internal_metadata.should_proactively_send():
-                        return ()
+                        return
 
-                    destinations = None  # type: Optional[Set[str]]
+                    destinations: Optional[Set[str]] = None
                     if not event.prev_event_ids():
                         # If there are no prev event IDs then the state is empty
                         # and so no remote servers in the room
@@ -317,7 +383,7 @@ class FederationSender(AbstractFederationSender):
                                 "Failed to calculate hosts in room for event: %s",
                                 event.event_id,
                             )
-                            return ()
+                            return
 
                     destinations = {
                         d
@@ -327,15 +393,17 @@ class FederationSender(AbstractFederationSender):
                         )
                     }
 
-                    destinations.discard(self.server_name)
-
                     if send_on_behalf_of is not None:
                         # If we are sending the event on behalf of another server
                         # then it already has the event and there is no reason to
                         # send the event to it.
                         destinations.discard(send_on_behalf_of)
 
+                    logger.debug("Sending %s to %r", event, destinations)
+
                     if destinations:
+                        await self._send_pdu(event, destinations)
+
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
 
@@ -343,29 +411,24 @@ class FederationSender(AbstractFederationSender):
                             "federation_sender"
                         ).observe((now - ts) / 1000)
 
-                        return destinations
-                    return ()
+                async def handle_room_events(events: Iterable[EventBase]) -> None:
+                    with Measure(self.clock, "handle_room_events"):
+                        for event in events:
+                            await handle_event(event)
 
-                async def get_federatable_events_and_destinations(
-                    events: Iterable[EventBase],
-                ) -> List[Tuple[EventBase, Collection[str]]]:
-                    with Measure(self.clock, "get_destinations_for_events"):
-                        # Fetch federation destinations per event,
-                        # skip if get_destinations_for_event returns an empty collection,
-                        # return list of event->destinations pairs.
-                        return [
-                            (event, dests)
-                            for (event, dests) in [
-                                (event, await get_destinations_for_event(event))
-                                for event in events
-                            ]
-                            if dests
-                        ]
+                events_by_room: Dict[str, List[EventBase]] = {}
+                for event in events:
+                    events_by_room.setdefault(event.room_id, []).append(event)
 
-                events_and_dests = await get_federatable_events_and_destinations(events)
-
-                # Send corresponding events to each destination queue
-                await self._distribute_events(events_and_dests)
+                await make_deferred_yieldable(
+                    defer.gatherResults(
+                        [
+                            run_in_background(handle_room_events, evs)
+                            for evs in events_by_room.values()
+                        ],
+                        consumeErrors=True,
+                    )
+                )
 
                 await self.store.update_federation_out_pos("events", next_token)
 
@@ -383,7 +446,7 @@ class FederationSender(AbstractFederationSender):
                     events_processed_counter.inc(len(events))
 
                     event_processing_loop_room_count.labels("federation_sender").inc(
-                        len({event.room_id for event in events})
+                        len(events_by_room)
                     )
 
                 event_processing_loop_counter.labels("federation_sender").inc()
@@ -395,53 +458,34 @@ class FederationSender(AbstractFederationSender):
         finally:
             self._is_processing = False
 
-    async def _distribute_events(
-        self,
-        events_and_dests: Iterable[Tuple[EventBase, Collection[str]]],
-    ) -> None:
-        """Distribute events to the respective per_destination queues.
+    async def _send_pdu(self, pdu: EventBase, destinations: Iterable[str]) -> None:
+        # We loop through all destinations to see whether we already have
+        # a transaction in progress. If we do, stick it in the pending_pdus
+        # table and we'll get back to it later.
 
-        Also persists last-seen per-room stream_ordering to 'destination_rooms'.
+        destinations = set(destinations)
+        destinations.discard(self.server_name)
+        logger.debug("Sending to: %s", str(destinations))
 
-        Args:
-            events_and_dests: A list of tuples, which are (event: EventBase, destinations: Collection[str]).
-                              Every event is paired with its intended destinations (in federation).
-        """
-        # Tuples of room_id + destination to their max-seen stream_ordering
-        room_with_dest_stream_ordering = {}  # type: Dict[Tuple[str, str], int]
+        if not destinations:
+            return
 
-        # List of events to send to each destination
-        events_by_dest = {}  # type: Dict[str, List[EventBase]]
+        sent_pdus_destination_dist_total.inc(len(destinations))
+        sent_pdus_destination_dist_count.inc()
 
-        # For each event-destinations pair...
-        for event, destinations in events_and_dests:
+        assert pdu.internal_metadata.stream_ordering
 
-            # (we got this from the database, it's filled)
-            assert event.internal_metadata.stream_ordering
-
-            sent_pdus_destination_dist_total.inc(len(destinations))
-            sent_pdus_destination_dist_count.inc()
-
-            # ...iterate over those destinations..
-            for destination in destinations:
-                # ...update their stream-ordering...
-                room_with_dest_stream_ordering[(event.room_id, destination)] = max(
-                    event.internal_metadata.stream_ordering,
-                    room_with_dest_stream_ordering.get((event.room_id, destination), 0),
-                )
-
-                # ...and add the event to each destination queue.
-                events_by_dest.setdefault(destination, []).append(event)
-
-        # Bulk-store destination_rooms stream_ids
-        await self.store.bulk_store_destination_rooms_entries(
-            room_with_dest_stream_ordering
+        # track the fact that we have a PDU for these destinations,
+        # to allow us to perform catch-up later on if the remote is unreachable
+        # for a while.
+        await self.store.store_destination_rooms_entries(
+            destinations,
+            pdu.room_id,
+            pdu.internal_metadata.stream_ordering,
         )
 
-        for destination, pdus in events_by_dest.items():
-            logger.debug("Sending %d pdus to %s", len(pdus), destination)
-
-            self._get_per_destination_queue(destination).send_pdus(pdus)
+        for destination in destinations:
+            self._get_per_destination_queue(destination).send_pdu(pdu)
 
     async def send_read_receipt(self, receipt: ReadReceipt) -> None:
         """Send a RR to any other servers in the room
@@ -560,7 +604,12 @@ class FederationSender(AbstractFederationSender):
                 self._instance_name, destination
             ):
                 continue
-            self._get_per_destination_queue(destination).send_presence(states)
+
+            self._get_per_destination_queue(destination).send_presence(
+                states, start_loop=False
+            )
+
+            self._presence_queue.add_to_queue(destination)
 
     def build_and_send_edu(
         self,
@@ -669,7 +718,7 @@ class FederationSender(AbstractFederationSender):
         In order to reduce load spikes, adds a delay between each destination.
         """
 
-        last_processed = None  # type: Optional[str]
+        last_processed: Optional[str] = None
 
         while True:
             destinations_to_wake = (

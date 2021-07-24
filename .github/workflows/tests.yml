@@ -34,7 +34,13 @@ jobs:
     if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
     runs-on: ubuntu-latest
     steps:
+      # Note: This and the script can be simplified once we drop Buildkite. See:
+      #   https://github.com/actions/checkout/issues/266#issuecomment-638346893
+      #   https://github.com/actions/checkout/issues/416
       - uses: actions/checkout@v2
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
       - uses: actions/setup-python@v2
       - run: pip install tox
       - name: Patch Buildkite-specific test script
@@ -59,14 +65,14 @@ jobs:
 
   # Dummy step to gate other tests on without repeating the whole list
   linting-done:
-    if: ${{ always() }} # Run this even if prior jobs were skipped
+    if: ${{ !cancelled() }} # Run this even if prior jobs were skipped
     needs: [lint, lint-crlf, lint-newsfile, lint-sdist]
     runs-on: ubuntu-latest
     steps:
       - run: "true"
 
   trial:
-    if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
+    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
     strategy:
@@ -125,7 +131,7 @@ jobs:
           || true
 
   trial-olddeps:
-    if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
+    if: ${{ !cancelled() && !failure() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
     steps:
@@ -150,7 +156,7 @@ jobs:
 
   trial-pypy:
     # Very slow; only run if the branch name includes 'pypy'
-    if: ${{ contains(github.ref, 'pypy') && !failure() }}
+    if: ${{ contains(github.ref, 'pypy') && !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
     strategy:
@@ -179,7 +185,7 @@ jobs:
           || true
 
   sytest:
-    if: ${{ !failure() }}
+    if: ${{ !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
     container:
@@ -226,9 +232,9 @@ jobs:
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
-      - name: Dump results.tap
+      - name: Summarise results.tap
         if: ${{ always() }}
-        run: cat /logs/results.tap
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
       - name: Upload SyTest logs
         uses: actions/upload-artifact@v2
         if: ${{ always() }}
@@ -239,7 +245,7 @@ jobs:
             /logs/**/*.log*
 
   portdb:
-    if: ${{ !failure() }} # Allow previous steps to be skipped, but not fail
+    if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
     strategy:
@@ -273,14 +279,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Patch Buildkite-specific test scripts
         run: |
-          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/create_postgres_db.py
+          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/postgres_exec.py
           sed -i -e 's/host: postgres/host: localhost/' .buildkite/postgres-config.yaml
           sed -i -e 's|/src/||' .buildkite/{sqlite,postgres}-config.yaml
           sed -i -e 's/\$TOP/\$GITHUB_WORKSPACE/' .coveragerc
       - run: .buildkite/scripts/test_synapse_port_db.sh
 
   complement:
-    if: ${{ !failure() }}
+    if: ${{ !failure() && !cancelled() }}
     needs: linting-done
     runs-on: ubuntu-latest
     container:
@@ -299,11 +305,29 @@ jobs:
         with:
           path: synapse
 
-      - name: Run actions/checkout@v2 for complement
-        uses: actions/checkout@v2
-        with:
-          repository: "matrix-org/complement"
-          path: complement
+      # Attempt to check out the same branch of Complement as the PR. If it
+      # doesn't exist, fallback to master.
+      - name: Checkout complement
+        shell: bash
+        run: |
+          mkdir -p complement
+          # Attempt to use the version of complement which best matches the current
+          # build. Depending on whether this is a PR or release, etc. we need to
+          # use different fallbacks.
+          #
+          # 1. First check if there's a similarly named branch (GITHUB_HEAD_REF
+          #    for pull requests, otherwise GITHUB_REF).
+          # 2. Attempt to use the base branch, e.g. when merging into release-vX.Y
+          #    (GITHUB_BASE_REF for pull requests).
+          # 3. Use the default complement branch ("master").
+          for BRANCH_NAME in "$GITHUB_HEAD_REF" "$GITHUB_BASE_REF" "${GITHUB_REF#refs/heads/}" "master"; do
+            # Skip empty branch names and merge commits.
+            if [[ -z "$BRANCH_NAME" || $BRANCH_NAME =~ ^refs/pull/.* ]]; then
+              continue
+            fi
+
+            (wget -O - "https://github.com/matrix-org/complement/archive/$BRANCH_NAME.tar.gz" | tar -xz --strip-components=1 -C complement) && break
+          done
 
       # Build initial Synapse image
       - run: docker build -t matrixdotorg/synapse:latest -f docker/Dockerfile .
@@ -316,7 +340,19 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist ./tests
+      - run: go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement
+
+  # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
+  tests-done:
+    needs:
+      - trial
+      - trial-olddeps
+      - sytest
+      - portdb
+      - complement
+    runs-on: ubuntu-latest
+    steps:
+      - run: "true"    

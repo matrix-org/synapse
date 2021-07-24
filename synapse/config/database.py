@@ -58,10 +58,12 @@ DEFAULT_CONFIG = """\
 #    password: secretpassword
 #    database: synapse
 #    host: localhost
+#    port: 5432
 #    cp_min: 5
 #    cp_max: 10
 #
-# For more information on using Synapse with Postgres, see `docs/postgres.md`.
+# For more information on using Synapse with Postgres,
+# see https://matrix-org.github.io/synapse/latest/postgres.html.
 #
 database:
   name: sqlite3

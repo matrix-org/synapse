@@ -1,1 +1,0 @@
-Handle recently added rate limits correctly when using `--no-rate-limit` with the demo scripts.

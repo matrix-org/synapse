@@ -17,7 +17,7 @@
 """Utilities for interacting with Identity Servers"""
 import logging
 import urllib.parse
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from synapse.api.errors import (
     CodeMessageException,
@@ -41,13 +41,16 @@ from synapse.util.stringutils import (
 
 from ._base import BaseHandler
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 id_server_scheme = "https://"
 
 
 class IdentityHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         # An HTTP client for contacting trusted URLs.
@@ -80,7 +83,7 @@ class IdentityHandler(BaseHandler):
         request: SynapseRequest,
         medium: str,
         address: str,
-    ):
+    ) -> None:
         """Used to ratelimit requests to `/requestToken` by IP and address.
 
         Args:
@@ -299,7 +302,7 @@ class IdentityHandler(BaseHandler):
             )
 
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
-        url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
+        url_bytes = b"/_matrix/identity/api/v1/3pid/unbind"
 
         content = {
             "mxid": mxid,
@@ -692,7 +695,7 @@ class IdentityHandler(BaseHandler):
                 return data["mxid"]
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        except IOError as e:
+        except OSError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
         return None

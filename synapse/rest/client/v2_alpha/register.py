@@ -41,11 +41,13 @@ from synapse.http.server import finish_request, respond_with_html
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
+    parse_boolean,
     parse_json_object_from_request,
     parse_string,
 )
 from synapse.metrics import threepid_send_requests
 from synapse.push.mailer import Mailer
+from synapse.types import JsonDict
 from synapse.util.msisdn import phone_number_to_msisdn
 from synapse.util.ratelimitutils import FederationRateLimiter
 from synapse.util.stringutils import assert_valid_client_secret, random_string
@@ -399,6 +401,7 @@ class RegisterRestServlet(RestServlet):
         self.password_policy_handler = hs.get_password_policy_handler()
         self.clock = hs.get_clock()
         self._registration_enabled = self.hs.config.enable_registration
+        self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self._registration_flows = _calculate_registration_flows(
             hs.config, self.auth_handler
@@ -423,6 +426,15 @@ class RegisterRestServlet(RestServlet):
             raise UnrecognizedRequestError(
                 "Do not understand membership kind: %s" % (kind.decode("utf8"),)
             )
+
+        if self._msc2918_enabled:
+            # Check if this registration should also issue a refresh token, as
+            # per MSC2918
+            should_issue_refresh_token = parse_boolean(
+                request, name="org.matrix.msc2918.refresh_token", default=False
+            )
+        else:
+            should_issue_refresh_token = False
 
         # Pull out the provided username and do basic sanity checks early since
         # the auth layer will store these in sessions.
@@ -462,7 +474,10 @@ class RegisterRestServlet(RestServlet):
                 raise SynapseError(400, "Desired Username is missing or not a string")
 
             result = await self._do_appservice_registration(
-                desired_username, access_token, body
+                desired_username,
+                access_token,
+                body,
+                should_issue_refresh_token=should_issue_refresh_token,
             )
 
             return 200, result
@@ -665,7 +680,9 @@ class RegisterRestServlet(RestServlet):
             registered = True
 
         return_dict = await self._create_registration_details(
-            registered_user_id, params
+            registered_user_id,
+            params,
+            should_issue_refresh_token=should_issue_refresh_token,
         )
 
         if registered:
@@ -677,7 +694,9 @@ class RegisterRestServlet(RestServlet):
 
         return 200, return_dict
 
-    async def _do_appservice_registration(self, username, as_token, body):
+    async def _do_appservice_registration(
+        self, username, as_token, body, should_issue_refresh_token: bool = False
+    ):
         user_id = await self.registration_handler.appservice_register(
             username, as_token
         )
@@ -685,19 +704,27 @@ class RegisterRestServlet(RestServlet):
             user_id,
             body,
             is_appservice_ghost=True,
+            should_issue_refresh_token=should_issue_refresh_token,
         )
 
     async def _create_registration_details(
-        self, user_id, params, is_appservice_ghost=False
+        self,
+        user_id: str,
+        params: JsonDict,
+        is_appservice_ghost: bool = False,
+        should_issue_refresh_token: bool = False,
     ):
         """Complete registration of newly-registered user
 
         Allocates device_id if one was not given; also creates access_token.
 
         Args:
-            (str) user_id: full canonical @user:id
-            (object) params: registration parameters, from which we pull
-                device_id, initial_device_name and inhibit_login
+            user_id: full canonical @user:id
+            params: registration parameters, from which we pull device_id,
+                initial_device_name and inhibit_login
+            is_appservice_ghost
+            should_issue_refresh_token: True if this registration should issue
+                a refresh token alongside the access token.
         Returns:
              dictionary for response from /register
         """
@@ -705,15 +732,29 @@ class RegisterRestServlet(RestServlet):
         if not params.get("inhibit_login", False):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
-            device_id, access_token = await self.registration_handler.register_device(
+            (
+                device_id,
+                access_token,
+                valid_until_ms,
+                refresh_token,
+            ) = await self.registration_handler.register_device(
                 user_id,
                 device_id,
                 initial_display_name,
                 is_guest=False,
                 is_appservice_ghost=is_appservice_ghost,
+                should_issue_refresh_token=should_issue_refresh_token,
             )
 
             result.update({"access_token": access_token, "device_id": device_id})
+
+            if valid_until_ms is not None:
+                expires_in_ms = valid_until_ms - self.clock.time_msec()
+                result["expires_in_ms"] = expires_in_ms
+
+            if refresh_token is not None:
+                result["refresh_token"] = refresh_token
+
         return result
 
     async def _do_guest_registration(self, params, address=None):
@@ -727,19 +768,30 @@ class RegisterRestServlet(RestServlet):
         # we have nowhere to store it.
         device_id = synapse.api.auth.GUEST_DEVICE_ID
         initial_display_name = params.get("initial_device_display_name")
-        device_id, access_token = await self.registration_handler.register_device(
+        (
+            device_id,
+            access_token,
+            valid_until_ms,
+            refresh_token,
+        ) = await self.registration_handler.register_device(
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        return (
-            200,
-            {
-                "user_id": user_id,
-                "device_id": device_id,
-                "access_token": access_token,
-                "home_server": self.hs.hostname,
-            },
-        )
+        result = {
+            "user_id": user_id,
+            "device_id": device_id,
+            "access_token": access_token,
+            "home_server": self.hs.hostname,
+        }
+
+        if valid_until_ms is not None:
+            expires_in_ms = valid_until_ms - self.clock.time_msec()
+            result["expires_in_ms"] = expires_in_ms
+
+        if refresh_token is not None:
+            result["refresh_token"] = refresh_token
+
+        return 200, result
 
 
 def _calculate_registration_flows(

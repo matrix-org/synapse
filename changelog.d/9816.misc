@@ -1,1 +1,0 @@
-Rename some handlers and config modules to not duplicate the top-level module.

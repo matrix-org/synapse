@@ -93,7 +93,7 @@ class EventStreamHandler(BaseHandler):
 
             # When the user joins a new room, or another user joins a currently
             # joined room, we need to send down presence for those users.
-            to_add = []  # type: List[JsonDict]
+            to_add: List[JsonDict] = []
             for event in events:
                 if not isinstance(event, EventBase):
                     continue
@@ -103,9 +103,9 @@ class EventStreamHandler(BaseHandler):
                     # Send down presence.
                     if event.state_key == auth_user_id:
                         # Send down presence for everyone in the room.
-                        users = await self.state.get_current_users_in_room(
+                        users: Iterable[str] = await self.store.get_users_in_room(
                             event.room_id
-                        )  # type: Iterable[str]
+                        )
                     else:
                         users = [event.state_key]
 

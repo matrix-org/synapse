@@ -46,6 +46,7 @@ from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
+from .lock import LockStore
 from .media_repository import MediaRepositoryStore
 from .metrics import ServerMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
@@ -67,7 +68,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
-from .transactions import TransactionStore
+from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
@@ -83,7 +84,7 @@ class DataStore(
     StreamStore,
     ProfileStore,
     PresenceStore,
-    TransactionStore,
+    TransactionWorkerStore,
     DirectoryStore,
     KeyStore,
     StateStore,
@@ -119,6 +120,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
     EventForwardExtremitiesStore,
+    LockStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs

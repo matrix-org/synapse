@@ -55,7 +55,7 @@ class KeyStore(SQLBaseStore):
         """
         keys = {}
 
-        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str]]) -> None:
+        def _get_keys(txn: Cursor, batch: Tuple[Tuple[str, str], ...]) -> None:
             """Processes a batch of keys to fetch, and adds the result to `keys`."""
 
             # batch_iter always returns tuples so it's safe to do len(batch)

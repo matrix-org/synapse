@@ -20,7 +20,12 @@ import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
-from synapse.api.errors import Codes, HttpResponseException
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.types import JsonDict, ThirdPartyInstanceID
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.response_cache import ResponseCache
@@ -42,19 +47,19 @@ class RoomListHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
         self.enable_room_list_search = hs.config.enable_room_list_search
-        self.response_cache = ResponseCache(
-            hs.get_clock(), "room_list"
-        )  # type: ResponseCache[Tuple[Optional[int], Optional[str], ThirdPartyInstanceID]]
-        self.remote_response_cache = ResponseCache(
-            hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000
-        )  # type: ResponseCache[Tuple[str, Optional[int], Optional[str], bool, Optional[str]]]
+        self.response_cache: ResponseCache[
+            Tuple[Optional[int], Optional[str], Optional[ThirdPartyInstanceID]]
+        ] = ResponseCache(hs.get_clock(), "room_list")
+        self.remote_response_cache: ResponseCache[
+            Tuple[str, Optional[int], Optional[str], bool, Optional[str]]
+        ] = ResponseCache(hs.get_clock(), "remote_room_list", timeout_ms=30 * 1000)
 
     async def get_local_public_room_list(
         self,
         limit: Optional[int] = None,
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
-        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
         from_federation: bool = False,
     ) -> JsonDict:
         """Generate a local public room list.
@@ -111,7 +116,7 @@ class RoomListHandler(BaseHandler):
         limit: Optional[int] = None,
         since_token: Optional[str] = None,
         search_filter: Optional[dict] = None,
-        network_tuple: ThirdPartyInstanceID = EMPTY_THIRD_PARTY_ID,
+        network_tuple: Optional[ThirdPartyInstanceID] = EMPTY_THIRD_PARTY_ID,
         from_federation: bool = False,
     ) -> JsonDict:
         """Generate a public room list.
@@ -134,10 +139,10 @@ class RoomListHandler(BaseHandler):
         if since_token:
             batch_token = RoomListNextBatch.from_token(since_token)
 
-            bounds = (
+            bounds: Optional[Tuple[int, str]] = (
                 batch_token.last_joined_members,
                 batch_token.last_room_id,
-            )  # type: Optional[Tuple[int, str]]
+            )
             forwards = batch_token.direction_is_forward
             has_batch_token = True
         else:
@@ -169,6 +174,7 @@ class RoomListHandler(BaseHandler):
                 "world_readable": room["history_visibility"]
                 == HistoryVisibility.WORLD_READABLE,
                 "guest_can_join": room["guest_access"] == "can_join",
+                "join_rule": room["join_rules"],
             }
 
             # Filter out Nones – rather omit the field altogether
@@ -176,7 +182,7 @@ class RoomListHandler(BaseHandler):
 
         results = [build_room_entry(r) for r in results]
 
-        response = {}  # type: JsonDict
+        response: JsonDict = {}
         num_results = len(results)
         if limit is not None:
             more_to_come = num_results == probing_limit
@@ -377,7 +383,11 @@ class RoomListHandler(BaseHandler):
                 ):
                     logger.debug("Falling back to locally-filtered /publicRooms")
                 else:
-                    raise  # Not an error that should trigger a fallback.
+                    # Not an error that should trigger a fallback.
+                    raise SynapseError(502, "Failed to fetch room list")
+            except RequestSendFailed:
+                # Not an error that should trigger a fallback.
+                raise SynapseError(502, "Failed to fetch room list")
 
             # if we reach this point, then we fall back to the situation where
             # we currently don't support searching across federation, so we have
@@ -416,14 +426,17 @@ class RoomListHandler(BaseHandler):
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            return await repl_layer.get_public_rooms(
-                server_name,
-                limit=limit,
-                since_token=since_token,
-                search_filter=search_filter,
-                include_all_networks=include_all_networks,
-                third_party_instance_id=third_party_instance_id,
-            )
+            try:
+                return await repl_layer.get_public_rooms(
+                    server_name,
+                    limit=limit,
+                    since_token=since_token,
+                    search_filter=search_filter,
+                    include_all_networks=include_all_networks,
+                    third_party_instance_id=third_party_instance_id,
+                )
+            except (RequestSendFailed, HttpResponseException):
+                raise SynapseError(502, "Failed to fetch room list")
 
         key = (
             server_name,

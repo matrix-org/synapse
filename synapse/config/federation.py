@@ -22,7 +22,7 @@ class FederationConfig(Config):
 
     def read_config(self, config, **kwargs):
         # FIXME: federation_domain_whitelist needs sytests
-        self.federation_domain_whitelist = None  # type: Optional[dict]
+        self.federation_domain_whitelist: Optional[dict] = None
         federation_domain_whitelist = config.get("federation_domain_whitelist", None)
 
         if federation_domain_whitelist is not None:
@@ -42,6 +42,10 @@ class FederationConfig(Config):
 
         self.allow_profile_lookup_over_federation = config.get(
             "allow_profile_lookup_over_federation", True
+        )
+
+        self.allow_device_name_lookup_over_federation = config.get(
+            "allow_device_name_lookup_over_federation", True
         )
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
@@ -75,6 +79,12 @@ class FederationConfig(Config):
         # on this homeserver. Defaults to 'true'.
         #
         #allow_profile_lookup_over_federation: false
+
+        # Uncomment to disable device display name lookup over federation. By default, the
+        # Federation API allows other homeservers to obtain device display names of any user
+        # on this homeserver. Defaults to 'true'.
+        #
+        #allow_device_name_lookup_over_federation: false
         """
 
 
