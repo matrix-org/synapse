@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import logging
 import os
 from typing import Iterable, Optional
@@ -297,9 +298,50 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(json, {"a": 1})
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
-    def test_get_via_proxy(self):
+    def test_get_via_http_proxy(self):
         """
-        test for federation request through proxy
+        test for federation request through a http proxy
+        """
+        self._do_get_via_proxy(ssl=False, auth_credentials=None)
+
+    @patch.dict(
+        os.environ, {"https_proxy": "user:pass@proxy.com", "no_proxy": "unused.com"}
+    )
+    def test_get_via_http_proxy_with_auth(self):
+        """
+        test for federation request through a http proxy with authentication
+        """
+        self._do_get_via_proxy(ssl=False, auth_credentials=b"user:pass")
+
+    @patch.dict(
+        os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
+    )
+    def test_get_via_https_proxy(self):
+        """
+        test for federation request through a https proxy
+        """
+        self._do_get_via_proxy(ssl=True, auth_credentials=None)
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "https://user:pass@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_get_via_https_proxy_with_auth(self):
+        """
+        test for federation request through a https proxy with authentication
+        """
+        self._do_get_via_proxy(ssl=True, auth_credentials=b"user:pass")
+
+    def _do_get_via_proxy(
+        self,
+        ssl: bool = False,
+        auth_credentials: Optional[bytes] = None,
+    ):
+        """Send a https federation request via an agent and check that it is correctly
+            received at the proxy and client. The proxy can use either http or https.
+        Args:
+            ssl: True if we expect the request to connect via https to proxy
+            auth_credentials: credentials to authenticate at proxy
         """
         # recreate the agent with patched env
         self.agent = MatrixFederationAgent(
@@ -326,10 +368,75 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(host, "9.9.9.9")
         self.assertEqual(port, 1080)
 
-        # make a test server, and wire up the client
-        http_server = self._make_connection(client_factory)
+        # make a test HTTP proxy server, and wire up the client
+        proxy_server = self._make_connection(
+            client_factory,
+            ssl=ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if ssl else None,
+            expected_sni=b"proxy.com" if ssl else None,
+        )
 
+        # fish the transports back out so that we can do the old switcheroo
+        s2c_transport = proxy_server.transport
+        client_protocol = s2c_transport.other
+        c2s_transport = client_protocol.transport
+
+        # the FakeTransport is async, so we need to pump the reactor
+        self.reactor.advance(0)
+
+        # now there should be a pending CONNECT request
+        self.assertEqual(len(proxy_server.requests), 1)
+
+        request = proxy_server.requests[0]
+        self.assertEqual(request.method, b"CONNECT")
+        self.assertEqual(request.path, b"testserv:8448")
+
+        # Check whether auth credentials have been supplied to the proxy
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+
+        if auth_credentials is not None:
+            # Compute the correct header value for Proxy-Authorization
+            encoded_credentials = base64.b64encode(auth_credentials)
+            expected_header_value = b"Basic " + encoded_credentials
+
+            # Validate the header's value
+            self.assertIn(expected_header_value, proxy_auth_header_values)
+        else:
+            # Check that the Proxy-Authorization header has not been supplied to the proxy
+            self.assertIsNone(proxy_auth_header_values)
+
+        # tell the proxy server not to close the connection
+        proxy_server.persistent = True
+
+        # this just stops the http Request trying to do a chunked response
+        # request.setHeader(b"Content-Length", b"0")
+        request.finish()
+
+        # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
+        ssl_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
+        ssl_protocol = ssl_factory.buildProtocol(None)
+        http_server = ssl_protocol.wrappedProtocol
+
+        ssl_protocol.makeConnection(
+            FakeTransport(client_protocol, self.reactor, ssl_protocol)
+        )
+        c2s_transport.other = ssl_protocol
+
+        self.reactor.advance(0)
+
+        server_name = ssl_protocol._tlsConnection.get_servername()
+        expected_sni = b"testserv"
+        self.assertEqual(
+            server_name,
+            expected_sni,
+            f"Expected SNI {expected_sni!s} but got {server_name!s}",
+        )
+
+        # now there should be a pending request
         self.assertEqual(len(http_server.requests), 1)
+
         request = http_server.requests[0]
         self.assertEqual(request.method, b"GET")
         self.assertEqual(request.path, b"/foo/bar")
@@ -339,6 +446,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
         )
+        # Check that the destination server DID NOT receive proxy credentials
+        self.assertIsNone(request.requestHeaders.getRawHeaders(b"Proxy-Authorization"))
         content = request.content.read()
         self.assertEqual(content, b"")
 
