@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
 import os
+from typing import Iterable, Optional
 from unittest.mock import patch
 
 import treq
@@ -51,24 +51,6 @@ from tests.server import FakeTransport, ThreadedMemoryReactorClock
 from tests.utils import default_config
 
 logger = logging.getLogger(__name__)
-
-test_server_connection_factory = None
-
-
-def get_connection_factory():
-    # this needs to happen once, but not until we are ready to run the first test
-    global test_server_connection_factory
-    if test_server_connection_factory is None:
-        test_server_connection_factory = TestServerTLSConnectionFactory(
-            sanlist=[
-                b"DNS:testserv",
-                b"DNS:target-server",
-                b"DNS:xn--bcher-kva.com",
-                b"IP:1.2.3.4",
-                b"IP:::1",
-            ]
-        )
-    return test_server_connection_factory
 
 
 # Once Async Mocks or lambdas are supported this can go away.
@@ -128,7 +110,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
 
         # build the test server
-        server_tls_protocol = _build_test_server(get_connection_factory())
+        server_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
+        server_tls_protocol = server_factory.buildProtocol(None)
 
         # now, tell the client protocol factory to build the client protocol (it will be a
         # _WrappingProtocol, around a TLSMemoryBIOProtocol, around an
@@ -1351,29 +1334,44 @@ def _check_logcontext(context):
         raise AssertionError("Expected logcontext %s but was %s" % (context, current))
 
 
-def _build_test_server(connection_creator):
-    """Construct a test server
-
-    This builds an HTTP channel, wrapped with a TLSMemoryBIOProtocol
-
+def _wrap_server_factory_for_tls(
+    factory: IProtocolFactory, sanlist: Iterable[bytes] = None
+) -> IProtocolFactory:
+    """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
+    The resultant factory will create a TLS server which presents a certificate
+    signed by our test CA, valid for the domains in `sanlist`
     Args:
-        connection_creator (IOpenSSLServerConnectionCreator): thing to build
-            SSL connections
-        sanlist (list[bytes]): list of the SAN entries for the cert returned
-            by the server
-
+        factory: protocol factory to wrap
+        sanlist: list of domains the cert should be valid for
     Returns:
-        TLSMemoryBIOProtocol
+        interfaces.IProtocolFactory
+    """
+    if sanlist is None:
+        sanlist = [
+            b"DNS:testserv",
+            b"DNS:target-server",
+            b"DNS:xn--bcher-kva.com",
+            b"IP:1.2.3.4",
+            b"IP:::1",
+        ]
+
+    connection_creator = TestServerTLSConnectionFactory(sanlist=sanlist)
+    return TLSMemoryBIOFactory(
+        connection_creator, isClient=False, wrappedFactory=factory
+    )
+
+
+def _get_test_protocol_factory() -> IProtocolFactory:
+    """Get a protocol Factory which will build an HTTPChannel
+    Returns:
+        interfaces.IProtocolFactory
     """
     server_factory = Factory.forProtocol(HTTPChannel)
+
     # Request.finish expects the factory to have a 'log' method.
     server_factory.log = _log_request
 
-    server_tls_factory = TLSMemoryBIOFactory(
-        connection_creator, isClient=False, wrappedFactory=server_factory
-    )
-
-    return server_tls_factory.buildProtocol(None)
+    return server_factory
 
 
 def _log_request(request: str):
