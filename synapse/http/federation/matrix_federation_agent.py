@@ -16,7 +16,7 @@ import urllib.parse
 from typing import Any, Generator, List, Optional
 from urllib.request import (  # type: ignore[attr-defined]
     getproxies_environment,
-    proxy_bypass,
+    proxy_bypass_environment,
 )
 
 from netaddr import AddrFormatError, IPAddress, IPSet
@@ -105,10 +105,6 @@ class MatrixFederationAgent:
         else:
             self.proxy_reactor = proxy_reactor
 
-        # http_proxy is not needed because federation is always over TLS
-        proxies = getproxies_environment()
-        https_proxy = proxies["https"].encode() if "https" in proxies else None
-
         self._agent = Agent.usingEndpointFactory(
             self._reactor,
             MatrixHostnameEndpointFactory(
@@ -116,7 +112,6 @@ class MatrixFederationAgent:
                 self.proxy_reactor,
                 tls_client_options_factory,
                 _srv_resolver,
-                https_proxy,
             ),
             pool=self._pool,
         )
@@ -236,29 +231,23 @@ class MatrixHostnameEndpointFactory:
         proxy_reactor: IReactorCore,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         srv_resolver: Optional[SrvResolver],
-        https_proxy: Optional[bytes] = None,
     ):
         self._reactor = reactor
+        self._proxy_reactor = proxy_reactor
         self._tls_client_options_factory = tls_client_options_factory
 
         if srv_resolver is None:
             srv_resolver = SrvResolver()
 
         self._srv_resolver = srv_resolver
-        self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
-
-        self.https_proxy_endpoint = proxyagent.http_proxy_endpoint(
-            https_proxy, proxy_reactor
-        )
 
     def endpointForURI(self, parsed_uri: URI):
         return MatrixHostnameEndpoint(
             self._reactor,
+            self._proxy_reactor,
             self._tls_client_options_factory,
             self._srv_resolver,
             parsed_uri,
-            self.https_proxy_endpoint,
-            self.https_proxy_creds,
         )
 
 
@@ -273,24 +262,32 @@ class MatrixHostnameEndpoint:
             factory to use for fetching client tls options, or none to disable TLS.
         srv_resolver: The SRV resolver to use
         parsed_uri: The parsed URI that we're wanting to connect to.
-        https_proxy_endpoint: Endpoint to use to connect to the proxy,
-        https_proxy_creds: Credentials to authenticate at proxy.
+        proxy_reactor: twisted reactor to use for connections to the proxy server
+           reactor might have some blacklisting applied (i.e. for DNS queries),
+           but we need unblocked access to the proxy.
     """
 
     def __init__(
         self,
         reactor: IReactorCore,
+        proxy_reactor: IReactorCore,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         srv_resolver: SrvResolver,
         parsed_uri: URI,
-        https_proxy_endpoint: Optional[IStreamClientEndpoint],
-        https_proxy_creds: Optional[ProxyCredentials],
     ):
         self._reactor = reactor
         self._parsed_uri = parsed_uri
 
-        self.https_proxy_endpoint = https_proxy_endpoint
-        self.https_proxy_creds = https_proxy_creds
+        # http_proxy is not needed because federation is always over TLS
+        proxies = getproxies_environment()
+        https_proxy = proxies["https"].encode() if "https" in proxies else None
+        self.no_proxy = proxies["no"] if "no" in proxies else None
+
+        self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
+
+        self.https_proxy_endpoint = proxyagent.http_proxy_endpoint(
+            https_proxy, proxy_reactor
+        )
 
         # set up the TLS connection params
         #
@@ -321,9 +318,16 @@ class MatrixHostnameEndpoint:
             host = server.host
             port = server.port
 
+            should_skip_proxy = False
+            if self.no_proxy is not None:
+                should_skip_proxy = proxy_bypass_environment(
+                    host.decode(),
+                    proxies={"no": self.no_proxy},
+                )
+
             endpoint: IStreamClientEndpoint
             try:
-                if self.https_proxy_endpoint and not proxy_bypass(host.decode()):
+                if self.https_proxy_endpoint and not should_skip_proxy:
                     logger.debug(
                         "Connecting to %s:%i via %s",
                         host.decode("ascii"),
