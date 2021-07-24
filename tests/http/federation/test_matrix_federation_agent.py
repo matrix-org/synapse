@@ -244,6 +244,32 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         happy-path test of a GET request with an explicit port
         """
+        self._do_get()
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "proxy.com", "no_proxy": "testserv"},
+    )
+    def test_get_bypass_proxy(self):
+        """
+        test of a GET request with an explicit port and bypass proxy
+        """
+        self._do_get()
+
+    def _do_get(self):
+        """
+        test of a GET request with an explicit port
+        """
+        # recreate the agent with patched env
+        self.agent = MatrixFederationAgent(
+            reactor=self.reactor,
+            tls_client_options_factory=self.tls_factory,
+            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
+            ip_blacklist=IPSet(),
+            _srv_resolver=self.mock_resolver,
+            _well_known_resolver=self.well_known_resolver,
+        )
+
         self.reactor.lookups["testserv"] = "1.2.3.4"
         test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
 
