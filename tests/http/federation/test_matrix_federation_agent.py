@@ -15,10 +15,9 @@ import base64
 import logging
 import os
 from typing import Iterable, Optional
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import treq
-from mock import Mock
 from netaddr import IPSet
 from service_identity import VerificationError
 from zope.interface import implementer

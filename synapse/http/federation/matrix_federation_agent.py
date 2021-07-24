@@ -39,11 +39,7 @@ from synapse.http.client import BlacklistingAgentWrapper
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
-from synapse.http.proxyagent import (
-    ProxyAgent,
-    ProxyCredentials,
-    parse_username_password,
-)
+from synapse.http.proxyagent import ProxyAgent, parse_username_password
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import ISynapseReactor
 from synapse.util import Clock
