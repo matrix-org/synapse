@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Optional
 import os
 from unittest.mock import patch
 
@@ -24,11 +24,12 @@ from zope.interface import implementer
 
 from twisted.internet import defer
 from twisted.internet._sslverify import ClientTLSOptions, OpenSSLCertificateOptions
+from twisted.internet.interfaces import IProtocolFactory
 from twisted.internet.protocol import Factory
 from twisted.protocols.tls import TLSMemoryBIOFactory
 from twisted.web._newclient import ResponseNeverReceived
 from twisted.web.client import Agent
-from twisted.web.http import HTTPChannel
+from twisted.web.http import HTTPChannel, Request
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IPolicyForHTTPS
 
@@ -111,11 +112,19 @@ class MatrixFederationAgentTests(unittest.TestCase):
             _well_known_resolver=self.well_known_resolver,
         )
 
-    def _make_connection(self, client_factory, expected_sni=None):
+    def _make_connection(
+        self, client_factory: IProtocolFactory, expected_sni: bytes = None
+    ) -> HTTPChannel:
         """Builds a test server, and completes the outgoing client connection
+        Args:
+            client_factory: the the factory that the
+                application is trying to use to make the outbound connection. We will
+                invoke it to build the client Protocol
+
+            expected_sni: the expected SNI value
 
         Returns:
-            HTTPChannel: the test server
+            the server Protocol returned by server_factory
         """
 
         # build the test server
@@ -144,8 +153,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # fish the test server back out of the server-side TLS protocol.
         http_protocol = server_tls_protocol.wrappedProtocol
 
-        # give the reactor a pump to get the TLS juices flowing.
-        self.reactor.pump((0.1,))
+        # give the reactor a pump to get the TLS juices flowing (if needed)
+        self.reactor.advance(0)
 
         # check the SNI
         if expected_sni is not None:
@@ -153,13 +162,13 @@ class MatrixFederationAgentTests(unittest.TestCase):
             self.assertEqual(
                 server_name,
                 expected_sni,
-                "Expected SNI %s but got %s" % (expected_sni, server_name),
+                f"Expected SNI {expected_sni!s} but got {server_name!s}",
             )
 
         return http_protocol
 
     @defer.inlineCallbacks
-    def _make_get_request(self, uri):
+    def _make_get_request(self, uri: bytes):
         """
         Sends a simple GET request via the agent, and checks its logcontext management
         """
@@ -182,17 +191,21 @@ class MatrixFederationAgentTests(unittest.TestCase):
                 _check_logcontext(context)
 
     def _handle_well_known_connection(
-        self, client_factory, expected_sni, content, response_headers={}
-    ):
+        self,
+        client_factory: IProtocolFactory,
+        expected_sni: bytes,
+        content: bytes,
+        response_headers: Optional[dict] = None,
+    ) -> HTTPChannel:
         """Handle an outgoing HTTPs connection: wire it up to a server, check that the
         request is for a .well-known, and send the response.
 
         Args:
-            client_factory (IProtocolFactory): outgoing connection
-            expected_sni (bytes): SNI that we expect the outgoing connection to send
-            content (bytes): content to send back as the .well-known
+            client_factory: outgoing connection
+            expected_sni: SNI that we expect the outgoing connection to send
+            content: content to send back as the .well-known
         Returns:
-            HTTPChannel: server impl
+            server impl
         """
         # make the connection for .well-known
         well_known_server = self._make_connection(
@@ -204,10 +217,15 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"user-agent"), [b"test-agent"]
         )
-        self._send_well_known_response(request, content, headers=response_headers)
+        self._send_well_known_response(request, content, headers=response_headers or {})
         return well_known_server
 
-    def _send_well_known_response(self, request, content, headers={}):
+    def _send_well_known_response(
+        self,
+        request: Request,
+        content: bytes,
+        headers: Optional[dict] = None,
+    ):
         """Check that an incoming request looks like a valid .well-known request, and
         send back the response.
         """
@@ -215,7 +233,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(request.path, b"/.well-known/matrix/server")
         self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"testserv"])
         # send back a response
-        for k, v in headers.items():
+        for k, v in (headers or {}).items():
             request.setHeader(k, v)
         request.write(content)
         request.finish()
@@ -1358,9 +1376,9 @@ def _build_test_server(connection_creator):
     return server_tls_factory.buildProtocol(None)
 
 
-def _log_request(request):
+def _log_request(request: str):
     """Implements Factory.log, which is expected by Request.finish"""
-    logger.info("Completed request %s", request)
+    logger.info(f"Completed request {request}")
 
 
 @implementer(IPolicyForHTTPS)
