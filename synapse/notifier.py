@@ -203,21 +203,21 @@ class Notifier:
     UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
 
     def __init__(self, hs: "synapse.server.HomeServer"):
-        self.user_to_user_stream = {}  # type: Dict[str, _NotifierUserStream]
-        self.room_to_user_streams = {}  # type: Dict[str, Set[_NotifierUserStream]]
+        self.user_to_user_stream: Dict[str, _NotifierUserStream] = {}
+        self.room_to_user_streams: Dict[str, Set[_NotifierUserStream]] = {}
 
         self.hs = hs
         self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
-        self.pending_new_room_events = []  # type: List[_PendingRoomEventEntry]
+        self.pending_new_room_events: List[_PendingRoomEventEntry] = []
 
         # Called when there are new things to stream over replication
-        self.replication_callbacks = []  # type: List[Callable[[], None]]
+        self.replication_callbacks: List[Callable[[], None]] = []
 
         # Called when remote servers have come back online after having been
         # down.
-        self.remote_server_up_callbacks = []  # type: List[Callable[[str], None]]
+        self.remote_server_up_callbacks: List[Callable[[str], None]] = []
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
@@ -237,7 +237,7 @@ class Notifier:
         # when rendering the metrics page, which is likely once per minute at
         # most when scraping it.
         def count_listeners():
-            all_user_streams = set()  # type: Set[_NotifierUserStream]
+            all_user_streams: Set[_NotifierUserStream] = set()
 
             for streams in list(self.room_to_user_streams.values()):
                 all_user_streams |= streams
@@ -329,8 +329,8 @@ class Notifier:
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
 
-        users = set()  # type: Set[UserID]
-        rooms = set()  # type: Set[str]
+        users: Set[UserID] = set()
+        rooms: Set[str] = set()
 
         for entry in pending:
             if entry.event_pos.persisted_after(max_room_stream_token):
@@ -580,7 +580,7 @@ class Notifier:
             if after_token == before_token:
                 return EventStreamResult([], (from_token, from_token))
 
-            events = []  # type: List[EventBase]
+            events: List[EventBase] = []
             end_token = from_token
 
             for name, source in self.event_sources.sources.items():

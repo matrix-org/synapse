@@ -29,6 +29,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.api.filtering import Filter
+from synapse.appservice import ApplicationService
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
     RestServlet,
@@ -47,11 +48,13 @@ from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import (
     JsonDict,
+    Requester,
     RoomAlias,
     RoomID,
     StreamToken,
     ThirdPartyInstanceID,
     UserID,
+    create_requester,
 )
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
@@ -309,7 +312,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         self.room_member_handler = hs.get_room_member_handler()
         self.auth = hs.get_auth()
 
-    async def inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
+    async def _inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
         (
             most_recent_prev_event_id,
             most_recent_prev_event_depth,
@@ -378,6 +381,25 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
 
         return insertion_event
 
+    async def _create_requester_for_user_id_from_app_service(
+        self, user_id: str, app_service: ApplicationService
+    ) -> Requester:
+        """Creates a new requester for the given user_id
+        and validates that the app service is allowed to control
+        the given user.
+
+        Args:
+            user_id: The author MXID that the app service is controlling
+            app_service: The app service that controls the user
+
+        Returns:
+            Requester object
+        """
+
+        await self.auth.validate_appservice_can_control_user_id(app_service, user_id)
+
+        return create_requester(user_id, app_service=app_service)
+
     async def on_POST(self, request, room_id):
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
@@ -391,7 +413,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         assert_params_in_dict(body, ["state_events_at_start", "events"])
 
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
-        chunk_id_from_query = parse_string(request, "chunk_id", default=None)
+        chunk_id_from_query = parse_string(request, "chunk_id")
 
         if prev_events_from_query is None:
             raise SynapseError(
@@ -443,7 +465,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             if event_dict["type"] == EventTypes.Member:
                 membership = event_dict["content"].get("membership", None)
                 event_id, _ = await self.room_member_handler.update_membership(
-                    requester,
+                    await self._create_requester_for_user_id_from_app_service(
+                        state_event["sender"], requester.app_service
+                    ),
                     target=UserID.from_string(event_dict["state_key"]),
                     room_id=room_id,
                     action=membership,
@@ -463,7 +487,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                     event,
                     _,
                 ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                    requester,
+                    await self._create_requester_for_user_id_from_app_service(
+                        state_event["sender"], requester.app_service
+                    ),
                     event_dict,
                     outlier=True,
                     prev_event_ids=[fake_prev_event_id],
@@ -479,7 +505,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         events_to_create = body["events"]
 
         prev_event_ids = prev_events_from_query
-        inherited_depth = await self.inherit_depth_from_prev_ids(prev_events_from_query)
+        inherited_depth = await self._inherit_depth_from_prev_ids(
+            prev_events_from_query
+        )
 
         # Figure out which chunk to connect to. If they passed in
         # chunk_id_from_query let's use it. The chunk ID passed in comes
@@ -509,7 +537,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 base_insertion_event,
                 _,
             ) = await self.event_creation_handler.create_and_send_nonmember_event(
-                requester,
+                await self._create_requester_for_user_id_from_app_service(
+                    base_insertion_event_dict["sender"],
+                    requester.app_service,
+                ),
                 base_insertion_event_dict,
                 prev_event_ids=base_insertion_event_dict.get("prev_events"),
                 auth_event_ids=auth_event_ids,
@@ -522,9 +553,18 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             ]
 
         # Connect this current chunk to the insertion event from the previous chunk
-        last_event_in_chunk["content"][
-            EventContentFields.MSC2716_CHUNK_ID
-        ] = chunk_id_to_connect_to
+        chunk_event = {
+            "type": EventTypes.MSC2716_CHUNK,
+            "sender": requester.user.to_string(),
+            "room_id": room_id,
+            "content": {EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to},
+            # Since the chunk event is put at the end of the chunk,
+            # where the newest-in-time event is, copy the origin_server_ts from
+            # the last event we're inserting
+            "origin_server_ts": last_event_in_chunk["origin_server_ts"],
+        }
+        # Add the chunk event to the end of the chunk (newest-in-time)
+        events_to_create.append(chunk_event)
 
         # Add an "insertion" event to the start of each chunk (next to the oldest-in-time
         # event in the chunk) so the next chunk can be connected to this one.
@@ -536,7 +576,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             # the first event we're inserting
             origin_server_ts=events_to_create[0]["origin_server_ts"],
         )
-        # Prepend the insertion event to the start of the chunk
+        # Prepend the insertion event to the start of the chunk (oldest-in-time)
         events_to_create = [insertion_event] + events_to_create
 
         event_ids = []
@@ -558,7 +598,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             }
 
             event, context = await self.event_creation_handler.create_event(
-                requester,
+                await self._create_requester_for_user_id_from_app_service(
+                    ev["sender"], requester.app_service
+                ),
                 event_dict,
                 prev_event_ids=event_dict.get("prev_events"),
                 auth_event_ids=auth_event_ids,
@@ -588,7 +630,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         # where topological_ordering is just depth.
         for (event, context) in reversed(events_to_persist):
             ev = await self.event_creation_handler.handle_new_client_event(
-                requester=requester,
+                await self._create_requester_for_user_id_from_app_service(
+                    event["sender"], requester.app_service
+                ),
                 event=event,
                 context=context,
             )
@@ -691,7 +735,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request):
-        server = parse_string(request, "server", default=None)
+        server = parse_string(request, "server")
 
         try:
             await self.auth.get_user_by_req(request, allow_guest=True)
@@ -710,8 +754,8 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             if server:
                 raise e
 
-        limit = parse_integer(request, "limit", 0)
-        since_token = parse_string(request, "since", None)
+        limit: Optional[int] = parse_integer(request, "limit", 0)
+        since_token = parse_string(request, "since")
 
         if limit == 0:
             # zero is a special value which corresponds to no limit.
@@ -745,10 +789,10 @@ class PublicRoomListRestServlet(TransactionRestServlet):
     async def on_POST(self, request):
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        server = parse_string(request, "server", default=None)
+        server = parse_string(request, "server")
         content = parse_json_object_from_request(request)
 
-        limit = int(content.get("limit", 100))  # type: Optional[int]
+        limit: Optional[int] = int(content.get("limit", 100))
         since_token = content.get("since", None)
         search_filter = content.get("filter", None)
 
@@ -894,9 +938,7 @@ class RoomMessageListRestServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(
-                json_decoder.decode(filter_json)
-            )  # type: Optional[Filter]
+            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
             if (
                 event_filter
                 and event_filter.filter_json.get("event_format", "client")
@@ -1009,9 +1051,7 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(
-                json_decoder.decode(filter_json)
-            )  # type: Optional[Filter]
+            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
         else:
             event_filter = None
 

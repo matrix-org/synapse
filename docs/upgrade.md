@@ -16,7 +16,7 @@ this document.
     summaries.
 
 -   If Synapse was installed using [prebuilt
-    packages](../setup/INSTALL.md#prebuilt-packages), you will need to follow the
+    packages](setup/installation.md#prebuilt-packages), you will need to follow the
     normal process for upgrading those packages.
 
 -   If Synapse was installed from source, then:
@@ -84,6 +84,19 @@ process, for example:
     wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
+
+
+# Upgrading to v1.39.0
+
+## Deprecation of the current third-party rules module interface
+
+The current third-party rules module interface is deprecated in favour of the new generic
+modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
+to [this documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
+to update their modules. Synapse administrators can refer to [this documentation](modules.md#using-modules)
+to update their configuration once the modules they are using have been updated.
+
+We plan to remove support for the current third-party rules interface in September 2021.
 
 
 # Upgrading to v1.38.0

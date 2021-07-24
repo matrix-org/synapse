@@ -14,7 +14,7 @@
 
 import logging
 
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import SynapseError
 from synapse.http.server import respond_with_html
 from synapse.http.servlet import RestServlet
 
@@ -92,11 +92,6 @@ class AccountValiditySendMailServlet(RestServlet):
         )
 
     async def on_POST(self, request):
-        if not self.account_validity_renew_by_email_enabled:
-            raise AuthError(
-                403, "Account renewal via email is disabled on this server."
-            )
-
         requester = await self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
         await self.account_activity_handler.send_renewal_email_to_user(user_id)

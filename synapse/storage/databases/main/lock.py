@@ -78,7 +78,11 @@ class LockStore(SQLBaseStore):
         """Called when the server is shutting down"""
         logger.info("Dropping held locks due to shutdown")
 
-        for (lock_name, lock_key), token in self._live_tokens.items():
+        # We need to take a copy of the tokens dict as dropping the locks will
+        # cause the dictionary to change.
+        tokens = dict(self._live_tokens)
+
+        for (lock_name, lock_key), token in tokens.items():
             await self._drop_lock(lock_name, lock_key, token)
 
         logger.info("Dropped locks due to shutdown")
@@ -310,13 +314,24 @@ class Lock:
         _excinst: Optional[BaseException],
         _exctb: Optional[TracebackType],
     ) -> bool:
+        await self.release()
+
+        return False
+
+    async def release(self) -> None:
+        """Release the lock.
+
+        This is automatically called when using the lock as a context manager.
+        """
+
+        if self._dropped:
+            return
+
         if self._looping_call.running:
             self._looping_call.stop()
 
         await self._store._drop_lock(self._lock_name, self._lock_key, self._token)
         self._dropped = True
-
-        return False
 
     def __del__(self) -> None:
         if not self._dropped:
