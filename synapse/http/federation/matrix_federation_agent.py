@@ -14,7 +14,10 @@
 import logging
 import urllib.parse
 from typing import Any, Generator, List, Optional
-from urllib.request import getproxies, proxy_bypass
+from urllib.request import (  # type: ignore[attr-defined]
+    getproxies_environment,
+    proxy_bypass,
+)
 
 from netaddr import AddrFormatError, IPAddress, IPSet
 from zope.interface import implementer
@@ -36,7 +39,11 @@ from synapse.http.client import BlacklistingAgentWrapper
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
-from synapse.http.proxyagent import ProxyAgent, parse_username_password
+from synapse.http.proxyagent import (
+    ProxyAgent,
+    ProxyCredentials,
+    parse_username_password,
+)
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.types import ISynapseReactor
 from synapse.util import Clock
@@ -60,6 +67,12 @@ class MatrixFederationAgent:
 
         user_agent:
             The user agent header to use for federation requests.
+
+        ip_blacklist: Disallowed IP addresses.
+
+        proxy_reactor: twisted reactor to use for connections to the proxy server
+           reactor might have some blacklisting applied (i.e. for DNS queries),
+           but we need unblocked access to the proxy.
 
         _srv_resolver:
             SrvResolver implementation to use for looking up SRV records. None
@@ -92,7 +105,8 @@ class MatrixFederationAgent:
         else:
             self.proxy_reactor = proxy_reactor
 
-        proxies = getproxies()
+        # http_proxy is not needed because federation is always over TLS
+        proxies = getproxies_environment()
         https_proxy = proxies["https"].encode() if "https" in proxies else None
 
         self._agent = Agent.usingEndpointFactory(
@@ -237,7 +251,7 @@ class MatrixHostnameEndpointFactory:
             https_proxy, proxy_reactor
         )
 
-    def endpointForURI(self, parsed_uri):
+    def endpointForURI(self, parsed_uri: URI):
         return MatrixHostnameEndpoint(
             self._reactor,
             self._tls_client_options_factory,
@@ -259,6 +273,8 @@ class MatrixHostnameEndpoint:
             factory to use for fetching client tls options, or none to disable TLS.
         srv_resolver: The SRV resolver to use
         parsed_uri: The parsed URI that we're wanting to connect to.
+        https_proxy_endpoint: Endpoint to use to connect to the proxy,
+        https_proxy_creds: Credentials to authenticate at proxy.
     """
 
     def __init__(
@@ -268,14 +284,12 @@ class MatrixHostnameEndpoint:
         srv_resolver: SrvResolver,
         parsed_uri: URI,
         https_proxy_endpoint: Optional[IStreamClientEndpoint],
-        https_proxy_creds,
+        https_proxy_creds: Optional[ProxyCredentials],
     ):
         self._reactor = reactor
-
         self._parsed_uri = parsed_uri
 
         self.https_proxy_endpoint = https_proxy_endpoint
-
         self.https_proxy_creds = https_proxy_creds
 
         # set up the TLS connection params
