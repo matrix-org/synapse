@@ -24,6 +24,7 @@ import pkg_resources
 import synapse.rest.admin
 from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes, HttpResponseException
+from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
@@ -474,6 +475,23 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
 
         whoami = self.whoami(tok)
         self.assertEqual(whoami, {"user_id": user_id, "device_id": device_id})
+
+    def test_GET_whoami_appservices(self):
+        user_id = "@as_user_kermit:test"
+        as_token = "i_am_an_app_service"
+
+        appservice = ApplicationService(
+            as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+        self.hs.get_datastore().services_cache.append(appservice)
+
+        whoami = self.whoami(as_token)
+        self.assertEqual(whoami, {"user_id": user_id})
+        self.assertFalse(hasattr(whoami, "device_id"))
 
     def whoami(self, tok):
         channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
