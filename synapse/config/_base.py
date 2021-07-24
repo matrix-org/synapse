@@ -910,16 +910,17 @@ def read_file(file_path: Any, config_path: Iterable[str]) -> str:
         with open(file_path) as file_stream:
             return file_stream.read()
     except OSError:
-       try:
-            file_path = os.path.realpath(file_path)
+        try:
+            file_path = os.path.realpath(
+                file_path
+            )  # doing acctuly the same thing as we have tyed to do before, but this time - processing systemlinks
             os.stat(file_path)
             with open(file_path) as file_stream:
                 return file_stream.read()
-       except OSError as e:
-           raise ConfigError(
-               "Error accessing file %r" % (file_path,), config_path
-           ) from e
-              raise ConfigError("Error accessing file %r" % (file_path,), config_path) from e
+        except OSError as e:
+            raise ConfigError(
+                "Error accessing file %r" % (file_path,), config_path
+            ) from e
 
 
 __all__ = [
