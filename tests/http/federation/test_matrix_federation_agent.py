@@ -86,14 +86,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             had_well_known_cache=self.had_well_known_cache,
         )
 
-        self.agent = MatrixFederationAgent(
-            reactor=self.reactor,
-            tls_client_options_factory=self.tls_factory,
-            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
-            ip_blacklist=IPSet(),
-            _srv_resolver=self.mock_resolver,
-            _well_known_resolver=self.well_known_resolver,
-        )
+        self.agent = self._make_agent()
 
     def _make_connection(
         self,
@@ -240,6 +233,20 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         self.reactor.pump((0.1,))
 
+    def _make_agent(self) -> MatrixFederationAgent:
+        """
+        If a proxy server is set, the MatrixFederationAgent must be created again
+        because it is created too early during setUp
+        """
+        return MatrixFederationAgent(
+            reactor=self.reactor,
+            tls_client_options_factory=self.tls_factory,
+            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
+            ip_blacklist=IPSet(),
+            _srv_resolver=self.mock_resolver,
+            _well_known_resolver=self.well_known_resolver,
+        )
+
     def test_get(self):
         """
         happy-path test of a GET request with an explicit port
@@ -261,14 +268,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         test of a GET request with an explicit port
         """
         # recreate the agent with patched env
-        self.agent = MatrixFederationAgent(
-            reactor=self.reactor,
-            tls_client_options_factory=self.tls_factory,
-            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
-            ip_blacklist=IPSet(),
-            _srv_resolver=self.mock_resolver,
-            _well_known_resolver=self.well_known_resolver,
-        )
+        self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
         test_d = self._make_get_request(b"matrix://testserv:8448/foo/bar")
@@ -370,14 +370,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             auth_credentials: credentials to authenticate at proxy
         """
         # recreate the agent with patched env
-        self.agent = MatrixFederationAgent(
-            reactor=self.reactor,
-            tls_client_options_factory=self.tls_factory,
-            user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
-            ip_blacklist=IPSet(),
-            _srv_resolver=self.mock_resolver,
-            _well_known_resolver=self.well_known_resolver,
-        )
+        self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["proxy.com"] = "9.9.9.9"
