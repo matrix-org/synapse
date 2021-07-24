@@ -526,11 +526,10 @@ def check_historical(
         AuthError if the event sender is not allowed to send historical related events
         ("insertion", "chunk", and "marker").
     """
+    # Ignore the auth checks in room versions that do not support historical
+    # events
     if not room_version_obj.msc2716_historical:
-        raise AuthError(
-            403,
-            "Historical events not supported with your room version",
-        )
+        return
 
     user_level = get_user_power_level(event.user_id, auth_events)
 

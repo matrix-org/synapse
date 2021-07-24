@@ -1770,6 +1770,12 @@ class PersistEventsStore:
             # Not a insertion event
             return
 
+        # Skip processing a insertion event if the room version doesn't
+        # support it.
+        room_version = self.store.get_room_version_txn(txn, event.room_id)
+        if not room_version.msc2716_historical:
+            return
+
         next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
         if next_chunk_id is None:
             # Invalid insertion event without next chunk ID
@@ -1813,6 +1819,12 @@ class PersistEventsStore:
 
         if event.type != EventTypes.MSC2716_CHUNK:
             # Not a chunk event
+            return
+
+        # Skip processing a chunk event if the room version doesn't
+        # support it.
+        room_version = self.store.get_room_version_txn(txn, event.room_id)
+        if not room_version.msc2716_historical:
             return
 
         chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
