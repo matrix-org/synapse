@@ -400,7 +400,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Join the second user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
-    def test_read_receipts(self):
+    def test_hidden_read_receipts(self):
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)
 
