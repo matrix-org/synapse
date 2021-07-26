@@ -25,14 +25,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_source = hs.get_event_sources().sources["receipt"]
 
-    def test_hidden_receipt_filtering(self):
-        """
-        In the first param of _test_filters_hidden we use "hidden" instead of
-        ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking
-        the data from the database which doesn't use the prefix
-        """
-
-        # Filters out a hidden receipt
+    def test_filters_out_hidden_receipt(self):
         self._test_filters_hidden(
             [
                 {
@@ -53,7 +46,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             [],
         )
 
-        # Doesn't filter out our hidden read receipt
+    def test_does_not_filter_out_our_hidden_receipt(self):
         self._test_filters_hidden(
             [
                 {
@@ -89,7 +82,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        # Filters out a hidden read receipt and doesn't touch the rest
+    def test_filters_out_hidden_receipt_and_ignores_rest(self):
         self._test_filters_hidden(
             [
                 {
@@ -127,7 +120,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        # Filters out an event with only hidden read receipts and doesn't touch the rest
+    def test_filters_out_event_with_only_hidden_receipts_and_ignores_the_rest(self):
         self._test_filters_hidden(
             [
                 {
@@ -169,7 +162,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        # Handles missing content of m.read
+    def test_handles_missing_content_of_m_read(self):
         self._test_filters_hidden(
             [
                 {
@@ -205,7 +198,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        # Handles an empty event
+    def test_handles_empty_event(self):
         self._test_filters_hidden(
             [
                 {
@@ -241,7 +234,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        # Filters out an event with only hidden read receipts and doesn't touch the rest
+    def test_filters_out_receipt_event_with_only_hidden_receipt_and_ignores_rest(self):
         self._test_filters_hidden(
             [
                 {
@@ -288,6 +281,12 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                 }
             ],
         )
+
+    """
+    In the first param of _test_filters_hidden we use "hidden" instead of
+    ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking
+    the data from the database which doesn't use the prefix
+    """
 
     def _test_filters_hidden(
         self, events: List[JsonDict], expected_output: List[JsonDict]
