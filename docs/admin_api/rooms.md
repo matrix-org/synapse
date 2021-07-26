@@ -483,6 +483,12 @@ The following fields are returned in the JSON response body:
 
 ## Undoing room shutdowns
 
+### If the `block` or `purge` option is `false`
+
+Nothing needs to be done. Users can rejoin the room.
+
+### If the `block` option is `true`
+
 *Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
 the structure can and does change without notice.
 
