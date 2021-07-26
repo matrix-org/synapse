@@ -62,6 +62,7 @@ class Auth:
         self.clock = hs.get_clock()
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
+        self._account_validity_handler = hs.get_account_validity_handler()
 
         self.token_cache: LruCache[str, Tuple[str, bool]] = LruCache(
             10000, "token_cache"
@@ -69,9 +70,6 @@ class Auth:
 
         self._auth_blocking = AuthBlocking(self.hs)
 
-        self._account_validity_enabled = (
-            hs.config.account_validity.account_validity_enabled
-        )
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
         self._force_tracing_for_users = hs.config.tracing.force_tracing_for_users
@@ -187,12 +185,17 @@ class Auth:
             shadow_banned = user_info.shadow_banned
 
             # Deny the request if the user account has expired.
-            if self._account_validity_enabled and not allow_expired:
-                if await self.store.is_account_expired(
-                    user_info.user_id, self.clock.time_msec()
+            if not allow_expired:
+                if await self._account_validity_handler.is_user_expired(
+                    user_info.user_id
                 ):
+                    # Raise the error if either an account validity module has determined
+                    # the account has expired, or the legacy account validity
+                    # implementation is enabled and determined the account has expired
                     raise AuthError(
-                        403, "User account has expired", errcode=Codes.EXPIRED_ACCOUNT
+                        403,
+                        "User account has expired",
+                        errcode=Codes.EXPIRED_ACCOUNT,
                     )
 
             device_id = user_info.device_id

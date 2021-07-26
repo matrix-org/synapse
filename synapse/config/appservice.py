@@ -64,7 +64,7 @@ def load_appservices(hostname, config_files):
 
     for config_file in config_files:
         try:
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 appservice = _load_appservice(hostname, yaml.safe_load(f), config_file)
                 if appservice.id in seen_ids:
                     raise ConfigError(

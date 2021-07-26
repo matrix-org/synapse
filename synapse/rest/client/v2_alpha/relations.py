@@ -158,19 +158,21 @@ class RelationPaginationServlet(RestServlet):
         event = await self.event_handler.get_event(requester.user, room_id, parent_id)
 
         limit = parse_integer(request, "limit", default=5)
-        from_token = parse_string(request, "from")
-        to_token = parse_string(request, "to")
+        from_token_str = parse_string(request, "from")
+        to_token_str = parse_string(request, "to")
 
         if event.internal_metadata.is_redacted():
             # If the event is redacted, return an empty list of relations
             pagination_chunk = PaginationChunk(chunk=[])
         else:
             # Return the relations
-            if from_token:
-                from_token = RelationPaginationToken.from_string(from_token)
+            from_token = None
+            if from_token_str:
+                from_token = RelationPaginationToken.from_string(from_token_str)
 
-            if to_token:
-                to_token = RelationPaginationToken.from_string(to_token)
+            to_token = None
+            if to_token_str:
+                to_token = RelationPaginationToken.from_string(to_token_str)
 
             pagination_chunk = await self.store.get_relations_for_event(
                 event_id=parent_id,
@@ -256,19 +258,21 @@ class RelationAggregationPaginationServlet(RestServlet):
             raise SynapseError(400, "Relation type must be 'annotation'")
 
         limit = parse_integer(request, "limit", default=5)
-        from_token = parse_string(request, "from")
-        to_token = parse_string(request, "to")
+        from_token_str = parse_string(request, "from")
+        to_token_str = parse_string(request, "to")
 
         if event.internal_metadata.is_redacted():
             # If the event is redacted, return an empty list of relations
             pagination_chunk = PaginationChunk(chunk=[])
         else:
             # Return the relations
-            if from_token:
-                from_token = AggregationPaginationToken.from_string(from_token)
+            from_token = None
+            if from_token_str:
+                from_token = AggregationPaginationToken.from_string(from_token_str)
 
-            if to_token:
-                to_token = AggregationPaginationToken.from_string(to_token)
+            to_token = None
+            if to_token_str:
+                to_token = AggregationPaginationToken.from_string(to_token_str)
 
             pagination_chunk = await self.store.get_aggregation_groups_for_event(
                 event_id=parent_id,
@@ -336,14 +340,16 @@ class RelationAggregationGroupPaginationServlet(RestServlet):
             raise SynapseError(400, "Relation type must be 'annotation'")
 
         limit = parse_integer(request, "limit", default=5)
-        from_token = parse_string(request, "from")
-        to_token = parse_string(request, "to")
+        from_token_str = parse_string(request, "from")
+        to_token_str = parse_string(request, "to")
 
-        if from_token:
-            from_token = RelationPaginationToken.from_string(from_token)
+        from_token = None
+        if from_token_str:
+            from_token = RelationPaginationToken.from_string(from_token_str)
 
-        if to_token:
-            to_token = RelationPaginationToken.from_string(to_token)
+        to_token = None
+        if to_token_str:
+            to_token = RelationPaginationToken.from_string(to_token_str)
 
         result = await self.store.get_relations_for_event(
             event_id=parent_id,

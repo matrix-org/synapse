@@ -75,6 +75,7 @@ class UserSortOrder(Enum):
     USER_TYPE = ordered alphabetically by `user_type`
     AVATAR_URL = ordered alphabetically by `avatar_url`
     SHADOW_BANNED = ordered by `shadow_banned`
+    CREATION_TS = ordered by `creation_ts`
     """
 
     MEDIA_LENGTH = "media_length"
@@ -88,6 +89,7 @@ class UserSortOrder(Enum):
     USER_TYPE = "user_type"
     AVATAR_URL = "avatar_url"
     SHADOW_BANNED = "shadow_banned"
+    CREATION_TS = "creation_ts"
 
 
 class StatsStore(StateDeltasStore):
@@ -647,10 +649,10 @@ class StatsStore(StateDeltasStore):
         limit: int,
         from_ts: Optional[int] = None,
         until_ts: Optional[int] = None,
-        order_by: Optional[UserSortOrder] = UserSortOrder.USER_ID.value,
+        order_by: Optional[str] = UserSortOrder.USER_ID.value,
         direction: Optional[str] = "f",
         search_term: Optional[str] = None,
-    ) -> Tuple[List[JsonDict], Dict[str, int]]:
+    ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users and their uploaded local media
         (size and number). This will return a json list of users and the
         total number of users matching the filter criteria.

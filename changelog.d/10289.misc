@@ -1,1 +1,0 @@
-Convert `room_depth.min_depth` column to a `BIGINT`.
