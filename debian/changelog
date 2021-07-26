@@ -1,6 +1,8 @@
 matrix-synapse-py3 (1.39.0ubuntu1) UNRELEASED; urgency=medium
 
   * Drop backwards-compatibility code that was required to support Ubuntu Xenial.
+  * Update package triggers so that the virtualenv is correctly rebuild
+    when the system python is rebuilt, on recent Python versions.
 
  -- Richard van der Hoff <richard@matrix.org>  Tue, 20 Jul 2021 00:10:03 +0100
 
