@@ -636,16 +636,20 @@ class StateResolutionHandler:
         """
         try:
             with Measure(self.clock, "state._resolve_events") as m:
-                v = KNOWN_ROOM_VERSIONS[room_version]
-                if v.state_res == StateResolutionVersions.V1:
+                room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+                if room_version_obj.state_res == StateResolutionVersions.V1:
                     return await v1.resolve_events_with_store(
-                        room_id, state_sets, event_map, state_res_store.get_events
+                        room_id,
+                        room_version_obj,
+                        state_sets,
+                        event_map,
+                        state_res_store.get_events,
                     )
                 else:
                     return await v2.resolve_events_with_store(
                         self.clock,
                         room_id,
-                        room_version,
+                        room_version_obj,
                         state_sets,
                         event_map,
                         state_res_store,

@@ -1219,8 +1219,26 @@ def _create_v2_path(path: str, *args: str) -> str:
 class SendJoinResponse:
     """The parsed response of a `/send_join` request."""
 
+    # The list of auth events from the /send_join response.
     auth_events: List[EventBase]
+    # The list of state from the /send_join response.
     state: List[EventBase]
+    # The raw join event from the /send_join response.
+    event_dict: JsonDict
+    # The parsed join event from the /send_join response. This will be None if
+    # "event" is not included in the response.
+    event: Optional[EventBase] = None
+
+
+@ijson.coroutine
+def _event_parser(event_dict: JsonDict):
+    """Helper function for use with `ijson.kvitems_coro` to parse key-value pairs
+    to add them to a given dictionary.
+    """
+
+    while True:
+        key, value = yield
+        event_dict[key] = value
 
 
 @ijson.coroutine
@@ -1246,7 +1264,8 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
     CONTENT_TYPE = "application/json"
 
     def __init__(self, room_version: RoomVersion, v1_api: bool):
-        self._response = SendJoinResponse([], [])
+        self._response = SendJoinResponse([], [], {})
+        self._room_version = room_version
 
         # The V1 API has the shape of `[200, {...}]`, which we handle by
         # prefixing with `item.*`.
@@ -1260,12 +1279,21 @@ class SendJoinParser(ByteParser[SendJoinResponse]):
             _event_list_parser(room_version, self._response.auth_events),
             prefix + "auth_chain.item",
         )
+        self._coro_event = ijson.kvitems_coro(
+            _event_parser(self._response.event_dict),
+            prefix + "org.matrix.msc3083.v2.event",
+        )
 
     def write(self, data: bytes) -> int:
         self._coro_state.send(data)
         self._coro_auth.send(data)
+        self._coro_event.send(data)
 
         return len(data)
 
     def finish(self) -> SendJoinResponse:
+        if self._response.event_dict:
+            self._response.event = make_event_from_dict(
+                self._response.event_dict, self._room_version
+            )
         return self._response
