@@ -26,7 +26,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
 
     def test_hidden_receipt_filtering(self):
         # Filters out a hidden receipt
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -47,7 +47,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
         # Doesn't filter out our hidden read receipt
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -83,7 +83,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
         # Filters out a hidden read receipt and doesn't touch the rest
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -121,7 +121,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
         # Filters out an event with only hidden read receipts and doesn't touch the rest
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -163,7 +163,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
         # Handles missing content of m.read
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -199,7 +199,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
         # Handles an empty event
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -235,7 +235,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
         # Filters out an event with only hidden read receipts and doesn't touch the rest
-        self._filters_correctly(
+        self._test_filters_hidden(
             [
                 {
                     "content": {
@@ -282,7 +282,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-    def _filters_correctly(
+    def _test_filters_hidden(
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
         """Tests that the _filter_out_hidden returns the expected output"""
