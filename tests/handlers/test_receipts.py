@@ -26,6 +26,12 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         self.event_source = hs.get_event_sources().sources["receipt"]
 
     def test_hidden_receipt_filtering(self):
+        """
+        In the first param of _test_filters_hidden we use "hidden" instead of
+        ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking
+        the data from the database which doesn't use the prefix
+        """
+
         # Filters out a hidden receipt
         self._test_filters_hidden(
             [
