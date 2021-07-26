@@ -13,7 +13,6 @@
 # limitations under the License.
 
 import logging
-from http import HTTPStatus
 
 from synapse.api.constants import ReadReceiptEventFields
 from synapse.api.errors import Codes, SynapseError

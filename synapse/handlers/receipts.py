@@ -188,7 +188,7 @@ class ReceiptEventSource:
                 new_users = {}
                 for rr_user_id, user_rr in m_read.items():
                     hidden = user_rr.get("hidden", None)
-                    if hidden != True or rr_user_id == user_id:
+                    if hidden is not True or rr_user_id == user_id:
                         new_users[rr_user_id] = user_rr.copy()
                         # If hidden has a value replace hidden with the correct prefixed key
                         if hidden is not None:
