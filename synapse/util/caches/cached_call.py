@@ -14,7 +14,6 @@
 import enum
 from typing import Awaitable, Callable, Generic, Optional, TypeVar, Union
 
-from twisted.internet import defer
 from twisted.internet.defer import Deferred
 from twisted.python.failure import Failure
 
@@ -103,12 +102,8 @@ class CachedCall(Generic[TV]):
             assert not isinstance(self._result, _Sentinel)
 
         if isinstance(self._result, Failure):
-            # I *think* awaiting a failed Deferred is the easiest way to correctly raise
-            # the right exception.
-            d = defer.fail(self._result)
-            await d
-            # the `await` should always raise, so this should be unreachable.
-            raise AssertionError("unexpected return from await on failure")
+            self._result.raiseException()
+            raise AssertionError("unexpected return from Failure.raiseException")
 
         return self._result
 
