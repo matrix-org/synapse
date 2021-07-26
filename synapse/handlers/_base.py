@@ -15,8 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-import synapse.state
-import synapse.storage
 import synapse.types
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.ratelimiting import Ratelimiter

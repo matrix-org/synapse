@@ -1,0 +1,1 @@
+Fix circular import with the default SAML mapping handler.
