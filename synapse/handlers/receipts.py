@@ -183,8 +183,7 @@ class ReceiptEventSource:
                     continue
 
                 new_users = {}
-                for rr_user_id in m_read.keys():
-                    user_rr = m_read[rr_user_id]
+                for rr_user_id, user_rr in m_read.items():
                     hidden = user_rr.get("hidden", None)
                     if hidden != True or rr_user_id == user_id:
                         new_users[rr_user_id] = user_rr.copy()
