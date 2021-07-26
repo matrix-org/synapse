@@ -57,7 +57,6 @@ It will **not be used** for:
   - connections from workers to Redis
 - fetch keys from other servers
 - download remote media
-- extension modules
 
 ## Troubleshooting
 
