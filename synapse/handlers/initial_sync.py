@@ -127,7 +127,8 @@ class InitialSyncHandler(BaseHandler):
             joined_rooms,
             to_key=int(now_token.receipt_key),
         )
-        receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
+        if self.hs.config.experimental.msc2285_enabled:
+            receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -425,7 +426,9 @@ class InitialSyncHandler(BaseHandler):
             )
             if not receipts:
                 return []
-            return ReceiptEventSource.filter_out_hidden(receipts, user_id)
+            if self.hs.config.experimental.msc2285_enabled:
+                receipts = ReceiptEventSource.filter_out_hidden(receipts, user_id)
+            return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(
             defer.gatherResults(

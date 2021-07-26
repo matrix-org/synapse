@@ -400,6 +400,7 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Join the second user
         self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
 
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
     def test_hidden_read_receipts(self):
         # Send a message as the first user
         res = self.helper.send(self.room_id, body="hello", tok=self.tok)

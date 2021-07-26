@@ -32,3 +32,6 @@ class ExperimentalConfig(Config):
 
         # MSC2716 (backfill existing history)
         self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool
+
+        # MSC2285 (hidden read receipts)
+        self.msc2285_enabled = experimental.get("msc2285_enabled", False)  # type: bool

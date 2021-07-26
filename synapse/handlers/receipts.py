@@ -155,13 +155,16 @@ class ReceiptsHandler(BaseHandler):
         if not is_new:
             return
 
-        if self.federation_sender and not hidden:
+        if self.federation_sender and (
+            not hidden or not self.hs.config.experimental.msc2285_enabled
+        ):
             await self.federation_sender.send_read_receipt(receipt)
 
 
 class ReceiptEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
+        self.config = hs.config
 
     @staticmethod
     def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
@@ -216,9 +219,11 @@ class ReceiptEventSource:
         events = await self.store.get_linearized_receipts_for_rooms(
             room_ids, from_key=from_key, to_key=to_key
         )
-        filtered_events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
-        return (filtered_events, to_key)
+        if self.config.experimental.msc2285_enabled:
+            events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
+
+        return (events, to_key)
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
