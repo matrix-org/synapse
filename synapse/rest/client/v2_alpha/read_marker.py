@@ -45,7 +45,7 @@ class ReadMarkerRestServlet(RestServlet):
 
         if not isinstance(hidden, bool):
             raise SynapseError(
-                HTTPStatus.BAD_REQUEST,
+                400,
                 "Param %s must be a boolean, if given"
                 % ReadReceiptEventFields.MSC2285_HIDDEN,
                 Codes.BAD_JSON,
