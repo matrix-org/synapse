@@ -14,6 +14,7 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
 from synapse.handlers._base import BaseHandler
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
@@ -190,7 +191,9 @@ class ReceiptEventSource:
                         # If hidden has a value replace hidden with the correct prefixed key
                         if user_rr.get("hidden", None) is not None:
                             new_users[rr_user_id].pop("hidden")
-                            new_users[rr_user_id]["org.matrix.msc2285.hidden"] = hidden
+                            new_users[rr_user_id][
+                                ReadReceiptEventFields.MSC2285_HIDDEN
+                            ] = hidden
 
                 # Set new users unless empty
                 if len(new_users.keys()) > 0:

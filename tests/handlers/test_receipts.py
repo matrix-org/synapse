@@ -15,6 +15,7 @@
 
 from typing import List
 
+from synapse.api.constants import ReadReceiptEventFields
 from synapse.types import JsonDict
 
 from tests import unittest
@@ -71,7 +72,7 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
                             "m.read": {
                                 "@me:server.org": {
                                     "ts": 1436451550453,
-                                    "org.matrix.msc2285.hidden": True,
+                                    ReadReceiptEventFields.MSC2285_HIDDEN: True,
                                 },
                             }
                         }

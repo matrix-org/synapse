@@ -15,6 +15,7 @@
 import logging
 from http import HTTPStatus
 
+from synapse.api.constants import ReadReceiptEventFields
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 
@@ -44,7 +45,7 @@ class ReceiptRestServlet(RestServlet):
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
         body = parse_json_object_from_request(request)
-        hidden = body.get("org.matrix.msc2285.hidden", False)
+        hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
 
         if not isinstance(hidden, bool):
             raise SynapseError(
