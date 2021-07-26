@@ -44,19 +44,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-LoginResponse = TypedDict(
-    "LoginResponse",
-    {
-        "user_id": str,
-        "access_token": str,
-        "home_server": str,
-        "expires_in_ms": Optional[int],
-        "refresh_token": Optional[str],
-        "device_id": str,
-        "well_known": Optional[Dict[str, Any]],
-    },
-    total=False,
-)
+class LoginResponse(TypedDict, total=False):
+    user_id: str
+    access_token: str
+    home_server: str
+    expires_in_ms: Optional[int]
+    refresh_token: Optional[str]
+    device_id: str
+    well_known: Optional[Dict[str, Any]]
 
 
 class LoginRestServlet(RestServlet):
@@ -121,7 +116,7 @@ class LoginRestServlet(RestServlet):
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
-            sso_flow = {
+            sso_flow: JsonDict = {
                 "type": LoginRestServlet.SSO_TYPE,
                 "identity_providers": [
                     _get_auth_flow_dict_for_idp(
@@ -129,7 +124,7 @@ class LoginRestServlet(RestServlet):
                     )
                     for idp in self._sso_handler.get_identity_providers().values()
                 ],
-            }  # type: JsonDict
+            }
 
             if self._msc2858_enabled:
                 # backwards-compatibility support for clients which don't
@@ -150,9 +145,7 @@ class LoginRestServlet(RestServlet):
             # login flow types returned.
             flows.append({"type": LoginRestServlet.TOKEN_TYPE})
 
-        flows.extend(
-            ({"type": t} for t in self.auth_handler.get_supported_login_types())
-        )
+        flows.extend({"type": t} for t in self.auth_handler.get_supported_login_types())
 
         flows.append({"type": LoginRestServlet.APPSERVICE_TYPE})
 
@@ -447,7 +440,7 @@ def _get_auth_flow_dict_for_idp(
         use_unstable_brands: whether we should use brand identifiers suitable
            for the unstable API
     """
-    e = {"id": idp.idp_id, "name": idp.idp_name}  # type: JsonDict
+    e: JsonDict = {"id": idp.idp_id, "name": idp.idp_name}
     if idp.idp_icon:
         e["icon"] = idp.idp_icon
     if idp.idp_brand:
@@ -561,7 +554,7 @@ class SsoRedirectServlet(RestServlet):
             finish_request(request)
             return
 
-        args = request.args  # type: Dict[bytes, List[bytes]]  # type: ignore
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
         client_redirect_url = parse_bytes_from_args(args, "redirectUrl", required=True)
         sso_url = await self._sso_handler.handle_redirect_request(
             request,

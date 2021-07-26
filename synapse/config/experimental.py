@@ -25,13 +25,16 @@ class ExperimentalConfig(Config):
         experimental = config.get("experimental_features") or {}
 
         # MSC2858 (multiple SSO identity providers)
-        self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
+        self.msc2858_enabled: bool = experimental.get("msc2858_enabled", False)
 
         # MSC3026 (busy presence state)
-        self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool
+        self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
 
         # MSC2716 (backfill existing history)
-        self.msc2716_enabled = experimental.get("msc2716_enabled", False)  # type: bool
+        self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
 
         # MSC2285 (hidden read receipts)
-        self.msc2285_enabled = experimental.get("msc2285_enabled", False)  # type: bool
+        self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
+
+        # MSC3244 (room version capabilities)
+        self.msc3244_enabled: bool = experimental.get("msc3244_enabled", False)

@@ -27,8 +27,11 @@ from synapse.util import json_encoder
 _DEFAULT_CATEGORY_ID = ""
 _DEFAULT_ROLE_ID = ""
 
+
 # A room in a group.
-_RoomInGroup = TypedDict("_RoomInGroup", {"room_id": str, "is_public": bool})
+class _RoomInGroup(TypedDict):
+    room_id: str
+    is_public: bool
 
 
 class GroupServerWorkerStore(SQLBaseStore):
@@ -92,6 +95,7 @@ class GroupServerWorkerStore(SQLBaseStore):
               "is_public": False                    # Whether this is a public room or not
             }
         """
+
         # TODO: Pagination
 
         def _get_rooms_in_group_txn(txn):

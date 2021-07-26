@@ -27,7 +27,7 @@ from twisted.internet.interfaces import (
 )
 from twisted.web.client import URI, Agent, HTTPConnectionPool
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer
+from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResponse
 
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http.client import BlacklistingAgentWrapper
@@ -116,7 +116,7 @@ class MatrixFederationAgent:
         uri: bytes,
         headers: Optional[Headers] = None,
         bodyProducer: Optional[IBodyProducer] = None,
-    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
+    ) -> Generator[defer.Deferred, Any, IResponse]:
         """
         Args:
             method: HTTP method: GET/POST/etc

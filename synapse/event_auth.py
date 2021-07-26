@@ -531,7 +531,7 @@ def _check_power_levels(
     user_level = get_user_power_level(event.user_id, auth_events)
 
     # Check other levels:
-    levels_to_check = [
+    levels_to_check: List[Tuple[str, Optional[str]]] = [
         ("users_default", None),
         ("events_default", None),
         ("state_default", None),
@@ -539,7 +539,7 @@ def _check_power_levels(
         ("redact", None),
         ("kick", None),
         ("invite", None),
-    ]  # type: List[Tuple[str, Optional[str]]]
+    ]
 
     old_list = current_state.content.get("users", {})
     for user in set(list(old_list) + list(user_list)):
@@ -569,12 +569,12 @@ def _check_power_levels(
             new_loc = new_loc.get(dir, {})
 
         if level_to_check in old_loc:
-            old_level = int(old_loc[level_to_check])  # type: Optional[int]
+            old_level: Optional[int] = int(old_loc[level_to_check])
         else:
             old_level = None
 
         if level_to_check in new_loc:
-            new_level = int(new_loc[level_to_check])  # type: Optional[int]
+            new_level: Optional[int] = int(new_loc[level_to_check])
         else:
             new_level = None
 

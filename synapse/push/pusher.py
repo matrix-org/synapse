@@ -31,13 +31,13 @@ class PusherFactory:
         self.hs = hs
         self.config = hs.config
 
-        self.pusher_types = {
+        self.pusher_types: Dict[str, Callable[[HomeServer, PusherConfig], Pusher]] = {
             "http": HttpPusher
-        }  # type: Dict[str, Callable[[HomeServer, PusherConfig], Pusher]]
+        }
 
         logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
         if hs.config.email_enable_notifs:
-            self.mailers = {}  # type: Dict[str, Mailer]
+            self.mailers: Dict[str, Mailer] = {}
 
             self._notif_template_html = hs.config.email_notif_template_html
             self._notif_template_text = hs.config.email_notif_template_text

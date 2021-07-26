@@ -594,7 +594,15 @@ class HomeserverTestCase(TestCase):
         user_id = channel.json_body["user_id"]
         return user_id
 
-    def login(self, username, password, device_id=None):
+    def login(
+        self,
+        username,
+        password,
+        device_id=None,
+        custom_headers: Optional[
+            Iterable[Tuple[Union[bytes, str], Union[bytes, str]]]
+        ] = None,
+    ):
         """
         Log in a user, and get an access token. Requires the Login API be
         registered.
@@ -605,7 +613,10 @@ class HomeserverTestCase(TestCase):
             body["device_id"] = device_id
 
         channel = self.make_request(
-            "POST", "/_matrix/client/r0/login", json.dumps(body).encode("utf8")
+            "POST",
+            "/_matrix/client/r0/login",
+            json.dumps(body).encode("utf8"),
+            custom_headers=custom_headers,
         )
         self.assertEqual(channel.code, 200, channel.result)
 
