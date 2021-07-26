@@ -86,6 +86,30 @@ process, for example:
     ```
 
 
+# Upgrading to v1.xx.0
+
+## Add support for routing outbound HTTP requests via a proxy for federation
+
+Since Synapse 1.6.0 (2019-11-26) you can set a proxy for outbound HTTP requests via
+http_proxy/https_proxy environment variables. This proxy was set for:
+- push
+- url previews
+- phone-home stats
+- recaptcha validation
+- CAS auth validation
+- OpenID Connect
+
+In this version we have added support for outbound requests for:
+- federation
+- download remote media
+- fetch keys from other servers
+- Identity servers
+
+These requests use the same proxy configuration. If you have a proxy configuration we
+recommend to verify the configuration. It may be necessary to adjust the `no_proxy`
+environment variable.
+
+
 # Upgrading to v1.39.0
 
 ## Deprecation of the current third-party rules module interface

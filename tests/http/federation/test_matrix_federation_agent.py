@@ -247,9 +247,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
 
     def test_get(self):
-        """
-        happy-path test of a GET request with an explicit port
-        """
+        """happy-path test of a GET request with an explicit port"""
         self._do_get()
 
     @patch.dict(
@@ -257,15 +255,11 @@ class MatrixFederationAgentTests(unittest.TestCase):
         {"https_proxy": "proxy.com", "no_proxy": "testserv"},
     )
     def test_get_bypass_proxy(self):
-        """
-        test of a GET request with an explicit port and bypass proxy
-        """
+        """test of a GET request with an explicit port and bypass proxy"""
         self._do_get()
 
     def _do_get(self):
-        """
-        test of a GET request with an explicit port
-        """
+        """test of a GET request with an explicit port"""
         # recreate the agent with patched env
         self.agent = self._make_agent()
 
@@ -324,27 +318,21 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
     def test_get_via_http_proxy(self):
-        """
-        test for federation request through a http proxy
-        """
+        """test for federation request through a http proxy"""
         self._do_get_via_proxy(ssl=False, auth_credentials=None)
 
     @patch.dict(
         os.environ, {"https_proxy": "user:pass@proxy.com", "no_proxy": "unused.com"}
     )
     def test_get_via_http_proxy_with_auth(self):
-        """
-        test for federation request through a http proxy with authentication
-        """
+        """test for federation request through a http proxy with authentication"""
         self._do_get_via_proxy(ssl=False, auth_credentials=b"user:pass")
 
     @patch.dict(
         os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
     )
     def test_get_via_https_proxy(self):
-        """
-        test for federation request through a https proxy
-        """
+        """test for federation request through a https proxy"""
         self._do_get_via_proxy(ssl=True, auth_credentials=None)
 
     @patch.dict(
@@ -352,9 +340,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         {"https_proxy": "https://user:pass@proxy.com", "no_proxy": "unused.com"},
     )
     def test_get_via_https_proxy_with_auth(self):
-        """
-        test for federation request through a https proxy with authentication
-        """
+        """test for federation request through a https proxy with authentication"""
         self._do_get_via_proxy(ssl=True, auth_credentials=b"user:pass")
 
     def _do_get_via_proxy(
