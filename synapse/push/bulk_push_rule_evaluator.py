@@ -194,7 +194,7 @@ class BulkPushRuleEvaluator:
         count_as_unread = _should_count_as_unread(event, context)
 
         rules_by_user = await self._get_rules_for_event(event, context)
-        actions_by_user = {}  # type: Dict[str, List[Union[dict, str]]]
+        actions_by_user: Dict[str, List[Union[dict, str]]] = {}
 
         room_members = await self.store.get_joined_users_from_context(event, context)
 
@@ -207,7 +207,7 @@ class BulkPushRuleEvaluator:
             event, len(room_members), sender_power_level, power_levels
         )
 
-        condition_cache = {}  # type: Dict[str, bool]
+        condition_cache: Dict[str, bool] = {}
 
         # If the event is not a state event check if any users ignore the sender.
         if not event.is_state():

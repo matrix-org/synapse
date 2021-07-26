@@ -9,7 +9,7 @@ commits each of which contains a single change building on what came
 before. Here, by way of an arbitrary example, is the top of `git log --graph
 b2dba0607`:
 
-<img src="git/clean.png" alt="clean git graph" width="500px">
+<img src="img/git/clean.png" alt="clean git graph" width="500px">
 
 Note how the commit comment explains clearly what is changing and why. Also
 note the *absence* of merge commits, as well as the absence of commits called
@@ -61,7 +61,7 @@ Ok, so that's what we'd like to achieve. How do we achieve it?
 The TL;DR is: when you come to merge a pull request, you *probably* want to
 “squash and merge”:
 
-![squash and merge](git/squash.png).
+![squash and merge](img/git/squash.png).
 
 (This applies whether you are merging your own PR, or that of another
 contributor.)
@@ -105,7 +105,7 @@ complicated. Here's how we do it.
 
 Let's start with a picture:
 
-![branching model](git/branches.jpg)
+![branching model](img/git/branches.jpg)
 
 It looks complicated, but it's really not. There's one basic rule: *anyone* is
 free to merge from *any* more-stable branch to *any* less-stable branch at

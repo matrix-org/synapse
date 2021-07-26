@@ -81,9 +81,9 @@ class PaginationHandler:
         self._server_name = hs.hostname
 
         self.pagination_lock = ReadWriteLock()
-        self._purges_in_progress_by_room = set()  # type: Set[str]
+        self._purges_in_progress_by_room: Set[str] = set()
         # map from purge id to PurgeStatus
-        self._purges_by_id = {}  # type: Dict[str, PurgeStatus]
+        self._purges_by_id: Dict[str, PurgeStatus] = {}
         self._event_serializer = hs.get_event_client_serializer()
 
         self._retention_default_max_lifetime = hs.config.retention_default_max_lifetime

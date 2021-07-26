@@ -98,8 +98,8 @@ class ReceiptsHandler(BaseHandler):
 
     async def _handle_new_receipts(self, receipts: List[ReadReceipt]) -> bool:
         """Takes a list of receipts, stores them and informs the notifier."""
-        min_batch_id = None  # type: Optional[int]
-        max_batch_id = None  # type: Optional[int]
+        min_batch_id: Optional[int] = None
+        max_batch_id: Optional[int] = None
 
         for receipt in receipts:
             res = await self.store.insert_receipt(
