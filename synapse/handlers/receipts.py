@@ -185,11 +185,11 @@ class ReceiptEventSource:
                 new_users = {}
                 for rr_user_id in m_read.keys():
                     user_rr = m_read[rr_user_id]
-                    hidden = user_rr.get("hidden", False)
-                    if not hidden or rr_user_id == user_id:
+                    hidden = user_rr.get("hidden", None)
+                    if hidden != True or rr_user_id == user_id:
                         new_users[rr_user_id] = user_rr.copy()
                         # If hidden has a value replace hidden with the correct prefixed key
-                        if user_rr.get("hidden", None) is not None:
+                        if hidden is not None:
                             new_users[rr_user_id].pop("hidden")
                             new_users[rr_user_id][
                                 ReadReceiptEventFields.MSC2285_HIDDEN
