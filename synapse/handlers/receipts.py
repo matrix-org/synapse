@@ -155,8 +155,8 @@ class ReceiptsHandler(BaseHandler):
         if not is_new:
             return
 
-        if self.federation_sender and (
-            not hidden or not self.hs.config.experimental.msc2285_enabled
+        if self.federation_sender and not (
+            self.hs.config.experimental.msc2285_enabled and hidden
         ):
             await self.federation_sender.send_read_receipt(receipt)
 
