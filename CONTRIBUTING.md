@@ -218,13 +218,13 @@ COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
 To run a specific test file, you can adjust [`scripts-dev/complement.sh`](https://github.com/matrix-org/synapse/blob/develop/scripts-dev/complement.sh) to use the `-run MyTest` syntax. The name comes from the name structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:
 
 ```sh
-go test -v -tags synapse_blacklist,msc2946,msc2716,msc3083,msc2403 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests -run TestBackfillingHistory
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
 ```
 
 To run a specific test, you can specify the whole name structure:
 
 ```sh
-go test -v -tags synapse_blacklist,msc2946,msc2716,msc3083,msc2403 -count=1 $EXTRA_COMPLEMENT_ARGS ./tests -run TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
 ```
 
 
