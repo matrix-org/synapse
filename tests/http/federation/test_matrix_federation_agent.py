@@ -316,13 +316,16 @@ class MatrixFederationAgentTests(unittest.TestCase):
         json = self.successResultOf(treq.json_content(response))
         self.assertEqual(json, {"a": 1})
 
-    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
+    @patch.dict(
+        os.environ, {"https_proxy": "http://proxy.com", "no_proxy": "unused.com"}
+    )
     def test_get_via_http_proxy(self):
         """test for federation request through a http proxy"""
         self._do_get_via_proxy(ssl=False, auth_credentials=None)
 
     @patch.dict(
-        os.environ, {"https_proxy": "user:pass@proxy.com", "no_proxy": "unused.com"}
+        os.environ,
+        {"https_proxy": "http://user:pass@proxy.com", "no_proxy": "unused.com"},
     )
     def test_get_via_http_proxy_with_auth(self):
         """test for federation request through a http proxy with authentication"""

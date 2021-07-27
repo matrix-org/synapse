@@ -484,7 +484,7 @@ class ModuleApi:
     @defer.inlineCallbacks
     def get_state_events_in_room(
         self, room_id: str, types: Iterable[Tuple[str, Optional[str]]]
-    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
+    ) -> Generator[defer.Deferred, Any, Iterable[EventBase]]:
         """Gets current state events for the given room.
 
         (This is exposed for compatibility with the old SpamCheckerApi. We should

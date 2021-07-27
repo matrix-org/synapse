@@ -29,9 +29,14 @@ from twisted.internet.interfaces import (
     IReactorCore,
     IStreamClientEndpoint,
 )
-from twisted.web.client import URI, Agent, HTTPConnectionPool
+from twisted.web.client import (
+    URI,
+    Agent,
+    BrowserLikePolicyForHTTPS,
+    HTTPConnectionPool,
+)
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer
+from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResponse
 
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http import proxyagent
@@ -140,7 +145,7 @@ class MatrixFederationAgent:
         uri: bytes,
         headers: Optional[Headers] = None,
         bodyProducer: Optional[IBodyProducer] = None,
-    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
+    ) -> Generator[defer.Deferred, Any, IResponse]:
         """
         Args:
             method: HTTP method: GET/POST/etc
@@ -279,10 +284,13 @@ class MatrixHostnameEndpoint:
         https_proxy = proxies["https"].encode() if "https" in proxies else None
         self.no_proxy = proxies["no"] if "no" in proxies else None
 
-        self.https_proxy_creds, https_proxy = parse_username_password(https_proxy)
-
-        self.https_proxy_endpoint = proxyagent.http_proxy_endpoint(
-            https_proxy, proxy_reactor
+        (
+            self.https_proxy_endpoint,
+            self.https_proxy_creds,
+        ) = proxyagent.http_proxy_endpoint(
+            https_proxy,
+            proxy_reactor,
+            _tls_client_options_factory or BrowserLikePolicyForHTTPS(),
         )
 
         # set up the TLS connection params
