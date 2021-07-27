@@ -559,7 +559,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.make_request(b"POST", self.url, json.dumps(params))
 
         # Delete token
-        result1 = self.get_success(
+        self.get_success(
             store.db_pool.simple_delete_one(
                 "registration_tokens",
                 keyvalues={"token": token},

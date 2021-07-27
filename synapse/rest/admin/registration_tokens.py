@@ -293,7 +293,9 @@ class RegistrationTokenRestServlet(RestServlet):
             # Nothing to update, get token info to return
             token_info = await self.store.get_one_registration_token(token)
         else:
-            token_info = await self.store.update_registration_token(token, new_attributes)
+            token_info = await self.store.update_registration_token(
+                token, new_attributes
+            )
 
         # If no result return a 404
         if token_info is None:
