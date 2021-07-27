@@ -1093,9 +1093,10 @@ class SyncHandler:
         one_time_key_counts: JsonDict = {}
         unused_fallback_key_types: List[str] = []
         if device_id:
-            # TODO: If this is an incremental sync and there's been no change in a count
-            # since the provided since token, then simply omit that algorithm's entry
-            # altogether.
+            # TODO: We should have a way to let clients differentiate between the states of:
+            #   * no change in OTK count since the provided since token
+            #   * the server has zero OTKs left for this device
+            #  Spec issue: https://github.com/matrix-org/matrix-doc/issues/3298
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
