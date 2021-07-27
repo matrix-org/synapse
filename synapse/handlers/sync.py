@@ -1093,6 +1093,9 @@ class SyncHandler:
         one_time_key_counts: JsonDict = {}
         unused_fallback_key_types: List[str] = []
         if device_id:
+            # TODO: If this is an incremental sync and there's been no change in a count
+            # since the provided since token, then simply omit that algorithm's entry
+            # altogether.
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
