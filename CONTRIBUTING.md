@@ -215,7 +215,7 @@ Here is how to run your local Synapse checkout against your local Complement che
 COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
 ```
 
-To run a specific test file, you can adjust [`scripts-dev/complement.sh`](https://github.com/matrix-org/synapse/blob/develop/scripts-dev/complement.sh) to use the `-run MyTest` syntax. The name comes from the name structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:
+To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:
 
 ```sh
 COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
