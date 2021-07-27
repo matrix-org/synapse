@@ -17,7 +17,8 @@ These objects have the following fields:
 - `pending`: The number of pending uses the token has. When someone uses
   the token to authenticate themselves, the pending counter is incremented
   so that the token is not used more than the permitted number of times.
-  When the person completes registration the pending counter is decremented.
+  When the person completes registration the pending counter is decremented,
+  and the completed counter is incremented.
 - `completed`: The number of times the token has been used to successfully
   complete a registration.
 - `expiry_time`: The latest time the token is valid. Given as the number of
