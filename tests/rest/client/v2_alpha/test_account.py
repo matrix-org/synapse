@@ -484,7 +484,7 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
             as_token,
             self.hs.config.server_name,
             id="1234",
-            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            namespaces={"users": [{"regex": user_id, "exclusive": True}]},
             sender=user_id,
         )
         self.hs.get_datastore().services_cache.append(appservice)
