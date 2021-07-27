@@ -264,9 +264,9 @@ class RegistrationTokenRestServlet(RestServlet):
         """Update a registration token."""
         await assert_requester_is_admin(self.auth, request)
         body = parse_json_object_from_request(request)
-        updatevalues = {}
+        new_attributes = {}
 
-        # Only add uses_allowed to updatevalues if it is present and valid
+        # Only add uses_allowed to new_attributes if it is present and valid
         if "uses_allowed" in body:
             ua = body["uses_allowed"]
             if not (ua is None or (isinstance(ua, int) and ua >= 0)):
@@ -275,7 +275,7 @@ class RegistrationTokenRestServlet(RestServlet):
                     "uses_allowed must be a non-negative integer or null",
                     Codes.INVALID_PARAM,
                 )
-            updatevalues["uses_allowed"] = ua
+            new_attributes["uses_allowed"] = ua
 
         if "expiry_time" in body:
             et = body["expiry_time"]
@@ -287,12 +287,12 @@ class RegistrationTokenRestServlet(RestServlet):
                 raise SynapseError(
                     400, "expiry_time must not be in the past", Codes.INVALID_PARAM
                 )
-            updatevalues["expiry_time"] = et
+            new_attributes["expiry_time"] = et
 
-        if len(updatevalues) == 0:
+        if len(new_attributes) == 0:
             raise SynapseError(400, "Nothing to update", Codes.MISSING_PARAM)
 
-        token_info = await self.store.update_registration_token(token, updatevalues)
+        token_info = await self.store.update_registration_token(token, new_attributes)
 
         # If no result return a 404
         if token_info is None:
