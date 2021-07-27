@@ -1,1 +1,1 @@
-Fix a long-standing bug where Synapse would signal "no change" in device one-time key counts, whereas in reality the number of keys had been exhausted.
+Fix a long-standing bug where Synapse would not inform clients that a device had exhausted its one-time-key pool, potentially causing problems decrypting events.
