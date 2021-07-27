@@ -240,8 +240,6 @@ If you're curious what the database looks like after you run some tests, here ar
  1. Then run `sqlite3` and open the database `.open /conf/homeserver.db` (this db path comes from the Synapse homeserver.yaml)
 
 
-
-
 # 9. Submit your patch.
 
 Once you're happy with your patch, it's time to prepare a Pull Request.
