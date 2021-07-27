@@ -20,14 +20,14 @@ from synapse.types import JsonDict
 
 from tests import unittest
 
-# In the first param of _test_filters_hidden we use "hidden" instead of
-# ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking
-# the data from the database which doesn't use the prefix
-
 
 class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.event_source = hs.get_event_sources().sources["receipt"]
+
+    # In the first param of _test_filters_hidden we use "hidden" instead of
+    # ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking
+    # the data from the database which doesn't use the prefix
 
     def test_filters_out_hidden_receipt(self):
         self._test_filters_hidden(
