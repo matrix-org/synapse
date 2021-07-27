@@ -139,6 +139,11 @@ def run():
 
     # Switch to the release branch.
     parsed_new_version = version.parse(new_version)
+
+    # We assume for debian changelogs that we only do RCs or full releases.
+    assert not parsed_new_version.is_devrelease
+    assert not parsed_new_version.is_postrelease
+
     release_branch_name = (
         f"release-v{parsed_new_version.major}.{parsed_new_version.minor}"
     )
@@ -191,9 +196,6 @@ def run():
     subprocess.run("python3 -m towncrier", shell=True)
 
     # Generate debian changelogs
-    assert not parsed_new_version.is_devrelease
-    assert not parsed_new_version.is_postrelease
-
     if parsed_new_version.pre is not None:
         # If this is an RC then we need to coerce the version string to match
         # Debian norms, e.g. 1.39.0rc2 gets converted to 1.39.0~rc2.
