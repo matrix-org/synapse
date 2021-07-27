@@ -307,7 +307,7 @@ Make sure that you have saved all your files.</p>
 <pre><code class="language-sh">source ./env/bin/activate
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 </code></pre>
-<h2 id="run-the-unit-tests"><a class="header" href="#run-the-unit-tests">Run the unit tests.</a></h2>
+<h2 id="run-the-unit-tests-twisted-trial"><a class="header" href="#run-the-unit-tests-twisted-trial">Run the unit tests (Twisted trial).</a></h2>
 <p>The unit tests run parts of Synapse, including your changes, to see if anything
 was broken. They are slower than the linters but will typically catch more errors.</p>
 <pre><code class="language-sh">source ./env/bin/activate
@@ -324,7 +324,7 @@ trial tests.rest.admin.test_room tests.handlers.test_admin.ExfiltrateData.test_i
 <p>To increase the log level for the tests, set <code>SYNAPSE_TEST_LOG_LEVEL</code>:</p>
 <pre><code class="language-sh">SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 </code></pre>
-<h2 id="run-the-integration-tests"><a class="header" href="#run-the-integration-tests">Run the integration tests.</a></h2>
+<h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgsytestsytesta">Run the integration tests (<a href="https://github.com/matrix-org/sytest">Sytest</a>).</a></h2>
 <p>The integration tests are a more comprehensive suite of tests. They
 run a full version of Synapse, including your changes, to check if
 anything was broken. They are slower than the unit tests but will
@@ -334,6 +334,29 @@ configuration:</p>
 <pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:py37
 </code></pre>
 <p>This configuration should generally cover  your needs. For more details about other configurations, see <a href="https://github.com/matrix-org/sytest/blob/develop/docker/README.md">documentation in the SyTest repo</a>.</p>
+<h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa">Run the integration tests (<a href="https://github.com/matrix-org/complement">Complement</a>).</a></h2>
+<p><a href="https://github.com/matrix-org/complement">Complement</a> is a suite of black box tests that can be run on any homeserver implementation. It can also be thought of as end-to-end (e2e) tests.</p>
+<p>It's often nice to develop on Synapse and write Complement tests at the same time.
+Here is how to run your local Synapse checkout against your local Complement checkout.</p>
+<p>(checkout <a href="https://github.com/matrix-org/complement"><code>complement</code></a> alongside your <code>synapse</code> checkout)</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
+</code></pre>
+<p>To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
+</code></pre>
+<p>To run a specific test, you can specify the whole name structure:</p>
+<pre><code class="language-sh">COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
+</code></pre>
+<h3 id="access-database-for-homeserver-after-complement-test-runs"><a class="header" href="#access-database-for-homeserver-after-complement-test-runs">Access database for homeserver after Complement test runs.</a></h3>
+<p>If you're curious what the database looks like after you run some tests, here are some steps to get you going in Synapse:</p>
+<ol>
+<li>In your Complement test comment out <code>defer deployment.Destroy(t)</code> and replace with <code>defer time.Sleep(2 * time.Hour)</code> to keep the homeserver running after the tests complete</li>
+<li>Start the Complement tests</li>
+<li>Find the name of the container, <code>docker ps -f name=complement_</code> (this will filter for just the Compelement related Docker containers)</li>
+<li>Access the container replacing the name with what you found in the previous step: <code>docker exec -it complement_1_hs_with_application_service.hs1_2 /bin/bash</code></li>
+<li>Install sqlite (database driver), <code>apt-get update &amp;&amp; apt-get install -y sqlite3</code></li>
+<li>Then run <code>sqlite3</code> and open the database <code>.open /conf/homeserver.db</code> (this db path comes from the Synapse homeserver.yaml)</li>
+</ol>
 <h1 id="9-submit-your-patch"><a class="header" href="#9-submit-your-patch">9. Submit your patch.</a></h1>
 <p>Once you're happy with your patch, it's time to prepare a Pull Request.</p>
 <p>To prepare a Pull Request, please:</p>
