@@ -297,7 +297,7 @@ class RegistrationTokenRestServlet(RestServlet):
 
         # If no result return a 404
         if token_info is None:
-            raise NotFoundError("No such registration token: {token}")
+            raise NotFoundError(f"No such registration token: {token}")
 
         return 200, token_info
 
@@ -309,5 +309,5 @@ class RegistrationTokenRestServlet(RestServlet):
 
         if await self.store.delete_registration_token(token):
             return 200, {}
-        else:
-            raise NotFoundError("No such registration token: {token}")
+
+        raise NotFoundError(f"No such registration token: {token}")
