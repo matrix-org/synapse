@@ -26,7 +26,7 @@ from twisted.internet import defer
 from twisted.internet._sslverify import ClientTLSOptions, OpenSSLCertificateOptions
 from twisted.internet.interfaces import IProtocolFactory
 from twisted.internet.protocol import Factory
-from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web._newclient import ResponseNeverReceived
 from twisted.web.client import Agent
 from twisted.web.http import HTTPChannel, Request
@@ -375,7 +375,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         self.assertEqual(host, "9.9.9.9")
         self.assertEqual(port, 1080)
 
-        # make a test HTTP proxy server, and wire up the client
+        # make a test server to act as the proxy, and wire up the client
         proxy_server = self._make_connection(
             client_factory,
             ssl=ssl,
@@ -383,13 +383,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             expected_sni=b"proxy.com" if ssl else None,
         )
 
-        # fish the transports back out so that we can do the old switcheroo
-        s2c_transport = proxy_server.transport
-        client_protocol = s2c_transport.other
-        c2s_transport = client_protocol.transport
-
-        # the FakeTransport is async, so we need to pump the reactor
-        self.reactor.advance(0)
+        assert isinstance(proxy_server, HTTPChannel)
 
         # now there should be a pending CONNECT request
         self.assertEqual(len(proxy_server.requests), 1)
@@ -417,23 +411,35 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # tell the proxy server not to close the connection
         proxy_server.persistent = True
 
-        # this just stops the http Request trying to do a chunked response
-        # request.setHeader(b"Content-Length", b"0")
         request.finish()
 
-        # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
-        ssl_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
-        ssl_protocol = ssl_factory.buildProtocol(None)
-        http_server = ssl_protocol.wrappedProtocol
+        # now we make another test server to act as the upstream HTTP server.
+        server_ssl_protocol = _wrap_server_factory_for_tls(
+            _get_test_protocol_factory()
+        ).buildProtocol(None)
 
-        ssl_protocol.makeConnection(
-            FakeTransport(client_protocol, self.reactor, ssl_protocol)
-        )
-        c2s_transport.other = ssl_protocol
+        # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
+        proxy_server_transport = proxy_server.transport
+        server_ssl_protocol.makeConnection(proxy_server_transport)
+
+        # ... and replace the protocol on the proxy's transport with the
+        # TLSMemoryBIOProtocol for the test server, so that incoming traffic
+        # to the proxy gets sent over to the HTTP(s) server.
+
+        # See also comment at `_do_https_request_via_proxy`
+        # in ../test_proxyagent.py for more details
+        if ssl:
+            assert isinstance(proxy_server_transport, TLSMemoryBIOProtocol)
+            proxy_server_transport.wrappedProtocol = server_ssl_protocol
+        else:
+            assert isinstance(proxy_server_transport, FakeTransport)
+            client_protocol = proxy_server_transport.other
+            c2s_transport = client_protocol.transport
+            c2s_transport.other = server_ssl_protocol
 
         self.reactor.advance(0)
 
-        server_name = ssl_protocol._tlsConnection.get_servername()
+        server_name = server_ssl_protocol._tlsConnection.get_servername()
         expected_sni = b"testserv"
         self.assertEqual(
             server_name,
@@ -442,6 +448,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         )
 
         # now there should be a pending request
+        http_server = server_ssl_protocol.wrappedProtocol
         self.assertEqual(len(http_server.requests), 1)
 
         request = http_server.requests[0]
