@@ -325,6 +325,7 @@ class MediaEncodingTestCase(unittest.TestCase):
         )
         self.assertEqual(encoding, "ascii")
 
+    def test_meta_charset_underscores(self):
         """A character encoding contains underscore."""
         encoding = get_html_media_encoding(
             b"""
