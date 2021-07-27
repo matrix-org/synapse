@@ -1,0 +1,1 @@
+Fix a long-standing bug where Synapse would signal "no change" in device one-time key counts, whereas in reality the number of keys had been exhausted.
