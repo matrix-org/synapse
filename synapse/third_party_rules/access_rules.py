@@ -27,7 +27,7 @@ from synapse.util.frozenutils import unfreeze
 logger = logging.getLogger(__name__)
 
 ACCESS_RULES_TYPE = "im.vector.room.access_rules"
-FROZEN_STATE_TYPE = "io.element.room.frozen"
+FROZEN_STATE_TYPE = "org.matrix.room.frozen"
 
 
 class AccessRules:
