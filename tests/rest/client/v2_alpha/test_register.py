@@ -262,7 +262,7 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         request_data = json.dumps(params)
         channel = self.make_request(b"POST", self.url, request_data)
         det_data = {
-            "user_id": "@{}:{}".format(username, self.hs.hostname),
+            "user_id": f"@{username}:{self.hs.hostname}",
             "home_server": self.hs.hostname,
             "device_id": device_id,
         }
@@ -1138,7 +1138,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             b"GET",
-            self.url + "?token={}".format(token),
+            f"{self.url}?token={token}",
         )
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertEquals(channel.json_body["valid"], True)
@@ -1147,7 +1147,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
         token = "1234"
         channel = self.make_request(
             b"GET",
-            self.url + "?token={}".format(token),
+            f"{self.url}?token={token}",
         )
         self.assertEquals(channel.result["code"], b"200", channel.result)
         self.assertEquals(channel.json_body["valid"], False)
@@ -1161,7 +1161,7 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
         for i in range(0, 6):
             channel = self.make_request(
                 b"GET",
-                self.url + "?token={}".format(token),
+                f"{self.url}?token={token}",
             )
 
             if i == 5:
@@ -1174,6 +1174,6 @@ class RegistrationTokenValidityRestServletTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             b"GET",
-            self.url + "?token={}".format(token),
+            f"{self.url}?token={token}",
         )
         self.assertEquals(channel.result["code"], b"200", channel.result)

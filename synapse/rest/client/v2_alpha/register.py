@@ -380,7 +380,7 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
 class RegistrationTokenValidityRestServlet(RestServlet):
     PATTERNS = client_patterns(
-        "/org.matrix.msc3231/register/{}/validity".format(LoginType.REGISTRATION_TOKEN),
+        f"/org.matrix.msc3231/register/{LoginType.REGISTRATION_TOKEN}/validity",
         unstable=True,
     )
 

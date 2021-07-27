@@ -180,7 +180,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
         if not res:
             # Creation failed, probably the token already exists
             raise SynapseError(
-                400, "Token already exists: {}".format(token), Codes.INVALID_PARAM
+                400, f"Token already exists: {token}", Codes.INVALID_PARAM
             )
 
         resp = {
@@ -256,7 +256,7 @@ class RegistrationTokenRestServlet(RestServlet):
 
         # If no result return a 404
         if token_info is None:
-            raise NotFoundError("No such registration token: {}".format(token))
+            raise NotFoundError(f"No such registration token: {token}")
 
         return 200, token_info
 
@@ -296,7 +296,7 @@ class RegistrationTokenRestServlet(RestServlet):
 
         # If no result return a 404
         if token_info is None:
-            raise NotFoundError("No such registration token: {}".format(token))
+            raise NotFoundError("No such registration token: {token}")
 
         return 200, token_info
 
@@ -309,4 +309,4 @@ class RegistrationTokenRestServlet(RestServlet):
         if await self.store.delete_registration_token(token):
             return 200, {}
         else:
-            raise NotFoundError("No such registration token: {}".format(token))
+            raise NotFoundError("No such registration token: {token}")

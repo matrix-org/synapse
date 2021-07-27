@@ -78,9 +78,7 @@ class AuthRestServlet(RestServlet):
         elif stagetype == LoginType.REGISTRATION_TOKEN:
             html = self.registration_token_template.render(
                 session=session,
-                myurl="{}/r0/auth/{}/fallback/web".format(
-                    CLIENT_API_PREFIX, LoginType.REGISTRATION_TOKEN
-                ),
+                myurl=f"{CLIENT_API_PREFIX}/r0/auth/{LoginType.REGISTRATION_TOKEN}/fallback/web",
             )
 
         else:
@@ -156,9 +154,7 @@ class AuthRestServlet(RestServlet):
             else:
                 html = self.registration_token_template.render(
                     session=session,
-                    myurl="{}/r0/auth/{}/fallback/web".format(
-                        CLIENT_API_PREFIX, LoginType.REGISTRATION_TOKEN
-                    ),
+                    myurl=f"{CLIENT_API_PREFIX}/r0/auth/{LoginType.REGISTRATION_TOKEN}/fallback/web",
                 )
 
         else:
