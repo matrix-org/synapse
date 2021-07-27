@@ -402,9 +402,9 @@ class JoinRoomAliasServlet(ResolveRoomIdMixin, RestServlet):
 
         # Get the room ID from the identifier.
         try:
-            remote_room_hosts = [
+            remote_room_hosts: Optional[List[str]] = [
                 x.decode("ascii") for x in request.args[b"server_name"]
-            ]  # type: Optional[List[str]]
+            ]
         except Exception:
             remote_room_hosts = None
         room_id, remote_room_hosts = await self.resolve_room_id(
@@ -659,9 +659,7 @@ class RoomEventContextServlet(RestServlet):
         filter_str = parse_string(request, "filter", encoding="utf-8")
         if filter_str:
             filter_json = urlparse.unquote(filter_str)
-            event_filter = Filter(
-                json_decoder.decode(filter_json)
-            )  # type: Optional[Filter]
+            event_filter: Optional[Filter] = Filter(json_decoder.decode(filter_json))
         else:
             event_filter = None
 

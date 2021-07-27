@@ -351,7 +351,11 @@ class EventAuthTestCase(unittest.TestCase):
         """
         Test joining a restricted room from MSC3083.
 
-        This is pretty much the same test as public.
+        This is similar to the public test, but has some additional checks on
+        signatures.
+
+        The checks which care about signatures fake them by simply adding an
+        object of the proper form, not generating valid signatures.
         """
         creator = "@creator:example.com"
         pleb = "@joiner:example.com"
@@ -359,6 +363,7 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events = {
             ("m.room.create", ""): _create_event(creator),
             ("m.room.member", creator): _join_event(creator),
+            ("m.room.power_levels", ""): _power_levels_event(creator, {"invite": 0}),
             ("m.room.join_rules", ""): _join_rules_event(creator, "restricted"),
         }
 
@@ -371,19 +376,81 @@ class EventAuthTestCase(unittest.TestCase):
                 do_sig_check=False,
             )
 
-        # Check join.
+        # A properly formatted join event should work.
+        authorised_join_event = _join_event(
+            pleb,
+            additional_content={
+                "join_authorised_via_users_server": "@creator:example.com"
+            },
+        )
         event_auth.check(
             RoomVersions.MSC3083,
-            _join_event(pleb),
+            authorised_join_event,
             auth_events,
             do_sig_check=False,
         )
 
-        # A user cannot be force-joined to a room.
+        # A join issued by a specific user works (i.e. the power level checks
+        # are done properly).
+        pl_auth_events = auth_events.copy()
+        pl_auth_events[("m.room.power_levels", "")] = _power_levels_event(
+            creator, {"invite": 100, "users": {"@inviter:foo.test": 150}}
+        )
+        pl_auth_events[("m.room.member", "@inviter:foo.test")] = _join_event(
+            "@inviter:foo.test"
+        )
+        event_auth.check(
+            RoomVersions.MSC3083,
+            _join_event(
+                pleb,
+                additional_content={
+                    "join_authorised_via_users_server": "@inviter:foo.test"
+                },
+            ),
+            pl_auth_events,
+            do_sig_check=False,
+        )
+
+        # A join which is missing an authorised server is rejected.
         with self.assertRaises(AuthError):
             event_auth.check(
                 RoomVersions.MSC3083,
-                _member_event(pleb, "join", sender=creator),
+                _join_event(pleb),
+                auth_events,
+                do_sig_check=False,
+            )
+
+        # An join authorised by a user who is not in the room is rejected.
+        pl_auth_events = auth_events.copy()
+        pl_auth_events[("m.room.power_levels", "")] = _power_levels_event(
+            creator, {"invite": 100, "users": {"@other:example.com": 150}}
+        )
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.MSC3083,
+                _join_event(
+                    pleb,
+                    additional_content={
+                        "join_authorised_via_users_server": "@other:example.com"
+                    },
+                ),
+                auth_events,
+                do_sig_check=False,
+            )
+
+        # A user cannot be force-joined to a room. (This uses an event which
+        # *would* be valid, but is sent be a different user.)
+        with self.assertRaises(AuthError):
+            event_auth.check(
+                RoomVersions.MSC3083,
+                _member_event(
+                    pleb,
+                    "join",
+                    sender=creator,
+                    additional_content={
+                        "join_authorised_via_users_server": "@inviter:foo.test"
+                    },
+                ),
                 auth_events,
                 do_sig_check=False,
             )
@@ -393,7 +460,7 @@ class EventAuthTestCase(unittest.TestCase):
         with self.assertRaises(AuthError):
             event_auth.check(
                 RoomVersions.MSC3083,
-                _join_event(pleb),
+                authorised_join_event,
                 auth_events,
                 do_sig_check=False,
             )
@@ -402,12 +469,13 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
         event_auth.check(
             RoomVersions.MSC3083,
-            _join_event(pleb),
+            authorised_join_event,
             auth_events,
             do_sig_check=False,
         )
 
-        # A user can send a join if they're in the room.
+        # A user can send a join if they're in the room. (This doesn't need to
+        # be authorised since the user is already joined.)
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "join")
         event_auth.check(
             RoomVersions.MSC3083,
@@ -416,7 +484,8 @@ class EventAuthTestCase(unittest.TestCase):
             do_sig_check=False,
         )
 
-        # A user can accept an invite.
+        # A user can accept an invite. (This doesn't need to be authorised since
+        # the user was invited.)
         auth_events[("m.room.member", pleb)] = _member_event(
             pleb, "invite", sender=creator
         )
@@ -446,7 +515,10 @@ def _create_event(user_id: str) -> EventBase:
 
 
 def _member_event(
-    user_id: str, membership: str, sender: Optional[str] = None
+    user_id: str,
+    membership: str,
+    sender: Optional[str] = None,
+    additional_content: Optional[dict] = None,
 ) -> EventBase:
     return make_event_from_dict(
         {
@@ -455,14 +527,14 @@ def _member_event(
             "type": "m.room.member",
             "sender": sender or user_id,
             "state_key": user_id,
-            "content": {"membership": membership},
+            "content": {"membership": membership, **(additional_content or {})},
             "prev_events": [],
         }
     )
 
 
-def _join_event(user_id: str) -> EventBase:
-    return _member_event(user_id, "join")
+def _join_event(user_id: str, additional_content: Optional[dict] = None) -> EventBase:
+    return _member_event(user_id, "join", additional_content=additional_content)
 
 
 def _power_levels_event(sender: str, content: JsonDict) -> EventBase:

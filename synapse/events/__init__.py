@@ -291,6 +291,20 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return pdu_json
 
+    def get_templated_pdu_json(self) -> JsonDict:
+        """
+        Return a JSON object suitable for a templated event, as used in the
+        make_{join,leave,knock} workflow.
+        """
+        # By using _dict directly we don't pull in signatures/unsigned.
+        template_json = dict(self._dict)
+        # The hashes (similar to the signature) need to be recalculated by the
+        # joining/leaving/knocking server after (potentially) modifying the
+        # event.
+        template_json.pop("hashes")
+
+        return template_json
+
     def __set__(self, instance, value):
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
