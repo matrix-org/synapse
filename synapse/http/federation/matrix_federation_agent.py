@@ -29,12 +29,7 @@ from twisted.internet.interfaces import (
     IReactorCore,
     IStreamClientEndpoint,
 )
-from twisted.web.client import (
-    URI,
-    Agent,
-    BrowserLikePolicyForHTTPS,
-    HTTPConnectionPool,
-)
+from twisted.web.client import URI, Agent, BrowserLikePolicyForHTTPS, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResponse
 
