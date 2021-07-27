@@ -290,9 +290,10 @@ class RegistrationTokenRestServlet(RestServlet):
             new_attributes["expiry_time"] = et
 
         if len(new_attributes) == 0:
-            raise SynapseError(400, "Nothing to update", Codes.MISSING_PARAM)
-
-        token_info = await self.store.update_registration_token(token, new_attributes)
+            # Nothing to update, get token info to return
+            token_info = await self.store.get_one_registration_token(token)
+        else:
+            token_info = await self.store.update_registration_token(token, new_attributes)
 
         # If no result return a 404
         if token_info is None:
