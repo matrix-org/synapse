@@ -1,0 +1,1 @@
+Fix bug introduced in Synapse 1.38 which caused an exception at startup when SAML authentication was enabled.
