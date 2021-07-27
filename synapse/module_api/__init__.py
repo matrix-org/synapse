@@ -110,6 +110,7 @@ class ModuleApi:
 
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
+        self._third_party_event_rules = hs.get_third_party_event_rules()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -123,6 +124,11 @@ class ModuleApi:
     def register_account_validity_callbacks(self):
         """Registers callbacks for account validity capabilities."""
         return self._account_validity_handler.register_account_validity_callbacks
+
+    @property
+    def register_third_party_rules_callbacks(self):
+        """Registers callbacks for third party event rules capabilities."""
+        return self._third_party_event_rules.register_third_party_rules_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.
@@ -478,7 +484,7 @@ class ModuleApi:
     @defer.inlineCallbacks
     def get_state_events_in_room(
         self, room_id: str, types: Iterable[Tuple[str, Optional[str]]]
-    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
+    ) -> Generator[defer.Deferred, Any, Iterable[EventBase]]:
         """Gets current state events for the given room.
 
         (This is exposed for compatibility with the old SpamCheckerApi. We should

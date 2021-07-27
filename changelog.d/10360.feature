@@ -1,1 +1,0 @@
-Allow providing credentials to `http_proxy`.
