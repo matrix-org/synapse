@@ -832,31 +832,16 @@ class DatabasePool:
         self,
         table: str,
         values: Dict[str, Any],
-        or_ignore: bool = False,
         desc: str = "simple_insert",
-    ) -> bool:
+    ) -> None:
         """Executes an INSERT query on the named table.
 
         Args:
             table: string giving the table name
             values: dict of new column names and values for them
-            or_ignore: bool stating whether an exception should be raised
-                when a conflicting row already exists. If True, False will be
-                returned by the function instead
             desc: description of the transaction, for logging and metrics
-
-        Returns:
-             Whether the row was inserted or not. Only useful when `or_ignore` is True
         """
-        try:
-            await self.runInteraction(desc, self.simple_insert_txn, table, values)
-        except self.engine.module.IntegrityError:
-            # We have to do or_ignore flag at this layer, since we can't reuse
-            # a cursor after we receive an error from the db.
-            if not or_ignore:
-                raise
-            return False
-        return True
+        await self.runInteraction(desc, self.simple_insert_txn, table, values)
 
     @staticmethod
     def simple_insert_txn(
@@ -930,7 +915,7 @@ class DatabasePool:
         insertion_values: Optional[Dict[str, Any]] = None,
         desc: str = "simple_upsert",
         lock: bool = True,
-    ) -> Optional[bool]:
+    ) -> bool:
         """
 
         `lock` should generally be set to True (the default), but can be set
@@ -951,8 +936,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
             lock: True to lock the table when doing the upsert.
         Returns:
-            Native upserts always return None. Emulated upserts return True if a
-            new entry was created, False if an existing one was updated.
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
@@ -995,7 +980,7 @@ class DatabasePool:
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
         lock: bool = True,
-    ) -> Optional[bool]:
+    ) -> bool:
         """
         Pick the UPSERT method which works best on the platform. Either the
         native one (Pg9.5+, recent SQLites), or fall back to an emulated method.
@@ -1008,16 +993,15 @@ class DatabasePool:
             insertion_values: additional key/values to use only when inserting
             lock: True to lock the table when doing the upsert.
         Returns:
-            Native upserts always return None. Emulated upserts return True if a
-            new entry was created, False if an existing one was updated.
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
-            self.simple_upsert_txn_native_upsert(
+            return self.simple_upsert_txn_native_upsert(
                 txn, table, keyvalues, values, insertion_values=insertion_values
             )
-            return None
         else:
             return self.simple_upsert_txn_emulated(
                 txn,
@@ -1045,8 +1029,8 @@ class DatabasePool:
             insertion_values: additional key/values to use only when inserting
             lock: True to lock the table when doing the upsert.
         Returns:
-            Returns True if a new entry was created, False if an existing
-            one was updated.
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         insertion_values = insertion_values or {}
 
@@ -1086,8 +1070,7 @@ class DatabasePool:
 
             txn.execute(sql, sqlargs)
             if txn.rowcount > 0:
-                # successfully updated at least one row.
-                return False
+                return True
 
         # We didn't find any existing rows, so insert a new one
         allvalues: Dict[str, Any] = {}
@@ -1111,15 +1094,19 @@ class DatabasePool:
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
         insertion_values: Optional[Dict[str, Any]] = None,
-    ) -> None:
+    ) -> bool:
         """
-        Use the native UPSERT functionality in recent PostgreSQL versions.
+        Use the native UPSERT functionality in PostgreSQL.
 
         Args:
             table: The table to upsert into
             keyvalues: The unique key tables and their new values
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
+
+        Returns:
+            Returns True if a row was inserted or updated (i.e. if `values` is
+            not empty then this always returns True)
         """
         allvalues: Dict[str, Any] = {}
         allvalues.update(keyvalues)
@@ -1139,6 +1126,8 @@ class DatabasePool:
             latter,
         )
         txn.execute(sql, list(allvalues.values()))
+
+        return bool(txn.rowcount)
 
     async def simple_upsert_many(
         self,

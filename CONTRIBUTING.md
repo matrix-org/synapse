@@ -392,7 +392,7 @@ By now, you know the drill!
 # Notes for maintainers on merging PRs etc
 
 There are some notes for those with commit access to the project on how we
-manage git [here](docs/dev/git.md).
+manage git [here](docs/development/git.md).
 
 # Conclusion
 

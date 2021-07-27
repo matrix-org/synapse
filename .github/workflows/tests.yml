@@ -5,6 +5,10 @@ on:
     branches: ["develop", "release-*"]
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+  
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -340,7 +344,36 @@ jobs:
         working-directory: complement/dockerfiles
 
       # Run Complement
-      - run: go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests
+      - run: go test -v -tags synapse_blacklist,msc2403,msc2946,msc3083 ./tests/...
         env:
           COMPLEMENT_BASE_IMAGE: complement-synapse:latest
         working-directory: complement
+
+  # a job which marks all the other jobs as complete, thus allowing PRs to be merged.
+  tests-done:
+    if: ${{ always() }}
+    needs:
+      - lint
+      - lint-crlf
+      - lint-newsfile
+      - lint-sdist
+      - trial
+      - trial-olddeps
+      - sytest
+      - portdb
+      - complement
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set build result
+        env:
+          NEEDS_CONTEXT: ${{ toJSON(needs) }}
+        # the `jq` incantation dumps out a series of "<job> <result>" lines
+        run: |
+          set -o pipefail
+          jq -r 'to_entries[] | [.key,.value.result] | join(" ")' \
+                          <<< $NEEDS_CONTEXT |
+              while read job result; do
+                  if [ "$result" != "success" ]; then
+                      echo "::set-failed ::Job $job returned $result"
+                  fi
+              done
