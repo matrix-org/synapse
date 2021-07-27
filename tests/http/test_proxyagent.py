@@ -276,7 +276,7 @@ class MatrixFederationAgentTests(TestCase):
             self.assertEqual(
                 server_name,
                 expected_sni,
-                f"Expected SNI {expected_sni !s} but got {server_name !s}",
+                f"Expected SNI {expected_sni!s} but got {server_name!s}",
             )
 
         return http_protocol
@@ -622,7 +622,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            f"Expected SNI {expected_sni !s} but got {server_name !s}",
+            f"Expected SNI {expected_sni!s} but got {server_name!s}",
         )
 
         # now there should be a pending request
@@ -760,7 +760,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            f"Expected SNI {expected_sni !s} but got {server_name !s}",
+            f"Expected SNI {expected_sni!s} but got {server_name!s}",
         )
 
         # now there should be a pending request
@@ -788,7 +788,7 @@ class MatrixFederationAgentTests(TestCase):
 
     @patch.dict(os.environ, {"http_proxy": "socks://proxy.com:8888"})
     def test_proxy_with_unsupported_scheme(self):
-        with self.assertRaises(RuntimeError):
+        with self.assertRaises(ValueError):
             ProxyAgent(self.reactor, use_proxy=True)
 
     @patch.dict(os.environ, {"http_proxy": "http://proxy.com:8888"})

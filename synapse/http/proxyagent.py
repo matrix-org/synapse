@@ -93,7 +93,7 @@ class ProxyAgent(_AgentBase):
             from conventional environment variables.
 
     Raises:
-        RuntimeError if use_proxy is set and the environment variables
+        ValueError if use_proxy is set and the environment variables
             contain an invalid proxy specification.
     """
 
@@ -293,7 +293,7 @@ def _http_proxy_endpoint(
             ProxyCredentials or if no credentials were found, or None
 
     Raise:
-        RuntimeError if proxy has no hostname or unsupported scheme.
+        ValueError if proxy has no hostname or unsupported scheme.
     """
     if proxy is None:
         return None, None
@@ -332,7 +332,7 @@ def parse_proxy(
             If no credentials were found, the ProxyCredentials instance is replaced with None.
 
     Raise:
-        RuntimeError if proxy has no hostname or unsupported scheme.
+        ValueError if proxy has no hostname or unsupported scheme.
     """
     # First check if we have a scheme present
     # Note: urlsplit/urlparse cannot be used (for Python # 3.9+) on scheme-less proxies, e.g. host:port.
@@ -342,11 +342,11 @@ def parse_proxy(
     url = urlparse(proxy)
 
     if not url.hostname:
-        raise RuntimeError("Proxy URL did not contain a hostname! Please specify one.")
+        raise ValueError("Proxy URL did not contain a hostname! Please specify one.")
 
     if url.scheme not in (b"http", b"https"):
-        raise RuntimeError(
-            f"Unknown proxy scheme {url.scheme !s}; only 'http' and 'https' is supported."
+        raise ValueError(
+            f"Unknown proxy scheme {url.scheme!s}; only 'http' and 'https' is supported."
         )
 
     credentials = None
