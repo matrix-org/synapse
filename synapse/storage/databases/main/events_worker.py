@@ -1512,26 +1512,25 @@ class EventsWorkerStore(SQLBaseStore):
             _cleanup_old_transaction_ids_txn,
         )
 
-    def get_event_for_timestamp(self, room_id, thread_id, timestamp):
+    def get_event_for_timestamp(self, room_id, timestamp):
         sql_template = """
-            SELECT event_id, origin_server_ts FROM 
+            SELECT event_id, origin_server_ts FROM events
             WHERE
                 origin_server_ts %s ?
                 AND room_id = ?
-                AND thread_id = ?
             ORDER BY origin_server_ts
             LIMIT 1;
         """
 
         def f(txn):
-            txn.execute(sql_template % ("<=",), (timestamp, room_id, thread_id))
+            txn.execute(sql_template % ("<=",), (timestamp, room_id))
             row = txn.fetchone()
             if row:
                 event_id_before, ts_before = row
             else:
                 event_id_before, ts_before = None, None
 
-            txn.execute(sql_template % (">=",), (timestamp, room_id, thread_id))
+            txn.execute(sql_template % (">=",), (timestamp, room_id))
             row = txn.fetchone()
             if row:
                 event_id_after, ts_after = row

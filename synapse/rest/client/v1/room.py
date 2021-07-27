@@ -1404,11 +1404,9 @@ class TimestampLookupRestServlet(RestServlet):
         await self._auth.check_joined_room(room_id, requester.to_string())
 
         timestamp = parse_integer(request, "ts")
-        thread_id = parse_integer(request, "thread_id", 0)
 
         event_id = await self._store.get_event_for_timestamp(
             room_id,
-            thread_id,
             timestamp,
         )
 
