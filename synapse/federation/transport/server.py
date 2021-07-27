@@ -962,7 +962,10 @@ class OpenIdUserInfo(BaseFederationServerServlet):
             if room_power_levels is not None:
                 user_power = room_power_levels.content.get("users", None)
                 if user_power is not None:
-                    room_power_level = user_power[user_id]
+                    try:
+                        room_power_level = user_power[user_id]
+                    except KeyError:
+                        pass
                 if room_power_level is None:
                     room_power_level = room_power_levels.content.get(
                         "state_default", None
