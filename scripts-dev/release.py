@@ -19,7 +19,7 @@
 
 import subprocess
 import sys
-from typing import Optional
+from typing import Optional, Tuple
 
 import click
 import git
@@ -56,32 +56,8 @@ def prepare():
     click.secho("Updating git repo...")
     repo.remote().fetch()
 
-    # Parse the AST and load the `__version__` node so that we can edit it
-    # later.
-    with open("synapse/__init__.py") as f:
-        red = RedBaron(f.read())
-
-    version_node = None
-    for node in red:
-        if node.type != "assignment":
-            continue
-
-        if node.target.type != "name":
-            continue
-
-        if node.target.value != "__version__":
-            continue
-
-        version_node = node
-        break
-
-    if not version_node:
-        print("Failed to find '__version__' definition in synapse/__init__.py")
-        sys.exit(1)
-
-    # Parse the current version.
-    current_version = version.parse(version_node.value.value.strip('"'))
-    assert isinstance(current_version, version.Version)
+    # Get the current version and AST from root Synapse module.
+    current_version, parsed_synapse_ast, version_node = parse_version_from_module()
 
     # Figure out what sort of release we're doing and calcuate the new version.
     rc = click.confirm("RC", default=True)
@@ -195,7 +171,7 @@ def prepare():
     # Update the `__version__` variable and write it back to the file.
     version_node.value = '"' + new_version + '"'
     with open("synapse/__init__.py", "w") as f:
-        f.write(red.dumps())
+        f.write(parsed_synapse_ast.dumps())
 
     # Generate changelogs
     subprocess.run("python3 -m towncrier", shell=True)
@@ -243,6 +219,37 @@ def prepare():
     click.launch(
         f"https://github.com/matrix-org/synapse/blob/{repo.active_branch.name}/CHANGES.md"
     )
+
+
+def parse_version_from_module() -> Tuple[version.Version, RedBaron, redbaron.Node]:
+    # Parse the AST and load the `__version__` node so that we can edit it
+    # later.
+    with open("synapse/__init__.py") as f:
+        red = RedBaron(f.read())
+
+    version_node = None
+    for node in red:
+        if node.type != "assignment":
+            continue
+
+        if node.target.type != "name":
+            continue
+
+        if node.target.value != "__version__":
+            continue
+
+        version_node = node
+        break
+
+    if not version_node:
+        print("Failed to find '__version__' definition in synapse/__init__.py")
+        sys.exit(1)
+
+    # Parse the current version.
+    current_version = version.parse(version_node.value.value.strip('"'))
+    assert isinstance(current_version, version.Version)
+
+    return current_version, red, version_node
 
 
 def find_ref(repo: git.Repo, ref_name: str) -> Optional[git.HEAD]:
