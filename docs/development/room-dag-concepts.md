@@ -56,8 +56,8 @@ state calculation ourself.
 ### Floating outlier
 
 A floating `outlier` is an arbitrary floating event in the DAG (as opposed to
-being inline with the current DAG). This happens when it the event doesn't have
-any `prev_events` or fake `prev_events` that don't exist.
+being inline with the current DAG). This happens when an event doesn't have
+any `prev_events` or has `prev_events` that don't exist.
 
 
 ## State groups
