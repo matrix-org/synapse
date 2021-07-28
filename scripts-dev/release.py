@@ -27,16 +27,21 @@ from packaging import version
 from redbaron import RedBaron
 
 
-@click.command()
-def run():
-    """An interactive script to walk through the initial stages of creating a
-    release, including creating release branch, updating changelog and pushing to
-    GitHub.
+@click.group()
+def cli():
+    """An interactive script to walk through the parts of creating a release.
 
     Requires the dev dependencies be installed, which can be done via:
 
         pip install -e .[dev]
 
+    """
+
+
+@cli.command()
+def prepare():
+    """Do the initial stages of creating a release, including creating release
+    branch, updating changelog and pushing to GitHub.
     """
 
     # Make sure we're in a git repo.
@@ -257,4 +262,4 @@ def update_branch(repo: git.Repo):
 
 
 if __name__ == "__main__":
-    run()
+    cli()
