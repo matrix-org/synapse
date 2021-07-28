@@ -884,7 +884,14 @@ class WhoamiRestServlet(RestServlet):
     async def on_GET(self, request):
         requester = await self.auth.get_user_by_req(request)
 
-        return 200, {"user_id": requester.user.to_string()}
+        response = {"user_id": requester.user.to_string()}
+
+        # Appservices and similar accounts do not have device IDs
+        # that we can report on, so exclude them for compliance.
+        if requester.device_id is not None:
+            response["device_id"] = requester.device_id
+
+        return 200, response
 
 
 def register_servlets(hs, http_server):

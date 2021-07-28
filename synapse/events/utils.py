@@ -109,6 +109,8 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
         add_fields("creator")
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
+        if room_version.msc3083_join_rules:
+            add_fields("allow")
     elif event_type == EventTypes.PowerLevels:
         add_fields(
             "users",
@@ -123,6 +125,9 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
 
         if room_version.msc2176_redaction_rules:
             add_fields("invite")
+
+        if room_version.msc2716_historical:
+            add_fields("historical")
 
     elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")

@@ -45,6 +45,7 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.crypto.event_signing import compute_event_signature
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
@@ -64,7 +65,7 @@ from synapse.replication.http.federation import (
     ReplicationGetQueryRestServlet,
 )
 from synapse.storage.databases.main.lock import Lock
-from synapse.types import JsonDict
+from synapse.types import JsonDict, get_domain_from_id
 from synapse.util import glob_to_regex, json_decoder, unwrapFirstError
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.caches.response_cache import ResponseCache
@@ -586,7 +587,7 @@ class FederationServer(FederationBase):
     async def on_send_join_request(
         self, origin: str, content: JsonDict, room_id: str
     ) -> Dict[str, Any]:
-        context = await self._on_send_membership_event(
+        event, context = await self._on_send_membership_event(
             origin, content, Membership.JOIN, room_id
         )
 
@@ -597,6 +598,7 @@ class FederationServer(FederationBase):
 
         time_now = self._clock.time_msec()
         return {
+            "org.matrix.msc3083.v2.event": event.get_pdu_json(),
             "state": [p.get_pdu_json(time_now) for p in state.values()],
             "auth_chain": [p.get_pdu_json(time_now) for p in auth_chain],
         }
@@ -681,7 +683,7 @@ class FederationServer(FederationBase):
         Returns:
             The stripped room state.
         """
-        event_context = await self._on_send_membership_event(
+        _, context = await self._on_send_membership_event(
             origin, content, Membership.KNOCK, room_id
         )
 
@@ -690,14 +692,14 @@ class FederationServer(FederationBase):
         # related to the room while the knock request is pending.
         stripped_room_state = (
             await self.store.get_stripped_room_state_from_event_context(
-                event_context, self._room_prejoin_state_types
+                context, self._room_prejoin_state_types
             )
         )
         return {"knock_state_events": stripped_room_state}
 
     async def _on_send_membership_event(
         self, origin: str, content: JsonDict, membership_type: str, room_id: str
-    ) -> EventContext:
+    ) -> Tuple[EventBase, EventContext]:
         """Handle an on_send_{join,leave,knock} request
 
         Does some preliminary validation before passing the request on to the
@@ -712,7 +714,7 @@ class FederationServer(FederationBase):
                 in the event
 
         Returns:
-            The context of the event after inserting it into the room graph.
+            The event and context of the event after inserting it into the room graph.
 
         Raises:
             SynapseError if there is a problem with the request, including things like
@@ -747,6 +749,33 @@ class FederationServer(FederationBase):
         await self.check_server_matches_acl(origin_host, event.room_id)
 
         logger.debug("_on_send_membership_event: pdu sigs: %s", event.signatures)
+
+        # Sign the event since we're vouching on behalf of the remote server that
+        # the event is valid to be sent into the room. Currently this is only done
+        # if the user is being joined via restricted join rules.
+        if (
+            room_version.msc3083_join_rules
+            and event.membership == Membership.JOIN
+            and "join_authorised_via_users_server" in event.content
+        ):
+            # We can only authorise our own users.
+            authorising_server = get_domain_from_id(
+                event.content["join_authorised_via_users_server"]
+            )
+            if authorising_server != self.server_name:
+                raise SynapseError(
+                    400,
+                    f"Cannot authorise request from resident server: {authorising_server}",
+                )
+
+            event.signatures.update(
+                compute_event_signature(
+                    room_version,
+                    event.get_pdu_json(),
+                    self.hs.hostname,
+                    self.hs.signing_key,
+                )
+            )
 
         event = await self._check_sigs_and_hash(room_version, event)
 

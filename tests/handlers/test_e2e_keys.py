@@ -47,12 +47,16 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             "alg2:k3": {"key": "key3"},
         }
 
+        # Note that "signed_curve25519" is always returned in key count responses. This is necessary until
+        # https://github.com/matrix-org/matrix-doc/issues/3298 is fixed.
         res = self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
+        )
 
         # we should be able to change the signature without a problem
         keys["alg2:k2"]["signatures"]["k1"] = "sig2"
@@ -61,7 +65,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
+        )
 
     def test_change_one_time_keys(self):
         """attempts to change one-time-keys should be rejected"""
@@ -79,7 +85,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
+        )
 
         # Error when changing string key
         self.get_failure(
@@ -89,7 +97,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             SynapseError,
         )
 
-        # Error when replacing dict key with strin
+        # Error when replacing dict key with string
         self.get_failure(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": {"alg2:k3": "key2"}}
@@ -131,7 +139,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "signed_curve25519": 0}}
+        )
 
         res2 = self.get_success(
             self.handler.claim_one_time_keys(

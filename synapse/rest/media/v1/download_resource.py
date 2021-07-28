@@ -49,6 +49,8 @@ class DownloadResource(DirectServeJsonResource):
             b" media-src 'self';"
             b" object-src 'self';",
         )
+        # Limited non-standard form of CSP for IE11
+        request.setHeader(b"X-Content-Security-Policy", b"sandbox;")
         request.setHeader(
             b"Referrer-Policy",
             b"no-referrer",

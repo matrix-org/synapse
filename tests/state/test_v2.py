@@ -484,7 +484,7 @@ class StateTestCase(unittest.TestCase):
                 state_d = resolve_events_with_store(
                     FakeClock(),
                     ROOM_ID,
-                    RoomVersions.V2.identifier,
+                    RoomVersions.V2,
                     [state_at_event[n] for n in prev_events],
                     event_map=event_map,
                     state_res_store=TestStateResolutionStore(event_map),
@@ -496,7 +496,7 @@ class StateTestCase(unittest.TestCase):
             if fake_event.state_key is not None:
                 state_after[(fake_event.type, fake_event.state_key)] = event_id
 
-            auth_types = set(auth_types_for_event(fake_event))
+            auth_types = set(auth_types_for_event(RoomVersions.V6, fake_event))
 
             auth_events = []
             for key in auth_types:
@@ -633,7 +633,7 @@ class SimpleParamStateTestCase(unittest.TestCase):
         state_d = resolve_events_with_store(
             FakeClock(),
             ROOM_ID,
-            RoomVersions.V2.identifier,
+            RoomVersions.V2,
             [self.state_at_bob, self.state_at_charlie],
             event_map=None,
             state_res_store=TestStateResolutionStore(self.event_map),
