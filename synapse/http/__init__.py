@@ -63,6 +63,15 @@ def get_request_uri(request: IRequest) -> bytes:
     )
 
 
+def get_request_uri_without_scheme(request: IRequest) -> bytes:
+    """Return the full URI that was requested by the client"""
+    return b"%s%s" % (
+        _get_requested_host(request),
+        # despite its name, "request.uri" is only the path and query-string.
+        request.uri,
+    )
+
+
 def _get_requested_host(request: IRequest) -> bytes:
     hostname = request.getHeader(b"host")
     if hostname:

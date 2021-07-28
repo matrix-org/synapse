@@ -15,6 +15,7 @@
 import logging
 import re
 from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
+from urllib.parse import urlsplit
 
 from typing_extensions import TypedDict
 
@@ -508,6 +509,9 @@ class SsoRedirectServlet(RestServlet):
         self._sso_handler = hs.get_sso_handler()
         self._msc2858_enabled = hs.config.experimental.msc2858_enabled
         self._public_baseurl = hs.config.public_baseurl
+        if hs.config.public.baseurl:
+            base_url_parts = urlsplit(hs.config.public_baseurl)
+            self._public_baseurl_without_scheme = "%s/%s" % base_url_parts[1:3]
 
     def register(self, http_server: HttpServer) -> None:
         super().register(http_server)
@@ -535,7 +539,10 @@ class SsoRedirectServlet(RestServlet):
         # get our cookies back.
         requested_uri = get_request_uri(request)
         baseurl_bytes = self._public_baseurl.encode("utf-8")
-        if not requested_uri.startswith(baseurl_bytes):
+        # Account for mismatched schemes due to reverse proxying
+        requested_uri_without_scheme = get_request_uri_without_scheme(request)
+        baseurl_without_scheme_bytes = self._public_baseurl_without_scheme.encode("utf-8")
+        if not requested_uri_without_scheme.startswith(baseurl_without_scheme_bytes):
             # swap out the incorrect base URL for the right one.
             #
             # The idea here is to redirect from
