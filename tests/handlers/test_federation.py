@@ -196,9 +196,9 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
     def test_backfill_floating_outlier_membership_auth(self):
         """
-        As the remote federated homeserver, check that we can properly process
-        an event with auth_events that include a floating membership event from
-        the OTHER_SERVER.
+        As the local homeserver, check that we can properly process a federated
+        event from the OTHER_SERVER with auth_events that include a floating
+        membership event from the OTHER_SERVER.
 
         Regression test, see #10439.
         """
