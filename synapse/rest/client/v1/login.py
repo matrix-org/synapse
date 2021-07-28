@@ -24,7 +24,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
 from synapse.handlers.sso import SsoIdentityProvider
-from synapse.http import get_request_uri
+from synapse.http import get_request_uri, get_request_uri_without_scheme
 from synapse.http.server import HttpServer, finish_request
 from synapse.http.servlet import (
     RestServlet,
