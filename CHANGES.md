@@ -4,9 +4,9 @@ Synapse 1.39.0rc3 (2021-07-28)
 Bugfixes
 --------
 
-- Fix bug introduced in Synapse 1.38 which caused an exception at startup when SAML authentication was enabled. ([\#10477](https://github.com/matrix-org/synapse/issues/10477))
+- Fix a bug introduced in Synapse 1.38 which caused an exception at startup when SAML authentication was enabled. ([\#10477](https://github.com/matrix-org/synapse/issues/10477))
 - Fix a long-standing bug where Synapse would not inform clients that a device had exhausted its one-time-key pool, potentially causing problems decrypting events. ([\#10485](https://github.com/matrix-org/synapse/issues/10485))
-- Fix reporting old R30 stats as R30v2 stats. ([\#10486](https://github.com/matrix-org/synapse/issues/10486))
+- Fix reporting old R30 stats as R30v2 stats. Introduced in v1.39.0rc1. ([\#10486](https://github.com/matrix-org/synapse/issues/10486))
 
 
 Internal Changes
