@@ -51,7 +51,7 @@ from synapse.replication.slave.storage._slaved_id_tracker import SlavedIdTracker
 from synapse.replication.tcp.streams import BackfillStream
 from synapse.replication.tcp.streams.events import EventsStream
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.database import DatabasePool
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.util.id_generators import MultiWriterIdGenerator, StreamIdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
@@ -206,82 +206,6 @@ class EventsWorkerStore(SQLBaseStore):
             retcol="received_ts",
             desc="get_received_ts",
         )
-
-    # Inform mypy that if allow_none is False (the default) then get_event
-    # always returns an EventBase.
-    @overload
-    def get_event_txn(
-        self,
-        event_id: str,
-        allow_rejected: bool = False,
-        allow_none: Literal[False] = False,
-    ) -> EventBase:
-        ...
-
-    @overload
-    def get_event_txn(
-        self,
-        event_id: str,
-        allow_rejected: bool = False,
-        allow_none: Literal[True] = False,
-    ) -> Optional[EventBase]:
-        ...
-
-    def get_event_txn(
-        self,
-        txn: LoggingTransaction,
-        event_id: str,
-        allow_rejected: bool = False,
-        allow_none: bool = False,
-    ) -> Optional[EventBase]:
-        """Get an event from the database by event_id.
-
-        Args:
-            txn: Transaction object
-
-            event_id: The event_id of the event to fetch
-
-            get_prev_content: If True and event is a state event,
-                include the previous states content in the unsigned field.
-
-            allow_rejected: If True, return rejected events. Otherwise,
-                behave as per allow_none.
-
-            allow_none: If True, return None if no event found, if
-                False throw a NotFoundError
-
-            check_room_id: if not None, check the room of the found event.
-                If there is a mismatch, behave as per allow_none.
-
-        Returns:
-            The event, or None if the event was not found and allow_none=True
-
-
-        Raises:
-            NotFoundError: if the event_id was not found and allow_none=False
-        """
-        event_map = self._fetch_event_rows(txn, [event_id])
-        event_info = event_map[event_id]
-        if event_info is None and not allow_none:
-            raise NotFoundError("Could not find event %s" % (event_id,))
-
-        rejected_reason = event_info["rejected_reason"]
-        if not allow_rejected and rejected_reason:
-            return
-
-        d = db_to_json(event_info["json"])
-        internal_metadata = db_to_json(event_info["internal_metadata"])
-        room_version_id = event_info["room_version_id"]
-        room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
-
-        event = make_event_from_dict(
-            event_dict=d,
-            room_version=room_version,
-            internal_metadata_dict=internal_metadata,
-            rejected_reason=rejected_reason,
-        )
-
-        return event
 
     # Inform mypy that if allow_none is False (the default) then get_event
     # always returns an EventBase.
