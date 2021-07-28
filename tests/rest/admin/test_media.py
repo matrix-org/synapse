@@ -261,7 +261,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_PARAM, channel.json_body["errcode"])
         self.assertEqual(
-            "Missing integer query parameter b'before_ts'", channel.json_body["error"]
+            "Missing integer query parameter 'before_ts'", channel.json_body["error"]
         )
 
     def test_invalid_parameter(self):
@@ -303,7 +303,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.UNKNOWN, channel.json_body["errcode"])
         self.assertEqual(
-            "Boolean query parameter b'keep_profiles' must be one of ['true', 'false']",
+            "Boolean query parameter 'keep_profiles' must be one of ['true', 'false']",
             channel.json_body["error"],
         )
 

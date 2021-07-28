@@ -168,7 +168,7 @@ class RoomVersions:
         msc2403_knocking=False,
     )
     MSC3083 = RoomVersion(
-        "org.matrix.msc3083",
+        "org.matrix.msc3083.v2",
         RoomDisposition.UNSTABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
