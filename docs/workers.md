@@ -319,11 +319,24 @@ effects of bursts of events from that bridge on events sent by normal users.
 
 #### Stream writers
 
-Additionally, there is *experimental* support for moving writing of specific
-streams (such as events) off of the main process to a particular worker. (This
-is only supported with Redis-based replication.)
+Additionally, there is support for moving writing of specific streams (such as
+events) off of the main process to a particular worker. (This is only supported
+with Redis-based replication.)
 
-Currently supported streams are `events` and `typing`.
+Currently supported streams are, and which endpoints **must** be routed to them:
+  * `events`
+
+  * `typing`:
+    * `^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/typing`
+
+  * `to_device`:
+    `^/_matrix/client/(api/v1|r0|unstable)/sendToDevice/`
+    `^/_matrix/client/(api/v1|r0|unstable)/keys/claim`
+    `^/_matrix/client/(api/v1|r0|unstable)/room_keys`
+
+  * `account_data`
+  * `receipts`
+  * `presence`
 
 To enable this, the worker must have a HTTP replication listener configured,
 have a `worker_name` and be listed in the `instance_map` config. For example to
@@ -340,10 +353,10 @@ stream_writers:
     events: event_persister1
 ```
 
-The `events` stream also experimentally supports having multiple writers, where
-work is sharded between them by room ID. Note that you *must* restart all worker
-instances when adding or removing event persisters. An example `stream_writers`
-configuration with multiple writers:
+The `events` stream also supports having multiple writers, where work is sharded
+between them by room ID. Note that you *must* restart all worker instances when
+adding or removing event persisters. An example `stream_writers` configuration
+with multiple writers:
 
 ```yaml
 stream_writers:
@@ -351,6 +364,8 @@ stream_writers:
         - event_persister1
         - event_persister2
 ```
+
+All other streams currently only support having a single writer.
 
 #### Background tasks
 
