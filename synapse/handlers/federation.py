@@ -1576,9 +1576,10 @@ class FederationHandler(BaseHandler):
                 host_list, event, room_version_obj
             )
 
-            origin = ret["origin"]
-            state = ret["state"]
-            auth_chain = ret["auth_chain"]
+            event = ret.event
+            origin = ret.origin
+            state = ret.state
+            auth_chain = ret.auth_chain
             auth_chain.sort(key=lambda e: e.depth)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
@@ -1758,7 +1759,7 @@ class FederationHandler(BaseHandler):
 
         # checking the room version will check that we've actually heard of the room
         # (and return a 404 otherwise)
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version(room_id)
 
         # now check that we are *still* in the room
         is_in_room = await self._event_auth_handler.check_host_in_room(
@@ -1773,8 +1774,38 @@ class FederationHandler(BaseHandler):
 
         event_content = {"membership": Membership.JOIN}
 
+        # If the current room is using restricted join rules, additional information
+        # may need to be included in the event content in order to efficiently
+        # validate the event.
+        #
+        # Note that this requires the /send_join request to come back to the
+        # same server.
+        if room_version.msc3083_join_rules:
+            state_ids = await self.store.get_current_state_ids(room_id)
+            if await self._event_auth_handler.has_restricted_join_rules(
+                state_ids, room_version
+            ):
+                prev_member_event_id = state_ids.get((EventTypes.Member, user_id), None)
+                # If the user is invited or joined to the room already, then
+                # no additional info is needed.
+                include_auth_user_id = True
+                if prev_member_event_id:
+                    prev_member_event = await self.store.get_event(prev_member_event_id)
+                    include_auth_user_id = prev_member_event.membership not in (
+                        Membership.JOIN,
+                        Membership.INVITE,
+                    )
+
+                if include_auth_user_id:
+                    event_content[
+                        "join_authorised_via_users_server"
+                    ] = await self._event_auth_handler.get_user_which_could_invite(
+                        room_id,
+                        state_ids,
+                    )
+
         builder = self.event_builder_factory.new(
-            room_version,
+            room_version.identifier,
             {
                 "type": EventTypes.Member,
                 "content": event_content,
@@ -1792,10 +1823,13 @@ class FederationHandler(BaseHandler):
             logger.warning("Failed to create join to %s because %s", room_id, e)
             raise
 
+        # Ensure the user can even join the room.
+        await self._check_join_restrictions(context, event)
+
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
         await self._event_auth_handler.check_from_context(
-            room_version, event, context, do_sig_check=False
+            room_version.identifier, event, context, do_sig_check=False
         )
 
         return event
@@ -2040,7 +2074,7 @@ class FederationHandler(BaseHandler):
     @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase
-    ) -> EventContext:
+    ) -> Tuple[EventBase, EventContext]:
         """
         We have received a join/leave/knock event for a room via send_join/leave/knock.
 
@@ -2063,7 +2097,7 @@ class FederationHandler(BaseHandler):
             event: The member event that has been signed by the remote homeserver.
 
         Returns:
-            The context of the event after inserting it into the room graph.
+            The event and context of the event after inserting it into the room graph.
 
         Raises:
             SynapseError if the event is not accepted into the room
@@ -2119,7 +2153,7 @@ class FederationHandler(BaseHandler):
 
         # all looks good, we can persist the event.
         await self._run_push_actions_and_persist_event(event, context)
-        return context
+        return event, context
 
     async def _check_join_restrictions(
         self, context: EventContext, event: EventBase
@@ -2555,7 +2589,7 @@ class FederationHandler(BaseHandler):
         )
 
         # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(event)
+        auth_types = auth_types_for_event(room_version_obj, event)
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]

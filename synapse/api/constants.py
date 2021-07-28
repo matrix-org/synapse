@@ -128,6 +128,14 @@ class ToDeviceEventTypes:
     RoomKeyRequest = "m.room_key_request"
 
 
+class DeviceKeyAlgorithms:
+    """Spec'd algorithms for the generation of per-device keys"""
+
+    ED25519 = "ed25519"
+    CURVE25519 = "curve25519"
+    SIGNED_CURVE25519 = "signed_curve25519"
+
+
 class EduTypes:
     Presence = "m.presence"
 
@@ -221,3 +229,7 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"

@@ -1023,6 +1023,13 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             event_results.add(event_id)
 
+            # Try and find any potential historical chunks of message history.
+            #
+            # First we look for an insertion event connected to the current
+            # event (by prev_event). If we find any, we need to go and try to
+            # find any chunk events connected to the insertion event (by
+            # chunk_id). If we find any, we'll add them to the queue and
+            # navigate up the DAG like normal in the next iteration of the loop.
             txn.execute(
                 connected_insertion_event_query, (event_id, limit - len(event_results))
             )
@@ -1326,12 +1333,15 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             (count,) = txn.fetchone()
 
             txn.execute(
-                "SELECT coalesce(min(received_ts), 0) FROM federation_inbound_events_staging"
+                "SELECT min(received_ts) FROM federation_inbound_events_staging"
             )
 
             (received_ts,) = txn.fetchone()
 
-            age = self._clock.time_msec() - received_ts
+            # If there is nothing in the staging area default it to 0.
+            age = 0
+            if received_ts is not None:
+                age = self._clock.time_msec() - received_ts
 
             return count, age
 
