@@ -14,10 +14,19 @@ A (oldest) <---- B <---- C (most recent)
 ## Depth and stream ordering
 
 Events are sorted by `(topological_ordering, stream_ordering)` where
-`topological_ordering` is just `depth`. Normally, `stream_ordering` is an auto
+`topological_ordering` is just `depth`. In other words, we first sort by `depth`
+and then tie-break based on `stream_ordering`. `depth` is incremented as new
+messages are added to the DAG. Normally, `stream_ordering` is an auto
 incrementing integer but for `backfilled=true` events, it decrements.
 
-`depth` is not re-calculated when messages are inserted into the DAG.
+`depth` is not re-calculated if a message is inserted into the middle of the DAG.
+
+---
+
+ - `/sync` returns things in the order they arrive at the server (`stream_ordering`).
+ - `/backfill` returns them in the order determined by the event graph `(topological_ordering, stream_ordering)`.
+
+The general idea is that, if you're following a room in real-time (i.e. `/sync`), you probably want to see the messages as they arrive at your server, rather than skipping any that arrived late; whereas if you're looking at a historical section of timeline (i.e. `/messages`), you want to see the best representation of the state of the room as others were seeing it at the time.
 
 
 ## Forward extremity
