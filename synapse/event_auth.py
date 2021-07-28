@@ -568,7 +568,7 @@ def check_historical(
 
     user_level = get_user_power_level(event.user_id, auth_events)
 
-    historical_level = _get_named_level(auth_events, "historical", 100)
+    historical_level = get_named_level(auth_events, "historical", 100)
 
     if user_level < historical_level:
         raise AuthError(
