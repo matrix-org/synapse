@@ -13,7 +13,9 @@ A (oldest) <---- B <---- C (most recent)
 
 ## Depth and stream ordering
 
-Events are sorted by `(topological_ordering, stream_ordering)` where `topological_ordering` is just `depth`. Normally, `stream_ordering` is an auto incrementing integer but for `backfilled=true` events, it decrements.
+Events are sorted by `(topological_ordering, stream_ordering)` where
+`topological_ordering` is just `depth`. Normally, `stream_ordering` is an auto
+incrementing integer but for `backfilled=true` events, it decrements.
 
 `depth` is not re-calculated when messages are inserted into the DAG.
 
@@ -33,8 +35,8 @@ A backwards extremity is a place where the oldest-in-time events of the DAG
 
 This is an event where we haven't fetched all of the `prev_events` for.
 
-Once we have fetched all of it's `prev_events`, it's unmarked as backwards extremity
-and those `prev_events` become the new backwards extremities.
+Once we have fetched all of it's `prev_events`, it's unmarked as backwards
+extremity and those `prev_events` become the new backwards extremities.
 
 
 ## Outliers
@@ -42,18 +44,20 @@ and those `prev_events` become the new backwards extremities.
 We mark an event as an `outlier` when we haven't figured out the state for the
 room at that point in the DAG yet.
 
-We won't *necessarily* have the `prev_events` of an `outlier` in the database, but it's entirely possible that we *might*. The status of whether we have all of the `prev_events` is marked as
-a [backwards extremity](#backwards-extremity).
+We won't *necessarily* have the `prev_events` of an `outlier` in the database,
+but it's entirely possible that we *might*. The status of whether we have all of
+the `prev_events` is marked as a [backwards extremity](#backwards-extremity).
 
-For example, when we fetch the event auth chain or state for a given event, we mark all of those
-claimed auth events as outliers because we haven't done the state calculation ourself.
+For example, when we fetch the event auth chain or state for a given event, we
+mark all of those claimed auth events as outliers because we haven't done the
+state calculation ourself.
 
 
 ### Floating outlier
 
-A floating `outlier` is an arbitrary floating event in the DAG (as opposed to being
-inline with the current DAG). This happens when it the event doesn't have any `prev_events`
-or fake `prev_events` that don't exist.
+A floating `outlier` is an arbitrary floating event in the DAG (as opposed to
+being inline with the current DAG). This happens when it the event doesn't have
+any `prev_events` or fake `prev_events` that don't exist.
 
 
 ## State groups
