@@ -109,6 +109,8 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
         add_fields("creator")
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
+        if room_version.msc3083_join_rules:
+            add_fields("allow")
     elif event_type == EventTypes.PowerLevels:
         add_fields(
             "users",

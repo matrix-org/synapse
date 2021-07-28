@@ -1227,12 +1227,15 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             (count,) = txn.fetchone()
 
             txn.execute(
-                "SELECT coalesce(min(received_ts), 0) FROM federation_inbound_events_staging"
+                "SELECT min(received_ts) FROM federation_inbound_events_staging"
             )
 
             (received_ts,) = txn.fetchone()
 
-            age = self._clock.time_msec() - received_ts
+            # If there is nothing in the staging area default it to 0.
+            age = 0
+            if received_ts is not None:
+                age = self._clock.time_msec() - received_ts
 
             return count, age
 

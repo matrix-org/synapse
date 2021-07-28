@@ -224,3 +224,7 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"
