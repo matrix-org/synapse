@@ -14,15 +14,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""An interactive script for doing a release. See `run()` below.
+"""An interactive script for doing a release. See `cli()` below.
 """
 
+import re
 import subprocess
 import sys
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
+import attr
 import click
+import commonmark
 import git
+import redbaron
+from github import Github
 from packaging import version
 from redbaron import RedBaron
 
@@ -35,6 +40,16 @@ def cli():
 
         pip install -e .[dev]
 
+    Then to use:
+
+        ./scripts-dev/release.py prepare
+
+        # ... ask others to look at the changelog ...
+
+        ./scripts-dev/release.py tag
+
+    If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the `tag`
+    command, then a new draft release will be created.
     """
 
 
@@ -221,6 +236,75 @@ def prepare():
     )
 
 
+@cli.command()
+@click.option("--gh_token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
+def tag(gh_token: Optional[str]):
+    """Tags the release and generates a draft GitHub release"""
+
+    # Make sure we're in a git repo.
+    try:
+        repo = git.Repo()
+    except git.InvalidGitRepositoryError:
+        raise click.ClickException("Not in Synapse repo.")
+
+    if repo.is_dirty():
+        raise click.ClickException("Uncommitted changes exist.")
+
+    click.secho("Updating git repo...")
+    repo.remote().fetch()
+
+    # Find out the version and tag name.
+    current_version, _, _ = parse_version_from_module()
+    tag_name = f"v{current_version}"
+
+    # Check we haven't released this version.
+    if tag_name in repo.tags:
+        raise click.ClickException(f"Tag already exists for {current_version}!\n")
+
+    # Get the appropriate changelogs and tag.
+    changes = get_changes_for_version(current_version)
+
+    click.echo_via_pager(changes)
+    if click.confirm("Edit text?", default=False):
+        changes = click.edit(changes, require_save=False)
+
+    repo.create_tag(tag_name, message=changes)
+
+    if not click.confirm("Push tag to GitHub?", default=True):
+        print("")
+        print("Run when ready to push:")
+        print("")
+        print(f"\tgit push {repo.remote().name} tag {current_version}")
+        print("")
+        return
+
+    repo.git.push(repo.remote().name, "tag", tag_name)
+
+    # If no token was given, we bail here
+    if not gh_token:
+        click.launch(f"https://github.com/matrix-org/synapse/releases/edit/{tag_name}")
+        return
+
+    # Create a new draft release
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    release = gh_repo.create_git_release(
+        tag=tag_name,
+        name=tag_name,
+        message=changes,
+        draft=True,
+        prerelease=current_version.is_prerelease,
+    )
+
+    # Open the release and the actions where we are building the assets.
+    click.launch(release.url)
+    click.launch(
+        f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
+    )
+
+    click.echo("Wait for release assets to be built")
+
+
 def parse_version_from_module() -> Tuple[version.Version, RedBaron, redbaron.Node]:
     # Parse the AST and load the `__version__` node so that we can edit it
     # later.
@@ -266,6 +350,67 @@ def update_branch(repo: git.Repo):
     """Ensure branch is up to date if it has a remote"""
     if repo.active_branch.tracking_branch():
         repo.git.merge(repo.active_branch.tracking_branch().name)
+
+
+def get_changes_for_version(wanted_version: version.Version) -> str:
+    """Get the changelogs for the given version.
+
+    If an RC then will only get the changelog for that RC version, otherwise if
+    its a full release will get the changelog for the release and all its RCs.
+    """
+
+    with open("CHANGES.md") as f:
+        changes = f.read()
+
+    # First we parse the changelog so that we can split it into sections based
+    # on the release headings.
+    ast = commonmark.Parser().parse(changes)
+
+    @attr.s(auto_attribs=True)
+    class VersionSection:
+        title: str
+
+        # These are 0-based.
+        start_line: int
+        end_line: Optional[int] = None  # Is none if its the last entry
+
+    headings: List[VersionSection] = []
+    for node, _ in ast.walker():
+        # We look for all text nodes that are in a level 1 heading.
+        if node.t != "text":
+            continue
+
+        if node.parent.t != "heading" or node.parent.level != 1:
+            continue
+
+        # If we have a previous heading then we update its `end_line`.
+        if headings:
+            headings[-1].end_line = node.parent.sourcepos[0][0] - 1
+
+        headings.append(VersionSection(node.literal, node.parent.sourcepos[0][0] - 1))
+
+    changes_by_line = changes.split("\n")
+
+    version_changelog = []  # The lines we want to include in the changelog
+
+    # Go through each section and find any that match the requested version.
+    regex = re.compile(r"^Synapse v?(\S+)")
+    for section in headings:
+        groups = regex.match(section.title)
+        if not groups:
+            continue
+
+        heading_version = version.parse(groups.group(1))
+        heading_base_version = version.parse(heading_version.base_version)
+
+        # Check if heading version matches the requested version, or if its an
+        # RC of the requested version.
+        if wanted_version not in (heading_version, heading_base_version):
+            continue
+
+        version_changelog.extend(changes_by_line[section.start_line : section.end_line])
+
+    return "\n".join(version_changelog)
 
 
 if __name__ == "__main__":
