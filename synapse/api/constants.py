@@ -206,9 +206,6 @@ class EventContentFields:
     MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
     # For "marker" events
     MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
-    MSC2716_MARKER_INSERTION_PREV_EVENTS = (
-        "org.matrix.msc2716.marker.insertion_prev_events"
-    )
 
 
 class RoomTypes:
