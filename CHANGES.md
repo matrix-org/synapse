@@ -51,6 +51,7 @@ Features
 - The spaces summary API now returns any joinable rooms, not only rooms which are world-readable. ([\#10298](https://github.com/matrix-org/synapse/issues/10298), [\#10305](https://github.com/matrix-org/synapse/issues/10305))
 - Add a new version of the R30 phone-home metric, which removes a false impression of retention given by the old R30 metric. ([\#10332](https://github.com/matrix-org/synapse/issues/10332), [\#10427](https://github.com/matrix-org/synapse/issues/10427))
 - Allow providing credentials to `http_proxy`. ([\#10360](https://github.com/matrix-org/synapse/issues/10360))
+- Add support for `ThirdPartyRules` callbacks to the new module interface added in v1.37.0. ([\#10386](https://github.com/matrix-org/synapse/issues/10386))
 
 
 Bugfixes
