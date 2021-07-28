@@ -202,22 +202,6 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         Regression test, see #10439.
         """
-
-        def filter_auth_events_on_event(event: EventBase, auth_events: List[EventBase]):
-            # Create a StateMap[str]
-            auth_event_state_map = {
-                (e.type, e.state_key): e.event_id for e in auth_events
-            }
-            # Actually strip down and use the necessary auth events
-            auth_event_ids = self._event_auth_handler.compute_auth_events(
-                event=event,
-                current_state_ids=auth_event_state_map,
-                for_verification=False,
-            )
-
-            # Replace the auth_events with the stripped down ones
-            event.auth_events = auth_event_ids
-
         OTHER_SERVER = "otherserver"
         OTHER_USER = "@otheruser:" + OTHER_SERVER
 
@@ -252,71 +236,86 @@ class FederationTestCase(unittest.HomeserverTestCase):
 
         # build a floating outlier member state event
         fake_prev_event_id = "$" + random_string(43)
-        member_event = event_from_pdu_json(
-            {
-                "type": EventTypes.Member,
-                "content": {
-                    "membership": "join",
-                },
-                "state_key": OTHER_USER,
-                "room_id": room_id,
-                "sender": OTHER_USER,
-                "depth": most_recent_prev_event_depth,
-                "prev_events": [fake_prev_event_id],
-                "auth_events": auth_event_ids.copy(),
-                "origin_server_ts": self.clock.time_msec(),
-                "signatures": {
-                    OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}
-                },
+        member_event_dict = {
+            "type": EventTypes.Member,
+            "content": {
+                "membership": "join",
             },
-            room_version,
-            outlier=True,
+            "state_key": OTHER_USER,
+            "room_id": room_id,
+            "sender": OTHER_USER,
+            "depth": most_recent_prev_event_depth,
+            "prev_events": [fake_prev_event_id],
+            "origin_server_ts": self.clock.time_msec(),
+            "signatures": {OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}},
+        }
+        builder = self.hs.get_event_builder_factory().for_room_version(
+            room_version, member_event_dict
         )
-        filter_auth_events_on_event(member_event, auth_events)
+        member_event = self.get_success(
+            builder.build(
+                prev_event_ids=member_event_dict["prev_events"],
+                auth_event_ids=self._event_auth_handler.compute_auth_events(
+                    builder,
+                    prev_state_map,
+                    for_verification=False,
+                ),
+                depth=member_event_dict["depth"],
+            )
+        )
+        # Override the signature added from "test" homeserver that we created the event with
+        member_event.signatures = member_event_dict["signatures"]
+
+        # Add the new member_event to the StateMap
+        prev_state_map[
+            (member_event.type, member_event.state_key)
+        ] = member_event.event_id
+        auth_events.append(member_event)
 
         # build and send an event authed based on the member event
-        raw_auth_events = auth_events + [member_event]
-        message_event = event_from_pdu_json(
-            {
-                "type": EventTypes.Message,
-                "content": {},
-                "room_id": room_id,
-                "sender": OTHER_USER,
-                "depth": most_recent_prev_event_depth,
-                "prev_events": prev_event_ids.copy(),
-                "auth_events": [ev.event_id for ev in raw_auth_events],
-                "origin_server_ts": self.clock.time_msec(),
-                "signatures": {
-                    OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}
-                },
-            },
-            room_version,
+        message_event_dict = {
+            "type": EventTypes.Message,
+            "content": {},
+            "room_id": room_id,
+            "sender": OTHER_USER,
+            "depth": most_recent_prev_event_depth,
+            "prev_events": prev_event_ids.copy(),
+            "origin_server_ts": self.clock.time_msec(),
+            "signatures": {OTHER_SERVER: {"ed25519:key_version": "SomeSignatureHere"}},
+        }
+        builder = self.hs.get_event_builder_factory().for_room_version(
+            room_version, message_event_dict
         )
-        filter_auth_events_on_event(message_event, raw_auth_events.copy())
+        message_event = self.get_success(
+            builder.build(
+                prev_event_ids=message_event_dict["prev_events"],
+                auth_event_ids=self._event_auth_handler.compute_auth_events(
+                    builder,
+                    prev_state_map,
+                    for_verification=False,
+                ),
+                depth=message_event_dict["depth"],
+            )
+        )
+        # Override the signature added from "test" homeserver that we created the event with
+        message_event.signatures = message_event_dict["signatures"]
 
         # Stub the /event_auth response from the OTHER_SERVER
-        async def get_event_auth(destination, room_id, event_id):
-            return [
-                auth_event
-                for auth_event in raw_auth_events
-                if auth_event.type is EventTypes.Create
-                or auth_event.type is EventTypes.PowerLevels
-                or auth_event.type is EventTypes.JoinRules
-                or (
-                    auth_event.type is EventTypes.Member
-                    and auth_event.state_key == message_event.sender
-                )
-            ]
+        async def get_event_auth(
+            destination: str, room_id: str, event_id: str
+        ) -> List[EventBase]:
+            return auth_events
 
         self.handler.federation_client.get_event_auth = get_event_auth
 
         with LoggingContext("receive_pdu"):
+            # Fake the OTHER_SERVER federating the message event over to our local homeserver
             d = run_in_background(
                 self.handler.on_receive_pdu, OTHER_SERVER, message_event
             )
         self.get_success(d)
 
-        # Try and get the events
+        # Now try and get the events on our local homeserver
         stored_event = self.get_success(
             self.store.get_event(message_event.event_id, allow_none=True)
         )
