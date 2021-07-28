@@ -22,6 +22,7 @@ from synapse.metrics.background_process_metrics import (
     run_as_background_process,
     wrap_as_background_process,
 )
+from synapse.replication.http.typing import ReplicationTypingRestServlet
 from synapse.replication.tcp.streams import TypingStream
 from synapse.types import JsonDict, Requester, UserID, get_domain_from_id
 from synapse.util.caches.stream_change_cache import StreamChangeCache
@@ -61,7 +62,9 @@ class FollowerTypingHandler:
         if hs.should_send_federation():
             self.federation = hs.get_federation_sender()
 
-        if hs.config.worker.writers.typing != hs.get_instance_name():
+        self._typing_repl_client = ReplicationTypingRestServlet.make_client(hs)
+        self._typing_worker = hs.config.worker.writers.typing
+        if self._typing_worker != hs.get_instance_name():
             hs.get_federation_registry().register_instance_for_edu(
                 "m.typing",
                 hs.config.worker.writers.typing,
@@ -198,6 +201,30 @@ class FollowerTypingHandler:
 
     def get_current_token(self) -> int:
         return self._latest_room_serial
+
+    async def started_typing(
+        self, target_user: UserID, requester: Requester, room_id: str, timeout: int
+    ) -> None:
+        await self._typing_repl_client(
+            typing=True,
+            instance_name=self._typing_worker,
+            user_id=target_user.to_string(),
+            requester=requester,
+            room_id=room_id,
+            timeout=timeout,
+        )
+
+    async def stopped_typing(
+        self, target_user: UserID, requester: Requester, room_id: str
+    ) -> None:
+        await self._typing_repl_client(
+            typing=True,
+            instance_name=self._typing_worker,
+            user_id=target_user.to_string(),
+            requester=requester,
+            room_id=room_id,
+            timeout=None,
+        )
 
 
 class TypingWriterHandler(FollowerTypingHandler):

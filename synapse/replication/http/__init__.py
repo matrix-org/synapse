@@ -24,6 +24,7 @@ from synapse.replication.http import (
     register,
     send_event,
     streams,
+    typing,
 )
 
 REPLICATION_PREFIX = "/_synapse/replication"
@@ -43,6 +44,7 @@ class ReplicationRestResource(JsonResource):
         streams.register_servlets(hs, self)
         account_data.register_servlets(hs, self)
         push.register_servlets(hs, self)
+        typing.register_servlets(hs, self)
 
         # The following can't currently be instantiated on workers.
         if hs.config.worker.worker_app is None:

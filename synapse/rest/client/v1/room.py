@@ -1254,17 +1254,10 @@ class RoomTypingRestServlet(RestServlet):
         self.presence_handler = hs.get_presence_handler()
         self.auth = hs.get_auth()
 
-        # If we're not on the typing writer instance we should scream if we get
-        # requests.
-        self._is_typing_writer = (
-            hs.config.worker.writers.typing == hs.get_instance_name()
-        )
+        self.handler = hs.get_typing_handler()
 
     async def on_PUT(self, request, room_id, user_id):
         requester = await self.auth.get_user_by_req(request)
-
-        if not self._is_typing_writer:
-            raise Exception("Got /typing request on instance that is not typing writer")
 
         room_id = urlparse.unquote(room_id)
         target_user = UserID.from_string(urlparse.unquote(user_id))
@@ -1276,19 +1269,16 @@ class RoomTypingRestServlet(RestServlet):
         # Limit timeout to stop people from setting silly typing timeouts.
         timeout = min(content.get("timeout", 30000), 120000)
 
-        # Defer getting the typing handler since it will raise on workers.
-        typing_handler = self.hs.get_typing_writer_handler()
-
         try:
             if content["typing"]:
-                await typing_handler.started_typing(
+                await self.handler.started_typing(
                     target_user=target_user,
                     requester=requester,
                     room_id=room_id,
                     timeout=timeout,
                 )
             else:
-                await typing_handler.stopped_typing(
+                await self.handler.stopped_typing(
                     target_user=target_user, requester=requester, room_id=room_id
                 )
         except ShadowBanError:
