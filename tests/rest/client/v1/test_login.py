@@ -453,7 +453,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
         # stick the flows results in a dict by type
-        flow_results = {}  # type: Dict[str, Any]
+        flow_results: Dict[str, Any] = {}
         for f in channel.json_body["flows"]:
             flow_type = f["type"]
             self.assertNotIn(
@@ -501,7 +501,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         p.close()
 
         # there should be a link for each href
-        returned_idps = []  # type: List[str]
+        returned_idps: List[str] = []
         for link in p.links:
             path, query = link.split("?", 1)
             self.assertEqual(path, "pick_idp")
@@ -582,7 +582,7 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         # ... and should have set a cookie including the redirect url
         cookie_headers = channel.headers.getRawHeaders("Set-Cookie")
         assert cookie_headers
-        cookies = {}  # type: Dict[str, str]
+        cookies: Dict[str, str] = {}
         for h in cookie_headers:
             key, value = h.split(";")[0].split("=", maxsplit=1)
             cookies[key] = value
@@ -874,9 +874,7 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_secret) -> str:
         # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
-        result = jwt.encode(
-            payload, secret, self.jwt_algorithm
-        )  # type: Union[str, bytes]
+        result: Union[str, bytes] = jwt.encode(payload, secret, self.jwt_algorithm)
         if isinstance(result, bytes):
             return result.decode("ascii")
         return result
@@ -1084,7 +1082,7 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_privatekey) -> str:
         # PyJWT 2.0.0 changed the return type of jwt.encode from bytes to str.
-        result = jwt.encode(payload, secret, "RS256")  # type: Union[bytes,str]
+        result: Union[bytes, str] = jwt.encode(payload, secret, "RS256")
         if isinstance(result, bytes):
             return result.decode("ascii")
         return result
@@ -1272,7 +1270,7 @@ class UsernamePickerTestCase(HomeserverTestCase):
         self.assertEqual(picker_url, "/_synapse/client/pick_username/account_details")
 
         # ... with a username_mapping_session cookie
-        cookies = {}  # type: Dict[str,str]
+        cookies: Dict[str, str] = {}
         channel.extract_cookies(cookies)
         self.assertIn("username_mapping_session", cookies)
         session_id = cookies["username_mapping_session"]

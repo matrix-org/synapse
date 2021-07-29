@@ -66,10 +66,8 @@ class TlsConfig(Config):
         if self.federation_client_minimum_tls_version == "1.3":
             if getattr(SSL, "OP_NO_TLSv1_3", None) is None:
                 raise ConfigError(
-                    (
-                        "federation_client_minimum_tls_version cannot be 1.3, "
-                        "your OpenSSL does not support it"
-                    )
+                    "federation_client_minimum_tls_version cannot be 1.3, "
+                    "your OpenSSL does not support it"
                 )
 
         # Whitelist of domains to not verify certificates for
@@ -80,7 +78,7 @@ class TlsConfig(Config):
             fed_whitelist_entries = []
 
         # Support globs (*) in whitelist values
-        self.federation_certificate_verification_whitelist = []  # type: List[Pattern]
+        self.federation_certificate_verification_whitelist: List[Pattern] = []
         for entry in fed_whitelist_entries:
             try:
                 entry_regex = glob_to_regex(entry.encode("ascii").decode("ascii"))
@@ -132,8 +130,8 @@ class TlsConfig(Config):
             "use_insecure_ssl_client_just_for_testing_do_not_use"
         )
 
-        self.tls_certificate = None  # type: Optional[crypto.X509]
-        self.tls_private_key = None  # type: Optional[crypto.PKey]
+        self.tls_certificate: Optional[crypto.X509] = None
+        self.tls_private_key: Optional[crypto.PKey] = None
 
     def is_disk_cert_valid(self, allow_self_signed=True):
         """

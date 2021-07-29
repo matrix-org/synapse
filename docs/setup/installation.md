@@ -166,12 +166,15 @@ sudo dnf groupinstall "Development Tools"
 
 Installing prerequisites on macOS:
 
+You may need to install the latest Xcode developer tools:
 ```sh
 xcode-select --install
-sudo easy_install pip
-sudo pip install virtualenv
-brew install pkg-config libffi
 ```
+
+On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):
+```sh
+ brew install jpeg
+ ```
 
 On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform `pip` about it so that `psycopg2` builds:
@@ -268,9 +271,8 @@ For more details, see
 
 ##### Matrix.org packages
 
-Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via <https://packages.matrix.org/debian/>. They are available for Debian
-9 (Stretch), Ubuntu 16.04 (Xenial), and later. To use them:
+Matrix.org provides Debian/Ubuntu packages of Synapse via
+<https://packages.matrix.org/debian/>.  To install the latest release:
 
 ```sh
 sudo apt install -y lsb-release wget apt-transport-https
@@ -281,12 +283,16 @@ sudo apt update
 sudo apt install matrix-synapse-py3
 ```
 
-**Note**: if you followed a previous version of these instructions which
-recommended using `apt-key add` to add an old key from
-`https://matrix.org/packages/debian/`, you should note that this key has been
-revoked. You should remove the old key with `sudo apt-key remove
-C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61`, and follow the above instructions to
-update your configuration.
+Packages are also published for release candidates. To enable the prerelease
+channel, add `prerelease` to the `sources.list` line. For example:
+
+```sh
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main prerelease" |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+```
 
 The fingerprint of the repository signing key (as shown by `gpg
 /usr/share/keyrings/matrix-org-archive-keyring.gpg`) is
@@ -409,7 +415,7 @@ instead. Advantages include:
 - allowing the DB to be run on separate hardware
 
 For information on how to install and use PostgreSQL in Synapse, please see
-[docs/postgres.md](../postgres.md)
+[Using Postgres](../postgres.md)
 
 SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
@@ -424,7 +430,7 @@ over HTTPS.
 
 The recommended way to do so is to set up a reverse proxy on port
 `8448`. You can find documentation on doing so in
-[docs/reverse_proxy.md](../reverse_proxy.md).
+[the reverse proxy documentation](../reverse_proxy.md).
 
 Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit `homeserver.yaml`, as follows:
@@ -451,7 +457,7 @@ so, you will need to edit `homeserver.yaml`, as follows:
   `cert.pem`).
 
 For a more detailed guide to configuring your server for federation, see
-[federate.md](../federate.md).
+[Federation](../federate.md).
 
 ### Client Well-Known URI
 
@@ -563,9 +569,7 @@ on your server even if `enable_registration` is `false`.
 ### Setting up a TURN server
 
 For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See
-[docs/turn-howto.md](../turn-howto.md)
-for details.
+a TURN server. See [TURN setup](../turn-howto.md) for details.
 
 ### URL previews
 

@@ -21,6 +21,7 @@ from canonicaljson import encode_canonical_json
 
 from twisted.enterprise.adbapi import Connection
 
+from synapse.api.constants import DeviceKeyAlgorithms
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, make_in_list_sql_clause
@@ -247,7 +248,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
         txn.execute(sql, query_params)
 
-        result = {}  # type: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]]
+        result: Dict[str, Dict[str, Optional[DeviceKeyLookupResult]]] = {}
         for (user_id, device_id, display_name, key_json) in txn:
             if include_deleted_devices:
                 deleted_devices.remove((user_id, device_id))
@@ -381,9 +382,15 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 " GROUP BY algorithm"
             )
             txn.execute(sql, (user_id, device_id))
-            result = {}
+
+            # Initially set the key count to 0. This ensures that the client will always
+            # receive *some count*, even if it's 0.
+            result = {DeviceKeyAlgorithms.SIGNED_CURVE25519: 0}
+
+            # Override entries with the count of any keys we pulled from the database
             for algorithm, key_count in txn:
                 result[algorithm] = key_count
+
             return result
 
         return await self.db_pool.runInteraction(
