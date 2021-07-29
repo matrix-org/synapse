@@ -63,7 +63,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
     def test_get_change_password_capabilities_password_login(self):
         access_token = self.login(self.localpart, self.password)
 
-        self._test_capability("m.change_password", access_token, True)
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(capabilities["m.change_password"]["enabled"])
 
     @override_config({"password_config": {"localdb_enabled": False}})
     def test_get_change_password_capabilities_localdb_disabled(self):
@@ -73,7 +77,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self._test_capability("m.change_password", access_token, False)
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["m.change_password"]["enabled"])
 
     @override_config({"password_config": {"enabled": False}})
     def test_get_change_password_capabilities_password_disabled(self):
@@ -83,7 +91,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             )
         )
 
-        self._test_capability("m.change_password", access_token, False)
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["m.change_password"]["enabled"])
 
     def test_get_change_users_attributes_capabilities_when_msc3283_disabled(self):
         """Test that per default msc3283 is disabled server returns `m.change_password`."""
@@ -108,9 +120,9 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self.assertEqual(channel.code, 200)
         self.assertTrue(capabilities["m.change_password"]["enabled"])
-        self.assertTrue("org.matrix.msc3283.set_displayname", capabilities)
-        self.assertTrue("org.matrix.msc3283.set_avatar_url", capabilities)
-        self.assertTrue("org.matrix.msc3283.3pid_changes", capabilities)
+        self.assertTrue(capabilities["org.matrix.msc3283.set_displayname"]["enabled"])
+        self.assertTrue(capabilities["org.matrix.msc3283.set_avatar_url"]["enabled"])
+        self.assertTrue(capabilities["org.matrix.msc3283.3pid_changes"]["enabled"])
 
     @override_config(
         {
@@ -122,7 +134,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         """Test if set displayname is disabled that the server responds it."""
         access_token = self.login(self.localpart, self.password)
 
-        self._test_capability("org.matrix.msc3283.set_displayname", access_token, False)
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["org.matrix.msc3283.set_displayname"]["enabled"])
 
     @override_config(
         {
@@ -134,7 +150,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         """Test if set avatar_url is disabled that the server responds it."""
         access_token = self.login(self.localpart, self.password)
 
-        self._test_capability("org.matrix.msc3283.set_avatar_url", access_token, False)
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["org.matrix.msc3283.set_avatar_url"]["enabled"])
 
     @override_config(
         {
@@ -146,7 +166,11 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         """Test if change 3pid is disabled that the server responds it."""
         access_token = self.login(self.localpart, self.password)
 
-        self._test_capability("org.matrix.msc3283.3pid_changes", access_token, False)
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertFalse(capabilities["org.matrix.msc3283.3pid_changes"]["enabled"])
 
     def test_get_does_not_include_msc3244_fields_by_default(self):
         access_token = self.get_success(
@@ -187,13 +211,3 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             self.assertGreater(len(details["support"]), 0)
             for room_version in details["support"]:
                 self.assertTrue(room_version in KNOWN_ROOM_VERSIONS, str(room_version))
-
-    def _test_capability(self, capability: str, access_token: str, expect_success=True):
-        """
-        Requests the capabilities from server and check if the value is expected.
-        """
-        channel = self.make_request("GET", self.url, access_token=access_token)
-        capabilities = channel.json_body["capabilities"]
-
-        self.assertEqual(channel.code, 200)
-        self.assertEqual(capabilities[capability]["enabled"], expect_success)
