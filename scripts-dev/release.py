@@ -20,6 +20,9 @@
 import re
 import subprocess
 import sys
+import urllib.request
+from os import path
+from tempfile import TemporaryDirectory
 from typing import List, Optional, Tuple
 
 import attr
@@ -27,6 +30,7 @@ import click
 import commonmark
 import git
 import redbaron
+from click.exceptions import ClickException
 from github import Github
 from packaging import version
 from redbaron import RedBaron
@@ -48,8 +52,12 @@ def cli():
 
         ./scripts-dev/release.py tag
 
-    If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the `tag`
-    command, then a new draft release will be created.
+        # ... wait for asssets to build ...
+
+        ./scripts-dev/release.py publish
+
+    If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
+    `tag`/`publish` command, then a new draft release will be created/published.
     """
 
 
@@ -237,7 +245,7 @@ def prepare():
 
 
 @cli.command()
-@click.option("--gh_token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
 def tag(gh_token: Optional[str]):
     """Tags the release and generates a draft GitHub release"""
 
@@ -303,6 +311,71 @@ def tag(gh_token: Optional[str]):
     )
 
     click.echo("Wait for release assets to be built")
+
+
+@cli.command()
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
+def publish(gh_token: Optional[str]):
+    """Publish release and upload to PyPI."""
+
+    # Make sure we're in a git repo.
+    try:
+        repo = git.Repo()
+    except git.InvalidGitRepositoryError:
+        raise click.ClickException("Not in Synapse repo.")
+
+    if repo.is_dirty():
+        raise click.ClickException("Uncommitted changes exist.")
+
+    current_version, _, _ = parse_version_from_module()
+    tag_name = f"v{current_version}"
+
+    if not click.confirm(f"Publish {tag_name}?", default=True):
+        return
+
+    if gh_token:
+        # Create a new draft release
+        gh = Github(gh_token)
+        gh_repo = gh.get_repo("matrix-org/synapse")
+        for release in gh_repo.get_releases():
+            if release.title == tag_name:
+                break
+        else:
+            raise ClickException(f"Failed to find GitHub release for {tag_name}")
+
+        assert release.title == tag_name
+
+        if not release.draft:
+            if not click.confirm("Release already published. Continue?", default=True):
+                return
+        else:
+            release = release.update_release(
+                name=release.title,
+                message=release.body,
+                tag_name=release.tag_name,
+                prerelease=release.prerelease,
+                draft=False,
+            )
+
+    pypi_asset_names = [
+        f"matrix_synapse-{current_version}-py3-none-any.whl",
+        f"matrix-synapse-{current_version}.tar.gz",
+    ]
+
+    with TemporaryDirectory(prefix=f"synapse_upload_{tag_name}_") as tmpdir:
+        for name in pypi_asset_names:
+            filename = path.join(tmpdir, name)
+            url = f"https://github.com/matrix-org/synapse/releases/download/{tag_name}/{name}"
+
+            click.echo(f"Downloading {name} into {filename}")
+            urllib.request.urlretrieve(url, filename=filename)
+
+        if click.confirm("Upload to PyPI?", default=True):
+            subprocess.run("twine upload *", shell=True, cwd=tmpdir)
+
+    click.echo(
+        f"Done! Remember to merge the tag {tag_name} into the appropriate branches"
+    )
 
 
 def parse_version_from_module() -> Tuple[version.Version, RedBaron, redbaron.Node]:
