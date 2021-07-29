@@ -337,7 +337,7 @@ class RoomAccessRules(object):
             True if the event should be allowed, False if it should be rejected, or a dictionary if the
             event needs to be rebuilt (containing the event's new content).
         """
-        if event.type == FROZEN_STATE_TYPE:
+        if event.type == FROZEN_STATE_TYPE and event.is_state():
             return await self._on_frozen_state_change(event, state_events)
 
         # If the room is frozen, we allow a very small number of events to go through
@@ -346,31 +346,37 @@ class RoomAccessRules(object):
         if frozen_state and frozen_state.content.get("frozen", False):
             return await self._on_event_when_frozen(event, state_events)
 
-        if event.type == ACCESS_RULES_TYPE:
-            return await self._on_rules_change(event, state_events)
+        # We check the rules when altering the state of the room, so only go further if
+        # the event is a state event.
+        if event.is_state():
+            if event.type == ACCESS_RULES_TYPE:
+                return await self._on_rules_change(event, state_events)
 
-        # We need to know the rule to apply when processing the event types below.
-        rule = self._get_rule_from_state(state_events)
+            # We need to know the rule to apply when processing the event types below.
+            rule = self._get_rule_from_state(state_events)
 
-        if event.type == EventTypes.PowerLevels:
-            return self._is_power_level_content_allowed(
-                event.content, rule, on_room_creation=False
-            )
+            if event.type == EventTypes.PowerLevels:
+                return self._is_power_level_content_allowed(
+                    event.content, rule, on_room_creation=False
+                )
 
-        if event.type == EventTypes.Member or event.type == EventTypes.ThirdPartyInvite:
-            return await self._on_membership_or_invite(event, rule, state_events)
+            if (
+                event.type == EventTypes.Member
+                or event.type == EventTypes.ThirdPartyInvite
+            ):
+                return await self._on_membership_or_invite(event, rule, state_events)
 
-        if event.type == EventTypes.JoinRules:
-            return self._on_join_rule_change(event, rule)
+            if event.type == EventTypes.JoinRules:
+                return self._on_join_rule_change(event, rule)
 
-        if event.type == EventTypes.RoomAvatar:
-            return self._on_room_avatar_change(event, rule)
+            if event.type == EventTypes.RoomAvatar:
+                return self._on_room_avatar_change(event, rule)
 
-        if event.type == EventTypes.Name:
-            return self._on_room_name_change(event, rule)
+            if event.type == EventTypes.Name:
+                return self._on_room_name_change(event, rule)
 
-        if event.type == EventTypes.Topic:
-            return self._on_room_topic_change(event, rule)
+            if event.type == EventTypes.Topic:
+                return self._on_room_topic_change(event, rule)
 
         return True
 
@@ -468,10 +474,11 @@ class RoomAccessRules(object):
             # Invalid event: frozen is either missing or not a boolean.
             return False
 
-        # If the event was sent from a restricted homeserver, don't allow the state
-        # change.
+        # If a user on the unfreeze blacklist attempts to unfreeze the room, don't allow
+        # the state change.
         if (
-            UserID.from_string(event.sender).domain
+            frozen is False
+            and UserID.from_string(event.sender).domain
             in self.domains_forbidden_when_restricted
         ):
             return False
@@ -491,6 +498,25 @@ class RoomAccessRules(object):
         # change the power levels.
         if not self._is_local_user(event.sender):
             return True
+
+        current_join_rules = state_events.get(
+            (EventTypes.JoinRules, ""),
+        )  # type: EventBase
+
+        # If the room is publicly joinable, revert that upon freezing the room.
+        if frozen is True and(
+            current_join_rules is None
+            or current_join_rules.content["join_rule"] == "public"
+        ):
+            await self.module_api.create_and_send_event_into_room(
+                {
+                    "room_id": event.room_id,
+                    "sender": event.sender,
+                    "type": EventTypes.JoinRules,
+                    "content": {"join_rule": "invite"},
+                    "state_key": "",
+                }
+            )
 
         current_power_levels = state_events.get(
             (EventTypes.PowerLevels, ""),
