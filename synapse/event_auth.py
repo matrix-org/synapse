@@ -205,6 +205,13 @@ def check(
     if event.type == EventTypes.Redaction:
         check_redaction(room_version_obj, event, auth_events)
 
+    if (
+        event.type == EventTypes.MSC2716_INSERTION
+        or event.type == EventTypes.MSC2716_CHUNK
+        or event.type == EventTypes.MSC2716_MARKER
+    ):
+        check_historical(room_version_obj, event, auth_events)
+
     logger.debug("Allowing! %s", event)
 
 
@@ -537,6 +544,37 @@ def check_redaction(
         return True
 
     raise AuthError(403, "You don't have permission to redact events")
+
+
+def check_historical(
+    room_version_obj: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
+) -> None:
+    """Check whether the event sender is allowed to send historical related
+    events like "insertion", "chunk", and "marker".
+
+    Returns:
+        None
+
+    Raises:
+        AuthError if the event sender is not allowed to send historical related events
+        ("insertion", "chunk", and "marker").
+    """
+    # Ignore the auth checks in room versions that do not support historical
+    # events
+    if not room_version_obj.msc2716_historical:
+        return
+
+    user_level = get_user_power_level(event.user_id, auth_events)
+
+    historical_level = get_named_level(auth_events, "historical", 100)
+
+    if user_level < historical_level:
+        raise AuthError(
+            403,
+            'You don\'t have permission to send send historical related events ("insertion", "chunk", and "marker")',
+        )
 
 
 def _check_power_levels(
