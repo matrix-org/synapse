@@ -73,6 +73,9 @@ class RoomVersion:
     # MSC2403: Allows join_rules to be set to 'knock', changes auth rules to allow sending
     # m.room.membership event with membership 'knock'.
     msc2403_knocking = attr.ib(type=bool)
+    # MSC2716: Adds m.room.power_levels -> content.historical field to control
+    # whether "insertion", "chunk", "marker" events can be sent
+    msc2716_historical = attr.ib(type=bool)
 
 
 class RoomVersions:
@@ -88,6 +91,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     V2 = RoomVersion(
         "2",
@@ -101,6 +105,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     V3 = RoomVersion(
         "3",
@@ -114,6 +119,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     V4 = RoomVersion(
         "4",
@@ -127,6 +133,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     V5 = RoomVersion(
         "5",
@@ -140,6 +147,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     V6 = RoomVersion(
         "6",
@@ -153,6 +161,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     MSC2176 = RoomVersion(
         "org.matrix.msc2176",
@@ -166,9 +175,10 @@ class RoomVersions:
         msc2176_redaction_rules=True,
         msc3083_join_rules=False,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     MSC3083 = RoomVersion(
-        "org.matrix.msc3083",
+        "org.matrix.msc3083.v2",
         RoomDisposition.UNSTABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
@@ -179,6 +189,7 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=True,
         msc2403_knocking=False,
+        msc2716_historical=False,
     )
     V7 = RoomVersion(
         "7",
@@ -192,6 +203,21 @@ class RoomVersions:
         msc2176_redaction_rules=False,
         msc3083_join_rules=False,
         msc2403_knocking=True,
+        msc2716_historical=False,
+    )
+    MSC2716 = RoomVersion(
+        "org.matrix.msc2716",
+        RoomDisposition.STABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=False,
+        msc2403_knocking=True,
+        msc2716_historical=True,
     )
 
 
@@ -207,6 +233,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC2176,
         RoomVersions.MSC3083,
         RoomVersions.V7,
+        RoomVersions.MSC2716,
     )
 }
 

@@ -15,9 +15,14 @@
 import json
 
 import synapse.rest.admin
-from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    ReadReceiptEventFields,
+    RelationTypes,
+)
 from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import knock, read_marker, sync
+from synapse.rest.client.v2_alpha import knock, read_marker, receipts, sync
 
 from tests import unittest
 from tests.federation.transport.test_knocking import (
@@ -368,6 +373,76 @@ class SyncKnockTestCase(
         )
 
 
+class ReadReceiptsTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
+        receipts.register_servlets,
+        room.register_servlets,
+        sync.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.url = "/sync?since=%s"
+        self.next_batch = "s0"
+
+        # Register the first user
+        self.user_id = self.register_user("kermit", "monkey")
+        self.tok = self.login("kermit", "monkey")
+
+        # Create the room
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+        # Register the second user
+        self.user2 = self.register_user("kermit2", "monkey")
+        self.tok2 = self.login("kermit2", "monkey")
+
+        # Join the second user
+        self.helper.join(room=self.room_id, user=self.user2, tok=self.tok2)
+
+    @override_config({"experimental_features": {"msc2285_enabled": True}})
+    def test_hidden_read_receipts(self):
+        # Send a message as the first user
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a read receipt to tell the server the first user's message was read
+        body = json.dumps({ReadReceiptEventFields.MSC2285_HIDDEN: True}).encode("utf8")
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
+            body,
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Test that the first user can't see the other user's hidden read receipt
+        self.assertEqual(self._get_read_receipt(), None)
+
+    def _get_read_receipt(self):
+        """Syncs and returns the read receipt."""
+
+        # Checks if event is a read receipt
+        def is_read_receipt(event):
+            return event["type"] == "m.receipt"
+
+        # Sync
+        channel = self.make_request(
+            "GET",
+            self.url % self.next_batch,
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200)
+
+        # Store the next batch for the next request.
+        self.next_batch = channel.json_body["next_batch"]
+
+        # Return the read receipt
+        ephemeral_events = channel.json_body["rooms"]["join"][self.room_id][
+            "ephemeral"
+        ]["events"]
+        return next(filter(is_read_receipt, ephemeral_events), None)
+
+
 class UnreadMessagesTestCase(unittest.HomeserverTestCase):
     servlets = [
         synapse.rest.admin.register_servlets,
@@ -375,6 +450,7 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         read_marker.register_servlets,
         room.register_servlets,
         sync.register_servlets,
+        receipts.register_servlets,
     ]
 
     def prepare(self, reactor, clock, hs):
@@ -440,6 +516,23 @@ class UnreadMessagesTestCase(unittest.HomeserverTestCase):
         channel = self.make_request(
             "POST",
             "/rooms/%s/read_markers" % self.room_id,
+            body,
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.json_body)
+
+        # Check that the unread counter is back to 0.
+        self._check_unread_count(0)
+
+        # Check that hidden read receipts don't break unread counts
+        res = self.helper.send(self.room_id, "hello", tok=self.tok2)
+        self._check_unread_count(1)
+
+        # Send a read receipt to tell the server we've read the latest event.
+        body = json.dumps({ReadReceiptEventFields.MSC2285_HIDDEN: True}).encode("utf8")
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
             body,
             access_token=self.tok,
         )
