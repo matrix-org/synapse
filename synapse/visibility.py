@@ -366,8 +366,7 @@ async def filter_events_for_server(
         if erased_senders:
             to_return = []
             for e in events:
-                erased = is_sender_erased(e, erased_senders)
-                if not erased:
+                if not is_sender_erased(e, erased_senders):
                     to_return.append(e)
                 elif redact:
                     to_return.append(prune_event(e))

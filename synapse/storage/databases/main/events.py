@@ -2139,7 +2139,7 @@ class PersistEventsStore:
         )
 
         # Delete all these events that we've already fetched and now know that their
-        # prev events are the new outliers.
+        # prev events are the new backwards extremeties.
         query = (
             "DELETE FROM event_backward_extremities"
             " WHERE event_id = ? AND room_id = ?"

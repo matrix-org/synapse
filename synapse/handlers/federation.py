@@ -906,6 +906,12 @@ class FederationHandler(BaseHandler):
             # Not a marker event
             return
 
+        # Skip processing a marker event if the room version doesn't
+        # support it.
+        room_version = await self.store.get_room_version(marker_event.room_id)
+        if not room_version.msc2716_historical:
+            return
+
         logger.info("_handle_marker_event: received %s", marker_event)
 
         insertion_event_id = marker_event.content.get(
@@ -946,6 +952,12 @@ class FederationHandler(BaseHandler):
 
         await self.store.insert_insertion_extremity(
             insertion_event_id, marker_event.room_id
+        )
+
+        logger.info(
+            "_handle_marker_event: insertion extremity added %s from marker event %s",
+            insertion_event,
+            marker_event,
         )
 
     async def _resync_device(self, sender: str) -> None:
