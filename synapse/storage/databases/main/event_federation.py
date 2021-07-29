@@ -951,7 +951,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return sorted(events, key=lambda e: -e.depth)
 
     def _get_backfill_events(self, txn, room_id, event_list, limit):
-        logger.info("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
+        logger.debug("_get_backfill_events: %s, %r, %s", room_id, event_list, limit)
 
         event_results = set()
 
@@ -1034,7 +1034,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                 connected_insertion_event_query, (event_id, limit - len(event_results))
             )
             connected_insertion_event_id_results = txn.fetchall()
-            logger.info(
+            logger.debug(
                 "_get_backfill_events: connected_insertion_event_query %s",
                 connected_insertion_event_id_results,
             )
@@ -1049,7 +1049,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
                     (connected_insertion_event, limit - len(event_results)),
                 )
                 chunk_start_event_id_results = txn.fetchall()
-                logger.info(
+                logger.debug(
                     "_get_backfill_events: chunk_start_event_id_results %s",
                     chunk_start_event_id_results,
                 )
@@ -1059,7 +1059,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
 
             txn.execute(query, (event_id, False, limit - len(event_results)))
             prev_event_id_results = txn.fetchall()
-            logger.info(
+            logger.debug(
                 "_get_backfill_events: prev_event_ids %s", prev_event_id_results
             )
 

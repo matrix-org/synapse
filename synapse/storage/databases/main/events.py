@@ -1781,7 +1781,7 @@ class PersistEventsStore:
             # Invalid insertion event without next chunk ID
             return
 
-        logger.info(
+        logger.debug(
             "_handle_insertion_event (next_chunk_id=%s) %s", next_chunk_id, event
         )
 
@@ -2127,7 +2127,6 @@ class PersistEventsStore:
             " )"
         )
 
-        logger.info("_update_backward_extremeties %s", events)
         txn.execute_batch(
             query,
             [

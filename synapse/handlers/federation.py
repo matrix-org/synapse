@@ -895,11 +895,11 @@ class FederationHandler(BaseHandler):
 
     async def _handle_marker_event(self, origin: str, marker_event: EventBase):
         """Handles backfilling the insertion event when we receive a marker
-        event that points to one
+        event that points to one.
 
         Args:
             origin: Origin of the event. Will be called to get the insertion event
-            event: The event to process
+            marker_event: The event to process
         """
 
         if marker_event.type != EventTypes.MSC2716_MARKER:
@@ -912,7 +912,7 @@ class FederationHandler(BaseHandler):
         if not room_version.msc2716_historical:
             return
 
-        logger.info("_handle_marker_event: received %s", marker_event)
+        logger.debug("_handle_marker_event: received %s", marker_event)
 
         insertion_event_id = marker_event.content.get(
             EventContentFields.MSC2716_MARKER_INSERTION
@@ -922,7 +922,7 @@ class FederationHandler(BaseHandler):
             # Nothing to retrieve then (invalid marker)
             return
 
-        logger.info(
+        logger.debug(
             "_handle_marker_event: backfilling insertion event %s", insertion_event_id
         )
 
@@ -944,8 +944,8 @@ class FederationHandler(BaseHandler):
             )
             return
 
-        logger.info(
-            "_handle_marker_event: Succesfully backfilled insertion event %s from marker event %s",
+        logger.debug(
+            "_handle_marker_event: succesfully backfilled insertion event %s from marker event %s",
             insertion_event,
             marker_event,
         )
@@ -954,8 +954,8 @@ class FederationHandler(BaseHandler):
             insertion_event_id, marker_event.room_id
         )
 
-        logger.info(
-            "_handle_marker_event: insertion extremity added %s from marker event %s",
+        logger.debug(
+            "_handle_marker_event: insertion extremity added for %s from marker event %s",
             insertion_event,
             marker_event,
         )
@@ -1134,7 +1134,7 @@ class FederationHandler(BaseHandler):
         insertion_events_to_be_backfilled = (
             await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
         )
-        logger.info(
+        logger.debug(
             "_maybe_backfill_inner: extremities oldest_events_with_depth=%s insertion_events_to_be_backfilled=%s",
             oldest_events_with_depth,
             insertion_events_to_be_backfilled,
@@ -1173,14 +1173,12 @@ class FederationHandler(BaseHandler):
         forward_event_ids = await self.store.get_successor_events(
             list(oldest_events_with_depth)
         )
-        logger.info("_maybe_backfill_inner: forward_event_ids=%s", forward_event_ids)
 
         extremities_events = await self.store.get_events(
             forward_event_ids,
             redact_behaviour=EventRedactBehaviour.AS_IS,
             get_prev_content=False,
         )
-        logger.info("_maybe_backfill_inner: extremities_events %s", extremities_events)
 
         # We set `check_history_visibility_only` as we might otherwise get false
         # positives from users having been erased.
@@ -1191,7 +1189,7 @@ class FederationHandler(BaseHandler):
             redact=False,
             check_history_visibility_only=True,
         )
-        logger.info(
+        logger.debug(
             "_maybe_backfill_inner: filtered_extremities %s", filtered_extremities
         )
 
@@ -1218,7 +1216,7 @@ class FederationHandler(BaseHandler):
         # much larger factor will result in triggering a backfill request much
         # earlier than necessary.
         if current_depth - 2 * limit > max_depth:
-            logger.info(
+            logger.debug(
                 "Not backfilling as we don't need to. %d < %d - 2 * %d",
                 max_depth,
                 current_depth,
@@ -1226,7 +1224,7 @@ class FederationHandler(BaseHandler):
             )
             return False
 
-        logger.info(
+        logger.debug(
             "room_id: %s, backfill: current_depth: %s, max_depth: %s, extrems: %s",
             room_id,
             current_depth,
