@@ -329,10 +329,11 @@ sudo dnf groupinstall &quot;Development Tools&quot;
 </code></pre>
 <h5 id="macos"><a class="header" href="#macos">macOS</a></h5>
 <p>Installing prerequisites on macOS:</p>
+<p>You may need to install the latest Xcode developer tools:</p>
 <pre><code class="language-sh">xcode-select --install
-sudo easy_install pip
-sudo pip install virtualenv
-brew install pkg-config libffi
+</code></pre>
+<p>On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):</p>
+<pre><code class="language-sh"> brew install jpeg
 </code></pre>
 <p>On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform <code>pip</code> about it so that <code>psycopg2</code> builds:</p>
@@ -397,9 +398,8 @@ For more details, see
 <a href="https://github.com/spantaleev/matrix-docker-ansible-deploy">https://github.com/spantaleev/matrix-docker-ansible-deploy</a></p>
 <h4 id="debianubuntu"><a class="header" href="#debianubuntu">Debian/Ubuntu</a></h4>
 <h5 id="matrixorg-packages"><a class="header" href="#matrixorg-packages">Matrix.org packages</a></h5>
-<p>Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via <a href="https://packages.matrix.org/debian/">https://packages.matrix.org/debian/</a>. They are available for Debian
-9 (Stretch), Ubuntu 16.04 (Xenial), and later. To use them:</p>
+<p>Matrix.org provides Debian/Ubuntu packages of Synapse via
+<a href="https://packages.matrix.org/debian/">https://packages.matrix.org/debian/</a>.  To install the latest release:</p>
 <pre><code class="language-sh">sudo apt install -y lsb-release wget apt-transport-https
 sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
 echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main&quot; |
@@ -407,11 +407,14 @@ echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] ht
 sudo apt update
 sudo apt install matrix-synapse-py3
 </code></pre>
-<p><strong>Note</strong>: if you followed a previous version of these instructions which
-recommended using <code>apt-key add</code> to add an old key from
-<code>https://matrix.org/packages/debian/</code>, you should note that this key has been
-revoked. You should remove the old key with <code>sudo apt-key remove C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61</code>, and follow the above instructions to
-update your configuration.</p>
+<p>Packages are also published for release candidates. To enable the prerelease
+channel, add <code>prerelease</code> to the <code>sources.list</code> line. For example:</p>
+<pre><code class="language-sh">sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main prerelease&quot; |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+</code></pre>
 <p>The fingerprint of the repository signing key (as shown by <code>gpg /usr/share/keyrings/matrix-org-archive-keyring.gpg</code>) is
 <code>AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058</code>.</p>
 <h5 id="downstream-debian-packages"><a class="header" href="#downstream-debian-packages">Downstream Debian packages</a></h5>
@@ -490,7 +493,7 @@ caching model, smarter query optimiser</li>
 <li>allowing the DB to be run on separate hardware</li>
 </ul>
 <p>For information on how to install and use PostgreSQL in Synapse, please see
-<a href="../postgres.html">docs/postgres.md</a></p>
+<a href="../postgres.html">Using Postgres</a></p>
 <p>SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
 SQLite, especially when participating in large rooms.</p>
@@ -501,7 +504,7 @@ but for any practical use, you will need Synapse's APIs to be served
 over HTTPS.</p>
 <p>The recommended way to do so is to set up a reverse proxy on port
 <code>8448</code>. You can find documentation on doing so in
-<a href="../reverse_proxy.html">docs/reverse_proxy.md</a>.</p>
+<a href="../reverse_proxy.html">the reverse proxy documentation</a>.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
@@ -527,7 +530,7 @@ includes the full certificate chain including any intermediate certificates
 </li>
 </ul>
 <p>For a more detailed guide to configuring your server for federation, see
-<a href="../federate.html">federate.md</a>.</p>
+<a href="../federate.html">Federation</a>.</p>
 <h3 id="client-well-known-uri"><a class="header" href="#client-well-known-uri">Client Well-Known URI</a></h3>
 <p>Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. <code>@user:&lt;server_name&gt;</code>) into clients
@@ -613,9 +616,7 @@ anyone with knowledge of it can register users, including admin accounts,
 on your server even if <code>enable_registration</code> is <code>false</code>.</p>
 <h3 id="setting-up-a-turn-server"><a class="header" href="#setting-up-a-turn-server">Setting up a TURN server</a></h3>
 <p>For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See
-<a href="../turn-howto.html">docs/turn-howto.md</a>
-for details.</p>
+a TURN server. See <a href="../turn-howto.html">TURN setup</a> for details.</p>
 <h3 id="url-previews"><a class="header" href="#url-previews">URL previews</a></h3>
 <p>Synapse includes support for previewing URLs, which is disabled by default.  To
 turn it on you must enable the <code>url_preview_enabled: True</code> config parameter

@@ -183,9 +183,9 @@
                         </div>
 
                         <h1 id="room-and-user-statistics"><a class="header" href="#room-and-user-statistics">Room and User Statistics</a></h1>
-<p>Synapse maintains room and user statistics (as well as a cache of room state),
-in various tables. These can be used for administrative purposes but are also
-used when generating the public room directory.</p>
+<p>Synapse maintains room and user statistics in various tables. These can be used
+for administrative purposes but are also used when generating the public room
+directory.</p>
 <h1 id="synapse-developer-documentation"><a class="header" href="#synapse-developer-documentation">Synapse Developer Documentation</a></h1>
 <h2 id="high-level-concepts"><a class="header" href="#high-level-concepts">High-Level Concepts</a></h2>
 <h3 id="definitions"><a class="header" href="#definitions">Definitions</a></h3>
@@ -193,48 +193,10 @@ used when generating the public room directory.</p>
 <li><strong>subject</strong>: Something we are tracking stats about – currently a room or user.</li>
 <li><strong>current row</strong>: An entry for a subject in the appropriate current statistics
 table. Each subject can have only one.</li>
-<li><strong>historical row</strong>: An entry for a subject in the appropriate historical
-statistics table. Each subject can have any number of these.</li>
 </ul>
 <h3 id="overview"><a class="header" href="#overview">Overview</a></h3>
-<p>Stats are maintained as time series. There are two kinds of column:</p>
-<ul>
-<li>absolute columns – where the value is correct for the time given by <code>end_ts</code>
-in the stats row. (Imagine a line graph for these values)
-<ul>
-<li>They can also be thought of as 'gauges' in Prometheus, if you are familiar.</li>
-</ul>
-</li>
-<li>per-slice columns – where the value corresponds to how many of the occurrences
-occurred within the time slice given by <code>(end_ts − bucket_size)…end_ts</code>
-or <code>start_ts…end_ts</code>. (Imagine a histogram for these values)</li>
-</ul>
-<p>Stats are maintained in two tables (for each type): current and historical.</p>
-<p>Current stats correspond to the present values. Each subject can only have one
-entry.</p>
-<p>Historical stats correspond to values in the past. Subjects may have multiple
-entries.</p>
-<h2 id="concepts-around-the-management-of-stats"><a class="header" href="#concepts-around-the-management-of-stats">Concepts around the management of stats</a></h2>
-<h3 id="current-rows"><a class="header" href="#current-rows">Current rows</a></h3>
-<p>Current rows contain the most up-to-date statistics for a room.
-They only contain absolute columns</p>
-<h3 id="historical-rows"><a class="header" href="#historical-rows">Historical rows</a></h3>
-<p>Historical rows can always be considered to be valid for the time slice and
-end time specified.</p>
-<ul>
-<li>historical rows will not exist for every time slice – they will be omitted
-if there were no changes. In this case, the following assumptions can be
-made to interpolate/recreate missing rows:
-<ul>
-<li>absolute fields have the same values as in the preceding row</li>
-<li>per-slice fields are zero (<code>0</code>)</li>
-</ul>
-</li>
-<li>historical rows will not be retained forever – rows older than a configurable
-time will be purged.</li>
-</ul>
-<h4 id="purge"><a class="header" href="#purge">Purge</a></h4>
-<p>The purging of historical rows is not yet implemented.</p>
+<p>Stats correspond to the present values. Current rows contain the most up-to-date
+statistics for a room. Each subject can only have one entry.</p>
 
                     </main>
 

@@ -330,10 +330,11 @@ sudo dnf groupinstall &quot;Development Tools&quot;
 </code></pre>
 <h5 id="macos"><a class="header" href="#macos">macOS</a></h5>
 <p>Installing prerequisites on macOS:</p>
+<p>You may need to install the latest Xcode developer tools:</p>
 <pre><code class="language-sh">xcode-select --install
-sudo easy_install pip
-sudo pip install virtualenv
-brew install pkg-config libffi
+</code></pre>
+<p>On ARM-based Macs you may need to explicitly install libjpeg which is a pillow dependency. You can use Homebrew (https://brew.sh):</p>
+<pre><code class="language-sh"> brew install jpeg
 </code></pre>
 <p>On macOS Catalina (10.15) you may need to explicitly install OpenSSL
 via brew and inform <code>pip</code> about it so that <code>psycopg2</code> builds:</p>
@@ -398,9 +399,8 @@ For more details, see
 <a href="https://github.com/spantaleev/matrix-docker-ansible-deploy">https://github.com/spantaleev/matrix-docker-ansible-deploy</a></p>
 <h4 id="debianubuntu"><a class="header" href="#debianubuntu">Debian/Ubuntu</a></h4>
 <h5 id="matrixorg-packages"><a class="header" href="#matrixorg-packages">Matrix.org packages</a></h5>
-<p>Matrix.org provides Debian/Ubuntu packages of the latest stable version of
-Synapse via <a href="https://packages.matrix.org/debian/">https://packages.matrix.org/debian/</a>. They are available for Debian
-9 (Stretch), Ubuntu 16.04 (Xenial), and later. To use them:</p>
+<p>Matrix.org provides Debian/Ubuntu packages of Synapse via
+<a href="https://packages.matrix.org/debian/">https://packages.matrix.org/debian/</a>.  To install the latest release:</p>
 <pre><code class="language-sh">sudo apt install -y lsb-release wget apt-transport-https
 sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
 echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main&quot; |
@@ -408,11 +408,14 @@ echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] ht
 sudo apt update
 sudo apt install matrix-synapse-py3
 </code></pre>
-<p><strong>Note</strong>: if you followed a previous version of these instructions which
-recommended using <code>apt-key add</code> to add an old key from
-<code>https://matrix.org/packages/debian/</code>, you should note that this key has been
-revoked. You should remove the old key with <code>sudo apt-key remove C35EB17E1EAE708E6603A9B3AD0592FE47F0DF61</code>, and follow the above instructions to
-update your configuration.</p>
+<p>Packages are also published for release candidates. To enable the prerelease
+channel, add <code>prerelease</code> to the <code>sources.list</code> line. For example:</p>
+<pre><code class="language-sh">sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+echo &quot;deb [signed-by=/usr/share/keyrings/matrix-org-archive-keyring.gpg] https://packages.matrix.org/debian/ $(lsb_release -cs) main prerelease&quot; |
+    sudo tee /etc/apt/sources.list.d/matrix-org.list
+sudo apt update
+sudo apt install matrix-synapse-py3
+</code></pre>
 <p>The fingerprint of the repository signing key (as shown by <code>gpg /usr/share/keyrings/matrix-org-archive-keyring.gpg</code>) is
 <code>AAF9AE843A7584B5A3E4CD2BCF45A512DE2DA058</code>.</p>
 <h5 id="downstream-debian-packages"><a class="header" href="#downstream-debian-packages">Downstream Debian packages</a></h5>
@@ -491,7 +494,7 @@ caching model, smarter query optimiser</li>
 <li>allowing the DB to be run on separate hardware</li>
 </ul>
 <p>For information on how to install and use PostgreSQL in Synapse, please see
-<a href="setup/../postgres.html">docs/postgres.md</a></p>
+<a href="setup/../postgres.html">Using Postgres</a></p>
 <p>SQLite is only acceptable for testing purposes. SQLite should not be used in
 a production server. Synapse will perform poorly when using
 SQLite, especially when participating in large rooms.</p>
@@ -502,7 +505,7 @@ but for any practical use, you will need Synapse's APIs to be served
 over HTTPS.</p>
 <p>The recommended way to do so is to set up a reverse proxy on port
 <code>8448</code>. You can find documentation on doing so in
-<a href="setup/../reverse_proxy.html">docs/reverse_proxy.md</a>.</p>
+<a href="setup/../reverse_proxy.html">the reverse proxy documentation</a>.</p>
 <p>Alternatively, you can configure Synapse to expose an HTTPS port. To do
 so, you will need to edit <code>homeserver.yaml</code>, as follows:</p>
 <ul>
@@ -528,7 +531,7 @@ includes the full certificate chain including any intermediate certificates
 </li>
 </ul>
 <p>For a more detailed guide to configuring your server for federation, see
-<a href="setup/../federate.html">federate.md</a>.</p>
+<a href="setup/../federate.html">Federation</a>.</p>
 <h3 id="client-well-known-uri"><a class="header" href="#client-well-known-uri">Client Well-Known URI</a></h3>
 <p>Setting up the client Well-Known URI is optional but if you set it up, it will
 allow users to enter their full username (e.g. <code>@user:&lt;server_name&gt;</code>) into clients
@@ -614,9 +617,7 @@ anyone with knowledge of it can register users, including admin accounts,
 on your server even if <code>enable_registration</code> is <code>false</code>.</p>
 <h3 id="setting-up-a-turn-server"><a class="header" href="#setting-up-a-turn-server">Setting up a TURN server</a></h3>
 <p>For reliable VoIP calls to be routed via this homeserver, you MUST configure
-a TURN server. See
-<a href="setup/../turn-howto.html">docs/turn-howto.md</a>
-for details.</p>
+a TURN server. See <a href="setup/../turn-howto.html">TURN setup</a> for details.</p>
 <h3 id="url-previews"><a class="header" href="#url-previews">URL previews</a></h3>
 <p>Synapse includes support for previewing URLs, which is disabled by default.  To
 turn it on you must enable the <code>url_preview_enabled: True</code> config parameter
@@ -854,7 +855,7 @@ port 8448. Where these are different, we refer to the 'client port' and the
 'federation port'. See <a href="https://matrix.org/docs/spec/server_server/latest#resolving-server-names">the Matrix
 specification</a>
 for more details of the algorithm used for federation connections, and
-<a href="delegate.html">delegate.md</a> for instructions on setting up delegation.</p>
+<a href="delegate.html">Delegation</a> for instructions on setting up delegation.</p>
 <p><strong>NOTE</strong>: Your reverse proxy must not <code>canonicalise</code> or <code>normalise</code>
 the requested URI in any way (for example, by decoding <code>%xx</code> escapes).
 Beware that Apache <em>will</em> canonicalise URIs unless you specify
@@ -915,6 +916,32 @@ example.com:8448 {
 
 example.com:8448 {
   reverse_proxy http://localhost:8008
+}
+</code></pre>
+<p><a href="delegate.html">Delegation</a> example:</p>
+<pre><code>(matrix-well-known-header) {
+    # Headers
+    header Access-Control-Allow-Origin &quot;*&quot;
+    header Access-Control-Allow-Methods &quot;GET, POST, PUT, DELETE, OPTIONS&quot;
+    header Access-Control-Allow-Headers &quot;Origin, X-Requested-With, Content-Type, Accept, Authorization&quot;
+    header Content-Type &quot;application/json&quot;
+}
+
+example.com {
+    handle /.well-known/matrix/server {
+        import matrix-well-known-header
+        respond `{&quot;m.server&quot;:&quot;matrix.example.com:443&quot;}`
+    }
+
+    handle /.well-known/matrix/client {
+        import matrix-well-known-header
+        respond `{&quot;m.homeserver&quot;:{&quot;base_url&quot;:&quot;https://matrix.example.com&quot;},&quot;m.identity_server&quot;:{&quot;base_url&quot;:&quot;https://identity.example.com&quot;}}`
+    }
+}
+
+matrix.example.com {
+    reverse_proxy /_matrix/* http://localhost:8008
+    reverse_proxy /_synapse/client/* http://localhost:8008
 }
 </code></pre>
 <h3 id="apache"><a class="header" href="#apache">Apache</a></h3>
@@ -1351,7 +1378,7 @@ find it using delegation.</p>
 <p>We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
 <p>This is no longer necessary. If you are using a reverse proxy for all of your
@@ -1442,6 +1469,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1390"><a class="header" href="#upgrading-to-v1390">Upgrading to v1.39.0</a></h1>
+<h2 id="deprecation-of-the-current-third-party-rules-module-interface"><a class="header" href="#deprecation-of-the-current-third-party-rules-module-interface">Deprecation of the current third-party rules module interface</a></h2>
+<p>The current third-party rules module interface is deprecated in favour of the new generic
+modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
+to <a href="modules.html#porting-an-existing-module-that-uses-the-old-interface">this documentation</a>
+to update their modules. Synapse administrators can refer to <a href="modules.html#using-modules">this documentation</a>
+to update their configuration once the modules they are using have been updated.</p>
+<p>We plan to remove support for the current third-party rules interface in September 2021.</p>
 <h1 id="upgrading-to-v1380"><a class="header" href="#upgrading-to-v1380">Upgrading to v1.38.0</a></h1>
 <h2 id="re-indexing-of-events-table-on-postgres-databases"><a class="header" href="#re-indexing-of-events-table-on-postgres-databases">Re-indexing of <code>events</code> table on Postgres databases</a></h2>
 <p>This release includes a database schema update which requires re-indexing one of
@@ -2607,7 +2642,7 @@ and the key to Synapse via <code>tls_certificate_path</code> and <code>tls_priva
 your domain, you can simply route all traffic through the reverse proxy by
 updating the SRV record appropriately (or removing it, if the proxy listens on
 8448).</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h4 id="option-3-add-a-well-known-file-to-delegate-your-matrix-traffic"><a class="header" href="#option-3-add-a-well-known-file-to-delegate-your-matrix-traffic">Option 3: add a .well-known file to delegate your matrix traffic</a></h4>
 <p>This will allow you to keep Synapse on a separate domain, without having to
@@ -2748,7 +2783,7 @@ federation end points.</p>
 <p>We no longer actively recommend against using a reverse proxy. Many admins will
 find it easier to direct federation traffic to a reverse proxy and manage their
 own TLS certificates, and this is a supported configuration.</p>
-<p>See <a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a
+<p>See <a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a
 reverse proxy.</p>
 <h3 id="do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy-1"><a class="header" href="#do-i-still-need-to-give-my-tls-certificates-to-synapse-if-i-am-using-a-reverse-proxy-1">Do I still need to give my TLS certificates to Synapse if I am using a reverse proxy?</a></h3>
 <p>Practically speaking, this is no longer necessary.</p>
@@ -2782,7 +2817,7 @@ server (via port 8448). This is easy to set up and will work provided
 you set the <code>server_name</code> to match your machine's public DNS hostname.</p>
 <p>For this default configuration to work, you will need to listen for TLS
 connections on port 8448. The preferred way to do that is by using a
-reverse proxy: see <a href="reverse_proxy.html">reverse_proxy.md</a> for instructions
+reverse proxy: see <a href="reverse_proxy.html">the reverse proxy documentation</a> for instructions
 on how to correctly set one up.</p>
 <p>In some cases you might not want to run Synapse on the machine that has
 the <code>server_name</code> as its public DNS hostname, or you might want federation
@@ -2790,7 +2825,7 @@ traffic to use a different port than 8448. For example, you might want to
 have your user names look like <code>@user:example.com</code>, but you want to run
 Synapse on <code>synapse.example.com</code> on port 443. This can be done using
 delegation, which allows an admin to control where federation traffic should
-be sent. See <a href="delegate.html">delegate.md</a> for instructions on how to set this up.</p>
+be sent. See <a href="delegate.html">the delegation documentation</a> for instructions on how to set this up.</p>
 <p>Once federation has been configured, you should be able to join a room over
 federation. A good place to start is <code>#synapse:matrix.org</code> - a room for
 Synapse admins.</p>
@@ -2806,8 +2841,8 @@ servers in the room could not access yours. (Joining a room over federation is
 a complicated dance which requires connections in both directions).</p>
 <p>Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see <a href="reverse_proxy.html">reverse_proxy.md</a> for instructions on how to correctly
-configure a reverse proxy.</p>
+proxy: see <a href="reverse_proxy.html">the reverse proxy documentation</a> for instructions on how
+to correctly configure a reverse proxy.</p>
 <h3 id="known-issues"><a class="header" href="#known-issues">Known issues</a></h3>
 <p><strong>HTTP <code>308 Permanent Redirect</code> redirects are not followed</strong>: Due to missing features
 in the HTTP library used by Synapse, 308 redirects are currently not followed by
@@ -4145,91 +4180,6 @@ account_threepid_delegates:
 #auto_join_rooms_for_guests: false
 
 
-## Account Validity ##
-
-# Optional account validity configuration. This allows for accounts to be denied
-# any request after a given period.
-#
-# Once this feature is enabled, Synapse will look for registered users without an
-# expiration date at startup and will add one to every account it found using the
-# current settings at that time.
-# This means that, if a validity period is set, and Synapse is restarted (it will
-# then derive an expiration date from the current validity period), and some time
-# after that the validity period changes and Synapse is restarted, the users'
-# expiration dates won't be updated unless their account is manually renewed. This
-# date will be randomly selected within a range [now + period - d ; now + period],
-# where d is equal to 10% of the validity period.
-#
-account_validity:
-  # The account validity feature is disabled by default. Uncomment the
-  # following line to enable it.
-  #
-  #enabled: true
-
-  # The period after which an account is valid after its registration. When
-  # renewing the account, its validity period will be extended by this amount
-  # of time. This parameter is required when using the account validity
-  # feature.
-  #
-  #period: 6w
-
-  # The amount of time before an account's expiry date at which Synapse will
-  # send an email to the account's email address with a renewal link. By
-  # default, no such emails are sent.
-  #
-  # If you enable this setting, you will also need to fill out the 'email' and
-  # 'public_baseurl' configuration sections.
-  #
-  #renew_at: 1w
-
-  # The subject of the email sent out with the renewal link. '%(app)s' can be
-  # used as a placeholder for the 'app_name' parameter from the 'email'
-  # section.
-  #
-  # Note that the placeholder must be written '%(app)s', including the
-  # trailing 's'.
-  #
-  # If this is not set, a default value is used.
-  #
-  #renew_email_subject: &quot;Renew your %(app)s account&quot;
-
-  # Directory in which Synapse will try to find templates for the HTML files to
-  # serve to the user when trying to renew an account. If not set, default
-  # templates from within the Synapse package will be used.
-  #
-  # The currently available templates are:
-  #
-  # * account_renewed.html: Displayed to the user after they have successfully
-  #       renewed their account.
-  #
-  # * account_previously_renewed.html: Displayed to the user if they attempt to
-  #       renew their account with a token that is valid, but that has already
-  #       been used. In this case the account is not renewed again.
-  #
-  # * invalid_token.html: Displayed to the user when they try to renew an account
-  #       with an unknown or invalid renewal token.
-  #
-  # See https://github.com/matrix-org/synapse/tree/master/synapse/res/templates for
-  # default template contents.
-  #
-  # The file name of some of these templates can be configured below for legacy
-  # reasons.
-  #
-  #template_dir: &quot;res/templates&quot;
-
-  # A custom file name for the 'account_renewed.html' template.
-  #
-  # If not set, the file is assumed to be named &quot;account_renewed.html&quot;.
-  #
-  #account_renewed_html_path: &quot;account_renewed.html&quot;
-
-  # A custom file name for the 'invalid_token.html' template.
-  #
-  # If not set, the file is assumed to be named &quot;invalid_token.html&quot;.
-  #
-  #invalid_token_html_path: &quot;invalid_token.html&quot;
-
-
 ## Metrics ###
 
 # Enable collection and rendering of performance metrics
@@ -5488,11 +5438,6 @@ stats:
   #
   #enabled: false
 
-  # The size of each timeslice in the room_stats_historical and
-  # user_stats_historical tables, as a time period. Defaults to &quot;1d&quot;.
-  #
-  #bucket_size: 1h
-
 
 # Server Notices room configuration
 #
@@ -5577,19 +5522,6 @@ stats:
 #    alias: &quot;*&quot;
 #    room_id: &quot;*&quot;
 #    action: allow
-
-
-# Server admins can define a Python module that implements extra rules for
-# allowing or denying incoming events. In order to work, this module needs to
-# override the methods defined in synapse/events/third_party_rules.py.
-#
-# This feature is designed to be used in closed federations only, where each
-# participating server enforces the same rules.
-#
-#third_party_event_rules:
-#  module: &quot;my_custom_project.SuperRulesSet&quot;
-#  config:
-#    example_option: 'things'
 
 
 ## Opentracing ##
@@ -5784,7 +5716,7 @@ root:
     handlers: [buffer]
 
 disable_existing_loggers: false
-``__`</code></pre>
+</code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="structured-logging"><a class="header" href="#structured-logging">Structured Logging</a></h1>
 <p>A structured logging system can be useful when your logs are destined for a
 machine to parse and process. By maintaining its machine-readable characteristics,
@@ -6849,8 +6781,8 @@ namespaces:
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="server-notices"><a class="header" href="#server-notices">Server Notices</a></h1>
 <p>'Server Notices' are a new feature introduced in Synapse 0.30. They provide a
 channel whereby server administrators can send messages to users on the server.</p>
-<p>They are used as part of communication of the server polices(see
-<a href="consent_tracking.html">consent_tracking.md</a>), however the intention is that
+<p>They are used as part of communication of the server polices (see
+<a href="consent_tracking.html">Consent Tracking</a>), however the intention is that
 they may also find a use for features such as &quot;Message of the day&quot;.</p>
 <p>This is a feature specific to Synapse, but it uses standard Matrix
 communication mechanisms, so should work with any Matrix client.</p>
@@ -7016,7 +6948,7 @@ version of the policy. To do so:</p>
 <p>ensure that the consent resource is configured, as in the previous section</p>
 </li>
 <li>
-<p>ensure that server notices are configured, as in <a href="server_notices.html">server_notices.md</a>.</p>
+<p>ensure that server notices are configured, as in <a href="server_notices.html">the server notice documentation</a>.</p>
 </li>
 <li>
 <p>Add <code>server_notice_content</code> under <code>user_consent</code> in <code>homeserver.yaml</code>. For
@@ -7370,7 +7302,7 @@ that the configuration is correct, and raise an instance of
 <h3 id="registering-a-web-resource"><a class="header" href="#registering-a-web-resource">Registering a web resource</a></h3>
 <p>Modules can register web resources onto Synapse's web server using the following module
 API method:</p>
-<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource)
+<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource) -&gt; None
 </code></pre>
 <p>The path is the full absolute path to register the resource at. For example, if you
 register a resource for the path <code>/_synapse/client/my_super_module/say_hello</code>, Synapse
@@ -7391,11 +7323,15 @@ Synapse will call when performing specific actions. Callbacks must be asynchrono
 are split in categories. A single module may implement callbacks from multiple categories,
 and is under no obligation to implement all callbacks from the categories it registers
 callbacks for.</p>
+<p>Modules can register callbacks using one of the module API's <code>register_[...]_callbacks</code>
+methods. The callback functions are passed to these methods as keyword arguments, with
+the callback name as the argument name and the function as its value. This is demonstrated
+in the example below. A <code>register_[...]_callbacks</code> method exists for each module type
+documented in this section.</p>
 <h4 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h4>
-<p>To register one of the callbacks described in this section, a module needs to use the
-module API's <code>register_spam_checker_callbacks</code> method. The callback functions are passed
-to <code>register_spam_checker_callbacks</code> as keyword arguments, with the callback name as the
-argument name and the function as its value. This is demonstrated in the example below.</p>
+<p>Spam checker callbacks allow module developers to implement spam mitigation actions for
+Synapse instances. Spam checker callbacks can be registered using the module API's
+<code>register_spam_checker_callbacks</code> method.</p>
 <p>The available spam checker callbacks are:</p>
 <pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
@@ -7407,7 +7343,7 @@ forward to clients.</p>
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (i.e. <code>@alice:example.com</code>).</p>
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
@@ -7456,11 +7392,76 @@ used during the registration process.</li>
 </ul>
 <pre><code class="language-python">async def check_media_file_for_spam(
     file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
-    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;
+    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
 ) -&gt; bool
 </code></pre>
 <p>Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.</p>
+<h4 id="account-validity-callbacks"><a class="header" href="#account-validity-callbacks">Account validity callbacks</a></h4>
+<p>Account validity callbacks allow module developers to add extra steps to verify the
+validity on an account, i.e. see if a user can be granted access to their account on the
+Synapse instance. Account validity callbacks can be registered using the module API's
+<code>register_account_validity_callbacks</code> method.</p>
+<p>The available account validity callbacks are:</p>
+<pre><code class="language-python">async def is_user_expired(user: str) -&gt; Optional[bool]
+</code></pre>
+<p>Called when processing any authenticated request (except for logout requests). The module
+can return a <code>bool</code> to indicate whether the user has expired and should be locked out of
+their account, or <code>None</code> if the module wasn't able to figure it out. The user is
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<p>If the module returns <code>True</code>, the current request will be denied with the error code
+<code>ORG_MATRIX_EXPIRED_ACCOUNT</code> and the HTTP status code 403. Note that this doesn't
+invalidate the user's access token.</p>
+<pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
+</code></pre>
+<p>Called after successfully registering a user, in case the module needs to perform extra
+operations to keep track of them. (e.g. add them to a database table). The user is
+represented by their Matrix user ID.</p>
+<h4 id="third-party-rules-callbacks"><a class="header" href="#third-party-rules-callbacks">Third party rules callbacks</a></h4>
+<p>Third party rules callbacks allow module developers to add extra checks to verify the
+validity of incoming events. Third party event rules callbacks can be registered using
+the module API's <code>register_third_party_rules_callbacks</code> method.</p>
+<p>The available third party rules callbacks are:</p>
+<pre><code class="language-python">async def check_event_allowed(
+    event: &quot;synapse.events.EventBase&quot;,
+    state_events: &quot;synapse.types.StateMap&quot;,
+) -&gt; Tuple[bool, Optional[dict]]
+</code></pre>
+<p><strong><span style="color:red">
+This callback is very experimental and can and will break without notice. Module developers
+are encouraged to implement <code>check_event_for_spam</code> from the spam checker category instead.
+</span></strong></p>
+<p>Called when processing any incoming event, with the event and a <code>StateMap</code>
+representing the current state of the room the event is being sent into. A <code>StateMap</code> is
+a dictionary that maps tuples containing an event type and a state key to the
+corresponding state event. For example retrieving the room's <code>m.room.create</code> event from
+the <code>state_events</code> argument would look like this: <code>state_events.get((&quot;m.room.create&quot;, &quot;&quot;))</code>.
+The module must return a boolean indicating whether the event can be allowed.</p>
+<p>Note that this callback function processes incoming events coming via federation
+traffic (on top of client traffic). This means denying an event might cause the local
+copy of the room's history to diverge from that of remote servers. This may cause
+federation issues in the room. It is strongly recommended to only deny events using this
+callback function if the sender is a local user, or in a private federation in which all
+servers are using the same module, with the same configuration.</p>
+<p>If the boolean returned by the module is <code>True</code>, it may also tell Synapse to replace the
+event with new data by returning the new event's data as a dictionary. In order to do
+that, it is recommended the module calls <code>event.get_dict()</code> to get the current event as a
+dictionary, and modify the returned dictionary accordingly.</p>
+<p>Note that replacing the event only works for events sent by local users, not for events
+received over federation.</p>
+<pre><code class="language-python">async def on_create_room(
+    requester: &quot;synapse.types.Requester&quot;,
+    request_content: dict,
+    is_requester_admin: bool,
+) -&gt; None
+</code></pre>
+<p>Called when processing a room creation request, with the <code>Requester</code> object for the user
+performing the request, a dictionary representing the room creation request's JSON body
+(see <a href="https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-createroom">the spec</a>
+for a list of possible parameters), and a boolean indicating whether the user performing
+the request is a server admin.</p>
+<p>Modules can modify the <code>request_content</code> (by e.g. adding events to its <code>initial_state</code>),
+or deny the room's creation by raising a <code>module_api.errors.SynapseError</code>.</p>
 <h3 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h3>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>
@@ -7884,7 +7885,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.</p>
 <p>To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-<a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a reverse
+<a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a reverse
 proxy.</p>
 <p>When using workers, each worker process has its own configuration file which
 contains settings specific to that worker, such as the HTTP listener that it
@@ -7959,8 +7960,8 @@ endpoints to the worker (<code>localhost:8083</code> in the above example).</p>
 <code>synctl</code> or your distribution's preferred service manager such as <code>systemd</code>. We
 recommend the use of <code>systemd</code> where available: for information on setting up
 <code>systemd</code> to start synapse workers, see
-<a href="systemd-with-workers">systemd-with-workers</a>. To use <code>synctl</code>, see
-<a href="synctl_workers.html">synctl_workers.md</a>.</p>
+<a href="systemd-with-workers">Systemd with Workers</a>. To use <code>synctl</code>, see
+<a href="synctl_workers.html">Using synctl with Workers</a>.</p>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
 <p>This worker can handle API requests matching the following regular
@@ -8292,10 +8293,23 @@ for the systemd unit files.</p>
 <p>The folder <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/">workers</a>
 contains an example configuration for the <code>federation_reader</code> worker.</p>
 <h2 id="synapse-configuration-files"><a class="header" href="#synapse-configuration-files">Synapse configuration files</a></h2>
-<p>See <a href="systemd-with-workers/../workers.html">workers.md</a> for information on how to set up the
-configuration files and reverse-proxy correctly. You can find an example worker
-config in the <a href="https://github.com/matrix-org/synapse/tree/develop/docs/systemd-with-workers/workers/">workers</a>
-folder.</p>
+<p>See <a href="systemd-with-workers/../workers.html">the worker documentation</a> for information on how to set up the
+configuration files and reverse-proxy correctly.
+Below is a sample <code>federation_reader</code> worker configuration file.</p>
+<pre><code class="language-yaml">worker_app: synapse.app.federation_reader
+worker_name: federation_reader1
+
+worker_replication_host: 127.0.0.1
+worker_replication_http_port: 9093
+
+worker_listeners:
+    - type: http
+      port: 8011
+      resources:
+          - names: [federation]
+
+worker_log_config: /etc/matrix-synapse/federation-reader-log.yaml
+</code></pre>
 <p>Systemd manages daemonization itself, so ensure that none of the configuration
 files set either <code>daemonize</code> or <code>worker_daemonize</code>.</p>
 <p>The config files of all workers are expected to be located in
@@ -8340,12 +8354,12 @@ systemctl restart matrix-synapse.target
 <h2 id="hardening"><a class="header" href="#hardening">Hardening</a></h2>
 <p><strong>Optional:</strong> If further hardening is desired, the file
 <code>override-hardened.conf</code> may be copied from
-<code>contrib/systemd/override-hardened.conf</code> in this repository to the location
+<a href="https://github.com/matrix-org/synapse/tree/develop/contrib/systemd/">contrib/systemd/override-hardened.conf</a>
+in this repository to the location
 <code>/etc/systemd/system/matrix-synapse.service.d/override-hardened.conf</code> (the
 directory may have to be created). It enables certain sandboxing features in
 systemd to further secure the synapse service. You may read the comments to
-understand what the override file is doing. The same file will need to be copied
-to
+understand what the override file is doing. The same file will need to be copied to
 <code>/etc/systemd/system/matrix-synapse-worker@.service.d/override-hardened-worker.conf</code>
 (this directory may also have to be created) in order to apply the same
 hardening options to any worker processes.</p>
@@ -8626,7 +8640,7 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
 </code></pre>
 <h2 id="list-all-media-uploaded-by-a-user"><a class="header" href="#list-all-media-uploaded-by-a-user">List all media uploaded by a user</a></h2>
 <p>Listing all media that has been uploaded by a local user can be achieved through
-the use of the <a href="admin_api/user_admin_api.rst#list-media-of-a-user">List media of a user</a>
+the use of the <a href="admin_api/user_admin_api.html#list-media-of-a-user">List media of a user</a>
 Admin API.</p>
 <h1 id="quarantine-media"><a class="header" href="#quarantine-media">Quarantine media</a></h1>
 <p>Quarantining media means that it is marked as inaccessible by users. It applies
@@ -8765,7 +8779,7 @@ See also <a href="admin_api/media_admin_api.html#purge-remote-media-api">Purge R
 <li><code>server_name</code>: string - The name of your local server (e.g <code>matrix.org</code>).</li>
 <li><code>before_ts</code>: string representing a positive integer - Unix timestamp in ms.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation. </li>
+last access and not the timestamp creation.</li>
 <li><code>size_gt</code>: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to <code>0</code>.</li>
 <li><code>keep_profiles</code>: Optional - string representing a boolean - Switch to also delete files
@@ -8963,19 +8977,12 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
 </code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="contents-2"><a class="header" href="#contents-2">Contents</a></h1>
 <ul>
-<li><a href="admin_api/rooms.html#list-room-api">List Room API</a>
-<ul>
-<li><a href="admin_api/rooms.html#parameters">Parameters</a></li>
-<li><a href="admin_api/rooms.html#usage">Usage</a></li>
-</ul>
-</li>
+<li><a href="admin_api/rooms.html#list-room-api">List Room API</a></li>
 <li><a href="admin_api/rooms.html#room-details-api">Room Details API</a></li>
 <li><a href="admin_api/rooms.html#room-members-api">Room Members API</a></li>
 <li><a href="admin_api/rooms.html#room-state-api">Room State API</a></li>
 <li><a href="admin_api/rooms.html#delete-room-api">Delete Room API</a>
 <ul>
-<li><a href="admin_api/rooms.html#parameters-1">Parameters</a></li>
-<li><a href="admin_api/rooms.html#response">Response</a></li>
 <li><a href="admin_api/rooms.html#undoing-room-shutdowns">Undoing room shutdowns</a></li>
 </ul>
 </li>
@@ -8987,7 +8994,7 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
 <p>The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.</p>
-<h2 id="parameters-1"><a class="header" href="#parameters-1">Parameters</a></h2>
+<p><strong>Parameters</strong></p>
 <p>The following query parameters are available:</p>
 <ul>
 <li><code>from</code> - Offset in the returned list. Defaults to <code>0</code>.</li>
@@ -9016,6 +9023,7 @@ this value to <code>b</code> will reverse the above sort order. Defaults to <cod
 <li><code>search_term</code> - Filter rooms by their room name. Search term can be contained in any
 part of the room name. Defaults to no filtering.</li>
 </ul>
+<p><strong>Response</strong></p>
 <p>The following fields are possible in the JSON response body:</p>
 <ul>
 <li><code>rooms</code> - An array of objects, each containing information about a room.
@@ -9055,13 +9063,11 @@ the value of <code>next_batch</code>.</li>
 Use <code>prev_batch</code> for the <code>from</code> value in the next request to
 get the &quot;previous page&quot; of results.</li>
 </ul>
-<h2 id="usage-2"><a class="header" href="#usage-2">Usage</a></h2>
+<p>The API is:</p>
 <p>A standard request with no filtering:</p>
 <pre><code>GET /_synapse/admin/v1/rooms
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-jsonc">{
   &quot;rooms&quot;: [
     {
@@ -9104,10 +9110,8 @@ get the &quot;previous page&quot; of results.</li>
 </code></pre>
 <p>Filtering by room name:</p>
 <pre><code>GET /_synapse/admin/v1/rooms?search_term=TWIM
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;rooms&quot;: [
     {
@@ -9133,10 +9137,8 @@ get the &quot;previous page&quot; of results.</li>
 </code></pre>
 <p>Paginating through a list of rooms:</p>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-jsonc">{
   &quot;rooms&quot;: [
     {
@@ -9183,10 +9185,8 @@ than returned in this request, and we need to make another request to get them.
 To get the next batch of room results, we repeat our request, setting the <code>from</code>
 parameter to the value of <code>next_token</code>.</p>
 <pre><code>GET /_synapse/admin/v1/rooms?order_by=size&amp;from=100
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-jsonc">{
   &quot;rooms&quot;: [
     {
@@ -9252,13 +9252,10 @@ end of the list.</p>
 <li><code>history_visibility</code> - Who can see the room history. One of: [&quot;invited&quot;, &quot;joined&quot;, &quot;shared&quot;, &quot;world_readable&quot;].</li>
 <li><code>state_events</code> - Total number of state_events of a room. Complexity of the room.</li>
 </ul>
-<h2 id="usage-3"><a class="header" href="#usage-3">Usage</a></h2>
-<p>A standard request:</p>
+<p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;room_id&quot;: &quot;!mscvqgqpHYjBGDxNym:matrix.org&quot;,
   &quot;name&quot;: &quot;Music Theory&quot;,
@@ -9286,13 +9283,10 @@ end of the list.</p>
 <li><code>members</code> - A list of all the members that are present in the room, represented by their ids.</li>
 <li><code>total</code> - Total number of members in the room.</li>
 </ul>
-<h2 id="usage-4"><a class="header" href="#usage-4">Usage</a></h2>
-<p>A standard request:</p>
+<p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;/members
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;members&quot;: [
     &quot;@foo:matrix.org&quot;,
@@ -9308,13 +9302,10 @@ end of the list.</p>
 <ul>
 <li><code>state</code> - The current state of the room at the time of request.</li>
 </ul>
-<h2 id="usage-5"><a class="header" href="#usage-5">Usage</a></h2>
-<p>A standard request:</p>
+<p>The API is:</p>
 <pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id&gt;/state
-
-{}
 </code></pre>
-<p>Response:</p>
+<p>A response body like the following is returned:</p>
 <pre><code class="language-json">{
   &quot;state&quot;: [
     {&quot;type&quot;: &quot;m.room.create&quot;, &quot;state_key&quot;: &quot;&quot;, &quot;etc&quot;: true},
@@ -9368,7 +9359,7 @@ server admin: see <a href="admin_api/../usage/administration/admin_api">Admin AP
     &quot;new_room_id&quot;: &quot;!newroomid:example.com&quot;
 }
 </code></pre>
-<h2 id="parameters-2"><a class="header" href="#parameters-2">Parameters</a></h2>
+<p><strong>Parameters</strong></p>
 <p>The following parameters should be set in the URL:</p>
 <ul>
 <li><code>room_id</code> - The ID of the room.</li>
@@ -9395,7 +9386,7 @@ use this unless a regular <code>purge</code> operation fails, as it could leave 
 clients in a confused state.</li>
 </ul>
 <p>The JSON body must not be empty. The body must be at least <code>{}</code>.</p>
-<h2 id="response"><a class="header" href="#response">Response</a></h2>
+<p><strong>Response</strong></p>
 <p>The following fields are returned in the JSON response body:</p>
 <ul>
 <li><code>kicked_users</code> - An array of users (<code>user_id</code>) that were kicked.</li>
@@ -9442,10 +9433,10 @@ to recover at all:</p>
 If the user is not in the room, and it is not publicly joinable, then invite the user.</p>
 <p>By default the server admin (the caller) is granted power, but another user can
 optionally be specified, e.g.:</p>
-<pre><code>    POST /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/make_room_admin
-    {
-        &quot;user_id&quot;: &quot;@foo:example.com&quot;
-    }
+<pre><code>POST /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/make_room_admin
+{
+    &quot;user_id&quot;: &quot;@foo:example.com&quot;
+}
 </code></pre>
 <h1 id="forward-extremities-admin-api"><a class="header" href="#forward-extremities-admin-api">Forward Extremities Admin API</a></h1>
 <p>Enables querying and deleting forward extremities from rooms. When a lot of forward
@@ -9453,7 +9444,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
 <a href="https://github.com/matrix-org/synapse/issues/1760">#1760</a>.</p>
 <h2 id="check-for-forward-extremities"><a class="header" href="#check-for-forward-extremities">Check for forward extremities</a></h2>
 <p>To check the status of forward extremities for a room:</p>
-<pre><code>    GET /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
+<pre><code>GET /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
 </code></pre>
 <p>A response as follows will be returned:</p>
 <pre><code class="language-json">{
@@ -9466,7 +9457,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
       &quot;received_ts&quot;: 1611263016761
     }
   ]
-}    
+}
 </code></pre>
 <h2 id="deleting-forward-extremities"><a class="header" href="#deleting-forward-extremities">Deleting forward extremities</a></h2>
 <p><strong>WARNING</strong>: Please ensure you know what you're doing and have read 
@@ -9474,7 +9465,7 @@ the related issue <a href="https://github.com/matrix-org/synapse/issues/1760">#1
 Under no situations should this API be executed as an automated maintenance task!</p>
 <p>If a room has lots of forward extremities, the extra can be
 deleted as follows:</p>
-<pre><code>    DELETE /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
+<pre><code>DELETE /_synapse/admin/v1/rooms/&lt;room_id_or_alias&gt;/forward_extremities
 </code></pre>
 <p>A response as follows will be returned, indicating the amount of forward extremities
 that were deleted.</p>
@@ -9622,7 +9613,7 @@ ignored in the same way as with <code>PUT /_matrix/client/r0/rooms/{roomId}/send
 }
 </code></pre>
 <p>Note that server notices must be enabled in <code>homeserver.yaml</code> before this API
-can be used. See <a href="admin_api/../server_notices.html">server_notices.md</a> for more information.</p>
+can be used. See <a href="admin_api/../server_notices.html">the server notices documentation</a> for more information.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="deprecated-shutdown-room-api"><a class="header" href="#deprecated-shutdown-room-api">Deprecated: Shutdown room API</a></h1>
 <p><strong>The old Shutdown room API is deprecated and will be removed in a future release.
 See the new <a href="admin_api/rooms.html#delete-room-api">Delete Room API</a> for more details.</strong></p>
@@ -11820,10 +11811,13 @@ activity.</p>
 <p>The <code>synapse.logging.context</code> module provides a facilities for managing
 the current log context (as well as providing the <code>LoggingContextFilter</code>
 class).</p>
-<p>Deferreds make the whole thing complicated, so this document describes
+<p>Asynchronous functions make the whole thing complicated, so this document describes
 how it all works, and how to write code which follows the rules.</p>
-<p>##Logcontexts without Deferreds</p>
-<p>In the absence of any Deferred voodoo, things are simple enough. As with
+<p>In this document, &quot;awaitable&quot; refers to any object which can be <code>await</code>ed. In the context of
+Synapse, that normally means either a coroutine or a Twisted 
+<a href="https://twistedmatrix.com/documents/current/api/twisted.internet.defer.Deferred.html"><code>Deferred</code></a>.</p>
+<h2 id="logcontexts-without-asynchronous-code"><a class="header" href="#logcontexts-without-asynchronous-code">Logcontexts without asynchronous code</a></h2>
+<p>In the absence of any asynchronous voodoo, things are simple enough. As with
 any code of this nature, the rule is that our function should leave
 things as it found them:</p>
 <pre><code class="language-python">from synapse.logging import context         # omitted from future snippets
@@ -11853,39 +11847,36 @@ can be written much more succinctly as:</p>
 def do_request_handling():
     logger.debug(&quot;phew&quot;)
 </code></pre>
-<h2 id="using-logcontexts-with-deferreds"><a class="header" href="#using-logcontexts-with-deferreds">Using logcontexts with Deferreds</a></h2>
-<p>Deferreds --- and in particular, <code>defer.inlineCallbacks</code> --- break the
-linear flow of code so that there is no longer a single entry point
-where we should set the logcontext and a single exit point where we
-should remove it.</p>
+<h2 id="using-logcontexts-with-awaitables"><a class="header" href="#using-logcontexts-with-awaitables">Using logcontexts with awaitables</a></h2>
+<p>Awaitables break the linear flow of code so that there is no longer a single entry point
+where we should set the logcontext and a single exit point where we should remove it.</p>
 <p>Consider the example above, where <code>do_request_handling</code> needs to do some
-blocking operation, and returns a deferred:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def handle_request(request_id):
+blocking operation, and returns an awaitable:</p>
+<pre><code class="language-python">async def handle_request(request_id):
     with context.LoggingContext() as request_context:
         request_context.request = request_id
-        yield do_request_handling()
+        await do_request_handling()
         logger.debug(&quot;finished&quot;)
 </code></pre>
 <p>In the above flow:</p>
 <ul>
 <li>The logcontext is set</li>
-<li><code>do_request_handling</code> is called, and returns a deferred</li>
-<li><code>handle_request</code> yields the deferred</li>
-<li>The <code>inlineCallbacks</code> wrapper of <code>handle_request</code> returns a deferred</li>
+<li><code>do_request_handling</code> is called, and returns an awaitable</li>
+<li><code>handle_request</code> awaits the awaitable</li>
+<li>Execution of <code>handle_request</code> is suspended</li>
 </ul>
 <p>So we have stopped processing the request (and will probably go on to
 start processing the next), without clearing the logcontext.</p>
 <p>To circumvent this problem, synapse code assumes that, wherever you have
-a deferred, you will want to yield on it. To that end, whereever
-functions return a deferred, we adopt the following conventions:</p>
-<p><strong>Rules for functions returning deferreds:</strong></p>
+an awaitable, you will want to <code>await</code> it. To that end, whereever
+functions return awaitables, we adopt the following conventions:</p>
+<p><strong>Rules for functions returning awaitables:</strong></p>
 <blockquote>
 <ul>
-<li>If the deferred is already complete, the function returns with the
+<li>If the awaitable is already complete, the function returns with the
 same logcontext it started with.</li>
-<li>If the deferred is incomplete, the function clears the logcontext
-before returning; when the deferred completes, it restores the
+<li>If the awaitable is incomplete, the function clears the logcontext
+before returning; when the awaitable completes, it restores the
 logcontext before running any callbacks.</li>
 </ul>
 </blockquote>
@@ -11893,72 +11884,60 @@ logcontext before running any callbacks.</li>
 the example above) &quot;just works&quot;. There are two cases:</p>
 <ul>
 <li>
-<p>If <code>do_request_handling</code> returns a completed deferred, then the
+<p>If <code>do_request_handling</code> returns a completed awaitable, then the
 logcontext will still be in place. In this case, execution will
-continue immediately after the <code>yield</code>; the &quot;finished&quot; line will
+continue immediately after the <code>await</code>; the &quot;finished&quot; line will
 be logged against the right context, and the <code>with</code> block restores
 the original context before we return to the caller.</p>
 </li>
 <li>
-<p>If the returned deferred is incomplete, <code>do_request_handling</code> clears
+<p>If the returned awaitable is incomplete, <code>do_request_handling</code> clears
 the logcontext before returning. The logcontext is therefore clear
-when <code>handle_request</code> yields the deferred. At that point, the
-<code>inlineCallbacks</code> wrapper adds a callback to the deferred, and
-returns another (incomplete) deferred to the caller, and it is safe
-to begin processing the next request.</p>
-<p>Once <code>do_request_handling</code>'s deferred completes, it will reinstate
-the logcontext, before running the callback added by the
-<code>inlineCallbacks</code> wrapper. That callback runs the second half of
-<code>handle_request</code>, so again the &quot;finished&quot; line will be logged
-against the right context, and the <code>with</code> block restores the
-original context.</p>
+when <code>handle_request</code> <code>await</code>s the awaitable.</p>
+<p>Once <code>do_request_handling</code>'s awaitable completes, it will reinstate
+the logcontext, before running the second half of <code>handle_request</code>,
+so again the &quot;finished&quot; line will be logged against the right context,
+and the <code>with</code> block restores the original context.</p>
 </li>
 </ul>
-<p>As an aside, it's worth noting that <code>handle_request</code> follows our rules
--though that only matters if the caller has its own logcontext which it
-cares about.</p>
+<p>As an aside, it's worth noting that <code>handle_request</code> follows our rules</p>
+<ul>
+<li>though that only matters if the caller has its own logcontext which it
+cares about.</li>
+</ul>
 <p>The following sections describe pitfalls and helpful patterns when
 implementing these rules.</p>
-<h2 id="always-yield-your-deferreds"><a class="header" href="#always-yield-your-deferreds">Always yield your deferreds</a></h2>
-<p>Whenever you get a deferred back from a function, you should <code>yield</code> on
-it as soon as possible. (Returning it directly to your caller is ok too,
-if you're not doing <code>inlineCallbacks</code>.) Do not pass go; do not do any
-logging; do not call any other functions.</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def fun():
+<h2 id="always-await-your-awaitables"><a class="header" href="#always-await-your-awaitables">Always await your awaitables</a></h2>
+<p>Whenever you get an awaitable back from a function, you should <code>await</code> on
+it as soon as possible. Do not pass go; do not do any logging; do not
+call any other functions.</p>
+<pre><code class="language-python">async def fun():
     logger.debug(&quot;starting&quot;)
-    yield do_some_stuff()       # just like this
+    await do_some_stuff()       # just like this
 
-    d = more_stuff()
-    result = yield d            # also fine, of course
+    coro = more_stuff()
+    result = await coro         # also fine, of course
 
     return result
-
-def nonInlineCallbacksFun():
-    logger.debug(&quot;just a wrapper really&quot;)
-    return do_some_stuff()      # this is ok too - the caller will yield on
-                                # it anyway.
 </code></pre>
 <p>Provided this pattern is followed all the way back up to the callchain
 to where the logcontext was set, this will make things work out ok:
 provided <code>do_some_stuff</code> and <code>more_stuff</code> follow the rules above, then
-so will <code>fun</code> (as wrapped by <code>inlineCallbacks</code>) and
-<code>nonInlineCallbacksFun</code>.</p>
-<p>It's all too easy to forget to <code>yield</code>: for instance if we forgot that
-<code>do_some_stuff</code> returned a deferred, we might plough on regardless. This
+so will <code>fun</code>.</p>
+<p>It's all too easy to forget to <code>await</code>: for instance if we forgot that
+<code>do_some_stuff</code> returned an awaitable, we might plough on regardless. This
 leads to a mess; it will probably work itself out eventually, but not
 before a load of stuff has been logged against the wrong context.
 (Normally, other things will break, more obviously, if you forget to
-<code>yield</code>, so this tends not to be a major problem in practice.)</p>
+<code>await</code>, so this tends not to be a major problem in practice.)</p>
 <p>Of course sometimes you need to do something a bit fancier with your
-Deferreds - not all code follows the linear A-then-B-then-C pattern.
+awaitable - not all code follows the linear A-then-B-then-C pattern.
 Notes on implementing more complex patterns are in later sections.</p>
-<h2 id="where-you-create-a-new-deferred-make-it-follow-the-rules"><a class="header" href="#where-you-create-a-new-deferred-make-it-follow-the-rules">Where you create a new Deferred, make it follow the rules</a></h2>
-<p>Most of the time, a Deferred comes from another synapse function.
-Sometimes, though, we need to make up a new Deferred, or we get a
-Deferred back from external code. We need to make it follow our rules.</p>
-<p>The easy way to do it is with a combination of <code>defer.inlineCallbacks</code>,
-and <code>context.PreserveLoggingContext</code>. Suppose we want to implement
+<h2 id="where-you-create-a-new-awaitable-make-it-follow-the-rules"><a class="header" href="#where-you-create-a-new-awaitable-make-it-follow-the-rules">Where you create a new awaitable, make it follow the rules</a></h2>
+<p>Most of the time, an awaitable comes from another synapse function.
+Sometimes, though, we need to make up a new awaitable, or we get an awaitable
+back from external code. We need to make it follow our rules.</p>
+<p>The easy way to do it is by using <code>context.make_deferred_yieldable</code>. Suppose we want to implement
 <code>sleep</code>, which returns a deferred which will run its callbacks after a
 given number of seconds. That might look like:</p>
 <pre><code class="language-python"># not a logcontext-rules-compliant function
@@ -11967,37 +11946,26 @@ def get_sleep_deferred(seconds):
     reactor.callLater(seconds, d.callback, None)
     return d
 </code></pre>
-<p>That doesn't follow the rules, but we can fix it by wrapping it with
-<code>PreserveLoggingContext</code> and <code>yield</code> ing on it:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def sleep(seconds):
-    with PreserveLoggingContext():
-        yield get_sleep_deferred(seconds)
-</code></pre>
-<p>This technique works equally for external functions which return
-deferreds, or deferreds we have made ourselves.</p>
-<p>You can also use <code>context.make_deferred_yieldable</code>, which just does the
-boilerplate for you, so the above could be written:</p>
-<pre><code class="language-python">def sleep(seconds):
-    return context.make_deferred_yieldable(get_sleep_deferred(seconds))
+<p>That doesn't follow the rules, but we can fix it by calling it through
+<code>context.make_deferred_yieldable</code>:</p>
+<pre><code class="language-python">async def sleep(seconds):
+    return await context.make_deferred_yieldable(get_sleep_deferred(seconds))
 </code></pre>
 <h2 id="fire-and-forget"><a class="header" href="#fire-and-forget">Fire-and-forget</a></h2>
 <p>Sometimes you want to fire off a chain of execution, but not wait for
 its result. That might look a bit like this:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def do_request_handling():
-    yield foreground_operation()
+<pre><code class="language-python">async def do_request_handling():
+    await foreground_operation()
 
     # *don't* do this
     background_operation()
 
     logger.debug(&quot;Request handling complete&quot;)
 
-@defer.inlineCallbacks
-def background_operation():
-    yield first_background_step()
+async def background_operation():
+    await first_background_step()
     logger.debug(&quot;Completed first step&quot;)
-    yield second_background_step()
+    await second_background_step()
     logger.debug(&quot;Completed second step&quot;)
 </code></pre>
 <p>The above code does a couple of steps in the background after
@@ -12005,12 +11973,12 @@ def background_operation():
 against the <code>request_context</code> logcontext, which may or may not be
 desirable. There are two big problems with the above, however. The first
 problem is that, if <code>background_operation</code> returns an incomplete
-Deferred, it will expect its caller to <code>yield</code> immediately, so will have
+awaitable, it will expect its caller to <code>await</code> immediately, so will have
 cleared the logcontext. In this example, that means that 'Request
 handling complete' will be logged without any context.</p>
 <p>The second problem, which is potentially even worse, is that when the
-Deferred returned by <code>background_operation</code> completes, it will restore
-the original logcontext. There is nothing waiting on that Deferred, so
+awaitable returned by <code>background_operation</code> completes, it will restore
+the original logcontext. There is nothing waiting on that awaitable, so
 the logcontext will leak into the reactor and possibly get attached to
 some arbitrary future operation.</p>
 <p>There are two potential solutions to this.</p>
@@ -12019,9 +11987,8 @@ some arbitrary future operation.</p>
 starting <code>background_operation</code> (so the context restored when the
 deferred completes will be the empty logcontext), and will restore the
 current logcontext before continuing the foreground process:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def do_request_handling():
-    yield foreground_operation()
+<pre><code class="language-python">async def do_request_handling():
+    await foreground_operation()
 
     # start background_operation off in the empty logcontext, to
     # avoid leaking the current context into the reactor.
@@ -12037,14 +12004,13 @@ def do_request_handling():
 <code>with LoggingContext(...)</code> in <code>background_operation</code>).</p>
 <p>The second option is to use <code>context.run_in_background</code>, which wraps a
 function so that it doesn't reset the logcontext even when it returns
-an incomplete deferred, and adds a callback to the returned deferred to
+an incomplete awaitable, and adds a callback to the returned awaitable to
 reset the logcontext. In other words, it turns a function that follows
-the Synapse rules about logcontexts and Deferreds into one which behaves
+the Synapse rules about logcontexts and awaitables into one which behaves
 more like an external function --- the opposite operation to that
 described in the previous section. It can be used like this:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def do_request_handling():
-    yield foreground_operation()
+<pre><code class="language-python">async def do_request_handling():
+    await foreground_operation()
 
     context.run_in_background(background_operation)
 
@@ -12053,120 +12019,41 @@ def do_request_handling():
 </code></pre>
 <h2 id="passing-synapse-deferreds-into-third-party-functions"><a class="header" href="#passing-synapse-deferreds-into-third-party-functions">Passing synapse deferreds into third-party functions</a></h2>
 <p>A typical example of this is where we want to collect together two or
-more deferred via <code>defer.gatherResults</code>:</p>
-<pre><code class="language-python">d1 = operation1()
-d2 = operation2()
-d3 = defer.gatherResults([d1, d2])
+more awaitables via <code>defer.gatherResults</code>:</p>
+<pre><code class="language-python">a1 = operation1()
+a2 = operation2()
+a3 = defer.gatherResults([a1, a2])
 </code></pre>
 <p>This is really a variation of the fire-and-forget problem above, in that
-we are firing off <code>d1</code> and <code>d2</code> without yielding on them. The difference
+we are firing off <code>a1</code> and <code>a2</code> without awaiting on them. The difference
 is that we now have third-party code attached to their callbacks. Anyway
 either technique given in the <a href="log_contexts.html#fire-and-forget">Fire-and-forget</a>
 section will work.</p>
-<p>Of course, the new Deferred returned by <code>gatherResults</code> needs to be
+<p>Of course, the new awaitable returned by <code>gather</code> needs to be
 wrapped in order to make it follow the logcontext rules before we can
-yield it, as described in <a href="log_contexts.html#where-you-create-a-new-deferred-make-it-follow-the-rules">Where you create a new Deferred, make it
+yield it, as described in <a href="log_contexts.html#where-you-create-a-new-awaitable-make-it-follow-the-rules">Where you create a new awaitable, make it
 follow the
 rules</a>.</p>
 <p>So, option one: reset the logcontext before starting the operations to
 be gathered:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def do_request_handling():
+<pre><code class="language-python">async def do_request_handling():
     with PreserveLoggingContext():
-        d1 = operation1()
-        d2 = operation2()
-        result = yield defer.gatherResults([d1, d2])
+        a1 = operation1()
+        a2 = operation2()
+        result = await defer.gatherResults([a1, a2])
 </code></pre>
 <p>In this case particularly, though, option two, of using
-<code>context.preserve_fn</code> almost certainly makes more sense, so that
+<code>context.run_in_background</code> almost certainly makes more sense, so that
 <code>operation1</code> and <code>operation2</code> are both logged against the original
 logcontext. This looks like:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def do_request_handling():
-    d1 = context.preserve_fn(operation1)()
-    d2 = context.preserve_fn(operation2)()
+<pre><code class="language-python">async def do_request_handling():
+    a1 = context.run_in_background(operation1)
+    a2 = context.run_in_background(operation2)
 
-    with PreserveLoggingContext():
-        result = yield defer.gatherResults([d1, d2])
+    result = await make_deferred_yieldable(defer.gatherResults([a1, a2]))
 </code></pre>
-<h2 id="was-all-this-really-necessary"><a class="header" href="#was-all-this-really-necessary">Was all this really necessary?</a></h2>
-<p>The conventions used work fine for a linear flow where everything
-happens in series via <code>defer.inlineCallbacks</code> and <code>yield</code>, but are
-certainly tricky to follow for any more exotic flows. It's hard not to
-wonder if we could have done something else.</p>
-<p>We're not going to rewrite Synapse now, so the following is entirely of
-academic interest, but I'd like to record some thoughts on an
-alternative approach.</p>
-<p>I briefly prototyped some code following an alternative set of rules. I
-think it would work, but I certainly didn't get as far as thinking how
-it would interact with concepts as complicated as the cache descriptors.</p>
-<p>My alternative rules were:</p>
-<ul>
-<li>functions always preserve the logcontext of their caller, whether or
-not they are returning a Deferred.</li>
-<li>Deferreds returned by synapse functions run their callbacks in the
-same context as the function was orignally called in.</li>
-</ul>
-<p>The main point of this scheme is that everywhere that sets the
-logcontext is responsible for clearing it before returning control to
-the reactor.</p>
-<p>So, for example, if you were the function which started a
-<code>with LoggingContext</code> block, you wouldn't <code>yield</code> within it --- instead
-you'd start off the background process, and then leave the <code>with</code> block
-to wait for it:</p>
-<pre><code class="language-python">def handle_request(request_id):
-    with context.LoggingContext() as request_context:
-        request_context.request = request_id
-        d = do_request_handling()
-
-    def cb(r):
-        logger.debug(&quot;finished&quot;)
-
-    d.addCallback(cb)
-    return d
-</code></pre>
-<p>(in general, mixing <code>with LoggingContext</code> blocks and
-<code>defer.inlineCallbacks</code> in the same function leads to slighly
-counter-intuitive code, under this scheme).</p>
-<p>Because we leave the original <code>with</code> block as soon as the Deferred is
-returned (as opposed to waiting for it to be resolved, as we do today),
-the logcontext is cleared before control passes back to the reactor; so
-if there is some code within <code>do_request_handling</code> which needs to wait
-for a Deferred to complete, there is no need for it to worry about
-clearing the logcontext before doing so:</p>
-<pre><code class="language-python">def handle_request():
-    r = do_some_stuff()
-    r.addCallback(do_some_more_stuff)
-    return r
-</code></pre>
-<p>--- and provided <code>do_some_stuff</code> follows the rules of returning a
-Deferred which runs its callbacks in the original logcontext, all is
-happy.</p>
-<p>The business of a Deferred which runs its callbacks in the original
-logcontext isn't hard to achieve --- we have it today, in the shape of
-<code>context._PreservingContextDeferred</code>:</p>
-<pre><code class="language-python">def do_some_stuff():
-    deferred = do_some_io()
-    pcd = _PreservingContextDeferred(LoggingContext.current_context())
-    deferred.chainDeferred(pcd)
-    return pcd
-</code></pre>
-<p>It turns out that, thanks to the way that Deferreds chain together, we
-automatically get the property of a context-preserving deferred with
-<code>defer.inlineCallbacks</code>, provided the final Defered the function
-<code>yields</code> on has that property. So we can just write:</p>
-<pre><code class="language-python">@defer.inlineCallbacks
-def handle_request():
-    yield do_some_stuff()
-    yield do_some_more_stuff()
-</code></pre>
-<p>To conclude: I think this scheme would have worked equally well, with
-less danger of messing it up, and probably made some more esoteric code
-easier to write. But again --- changing the conventions of the entire
-Synapse codebase is not a sensible option for the marginal improvement
-offered.</p>
-<h2 id="a-note-on-garbage-collection-of-deferred-chains"><a class="header" href="#a-note-on-garbage-collection-of-deferred-chains">A note on garbage-collection of Deferred chains</a></h2>
-<p>It turns out that our logcontext rules do not play nicely with Deferred
+<h2 id="a-note-on-garbage-collection-of-awaitable-chains"><a class="header" href="#a-note-on-garbage-collection-of-awaitable-chains">A note on garbage-collection of awaitable chains</a></h2>
+<p>It turns out that our logcontext rules do not play nicely with awaitable
 chains which get orphaned and garbage-collected.</p>
 <p>Imagine we have some code that looks like this:</p>
 <pre><code class="language-python">listener_queue = []
@@ -12175,13 +12062,12 @@ def on_something_interesting():
     for d in listener_queue:
         d.callback(&quot;foo&quot;)
 
-@defer.inlineCallbacks
-def await_something_interesting():
-    new_deferred = defer.Deferred()
-    listener_queue.append(new_deferred)
+async def await_something_interesting():
+    new_awaitable = defer.Deferred()
+    listener_queue.append(new_awaitable)
 
     with PreserveLoggingContext():
-        yield new_deferred
+        await new_awaitable
 </code></pre>
 <p>Obviously, the idea here is that we have a bunch of things which are
 waiting for an event. (It's just an example of the problem here, but a
@@ -12194,18 +12080,19 @@ never going to happen, and we reset the listener queue:</p>
 <pre><code class="language-python">def reset_listener_queue():
     listener_queue.clear()
 </code></pre>
-<p>So, both ends of the deferred chain have now dropped their references,
-and the deferred chain is now orphaned, and will be garbage-collected at
-some point. Note that <code>await_something_interesting</code> is a generator
-function, and when Python garbage-collects generator functions, it gives
-them a chance to clean up by making the <code>yield</code> raise a <code>GeneratorExit</code>
+<p>So, both ends of the awaitable chain have now dropped their references,
+and the awaitable chain is now orphaned, and will be garbage-collected at
+some point. Note that <code>await_something_interesting</code> is a coroutine, 
+which Python implements as a generator function.  When Python
+garbage-collects generator functions, it gives them a chance to 
+clean up by making the <code>async</code> (or <code>yield</code>) raise a <code>GeneratorExit</code>
 exception. In our case, that means that the <code>__exit__</code> handler of
 <code>PreserveLoggingContext</code> will carefully restore the request context, but
 there is now nothing waiting for its return, so the request context is
 never cleared.</p>
-<p>To reiterate, this problem only arises when <em>both</em> ends of a deferred
-chain are dropped. Dropping the the reference to a deferred you're
-supposed to be calling is probably bad practice, so this doesn't
+<p>To reiterate, this problem only arises when <em>both</em> ends of a awaitable
+chain are dropped. Dropping the the reference to an awaitable you're
+supposed to be awaiting is bad practice, so this doesn't
 actually happen too much. Unfortunately, when it does happen, it will
 lead to leaked logcontexts which are incredibly hard to track down.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="replication-architecture"><a class="header" href="#replication-architecture">Replication Architecture</a></h1>
@@ -12231,7 +12118,7 @@ needed to expose the append-only log to the readers should be fairly
 minimal.</p>
 <h2 id="architecture"><a class="header" href="#architecture">Architecture</a></h2>
 <h3 id="the-replication-protocol"><a class="header" href="#the-replication-protocol">The Replication Protocol</a></h3>
-<p>See <a href="tcp_replication.html">tcp_replication.md</a></p>
+<p>See <a href="tcp_replication.html">the TCP replication documentation</a>.</p>
 <h3 id="the-slaved-datastore"><a class="header" href="#the-slaved-datastore">The Slaved DataStore</a></h3>
 <p>There are read-only version of the synapse storage layer in
 <code>synapse/replication/slave/storage</code> that use the response of the
@@ -12654,9 +12541,9 @@ directory structure <code>&quot;remote_content/server_name/aa/bb/ccccccccddddddd
 is appropriate. Thumbnails for remote content are stored under
 <code>&quot;remote_thumbnails/server_name/...&quot;</code></p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="room-and-user-statistics"><a class="header" href="#room-and-user-statistics">Room and User Statistics</a></h1>
-<p>Synapse maintains room and user statistics (as well as a cache of room state),
-in various tables. These can be used for administrative purposes but are also
-used when generating the public room directory.</p>
+<p>Synapse maintains room and user statistics in various tables. These can be used
+for administrative purposes but are also used when generating the public room
+directory.</p>
 <h1 id="synapse-developer-documentation"><a class="header" href="#synapse-developer-documentation">Synapse Developer Documentation</a></h1>
 <h2 id="high-level-concepts"><a class="header" href="#high-level-concepts">High-Level Concepts</a></h2>
 <h3 id="definitions-1"><a class="header" href="#definitions-1">Definitions</a></h3>
@@ -12664,48 +12551,10 @@ used when generating the public room directory.</p>
 <li><strong>subject</strong>: Something we are tracking stats about – currently a room or user.</li>
 <li><strong>current row</strong>: An entry for a subject in the appropriate current statistics
 table. Each subject can have only one.</li>
-<li><strong>historical row</strong>: An entry for a subject in the appropriate historical
-statistics table. Each subject can have any number of these.</li>
 </ul>
 <h3 id="overview-4"><a class="header" href="#overview-4">Overview</a></h3>
-<p>Stats are maintained as time series. There are two kinds of column:</p>
-<ul>
-<li>absolute columns – where the value is correct for the time given by <code>end_ts</code>
-in the stats row. (Imagine a line graph for these values)
-<ul>
-<li>They can also be thought of as 'gauges' in Prometheus, if you are familiar.</li>
-</ul>
-</li>
-<li>per-slice columns – where the value corresponds to how many of the occurrences
-occurred within the time slice given by <code>(end_ts − bucket_size)…end_ts</code>
-or <code>start_ts…end_ts</code>. (Imagine a histogram for these values)</li>
-</ul>
-<p>Stats are maintained in two tables (for each type): current and historical.</p>
-<p>Current stats correspond to the present values. Each subject can only have one
-entry.</p>
-<p>Historical stats correspond to values in the past. Subjects may have multiple
-entries.</p>
-<h2 id="concepts-around-the-management-of-stats"><a class="header" href="#concepts-around-the-management-of-stats">Concepts around the management of stats</a></h2>
-<h3 id="current-rows"><a class="header" href="#current-rows">Current rows</a></h3>
-<p>Current rows contain the most up-to-date statistics for a room.
-They only contain absolute columns</p>
-<h3 id="historical-rows"><a class="header" href="#historical-rows">Historical rows</a></h3>
-<p>Historical rows can always be considered to be valid for the time slice and
-end time specified.</p>
-<ul>
-<li>historical rows will not exist for every time slice – they will be omitted
-if there were no changes. In this case, the following assumptions can be
-made to interpolate/recreate missing rows:
-<ul>
-<li>absolute fields have the same values as in the preceding row</li>
-<li>per-slice fields are zero (<code>0</code>)</li>
-</ul>
-</li>
-<li>historical rows will not be retained forever – rows older than a configurable
-time will be purged.</li>
-</ul>
-<h4 id="purge"><a class="header" href="#purge">Purge</a></h4>
-<p>The purging of historical rows is not yet implemented.</p>
+<p>Stats correspond to the present values. Current rows contain the most up-to-date
+statistics for a room. Each subject can only have one entry.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="deprecation-policy-for-platform-dependencies"><a class="header" href="#deprecation-policy-for-platform-dependencies">Deprecation Policy for Platform Dependencies</a></h1>
 <p>Synapse has a number of platform dependencies, including Python and PostgreSQL.
 This document outlines the policy towards which versions we support, and when we

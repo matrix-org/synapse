@@ -226,7 +226,7 @@ that the configuration is correct, and raise an instance of
 <h3 id="registering-a-web-resource"><a class="header" href="#registering-a-web-resource">Registering a web resource</a></h3>
 <p>Modules can register web resources onto Synapse's web server using the following module
 API method:</p>
-<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource)
+<pre><code class="language-python">def ModuleApi.register_web_resource(path: str, resource: IResource) -&gt; None
 </code></pre>
 <p>The path is the full absolute path to register the resource at. For example, if you
 register a resource for the path <code>/_synapse/client/my_super_module/say_hello</code>, Synapse
@@ -247,11 +247,15 @@ Synapse will call when performing specific actions. Callbacks must be asynchrono
 are split in categories. A single module may implement callbacks from multiple categories,
 and is under no obligation to implement all callbacks from the categories it registers
 callbacks for.</p>
+<p>Modules can register callbacks using one of the module API's <code>register_[...]_callbacks</code>
+methods. The callback functions are passed to these methods as keyword arguments, with
+the callback name as the argument name and the function as its value. This is demonstrated
+in the example below. A <code>register_[...]_callbacks</code> method exists for each module type
+documented in this section.</p>
 <h4 id="spam-checker-callbacks"><a class="header" href="#spam-checker-callbacks">Spam checker callbacks</a></h4>
-<p>To register one of the callbacks described in this section, a module needs to use the
-module API's <code>register_spam_checker_callbacks</code> method. The callback functions are passed
-to <code>register_spam_checker_callbacks</code> as keyword arguments, with the callback name as the
-argument name and the function as its value. This is demonstrated in the example below.</p>
+<p>Spam checker callbacks allow module developers to implement spam mitigation actions for
+Synapse instances. Spam checker callbacks can be registered using the module API's
+<code>register_spam_checker_callbacks</code> method.</p>
 <p>The available spam checker callbacks are:</p>
 <pre><code class="language-python">async def check_event_for_spam(event: &quot;synapse.events.EventBase&quot;) -&gt; Union[bool, str]
 </code></pre>
@@ -263,7 +267,7 @@ forward to clients.</p>
 </code></pre>
 <p>Called when processing an invitation. The module must return a <code>bool</code> indicating whether
 the inviter can invite the invitee to the given room. Both inviter and invitee are
-represented by their Matrix user ID (i.e. <code>@alice:example.com</code>).</p>
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
 <pre><code class="language-python">async def user_may_create_room(user: str) -&gt; bool
 </code></pre>
 <p>Called when processing a room creation request. The module must return a <code>bool</code> indicating
@@ -312,11 +316,76 @@ used during the registration process.</li>
 </ul>
 <pre><code class="language-python">async def check_media_file_for_spam(
     file_wrapper: &quot;synapse.rest.media.v1.media_storage.ReadableFileWrapper&quot;,
-    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;
+    file_info: &quot;synapse.rest.media.v1._base.FileInfo&quot;,
 ) -&gt; bool
 </code></pre>
 <p>Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.</p>
+<h4 id="account-validity-callbacks"><a class="header" href="#account-validity-callbacks">Account validity callbacks</a></h4>
+<p>Account validity callbacks allow module developers to add extra steps to verify the
+validity on an account, i.e. see if a user can be granted access to their account on the
+Synapse instance. Account validity callbacks can be registered using the module API's
+<code>register_account_validity_callbacks</code> method.</p>
+<p>The available account validity callbacks are:</p>
+<pre><code class="language-python">async def is_user_expired(user: str) -&gt; Optional[bool]
+</code></pre>
+<p>Called when processing any authenticated request (except for logout requests). The module
+can return a <code>bool</code> to indicate whether the user has expired and should be locked out of
+their account, or <code>None</code> if the module wasn't able to figure it out. The user is
+represented by their Matrix user ID (e.g. <code>@alice:example.com</code>).</p>
+<p>If the module returns <code>True</code>, the current request will be denied with the error code
+<code>ORG_MATRIX_EXPIRED_ACCOUNT</code> and the HTTP status code 403. Note that this doesn't
+invalidate the user's access token.</p>
+<pre><code class="language-python">async def on_user_registration(user: str) -&gt; None
+</code></pre>
+<p>Called after successfully registering a user, in case the module needs to perform extra
+operations to keep track of them. (e.g. add them to a database table). The user is
+represented by their Matrix user ID.</p>
+<h4 id="third-party-rules-callbacks"><a class="header" href="#third-party-rules-callbacks">Third party rules callbacks</a></h4>
+<p>Third party rules callbacks allow module developers to add extra checks to verify the
+validity of incoming events. Third party event rules callbacks can be registered using
+the module API's <code>register_third_party_rules_callbacks</code> method.</p>
+<p>The available third party rules callbacks are:</p>
+<pre><code class="language-python">async def check_event_allowed(
+    event: &quot;synapse.events.EventBase&quot;,
+    state_events: &quot;synapse.types.StateMap&quot;,
+) -&gt; Tuple[bool, Optional[dict]]
+</code></pre>
+<p><strong><span style="color:red">
+This callback is very experimental and can and will break without notice. Module developers
+are encouraged to implement <code>check_event_for_spam</code> from the spam checker category instead.
+</span></strong></p>
+<p>Called when processing any incoming event, with the event and a <code>StateMap</code>
+representing the current state of the room the event is being sent into. A <code>StateMap</code> is
+a dictionary that maps tuples containing an event type and a state key to the
+corresponding state event. For example retrieving the room's <code>m.room.create</code> event from
+the <code>state_events</code> argument would look like this: <code>state_events.get((&quot;m.room.create&quot;, &quot;&quot;))</code>.
+The module must return a boolean indicating whether the event can be allowed.</p>
+<p>Note that this callback function processes incoming events coming via federation
+traffic (on top of client traffic). This means denying an event might cause the local
+copy of the room's history to diverge from that of remote servers. This may cause
+federation issues in the room. It is strongly recommended to only deny events using this
+callback function if the sender is a local user, or in a private federation in which all
+servers are using the same module, with the same configuration.</p>
+<p>If the boolean returned by the module is <code>True</code>, it may also tell Synapse to replace the
+event with new data by returning the new event's data as a dictionary. In order to do
+that, it is recommended the module calls <code>event.get_dict()</code> to get the current event as a
+dictionary, and modify the returned dictionary accordingly.</p>
+<p>Note that replacing the event only works for events sent by local users, not for events
+received over federation.</p>
+<pre><code class="language-python">async def on_create_room(
+    requester: &quot;synapse.types.Requester&quot;,
+    request_content: dict,
+    is_requester_admin: bool,
+) -&gt; None
+</code></pre>
+<p>Called when processing a room creation request, with the <code>Requester</code> object for the user
+performing the request, a dictionary representing the room creation request's JSON body
+(see <a href="https://matrix.org/docs/spec/client_server/latest#post-matrix-client-r0-createroom">the spec</a>
+for a list of possible parameters), and a boolean indicating whether the user performing
+the request is a server admin.</p>
+<p>Modules can modify the <code>request_content</code> (by e.g. adding events to its <code>initial_state</code>),
+or deny the room's creation by raising a <code>module_api.errors.SynapseError</code>.</p>
 <h3 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h3>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>

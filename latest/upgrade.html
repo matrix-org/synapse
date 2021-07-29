@@ -260,6 +260,14 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1390"><a class="header" href="#upgrading-to-v1390">Upgrading to v1.39.0</a></h1>
+<h2 id="deprecation-of-the-current-third-party-rules-module-interface"><a class="header" href="#deprecation-of-the-current-third-party-rules-module-interface">Deprecation of the current third-party rules module interface</a></h2>
+<p>The current third-party rules module interface is deprecated in favour of the new generic
+modules system introduced in Synapse v1.37.0. Authors of third-party rules modules can refer
+to <a href="modules.html#porting-an-existing-module-that-uses-the-old-interface">this documentation</a>
+to update their modules. Synapse administrators can refer to <a href="modules.html#using-modules">this documentation</a>
+to update their configuration once the modules they are using have been updated.</p>
+<p>We plan to remove support for the current third-party rules interface in September 2021.</p>
 <h1 id="upgrading-to-v1380"><a class="header" href="#upgrading-to-v1380">Upgrading to v1.38.0</a></h1>
 <h2 id="re-indexing-of-events-table-on-postgres-databases"><a class="header" href="#re-indexing-of-events-table-on-postgres-databases">Re-indexing of <code>events</code> table on Postgres databases</a></h2>
 <p>This release includes a database schema update which requires re-indexing one of

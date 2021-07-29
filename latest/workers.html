@@ -237,7 +237,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.</p>
 <p>To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-<a href="reverse_proxy.html">reverse_proxy.md</a> for information on setting up a reverse
+<a href="reverse_proxy.html">the reverse proxy documentation</a> for information on setting up a reverse
 proxy.</p>
 <p>When using workers, each worker process has its own configuration file which
 contains settings specific to that worker, such as the HTTP listener that it
@@ -312,8 +312,8 @@ endpoints to the worker (<code>localhost:8083</code> in the above example).</p>
 <code>synctl</code> or your distribution's preferred service manager such as <code>systemd</code>. We
 recommend the use of <code>systemd</code> where available: for information on setting up
 <code>systemd</code> to start synapse workers, see
-<a href="systemd-with-workers">systemd-with-workers</a>. To use <code>synctl</code>, see
-<a href="synctl_workers.html">synctl_workers.md</a>.</p>
+<a href="systemd-with-workers">Systemd with Workers</a>. To use <code>synctl</code>, see
+<a href="synctl_workers.html">Using synctl with Workers</a>.</p>
 <h2 id="available-worker-applications"><a class="header" href="#available-worker-applications">Available worker applications</a></h2>
 <h3 id="synapseappgeneric_worker"><a class="header" href="#synapseappgeneric_worker"><code>synapse.app.generic_worker</code></a></h3>
 <p>This worker can handle API requests matching the following regular

@@ -194,7 +194,7 @@ server (via port 8448). This is easy to set up and will work provided
 you set the <code>server_name</code> to match your machine's public DNS hostname.</p>
 <p>For this default configuration to work, you will need to listen for TLS
 connections on port 8448. The preferred way to do that is by using a
-reverse proxy: see <a href="reverse_proxy.html">reverse_proxy.md</a> for instructions
+reverse proxy: see <a href="reverse_proxy.html">the reverse proxy documentation</a> for instructions
 on how to correctly set one up.</p>
 <p>In some cases you might not want to run Synapse on the machine that has
 the <code>server_name</code> as its public DNS hostname, or you might want federation
@@ -202,7 +202,7 @@ traffic to use a different port than 8448. For example, you might want to
 have your user names look like <code>@user:example.com</code>, but you want to run
 Synapse on <code>synapse.example.com</code> on port 443. This can be done using
 delegation, which allows an admin to control where federation traffic should
-be sent. See <a href="delegate.html">delegate.md</a> for instructions on how to set this up.</p>
+be sent. See <a href="delegate.html">the delegation documentation</a> for instructions on how to set this up.</p>
 <p>Once federation has been configured, you should be able to join a room over
 federation. A good place to start is <code>#synapse:matrix.org</code> - a room for
 Synapse admins.</p>
@@ -218,8 +218,8 @@ servers in the room could not access yours. (Joining a room over federation is
 a complicated dance which requires connections in both directions).</p>
 <p>Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see <a href="reverse_proxy.html">reverse_proxy.md</a> for instructions on how to correctly
-configure a reverse proxy.</p>
+proxy: see <a href="reverse_proxy.html">the reverse proxy documentation</a> for instructions on how
+to correctly configure a reverse proxy.</p>
 <h3 id="known-issues"><a class="header" href="#known-issues">Known issues</a></h3>
 <p><strong>HTTP <code>308 Permanent Redirect</code> redirects are not followed</strong>: Due to missing features
 in the HTTP library used by Synapse, 308 redirects are currently not followed by
