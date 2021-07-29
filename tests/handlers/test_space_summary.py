@@ -133,20 +133,33 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             state_key=room_id,
         )
 
-    def _assert_rooms(self, result: JsonDict, rooms: Iterable[str]) -> None:
-        """Assert that the expected room IDs are in the response."""
-        self.assertCountEqual([room.get("room_id") for room in result["rooms"]], rooms)
-
-    def _assert_events(
-        self, result: JsonDict, events: Iterable[Tuple[str, str]]
+    def _assert_rooms(
+        self, result: JsonDict, rooms_and_children: Iterable[Tuple[str, Iterable[str]]]
     ) -> None:
-        """Assert that the expected parent / child room IDs are in the response."""
+        """
+        Assert that the expected room IDs and events are in the response.
+
+        Args:
+            result: The result from the API call.
+            rooms_and_children: An iterable of tuples where each tuple is:
+                The expected room ID.
+                The expected IDs of any children rooms.
+        """
+        room_ids = []
+        children_ids = []
+        for room_id, children in rooms_and_children:
+            room_ids.append(room_id)
+            if children:
+                children_ids.extend([(room_id, child_id) for child_id in children])
+        self.assertCountEqual(
+            [room.get("room_id") for room in result["rooms"]], room_ids
+        )
         self.assertCountEqual(
             [
                 (event.get("room_id"), event.get("state_key"))
                 for event in result["events"]
             ],
-            events,
+            children_ids,
         )
 
     def test_simple_space(self):
@@ -154,8 +167,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
         # The result should have the space and the room in it, along with a link
         # from space -> room.
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_rooms(result, expected)
 
     def test_visibility(self):
         """A user not in a space cannot inspect it."""
@@ -173,8 +186,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_rooms(result, expected)
 
         # Make it not world-readable again and confirm it results in an error.
         self.helper.send_state(
@@ -188,8 +201,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Join the space and results should be returned.
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
+        self._assert_rooms(result, expected)
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
@@ -260,34 +272,30 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Join the space.
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-
-        self._assert_rooms(
-            result,
-            [
+        expected = [
+            (
                 self.space,
-                self.room,
-                public_room,
-                knock_room,
-                invited_room,
-                restricted_accessible_room,
-                world_readable_room,
-                joined_room,
-            ],
-        )
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, public_room),
-                (self.space, knock_room),
-                (self.space, not_invited_room),
-                (self.space, invited_room),
-                (self.space, restricted_room),
-                (self.space, restricted_accessible_room),
-                (self.space, world_readable_room),
-                (self.space, joined_room),
-            ],
-        )
+                [
+                    self.room,
+                    public_room,
+                    knock_room,
+                    not_invited_room,
+                    invited_room,
+                    restricted_room,
+                    restricted_accessible_room,
+                    world_readable_room,
+                    joined_room,
+                ],
+            ),
+            (self.room, ()),
+            (public_room, ()),
+            (knock_room, ()),
+            (invited_room, ()),
+            (restricted_accessible_room, ()),
+            (world_readable_room, ()),
+            (joined_room, ()),
+        ]
+        self._assert_rooms(result, expected)
 
     def test_complex_space(self):
         """
@@ -319,18 +327,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
 
         # The result should include each room a single time and each link.
-        self._assert_rooms(result, [self.space, self.room, subspace, subroom])
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, room2),
-                (self.space, subspace),
-                (subspace, subroom),
-                (subspace, self.room),
-                (subspace, room2),
-            ],
-        )
+        expected = [
+            (self.space, [self.room, room2, subspace]),
+            (self.room, ()),
+            (subspace, [subroom, self.room, room2]),
+            (subroom, ()),
+        ]
+        self._assert_rooms(result, expected)
 
     def test_fed_complex(self):
         """
@@ -387,15 +390,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.handler.get_space_summary(self.user, self.space)
             )
 
-        self._assert_rooms(result, [self.space, self.room, subspace, subroom])
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, subspace),
-                (subspace, subroom),
-            ],
-        )
+        expected = [
+            (self.space, [self.room, subspace]),
+            (self.room, ()),
+            (subspace, [subroom]),
+            (subroom, ()),
+        ]
+        self._assert_rooms(result, expected)
 
     def test_fed_filtering(self):
         """
@@ -541,32 +542,27 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.handler.get_space_summary(self.user, self.space)
             )
 
-        self._assert_rooms(
-            result,
-            [
-                self.space,
-                self.room,
+        expected = [
+            (self.space, [self.room, subspace]),
+            (self.room, ()),
+            (
                 subspace,
-                public_room,
-                knock_room,
-                invited_room,
-                restricted_accessible_room,
-                world_readable_room,
-                joined_room,
-            ],
-        )
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, subspace),
-                (subspace, public_room),
-                (subspace, knock_room),
-                (subspace, not_invited_room),
-                (subspace, invited_room),
-                (subspace, restricted_room),
-                (subspace, restricted_accessible_room),
-                (subspace, world_readable_room),
-                (subspace, joined_room),
-            ],
-        )
+                [
+                    public_room,
+                    knock_room,
+                    not_invited_room,
+                    invited_room,
+                    restricted_room,
+                    restricted_accessible_room,
+                    world_readable_room,
+                    joined_room,
+                ],
+            ),
+            (public_room, ()),
+            (knock_room, ()),
+            (invited_room, ()),
+            (restricted_accessible_room, ()),
+            (world_readable_room, ()),
+            (joined_room, ()),
+        ]
+        self._assert_rooms(result, expected)
