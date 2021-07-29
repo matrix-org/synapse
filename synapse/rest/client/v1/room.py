@@ -1445,6 +1445,46 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         )
 
 
+class RoomHierarchyRestServlet(RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "/rooms/(?P<room_id>[^/]*)/hierarchy$"
+        ),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._space_summary_handler = hs.get_space_summary_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+
+        max_depth = parse_integer(request, "max_depth")
+        if max_depth is not None and max_depth < 0:
+            raise SynapseError(
+                400, "'max_depth' must be a non-negative integer", Codes.BAD_JSON
+            )
+
+        limit = parse_integer(request, "limit")
+        if limit is not None and limit <= 0:
+            raise SynapseError(
+                400, "'limit' must be a positive integer", Codes.BAD_JSON
+            )
+
+        return 200, await self._space_summary_handler.get_room_hierarchy(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=parse_boolean(request, "suggested_only", default=False),
+            max_depth=max_depth,
+            limit=limit,
+            from_token=parse_string(request, "from"),
+        )
+
+
 def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     msc2716_enabled = hs.config.experimental.msc2716_enabled
 
@@ -1463,6 +1503,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomHierarchyRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     JoinedRoomsRestServlet(hs).register(http_server)
     RoomAliasListServlet(hs).register(http_server)

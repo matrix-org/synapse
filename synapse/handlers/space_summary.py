@@ -245,6 +245,36 @@ class SpaceSummaryHandler:
 
         return {"rooms": rooms_result, "events": events_result}
 
+    async def get_room_hierarchy(
+        self,
+        requester: str,
+        room_id: str,
+        suggested_only: bool = False,
+        max_depth: Optional[int] = None,
+        limit: Optional[int] = None,
+        from_token: Optional[str] = None,
+    ) -> JsonDict:
+        """
+        Implementation of the room hierarchy C-S API.
+
+        Args:
+            requester: The user ID of the user making this request.
+            room_id: The room ID to start the summary at (the "root" room).
+            suggested_only: Whether we should only return children with the "suggested"
+                flag set.
+            max_depth: The maximum depth in the tree to explore, must be a
+                non-negative integer.
+
+                0 would correspond to just the root room, 1 would include just
+                the root room's children, etc.
+            limit: An optional limit on the number of rooms to return per
+                page. Must be a positive integer.
+            from_token: An optional pagination token.
+
+        Returns:
+            The JSON hierarchy dictionary.
+        """
+
     async def federation_space_summary(
         self,
         origin: str,
