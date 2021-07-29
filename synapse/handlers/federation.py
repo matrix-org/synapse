@@ -1129,7 +1129,7 @@ class FederationHandler(BaseHandler):
         self, room_id: str, current_depth: int, limit: int
     ) -> bool:
         oldest_events_with_depth = (
-            await self.store.get_oldest_events_with_depth_in_room(room_id)
+            await self.store.get_oldest_event_ids_with_depth_in_room(room_id)
         )
         insertion_events_to_be_backfilled = (
             await self.store.get_insertion_event_backwards_extremities_in_room(room_id)
