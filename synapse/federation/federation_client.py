@@ -536,7 +536,7 @@ class FederationClient(FederationBase):
                 suppressed if the exception is an InvalidResponseError.
 
             failover_errcodes: Error codes (specific to this endpoint) which should
-                cause a failover.
+                cause a failover when received as part of an HTTP 400 error.
 
             failover_on_unknown_endpoint: if True, we will try other servers if it looks
                 like a server doesn't support the endpoint. This is typically useful
