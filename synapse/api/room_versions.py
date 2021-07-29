@@ -219,6 +219,20 @@ class RoomVersions:
         msc2403_knocking=True,
         msc2716_historical=True,
     )
+    V8 = RoomVersion(
+        "8",
+        RoomDisposition.STABLE,
+        EventFormatVersions.V3,
+        StateResolutionVersions.V2,
+        enforce_key_validity=True,
+        special_case_aliases_auth=False,
+        strict_canonicaljson=True,
+        limit_notifications_power_levels=True,
+        msc2176_redaction_rules=False,
+        msc3083_join_rules=True,
+        msc2403_knocking=True,
+        msc2716_historical=False,
+    )
 
 
 KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
@@ -234,6 +248,7 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.MSC3083,
         RoomVersions.V7,
         RoomVersions.MSC2716,
+        RoomVersions.V8,
     )
 }
 
@@ -261,12 +276,12 @@ MSC3244_CAPABILITIES = {
     for cap in (
         RoomVersionCapability(
             "knock",
-            RoomVersions.V7,
+            RoomVersions.V8,
             lambda room_version: room_version.msc2403_knocking,
         ),
         RoomVersionCapability(
             "restricted",
-            None,
+            RoomVersions.V8,
             lambda room_version: room_version.msc3083_join_rules,
         ),
     )
