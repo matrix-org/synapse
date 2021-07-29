@@ -1290,7 +1290,7 @@ class FederationClient(FederationBase):
         )
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryEventResult:
     """Represents a single event in the result of a successful get_space_summary call.
 
@@ -1299,12 +1299,12 @@ class FederationSpaceSummaryEventResult:
     object attributes.
     """
 
-    event_type = attr.ib(type=str)
-    state_key = attr.ib(type=str)
-    via = attr.ib(type=Sequence[str])
+    event_type: str
+    state_key: str
+    via: Sequence[str]
 
     # the raw data, including the above keys
-    data = attr.ib(type=JsonDict)
+    data: JsonDict
 
     @classmethod
     def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
@@ -1335,15 +1335,15 @@ class FederationSpaceSummaryEventResult:
         if any(not isinstance(v, str) for v in via):
             raise ValueError("Invalid event: 'via' must be a list of strings")
 
-        return cls(event_type, state_key, via, d)
+        return cls(event_type, room_id, state_key, via, d)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryResult:
     """Represents the data returned by a successful get_space_summary call."""
 
-    rooms = attr.ib(type=Sequence[JsonDict])
-    events = attr.ib(type=Sequence[FederationSpaceSummaryEventResult])
+    rooms: Sequence[JsonDict]
+    events: Sequence[FederationSpaceSummaryEventResult]
 
     @classmethod
     def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryResult":

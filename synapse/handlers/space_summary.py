@@ -606,10 +606,10 @@ class SpaceSummaryHandler:
         return sorted(filter(_has_valid_via, events), key=_child_events_comparison_key)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class _RoomQueueEntry:
-    room_id = attr.ib(type=str)
-    via = attr.ib(type=Sequence[str])
+    room_id: str
+    via: Sequence[str]
 
 
 def _has_valid_via(e: EventBase) -> bool:
