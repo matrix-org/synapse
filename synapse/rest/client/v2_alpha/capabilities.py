@@ -61,18 +61,13 @@ class CapabilitiesRestServlet(RestServlet):
                 "org.matrix.msc3244.room_capabilities"
             ] = MSC3244_CAPABILITIES
 
-        # Add this to response only if `enable_set_displayname` is set to `false` (not default)
-        # because it is experimental
-        # This needs an update after release of MSC3283. Then it will be always available.
-        if not self.config.enable_set_displayname:
+        if self.config.experimental.msc3283_enabled:
             response["capabilities"]["org.matrix.msc3283.set_displayname"] = {
                 "enabled": self.config.enable_set_displayname
             }
-        if not self.config.enable_set_avatar_url:
             response["capabilities"]["org.matrix.msc3283.set_avatar_url"] = {
                 "enabled": self.config.enable_set_avatar_url
             }
-        if not self.config.enable_3pid_changes:
             response["capabilities"]["org.matrix.msc3283.3pid_changes"] = {
                 "enabled": self.config.enable_3pid_changes
             }

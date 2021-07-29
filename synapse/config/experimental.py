@@ -35,3 +35,6 @@ class ExperimentalConfig(Config):
 
         # MSC3244 (room version capabilities)
         self.msc3244_enabled: bool = experimental.get("msc3244_enabled", False)
+
+        # MSC3283 (room version capabilities)
+        self.msc3283_enabled: bool = experimental.get("msc3283_enabled", False)

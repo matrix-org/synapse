@@ -85,14 +85,8 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
 
         self._test_capability("m.change_password", access_token, False)
 
-    def test_get_change_users_attributes_capabilities(self):
-        """
-        Test that per default server returns `m.change_password`
-        but not `org.matrix.msc3283.set_displayname`.
-        In feature we can add further capabilites.
-        If MSC3283 is in spec, the test must be updated to test that server reponds
-        with `m.enable_set_displayname` per default.
-        """
+    def test_get_change_users_attributes_capabilities_when_msc3283_disabled(self):
+        """Test that per default msc3283 is disabled server returns `m.change_password`."""
         access_token = self.login(self.localpart, self.password)
 
         channel = self.make_request("GET", self.url, access_token=access_token)
@@ -104,29 +98,52 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("org.matrix.msc3283.set_avatar_url", capabilities)
         self.assertNotIn("org.matrix.msc3283.3pid_changes", capabilities)
 
-    @override_config({"enable_set_displayname": False})
+    @override_config({"experimental_features": {"msc3283_enabled": True}})
+    def test_get_change_users_attributes_capabilities_when_msc3283_enabled(self):
+        """Test if msc3283 is enabled server returns capabilities."""
+        access_token = self.login(self.localpart, self.password)
+
+        channel = self.make_request("GET", self.url, access_token=access_token)
+        capabilities = channel.json_body["capabilities"]
+
+        self.assertEqual(channel.code, 200)
+        self.assertTrue(capabilities["m.change_password"]["enabled"])
+        self.assertTrue("org.matrix.msc3283.set_displayname", capabilities)
+        self.assertTrue("org.matrix.msc3283.set_avatar_url", capabilities)
+        self.assertTrue("org.matrix.msc3283.3pid_changes", capabilities)
+
+    @override_config(
+        {
+            "enable_set_displayname": False,
+            "experimental_features": {"msc3283_enabled": True},
+        }
+    )
     def test_get_set_displayname_capabilities_displayname_disabled(self):
-        """
-        Test if set displayname is disabled that the server responds it.
-        """
+        """Test if set displayname is disabled that the server responds it."""
         access_token = self.login(self.localpart, self.password)
 
         self._test_capability("org.matrix.msc3283.set_displayname", access_token, False)
 
-    @override_config({"enable_set_avatar_url": False})
+    @override_config(
+        {
+            "enable_set_avatar_url": False,
+            "experimental_features": {"msc3283_enabled": True},
+        }
+    )
     def test_get_set_avatar_url_capabilities_avatar_url_disabled(self):
-        """
-        Test if set avatar_url is disabled that the server responds it.
-        """
+        """Test if set avatar_url is disabled that the server responds it."""
         access_token = self.login(self.localpart, self.password)
 
         self._test_capability("org.matrix.msc3283.set_avatar_url", access_token, False)
 
-    @override_config({"enable_3pid_changes": False})
+    @override_config(
+        {
+            "enable_3pid_changes": False,
+            "experimental_features": {"msc3283_enabled": True},
+        }
+    )
     def test_change_3pid_capabilities_3pid_disabled(self):
-        """
-        Test if change 3pid is disabled that the server responds it.
-        """
+        """Test if change 3pid is disabled that the server responds it."""
         access_token = self.login(self.localpart, self.password)
 
         self._test_capability("org.matrix.msc3283.3pid_changes", access_token, False)
@@ -179,8 +196,4 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         capabilities = channel.json_body["capabilities"]
 
         self.assertEqual(channel.code, 200)
-
-        if expect_success:
-            self.assertTrue(capabilities[capability]["enabled"])
-        else:
-            self.assertFalse(capabilities[capability]["enabled"])
+        self.assertEqual(capabilities[capability]["enabled"], expect_success)
