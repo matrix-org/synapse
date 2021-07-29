@@ -162,6 +162,39 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             children_ids,
         )
 
+    def _assert_hierarchy(
+        self, result: JsonDict, rooms_and_children: Iterable[Tuple[str, Iterable[str]]]
+    ) -> None:
+        """
+        Assert that the expected room IDs are in the response.
+
+        Args:
+            result: The result from the API call.
+            rooms_and_children: An iterable of tuples where each tuple is:
+                The expected room ID.
+                The expected IDs of any children rooms.
+        """
+        result_room_ids = []
+        result_children_ids = []
+        for result_room in result["rooms"]:
+            result_room_ids.append(result_room["room_id"])
+            result_children_ids.append(
+                [
+                    (cs["room_id"], cs["state_key"])
+                    for cs in result_room.get("children_state")
+                ]
+            )
+
+        room_ids = []
+        children_ids = []
+        for room_id, children in rooms_and_children:
+            room_ids.append(room_id)
+            children_ids.append([(room_id, child_id) for child_id in children])
+
+        # Note that order matters.
+        self.assertEqual(result_room_ids, room_ids)
+        self.assertEqual(result_children_ids, children_ids)
+
     def test_simple_space(self):
         """Test a simple space with a single room."""
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
@@ -170,6 +203,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         expected = [(self.space, [self.room]), (self.room, ())]
         self._assert_rooms(result, expected)
 
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        self._assert_hierarchy(result, expected)
+
     def test_visibility(self):
         """A user not in a space cannot inspect it."""
         user2 = self.register_user("user2", "pass")
@@ -177,6 +215,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
         # The user cannot see the space.
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
+        self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
         # If the space is made world-readable it should return a result.
         self.helper.send_state(
@@ -189,6 +228,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         expected = [(self.space, [self.room]), (self.room, ())]
         self._assert_rooms(result, expected)
 
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
+
         # Make it not world-readable again and confirm it results in an error.
         self.helper.send_state(
             self.space,
@@ -197,11 +239,15 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
+        self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
         # Join the space and results should be returned.
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
         self._assert_rooms(result, expected)
+
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
@@ -297,6 +343,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ]
         self._assert_rooms(result, expected)
 
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
+
     def test_complex_space(self):
         """
         Create a "complex" space to see how it handles things like loops and subspaces.
@@ -334,6 +383,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (subroom, ()),
         ]
         self._assert_rooms(result, expected)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        self._assert_hierarchy(result, expected)
 
     def test_fed_complex(self):
         """

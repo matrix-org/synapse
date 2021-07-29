@@ -18,7 +18,7 @@ import re
 from collections import deque
 from typing import (
     TYPE_CHECKING,
-    Collection,
+    Deque,
     Dict,
     Iterable,
     List,
@@ -130,7 +130,7 @@ class SpaceSummaryHandler:
                     requester, None, room_id, suggested_only, max_children
                 )
 
-                events: Collection[JsonDict] = []
+                events: Sequence[JsonDict] = []
                 if room_entry:
                     rooms_result.append(room_entry.room)
                     events = room_entry.children
@@ -274,6 +274,70 @@ class SpaceSummaryHandler:
         Returns:
             The JSON hierarchy dictionary.
         """
+        # first of all, check that the user is in the room in question (or it's
+        # world-readable)
+        await self._auth.check_user_in_room_or_world_readable(room_id, requester)
+
+        # TODO Handle pulling previously persisted state by the pagination token.
+
+        # the queue of rooms to process
+        room_queue = deque((_RoomQueueEntry(room_id, ()),))
+
+        # Rooms we have already processed.
+        processed_rooms: Set[str] = set()
+
+        rooms_result: List[JsonDict] = []
+
+        # Cap the limit to a server-side maximum.
+        if limit is None:
+            limit = MAX_ROOMS
+        else:
+            limit = min(limit, MAX_ROOMS)
+
+        # Iterate through the queue until we reach the limit or run out of
+        # rooms to include.
+        while room_queue and len(rooms_result) < limit:
+            queue_entry = room_queue.popleft()
+            room_id = queue_entry.room_id
+            if room_id in processed_rooms:
+                # already done this room
+                continue
+
+            logger.debug("Processing room %s", room_id)
+
+            is_in_room = await self._store.is_host_joined(room_id, self._server_name)
+            if is_in_room:
+                room_entry = await self._summarize_local_room(
+                    requester,
+                    None,
+                    room_id,
+                    suggested_only,
+                    # TODO Handle max children.
+                    max_children=None,
+                )
+
+                if room_entry:
+                    rooms_result.append(room_entry.as_json())
+
+                    # Add the child to the queue. We have already validated
+                    # that the vias are a list of server names.
+                    #
+                    # TODO Handle max_depth
+                    room_queue.extendleft(
+                        _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
+                        for ev in reversed(room_entry.children)
+                    )
+
+                processed_rooms.add(room_id)
+            else:
+                # TODO Federation.
+                pass
+
+        result = {"rooms": rooms_result}
+
+        # TODO Handle adding a pagination token (and persisting state).
+
+        return result
 
     async def federation_space_summary(
         self,
@@ -685,7 +749,12 @@ class _RoomEntry:
     # An iterable of the sorted, stripped children events for children of this room.
     #
     # This may not include all children.
-    children: Collection[JsonDict] = ()
+    children: Sequence[JsonDict] = ()
+
+    def as_json(self) -> JsonDict:
+        result = dict(self.room)
+        result["children_state"] = self.children
+        return result
 
 
 def _has_valid_via(e: EventBase) -> bool:
