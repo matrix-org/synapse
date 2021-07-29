@@ -1143,10 +1143,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if room_name_event:
             room_name = room_name_event.content.get("name", "")
 
-        room_type = ""
+        room_type = None
         room_create_event = room_state.get((EventTypes.Create, ""))
         if room_create_event:
-            room_type = room_create_event.content.get(EventContentFields.ROOM_TYPE, "")
+            room_type = room_create_event.content.get(EventContentFields.ROOM_TYPE, None)
 
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
