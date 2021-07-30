@@ -276,12 +276,12 @@ MSC3244_CAPABILITIES = {
     for cap in (
         RoomVersionCapability(
             "knock",
-            RoomVersions.V8,
+            RoomVersions.V7,
             lambda room_version: room_version.msc2403_knocking,
         ),
         RoomVersionCapability(
             "restricted",
-            RoomVersions.V8,
+            None,
             lambda room_version: room_version.msc3083_join_rules,
         ),
     )
