@@ -104,13 +104,13 @@ class TransactionManager:
                 len(edus),
             )
 
-            transaction = Transaction.create_new(
+            transaction = Transaction(
                 origin_server_ts=int(self.clock.time_msec()),
                 transaction_id=txn_id,
                 origin=self._server_name,
                 destination=destination,
-                pdus=pdus,
-                edus=edus,
+                pdus=[p.get_pdu_json() for p in pdus],
+                edus=[edu.get_dict() for edu in edus],
             )
 
             self._next_txn_id += 1

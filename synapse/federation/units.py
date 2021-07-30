@@ -108,17 +108,3 @@ class Transaction(JsonEncodedObject):
             del kwargs["edus"]
 
         super().__init__(transaction_id=transaction_id, pdus=pdus or [], **kwargs)
-
-    @staticmethod
-    def create_new(pdus, **kwargs):
-        """Used to create a new transaction. Will auto fill out
-        transaction_id and origin_server_ts keys.
-        """
-        if "origin_server_ts" not in kwargs:
-            raise KeyError("Require 'origin_server_ts' to construct a Transaction")
-        if "transaction_id" not in kwargs:
-            raise KeyError("Require 'transaction_id' to construct a Transaction")
-
-        kwargs["pdus"] = [p.get_pdu_json() for p in pdus]
-
-        return Transaction(**kwargs)
