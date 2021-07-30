@@ -450,9 +450,6 @@ class FederationSendServlet(BaseFederationServerServlet):
                 len(transaction_data.get("edus", [])),
             )
 
-            # We should ideally be getting this from the security layer.
-            # origin = body["origin"]
-
         except Exception as e:
             logger.exception(e)
             return 400, {"error": "Invalid transaction"}
