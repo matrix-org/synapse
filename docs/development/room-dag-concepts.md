@@ -13,25 +13,25 @@ A (oldest) <---- B <---- C (most recent)
 
 ## Depth and stream ordering
 
-Events are sorted by `(topological_ordering, stream_ordering)` where
+Events are normally sorted by `(topological_ordering, stream_ordering)` where
 `topological_ordering` is just `depth`. In other words, we first sort by `depth`
 and then tie-break based on `stream_ordering`. `depth` is incremented as new
 messages are added to the DAG. Normally, `stream_ordering` is an auto
-incrementing integer but for `backfilled=true` events, it decrements.
+incrementing integer, but backfilled events start with `stream_ordering=-1` and decrement.
 
 `depth` is not re-calculated if a message is inserted into the middle of the DAG.
 
 ---
 
  - `/sync` returns things in the order they arrive at the server (`stream_ordering`).
- - `/backfill` returns them in the order determined by the event graph `(topological_ordering, stream_ordering)`.
+ - `/messages` (and `/backfill in the federation API) return them in the order determined by the event graph `(topological_ordering, stream_ordering)`.
 
 The general idea is that, if you're following a room in real-time (i.e. `/sync`), you probably want to see the messages as they arrive at your server, rather than skipping any that arrived late; whereas if you're looking at a historical section of timeline (i.e. `/messages`), you want to see the best representation of the state of the room as others were seeing it at the time.
 
 
 ## Forward extremity
 
-Most-recent-in-time events in the DAG which are not referenced by any `prev_events` yet.
+Most-recent-in-time events in the DAG which are not referenced by any other events' `prev_events` yet.
 
 The forward extremities of a room are used as the `prev_events` when the next event is sent.
 
@@ -44,7 +44,7 @@ A backwards extremity is a place where the oldest-in-time events of the DAG
 
 This is an event where we haven't fetched all of the `prev_events` for.
 
-Once we have fetched all of it's `prev_events`, it's unmarked as backwards
+Once we have fetched all of its `prev_events`, it's unmarked as a backwards
 extremity and those `prev_events` become the new backwards extremities.
 
 
