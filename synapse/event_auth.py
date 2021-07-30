@@ -692,7 +692,7 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
     power_level_event = get_power_level_event(auth_events)
     if power_level_event:
         level = power_level_event.content.get("users", {}).get(user_id)
-        if not level:
+        if level is None:
             level = power_level_event.content.get("users_default", 0)
 
         if level is None:
