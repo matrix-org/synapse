@@ -443,10 +443,10 @@ class FederationServer(FederationBase):
 
         return pdu_results
 
-    async def _handle_edus_in_txn(self, origin: str, transaction: Transaction):
+    async def _handle_edus_in_txn(self, origin: str, transaction: Transaction) -> None:
         """Process the EDUs in a received transaction."""
 
-        async def _process_edu(edu_dict):
+        async def _process_edu(edu_dict: JsonDict) -> None:
             received_edus_counter.inc()
 
             edu = Edu(

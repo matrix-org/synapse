@@ -27,6 +27,7 @@ from synapse.logging.opentracing import (
     tags,
     whitelisted_homeserver,
 )
+from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.metrics import measure_func
 
@@ -131,7 +132,7 @@ class TransactionManager:
             # FIXME (richardv): I also believe it no longer works. We (now?) store
             #  "age_ts" in "unsigned" rather than at the top level. See
             #  https://github.com/matrix-org/synapse/issues/8429.
-            def json_data_cb():
+            def json_data_cb() -> JsonDict:
                 data = transaction.get_dict()
                 now = int(self.clock.time_msec())
                 if "pdus" in data:
