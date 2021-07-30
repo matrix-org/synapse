@@ -755,9 +755,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         """
 
         @trace
-        def _claim_e2e_one_time_key(
+        def _claim_e2e_one_time_key_simple(
             txn, user_id: str, device_id: str, algorithm: str
         ) -> Optional[Tuple[str, str]]:
+            """Claim OTK for device for DBs that don't support RETURNING."""
+
             sql = """
                 SELECT key_id, key_json FROM e2e_one_time_keys_json
                 WHERE user_id = ? AND device_id = ? AND algorithm = ?
@@ -787,14 +789,52 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
             return f"{algorithm}:{key_id}", key_json
 
+        @trace
+        def _claim_e2e_one_time_key_returning(
+            txn, user_id: str, device_id: str, algorithm: str
+        ) -> Optional[Tuple[str, str]]:
+            """Claim OTK for device for DBs that support RETURNING."""
+
+            # We can use RETURNING to do the fetch and DELETE in once step.
+            sql = """
+                DELETE FROM e2e_one_time_keys_json
+                WHERE user_id = ? AND device_id = ? AND algorithm = ?
+                    AND key_id IN (
+                        SELECT key_id FROM e2e_one_time_keys_json
+                        WHERE user_id = ? AND device_id = ? AND algorithm = ?
+                        LIMIT 1
+                    )
+                RETURNING key_id, key_json
+            """
+
+            txn.execute(
+                sql, (user_id, device_id, algorithm, user_id, device_id, algorithm)
+            )
+            otk_row = txn.fetchone()
+            if otk_row is None:
+                return None
+
+            key_id, key_json = otk_row
+            return f"{algorithm}:{key_id}", key_json
+
         results = {}
         for user_id, device_id, algorithm in query_list:
+            if self.database_engine.supports_returning:
+                # If we support RETURNING clause we can use a single query that
+                # allows us to use autocommit mode.
+                _claim_e2e_one_time_key = _claim_e2e_one_time_key_returning
+                db_autocommit = True
+            else:
+                _claim_e2e_one_time_key = _claim_e2e_one_time_key_simple
+                db_autocommit = False
+
             row = await self.db_pool.runInteraction(
                 "claim_e2e_one_time_keys",
                 _claim_e2e_one_time_key,
                 user_id,
                 device_id,
                 algorithm,
+                db_autocommit=db_autocommit,
             )
             if row:
                 device_results = results.setdefault(user_id, {}).setdefault(
