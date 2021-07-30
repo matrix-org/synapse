@@ -766,27 +766,32 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
             txn.execute(sql, (user_id, device_id, algorithm))
             otk_row = txn.fetchone()
-            if otk_row is not None:
-                key_id, key_json = otk_row
+            if otk_row is None:
+                return None
 
-                self.db_pool.simple_delete_one_txn(
-                    txn,
-                    table="e2e_one_time_keys_json",
-                    keyvalues={
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "algorithm": algorithm,
-                        "key_id": key_id,
-                    },
-                )
-                self._invalidate_cache_and_stream(
-                    txn, self.count_e2e_one_time_keys, (user_id, device_id)
-                )
+            key_id, key_json = otk_row
 
-                return f"{algorithm}:{key_id}", key_json
+            self.db_pool.simple_delete_one_txn(
+                txn,
+                table="e2e_one_time_keys_json",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "algorithm": algorithm,
+                    "key_id": key_id,
+                },
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.count_e2e_one_time_keys, (user_id, device_id)
+            )
 
-            # no one-time key available, so see if there's a fallback
-            # key
+            return f"{algorithm}:{key_id}", key_json
+
+        @trace
+        def _get_fallback_key(
+            txn, user_id: str, device_id: str, algorithm: str
+        ) -> Optional[Tuple[str, str]]:
+
             fallback_sql = """
                 SELECT key_id, key_json, used FROM e2e_fallback_keys_json
                 WHERE user_id = ? AND device_id = ? AND algorithm = ?
@@ -795,27 +800,27 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
             txn.execute(fallback_sql, (user_id, device_id, algorithm))
             fallback_row = txn.fetchone()
-            if fallback_row is not None:
-                key_id, key_json, used = fallback_row
+            if fallback_row is None:
+                return None
 
-                self.db_pool.simple_update_one_txn(
-                    txn,
-                    table="e2e_fallback_keys_json",
-                    keyvalues={
-                        "user_id": user_id,
-                        "device_id": device_id,
-                        "algorithm": algorithm,
-                        "key_id": key_id,
-                    },
-                    updatevalues={"used": True},
-                )
-                self._invalidate_cache_and_stream(
-                    txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
-                )
+            key_id, key_json, used = fallback_row
 
-                return f"{algorithm}:{key_id}", key_json
+            self.db_pool.simple_update_one_txn(
+                txn,
+                table="e2e_fallback_keys_json",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "algorithm": algorithm,
+                    "key_id": key_id,
+                },
+                updatevalues={"used": True},
+            )
+            self._invalidate_cache_and_stream(
+                txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
+            )
 
-            return None
+            return f"{algorithm}:{key_id}", key_json
 
         results = {}
         for user_id, device_id, algorithm in query_list:
@@ -826,6 +831,23 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 device_id,
                 algorithm,
             )
+            if row:
+                device_results = results.setdefault(user_id, {}).setdefault(
+                    device_id, {}
+                )
+                device_results[row[0]] = row[1]
+                continue
+
+            # no one-time key available, so see if there's a fallback
+            # key
+            row = await self.db_pool.runInteraction(
+                "_get_fallback_key",
+                _get_fallback_key,
+                user_id,
+                device_id,
+                algorithm,
+            )
+
             if row:
                 device_results = results.setdefault(user_id, {}).setdefault(
                     device_id, {}
