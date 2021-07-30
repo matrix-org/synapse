@@ -65,12 +65,11 @@ For example, when we fetch the event auth chain or state for a given event, we
 mark all of those claimed auth events as outliers because we haven't done the
 state calculation ourself.
 
+Outliers are sometimes referred to as floating outliers but there is no
+distinction between a normal and floating outlier. The floating descriptor just
+comes from the fact that all outliers are an arbitrary floating event in the DAG
+as opposed to being inline with the current DAG.
 
-### Floating outlier
-
-A floating `outlier` is an arbitrary floating event in the DAG (as opposed to
-being inline with the current DAG). This happens when an event doesn't have
-any `prev_events` or has `prev_events` that don't exist.
 
 
 ## State groups
@@ -85,3 +84,4 @@ mappings of `event_id -> state_group` and `state_group -> state`.
 ### Stage group edges
 
 TODO: `state_group_edges` is a further optimization...
+      notes from @Azrenbeth, https://pastebin.com/seUGVGeT
