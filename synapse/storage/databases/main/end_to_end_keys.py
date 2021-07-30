@@ -755,81 +755,84 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         """
 
         @trace
-        def _claim_e2e_one_time_keys(txn):
-            sql = (
-                "SELECT key_id, key_json FROM e2e_one_time_keys_json"
-                " WHERE user_id = ? AND device_id = ? AND algorithm = ?"
-                " LIMIT 1"
-            )
-            fallback_sql = (
-                "SELECT key_id, key_json, used FROM e2e_fallback_keys_json"
-                " WHERE user_id = ? AND device_id = ? AND algorithm = ?"
-                " LIMIT 1"
-            )
-            result = {}
-            delete = []
-            used_fallbacks = []
-            for user_id, device_id, algorithm in query_list:
-                user_result = result.setdefault(user_id, {})
-                device_result = user_result.setdefault(device_id, {})
-                txn.execute(sql, (user_id, device_id, algorithm))
-                otk_row = txn.fetchone()
-                if otk_row is not None:
-                    key_id, key_json = otk_row
-                    device_result[algorithm + ":" + key_id] = key_json
-                    delete.append((user_id, device_id, algorithm, key_id))
-                else:
-                    # no one-time key available, so see if there's a fallback
-                    # key
-                    txn.execute(fallback_sql, (user_id, device_id, algorithm))
-                    fallback_row = txn.fetchone()
-                    if fallback_row is not None:
-                        key_id, key_json, used = fallback_row
-                        device_result[algorithm + ":" + key_id] = key_json
-                        if not used:
-                            used_fallbacks.append(
-                                (user_id, device_id, algorithm, key_id)
-                            )
+        def _claim_e2e_one_time_key(
+            txn, user_id: str, device_id: str, algorithm: str
+        ) -> Optional[Tuple[str, str]]:
+            sql = """
+                SELECT key_id, key_json FROM e2e_one_time_keys_json
+                WHERE user_id = ? AND device_id = ? AND algorithm = ?
+                LIMIT 1
+            """
 
-            # drop any one-time keys that were claimed
-            sql = (
-                "DELETE FROM e2e_one_time_keys_json"
-                " WHERE user_id = ? AND device_id = ? AND algorithm = ?"
-                " AND key_id = ?"
-            )
-            for user_id, device_id, algorithm, key_id in delete:
-                log_kv(
-                    {
-                        "message": "Executing claim e2e_one_time_keys transaction on database."
-                    }
-                )
-                txn.execute(sql, (user_id, device_id, algorithm, key_id))
-                log_kv({"message": "finished executing and invalidating cache"})
-                self._invalidate_cache_and_stream(
-                    txn, self.count_e2e_one_time_keys, (user_id, device_id)
-                )
-            # mark fallback keys as used
-            for user_id, device_id, algorithm, key_id in used_fallbacks:
-                self.db_pool.simple_update_txn(
+            txn.execute(sql, (user_id, device_id, algorithm))
+            otk_row = txn.fetchone()
+            if otk_row is not None:
+                key_id, key_json = otk_row
+
+                self.db_pool.simple_delete_one_txn(
                     txn,
-                    "e2e_fallback_keys_json",
-                    {
+                    table="e2e_one_time_keys_json",
+                    keyvalues={
                         "user_id": user_id,
                         "device_id": device_id,
                         "algorithm": algorithm,
                         "key_id": key_id,
                     },
-                    {"used": True},
+                )
+                self._invalidate_cache_and_stream(
+                    txn, self.count_e2e_one_time_keys, (user_id, device_id)
+                )
+
+                return f"{algorithm}:{key_id}", key_json
+
+            # no one-time key available, so see if there's a fallback
+            # key
+            fallback_sql = """
+                SELECT key_id, key_json, used FROM e2e_fallback_keys_json
+                WHERE user_id = ? AND device_id = ? AND algorithm = ?
+                LIMIT 1
+            """
+
+            txn.execute(fallback_sql, (user_id, device_id, algorithm))
+            fallback_row = txn.fetchone()
+            if fallback_row is not None:
+                key_id, key_json, used = fallback_row
+
+                self.db_pool.simple_update_one_txn(
+                    txn,
+                    table="e2e_fallback_keys_json",
+                    keyvalues={
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        "algorithm": algorithm,
+                        "key_id": key_id,
+                    },
+                    updatevalues={"used": True},
                 )
                 self._invalidate_cache_and_stream(
                     txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
                 )
 
-            return result
+                return f"{algorithm}:{key_id}", key_json
 
-        return await self.db_pool.runInteraction(
-            "claim_e2e_one_time_keys", _claim_e2e_one_time_keys
-        )
+            return None
+
+        results = {}
+        for user_id, device_id, algorithm in query_list:
+            row = await self.db_pool.runInteraction(
+                "claim_e2e_one_time_keys",
+                _claim_e2e_one_time_key,
+                user_id,
+                device_id,
+                algorithm,
+            )
+            if row:
+                device_results = results.setdefault(user_id, {}).setdefault(
+                    device_id, {}
+                )
+                device_results[row[0]] = row[1]
+
+        return results
 
 
 class EndToEndKeyStore(EndToEndKeyWorkerStore, SQLBaseStore):
