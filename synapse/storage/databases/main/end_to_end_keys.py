@@ -787,41 +787,6 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
             return f"{algorithm}:{key_id}", key_json
 
-        @trace
-        def _get_fallback_key(
-            txn, user_id: str, device_id: str, algorithm: str
-        ) -> Optional[Tuple[str, str]]:
-
-            fallback_sql = """
-                SELECT key_id, key_json, used FROM e2e_fallback_keys_json
-                WHERE user_id = ? AND device_id = ? AND algorithm = ?
-                LIMIT 1
-            """
-
-            txn.execute(fallback_sql, (user_id, device_id, algorithm))
-            fallback_row = txn.fetchone()
-            if fallback_row is None:
-                return None
-
-            key_id, key_json, used = fallback_row
-
-            self.db_pool.simple_update_one_txn(
-                txn,
-                table="e2e_fallback_keys_json",
-                keyvalues={
-                    "user_id": user_id,
-                    "device_id": device_id,
-                    "algorithm": algorithm,
-                    "key_id": key_id,
-                },
-                updatevalues={"used": True},
-            )
-            self._invalidate_cache_and_stream(
-                txn, self.get_e2e_unused_fallback_key_types, (user_id, device_id)
-            )
-
-            return f"{algorithm}:{key_id}", key_json
-
         results = {}
         for user_id, device_id, algorithm in query_list:
             row = await self.db_pool.runInteraction(
@@ -838,21 +803,45 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 device_results[row[0]] = row[1]
                 continue
 
-            # no one-time key available, so see if there's a fallback
+            # No one-time key available, so see if there's a fallback
             # key
-            row = await self.db_pool.runInteraction(
-                "_get_fallback_key",
-                _get_fallback_key,
-                user_id,
-                device_id,
-                algorithm,
+            rows = await self.db_pool.simple_select_list(
+                table="e2e_fallback_keys_json",
+                keyvalues={
+                    "user_id": user_id,
+                    "device_id": device_id,
+                    "algorithm": algorithm,
+                },
+                retcols=("key_id", "key_json", "used"),
+                desc="_get_fallback_key",
             )
+            if not rows:
+                continue
 
-            if row:
-                device_results = results.setdefault(user_id, {}).setdefault(
-                    device_id, {}
+            row = rows[0]
+            key_id = row["key_id"]
+            key_json = row["key_json"]
+            used = row["used"]
+
+            # Mark fallback key as used if not already.
+            if not used:
+                await self.db_pool.simple_update_one(
+                    table="e2e_fallback_keys_json",
+                    keyvalues={
+                        "user_id": user_id,
+                        "device_id": device_id,
+                        "algorithm": algorithm,
+                        "key_id": key_id,
+                    },
+                    updatevalues={"used": True},
+                    desc="_get_fallback_key_set_used",
                 )
-                device_results[row[0]] = row[1]
+                await self.invalidate_cache_and_stream(
+                    "get_e2e_unused_fallback_key_types", (user_id, device_id)
+                )
+
+            device_results = results.setdefault(user_id, {}).setdefault(device_id, {})
+            device_results[f"{algorithm}:{key_id}"] = key_json
 
         return results
 
