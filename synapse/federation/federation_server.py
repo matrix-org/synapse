@@ -200,8 +200,12 @@ class FederationServer(FederationBase):
         return 200, res
 
     async def on_incoming_transaction(
-        self, origin: str, transaction_data: JsonDict
-    ) -> Tuple[int, Dict[str, Any]]:
+        self,
+        origin: str,
+        transaction_id: str,
+        destination: str,
+        transaction_data: JsonDict,
+    ) -> Tuple[int, JsonDict]:
         # If we receive a transaction we should make sure that kick off handling
         # any old events in the staging area.
         if not self._started_handling_of_staged_events:
@@ -212,8 +216,11 @@ class FederationServer(FederationBase):
         # accurate as possible.
         request_time = self._clock.time_msec()
 
-        transaction = Transaction(**transaction_data)
-        transaction_id = transaction.transaction_id  # type: ignore
+        transaction = Transaction(
+            transaction_id=transaction_id,
+            destination=destination,
+            **transaction_data,
+        )
 
         if not transaction_id:
             raise Exception("Transaction missing transaction_id")
