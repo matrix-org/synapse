@@ -11,10 +11,6 @@ DIST=`cut -d ':' -f2 <<< $distro`
 cp -aT /synapse/source /synapse/build
 cd /synapse/build
 
-# add an entry to the changelog for this distribution
-dch -M -l "+$DIST" "build for $DIST"
-dch -M -r "" --force-distribution --distribution "$DIST"
-
 # if this is a prerelease, set the Section accordingly.
 #
 # When the package is later added to the package repo, reprepro will use the
@@ -23,11 +19,14 @@ dch -M -r "" --force-distribution --distribution "$DIST"
 
 DEB_VERSION=`dpkg-parsechangelog -SVersion`
 case $DEB_VERSION in
-    *rc*|*a*|*b*|*c*)
+    *~rc*|*~a*|*~b*|*~c*)
         sed -ie '/^Section:/c\Section: prerelease' debian/control
         ;;
 esac
 
+# add an entry to the changelog for this distribution
+dch -M -l "+$DIST" "build for $DIST"
+dch -M -r "" --force-distribution --distribution "$DIST"
 
 dpkg-buildpackage -us -uc
 
