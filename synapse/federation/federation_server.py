@@ -998,7 +998,7 @@ class FederationServer(FederationBase):
 
             origin, event = next
 
-            # Prune the event queue if its getting large.
+            # Prune the event queue if it's getting large.
             #
             # We do this *after* handling the first event as the common case is
             # that the queue is empty (/has the single event in), and so there's
