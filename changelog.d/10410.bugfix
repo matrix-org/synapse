@@ -1,0 +1,1 @@
+Improve character set detection in URL previews by supporting underscores (in addition to hyphens). Contributed by @srividyut.
