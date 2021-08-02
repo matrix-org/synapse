@@ -72,6 +72,7 @@ from synapse.logging.context import (
     preserve_fn,
     run_in_background,
 )
+from synapse.logging.opentracing import start_active_span
 from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
@@ -1462,14 +1463,15 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Joining %s to %s", joinee, room_id)
 
-        origin, event, room_version_obj = await self._make_and_verify_event(
-            target_hosts,
-            room_id,
-            joinee,
-            "join",
-            content,
-            params={"ver": KNOWN_ROOM_VERSIONS},
-        )
+        with start_active_span("make_join"):
+            origin, event, room_version_obj = await self._make_and_verify_event(
+                target_hosts,
+                room_id,
+                joinee,
+                "join",
+                content,
+                params={"ver": KNOWN_ROOM_VERSIONS},
+            )
 
         # This shouldn't happen, because the RoomMemberHandler has a
         # linearizer lock which only allows one operation per user per room
@@ -1490,9 +1492,10 @@ class FederationHandler(BaseHandler):
             except ValueError:
                 pass
 
-            ret = await self.federation_client.send_join(
-                host_list, event, room_version_obj
-            )
+            with start_active_span("send_join"):
+                ret = await self.federation_client.send_join(
+                    host_list, event, room_version_obj
+                )
 
             event = ret.event
             origin = ret.origin
@@ -1519,9 +1522,10 @@ class FederationHandler(BaseHandler):
                 room_version=room_version_obj,
             )
 
-            max_stream_id = await self._persist_auth_tree(
-                origin, room_id, auth_chain, state, event, room_version_obj
-            )
+            with start_active_span("_persist_auth_tree"):
+                max_stream_id = await self._persist_auth_tree(
+                    origin, room_id, auth_chain, state, event, room_version_obj
+                )
 
             # We wait here until this instance has seen the events come down
             # replication (if we're using replication) as the below uses caches.

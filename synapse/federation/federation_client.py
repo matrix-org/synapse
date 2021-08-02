@@ -55,6 +55,7 @@ from synapse.api.room_versions import (
 from synapse.events import EventBase, builder
 from synapse.federation.federation_base import FederationBase, event_from_pdu_json
 from synapse.federation.transport.client import SendJoinResponse
+from synapse.logging.opentracing import start_active_span
 from synapse.logging.utils import log_function
 from synapse.types import JsonDict, get_domain_from_id
 from synapse.util.async_helpers import concurrently_execute
@@ -732,7 +733,8 @@ class FederationClient(FederationBase):
         """
 
         async def send_request(destination) -> SendJoinResult:
-            response = await self._do_send_join(room_version, destination, pdu)
+            with start_active_span("_do_send_join"):
+                response = await self._do_send_join(room_version, destination, pdu)
 
             # If an event was returned (and expected to be returned):
             #
@@ -792,19 +794,21 @@ class FederationClient(FederationBase):
             valid_pdus_map: Dict[str, EventBase] = {}
 
             async def _execute(pdu: EventBase) -> None:
-                valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
-                    pdu=pdu,
-                    origin=destination,
-                    outlier=True,
-                    room_version=room_version,
-                )
+                with start_active_span("_check_sigs_and_hash_and_fetch_one"):
+                    valid_pdu = await self._check_sigs_and_hash_and_fetch_one(
+                        pdu=pdu,
+                        origin=destination,
+                        outlier=True,
+                        room_version=room_version,
+                    )
 
                 if valid_pdu:
                     valid_pdus_map[valid_pdu.event_id] = valid_pdu
 
-            await concurrently_execute(
-                _execute, itertools.chain(state, auth_chain), 10000
-            )
+            with start_active_span("check_sigs"):
+                await concurrently_execute(
+                    _execute, itertools.chain(state, auth_chain), 10000
+                )
 
             # NB: We *need* to copy to ensure that we don't have multiple
             # references being passed on, as that causes... issues.
