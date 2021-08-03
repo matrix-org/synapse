@@ -33,7 +33,6 @@ import redbaron
 from click.exceptions import ClickException
 from github import Github
 from packaging import version
-from redbaron import RedBaron
 
 
 @click.group()
@@ -378,11 +377,13 @@ def publish(gh_token: Optional[str]):
     )
 
 
-def parse_version_from_module() -> Tuple[version.Version, RedBaron, redbaron.Node]:
+def parse_version_from_module() -> Tuple[
+    version.Version, redbaron.RedBaron, redbaron.Node
+]:
     # Parse the AST and load the `__version__` node so that we can edit it
     # later.
     with open("synapse/__init__.py") as f:
-        red = RedBaron(f.read())
+        red = redbaron.RedBaron(f.read())
 
     version_node = None
     for node in red:
