@@ -305,7 +305,7 @@ def tag(gh_token: Optional[str]):
     )
 
     # Open the release and the actions where we are building the assets.
-    click.launch(release.url)
+    click.launch(release.html_url)
     click.launch(
         f"https://github.com/matrix-org/synapse/actions?query=branch%3A{tag_name}"
     )
