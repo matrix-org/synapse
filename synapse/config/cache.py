@@ -151,7 +151,7 @@ class CacheConfig(Config):
           # entries are never evicted based on time.
           #
           #expiry_time: 30m
-          
+
           # Controls how long the results of a /sync request are cached for after
           # a successful response is returned. A higher duration can help clients with
           # intermittent connections, at the cost of higher memory usage.
