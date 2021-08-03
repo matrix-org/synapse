@@ -345,16 +345,16 @@ def publish(gh_token: str):
     assert release.title == tag_name
 
     if not release.draft:
-        if not click.confirm("Release already published. Continue?", default=True):
-            return
-    else:
-        release = release.update_release(
-            name=release.title,
-            message=release.body,
-            tag_name=release.tag_name,
-            prerelease=release.prerelease,
-            draft=False,
-        )
+        click.echo("Release already published.")
+        return
+
+    release = release.update_release(
+        name=release.title,
+        message=release.body,
+        tag_name=release.tag_name,
+        prerelease=release.prerelease,
+        draft=False,
+    )
 
 
 @cli.command()
