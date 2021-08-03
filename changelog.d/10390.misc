@@ -1,0 +1,1 @@
+Prune inbound federation inbound queues for a room if they get too large.

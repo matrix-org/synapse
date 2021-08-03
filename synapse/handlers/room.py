@@ -951,6 +951,7 @@ class RoomCreationHandler(BaseHandler):
                 "kick": 50,
                 "redact": 50,
                 "invite": 50,
+                "historical": 100,
             }
 
             if config["original_invitees_have_ops"]:
