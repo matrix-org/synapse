@@ -239,6 +239,9 @@ def setup_test_homeserver(
             "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
 
+    if "db_txn_limit" in kwargs:
+        database_config["txn_limit"] = kwargs["db_txn_limit"]
+
     database = DatabaseConnectionConfig("master", database_config)
     config.database.databases = [database]
 

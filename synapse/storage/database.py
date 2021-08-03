@@ -15,6 +15,7 @@
 # limitations under the License.
 import logging
 import time
+from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
@@ -397,6 +398,7 @@ class DatabasePool:
     ):
         self.hs = hs
         self._clock = hs.get_clock()
+        self._txn_limit = database_config.config.get("txn_limit", 0)
         self._database_config = database_config
         self._db_pool = make_pool(hs.get_reactor(), database_config, engine)
 
@@ -405,6 +407,9 @@ class DatabasePool:
         self._previous_txn_total_time = 0.0
         self._current_txn_total_time = 0.0
         self._previous_loop_ts = 0.0
+
+        # Transaction counter: key is the twisted thread id, value is the current count
+        self._txn_counters: Dict[int, int] = defaultdict(int)
 
         # TODO(paul): These can eventually be removed once the metrics code
         #   is running in mainline, and we have some nice monitoring frontends
@@ -750,10 +755,26 @@ class DatabasePool:
                     sql_scheduling_timer.observe(sched_duration_sec)
                     context.add_database_scheduled(sched_duration_sec)
 
+                    if self._txn_limit > 0:
+                        tid = self._db_pool.threadID()
+                        self._txn_counters[tid] += 1
+
+                        if self._txn_counters[tid] > self._txn_limit:
+                            logger.debug(
+                                "Reconnecting database connection over transaction limit"
+                            )
+                            conn.reconnect()
+                            opentracing.log_kv(
+                                {"message": "reconnected due to txn limit"}
+                            )
+                            self._txn_counters[tid] = 1
+
                     if self.engine.is_connection_closed(conn):
                         logger.debug("Reconnecting closed database connection")
                         conn.reconnect()
                         opentracing.log_kv({"message": "reconnected"})
+                        if self._txn_limit > 0:
+                            self._txn_counters[tid] = 1
 
                     try:
                         if db_autocommit:
