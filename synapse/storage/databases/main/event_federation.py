@@ -1198,18 +1198,15 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         )
 
     async def insert_insertion_extremity(self, event_id: str, room_id: str) -> None:
-        def _insert_insertion_extremity_txn(txn):
-            self.db_pool.simple_insert_txn(
-                txn,
-                table="insertion_event_extremities",
-                values={
-                    "event_id": event_id,
-                    "room_id": room_id,
-                },
-            )
-
-        await self.db_pool.runInteraction(
-            "_insert_insertion_extremity_txn", _insert_insertion_extremity_txn
+        await self.db_pool.simple_upsert(
+            table="insertion_event_extremities",
+            keyvalues={"event_id": event_id},
+            values={
+                "event_id": event_id,
+                "room_id": room_id,
+            },
+            insertion_values={},
+            desc="insert_insertion_extremity",
         )
 
     async def insert_received_event_to_staging(
