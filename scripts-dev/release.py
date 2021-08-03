@@ -358,7 +358,7 @@ def publish(gh_token: str):
 
 
 @cli.command()
-def upload(gh_token: Optional[str]):
+def upload():
     """Upload release to pypi."""
 
     current_version, _, _ = parse_version_from_module()
