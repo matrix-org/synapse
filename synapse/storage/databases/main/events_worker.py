@@ -592,7 +592,7 @@ class EventsWorkerStore(SQLBaseStore):
     def _get_events_from_cache(
         self, events: Iterable[str], update_metrics: bool = True
     ) -> Dict[str, _EventCacheEntry]:
-        """Fetch events from the caches
+        """Fetch events from the caches, may return rejected events.
 
         Args:
             events: list of event_ids to fetch
@@ -737,7 +737,8 @@ class EventsWorkerStore(SQLBaseStore):
     async def _get_events_from_db(
         self, event_ids: Iterable[str]
     ) -> Dict[str, _EventCacheEntry]:
-        """Fetch a bunch of events from the database.
+        """Fetch a bunch of events from the database, may return rejected
+        events.
 
         Returned events will be added to the cache for future lookups.
 
