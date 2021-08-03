@@ -1024,6 +1024,23 @@ class FederationServer(FederationBase):
 
             origin, event = next
 
+            # Prune the event queue if it's getting large.
+            #
+            # We do this *after* handling the first event as the common case is
+            # that the queue is empty (/has the single event in), and so there's
+            # no need to do this check.
+            pruned = await self.store.prune_staged_events_in_room(room_id, room_version)
+            if pruned:
+                # If we have pruned the queue check we need to refetch the next
+                # event to handle.
+                next = await self.store.get_next_staged_event_for_room(
+                    room_id, room_version
+                )
+                if not next:
+                    break
+
+                origin, event = next
+
             lock = await self.store.try_acquire_lock(
                 _INBOUND_EVENT_HANDLING_LOCK_NAME, room_id
             )

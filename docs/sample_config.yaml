@@ -711,6 +711,15 @@ caches:
   #
   #expiry_time: 30m
 
+  # Controls how long the results of a /sync request are cached for after
+  # a successful response is returned. A higher duration can help clients with
+  # intermittent connections, at the cost of higher memory usage.
+  #
+  # By default, this is zero, which means that sync responses are not cached
+  # at all.
+  #
+  #sync_response_cache_duration: 2m
+
 
 ## Database ##
 
@@ -719,6 +728,9 @@ caches:
 #
 # 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
 # 'psycopg2' (for PostgreSQL).
+#
+# 'txn_limit' gives the maximum number of transactions to run per connection
+# before reconnecting. Defaults to 0, which means no limit.
 #
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
@@ -740,6 +752,7 @@ caches:
 #
 #database:
 #  name: psycopg2
+#  txn_limit: 10000
 #  args:
 #    user: synapse_user
 #    password: secretpassword
