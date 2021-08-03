@@ -529,7 +529,7 @@ class EventsWorkerStore(SQLBaseStore):
         for event_id in missing_events_ids:
             deferred = self._current_event_fetches.get(event_id)
             if deferred is not None:
-                # We're already pulling the event out of the DB, ad the deferred
+                # We're already pulling the event out of the DB. Add the deferred
                 # to the collection of deferreds to wait on.
                 already_fetching[event_id] = deferred.observe()
             else:
