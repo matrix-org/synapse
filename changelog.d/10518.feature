@@ -1,1 +1,1 @@
-Make `PeriodicallyFlushingMemoryHandler` (buffered logging handler which periodically flushes itself) the default logging handler.
+The default logging handler for new installations is now `PeriodicallyFlushingMemoryHandler`, a buffered logging handler which periodically flushes itself.
