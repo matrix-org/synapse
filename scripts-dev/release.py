@@ -54,6 +54,7 @@ def cli():
         # ... wait for asssets to build ...
 
         ./scripts-dev/release.py publish
+        ./scripts-dev/release.py upload
 
     If the env var GH_TOKEN (or GITHUB_TOKEN) is set, or passed into the
     `tag`/`publish` command, then a new draft release will be created/published.
@@ -315,7 +316,7 @@ def tag(gh_token: Optional[str]):
 @cli.command()
 @click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
 def publish(gh_token: Optional[str]):
-    """Publish release and upload to PyPI."""
+    """Publish release."""
 
     # Make sure we're in a git repo.
     try:
@@ -355,6 +356,14 @@ def publish(gh_token: Optional[str]):
                 prerelease=release.prerelease,
                 draft=False,
             )
+
+
+@cli.command()
+def upload(gh_token: Optional[str]):
+    """Upload release to pypi."""
+
+    current_version, _, _ = parse_version_from_module()
+    tag_name = f"v{current_version}"
 
     pypi_asset_names = [
         f"matrix_synapse-{current_version}-py3-none-any.whl",
