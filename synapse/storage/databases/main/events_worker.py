@@ -170,9 +170,12 @@ class EventsWorkerStore(SQLBaseStore):
             max_size=hs.config.caches.event_cache_size,
         )
 
-        # Map from event ID to a deferred that will result in an
-        # Dict[str, _EventCacheEntry].
-        self._current_event_fetches: Dict[str, ObservableDeferred] = {}
+        # Map from event ID to a deferred that will result in a map from event
+        # ID to cache entry. Note that the returned dict may not have the
+        # requested event in it if the event isn't in the DB.
+        self._current_event_fetches: Dict[
+            str, ObservableDeferred[Dict[str, _EventCacheEntry]]
+        ] = {}
 
         self._event_fetch_lock = threading.Condition()
         self._event_fetch_list = []
@@ -537,7 +540,9 @@ class EventsWorkerStore(SQLBaseStore):
             # to all the events we pulled from the DB (this will result in this
             # function returning more events than requested, but that can happen
             # already due to `_get_events_from_db`).
-            fetching_deferred = ObservableDeferred(defer.Deferred())
+            fetching_deferred: ObservableDeferred[
+                Dict[str, _EventCacheEntry]
+            ] = ObservableDeferred(defer.Deferred())
             for event_id in missing_events_ids:
                 self._current_event_fetches[event_id] = fetching_deferred
 
