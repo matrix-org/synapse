@@ -38,9 +38,11 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
+from synapse.api.errors import Codes, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
+from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -66,6 +68,12 @@ class SpaceSummaryHandler:
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
+
+        # TODO Allow for multiple workers to share this data.
+        # TODO Expire pagination tokens.
+        self._pagination_sessions: Dict[
+            str, Tuple[Deque[_RoomQueueEntry], Set[str]]
+        ] = {}
 
     async def get_space_summary(
         self,
@@ -278,13 +286,19 @@ class SpaceSummaryHandler:
         # world-readable)
         await self._auth.check_user_in_room_or_world_readable(room_id, requester)
 
-        # TODO Handle pulling previously persisted state by the pagination token.
+        # If this is continuing a previous session, pull the persisted data.
+        if from_token:
+            if from_token not in self._pagination_sessions:
+                raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
-        # the queue of rooms to process
-        room_queue = deque((_RoomQueueEntry(room_id, ()),))
+            # TODO Assert that other parameters have not changed.
+            (room_queue, processed_rooms) = self._pagination_sessions[from_token]
+        else:
+            # the queue of rooms to process
+            room_queue = deque((_RoomQueueEntry(room_id, ()),))
 
-        # Rooms we have already processed.
-        processed_rooms: Set[str] = set()
+            # Rooms we have already processed.
+            processed_rooms = set()
 
         rooms_result: List[JsonDict] = []
 
@@ -333,9 +347,13 @@ class SpaceSummaryHandler:
                 # TODO Federation.
                 pass
 
-        result = {"rooms": rooms_result}
+        result: JsonDict = {"rooms": rooms_result}
 
-        # TODO Handle adding a pagination token (and persisting state).
+        # If there's additional data, generate a pagination token (and persist state).
+        if room_queue:
+            next_token = random_string(24)
+            result["next_token"] = next_token
+            self._pagination_sessions[next_token] = (room_queue, processed_rooms)
 
         return result
 

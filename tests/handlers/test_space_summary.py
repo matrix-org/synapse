@@ -123,12 +123,17 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.room = self.helper.create_room_as(self.user, tok=self.token)
         self._add_child(self.space, self.room, self.token)
 
-    def _add_child(self, space_id: str, room_id: str, token: str) -> None:
+    def _add_child(
+        self, space_id: str, room_id: str, token: str, order: Optional[str] = None
+    ) -> None:
         """Add a child room to a space."""
+        content = {"via": [self.hs.hostname]}
+        if order is not None:
+            content["order"] = order
         self.helper.send_state(
             space_id,
             event_type=EventTypes.SpaceChild,
-            body={"via": [self.hs.hostname]},
+            body=content,
             tok=token,
             state_key=room_id,
         )
@@ -388,6 +393,39 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             self.handler.get_room_hierarchy(self.user, self.space)
         )
         self._assert_hierarchy(result, expected)
+
+    def test_pagination(self):
+        """Test simple pagination works."""
+        room_ids = []
+        for i in range(1, 10):
+            room = self.helper.create_room_as(self.user, tok=self.token)
+            self._add_child(self.space, room, self.token, order=str(i))
+            room_ids.append(room)
+        # The room created initially doesn't have an order, so comes last.
+        room_ids.append(self.room)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, limit=7)
+        )
+        # The result should have the space and all of the links, plus some of the
+        # rooms and a pagination token.
+        expected = [(self.space, room_ids)] + [
+            (room_id, ()) for room_id in room_ids[:6]
+        ]
+        self._assert_hierarchy(result, expected)
+        self.assertIn("next_token", result)
+
+        # Check the next page.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(
+                self.user, self.space, limit=5, from_token=result["next_token"]
+            )
+        )
+        # The result should have the space and the room in it, along with a link
+        # from space -> room.
+        expected = [(room_id, ()) for room_id in room_ids[6:]]
+        self._assert_hierarchy(result, expected)
+        self.assertNotIn("next_token", result)
 
     def test_fed_complex(self):
         """
