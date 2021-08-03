@@ -22,7 +22,7 @@ incrementing integer, but backfilled events start with `stream_ordering=-1` and 
 ---
 
  - `/sync` returns things in the order they arrive at the server (`stream_ordering`).
- - `/messages` (and `/backfill in the federation API) return them in the order determined by the event graph `(topological_ordering, stream_ordering)`.
+ - `/messages` (and `/backfill` in the federation API) return them in the order determined by the event graph `(topological_ordering, stream_ordering)`.
 
 The general idea is that, if you're following a room in real-time (i.e.
 `/sync`), you probably want to see the messages as they arrive at your server,
@@ -46,10 +46,8 @@ oldest-in-time events we know of in the DAG.
 This is an event where we haven't fetched all of the `prev_events` for.
 
 Once we have fetched all of its `prev_events`, it's unmarked as a backwards
-extremity and those `prev_events` become the new backwards extremities (unless
-we have already persisted them). Also in reality, we backfill in batches of 20
-events or so, so only the `prev_events` of the last oldest-in-time event will
-become the backwards extremeties.
+extremity (although we may have formed new backwards extremities from the prev
+events during the backfilling process).
 
 
 ## Outliers
@@ -64,12 +62,6 @@ the `prev_events` is marked as a [backwards extremity](#backwards-extremity).
 For example, when we fetch the event auth chain or state for a given event, we
 mark all of those claimed auth events as outliers because we haven't done the
 state calculation ourself.
-
-Outliers are sometimes referred to as floating outliers but there is no
-distinction between a normal and floating outlier. The floating descriptor just
-comes from the fact that all outliers are an arbitrary floating event in the DAG
-as opposed to being inline with the current DAG.
-
 
 
 ## State groups
