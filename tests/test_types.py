@@ -13,12 +13,7 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.types import (
-    GroupID,
-    RoomAlias,
-    UserID,
-    map_username_to_mxid_localpart,
-)
+from synapse.types import GroupID, RoomAlias, UserID, map_username_to_mxid_localpart
 
 from tests import unittest
 
