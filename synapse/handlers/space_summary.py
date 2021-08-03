@@ -313,6 +313,7 @@ class SpaceSummaryHandler:
         while room_queue and len(rooms_result) < limit:
             queue_entry = room_queue.popleft()
             room_id = queue_entry.room_id
+            current_depth = queue_entry.depth
             if room_id in processed_rooms:
                 # already done this room
                 continue
@@ -336,11 +337,15 @@ class SpaceSummaryHandler:
                     # Add the child to the queue. We have already validated
                     # that the vias are a list of server names.
                     #
-                    # TODO Handle max_depth
-                    room_queue.extendleft(
-                        _RoomQueueEntry(ev["state_key"], ev["content"]["via"])
-                        for ev in reversed(room_entry.children)
-                    )
+                    # If the current depth is the maximum depth, do not queue
+                    # more entries.
+                    if max_depth is None or current_depth < max_depth:
+                        room_queue.extendleft(
+                            _RoomQueueEntry(
+                                ev["state_key"], ev["content"]["via"], current_depth + 1
+                            )
+                            for ev in reversed(room_entry.children)
+                        )
 
                 processed_rooms.add(room_id)
             else:
@@ -757,6 +762,7 @@ class SpaceSummaryHandler:
 class _RoomQueueEntry:
     room_id: str
     via: Sequence[str]
+    depth: int = 0
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

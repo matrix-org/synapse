@@ -427,6 +427,55 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._assert_hierarchy(result, expected)
         self.assertNotIn("next_token", result)
 
+    def test_max_depth(self):
+        """Create a deep tree to test the max depth against."""
+        spaces = [self.space]
+        rooms = [self.room]
+        for _ in range(5):
+            spaces.append(
+                self.helper.create_room_as(
+                    self.user,
+                    tok=self.token,
+                    extra_content={
+                        "creation_content": {
+                            EventContentFields.ROOM_TYPE: RoomTypes.SPACE
+                        }
+                    },
+                )
+            )
+            self._add_child(spaces[-2], spaces[-1], self.token)
+            rooms.append(self.helper.create_room_as(self.user, tok=self.token))
+            self._add_child(spaces[-1], rooms[-1], self.token)
+
+        # Test just the space itself.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, max_depth=0)
+        )
+        expected = [(spaces[0], [rooms[0], spaces[1]])]
+        self._assert_hierarchy(result, expected)
+
+        # A single additional layer.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, max_depth=1)
+        )
+        expected += [
+            (rooms[0], ()),
+            (spaces[1], [rooms[1], spaces[2]]),
+        ]
+        self._assert_hierarchy(result, expected)
+
+        # A few layers.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, max_depth=3)
+        )
+        expected += [
+            (rooms[1], ()),
+            (spaces[2], [rooms[2], spaces[3]]),
+            (rooms[2], ()),
+            (spaces[3], [rooms[3], spaces[4]]),
+        ]
+        self._assert_hierarchy(result, expected)
+
     def test_fed_complex(self):
         """
         Return data over federation and ensure that it is handled properly.
