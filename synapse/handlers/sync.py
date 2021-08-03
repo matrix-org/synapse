@@ -269,13 +269,21 @@ class SyncHandler:
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache: ResponseCache[SyncRequestKey] = ResponseCache(
-            hs.get_clock(), "sync"
-        )
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
+
+        # TODO: flush cache entries on subsequent sync request.
+        #    Once we get the next /sync request (ie, one with the same access token
+        #    that sets 'since' to 'next_batch'), we know that device won't need a
+        #    cached result any more, and we could flush the entry from the cache to save
+        #    memory.
+        self.response_cache: ResponseCache[SyncRequestKey] = ResponseCache(
+            hs.get_clock(),
+            "sync",
+            timeout_ms=hs.config.caches.sync_response_cache_duration,
+        )
 
         # ExpiringCache((User, Device)) -> LruCache(user_id => event_id)
         self.lazy_loaded_members_cache: ExpiringCache[
