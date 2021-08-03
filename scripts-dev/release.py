@@ -314,8 +314,8 @@ def tag(gh_token: Optional[str]):
 
 
 @cli.command()
-@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"])
-def publish(gh_token: Optional[str]):
+@click.option("--gh-token", envvar=["GH_TOKEN", "GITHUB_TOKEN"], required=True)
+def publish(gh_token: str):
     """Publish release."""
 
     # Make sure we're in a git repo.
@@ -333,29 +333,28 @@ def publish(gh_token: Optional[str]):
     if not click.confirm(f"Publish {tag_name}?", default=True):
         return
 
-    if gh_token:
-        # Publish the draft release
-        gh = Github(gh_token)
-        gh_repo = gh.get_repo("matrix-org/synapse")
-        for release in gh_repo.get_releases():
-            if release.title == tag_name:
-                break
-        else:
-            raise ClickException(f"Failed to find GitHub release for {tag_name}")
+    # Publish the draft release
+    gh = Github(gh_token)
+    gh_repo = gh.get_repo("matrix-org/synapse")
+    for release in gh_repo.get_releases():
+        if release.title == tag_name:
+            break
+    else:
+        raise ClickException(f"Failed to find GitHub release for {tag_name}")
 
-        assert release.title == tag_name
+    assert release.title == tag_name
 
-        if not release.draft:
-            if not click.confirm("Release already published. Continue?", default=True):
-                return
-        else:
-            release = release.update_release(
-                name=release.title,
-                message=release.body,
-                tag_name=release.tag_name,
-                prerelease=release.prerelease,
-                draft=False,
-            )
+    if not release.draft:
+        if not click.confirm("Release already published. Continue?", default=True):
+            return
+    else:
+        release = release.update_release(
+            name=release.title,
+            message=release.body,
+            tag_name=release.tag_name,
+            prerelease=release.prerelease,
+            draft=False,
+        )
 
 
 @cli.command()
