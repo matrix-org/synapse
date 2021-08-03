@@ -759,7 +759,7 @@ class UserInfo:
 
     Attributes:
         user_id:  ID of the user.
-        app_service:  Application service that created this user.
+        appservice_id:  Application service ID that created this user.
         consent_server_notice_sent:  Version of policy documents the user has been sent.
         consent_version:  Version of policy documents the user has consented to.
         creation_ts:  Creation timestamp of the user.
@@ -771,12 +771,12 @@ class UserInfo:
     """
 
     user_id: UserID
-    app_service: Optional[ApplicationService]
+    appservice_id: Optional[int]
     consent_server_notice_sent: Optional[str]
     consent_version: Optional[str]
     user_type: Optional[str]
-    creation_ts: int = 0
-    is_admin: bool = False
-    is_deactivated: bool = False
-    is_guest: bool = False
-    is_shadow_banned: bool = False
+    creation_ts: int
+    is_admin: bool
+    is_deactivated: bool
+    is_guest: bool
+    is_shadow_banned: bool

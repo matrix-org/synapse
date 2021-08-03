@@ -79,14 +79,14 @@ class ModuleApiTestCase(HomeserverTestCase):
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
 
-    def test_get_user_by_id(self):
+    def test_get_userinfo_by_id(self):
         user_id = self.register_user("alice", "1234")
-        found_user = self.get_success(self.module_api.get_user_by_id(user_id))
-        self.assertEqual(found_user.user.to_string(), user_id)
-        self.assertIdentical(found_user.admin, False)
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, False)
 
-    def test_get_user_by_id__no_user_found(self):
-        found_user = self.get_success(self.module_api.get_user_by_id("@alice:test"))
+    def test_get_userinfo_by_id__no_user_found(self):
+        found_user = self.get_success(self.module_api.get_userinfo_by_id("@alice:test"))
         self.assertIsNone(found_user)
 
     def test_sending_events_into_room(self):

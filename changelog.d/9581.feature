@@ -1,1 +1,1 @@
-Add get_user_by_id method to ModuleApi.
+Add get_userinfo_by_id method to ModuleApi.

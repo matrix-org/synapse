@@ -29,7 +29,7 @@ from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.types import Connection, Cursor
 from synapse.storage.util.id_generators import IdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import UserID
+from synapse.types import UserID, UserInfo
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -164,6 +164,42 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             ],
             allow_none=True,
             desc="get_user_by_id",
+        )
+
+    @cached()
+    async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
+        user_data = await self.db_pool.simple_select_one(
+            table="users",
+            keyvalues={"name": user_id},
+            retcols=[
+                "name",
+                "password_hash",
+                "is_guest",
+                "admin",
+                "consent_version",
+                "consent_server_notice_sent",
+                "appservice_id",
+                "creation_ts",
+                "user_type",
+                "deactivated",
+                "shadow_banned",
+            ],
+            allow_none=True,
+            desc="get_userinfo_by_id",
+        )
+        if not user_data:
+            return
+        return UserInfo(
+            appservice_id=user_data.get("appservice_id"),
+            consent_server_notice_sent=user_data.get("consent_server_notice_sent"),
+            consent_version=user_data.get("consent_version"),
+            creation_ts=user_data.get("creation_ts"),
+            is_admin=bool(user_data.get("admin")),
+            is_deactivated=bool(user_data.get("deactivated")),
+            is_guest=bool(user_data.get("is_guest")),
+            is_shadow_banned=bool(user_data.get("shadow_banned")),
+            user_id=UserID.from_string(user_data.get("name")),
+            user_type=user_data.get("user_type"),
         )
 
     async def is_trial_user(self, user_id: str) -> bool:
