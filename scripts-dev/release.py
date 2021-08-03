@@ -267,7 +267,7 @@ def tag(gh_token: Optional[str]):
 
     # Check we haven't released this version.
     if tag_name in repo.tags:
-        raise click.ClickException(f"Tag already exists for {current_version}!\n")
+        raise click.ClickException(f"Tag {tag_name} already exists!\n")
 
     # Get the appropriate changelogs and tag.
     changes = get_changes_for_version(current_version)
@@ -334,7 +334,7 @@ def publish(gh_token: Optional[str]):
         return
 
     if gh_token:
-        # Create a new draft release
+        # Publish the draft release
         gh = Github(gh_token)
         gh_repo = gh.get_repo("matrix-org/synapse")
         for release in gh_repo.get_releases():
