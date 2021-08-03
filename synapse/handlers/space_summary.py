@@ -179,7 +179,7 @@ class SpaceSummaryHandler:
 
                     # Check if the user is a member of any of the allowed spaces
                     # from the response.
-                    allowed_rooms = room.get("allowed_spaces")
+                    allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
                     if (
                         not include_room
                         and allowed_rooms
@@ -236,9 +236,10 @@ class SpaceSummaryHandler:
                 )
                 processed_events.add(ev_key)
 
-        # Before returning to the client, remove the allowed_spaces key for any
-        # rooms.
+        # Before returning to the client, remove the allowed_room_ids and
+        # allowed_spaces key for any rooms.
         for room in rooms_result:
+            room.pop("allowed_room_ids", None)
             room.pop("allowed_spaces", None)
 
         return {"rooms": rooms_result, "events": events_result}
@@ -585,6 +586,8 @@ class SpaceSummaryHandler:
             "guest_can_join": stats["guest_access"] == "can_join",
             "creation_ts": create_event.origin_server_ts,
             "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
+            "allowed_room_ids": allowed_rooms,
+            # TODO Remove this key once the API is stable.
             "allowed_spaces": allowed_rooms,
         }
 
