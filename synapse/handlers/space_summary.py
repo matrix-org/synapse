@@ -69,10 +69,16 @@ class SpaceSummaryHandler:
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
 
+        # A map of query information to the current state, for pagination.
+        #
+        # The query information is a tuple of the room ID, suggested-only, and
+        # max-depth fields, followed by the pagination token.
+        #
         # TODO Allow for multiple workers to share this data.
         # TODO Expire pagination tokens.
         self._pagination_sessions: Dict[
-            str, Tuple[Deque[_RoomQueueEntry], Set[str]]
+            Tuple[str, bool, Optional[int], str],
+            Tuple[Deque[_RoomQueueEntry], Set[str]],
         ] = {}
 
     async def get_space_summary(
@@ -256,7 +262,7 @@ class SpaceSummaryHandler:
     async def get_room_hierarchy(
         self,
         requester: str,
-        room_id: str,
+        requested_room_id: str,
         suggested_only: bool = False,
         max_depth: Optional[int] = None,
         limit: Optional[int] = None,
@@ -267,7 +273,7 @@ class SpaceSummaryHandler:
 
         Args:
             requester: The user ID of the user making this request.
-            room_id: The room ID to start the summary at (the "root" room).
+            requested_room_id: The room ID to start the hierarchy at (the "root" room).
             suggested_only: Whether we should only return children with the "suggested"
                 flag set.
             max_depth: The maximum depth in the tree to explore, must be a
@@ -284,18 +290,21 @@ class SpaceSummaryHandler:
         """
         # first of all, check that the user is in the room in question (or it's
         # world-readable)
-        await self._auth.check_user_in_room_or_world_readable(room_id, requester)
+        await self._auth.check_user_in_room_or_world_readable(
+            requested_room_id, requester
+        )
 
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
-            if from_token not in self._pagination_sessions:
+            pagination_key = (requested_room_id, suggested_only, max_depth, from_token)
+            if pagination_key not in self._pagination_sessions:
                 raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
-            # TODO Assert that other parameters have not changed.
-            (room_queue, processed_rooms) = self._pagination_sessions[from_token]
+            # Load the previous state.
+            (room_queue, processed_rooms) = self._pagination_sessions[pagination_key]
         else:
             # the queue of rooms to process
-            room_queue = deque((_RoomQueueEntry(room_id, ()),))
+            room_queue = deque((_RoomQueueEntry(requested_room_id, ()),))
 
             # Rooms we have already processed.
             processed_rooms = set()
@@ -358,7 +367,8 @@ class SpaceSummaryHandler:
         if room_queue:
             next_token = random_string(24)
             result["next_token"] = next_token
-            self._pagination_sessions[next_token] = (room_queue, processed_rooms)
+            pagination_key = (requested_room_id, suggested_only, max_depth, next_token)
+            self._pagination_sessions[pagination_key] = (room_queue, processed_rooms)
 
         return result
 

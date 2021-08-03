@@ -23,7 +23,7 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
     RoomTypes,
 )
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.handlers.space_summary import _child_events_comparison_key, _RoomEntry
@@ -426,6 +426,50 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         expected = [(room_id, ()) for room_id in room_ids[6:]]
         self._assert_hierarchy(result, expected)
         self.assertNotIn("next_token", result)
+
+    def test_invalid_pagination_token(self):
+        """"""
+        room_ids = []
+        for i in range(1, 10):
+            room = self.helper.create_room_as(self.user, tok=self.token)
+            self._add_child(self.space, room, self.token, order=str(i))
+            room_ids.append(room)
+        # The room created initially doesn't have an order, so comes last.
+        room_ids.append(self.room)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, limit=7)
+        )
+        self.assertIn("next_token", result)
+
+        # Changing the room ID, suggested-only, or max-depth causes an error.
+        self.get_failure(
+            self.handler.get_room_hierarchy(
+                self.user, self.room, from_token=result["next_token"]
+            ),
+            SynapseError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(
+                self.user,
+                self.space,
+                suggested_only=True,
+                from_token=result["next_token"],
+            ),
+            SynapseError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(
+                self.user, self.space, max_depth=0, from_token=result["next_token"]
+            ),
+            SynapseError,
+        )
+
+        # An invalid token is ignored.
+        self.get_failure(
+            self.handler.get_room_hierarchy(self.user, self.space, from_token="foo"),
+            SynapseError,
+        )
 
     def test_max_depth(self):
         """Create a deep tree to test the max depth against."""
