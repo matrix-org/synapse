@@ -553,14 +553,16 @@ class EventsWorkerStore(SQLBaseStore):
 
                 event_entry_map.update(missing_events)
             except Exception as e:
-                fetching_deferred.errback(e)
+                with PreserveLoggingContext():
+                    fetching_deferred.errback(e)
                 raise e
             finally:
                 # Ensure that we mark these events as no longer being fetched.
                 for event_id in missing_events_ids:
                     self._current_event_fetches.pop(event_id, None)
 
-            fetching_deferred.callback(missing_events)
+            with PreserveLoggingContext():
+                fetching_deferred.callback(missing_events)
 
         if already_fetching:
             # Wait for the other event requests to finish and add their results
