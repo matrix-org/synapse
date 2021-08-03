@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from canonicaljson import encode_canonical_json
 from signedjson.key import decode_verify_key_bytes
@@ -29,6 +29,7 @@ from synapse.api.room_versions import (
     RoomVersion,
 )
 from synapse.events import EventBase
+from synapse.events.builder import EventBuilder
 from synapse.types import StateMap, UserID, get_domain_from_id
 
 logger = logging.getLogger(__name__)
@@ -47,6 +48,9 @@ def check(
         room_version_obj: the version of the room
         event: the event being checked.
         auth_events: the existing room state.
+        do_sig_check: True if it should be verified that the sending server
+            signed the event.
+        do_size_check: True if the size of the event fields should be verified.
 
     Raises:
         AuthError if the checks fail
@@ -101,6 +105,18 @@ def check(
             # Check the origin domain has signed the event
             if not event.signatures.get(event_id_domain):
                 raise AuthError(403, "Event not signed by sending server")
+
+        is_invite_via_allow_rule = (
+            event.type == EventTypes.Member
+            and event.membership == Membership.JOIN
+            and "join_authorised_via_users_server" in event.content
+        )
+        if is_invite_via_allow_rule:
+            authoriser_domain = get_domain_from_id(
+                event.content["join_authorised_via_users_server"]
+            )
+            if not event.signatures.get(authoriser_domain):
+                raise AuthError(403, "Event not signed by authorising server")
 
     # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
     #
@@ -173,7 +189,7 @@ def check(
     # https://github.com/vector-im/vector-web/issues/1208 hopefully
     if event.type == EventTypes.ThirdPartyInvite:
         user_level = get_user_power_level(event.user_id, auth_events)
-        invite_level = _get_named_level(auth_events, "invite", 0)
+        invite_level = get_named_level(auth_events, "invite", 0)
 
         if user_level < invite_level:
             raise AuthError(403, "You don't have permission to invite users")
@@ -188,6 +204,13 @@ def check(
 
     if event.type == EventTypes.Redaction:
         check_redaction(room_version_obj, event, auth_events)
+
+    if (
+        event.type == EventTypes.MSC2716_INSERTION
+        or event.type == EventTypes.MSC2716_CHUNK
+        or event.type == EventTypes.MSC2716_MARKER
+    ):
+        check_historical(room_version_obj, event, auth_events)
 
     logger.debug("Allowing! %s", event)
 
@@ -281,8 +304,8 @@ def _is_membership_change_allowed(
     user_level = get_user_power_level(event.user_id, auth_events)
     target_level = get_user_power_level(target_user_id, auth_events)
 
-    # FIXME (erikj): What should we do here as the default?
-    ban_level = _get_named_level(auth_events, "ban", 50)
+    invite_level = get_named_level(auth_events, "invite", 0)
+    ban_level = get_named_level(auth_events, "ban", 50)
 
     logger.debug(
         "_is_membership_change_allowed: %s",
@@ -332,8 +355,6 @@ def _is_membership_change_allowed(
         elif target_in_room:  # the target is already in the room.
             raise AuthError(403, "%s is already in the room." % target_user_id)
         else:
-            invite_level = _get_named_level(auth_events, "invite", 0)
-
             if user_level < invite_level:
                 raise AuthError(403, "You don't have permission to invite users")
     elif Membership.JOIN == membership:
@@ -341,16 +362,41 @@ def _is_membership_change_allowed(
         # * They are not banned.
         # * They are accepting a previously sent invitation.
         # * They are already joined (it's a NOOP).
-        # * The room is public or restricted.
+        # * The room is public.
+        # * The room is restricted and the user meets the allows rules.
         if event.user_id != target_user_id:
             raise AuthError(403, "Cannot force another user to join.")
         elif target_banned:
             raise AuthError(403, "You are banned from this room")
-        elif join_rule == JoinRules.PUBLIC or (
+        elif join_rule == JoinRules.PUBLIC:
+            pass
+        elif (
             room_version.msc3083_join_rules
             and join_rule == JoinRules.MSC3083_RESTRICTED
         ):
-            pass
+            # This is the same as public, but the event must contain a reference
+            # to the server who authorised the join. If the event does not contain
+            # the proper content it is rejected.
+            #
+            # Note that if the caller is in the room or invited, then they do
+            # not need to meet the allow rules.
+            if not caller_in_room and not caller_invited:
+                authorising_user = event.content.get("join_authorised_via_users_server")
+
+                if authorising_user is None:
+                    raise AuthError(403, "Join event is missing authorising user.")
+
+                # The authorising user must be in the room.
+                key = (EventTypes.Member, authorising_user)
+                member_event = auth_events.get(key)
+                _check_joined_room(member_event, authorising_user, event.room_id)
+
+                authorising_user_level = get_user_power_level(
+                    authorising_user, auth_events
+                )
+                if authorising_user_level < invite_level:
+                    raise AuthError(403, "Join event authorised by invalid server.")
+
         elif join_rule == JoinRules.INVITE or (
             room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
         ):
@@ -365,7 +411,7 @@ def _is_membership_change_allowed(
         if target_banned and user_level < ban_level:
             raise AuthError(403, "You cannot unban user %s." % (target_user_id,))
         elif target_user_id != event.user_id:
-            kick_level = _get_named_level(auth_events, "kick", 50)
+            kick_level = get_named_level(auth_events, "kick", 50)
 
             if user_level < kick_level or user_level <= target_level:
                 raise AuthError(403, "You cannot kick user %s." % target_user_id)
@@ -441,7 +487,7 @@ def get_send_level(
 
 
 def _can_send_event(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
-    power_levels_event = _get_power_level_event(auth_events)
+    power_levels_event = get_power_level_event(auth_events)
 
     send_level = get_send_level(event.type, event.get("state_key"), power_levels_event)
     user_level = get_user_power_level(event.user_id, auth_events)
@@ -481,7 +527,7 @@ def check_redaction(
     """
     user_level = get_user_power_level(event.user_id, auth_events)
 
-    redact_level = _get_named_level(auth_events, "redact", 50)
+    redact_level = get_named_level(auth_events, "redact", 50)
 
     if user_level >= redact_level:
         return False
@@ -498,6 +544,37 @@ def check_redaction(
         return True
 
     raise AuthError(403, "You don't have permission to redact events")
+
+
+def check_historical(
+    room_version_obj: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
+) -> None:
+    """Check whether the event sender is allowed to send historical related
+    events like "insertion", "chunk", and "marker".
+
+    Returns:
+        None
+
+    Raises:
+        AuthError if the event sender is not allowed to send historical related events
+        ("insertion", "chunk", and "marker").
+    """
+    # Ignore the auth checks in room versions that do not support historical
+    # events
+    if not room_version_obj.msc2716_historical:
+        return
+
+    user_level = get_user_power_level(event.user_id, auth_events)
+
+    historical_level = get_named_level(auth_events, "historical", 100)
+
+    if user_level < historical_level:
+        raise AuthError(
+            403,
+            'You don\'t have permission to send send historical related events ("insertion", "chunk", and "marker")',
+        )
 
 
 def _check_power_levels(
@@ -527,7 +604,7 @@ def _check_power_levels(
     user_level = get_user_power_level(event.user_id, auth_events)
 
     # Check other levels:
-    levels_to_check = [
+    levels_to_check: List[Tuple[str, Optional[str]]] = [
         ("users_default", None),
         ("events_default", None),
         ("state_default", None),
@@ -535,7 +612,7 @@ def _check_power_levels(
         ("redact", None),
         ("kick", None),
         ("invite", None),
-    ]  # type: List[Tuple[str, Optional[str]]]
+    ]
 
     old_list = current_state.content.get("users", {})
     for user in set(list(old_list) + list(user_list)):
@@ -565,12 +642,12 @@ def _check_power_levels(
             new_loc = new_loc.get(dir, {})
 
         if level_to_check in old_loc:
-            old_level = int(old_loc[level_to_check])  # type: Optional[int]
+            old_level: Optional[int] = int(old_loc[level_to_check])
         else:
             old_level = None
 
         if level_to_check in new_loc:
-            new_level = int(new_loc[level_to_check])  # type: Optional[int]
+            new_level: Optional[int] = int(new_loc[level_to_check])
         else:
             new_level = None
 
@@ -596,7 +673,7 @@ def _check_power_levels(
             )
 
 
-def _get_power_level_event(auth_events: StateMap[EventBase]) -> Optional[EventBase]:
+def get_power_level_event(auth_events: StateMap[EventBase]) -> Optional[EventBase]:
     return auth_events.get((EventTypes.PowerLevels, ""))
 
 
@@ -612,7 +689,7 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
     Returns:
         the user's power level in this room.
     """
-    power_level_event = _get_power_level_event(auth_events)
+    power_level_event = get_power_level_event(auth_events)
     if power_level_event:
         level = power_level_event.content.get("users", {}).get(user_id)
         if not level:
@@ -636,8 +713,8 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
             return 0
 
 
-def _get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:
-    power_level_event = _get_power_level_event(auth_events)
+def get_named_level(auth_events: StateMap[EventBase], name: str, default: int) -> int:
+    power_level_event = get_power_level_event(auth_events)
 
     if not power_level_event:
         return default
@@ -724,7 +801,9 @@ def get_public_keys(invite_event: EventBase) -> List[Dict[str, Any]]:
     return public_keys
 
 
-def auth_types_for_event(event: EventBase) -> Set[Tuple[str, str]]:
+def auth_types_for_event(
+    room_version: RoomVersion, event: Union[EventBase, EventBuilder]
+) -> Set[Tuple[str, str]]:
     """Given an event, return a list of (EventType, StateKey) that may be
     needed to auth the event. The returned list may be a superset of what
     would actually be required depending on the full state of the room.
@@ -753,6 +832,14 @@ def auth_types_for_event(event: EventBase) -> Set[Tuple[str, str]]:
                 key = (
                     EventTypes.ThirdPartyInvite,
                     event.content["third_party_invite"]["signed"]["token"],
+                )
+                auth_types.add(key)
+
+        if room_version.msc3083_join_rules and membership == Membership.JOIN:
+            if "join_authorised_via_users_server" in event.content:
+                key = (
+                    EventTypes.Member,
+                    event.content["join_authorised_via_users_server"],
                 )
                 auth_types.add(key)
 

@@ -19,7 +19,7 @@ from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, TypeVar
 import bleach
 import jinja2
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
 from synapse.config.emailconfig import EmailSubjectConfig
 from synapse.events import EventBase
@@ -110,7 +110,7 @@ class Mailer:
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
         self.app_name = app_name
-        self.email_subjects = hs.config.email_subjects  # type: EmailSubjectConfig
+        self.email_subjects: EmailSubjectConfig = hs.config.email_subjects
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -230,7 +230,7 @@ class Mailer:
             [pa["event_id"] for pa in push_actions]
         )
 
-        notifs_by_room = {}  # type: Dict[str, List[Dict[str, Any]]]
+        notifs_by_room: Dict[str, List[Dict[str, Any]]] = {}
         for pa in push_actions:
             notifs_by_room.setdefault(pa["room_id"], []).append(pa)
 
@@ -356,13 +356,13 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
-        room_vars = {
+        room_vars: Dict[str, Any] = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
-        }  # type: Dict[str, Any]
+        }
 
         if not is_invite:
             for n in notifs:
@@ -460,9 +460,9 @@ class Mailer:
         type_state_key = ("m.room.member", event.sender)
         sender_state_event_id = room_state_ids.get(type_state_key)
         if sender_state_event_id:
-            sender_state_event = await self.store.get_event(
+            sender_state_event: Optional[EventBase] = await self.store.get_event(
                 sender_state_event_id
-            )  # type: Optional[EventBase]
+            )
         else:
             # Attempt to check the historical state for the room.
             historical_state = await self.state_store.get_state_for_event(
@@ -599,6 +599,22 @@ class Mailer:
                     "person": inviter_name,
                     "app": self.app_name,
                 }
+
+            # If the room is a space, it gets a slightly different topic.
+            create_event_id = room_state_ids.get(("m.room.create", ""))
+            if create_event_id:
+                create_event = await self.store.get_event(
+                    create_event_id, allow_none=True
+                )
+                if (
+                    create_event
+                    and create_event.content.get("room_type") == RoomTypes.SPACE
+                ):
+                    return self.email_subjects.invite_from_person_to_space % {
+                        "person": inviter_name,
+                        "space": room_name,
+                        "app": self.app_name,
+                    }
 
             return self.email_subjects.invite_from_person_to_room % {
                 "person": inviter_name,

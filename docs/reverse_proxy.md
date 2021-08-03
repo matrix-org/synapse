@@ -21,7 +21,7 @@ port 8448. Where these are different, we refer to the 'client port' and the
 'federation port'. See [the Matrix
 specification](https://matrix.org/docs/spec/server_server/latest#resolving-server-names)
 for more details of the algorithm used for federation connections, and
-[delegate.md](<delegate.md>) for instructions on setting up delegation.
+[Delegation](delegate.md) for instructions on setting up delegation.
 
 **NOTE**: Your reverse proxy must not `canonicalise` or `normalise`
 the requested URI in any way (for example, by decoding `%xx` escapes).
@@ -96,6 +96,33 @@ matrix.example.com {
 
 example.com:8448 {
   reverse_proxy http://localhost:8008
+}
+```
+[Delegation](delegate.md) example:
+```
+(matrix-well-known-header) {
+    # Headers
+    header Access-Control-Allow-Origin "*"
+    header Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    header Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    header Content-Type "application/json"
+}
+
+example.com {
+    handle /.well-known/matrix/server {
+        import matrix-well-known-header
+        respond `{"m.server":"matrix.example.com:443"}`
+    }
+
+    handle /.well-known/matrix/client {
+        import matrix-well-known-header
+        respond `{"m.homeserver":{"base_url":"https://matrix.example.com"},"m.identity_server":{"base_url":"https://identity.example.com"}}`
+    }
+}
+
+matrix.example.com {
+    reverse_proxy /_matrix/* http://localhost:8008
+    reverse_proxy /_synapse/client/* http://localhost:8008
 }
 ```
 

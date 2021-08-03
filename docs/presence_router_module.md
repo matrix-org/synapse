@@ -30,7 +30,7 @@ presence to (for those users that the receiving user is considered interested in
 It does not include state for users who are currently offline, and it can only be
 called on workers that support sending federation. Additionally, this method must
 only be called from the process that has been configured to write to the
-the [presence stream](https://github.com/matrix-org/synapse/blob/master/docs/workers.md#stream-writers).
+the [presence stream](workers.md#stream-writers).
 By default, this is the main process, but another worker can be configured to do
 so.
 
@@ -222,7 +222,9 @@ Synapse, amend your homeserver config file with the following.
 
 ```yaml
 presence:
-  routing_module:
+  enabled: true
+
+  presence_router:
     module: my_module.ExamplePresenceRouter
     config:
       # Any configuration options for your module. The below is an example.

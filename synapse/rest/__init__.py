@@ -121,10 +121,7 @@ class ClientRestResource(JsonResource):
         account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
         password_policy.register_servlets(hs, client_resource)
-
-        # Register msc2403 (knocking) servlets if the feature is enabled
-        if hs.config.experimental.msc2403_enabled:
-            knock.register_servlets(hs, client_resource)
+        knock.register_servlets(hs, client_resource)
 
         # moving to /_synapse/admin
         admin.register_servlets_for_client_rest_resource(hs, client_resource)

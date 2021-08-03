@@ -28,7 +28,7 @@ The API is:
 GET /_synapse/admin/v1/room/<room_id>/media
 ```
 To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../../usage/administration/admin_api).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 The API returns a JSON body like the following:
 ```json
@@ -47,7 +47,7 @@ The API returns a JSON body like the following:
 ## List all media uploaded by a user
 
 Listing all media that has been uploaded by a local user can be achieved through
-the use of the [List media of a user](user_admin_api.rst#list-media-of-a-user)
+the use of the [List media of a user](user_admin_api.md#list-media-of-a-user)
 Admin API.
 
 # Quarantine media
@@ -257,7 +257,7 @@ URL Parameters
 * `server_name`: string - The name of your local server (e.g `matrix.org`).
 * `before_ts`: string representing a positive integer - Unix timestamp in ms.
 Files that were last used before this timestamp will be deleted. It is the timestamp of
-last access and not the timestamp creation. 
+last access and not the timestamp creation.
 * `size_gt`: Optional - string representing a positive integer - Size of the media in bytes.
 Files that are larger will be deleted. Defaults to `0`.
 * `keep_profiles`: Optional - string representing a boolean - Switch to also delete files
@@ -311,7 +311,7 @@ The following fields are returned in the JSON response body:
 * `deleted`: integer - The number of media items successfully deleted
 
 To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../../usage/administration/admin_api).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.

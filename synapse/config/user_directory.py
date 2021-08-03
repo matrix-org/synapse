@@ -50,7 +50,7 @@ class UserDirectoryConfig(Config):
             #
             # If you set it true, you'll have to rebuild the user_directory search
             # indexes, see:
-            # https://github.com/matrix-org/synapse/blob/master/docs/user_directory.md
+            # https://matrix-org.github.io/synapse/latest/user_directory.html
             #
             # Uncomment to return search results containing all known users, even if that
             # user does not share a room with the requester.

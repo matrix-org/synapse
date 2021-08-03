@@ -49,7 +49,7 @@ DEFAULT_LOG_CONFIG = Template(
 # be ingested by ELK stacks. See [2] for details.
 #
 # [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-# [2]: https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md
+# [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
 
@@ -71,7 +71,7 @@ handlers:
     # will be a delay for INFO/DEBUG logs to get written, but WARNING/ERROR
     # logs will still be flushed immediately.
     buffer:
-        class: logging.handlers.MemoryHandler
+        class: synapse.logging.handlers.PeriodicallyFlushingMemoryHandler
         target: file
         # The capacity is the number of log lines that are buffered before
         # being written to disk. Increasing this will lead to better
@@ -79,6 +79,9 @@ handlers:
         # be written to disk.
         capacity: 10
         flushLevel: 30  # Flush for WARNING logs as well
+        # The period of time, in seconds, between forced flushes.
+        # Messages will not be delayed for longer than this time.
+        period: 5
 
     # A handler that writes logs to stderr. Unused by default, but can be used
     # instead of "buffer" and "file" in the logger handlers.
@@ -259,9 +262,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
         finally:
             threadlocal.active = False
 
-    logBeginner.beginLoggingTo([_log], redirectStandardIO=not config.no_redirect_stdio)
-    if not config.no_redirect_stdio:
-        print("Redirected stdout/stderr to logs")
+    logBeginner.beginLoggingTo([_log], redirectStandardIO=False)
 
 
 def _load_logging_config(log_config_path: str) -> None:

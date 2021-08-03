@@ -89,12 +89,12 @@ class FederationBase:
         result = await self.spam_checker.check_event_for_spam(pdu)
 
         if result:
-            logger.warning(
-                "Event contains spam, redacting %s: %s",
-                pdu.event_id,
-                pdu.get_pdu_json(),
-            )
-            return prune_event(pdu)
+            logger.warning("Event contains spam, soft-failing %s", pdu.event_id)
+            # we redact (to save disk space) as well as soft-failing (to stop
+            # using the event in prev_events).
+            redacted_event = prune_event(pdu)
+            redacted_event.internal_metadata.soft_failed = True
+            return redacted_event
 
         return pdu
 
@@ -173,6 +173,34 @@ async def _check_sigs_on_pdu(
                 % (
                     pdu.event_id,
                     get_domain_from_id(pdu.event_id),
+                    e,
+                )
+            )
+            raise SynapseError(403, errmsg, Codes.FORBIDDEN)
+
+    # If this is a join event for a restricted room it may have been authorised
+    # via a different server from the sending server. Check those signatures.
+    if (
+        room_version.msc3083_join_rules
+        and pdu.type == EventTypes.Member
+        and pdu.membership == Membership.JOIN
+        and "join_authorised_via_users_server" in pdu.content
+    ):
+        authorising_server = get_domain_from_id(
+            pdu.content["join_authorised_via_users_server"]
+        )
+        try:
+            await keyring.verify_event_for_server(
+                authorising_server,
+                pdu,
+                pdu.origin_server_ts if room_version.enforce_key_validity else 0,
+            )
+        except Exception as e:
+            errmsg = (
+                "event id %s: unable to verify signature for authorising server %s: %s"
+                % (
+                    pdu.event_id,
+                    authorising_server,
                     e,
                 )
             )

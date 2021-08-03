@@ -734,7 +734,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         self.store = hs.get_datastore()
         self.state = hs.get_state_handler()
-        self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
 
         # We don't actually check signatures in tests, so lets just create a
         # random key to use.
@@ -846,7 +846,7 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
         builder = EventBuilder(
             state=self.state,
-            auth=self.auth,
+            event_auth_handler=self._event_auth_handler,
             store=self.store,
             clock=self.clock,
             hostname=hostname,
@@ -863,7 +863,9 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
             self.store.get_latest_event_ids_in_room(room_id)
         )
 
-        event = self.get_success(builder.build(prev_event_ids, None))
+        event = self.get_success(
+            builder.build(prev_event_ids=prev_event_ids, auth_event_ids=None)
+        )
 
         self.get_success(self.federation_handler.on_receive_pdu(hostname, event))
 

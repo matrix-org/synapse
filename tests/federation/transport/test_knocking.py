@@ -25,9 +25,6 @@ from synapse.types import RoomAlias
 from tests.test_utils import event_injection
 from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
 
-# An identifier to use while MSC2304 is not in a stable release of the spec
-KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
-
 
 class KnockingStrippedStateEventHelperMixin(TestCase):
     def send_example_state_events_to_room(
@@ -61,7 +58,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         self.get_success(
             event_injection.inject_event(
                 hs,
-                room_version=RoomVersions.MSC2403.identifier,
+                room_version=RoomVersions.V7.identifier,
                 room_id=room_id,
                 sender=sender,
                 type="com.example.secret",
@@ -121,7 +118,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
             self.get_success(
                 event_injection.inject_event(
                     hs,
-                    room_version=RoomVersions.MSC2403.identifier,
+                    room_version=RoomVersions.V7.identifier,
                     room_id=room_id,
                     sender=sender,
                     type=event_type,
@@ -135,7 +132,7 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
         room_state[EventTypes.Create] = {
             "content": {
                 "creator": sender,
-                "room_version": RoomVersions.MSC2403.identifier,
+                "room_version": RoomVersions.V7.identifier,
             },
             "state_key": "",
         }
@@ -208,9 +205,7 @@ class FederationKnockingTestCase(
 
         # Have this homeserver skip event auth checks. This is necessary due to
         # event auth checks ensuring that events were signed by the sender's homeserver.
-        async def _check_event_auth(
-            origin, event, context, state, auth_events, backfilled
-        ):
+        async def _check_event_auth(origin, event, context, *args, **kwargs):
             return context
 
         homeserver.get_federation_handler()._check_event_auth = _check_event_auth
@@ -232,7 +227,7 @@ class FederationKnockingTestCase(
         room_id = self.helper.create_room_as(
             "u1",
             is_public=False,
-            room_version=RoomVersions.MSC2403.identifier,
+            room_version=RoomVersions.V7.identifier,
             tok=user_token,
         )
 
@@ -243,14 +238,13 @@ class FederationKnockingTestCase(
 
         channel = self.make_request(
             "GET",
-            "/_matrix/federation/unstable/%s/make_knock/%s/%s?ver=%s"
+            "/_matrix/federation/v1/make_knock/%s/%s?ver=%s"
             % (
-                KNOCK_UNSTABLE_IDENTIFIER,
                 room_id,
                 fake_knocking_user_id,
                 # Inform the remote that we support the room version of the room we're
                 # knocking on
-                RoomVersions.MSC2403.identifier,
+                RoomVersions.V7.identifier,
             ),
         )
         self.assertEquals(200, channel.code, channel.result)
@@ -275,7 +269,7 @@ class FederationKnockingTestCase(
             self.clock,
             self.hs.hostname,
             self.hs.signing_key,
-            room_version=RoomVersions.MSC2403,
+            room_version=RoomVersions.V7,
             event_dict=knock_event,
         )
 
@@ -287,8 +281,8 @@ class FederationKnockingTestCase(
         # Send the signed knock event into the room
         channel = self.make_request(
             "PUT",
-            "/_matrix/federation/unstable/%s/send_knock/%s/%s"
-            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, signed_knock_event.event_id),
+            "/_matrix/federation/v1/send_knock/%s/%s"
+            % (room_id, signed_knock_event.event_id),
             signed_knock_event_json,
         )
         self.assertEquals(200, channel.code, channel.result)

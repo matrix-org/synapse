@@ -41,7 +41,7 @@ class Membership:
 
     INVITE = "invite"
     JOIN = "join"
-    KNOCK = "xyz.amorgan.knock"
+    KNOCK = "knock"
     LEAVE = "leave"
     BAN = "ban"
     LIST = (INVITE, JOIN, KNOCK, LEAVE, BAN)
@@ -58,11 +58,17 @@ class PresenceState:
 
 class JoinRules:
     PUBLIC = "public"
-    KNOCK = "xyz.amorgan.knock"
+    KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
     # As defined for MSC3083.
     MSC3083_RESTRICTED = "restricted"
+
+
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
 
 
 class LoginType:
@@ -112,12 +118,22 @@ class EventTypes:
 
     SpaceChild = "m.space.child"
     SpaceParent = "m.space.parent"
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+
+    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_CHUNK = "org.matrix.msc2716.chunk"
+    MSC2716_MARKER = "org.matrix.msc2716.marker"
 
 
 class ToDeviceEventTypes:
     RoomKeyRequest = "m.room_key_request"
+
+
+class DeviceKeyAlgorithms:
+    """Spec'd algorithms for the generation of per-device keys"""
+
+    ED25519 = "ed25519"
+    CURVE25519 = "curve25519"
+    SIGNED_CURVE25519 = "signed_curve25519"
 
 
 class EduTypes:
@@ -180,7 +196,22 @@ class EventContentFields:
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
+
+    # Used on normal messages to indicate they were historically imported after the fact
+    MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
+    # For "insertion" events to indicate what the next chunk ID should be in
+    # order to connect to it
+    MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
+    # Used on "chunk" events to indicate which insertion event it connects to
+    MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
+    # For "marker" events
+    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+
+
+class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
+    SPACE = "m.space"
 
 
 class RoomEncryptionAlgorithms:
@@ -198,3 +229,7 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"

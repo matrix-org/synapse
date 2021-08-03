@@ -174,7 +174,7 @@ class DescriptorTestCase(unittest.TestCase):
                 return self.result
 
         obj = Cls()
-        callbacks = set()  # type: Set[str]
+        callbacks: Set[str] = set()
 
         # set off an asynchronous request
         obj.result = origin_d = defer.Deferred()

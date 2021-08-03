@@ -11,7 +11,7 @@
   - [Delegation](delegate.md)
 
 # Upgrading
-  - [Upgrading between Synapse Versions](upgrading/README.md)
+  - [Upgrading between Synapse Versions](upgrade.md)
   - [Upgrading from pre-Synapse 1.0](MSC1711_certificates_FAQ.md)
 
 # Usage
@@ -35,7 +35,7 @@
     - [URL Previews](url_previews.md)
     - [User Directory](user_directory.md)
     - [Message Retention Policies](message_retention_policies.md)
-    - [Pluggable Modules]()
+    - [Pluggable Modules](modules.md)
       - [Third Party Rules]()
       - [Spam Checker](spam_checker.md)
       - [Presence Router](presence_router_module.md)
@@ -61,22 +61,24 @@
       - [Server Version](admin_api/version_api.md)
     - [Manhole](manhole.md)
     - [Monitoring](metrics-howto.md)
+    - [Request log format](usage/administration/request_log.md)
     - [Scripts]()
 
 # Development
   - [Contributing Guide](development/contributing_guide.md)
   - [Code Style](code_style.md)
-  - [Git Usage](dev/git.md)
+  - [Git Usage](development/git.md)
   - [Testing]()
   - [OpenTracing](opentracing.md)
+  - [Database Schemas](development/database_schema.md)
   - [Synapse Architecture]()
     - [Log Contexts](log_contexts.md)
     - [Replication](replication.md)
     - [TCP Replication](tcp_replication.md)
   - [Internal Documentation](development/internal_documentation/README.md)
     - [Single Sign-On]()
-      - [SAML](dev/saml.md)
-      - [CAS](dev/cas.md)
+      - [SAML](development/saml.md)
+      - [CAS](development/cas.md)
     - [State Resolution]()
       - [The Auth Chain Difference Algorithm](auth_chain_difference_algorithm.md)
     - [Media Repository](media_repository.md)

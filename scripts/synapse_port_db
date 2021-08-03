@@ -93,6 +93,7 @@ BOOLEAN_COLUMNS = {
     "local_media_repository": ["safe_from_quarantine"],
     "users": ["shadow_banned"],
     "e2e_fallback_keys_json": ["used"],
+    "access_tokens": ["used"],
 }
 
 
@@ -307,7 +308,8 @@ class Porter(object):
                     information_schema.table_constraints AS tc
                     INNER JOIN information_schema.constraint_column_usage AS ccu
                     USING (table_schema, constraint_name)
-                WHERE tc.constraint_type = 'FOREIGN KEY';
+                WHERE tc.constraint_type = 'FOREIGN KEY'
+                  AND tc.table_name != ccu.table_name;
             """
             txn.execute(sql)
 

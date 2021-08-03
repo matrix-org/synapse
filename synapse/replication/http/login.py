@@ -36,20 +36,29 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
 
     @staticmethod
     async def _serialize_payload(
-        user_id, device_id, initial_display_name, is_guest, is_appservice_ghost
+        user_id,
+        device_id,
+        initial_display_name,
+        is_guest,
+        is_appservice_ghost,
+        should_issue_refresh_token,
     ):
         """
         Args:
+            user_id (int)
             device_id (str|None): Device ID to use, if None a new one is
                 generated.
             initial_display_name (str|None)
             is_guest (bool)
+            is_appservice_ghost (bool)
+            should_issue_refresh_token (bool)
         """
         return {
             "device_id": device_id,
             "initial_display_name": initial_display_name,
             "is_guest": is_guest,
             "is_appservice_ghost": is_appservice_ghost,
+            "should_issue_refresh_token": should_issue_refresh_token,
         }
 
     async def _handle_request(self, request, user_id):
@@ -59,6 +68,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
         initial_display_name = content["initial_display_name"]
         is_guest = content["is_guest"]
         is_appservice_ghost = content["is_appservice_ghost"]
+        should_issue_refresh_token = content["should_issue_refresh_token"]
 
         res = await self.registration_handler.register_device_inner(
             user_id,
@@ -66,6 +76,7 @@ class RegisterDeviceReplicationServlet(ReplicationEndpoint):
             initial_display_name,
             is_guest,
             is_appservice_ghost=is_appservice_ghost,
+            should_issue_refresh_token=should_issue_refresh_token,
         )
 
         return 200, res

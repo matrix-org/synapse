@@ -83,12 +83,6 @@ def run():
     if current_version.pre:
         # If the current version is an RC we don't need to bump any of the
         # version numbers (other than the RC number).
-        base_version = "{}.{}.{}".format(
-            current_version.major,
-            current_version.minor,
-            current_version.micro,
-        )
-
         if rc:
             new_version = "{}.{}.{}rc{}".format(
                 current_version.major,
@@ -97,38 +91,43 @@ def run():
                 current_version.pre[1] + 1,
             )
         else:
-            new_version = base_version
+            new_version = "{}.{}.{}".format(
+                current_version.major,
+                current_version.minor,
+                current_version.micro,
+            )
     else:
-        # If this is a new release cycle then we need to know if its a major
-        # version bump or a hotfix.
+        # If this is a new release cycle then we need to know if it's a minor
+        # or a patch version bump.
         release_type = click.prompt(
             "Release type",
-            type=click.Choice(("major", "hotfix")),
+            type=click.Choice(("minor", "patch")),
             show_choices=True,
-            default="major",
+            default="minor",
         )
 
-        if release_type == "major":
-            base_version = new_version = "{}.{}.{}".format(
-                current_version.major,
-                current_version.minor + 1,
-                0,
-            )
+        if release_type == "minor":
             if rc:
                 new_version = "{}.{}.{}rc1".format(
                     current_version.major,
                     current_version.minor + 1,
                     0,
                 )
-
+            else:
+                new_version = "{}.{}.{}".format(
+                    current_version.major,
+                    current_version.minor + 1,
+                    0,
+                )
         else:
-            base_version = new_version = "{}.{}.{}".format(
-                current_version.major,
-                current_version.minor,
-                current_version.micro + 1,
-            )
             if rc:
                 new_version = "{}.{}.{}rc1".format(
+                    current_version.major,
+                    current_version.minor,
+                    current_version.micro + 1,
+                )
+            else:
+                new_version = "{}.{}.{}".format(
                     current_version.major,
                     current_version.minor,
                     current_version.micro + 1,
@@ -139,7 +138,15 @@ def run():
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    release_branch_name = f"release-v{current_version.major}.{current_version.minor}"
+    parsed_new_version = version.parse(new_version)
+
+    # We assume for debian changelogs that we only do RCs or full releases.
+    assert not parsed_new_version.is_devrelease
+    assert not parsed_new_version.is_postrelease
+
+    release_branch_name = (
+        f"release-v{parsed_new_version.major}.{parsed_new_version.minor}"
+    )
     release_branch = find_ref(repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():
@@ -153,7 +160,7 @@ def run():
         # release type.
         if current_version.is_prerelease:
             default = release_branch_name
-        elif release_type == "major":
+        elif release_type == "minor":
             default = "develop"
         else:
             default = "master"
@@ -188,12 +195,21 @@ def run():
     # Generate changelogs
     subprocess.run("python3 -m towncrier", shell=True)
 
-    # Generate debian changelogs if its not an RC.
-    if not rc:
-        subprocess.run(
-            f'dch -M -v {new_version} "New synapse release {new_version}."', shell=True
-        )
-        subprocess.run('dch -M -r -D stable ""', shell=True)
+    # Generate debian changelogs
+    if parsed_new_version.pre is not None:
+        # If this is an RC then we need to coerce the version string to match
+        # Debian norms, e.g. 1.39.0rc2 gets converted to 1.39.0~rc2.
+        base_ver = parsed_new_version.base_version
+        pre_type, pre_num = parsed_new_version.pre
+        debian_version = f"{base_ver}~{pre_type}{pre_num}"
+    else:
+        debian_version = new_version
+
+    subprocess.run(
+        f'dch -M -v {debian_version} "New synapse release {debian_version}."',
+        shell=True,
+    )
+    subprocess.run('dch -M -r -D stable ""', shell=True)
 
     # Show the user the changes and ask if they want to edit the change log.
     repo.git.add("-u")

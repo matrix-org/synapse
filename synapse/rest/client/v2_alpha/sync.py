@@ -13,6 +13,7 @@
 # limitations under the License.
 import itertools
 import logging
+from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple
 
 from synapse.api.constants import Membership, PresenceState
@@ -111,7 +112,7 @@ class SyncRestServlet(RestServlet):
             default="online",
             allowed_values=self.ALLOWED_PRESENCE,
         )
-        filter_id = parse_string(request, "filter", default=None)
+        filter_id = parse_string(request, "filter")
         full_state = parse_boolean(request, "full_state", default=False)
 
         logger.debug(
@@ -232,29 +233,54 @@ class SyncRestServlet(RestServlet):
         )
 
         logger.debug("building sync response dict")
-        return {
-            "account_data": {"events": sync_result.account_data},
-            "to_device": {"events": sync_result.to_device},
-            "device_lists": {
-                "changed": list(sync_result.device_lists.changed),
-                "left": list(sync_result.device_lists.left),
-            },
-            "presence": SyncRestServlet.encode_presence(sync_result.presence, time_now),
-            "rooms": {
-                Membership.JOIN: joined,
-                Membership.INVITE: invited,
-                Membership.KNOCK: knocked,
-                Membership.LEAVE: archived,
-            },
-            "groups": {
-                Membership.JOIN: sync_result.groups.join,
-                Membership.INVITE: sync_result.groups.invite,
-                Membership.LEAVE: sync_result.groups.leave,
-            },
-            "device_one_time_keys_count": sync_result.device_one_time_keys_count,
-            "org.matrix.msc2732.device_unused_fallback_key_types": sync_result.device_unused_fallback_key_types,
-            "next_batch": await sync_result.next_batch.to_string(self.store),
-        }
+
+        response: dict = defaultdict(dict)
+        response["next_batch"] = await sync_result.next_batch.to_string(self.store)
+
+        if sync_result.account_data:
+            response["account_data"] = {"events": sync_result.account_data}
+        if sync_result.presence:
+            response["presence"] = SyncRestServlet.encode_presence(
+                sync_result.presence, time_now
+            )
+
+        if sync_result.to_device:
+            response["to_device"] = {"events": sync_result.to_device}
+
+        if sync_result.device_lists.changed:
+            response["device_lists"]["changed"] = list(sync_result.device_lists.changed)
+        if sync_result.device_lists.left:
+            response["device_lists"]["left"] = list(sync_result.device_lists.left)
+
+        # We always include this because https://github.com/vector-im/element-android/issues/3725
+        # The spec isn't terribly clear on when this can be omitted and how a client would tell
+        # the difference between "no keys present" and "nothing changed" in terms of whole field
+        # absent / individual key type entry absent
+        # Corresponding synapse issue: https://github.com/matrix-org/synapse/issues/10456
+        response["device_one_time_keys_count"] = sync_result.device_one_time_keys_count
+
+        if sync_result.device_unused_fallback_key_types:
+            response[
+                "org.matrix.msc2732.device_unused_fallback_key_types"
+            ] = sync_result.device_unused_fallback_key_types
+
+        if joined:
+            response["rooms"][Membership.JOIN] = joined
+        if invited:
+            response["rooms"][Membership.INVITE] = invited
+        if knocked:
+            response["rooms"][Membership.KNOCK] = knocked
+        if archived:
+            response["rooms"][Membership.LEAVE] = archived
+
+        if sync_result.groups.join:
+            response["groups"][Membership.JOIN] = sync_result.groups.join
+        if sync_result.groups.invite:
+            response["groups"][Membership.INVITE] = sync_result.groups.invite
+        if sync_result.groups.leave:
+            response["groups"][Membership.LEAVE] = sync_result.groups.leave
+
+        return response
 
     @staticmethod
     def encode_presence(events, time_now):

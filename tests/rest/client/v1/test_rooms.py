@@ -64,7 +64,7 @@ class RoomBase(unittest.HomeserverTestCase):
 
 
 class RoomPermissionsTestCase(RoomBase):
-    """ Tests room permissions. """
+    """Tests room permissions."""
 
     user_id = "@sid1:red"
     rmcreator_id = "@notme:red"
@@ -377,7 +377,7 @@ class RoomPermissionsTestCase(RoomBase):
 
 
 class RoomsMemberListTestCase(RoomBase):
-    """ Tests /rooms/$room_id/members/list REST events."""
+    """Tests /rooms/$room_id/members/list REST events."""
 
     user_id = "@sid1:red"
 
@@ -416,7 +416,7 @@ class RoomsMemberListTestCase(RoomBase):
 
 
 class RoomsCreateTestCase(RoomBase):
-    """ Tests /rooms and /rooms/$room_id REST events. """
+    """Tests /rooms and /rooms/$room_id REST events."""
 
     user_id = "@sid1:red"
 
@@ -502,7 +502,7 @@ class RoomsCreateTestCase(RoomBase):
 
 
 class RoomTopicTestCase(RoomBase):
-    """ Tests /rooms/$room_id/topic REST events. """
+    """Tests /rooms/$room_id/topic REST events."""
 
     user_id = "@sid1:red"
 
@@ -566,7 +566,7 @@ class RoomTopicTestCase(RoomBase):
 
 
 class RoomMemberStateTestCase(RoomBase):
-    """ Tests /rooms/$room_id/members/$user_id/state REST events. """
+    """Tests /rooms/$room_id/members/$user_id/state REST events."""
 
     user_id = "@sid1:red"
 
@@ -790,7 +790,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
 
 
 class RoomMessagesTestCase(RoomBase):
-    """ Tests /rooms/$room_id/messages/$user_id/$msg_id REST events. """
+    """Tests /rooms/$room_id/messages/$user_id/$msg_id REST events."""
 
     user_id = "@sid1:red"
 
@@ -838,7 +838,7 @@ class RoomMessagesTestCase(RoomBase):
 
 
 class RoomInitialSyncTestCase(RoomBase):
-    """ Tests /rooms/$room_id/initialSync. """
+    """Tests /rooms/$room_id/initialSync."""
 
     user_id = "@sid1:red"
 
@@ -879,7 +879,7 @@ class RoomInitialSyncTestCase(RoomBase):
 
 
 class RoomMessageListTestCase(RoomBase):
-    """ Tests /rooms/$room_id/messages REST events. """
+    """Tests /rooms/$room_id/messages REST events."""
 
     user_id = "@sid1:red"
 
@@ -1206,7 +1206,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/join",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1220,7 +1220,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1234,7 +1234,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.second_tok,
         )
@@ -1248,7 +1248,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/ban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1260,7 +1260,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/unban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1272,7 +1272,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/invite",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1291,7 +1291,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )

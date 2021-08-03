@@ -21,6 +21,7 @@ from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
+from synapse.handlers.receipts import ReceiptEventSource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
@@ -46,9 +47,17 @@ class InitialSyncHandler(BaseHandler):
         self.state = hs.get_state_handler()
         self.clock = hs.get_clock()
         self.validator = EventValidator()
-        self.snapshot_cache = ResponseCache(
-            hs.get_clock(), "initial_sync_cache"
-        )  # type: ResponseCache[Tuple[str, Optional[StreamToken], Optional[StreamToken], str, Optional[int], bool, bool]]
+        self.snapshot_cache: ResponseCache[
+            Tuple[
+                str,
+                Optional[StreamToken],
+                Optional[StreamToken],
+                str,
+                Optional[int],
+                bool,
+                bool,
+            ]
+        ] = ResponseCache(hs.get_clock(), "initial_sync_cache")
         self._event_serializer = hs.get_event_client_serializer()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -126,6 +135,8 @@ class InitialSyncHandler(BaseHandler):
             joined_rooms,
             to_key=int(now_token.receipt_key),
         )
+        if self.hs.config.experimental.msc2285_enabled:
+            receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -422,7 +433,9 @@ class InitialSyncHandler(BaseHandler):
                 room_id, to_key=now_token.receipt_key
             )
             if not receipts:
-                receipts = []
+                return []
+            if self.hs.config.experimental.msc2285_enabled:
+                receipts = ReceiptEventSource.filter_out_hidden(receipts, user_id)
             return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(

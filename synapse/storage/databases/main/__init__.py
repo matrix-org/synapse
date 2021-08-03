@@ -46,6 +46,7 @@ from .events_forward_extremities import EventForwardExtremitiesStore
 from .filtering import FilteringStore
 from .group_server import GroupServerStore
 from .keys import KeyStore
+from .lock import LockStore
 from .media_repository import MediaRepositoryStore
 from .metrics import ServerMetricsStore
 from .monthly_active_users import MonthlyActiveUsersStore
@@ -119,6 +120,7 @@ class DataStore(
     CacheInvalidationWorkerStore,
     ServerMetricsStore,
     EventForwardExtremitiesStore,
+    LockStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
@@ -247,7 +249,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-        order_by: UserSortOrder = UserSortOrder.USER_ID.value,
+        order_by: str = UserSortOrder.USER_ID.value,
         direction: str = "f",
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
@@ -295,27 +297,22 @@ class DataStore(
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
-            sql_base = """
+            sql_base = f"""
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
-                {}
-                """.format(
-                where_clause
-            )
+                {where_clause}
+                """
             sql = "SELECT COUNT(*) as total_users " + sql_base
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
-            sql = """
-                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url
+            sql = f"""
+                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
+                displayname, avatar_url, creation_ts * 1000 as creation_ts
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
-            """.format(
-                sql_base=sql_base,
-                order_by_column=order_by_column,
-                order=order,
-            )
+            """
             args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)

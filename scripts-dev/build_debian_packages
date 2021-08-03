@@ -10,12 +10,14 @@
 # can be passed on the commandline for debugging.
 
 import argparse
+import json
 import os
 import signal
 import subprocess
 import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Sequence
 
 DISTS = (
     "debian:buster",
@@ -34,10 +36,15 @@ By default, builds for all known distributions, but a list of distributions
 can be passed on the commandline for debugging.
 """
 
+projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+
 
 class Builder(object):
-    def __init__(self, redirect_stdout=False):
+    def __init__(
+        self, redirect_stdout=False, docker_build_args: Optional[Sequence[str]] = None
+    ):
         self.redirect_stdout = redirect_stdout
+        self._docker_build_args = tuple(docker_build_args or ())
         self.active_containers = set()
         self._lock = threading.Lock()
         self._failed = False
@@ -57,9 +64,6 @@ class Builder(object):
             raise
 
     def _inner_build(self, dist, skip_tests=False):
-        projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
-        os.chdir(projdir)
-
         tag = dist.split(":", 1)[1]
 
         # Make the dir where the debs will live.
@@ -79,8 +83,8 @@ class Builder(object):
             stdout = None
 
         # first build a docker image for the build environment
-        subprocess.check_call(
-            [
+        build_args = (
+            (
                 "docker",
                 "build",
                 "--tag",
@@ -89,10 +93,16 @@ class Builder(object):
                 "distro=" + dist,
                 "-f",
                 "docker/Dockerfile-dhvirtualenv",
-                "docker",
-            ],
+            )
+            + self._docker_build_args
+            + ("docker",)
+        )
+
+        subprocess.check_call(
+            build_args,
             stdout=stdout,
             stderr=subprocess.STDOUT,
+            cwd=projdir,
         )
 
         container_name = "synapse_build_" + tag
@@ -146,9 +156,7 @@ class Builder(object):
                 self.active_containers.remove(c)
 
 
-def run_builds(dists, jobs=1, skip_tests=False):
-    builder = Builder(redirect_stdout=(jobs > 1))
-
+def run_builds(builder, dists, jobs=1, skip_tests=False):
     def sig(signum, _frame):
         print("Caught SIGINT")
         builder.kill_containers()
@@ -180,10 +188,31 @@ if __name__ == "__main__":
         help="skip running tests after building",
     )
     parser.add_argument(
+        "--docker-build-arg",
+        action="append",
+        help="specify an argument to pass to docker build",
+    )
+    parser.add_argument(
+        "--show-dists-json",
+        action="store_true",
+        help="instead of building the packages, just list the dists to build for, as a json array",
+    )
+    parser.add_argument(
         "dist",
         nargs="*",
         default=DISTS,
         help="a list of distributions to build for. Default: %(default)s",
     )
     args = parser.parse_args()
-    run_builds(dists=args.dist, jobs=args.jobs, skip_tests=args.no_check)
+    if args.show_dists_json:
+        print(json.dumps(DISTS))
+    else:
+        builder = Builder(
+            redirect_stdout=(args.jobs > 1), docker_build_args=args.docker_build_arg
+        )
+        run_builds(
+            builder,
+            dists=args.dist,
+            jobs=args.jobs,
+            skip_tests=args.no_check,
+        )

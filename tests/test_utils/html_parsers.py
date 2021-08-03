@@ -23,13 +23,13 @@ class TestHtmlParser(HTMLParser):
         super().__init__()
 
         # a list of links found in the doc
-        self.links = []  # type: List[str]
+        self.links: List[str] = []
 
         # the values of any hidden <input>s: map from name to value
-        self.hiddens = {}  # type: Dict[str, Optional[str]]
+        self.hiddens: Dict[str, Optional[str]] = {}
 
         # the values of any radio buttons: map from name to list of values
-        self.radios = {}  # type: Dict[str, List[Optional[str]]]
+        self.radios: Dict[str, List[Optional[str]]] = {}
 
     def handle_starttag(
         self, tag: str, attrs: Iterable[Tuple[str, Optional[str]]]
