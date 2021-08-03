@@ -5679,7 +5679,7 @@ handlers:
     # will be a delay for INFO/DEBUG logs to get written, but WARNING/ERROR
     # logs will still be flushed immediately.
     buffer:
-        class: synapse.logging.handlers.PeriodicallyFlushingMemoryHandler
+        class: logging.handlers.MemoryHandler
         target: file
         # The capacity is the number of log lines that are buffered before
         # being written to disk. Increasing this will lead to better
@@ -5687,9 +5687,6 @@ handlers:
         # be written to disk.
         capacity: 10
         flushLevel: 30  # Flush for WARNING logs as well
-        # The period of time, in seconds, between forced flushes.
-        # Messages will not be delayed for longer than this time.
-        period: 5
 
     # A handler that writes logs to stderr. Unused by default, but can be used
     # instead of &quot;buffer&quot; and &quot;file&quot; in the logger handlers.
