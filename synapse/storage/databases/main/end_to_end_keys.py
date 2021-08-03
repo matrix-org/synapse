@@ -758,7 +758,12 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         def _claim_e2e_one_time_key_simple(
             txn, user_id: str, device_id: str, algorithm: str
         ) -> Optional[Tuple[str, str]]:
-            """Claim OTK for device for DBs that don't support RETURNING."""
+            """Claim OTK for device for DBs that don't support RETURNING.
+
+            Returns:
+                A tuple of key name (algorithm + key ID) and key JSON, if an
+                OTK was found.
+            """
 
             sql = """
                 SELECT key_id, key_json FROM e2e_one_time_keys_json
@@ -793,7 +798,12 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         def _claim_e2e_one_time_key_returning(
             txn, user_id: str, device_id: str, algorithm: str
         ) -> Optional[Tuple[str, str]]:
-            """Claim OTK for device for DBs that support RETURNING."""
+            """Claim OTK for device for DBs that support RETURNING.
+
+            Returns:
+                A tuple of key name (algorithm + key ID) and key JSON, if an
+                OTK was found.
+            """
 
             # We can use RETURNING to do the fetch and DELETE in once step.
             sql = """
@@ -845,7 +855,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
 
             # No one-time key available, so see if there's a fallback
             # key
-            rows = await self.db_pool.simple_select_list(
+            row = await self.db_pool.simple_select_one(
                 table="e2e_fallback_keys_json",
                 keyvalues={
                     "user_id": user_id,
@@ -854,11 +864,11 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                 },
                 retcols=("key_id", "key_json", "used"),
                 desc="_get_fallback_key",
+                allow_none=True,
             )
-            if not rows:
+            if row is None:
                 continue
 
-            row = rows[0]
             key_id = row["key_id"]
             key_json = row["key_json"]
             used = row["used"]
