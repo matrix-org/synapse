@@ -45,7 +45,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, User, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -174,7 +174,7 @@ class ModuleApi:
         """The application name configured in the homeserver's configuration."""
         return self._hs.config.email.email_app_name
 
-    async def get_user_by_id(self, user_id: str) -> Optional[User]:
+    async def get_user_by_id(self, user_id: str) -> Optional[UserInfo]:
         """Get User by user_id
 
         Args:
@@ -189,16 +189,16 @@ class ModuleApi:
                 app_service = self._store.get_app_service_by_id(
                     user_data.get("appservice_id")
                 )
-            return User(
-                user=UserID.from_string(user_data.get("name")),
-                creation_ts=user_data.get("creation_ts"),
-                consent_version=user_data.get("consent_version"),
-                consent_server_notice_sent=user_data.get("consent_server_notice_sent"),
+            return UserInfo(
                 app_service=app_service,
-                shadow_banned=user_data.get("shadow_banned"),
-                deactivated=user_data.get("deactivated"),
+                consent_server_notice_sent=user_data.get("consent_server_notice_sent"),
+                consent_version=user_data.get("consent_version"),
+                creation_ts=user_data.get("creation_ts"),
+                is_admin=user_data.get("admin"),
+                is_deactivated=user_data.get("deactivated"),
                 is_guest=user_data.get("is_guest"),
-                admin=user_data.get("admin"),
+                is_shadow_banned=user_data.get("shadow_banned"),
+                user_id=UserID.from_string(user_data.get("name")),
                 user_type=user_data.get("user_type"),
             )
 
