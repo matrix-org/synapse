@@ -62,7 +62,7 @@ def parse_thumbnail_requirements(thumbnail_sizes):
         Dictionary mapping from media type string to list of
         ThumbnailRequirement tuples.
     """
-    requirements = {}  # type: Dict[str, List]
+    requirements: Dict[str, List] = {}
     for size in thumbnail_sizes:
         width = size["width"]
         height = size["height"]
@@ -141,7 +141,7 @@ class ContentRepositoryConfig(Config):
         #
         # We don't create the storage providers here as not all workers need
         # them to be started.
-        self.media_storage_providers = []  # type: List[tuple]
+        self.media_storage_providers: List[tuple] = []
 
         for i, provider_config in enumerate(storage_providers):
             # We special case the module "file_system" so as not to need to

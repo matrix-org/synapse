@@ -132,12 +132,12 @@ class EventBuilder:
         format_version = self.room_version.event_format
         if format_version == EventFormatVersions.V1:
             # The types of auth/prev events changes between event versions.
-            auth_events = await self._store.add_event_hashes(
-                auth_event_ids
-            )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
-            prev_events = await self._store.add_event_hashes(
-                prev_event_ids
-            )  # type: Union[List[str], List[Tuple[str, Dict[str, str]]]]
+            auth_events: Union[
+                List[str], List[Tuple[str, Dict[str, str]]]
+            ] = await self._store.add_event_hashes(auth_event_ids)
+            prev_events: Union[
+                List[str], List[Tuple[str, Dict[str, str]]]
+            ] = await self._store.add_event_hashes(prev_event_ids)
         else:
             auth_events = auth_event_ids
             prev_events = prev_event_ids
@@ -156,7 +156,7 @@ class EventBuilder:
         # the db)
         depth = min(depth, MAX_DEPTH)
 
-        event_dict = {
+        event_dict: Dict[str, Any] = {
             "auth_events": auth_events,
             "prev_events": prev_events,
             "type": self.type,
@@ -166,7 +166,7 @@ class EventBuilder:
             "unsigned": self.unsigned,
             "depth": depth,
             "prev_state": [],
-        }  # type: Dict[str, Any]
+        }
 
         if self.is_state():
             event_dict["state_key"] = self._state_key

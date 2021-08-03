@@ -195,7 +195,7 @@ class RoomVersions:
     )
 
 
-KNOWN_ROOM_VERSIONS = {
+KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
     v.identifier: v
     for v in (
         RoomVersions.V1,
@@ -209,4 +209,4 @@ KNOWN_ROOM_VERSIONS = {
         RoomVersions.V7,
     )
     # Note that we do not include MSC2043 here unless it is enabled in the config.
-}  # type: Dict[str, RoomVersion]
+}

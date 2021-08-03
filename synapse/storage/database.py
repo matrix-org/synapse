@@ -670,8 +670,8 @@ class DatabasePool:
         Returns:
             The result of func
         """
-        after_callbacks = []  # type: List[_CallbackListEntry]
-        exception_callbacks = []  # type: List[_CallbackListEntry]
+        after_callbacks: List[_CallbackListEntry] = []
+        exception_callbacks: List[_CallbackListEntry] = []
 
         if not current_context():
             logger.warning("Starting db txn '%s' from sentinel context", desc)
@@ -907,7 +907,7 @@ class DatabasePool:
         # The sort is to ensure that we don't rely on dictionary iteration
         # order.
         keys, vals = zip(
-            *[zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i]
+            *(zip(*(sorted(i.items(), key=lambda kv: kv[0]))) for i in values if i)
         )
 
         for k in keys:
@@ -1090,7 +1090,7 @@ class DatabasePool:
                 return False
 
         # We didn't find any existing rows, so insert a new one
-        allvalues = {}  # type: Dict[str, Any]
+        allvalues: Dict[str, Any] = {}
         allvalues.update(keyvalues)
         allvalues.update(values)
         allvalues.update(insertion_values)
@@ -1121,7 +1121,7 @@ class DatabasePool:
             values: The nonunique columns and their new values
             insertion_values: additional key/values to use only when inserting
         """
-        allvalues = {}  # type: Dict[str, Any]
+        allvalues: Dict[str, Any] = {}
         allvalues.update(keyvalues)
         allvalues.update(insertion_values or {})
 
@@ -1257,7 +1257,7 @@ class DatabasePool:
             value_values: A list of each row's value column values.
                 Ignored if value_names is empty.
         """
-        allnames = []  # type: List[str]
+        allnames: List[str] = []
         allnames.extend(key_names)
         allnames.extend(value_names)
 
@@ -1566,7 +1566,7 @@ class DatabasePool:
         """
         keyvalues = keyvalues or {}
 
-        results = []  # type: List[Dict[str, Any]]
+        results: List[Dict[str, Any]] = []
 
         if not iterable:
             return results
@@ -1978,7 +1978,7 @@ class DatabasePool:
             raise ValueError("order_direction must be one of 'ASC' or 'DESC'.")
 
         where_clause = "WHERE " if filters or keyvalues or exclude_keyvalues else ""
-        arg_list = []  # type: List[Any]
+        arg_list: List[Any] = []
         if filters:
             where_clause += " AND ".join("%s LIKE ?" % (k,) for k in filters)
             arg_list += list(filters.values())

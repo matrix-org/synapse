@@ -251,7 +251,7 @@ try:
             except Exception:
                 logger.exception("Failed to report span")
 
-    RustReporter = _WrappedRustReporter  # type: Optional[Type[_WrappedRustReporter]]
+    RustReporter: Optional[Type[_WrappedRustReporter]] = _WrappedRustReporter
 except ImportError:
     RustReporter = None
 
@@ -286,7 +286,7 @@ class SynapseBaggage:
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
 # None means 'block everything'.
-_homeserver_whitelist = None  # type: Optional[Pattern[str]]
+_homeserver_whitelist: Optional[Pattern[str]] = None
 
 # Util methods
 
@@ -374,7 +374,7 @@ def init_tracer(hs: "HomeServer"):
 
     config = JaegerConfig(
         config=hs.config.jaeger_config,
-        service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
+        service_name=f"{hs.config.server_name} {hs.get_instance_name()}",
         scope_manager=LogContextScopeManager(hs.config),
         metrics_factory=PrometheusMetricsFactory(),
     )
@@ -662,7 +662,7 @@ def inject_header_dict(
 
     span = opentracing.tracer.active_span
 
-    carrier = {}  # type: Dict[str, str]
+    carrier: Dict[str, str] = {}
     opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
@@ -704,7 +704,7 @@ def get_active_span_text_map(destination=None):
     if destination and not whitelisted_homeserver(destination):
         return {}
 
-    carrier = {}  # type: Dict[str, str]
+    carrier: Dict[str, str] = {}
     opentracing.tracer.inject(
         opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
@@ -718,7 +718,7 @@ def active_span_context_as_string():
     Returns:
         The active span context encoded as a string.
     """
-    carrier = {}  # type: Dict[str, str]
+    carrier: Dict[str, str] = {}
     if opentracing:
         opentracing.tracer.inject(
             opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
