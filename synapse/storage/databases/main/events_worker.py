@@ -519,33 +519,27 @@ class EventsWorkerStore(SQLBaseStore):
         # events out of the DB multiple times.
         already_fetching: Dict[str, defer.Deferred] = {}
 
-        # We also add entries to `self._current_event_fetches` for each event
-        # we're going to pull from the DB. We use a single deferred that
-        # resolves to all the events we pulled from the DB (this will result in
-        # this function returning more events than requested, but that can
-        # happen already due to `_get_events_from_db`).
-        fetching_deferred = ObservableDeferred(defer.Deferred())
-
         for event_id in missing_events_ids:
             deferred = self._current_event_fetches.get(event_id)
             if deferred is not None:
                 # We're already pulling the event out of the DB. Add the deferred
                 # to the collection of deferreds to wait on.
                 already_fetching[event_id] = deferred.observe()
-            else:
-                # We're not already pulling the event from the DB, so add our
-                # deferred to the the map of events that are being fetched.
-                self._current_event_fetches[event_id] = fetching_deferred
-                fetching_deferred.observe().addBoth(
-                    lambda _, event_id: self._current_event_fetches.pop(event_id, None),
-                    event_id,
-                )
 
         missing_events_ids.difference_update(already_fetching)
 
         if missing_events_ids:
             log_ctx = current_context()
             log_ctx.record_event_fetch(len(missing_events_ids))
+
+            # Add entries to `self._current_event_fetches` for each event we're
+            # going to pull from the DB. We use a single deferred that resolves
+            # to all the events we pulled from the DB (this will result in this
+            # function returning more events than requested, but that can happen
+            # already due to `_get_events_from_db`).
+            fetching_deferred = ObservableDeferred(defer.Deferred())
+            for event_id in missing_events_ids:
+                self._current_event_fetches[event_id] = fetching_deferred
 
             # Note that _get_events_from_db is also responsible for turning db rows
             # into FrozenEvents (via _get_event_from_row), which involves seeing if
@@ -561,6 +555,10 @@ class EventsWorkerStore(SQLBaseStore):
             except Exception as e:
                 fetching_deferred.errback(e)
                 raise e
+            finally:
+                # Ensure that we mark these events as no longer being fetched.
+                for event_id in missing_events_ids:
+                    self._current_event_fetches.pop(event_id, None)
 
             fetching_deferred.callback(missing_events)
 
