@@ -1,0 +1,1 @@
+Fix the `PeriodicallyFlushingMemoryHandler` inhibiting application shutdown because of its background thread.
