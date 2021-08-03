@@ -210,6 +210,8 @@ presence:
 #
 # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
 #
+# Note: The value is ignored when an HTTP proxy is in use
+#
 #ip_range_blacklist:
 #  - '127.0.0.0/8'
 #  - '10.0.0.0/8'
@@ -971,6 +973,8 @@ media_store_path: "DATADIR/media_store"
 #
 # This must be specified if url_preview_enabled is set. It is recommended that
 # you uncomment the following list as a starting point.
+#
+# Note: The value is ignored when an HTTP proxy is in use
 #
 #url_preview_ip_range_blacklist:
 #  - '127.0.0.0/8'
