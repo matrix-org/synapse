@@ -111,6 +111,7 @@ class ModuleApi:
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._presence_router = hs.get_presence_router()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -129,6 +130,11 @@ class ModuleApi:
     def register_third_party_rules_callbacks(self):
         """Registers callbacks for third party event rules capabilities."""
         return self._third_party_event_rules.register_third_party_rules_callbacks
+
+    @property
+    def register_presence_router_callbacks(self):
+        """Registers callbacks for presence router capabilities."""
+        return self._presence_router.register_presence_router_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.
