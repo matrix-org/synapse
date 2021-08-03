@@ -906,6 +906,10 @@ class FederationHandler(BaseHandler):
             # Not a marker event
             return
 
+        if marker_event.rejected_reason is not None:
+            # Rejected event
+            return
+
         # Skip processing a marker event if the room version doesn't
         # support it.
         room_version = await self.store.get_room_version(marker_event.room_id)
