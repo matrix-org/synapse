@@ -188,17 +188,17 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="get_userinfo_by_id",
         )
         if not user_data:
-            return
+            return None
         return UserInfo(
             appservice_id=user_data.get("appservice_id"),
             consent_server_notice_sent=user_data.get("consent_server_notice_sent"),
             consent_version=user_data.get("consent_version"),
-            creation_ts=user_data.get("creation_ts"),
+            creation_ts=user_data.get("creation_ts", 0),
             is_admin=bool(user_data.get("admin")),
             is_deactivated=bool(user_data.get("deactivated")),
             is_guest=bool(user_data.get("is_guest")),
             is_shadow_banned=bool(user_data.get("shadow_banned")),
-            user_id=UserID.from_string(user_data.get("name")),
+            user_id=UserID.from_string(str(user_data.get("name"))),
             user_type=user_data.get("user_type"),
         )
 
