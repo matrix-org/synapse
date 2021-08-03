@@ -1,1 +1,0 @@
-Mitigate media repo XSS attacks on IE11 via the non-standard X-Content-Security-Policy header.
