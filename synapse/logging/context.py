@@ -25,7 +25,7 @@ See doc/log_contexts.rst for details on how this works.
 import inspect
 import logging
 import threading
-import types
+import typing
 import warnings
 from typing import TYPE_CHECKING, Optional, Tuple, TypeVar, Union
 
@@ -745,7 +745,7 @@ def run_in_background(f, *args, **kwargs) -> defer.Deferred:
         # by synchronous exceptions, so let's turn them into Failures.
         return defer.fail()
 
-    if isinstance(res, types.CoroutineType):
+    if isinstance(res, typing.Coroutine):
         res = defer.ensureDeferred(res)
 
     # At this point we should have a Deferred, if not then f was a synchronous

@@ -109,7 +109,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     for name, count in r30_results.items():
         stats["r30_users_" + name] = count
 
-    r30v2_results = await store.count_r30_users()
+    r30v2_results = await store.count_r30v2_users()
     for name, count in r30v2_results.items():
         stats["r30v2_users_" + name] = count
 

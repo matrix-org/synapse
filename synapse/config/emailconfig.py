@@ -39,12 +39,13 @@ DEFAULT_SUBJECTS = {
     "messages_from_person_and_others": "[%(app)s] You have messages on %(app)s from %(person)s and others...",
     "invite_from_person": "[%(app)s] %(person)s has invited you to chat on %(app)s...",
     "invite_from_person_to_room": "[%(app)s] %(person)s has invited you to join the %(room)s room on %(app)s...",
+    "invite_from_person_to_space": "[%(app)s] %(person)s has invited you to join the %(space)s space on %(app)s...",
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
 }
 
 
-@attr.s
+@attr.s(slots=True, frozen=True)
 class EmailSubjectConfig:
     message_from_person_in_room = attr.ib(type=str)
     message_from_person = attr.ib(type=str)
@@ -54,6 +55,7 @@ class EmailSubjectConfig:
     messages_from_person_and_others = attr.ib(type=str)
     invite_from_person = attr.ib(type=str)
     invite_from_person_to_room = attr.ib(type=str)
+    invite_from_person_to_space = attr.ib(type=str)
     password_reset = attr.ib(type=str)
     email_validation = attr.ib(type=str)
 
