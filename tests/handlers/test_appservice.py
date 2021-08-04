@@ -217,7 +217,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         service_one = self._mkservice(False, ["my-protocol"])
         service_two = self._mkservice(False, ["my-protocol"])
 
-        async def someFunc(service, unusedProtocol):
+        async def get_3pe_protocol(service, unusedProtocol):
             if service == service_one:
                 return {
                     "x-protocol-data": 42,
@@ -232,7 +232,7 @@ class AppServiceHandlerTestCase(unittest.TestCase):
             raise Exception("Unexpected service")
 
         self.mock_store.get_app_services.return_value = [service_one, service_two]
-        self.mock_as_api.get_3pe_protocol = someFunc
+        self.mock_as_api.get_3pe_protocol = get_3pe_protocol
         response = self.successResultOf(
             defer.ensureDeferred(self.handler.get_3pe_protocols())
         )
