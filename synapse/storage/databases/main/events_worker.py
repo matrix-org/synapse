@@ -625,6 +625,8 @@ class EventsWorkerStore(SQLBaseStore):
             # Otherwise check if we still have the event in memory.
             event = self._event_ref.get(event_id)
             if event:
+                # Reconstruct an event cache entry
+
                 redacted_event = None
                 if event.internal_metadata.redacted_by is not None:
                     # The event has been redacted, so we generate a redacted
