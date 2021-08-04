@@ -367,12 +367,14 @@ jobs:
       - name: Set build result
         env:
           NEEDS_CONTEXT: ${{ toJSON(needs) }}
+          JOB_STATUS: ${{ job.status }}
         # the `jq` incantation dumps out a series of "<job> <result>" lines.
         # we set it to an intermediate variable to avoid a pipe, which makes it
         # hard to set $rc.
         run: |
           rc=0
           results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
+          echo "Current job status: $JOB_STATUS"
           while read job result ; do
               if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
                   echo "::set-failed ::Job $job returned $result"
