@@ -445,7 +445,9 @@ class EventsPersistenceStorage:
             potentially_left_users: Set[str] = set()
 
             if not backfilled:
-                with Measure(self._clock, "_calculate_state_and_extrem"):
+                with Measure(
+                    self._clock, "_calculate_state_and_extrem"
+                ), opentracing.start_active_span("_calculate_state_and_extrem"):
                     # Work out the new "current state" for each room.
                     # We do this by working out what the new extremities are and then
                     # calculating the state from that.

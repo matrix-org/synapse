@@ -16,6 +16,7 @@
 import itertools
 import logging
 from collections import OrderedDict, namedtuple
+from synapse.logging.opentracing import start_active_span
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -382,7 +383,8 @@ class PersistEventsStore:
         # Insert into event_to_state_groups.
         self._store_event_state_mappings_txn(txn, events_and_contexts)
 
-        self._persist_event_auth_chain_txn(txn, [e for e, _ in events_and_contexts])
+        with start_active_span("_persist_event_auth_chain_txn"):
+            self._persist_event_auth_chain_txn(txn, [e for e, _ in events_and_contexts])
 
         # _store_rejected_events_txn filters out any events which were
         # rejected, and returns the filtered list.
@@ -393,12 +395,13 @@ class PersistEventsStore:
         # From this point onwards the events are only ones that weren't
         # rejected.
 
-        self._update_metadata_tables_txn(
-            txn,
-            events_and_contexts=events_and_contexts,
-            all_events_and_contexts=all_events_and_contexts,
-            backfilled=backfilled,
-        )
+        with start_active_span("_update_metadata_tables_txn"):
+            self._update_metadata_tables_txn(
+                txn,
+                events_and_contexts=events_and_contexts,
+                all_events_and_contexts=all_events_and_contexts,
+                backfilled=backfilled,
+            )
 
         # We call this last as it assumes we've inserted the events into
         # room_memberships, where applicable.
