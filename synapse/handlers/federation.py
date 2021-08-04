@@ -2386,51 +2386,54 @@ class FederationHandler(BaseHandler):
                 if e_id not in event_map:
                     missing_auth_events.add(e_id)
 
-        for e_id in missing_auth_events:
-            m_ev = await self.federation_client.get_pdu(
-                [origin],
-                e_id,
-                room_version=room_version,
-                outlier=True,
-                timeout=10000,
-            )
-            if m_ev and m_ev.event_id == e_id:
-                event_map[e_id] = m_ev
-            else:
-                logger.info("Failed to find auth event %r", e_id)
+        with start_active_span("fetching.missing_auth_events"):
+            for e_id in missing_auth_events:
+                m_ev = await self.federation_client.get_pdu(
+                    [origin],
+                    e_id,
+                    room_version=room_version,
+                    outlier=True,
+                    timeout=10000,
+                )
+                if m_ev and m_ev.event_id == e_id:
+                    event_map[e_id] = m_ev
+                else:
+                    logger.info("Failed to find auth event %r", e_id)
 
-        for e in itertools.chain(auth_events, state, [event]):
-            auth_for_e = {
-                (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
-                for e_id in e.auth_event_ids()
-                if e_id in event_map
-            }
-            if create_event:
-                auth_for_e[(EventTypes.Create, "")] = create_event
+        with start_active_span("authing_events"):
+            for e in itertools.chain(auth_events, state, [event]):
+                auth_for_e = {
+                    (event_map[e_id].type, event_map[e_id].state_key): event_map[e_id]
+                    for e_id in e.auth_event_ids()
+                    if e_id in event_map
+                }
+                if create_event:
+                    auth_for_e[(EventTypes.Create, "")] = create_event
 
-            try:
-                event_auth.check(room_version, e, auth_events=auth_for_e)
-            except SynapseError as err:
-                # we may get SynapseErrors here as well as AuthErrors. For
-                # instance, there are a couple of (ancient) events in some
-                # rooms whose senders do not have the correct sigil; these
-                # cause SynapseErrors in auth.check. We don't want to give up
-                # the attempt to federate altogether in such cases.
+                try:
+                    event_auth.check(room_version, e, auth_events=auth_for_e)
+                except SynapseError as err:
+                    # we may get SynapseErrors here as well as AuthErrors. For
+                    # instance, there are a couple of (ancient) events in some
+                    # rooms whose senders do not have the correct sigil; these
+                    # cause SynapseErrors in auth.check. We don't want to give up
+                    # the attempt to federate altogether in such cases.
 
-                logger.warning("Rejecting %s because %s", e.event_id, err.msg)
+                    logger.warning("Rejecting %s because %s", e.event_id, err.msg)
 
-                if e == event:
-                    raise
-                events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
+                    if e == event:
+                        raise
+                    events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
         if auth_events or state:
-            await self.persist_events_and_notify(
-                room_id,
-                [
-                    (e, events_to_context[e.event_id])
-                    for e in itertools.chain(auth_events, state)
-                ],
-            )
+            with start_active_span("persist_events_and_notify.state"):
+                await self.persist_events_and_notify(
+                    room_id,
+                    [
+                        (e, events_to_context[e.event_id])
+                        for e in itertools.chain(auth_events, state)
+                    ],
+                )
 
         new_event_context = await self.state_handler.compute_event_context(
             event, old_state=state
