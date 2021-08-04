@@ -173,16 +173,16 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         if not user_data:
             return None
         return UserInfo(
-            appservice_id=user_data.get("appservice_id"),
-            consent_server_notice_sent=user_data.get("consent_server_notice_sent"),
-            consent_version=user_data.get("consent_version"),
-            creation_ts=user_data.get("creation_ts", 0),
-            is_admin=bool(user_data.get("admin")),
-            is_deactivated=bool(user_data.get("deactivated")),
-            is_guest=bool(user_data.get("is_guest")),
-            is_shadow_banned=bool(user_data.get("shadow_banned")),
-            user_id=UserID.from_string(str(user_data.get("name"))),
-            user_type=user_data.get("user_type"),
+            appservice_id=user_data["appservice_id"],
+            consent_server_notice_sent=user_data["consent_server_notice_sent"],
+            consent_version=user_data["consent_version"],
+            creation_ts=user_data["creation_ts"],
+            is_admin=bool(user_data["admin"]),
+            is_deactivated=bool(user_data["deactivated"]),
+            is_guest=bool(user_data["is_guest"]),
+            is_shadow_banned=bool(user_data["shadow_banned"]),
+            user_id=UserID.from_string(user_data["name"]),
+            user_type=user_data["user_type"],
         )
 
     async def is_trial_user(self, user_id: str) -> bool:
