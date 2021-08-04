@@ -2208,7 +2208,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[StateMap[EventBase]] = None,
+        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> None:
         """
@@ -2223,13 +2223,15 @@ class FederationHandler(BaseHandler):
             state:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
-            auth_events:
-                Map from (event_type, state_key) to event
 
-                Normally, our calculated auth_events based on the state of the room
-                at the event's position in the DAG, though occasionally (eg if the
-                event is an outlier), may be the auth events claimed by the remote
-                server.
+            claimed_auth_event_map:
+                A map of (type, state_key) => event for the event's claimed auth_events.
+                Possibly incomplete, and possibly including events that are not yet
+                persisted, or authed, or in the right room.
+
+                Only populated where we may not already have persisted these events -
+                for example, when populating outliers.
+
             backfilled: True if the event was backfilled.
         """
         context = await self._check_event_auth(
@@ -2237,7 +2239,7 @@ class FederationHandler(BaseHandler):
             event,
             context,
             state=state,
-            auth_events=auth_events,
+            auth_events=claimed_auth_event_map,
             backfilled=backfilled,
         )
 
@@ -2742,7 +2744,10 @@ class FederationHandler(BaseHandler):
                             await self.state_handler.compute_event_context(e)
                         )
                         await self._auth_and_persist_event(
-                            origin, e, missing_auth_event_context, auth_events=auth
+                            origin,
+                            e,
+                            missing_auth_event_context,
+                            claimed_auth_event_map=auth,
                         )
 
                         if e.event_id in event_auth_events:
