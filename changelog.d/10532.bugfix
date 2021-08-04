@@ -1,0 +1,1 @@
+Only report protocols that are implemented by at least one service, as required by the spec when handling `GET /_matrix/client/r0/thirdparty/protocols`.

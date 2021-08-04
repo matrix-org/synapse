@@ -406,7 +406,11 @@ class ApplicationServicesHandler:
 
             return combined
 
-        return {p: _merge_instances(protocols[p]) for p in protocols.keys()}
+        return {
+            p: _merge_instances(protocols[p])
+            for p in protocols.keys()
+            if len(protocols[p]) > 0
+        }
 
     async def _get_services_for_event(
         self, event: EventBase
