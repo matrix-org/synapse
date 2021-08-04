@@ -755,7 +755,7 @@ def get_verify_key_from_cross_signing_key(key_info):
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)
 class UserInfo:
-    """Represents an object with information about a user.
+    """Holds information about a user. Result of get_userinfo_by_id.
 
     Attributes:
         user_id:  ID of the user.
