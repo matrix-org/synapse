@@ -1290,6 +1290,74 @@ class FederationClient(FederationBase):
             failover_on_unknown_endpoint=True,
         )
 
+    async def get_room_hierarchy(
+        self,
+        destinations: Iterable[str],
+        room_id: str,
+        suggested_only: bool,
+    ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+        """
+        Call other servers to get a hierarchy of the given room.
+
+        Performs simple data validates and parsing of the response.
+
+        Args:
+            destinations: The remote servers. We will try them in turn, omitting any
+                that have been blacklisted.
+            room_id: ID of the space to be queried
+            suggested_only:  If true, ask the remote server to only return children
+                with the "suggested" flag set
+
+        Returns:
+            A tuple of:
+                The room as a JSON dictionary.
+                A list of children rooms, as JSON dictionaries.
+                A list of inaccessible children room IDs.
+
+        Raises:
+            SynapseError if we were unable to get a valid summary from any of the
+               remote servers
+        """
+
+        async def send_request(
+            destination: str,
+        ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
+            res = await self.transport_layer.get_room_hierarchy(
+                destination=destination,
+                room_id=room_id,
+                suggested_only=suggested_only,
+            )
+
+            room = res.get("room")
+            if not isinstance(room, dict):
+                raise InvalidResponseError("'room' must be a dict")
+
+            # TODO Validate children_state of the room.
+
+            children = res.get("children", [])
+            if not isinstance(children, Sequence):
+                raise InvalidResponseError("'children' must be a list")
+            if any(not isinstance(r, dict) for r in children):
+                raise InvalidResponseError("Invalid room in 'children' list")
+
+            inaccessible_children = res.get("inaccessible_children", [])
+            if not isinstance(inaccessible_children, Sequence):
+                raise InvalidResponseError("'inaccessible_children' must be a list")
+            if any(not isinstance(r, str) for r in inaccessible_children):
+                raise InvalidResponseError(
+                    "Invalid room ID in 'inaccessible_children' list"
+                )
+
+            return room, children, inaccessible_children
+
+        # TODO Fallback to the old federation API and translate the results.
+        return await self._try_destination_list(
+            "fetch room hierarchy",
+            destinations,
+            send_request,
+            failover_on_unknown_endpoint=True,
+        )
+
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryEventResult:

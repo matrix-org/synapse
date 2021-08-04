@@ -378,8 +378,46 @@ class SpaceSummaryHandler:
 
                 processed_rooms.add(room_id)
             else:
-                # TODO Federation.
-                pass
+                # If a previous call got information for this room *and* it is
+                # not a space (or the max-depth has been achieved), include it.
+                if queue_entry.remote_room and (
+                    queue_entry.remote_room.get("room_type") != RoomTypes.SPACE
+                    or (max_depth is not None and current_depth >= max_depth)
+                ):
+                    room_entry = _RoomEntry(
+                        queue_entry.room_id, queue_entry.remote_room
+                    )
+                    children_room_entries: Dict[str, JsonDict] = {}
+                    inaccessible_children: Set[str] = set()
+                else:
+                    (
+                        room_entry,
+                        children_room_entries,
+                        inaccessible_children,
+                    ) = await self._summarize_remote_room_hiearchy(
+                        queue_entry,
+                        suggested_only,
+                    )
+                processed_rooms.add(room_id)
+
+                if room_entry and await self._is_remote_room_accessible(
+                    requester, queue_entry.room_id, room_entry.room
+                ):
+                    rooms_result.append(room_entry.as_json())
+
+                    # If this room is not at the max-depth, we might want to include
+                    # children.
+                    if max_depth is None or current_depth < max_depth:
+                        room_queue.extendleft(
+                            _RoomQueueEntry(
+                                ev["state_key"],
+                                ev["content"]["via"],
+                                current_depth + 1,
+                                children_room_entries.get(ev["state_key"]),
+                            )
+                            for ev in reversed(room_entry.children)
+                            if ev["state_key"] not in inaccessible_children
+                        )
 
         result: JsonDict = {"rooms": rooms_result}
 
@@ -648,6 +686,59 @@ class SpaceSummaryHandler:
 
         return results
 
+    async def _summarize_remote_room_hiearchy(
+        self, room: "_RoomQueueEntry", suggested_only: bool
+    ) -> Tuple[Optional["_RoomEntry"], Dict[str, JsonDict], Set[str]]:
+        """
+        Request room entries and a list of event entries for a given room by querying a remote server.
+
+        Args:
+            room: The room to summarize.
+            suggested_only: True if only suggested children should be returned.
+                Otherwise, all children are returned.
+
+        Returns:
+            A tuple of:
+                The room entry.
+                Partial room data return over federation.
+                A set of inaccessible children room IDs.
+        """
+        room_id = room.room_id
+        logger.info("Requesting summary for %s via %s", room_id, room.via)
+
+        via = itertools.islice(room.via, MAX_SERVERS_PER_SPACE)
+        try:
+            (
+                room_response,
+                children,
+                inaccessible_children,
+            ) = await self._federation_client.get_room_hierarchy(
+                via,
+                room_id,
+                suggested_only=suggested_only,
+            )
+        except Exception as e:
+            logger.warning(
+                "Unable to get hierarchy of %s via federation: %s",
+                room_id,
+                e,
+                exc_info=logger.isEnabledFor(logging.DEBUG),
+            )
+            return None, {}, set()
+
+        # Map the children to their room ID.
+        children_by_room_id = {
+            c["room_id"]: c
+            for c in children
+            if "room_id" in c and isinstance(c["room_id"], str)
+        }
+
+        return (
+            _RoomEntry(room_id, room_response, room_response.pop("children_state", ())),
+            children_by_room_id,
+            set(inaccessible_children),
+        )
+
     async def _is_local_room_accessible(
         self, room_id: str, requester: Optional[str], origin: Optional[str]
     ) -> bool:
@@ -901,6 +992,7 @@ class _RoomQueueEntry:
     room_id: str
     via: Sequence[str]
     depth: int = 0
+    remote_room: Optional[JsonDict] = None
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
