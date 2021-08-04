@@ -2251,7 +2251,7 @@ class FederationHandler(BaseHandler):
             event,
             context,
             state=state,
-            auth_events=claimed_auth_event_map,
+            claimed_auth_event_map=claimed_auth_event_map,
             backfilled=backfilled,
         )
 
@@ -2315,7 +2315,7 @@ class FederationHandler(BaseHandler):
                     event,
                     res,
                     state=ev_info.state,
-                    auth_events=ev_info.claimed_auth_event_map,
+                    claimed_auth_event_map=ev_info.claimed_auth_event_map,
                     backfilled=backfilled,
                 )
             return res
@@ -2581,7 +2581,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[StateMap[EventBase]] = None,
+        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
         """
@@ -2592,18 +2592,20 @@ class FederationHandler(BaseHandler):
             event: The event itself.
             context:
                 The event context.
+
             state:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
-            auth_events:
-                Map from (event_type, state_key) to event
 
-                Normally, our calculated auth_events based on the state of the room
-                at the event's position in the DAG, though occasionally (eg if the
-                event is an outlier), may be the auth events claimed by the remote
-                server.
+            claimed_auth_event_map:
+                A map of (type, state_key) => event for the event's claimed auth_events.
+                Possibly incomplete, and possibly including events that are not yet
+                persisted, or authed, or in the right room.
 
-                If this is not provided, it is calculated from the previous state IDs.
+                Only populated where we may not already have persisted these events -
+                for example, when populating outliers, or the state for a backwards
+                extremity.
+
             backfilled: True if the event was backfilled.
 
         Returns:
@@ -2612,7 +2614,12 @@ class FederationHandler(BaseHandler):
         room_version = await self.store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
-        if not auth_events:
+        if claimed_auth_event_map:
+            # if we have a copy of the auth events from the event, use that as the
+            # basis for auth.
+            auth_events = claimed_auth_event_map
+        else:
+            # otherwise, we calculate what the auth events *should* be, and use that
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
