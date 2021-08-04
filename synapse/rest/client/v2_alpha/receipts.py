@@ -43,7 +43,7 @@ class ReceiptRestServlet(RestServlet):
         if receipt_type != "m.read":
             raise SynapseError(400, "Receipt type must be 'm.read'")
 
-        body = parse_json_object_from_request(request)
+        body = parse_json_object_from_request(request, allow_empty_body=True)
         hidden = body.get(ReadReceiptEventFields.MSC2285_HIDDEN, False)
 
         if not isinstance(hidden, bool):
