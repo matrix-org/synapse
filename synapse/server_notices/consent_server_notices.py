@@ -34,7 +34,7 @@ class ConsentServerNotices:
         self._server_notices_manager = hs.get_server_notices_manager()
         self._store = hs.get_datastore()
 
-        self._users_in_progress = set()  # type: Set[str]
+        self._users_in_progress: Set[str] = set()
 
         self._current_consent_version = hs.config.user_consent_version
         self._server_notice_content = hs.config.user_consent_server_notice_content

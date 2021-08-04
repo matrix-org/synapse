@@ -25,7 +25,7 @@ from ._base import Config, ConfigError
 _CACHE_PREFIX = "SYNAPSE_CACHE_FACTOR"
 
 # Map from canonicalised cache name to cache.
-_CACHES = {}  # type: Dict[str, Callable[[float], None]]
+_CACHES: Dict[str, Callable[[float], None]] = {}
 
 # a lock on the contents of _CACHES
 _CACHES_LOCK = threading.Lock()
@@ -151,13 +151,22 @@ class CacheConfig(Config):
           # entries are never evicted based on time.
           #
           #expiry_time: 30m
+
+          # Controls how long the results of a /sync request are cached for after
+          # a successful response is returned. A higher duration can help clients with
+          # intermittent connections, at the cost of higher memory usage.
+          #
+          # By default, this is zero, which means that sync responses are not cached
+          # at all.
+          #
+          #sync_response_cache_duration: 2m
         """
 
     def read_config(self, config, **kwargs):
         self.event_cache_size = self.parse_size(
             config.get("event_cache_size", _DEFAULT_EVENT_CACHE_SIZE)
         )
-        self.cache_factors = {}  # type: Dict[str, float]
+        self.cache_factors: Dict[str, float] = {}
 
         cache_config = config.get("caches") or {}
         self.global_factor = cache_config.get(
@@ -211,6 +220,10 @@ class CacheConfig(Config):
             self.expiry_time_msec = self.parse_duration(expiry_time)
         else:
             self.expiry_time_msec = None
+
+        self.sync_response_cache_duration = self.parse_duration(
+            cache_config.get("sync_response_cache_duration", 0)
+        )
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()

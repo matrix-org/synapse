@@ -248,15 +248,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         # the key we use to sign events and requests
         self.signing_key = config.key.signing_key[0]
         self.config = config
-        self._listening_services = []  # type: List[twisted.internet.tcp.Port]
-        self.start_time = None  # type: Optional[int]
+        self._listening_services: List[twisted.internet.tcp.Port] = []
+        self.start_time: Optional[int] = None
 
         self._instance_id = random_string(5)
         self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
-        self.datastores = None  # type: Optional[Databases]
+        self.datastores: Optional[Databases] = None
 
         self._module_web_resources: Dict[str, IResource] = {}
         self._module_web_resources_consumed = False

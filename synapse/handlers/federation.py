@@ -181,7 +181,7 @@ class FederationHandler(BaseHandler):
 
         # When joining a room we need to queue any events for that room up.
         # For each room, a list of (pdu, origin) tuples.
-        self.room_queues = {}  # type: Dict[str, List[Tuple[EventBase, str]]]
+        self.room_queues: Dict[str, List[Tuple[EventBase, str]]] = {}
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self._room_backfill = Linearizer("room_backfill")
@@ -368,7 +368,7 @@ class FederationHandler(BaseHandler):
                     ours = await self.state_store.get_state_groups_ids(room_id, seen)
 
                     # state_maps is a list of mappings from (type, state_key) to event_id
-                    state_maps = list(ours.values())  # type: List[StateMap[str]]
+                    state_maps: List[StateMap[str]] = list(ours.values())
 
                     # we don't need this any more, let's delete it.
                     del ours
@@ -735,7 +735,7 @@ class FederationHandler(BaseHandler):
         # we need to make sure we re-load from the database to get the rejected
         # state correct.
         fetched_events.update(
-            (await self.store.get_events(missing_desired_events, allow_rejected=True))
+            await self.store.get_events(missing_desired_events, allow_rejected=True)
         )
 
         # check for events which were in the wrong room.
@@ -845,7 +845,7 @@ class FederationHandler(BaseHandler):
                 # exact key to expect. Otherwise check it matches any key we
                 # have for that device.
 
-                current_keys = []  # type: Container[str]
+                current_keys: Container[str] = []
 
                 if device:
                     keys = device.get("keys", {}).get("keys", {})
@@ -1185,7 +1185,7 @@ class FederationHandler(BaseHandler):
                 if e_type == EventTypes.Member and event.membership == Membership.JOIN
             ]
 
-            joined_domains = {}  # type: Dict[str, int]
+            joined_domains: Dict[str, int] = {}
             for u, d in joined_users:
                 try:
                     dom = get_domain_from_id(u)
@@ -1314,7 +1314,7 @@ class FederationHandler(BaseHandler):
 
         room_version = await self.store.get_room_version(room_id)
 
-        event_map = {}  # type: Dict[str, EventBase]
+        event_map: Dict[str, EventBase] = {}
 
         async def get_event(event_id: str):
             with nested_logging_context(event_id):
@@ -1414,12 +1414,15 @@ class FederationHandler(BaseHandler):
 
         Invites must be signed by the invitee's server before distribution.
         """
-        pdu = await self.federation_client.send_invite(
-            destination=target_host,
-            room_id=event.room_id,
-            event_id=event.event_id,
-            pdu=event,
-        )
+        try:
+            pdu = await self.federation_client.send_invite(
+                destination=target_host,
+                room_id=event.room_id,
+                event_id=event.event_id,
+                pdu=event,
+            )
+        except RequestSendFailed:
+            raise SynapseError(502, f"Can't connect to server {target_host}")
 
         return pdu
 
@@ -1491,9 +1494,10 @@ class FederationHandler(BaseHandler):
                 host_list, event, room_version_obj
             )
 
-            origin = ret["origin"]
-            state = ret["state"]
-            auth_chain = ret["auth_chain"]
+            event = ret.event
+            origin = ret.origin
+            state = ret.state
+            auth_chain = ret.auth_chain
             auth_chain.sort(key=lambda e: e.depth)
 
             logger.debug("do_invite_join auth_chain: %s", auth_chain)
@@ -1593,7 +1597,7 @@ class FederationHandler(BaseHandler):
 
         # Ask the remote server to create a valid knock event for us. Once received,
         # we sign the event
-        params = {"ver": supported_room_versions}  # type: Dict[str, Iterable[str]]
+        params: Dict[str, Iterable[str]] = {"ver": supported_room_versions}
         origin, event, event_format_version = await self._make_and_verify_event(
             target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
         )
@@ -1673,7 +1677,7 @@ class FederationHandler(BaseHandler):
 
         # checking the room version will check that we've actually heard of the room
         # (and return a 404 otherwise)
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version = await self.store.get_room_version(room_id)
 
         # now check that we are *still* in the room
         is_in_room = await self._event_auth_handler.check_host_in_room(
@@ -1688,8 +1692,38 @@ class FederationHandler(BaseHandler):
 
         event_content = {"membership": Membership.JOIN}
 
+        # If the current room is using restricted join rules, additional information
+        # may need to be included in the event content in order to efficiently
+        # validate the event.
+        #
+        # Note that this requires the /send_join request to come back to the
+        # same server.
+        if room_version.msc3083_join_rules:
+            state_ids = await self.store.get_current_state_ids(room_id)
+            if await self._event_auth_handler.has_restricted_join_rules(
+                state_ids, room_version
+            ):
+                prev_member_event_id = state_ids.get((EventTypes.Member, user_id), None)
+                # If the user is invited or joined to the room already, then
+                # no additional info is needed.
+                include_auth_user_id = True
+                if prev_member_event_id:
+                    prev_member_event = await self.store.get_event(prev_member_event_id)
+                    include_auth_user_id = prev_member_event.membership not in (
+                        Membership.JOIN,
+                        Membership.INVITE,
+                    )
+
+                if include_auth_user_id:
+                    event_content[
+                        "join_authorised_via_users_server"
+                    ] = await self._event_auth_handler.get_user_which_could_invite(
+                        room_id,
+                        state_ids,
+                    )
+
         builder = self.event_builder_factory.new(
-            room_version,
+            room_version.identifier,
             {
                 "type": EventTypes.Member,
                 "content": event_content,
@@ -1707,10 +1741,13 @@ class FederationHandler(BaseHandler):
             logger.warning("Failed to create join to %s because %s", room_id, e)
             raise
 
+        # Ensure the user can even join the room.
+        await self._check_join_restrictions(context, event)
+
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
         await self._event_auth_handler.check_from_context(
-            room_version, event, context, do_sig_check=False
+            room_version.identifier, event, context, do_sig_check=False
         )
 
         return event
@@ -1931,7 +1968,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
 
-        event_allowed = await self.third_party_event_rules.check_event_allowed(
+        event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
             event, context
         )
         if not event_allowed:
@@ -1955,7 +1992,7 @@ class FederationHandler(BaseHandler):
     @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase
-    ) -> EventContext:
+    ) -> Tuple[EventBase, EventContext]:
         """
         We have received a join/leave/knock event for a room via send_join/leave/knock.
 
@@ -1978,7 +2015,7 @@ class FederationHandler(BaseHandler):
             event: The member event that has been signed by the remote homeserver.
 
         Returns:
-            The context of the event after inserting it into the room graph.
+            The event and context of the event after inserting it into the room graph.
 
         Raises:
             SynapseError if the event is not accepted into the room
@@ -2023,7 +2060,7 @@ class FederationHandler(BaseHandler):
         # for knock events, we run the third-party event rules. It's not entirely clear
         # why we don't do this for other sorts of membership events.
         if event.membership == Membership.KNOCK:
-            event_allowed = await self.third_party_event_rules.check_event_allowed(
+            event_allowed, _ = await self.third_party_event_rules.check_event_allowed(
                 event, context
             )
             if not event_allowed:
@@ -2034,7 +2071,7 @@ class FederationHandler(BaseHandler):
 
         # all looks good, we can persist the event.
         await self._run_push_actions_and_persist_event(event, context)
-        return context
+        return event, context
 
     async def _check_join_restrictions(
         self, context: EventContext, event: EventBase
@@ -2450,14 +2487,14 @@ class FederationHandler(BaseHandler):
             state_sets_d = await self.state_store.get_state_groups(
                 event.room_id, extrem_ids
             )
-            state_sets = list(state_sets_d.values())  # type: List[Iterable[EventBase]]
+            state_sets: List[Iterable[EventBase]] = list(state_sets_d.values())
             state_sets.append(state)
             current_states = await self.state_handler.resolve_events(
                 room_version, state_sets, event
             )
-            current_state_ids = {
+            current_state_ids: StateMap[str] = {
                 k: e.event_id for k, e in current_states.items()
-            }  # type: StateMap[str]
+            }
         else:
             current_state_ids = await self.state_handler.get_current_state_ids(
                 event.room_id, latest_event_ids=extrem_ids
@@ -2470,7 +2507,7 @@ class FederationHandler(BaseHandler):
         )
 
         # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(event)
+        auth_types = auth_types_for_event(room_version_obj, event)
         current_state_ids_list = [
             e for k, e in current_state_ids.items() if k in auth_types
         ]
@@ -2711,9 +2748,11 @@ class FederationHandler(BaseHandler):
                             event.event_id,
                             e.event_id,
                         )
-                        context = await self.state_handler.compute_event_context(e)
+                        missing_auth_event_context = (
+                            await self.state_handler.compute_event_context(e)
+                        )
                         await self._auth_and_persist_event(
-                            origin, e, context, auth_events=auth
+                            origin, e, missing_auth_event_context, auth_events=auth
                         )
 
                         if e.event_id in event_auth_events:
@@ -2814,7 +2853,7 @@ class FederationHandler(BaseHandler):
         """
         # exclude the state key of the new event from the current_state in the context.
         if event.is_state():
-            event_key = (event.type, event.state_key)  # type: Optional[Tuple[str, str]]
+            event_key: Optional[Tuple[str, str]] = (event.type, event.state_key)
         else:
             event_key = None
         state_updates = {
@@ -3031,9 +3070,13 @@ class FederationHandler(BaseHandler):
             await member_handler.send_membership_event(None, event, context)
         else:
             destinations = {x.split(":", 1)[-1] for x in (sender_user_id, room_id)}
-            await self.federation_client.forward_third_party_invite(
-                destinations, room_id, event_dict
-            )
+
+            try:
+                await self.federation_client.forward_third_party_invite(
+                    destinations, room_id, event_dict
+                )
+            except (RequestSendFailed, HttpResponseException):
+                raise SynapseError(502, "Failed to forward third party invite")
 
     async def on_exchange_third_party_invite_request(
         self, event_dict: JsonDict
@@ -3149,7 +3192,7 @@ class FederationHandler(BaseHandler):
 
         logger.debug("Checking auth on event %r", event.content)
 
-        last_exception = None  # type: Optional[Exception]
+        last_exception: Optional[Exception] = None
 
         # for each public key in the 3pid invite event
         for public_key_object in event_auth.get_public_keys(invite_event):

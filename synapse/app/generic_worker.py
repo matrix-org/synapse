@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -270,7 +269,7 @@ class GenericWorkerServer(HomeServer):
             site_tag = port
 
         # We always include a health resource.
-        resources = {"/health": HealthResource()}  # type: Dict[str, IResource]
+        resources: Dict[str, IResource] = {"/health": HealthResource()}
 
         for res in listener_config.http_options.resources:
             for name in res.names:
@@ -395,10 +394,8 @@ class GenericWorkerServer(HomeServer):
             elif listener.type == "metrics":
                 if not self.config.enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but "
+                        "enable_metrics is not True!"
                     )
                 else:
                     _base.listen_metrics(listener.bind_addresses, listener.port)

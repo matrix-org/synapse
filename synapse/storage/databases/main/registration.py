@@ -29,7 +29,7 @@ from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.types import Connection, Cursor
 from synapse.storage.util.id_generators import IdGenerator
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import UserID
+from synapse.types import UserID, UserInfo
 from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
@@ -146,6 +146,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     @cached()
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Deprecated: use get_userinfo_by_id instead"""
         return await self.db_pool.simple_select_one(
             table="users",
             keyvalues={"name": user_id},
@@ -164,6 +165,33 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             ],
             allow_none=True,
             desc="get_user_by_id",
+        )
+
+    async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
+        """Get a UserInfo object for a user by user ID.
+
+        Note! Currently uses the cache of `get_user_by_id`. Once that deprecated method is removed,
+        this method should be cached.
+
+        Args:
+             user_id: The user to fetch user info for.
+        Returns:
+            `UserInfo` object if user found, otherwise `None`.
+        """
+        user_data = await self.get_user_by_id(user_id)
+        if not user_data:
+            return None
+        return UserInfo(
+            appservice_id=user_data["appservice_id"],
+            consent_server_notice_sent=user_data["consent_server_notice_sent"],
+            consent_version=user_data["consent_version"],
+            creation_ts=user_data["creation_ts"],
+            is_admin=bool(user_data["admin"]),
+            is_deactivated=bool(user_data["deactivated"]),
+            is_guest=bool(user_data["is_guest"]),
+            is_shadow_banned=bool(user_data["shadow_banned"]),
+            user_id=UserID.from_string(user_data["name"]),
+            user_type=user_data["user_type"],
         )
 
     async def is_trial_user(self, user_id: str) -> bool:
@@ -1744,7 +1772,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
             items = keyvalues.items()
             where_clause = " AND ".join(k + " = ?" for k, _ in items)
-            values = [v for _, v in items]  # type: List[Union[str, int]]
+            values: List[Union[str, int]] = [v for _, v in items]
             # Conveniently, refresh_tokens and access_tokens both use the user_id and device_id fields. Only caveat
             # is the `except_token_id` param that is tricky to get right, so for now we're just using the same where
             # clause and values before we handle that. This seems to be only used in the "set password" handler.
