@@ -146,6 +146,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     @cached()
     async def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Deprecated: use get_userinfo_by_id instead"""
         return await self.db_pool.simple_select_one(
             table="users",
             keyvalues={"name": user_id},
