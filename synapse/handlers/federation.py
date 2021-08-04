@@ -2606,13 +2606,12 @@ class FederationHandler(BaseHandler):
             auth_events_x = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
 
-        # take a copy of auth_events before _update_auth_events_and_context_for_auth
-        # modifies it
-        mut_auth_events: MutableStateMap[EventBase] = dict(auth_events)
-
         try:
-            context = await self._update_auth_events_and_context_for_auth(
-                origin, event, context, mut_auth_events
+            (
+                context,
+                auth_events_for_auth,
+            ) = await self._update_auth_events_and_context_for_auth(
+                origin, event, context, auth_events
             )
         except Exception:
             # We don't really mind if the above fails, so lets not fail
@@ -2624,9 +2623,10 @@ class FederationHandler(BaseHandler):
                 "Ignoring failure and continuing processing of event.",
                 event.event_id,
             )
+            auth_events_for_auth = auth_events
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=mut_auth_events)
+            event_auth.check(room_version_obj, event, auth_events=auth_events_for_auth)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -2651,8 +2651,8 @@ class FederationHandler(BaseHandler):
         origin: str,
         event: EventBase,
         context: EventContext,
-        auth_events: MutableStateMap[EventBase],
-    ) -> EventContext:
+        input_auth_events: StateMap[EventBase],
+    ) -> Tuple[EventContext, StateMap[EventBase]]:
         """Helper for _check_event_auth. See there for docs.
 
         Checks whether a given event has the expected auth events. If it
@@ -2669,7 +2669,7 @@ class FederationHandler(BaseHandler):
             event:
             context:
 
-            auth_events:
+            input_auth_events:
                 Map from (event_type, state_key) to event
 
                 Normally, our calculated auth_events based on the state of the room
@@ -2677,11 +2677,12 @@ class FederationHandler(BaseHandler):
                 event is an outlier), may be the auth events claimed by the remote
                 server.
 
-                Also NB that this function adds entries to it.
-
         Returns:
-            updated context
+            updated context, updated auth event map
         """
+        # take a copy of input_auth_events before we modify it.
+        auth_events: MutableStateMap[EventBase] = dict(input_auth_events)
+
         event_auth_events = set(event.auth_event_ids())
 
         # missing_auth is the set of the event's auth_events which we don't yet have
@@ -2710,7 +2711,7 @@ class FederationHandler(BaseHandler):
                     # The other side isn't around or doesn't implement the
                     # endpoint, so lets just bail out.
                     logger.info("Failed to get event auth from remote: %s", e1)
-                    return context
+                    return context, auth_events
 
                 seen_remotes = await self.store.have_seen_events(
                     event.room_id, [e.event_id for e in remote_auth_chain]
@@ -2759,14 +2760,14 @@ class FederationHandler(BaseHandler):
             # obviously be empty
             # (b) alternatively, why don't we do it earlier?
             logger.info("Skipping auth_event fetch for outlier")
-            return context
+            return context, auth_events
 
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
 
         if not different_auth:
-            return context
+            return context, auth_events
 
         logger.info(
             "auth_events refers to events which are not in our calculated auth "
@@ -2792,7 +2793,7 @@ class FederationHandler(BaseHandler):
                 # XXX: should we reject the event in this case? It feels like we should,
                 # but then shouldn't we also do so if we've failed to fetch any of the
                 # auth events?
-                return context
+                return context, auth_events
 
         # now we state-resolve between our own idea of the auth events, and the remote's
         # idea of them.
@@ -2822,7 +2823,7 @@ class FederationHandler(BaseHandler):
             event, context, auth_events
         )
 
-        return context
+        return context, auth_events
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
