@@ -122,7 +122,7 @@ class _NewEventInfo:
 
     event = attr.ib(type=EventBase)
     state = attr.ib(type=Optional[Sequence[EventBase]], default=None)
-    auth_events = attr.ib(type=Optional[MutableStateMap[EventBase]], default=None)
+    auth_events = attr.ib(type=Optional[StateMap[EventBase]], default=None)
 
 
 class FederationHandler(BaseHandler):
@@ -2232,17 +2232,12 @@ class FederationHandler(BaseHandler):
                 server.
             backfilled: True if the event was backfilled.
         """
-        # take a copy of auth_events before _check_event_auth modifies it
-        mut_auth_events: Optional[MutableStateMap[EventBase]] = None
-        if auth_events:
-            mut_auth_events = dict(auth_events)
-
         context = await self._check_event_auth(
             origin,
             event,
             context,
             state=state,
-            auth_events=mut_auth_events,
+            auth_events=auth_events,
             backfilled=backfilled,
         )
 
@@ -2572,7 +2567,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[MutableStateMap[EventBase]] = None,
+        auth_events: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
         """
@@ -2594,8 +2589,6 @@ class FederationHandler(BaseHandler):
                 event is an outlier), may be the auth events claimed by the remote
                 server.
 
-                Also NB that this function adds entries to it.
-
                 If this is not provided, it is calculated from the previous state IDs.
             backfilled: True if the event was backfilled.
 
@@ -2613,9 +2606,13 @@ class FederationHandler(BaseHandler):
             auth_events_x = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
 
+        # take a copy of auth_events before _update_auth_events_and_context_for_auth
+        # modifies it
+        mut_auth_events: MutableStateMap[EventBase] = dict(auth_events)
+
         try:
             context = await self._update_auth_events_and_context_for_auth(
-                origin, event, context, auth_events
+                origin, event, context, mut_auth_events
             )
         except Exception:
             # We don't really mind if the above fails, so lets not fail
@@ -2629,7 +2626,7 @@ class FederationHandler(BaseHandler):
             )
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=auth_events)
+            event_auth.check(room_version_obj, event, auth_events=mut_auth_events)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
