@@ -11,7 +11,7 @@ Bugfixes
 Internal Changes
 ----------------
 
-- Fix release script to open correct URL for the release. ([\#10516](https://github.com/matrix-org/synapse/issues/10516))
+- Fix release script to open the correct URL for the release. ([\#10516](https://github.com/matrix-org/synapse/issues/10516))
 
 
 Synapse 1.40.0rc1 (2021-08-03)
