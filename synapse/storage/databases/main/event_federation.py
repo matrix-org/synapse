@@ -666,7 +666,8 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
         return {eid for eid, n in event_to_missing_sets.items() if n}
 
     async def get_oldest_event_ids_with_depth_in_room(self, room_id) -> Dict[str, int]:
-        """Gets the oldest events in the room with depth.
+        """Gets the oldest events(backwards extremities) in the room along with the
+        aproximate depth.
 
         We use this function so that we can compare and see if someones current
         depth at their current scrollback is within pagination range of the
@@ -685,8 +686,9 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             # we know of in the room. Backwards extremeties are the oldest
             # events we know of in the room but we only know of them because
             # some other event referenced them by prev_event and aren't peristed
-            # in our database yet. So we need to look for the events connected
-            # to the current backwards extremeties.
+            # in our database yet (meaning we don't know their depth
+            # specifically). So we need to look for the aproximate depth from
+            # the events connected to the current backwards extremeties.
             sql = """
                 SELECT b.event_id, MAX(e.depth) FROM events as e
                 /**
