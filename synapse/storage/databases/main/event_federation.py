@@ -1209,6 +1209,7 @@ class EventFederationWorkerStore(EventsWorkerStore, SignatureWorkerStore, SQLBas
             },
             insertion_values={},
             desc="insert_insertion_extremity",
+            lock=False,
         )
 
     async def insert_received_event_to_staging(
