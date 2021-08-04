@@ -374,7 +374,7 @@ jobs:
           rc=0
           results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
           while read job result ; do
-              if [ "$result" != "success" ] || [ "$result" != "skipped" ]; then
+              if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
                   echo "::set-failed ::Job $job returned $result"
                   rc=1
               fi
