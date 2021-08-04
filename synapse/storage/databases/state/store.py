@@ -588,7 +588,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # groups to non delta versions.
         for sg in remaining_state_groups:
             logger.info("[purge] de-delta-ing remaining state group %s", sg)
-            curr_state = self._get_state_groups_from_groups_txn(txn, [sg])
+            curr_state = self._get_state_groups_from_group_txn(txn, sg)
             curr_state = curr_state[sg]
 
             self.db_pool.simple_delete_txn(
