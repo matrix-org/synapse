@@ -167,8 +167,17 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="get_user_by_id",
         )
 
-    @cached()
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
+        """Get a UserInfo object for a user by user ID.
+
+        Note! Currently uses the cache of `get_user_by_id`. Once that deprecated method is removed,
+        this method should be cached.
+
+        Args:
+             user_id: The user to fetch user info for.
+        Returns:
+            `UserInfo` object if user found, otherwise `None`.
+        """
         user_data = await self.get_user_by_id(user_id)
         if not user_data:
             return None
