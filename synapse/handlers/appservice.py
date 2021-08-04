@@ -404,9 +404,7 @@ class ApplicationServicesHandler:
             return combined
 
         return {
-            p: _merge_instances(protocols[p])
-            for p in protocols.keys()
-            if protocols[p]
+            p: _merge_instances(protocols[p]) for p in protocols.keys() if protocols[p]
         }
 
     async def _get_services_for_event(
