@@ -16,8 +16,6 @@ import logging
 from collections import namedtuple
 from typing import Dict, Iterable, List, Optional, Set, Tuple
 
-from frozendict import frozendict
-
 from synapse.api.constants import EventTypes
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
@@ -188,19 +186,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             state map
         """
 
-        # convert the state_filter.types dict into something that is hashable.
-        frozen_kvs = {}
-        for k, v in state_filter.types.items():
-            if v is None:
-                frozen_kvs[k] = v
-            else:
-                # make the set hashable by making a frozen copy of it
-                frozen_kvs[k] = frozenset(v)
-
-        state_filter_hashable = (frozendict(frozen_kvs), state_filter.include_others)
-
         return await self._state_group_from_group_cache.wrap(
-            (group, state_filter_hashable),
+            (group, state_filter),
             self.db_pool.runInteraction,
             "_get_state_groups_from_group",
             self._get_state_groups_from_group_txn,

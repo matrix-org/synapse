@@ -14,6 +14,8 @@
 
 import logging
 
+from frozendict import frozendict
+
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.storage.state import StateFilter
@@ -183,7 +185,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.storage.state.get_state_for_event(
                 e5.event_id,
                 state_filter=StateFilter(
-                    types={EventTypes.Member: {self.u_alice.to_string()}},
+                    types=frozendict({EventTypes.Member: {self.u_alice.to_string()}}),
                     include_others=True,
                 ),
             )
@@ -203,7 +205,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.storage.state.get_state_for_event(
                 e5.event_id,
                 state_filter=StateFilter(
-                    types={EventTypes.Member: set()}, include_others=True
+                    types=frozendict({EventTypes.Member: set()}), include_others=True
                 ),
             )
         )
@@ -228,7 +230,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()}, include_others=True
+                types=frozendict({EventTypes.Member: set()}), include_others=True
             ),
         )
 
@@ -245,7 +247,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()}, include_others=True
+                types=frozendict({EventTypes.Member: set()}), include_others=True
             ),
         )
 
@@ -258,7 +260,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None}, include_others=True
+                types=frozendict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -275,7 +277,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None}, include_others=True
+                types=frozendict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -295,7 +297,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=True
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=True,
             ),
         )
 
@@ -312,7 +315,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=True
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=True,
             ),
         )
 
@@ -325,7 +329,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=False
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=False,
             ),
         )
 
@@ -375,7 +380,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()}, include_others=True
+                types=frozendict({EventTypes.Member: set()}), include_others=True
             ),
         )
 
@@ -387,7 +392,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: set()}, include_others=True
+                types=frozendict({EventTypes.Member: set()}), include_others=True
             ),
         )
 
@@ -400,7 +405,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None}, include_others=True
+                types=frozendict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -411,7 +416,7 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: None}, include_others=True
+                types=frozendict({EventTypes.Member: None}), include_others=True
             ),
         )
 
@@ -430,7 +435,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=True
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=True,
             ),
         )
 
@@ -441,7 +447,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=True
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=True,
             ),
         )
 
@@ -454,7 +461,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=False
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=False,
             ),
         )
 
@@ -465,7 +473,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.state_datastore._state_group_members_cache,
             group,
             state_filter=StateFilter(
-                types={EventTypes.Member: {e5.state_key}}, include_others=False
+                types=frozendict({EventTypes.Member: {e5.state_key}}),
+                include_others=False,
             ),
         )
 
