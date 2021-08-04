@@ -2208,7 +2208,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[MutableStateMap[EventBase]] = None,
+        auth_events: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> None:
         """
@@ -2232,12 +2232,17 @@ class FederationHandler(BaseHandler):
                 server.
             backfilled: True if the event was backfilled.
         """
+        # take a copy of auth_events before _check_event_auth modifies it
+        mut_auth_events: Optional[MutableStateMap[EventBase]] = None
+        if auth_events:
+            mut_auth_events = dict(auth_events)
+
         context = await self._check_event_auth(
             origin,
             event,
             context,
             state=state,
-            auth_events=auth_events,
+            auth_events=mut_auth_events,
             backfilled=backfilled,
         )
 
