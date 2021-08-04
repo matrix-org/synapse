@@ -14,7 +14,7 @@
 
 import logging
 import typing
-from typing import Dict, List, Optional
+from typing import Optional
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import DatabasePool
