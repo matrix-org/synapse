@@ -115,11 +115,15 @@ class ExamplePresenceRouter:
 
     Args:
         config: A configuration object.
-        module_api: An instance of Synapse's ModuleApi.
+        api: An instance of Synapse's ModuleApi.
     """
-    def __init__(self, config: PresenceRouterConfig, module_api: ModuleApi):
+    def __init__(self, config: PresenceRouterConfig, api: ModuleApi):
         self._config = config
-        self._module_api = module_api
+        self._module_api = api
+        api.register_presence_router_callbacks(
+          get_users_for_states=self.get_users_for_states,
+          get_interested_users=self.get_interested_users,
+        )
 
     @staticmethod
     def parse_config(config_dict: dict) -> PresenceRouterConfig:
@@ -221,11 +225,8 @@ Once you've crafted your module and installed it into the same Python environmen
 Synapse, amend your homeserver config file with the following.
 
 ```yaml
-presence:
-  enabled: true
-
-  presence_router:
-    module: my_module.ExamplePresenceRouter
+modules:
+  - module: my_module.ExamplePresenceRouter
     config:
       # Any configuration options for your module. The below is an example.
       # of setting options for ExamplePresenceRouter.

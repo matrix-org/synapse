@@ -282,6 +282,49 @@ the request is a server admin.
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
 
+#### Presence router callbacks
+
+Presence router callbacks allow module developers to specify additional users (local or remote)
+to receive certain presence updates from local users. Presence router callbacks can be 
+registered using the module API's `register_presence_router_callbacks` method.
+
+The available presence router callbacks are:
+
+```python 
+async def get_users_for_states(
+    self,
+    state_updates: Iterable[UserPresenceState],
+) -> Dict[str, Set[UserPresenceState]]:
+```
+**Requires** `get_interested_users` to also be registered
+
+An asynchronous method that is passed an iterable of user presence state. This method can
+determine whether a given presence update should be sent to certain users. It does this by
+returning a dictionary with keys representing local or remote Matrix User IDs, and values 
+being a python set of synapse.handlers.presence.UserPresenceState instances.
+
+Synapse will then attempt to send the specified presence updates to each user when possible.
+
+```python
+async def get_interested_users(self, user_id: str) -> Union[Set[str], str]
+```
+**Requires** `get_users_for_states` to also be registered
+
+An asynchronous method that is passed a single Matrix User ID. This method is expected to
+return the users that the passed in user may be interested in the presence of. Returned 
+users may be local or remote. The presence routed as a result of what this method returns 
+is sent in addition to the updates already sent between users that share a room together. 
+Presence updates are deduplicated.
+
+This method should return a python set of Matrix User IDs, or the object 
+`synapse.events.presence_router.PresenceRouter.ALL_USERS` to indicate that the passed user 
+should receive presence information for all known users.
+
+For clarity, if the user `@alice:example.org` is passed to this method, and the Set 
+`{"@bob:example.com", "@charlie:somewhere.org"}` is returned, this signifies that Alice 
+should receive presence updates sent by Bob and Charlie, regardless of whether these users 
+share a room.
+
 
 ### Porting an existing module that uses the old interface
 
