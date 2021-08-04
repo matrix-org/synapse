@@ -45,7 +45,7 @@ The proxy will be **used** for:
 - recaptcha validation
 - CAS auth validation
 - OpenID Connect
-- federation (check public_key revocation)
+- Federation (checking public key revocation)
 
 It will **not be used** for:
 
@@ -55,8 +55,8 @@ It will **not be used** for:
 - In worker configurations
   - connections between workers
   - connections from workers to Redis
-- fetch keys from other servers
-- download remote media
+- Fetching public keys of other servers
+- Downloading remote media
 
 ## Troubleshooting
 
