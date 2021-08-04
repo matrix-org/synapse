@@ -168,25 +168,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     @cached()
     async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
-        user_data = await self.db_pool.simple_select_one(
-            table="users",
-            keyvalues={"name": user_id},
-            retcols=[
-                "name",
-                "password_hash",
-                "is_guest",
-                "admin",
-                "consent_version",
-                "consent_server_notice_sent",
-                "appservice_id",
-                "creation_ts",
-                "user_type",
-                "deactivated",
-                "shadow_banned",
-            ],
-            allow_none=True,
-            desc="get_userinfo_by_id",
-        )
+        user_data = await self.get_user_by_id(user_id)
         if not user_data:
             return None
         return UserInfo(
