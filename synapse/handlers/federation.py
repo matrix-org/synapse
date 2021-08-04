@@ -2220,7 +2220,6 @@ class FederationHandler(BaseHandler):
             context:
                 The event context.
 
-                NB that this function potentially modifies it.
             state:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
@@ -2579,8 +2578,6 @@ class FederationHandler(BaseHandler):
             event: The event itself.
             context:
                 The event context.
-
-                NB that this function potentially modifies it.
             state:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
