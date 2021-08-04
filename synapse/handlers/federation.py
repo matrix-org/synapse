@@ -108,21 +108,33 @@ soft_failed_event_counter = Counter(
 )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _NewEventInfo:
     """Holds information about a received event, ready for passing to _auth_and_persist_events
 
     Attributes:
         event: the received event
 
-        state: the state at that event
+        state: the state at that event, according to /state_ids from a remote
+           homeserver. Only populated for backfilled events which are going to be a
+           new backwards extremity.
 
-        auth_events: the auth_event map for that event
+        claimed_auth_event_map: a map of (type, state_key) => event for the event's
+            claimed auth_events.
+
+            This can include events which have not yet been persisted, in the case that
+            we are backfilling a batch of events.
+
+            Note: May be incomplete: if we were unable to find all of the claimed auth
+            events. Also, treat the contents with caution: the events might also have
+            been rejected, might not yet have been authorized themselves, or they might
+            be in the wrong room.
+
     """
 
-    event = attr.ib(type=EventBase)
-    state = attr.ib(type=Optional[Sequence[EventBase]], default=None)
-    auth_events = attr.ib(type=Optional[StateMap[EventBase]], default=None)
+    event: EventBase
+    state: Optional[Sequence[EventBase]]
+    claimed_auth_event_map: StateMap[EventBase]
 
 
 class FederationHandler(BaseHandler):
@@ -1000,7 +1012,7 @@ class FederationHandler(BaseHandler):
                 _NewEventInfo(
                     event=ev,
                     state=events_to_state[e_id],
-                    auth_events={
+                    claimed_auth_event_map={
                         (
                             auth_events[a_id].type,
                             auth_events[a_id].state_key,
@@ -2303,7 +2315,7 @@ class FederationHandler(BaseHandler):
                     event,
                     res,
                     state=ev_info.state,
-                    auth_events=ev_info.auth_events,
+                    auth_events=ev_info.claimed_auth_event_map,
                     backfilled=backfilled,
                 )
             return res
