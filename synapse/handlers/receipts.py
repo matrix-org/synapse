@@ -70,7 +70,8 @@ class ReceiptsHandler(BaseHandler):
             )
             if not is_in_room:
                 logger.info(
-                    "Ignoring receipt from %s as we're not in the room",
+                    "Ignoring receipt for room %r from server %s as we're not in the room",
+                    room_id,
                     origin,
                 )
                 continue

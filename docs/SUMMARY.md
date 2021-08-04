@@ -79,6 +79,7 @@
     - [Single Sign-On]()
       - [SAML](development/saml.md)
       - [CAS](development/cas.md)
+    - [Room DAG concepts](development/room-dag-concepts.md)
     - [State Resolution]()
       - [The Auth Chain Difference Algorithm](auth_chain_difference_algorithm.md)
     - [Media Repository](media_repository.md)
