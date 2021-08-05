@@ -16,7 +16,17 @@ import itertools
 import logging
 import re
 from collections import deque
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+)
 
 import attr
 
@@ -120,7 +130,7 @@ class SpaceSummaryHandler:
                     requester, None, room_id, suggested_only, max_children
                 )
 
-                events: List[JsonDict] = []
+                events: Collection[JsonDict] = []
                 if room_entry:
                     rooms_result.append(room_entry.room)
                     events = room_entry.children
@@ -626,7 +636,7 @@ class _RoomEntry:
     # An iterable of the sorted, stripped children events for children of this room.
     #
     # This may not include all children.
-    children: List[JsonDict] = attr.ib(factory=list)
+    children: Collection[JsonDict] = ()
 
 
 def _has_valid_via(e: EventBase) -> bool:
