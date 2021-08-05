@@ -426,17 +426,14 @@ class RoomListHandler(BaseHandler):
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            try:
-                return await repl_layer.get_public_rooms(
-                    server_name,
-                    limit=limit,
-                    since_token=since_token,
-                    search_filter=search_filter,
-                    include_all_networks=include_all_networks,
-                    third_party_instance_id=third_party_instance_id,
-                )
-            except (RequestSendFailed, HttpResponseException):
-                raise SynapseError(502, "Failed to fetch room list")
+            return await repl_layer.get_public_rooms(
+                server_name,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
 
         key = (
             server_name,
