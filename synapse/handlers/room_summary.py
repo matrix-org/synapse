@@ -127,7 +127,7 @@ class RoomSummaryHandler(RoomSummaryMixin):
         self,
         requester: Optional[str],
         room_id: str,
-        remote_room_hosts: Optional[List[str]],
+        remote_room_hosts: Optional[List[str]] = None,
     ) -> JsonDict:
         """
         Implementation of the room summary C-S API MSC3266
