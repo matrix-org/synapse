@@ -271,7 +271,7 @@ class FederationServer(FederationBase):
         # CRITICAL SECTION: the first thing we must do (before awaiting) is
         # add an entry to _active_transactions.
         assert origin not in self._active_transactions
-        self._active_transactions[origin] = transaction.transaction_id  # type: ignore
+        self._active_transactions[origin] = transaction.transaction_id
 
         try:
             result = await self._handle_incoming_transaction(
@@ -299,11 +299,11 @@ class FederationServer(FederationBase):
         if response:
             logger.debug(
                 "[%s] We've already responded to this request",
-                transaction.transaction_id,  # type: ignore
+                transaction.transaction_id,
             )
             return response
 
-        logger.debug("[%s] Transaction is new", transaction.transaction_id)  # type: ignore
+        logger.debug("[%s] Transaction is new", transaction.transaction_id)
 
         # We process PDUs and EDUs in parallel. This is important as we don't
         # want to block things like to device messages from reaching clients
@@ -342,7 +342,7 @@ class FederationServer(FederationBase):
             report back to the sending server.
         """
 
-        received_pdus_counter.inc(len(transaction.pdus))  # type: ignore
+        received_pdus_counter.inc(len(transaction.pdus))
 
         origin_host, _ = parse_server_name(origin)
 
@@ -350,7 +350,7 @@ class FederationServer(FederationBase):
 
         newest_pdu_ts = 0
 
-        for p in transaction.pdus:  # type: ignore
+        for p in transaction.pdus:
             # FIXME (richardv): I don't think this works:
             #  https://github.com/matrix-org/synapse/issues/8429
             if "unsigned" in p:
