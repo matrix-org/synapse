@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import FrozenSet  # noqa: used within quoted type hint; flake8 sad
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -54,15 +55,19 @@ class StateFilter:
             appear in `types`.
     """
 
-    types = attr.ib(type=frozendict[str, Optional[Set[str]]])
+    types = attr.ib(type="frozendict[str, Optional[FrozenSet[str]]]")
     include_others = attr.ib(default=False, type=bool)
 
     def __attrs_post_init__(self):
         # If `include_others` is set we canonicalise the filter by removing
         # wildcards from the types dictionary
         if self.include_others:
-            self.types = frozendict(
-                {k: v for k, v in self.types.items() if v is not None}
+            # REVIEW: yucky. any better way?
+            # Work around this class being frozen.
+            object.__setattr__(
+                self,
+                "types",
+                frozendict({k: v for k, v in self.types.items() if v is not None}),
             )
 
     @staticmethod
