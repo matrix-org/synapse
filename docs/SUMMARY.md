@@ -7,6 +7,7 @@
   - [Installation](setup/installation.md)
   - [Using Postgres](postgres.md)
   - [Configuring a Reverse Proxy](reverse_proxy.md)
+  - [Configuring a Forward/Outbound Proxy](setup/forward_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
   - [Delegation](delegate.md)
 
@@ -79,6 +80,7 @@
     - [Single Sign-On]()
       - [SAML](development/saml.md)
       - [CAS](development/cas.md)
+    - [Room DAG concepts](development/room-dag-concepts.md)
     - [State Resolution]()
       - [The Auth Chain Difference Algorithm](auth_chain_difference_algorithm.md)
     - [Media Repository](media_repository.md)

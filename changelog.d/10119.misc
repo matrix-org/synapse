@@ -1,0 +1,1 @@
+Improve event caching mechanism to avoid having multiple copies of an event in memory at a time.

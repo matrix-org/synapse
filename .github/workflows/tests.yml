@@ -8,7 +8,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -367,13 +367,21 @@ jobs:
       - name: Set build result
         env:
           NEEDS_CONTEXT: ${{ toJSON(needs) }}
-        # the `jq` incantation dumps out a series of "<job> <result>" lines
+        # the `jq` incantation dumps out a series of "<job> <result>" lines.
+        # we set it to an intermediate variable to avoid a pipe, which makes it
+        # hard to set $rc.
         run: |
-          set -o pipefail
-          jq -r 'to_entries[] | [.key,.value.result] | join(" ")' \
-                          <<< $NEEDS_CONTEXT |
-              while read job result; do
-                  if [ "$result" != "success" ]; then
-                      echo "::set-failed ::Job $job returned $result"
-                  fi
-              done
+          rc=0
+          results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
+          while read job result ; do
+              # The newsfile lint may be skipped on non PR builds
+              if [ $result == "skipped" ] && [ $job == "lint-newsfile" ]; then
+                continue
+              fi
+
+              if [ "$result" != "success" ]; then
+                  echo "::set-failed ::Job $job returned $result"
+                  rc=1
+              fi
+          done <<< $results
+          exit $rc
