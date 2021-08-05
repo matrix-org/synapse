@@ -109,7 +109,10 @@ class StateFilter:
             type_dict.setdefault(typ, set()).add(s)  # type: ignore
 
         return StateFilter(
-            types=frozendict((k, frozenset(v)) for k, v in type_dict.items())
+            types=frozendict(
+                (k, frozenset(v) if v is not None else None)
+                for k, v in type_dict.items()
+            )
         )
 
     @staticmethod
