@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import FrozenSet  # noqa: used within quoted type hint; flake8 sad
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -33,6 +32,8 @@ from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap
 
 if TYPE_CHECKING:
+    from typing import FrozenSet  # noqa: used within quoted type hint; flake8 sad
+
     from synapse.server import HomeServer
     from synapse.storage.databases import Databases
 
@@ -111,7 +112,9 @@ class StateFilter:
 
             type_dict.setdefault(typ, set()).add(s)  # type: ignore
 
-        return StateFilter(types=frozendict(type_dict))
+        return StateFilter(
+            types=frozendict((k, frozenset(v)) for k, v in type_dict.items())
+        )
 
     @staticmethod
     def from_lazy_load_member_list(members: Iterable[str]) -> "StateFilter":
@@ -125,7 +128,8 @@ class StateFilter:
             The new state filter
         """
         return StateFilter(
-            types=frozendict({EventTypes.Member: set(members)}), include_others=True
+            types=frozendict({EventTypes.Member: frozenset(members)}),
+            include_others=True,
         )
 
     def return_expanded(self) -> "StateFilter":
