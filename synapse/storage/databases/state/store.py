@@ -96,8 +96,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             self.hs.get_clock(),
             # REVIEW: why do the other 2 have asterisks? should this one too?
             "*stateGroupFromGroupCache*",
-            # TODO: not tuned
-            timeout_ms=30_000,
+            # we're only using this cache to track in-flight requests;
+            # the results are added to another cache once complete.
+            timeout_ms=0,
         )
 
         def get_max_state_group_txn(txn: Cursor):
