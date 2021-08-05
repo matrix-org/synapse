@@ -335,7 +335,8 @@ class TypingWriterHandler(FollowerTypingHandler):
         )
         if not is_in_room:
             logger.info(
-                "Ignoring typing update from %s as we're not in the room",
+                "Ignoring typing update for room %r from server %s as we're not in the room",
+                room_id,
                 origin,
             )
             return

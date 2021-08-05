@@ -26,7 +26,7 @@ from synapse.api.constants import (
 from synapse.api.errors import AuthError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
-from synapse.handlers.space_summary import _child_events_comparison_key
+from synapse.handlers.space_summary import _child_events_comparison_key, _RoomEntry
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.server import HomeServer
@@ -351,26 +351,30 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             #   events before child events).
 
             # Note that these entries are brief, but should contain enough info.
-            rooms = [
-                {
-                    "room_id": subspace,
-                    "world_readable": True,
-                    "room_type": RoomTypes.SPACE,
-                },
-                {
-                    "room_id": subroom,
-                    "world_readable": True,
-                },
+            return [
+                _RoomEntry(
+                    subspace,
+                    {
+                        "room_id": subspace,
+                        "world_readable": True,
+                        "room_type": RoomTypes.SPACE,
+                    },
+                    [
+                        {
+                            "room_id": subspace,
+                            "state_key": subroom,
+                            "content": {"via": [fed_hostname]},
+                        }
+                    ],
+                ),
+                _RoomEntry(
+                    subroom,
+                    {
+                        "room_id": subroom,
+                        "world_readable": True,
+                    },
+                ),
             ]
-            event_content = {"via": [fed_hostname]}
-            events = [
-                {
-                    "room_id": subspace,
-                    "state_key": subroom,
-                    "content": event_content,
-                },
-            ]
-            return rooms, events
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, subspace, self.token)
@@ -436,70 +440,95 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ):
             # Note that these entries are brief, but should contain enough info.
             rooms = [
-                {
-                    "room_id": public_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.PUBLIC,
-                },
-                {
-                    "room_id": knock_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.KNOCK,
-                },
-                {
-                    "room_id": not_invited_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
-                },
-                {
-                    "room_id": invited_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
-                },
-                {
-                    "room_id": restricted_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.MSC3083_RESTRICTED,
-                    "allowed_spaces": [],
-                },
-                {
-                    "room_id": restricted_accessible_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.MSC3083_RESTRICTED,
-                    "allowed_spaces": [self.room],
-                },
-                {
-                    "room_id": world_readable_room,
-                    "world_readable": True,
-                    "join_rules": JoinRules.INVITE,
-                },
-                {
-                    "room_id": joined_room,
-                    "world_readable": False,
-                    "join_rules": JoinRules.INVITE,
-                },
-            ]
-
-            # Place each room in the sub-space.
-            event_content = {"via": [fed_hostname]}
-            events = [
-                {
-                    "room_id": subspace,
-                    "state_key": room["room_id"],
-                    "content": event_content,
-                }
-                for room in rooms
+                _RoomEntry(
+                    public_room,
+                    {
+                        "room_id": public_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.PUBLIC,
+                    },
+                ),
+                _RoomEntry(
+                    knock_room,
+                    {
+                        "room_id": knock_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.KNOCK,
+                    },
+                ),
+                _RoomEntry(
+                    not_invited_room,
+                    {
+                        "room_id": not_invited_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.INVITE,
+                    },
+                ),
+                _RoomEntry(
+                    invited_room,
+                    {
+                        "room_id": invited_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.INVITE,
+                    },
+                ),
+                _RoomEntry(
+                    restricted_room,
+                    {
+                        "room_id": restricted_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.MSC3083_RESTRICTED,
+                        "allowed_spaces": [],
+                    },
+                ),
+                _RoomEntry(
+                    restricted_accessible_room,
+                    {
+                        "room_id": restricted_accessible_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.MSC3083_RESTRICTED,
+                        "allowed_spaces": [self.room],
+                    },
+                ),
+                _RoomEntry(
+                    world_readable_room,
+                    {
+                        "room_id": world_readable_room,
+                        "world_readable": True,
+                        "join_rules": JoinRules.INVITE,
+                    },
+                ),
+                _RoomEntry(
+                    joined_room,
+                    {
+                        "room_id": joined_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.INVITE,
+                    },
+                ),
             ]
 
             # Also include the subspace.
             rooms.insert(
                 0,
-                {
-                    "room_id": subspace,
-                    "world_readable": True,
-                },
+                _RoomEntry(
+                    subspace,
+                    {
+                        "room_id": subspace,
+                        "world_readable": True,
+                    },
+                    # Place each room in the sub-space.
+                    [
+                        {
+                            "room_id": subspace,
+                            "state_key": room.room_id,
+                            "content": {"via": [fed_hostname]},
+                        }
+                        for room in rooms
+                    ],
+                ),
             )
-            return rooms, events
+            return rooms
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, subspace, self.token)
