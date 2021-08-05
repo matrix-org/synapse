@@ -541,7 +541,9 @@ class SsoRedirectServlet(RestServlet):
         baseurl_bytes = self._public_baseurl.encode("utf-8")
         # Account for mismatched schemes due to reverse proxying
         requested_uri_without_scheme = get_request_uri_without_scheme(request)
-        baseurl_without_scheme_bytes = self._public_baseurl_without_scheme.encode("utf-8")
+        baseurl_without_scheme_bytes = self._public_baseurl_without_scheme.encode(
+            "utf-8"
+        )
         if not requested_uri_without_scheme.startswith(baseurl_without_scheme_bytes):
             # swap out the incorrect base URL for the right one.
             #
