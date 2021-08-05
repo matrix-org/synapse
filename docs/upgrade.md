@@ -142,9 +142,9 @@ SQLite databases are unaffected by this change.
 
 The current spam checker interface is deprecated in favour of a new generic modules system.
 Authors of spam checker modules can refer to [this
-documentation](https://matrix-org.github.io/synapse/develop/modules.html#porting-an-existing-module-that-uses-the-old-interface)
+documentation](modules.md#porting-an-existing-module-that-uses-the-old-interface)
 to update their modules. Synapse administrators can refer to [this
-documentation](https://matrix-org.github.io/synapse/develop/modules.html#using-modules)
+documentation](modules.md#using-modules)
 to update their configuration once the modules they are using have been updated.
 
 We plan to remove support for the current spam checker interface in August 2021.
@@ -217,8 +217,7 @@ Instructions for doing so are provided
 
 ## Dropping support for old Python, Postgres and SQLite versions
 
-In line with our [deprecation
-policy](https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md),
+In line with our [deprecation policy](deprecation_policy.md),
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.
 
@@ -231,8 +230,7 @@ The deprecated v1 "list accounts" admin API
 (`GET /_synapse/admin/v1/users/<user_id>`) has been removed in this
 version.
 
-The [v2 list accounts
-API](https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts)
+The [v2 list accounts API](admin_api/user_admin_api.md#list-accounts)
 has been available since Synapse 1.7.0 (2019-12-13), and is accessible
 under `GET /_synapse/admin/v2/users`.
 
@@ -267,7 +265,7 @@ by the client.
 
 Synapse also requires the [Host]{.title-ref} header to be preserved.
 
-See the [reverse proxy documentation](../reverse_proxy.md), where the
+See the [reverse proxy documentation](reverse_proxy.md), where the
 example configurations have been updated to show how to set these
 headers.
 
@@ -286,7 +284,7 @@ identity providers:
     `[synapse public baseurl]/_synapse/client/oidc/callback` to the list
     of permitted "redirect URIs" at the identity provider.
 
-    See the [OpenID docs](../openid.md) for more information on setting
+    See the [OpenID docs](openid.md) for more information on setting
     up OpenID Connect.
 
 -   If your server is configured for single sign-on via a SAML2 identity
@@ -486,8 +484,7 @@ lock down external access to the Admin API endpoints.
 This release deprecates use of the `structured: true` logging
 configuration for structured logging. If your logging configuration
 contains `structured: true` then it should be modified based on the
-[structured logging
-documentation](../structured_logging.md).
+[structured logging documentation](structured_logging.md).
 
 The `structured` and `drains` logging options are now deprecated and
 should be replaced by standard logging configuration of `handlers` and
@@ -517,14 +514,13 @@ acts the same as the `http_client` argument previously passed to
 
 ## Forwarding `/_synapse/client` through your reverse proxy
 
-The [reverse proxy
-documentation](https://github.com/matrix-org/synapse/blob/develop/docs/reverse_proxy.md)
+The [reverse proxy documentation](reverse_proxy.md)
 has been updated to include reverse proxy directives for
 `/_synapse/client/*` endpoints. As the user password reset flow now uses
 endpoints under this prefix, **you must update your reverse proxy
 configurations for user password reset to work**.
 
-Additionally, note that the [Synapse worker documentation](https://github.com/matrix-org/synapse/blob/develop/docs/workers.md) has been updated to
+Additionally, note that the [Synapse worker documentation](workers.md) has been updated to
 
 :   state that the `/_synapse/client/password_reset/email/submit_token`
     endpoint can be handled
@@ -588,7 +584,7 @@ updated.
 When setting up worker processes, we now recommend the use of a Redis
 server for replication. **The old direct TCP connection method is
 deprecated and will be removed in a future release.** See
-[workers](../workers.md) for more details.
+[workers](workers.md) for more details.
 
 # Upgrading to v1.14.0
 
@@ -720,8 +716,7 @@ participating in many rooms.
     omitting the `CONCURRENTLY` keyword. Note however that this
     operation may in itself cause Synapse to stop running for some time.
     Synapse admins are reminded that [SQLite is not recommended for use
-    outside a test
-    environment](https://github.com/matrix-org/synapse/blob/master/README.rst#using-postgresql).
+    outside a test environment](postgres.md).
 
 3.  Once the index has been created, the `SELECT` query in step 1 above
     should complete quickly. It is therefore safe to upgrade to Synapse
@@ -739,7 +734,7 @@ participating in many rooms.
 Synapse will now log a warning on start up if used with a PostgreSQL
 database that has a non-recommended locale set.
 
-See [Postgres](../postgres.md) for details.
+See [Postgres](postgres.md) for details.
 
 # Upgrading to v1.8.0
 
@@ -856,8 +851,8 @@ section headed `email`, and be sure to have at least the
 You may also need to set `smtp_user`, `smtp_pass`, and
 `require_transport_security`.
 
-See the [sample configuration file](docs/sample_config.yaml) for more
-details on these settings.
+See the [sample configuration file](usage/configuration/homeserver_sample_config.md)
+for more details on these settings.
 
 #### Delegate email to an identity server
 
@@ -959,7 +954,7 @@ back to v1.3.1, subject to the following:
 
 Some counter metrics have been renamed, with the old names deprecated.
 See [the metrics
-documentation](../metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
+documentation](metrics-howto.md#renaming-of-metrics--deprecation-of-old-names-in-12)
 for details.
 
 # Upgrading to v1.1.0
@@ -995,7 +990,7 @@ more details on upgrading your database.
 Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
 certificates are correctly configured. See the
-[FAQ](../MSC1711_certificates_FAQ.md) for more information.
+[FAQ](MSC1711_certificates_FAQ.md) for more information.
 
 Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.
@@ -1010,8 +1005,8 @@ ways:-
 -   Configure a whitelist of server domains to trust via
     `federation_certificate_verification_whitelist`.
 
-See the [sample configuration file](docs/sample_config.yaml) for more
-details on these settings.
+See the [sample configuration file](usage/configuration/homeserver_sample_config.md)
+for more details on these settings.
 
 ## Email
 
@@ -1036,8 +1031,8 @@ If you are absolutely certain that you wish to continue using an
 identity server for password resets, set
 `trust_identity_server_for_password_resets` to `true`.
 
-See the [sample configuration file](docs/sample_config.yaml) for more
-details on these settings.
+See the [sample configuration file](usage/configuration/homeserver_sample_config.md)
+for more details on these settings.
 
 ## New email templates
 
@@ -1057,11 +1052,11 @@ sent to them.
 
 Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
-verified by a root CA. Information on how to do so can be found at [the
-ACME docs](../ACME.md).
+verified by a root CA. Information on how to do so can be found at the
+ACME docs.
 
 For more information on configuring TLS certificates see the
-[FAQ](../MSC1711_certificates_FAQ.md).
+[FAQ](MSC1711_certificates_FAQ.md).
 
 # Upgrading to v0.34.0
 
