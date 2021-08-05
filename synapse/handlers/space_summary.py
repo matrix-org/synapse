@@ -349,6 +349,17 @@ class SpaceSummaryHandler:
 
             logger.debug("Processing room %s", room_id)
 
+            # A map of summaries for children rooms that might be returned over
+            # federation. The rationale for caching these and *maybe* using them
+            # is to prefer any information local to the homeserver before trusting
+            # data received over federation.
+            children_room_entries: Dict[str, JsonDict] = {}
+            # A set of room IDs which are children that did not have information
+            # returned over federation and are known to be inaccessible to the
+            # current server. We should not reach out over federation to try to
+            # summarise these rooms.
+            inaccessible_children: Set[str] = set()
+
             is_in_room = await self._store.is_host_joined(room_id, self._server_name)
             if is_in_room:
                 room_entry = await self._summarize_local_room(
@@ -359,24 +370,6 @@ class SpaceSummaryHandler:
                     # TODO Handle max children.
                     max_children=None,
                 )
-
-                if room_entry:
-                    rooms_result.append(room_entry.as_json())
-
-                    # Add the child to the queue. We have already validated
-                    # that the vias are a list of server names.
-                    #
-                    # If the current depth is the maximum depth, do not queue
-                    # more entries.
-                    if max_depth is None or current_depth < max_depth:
-                        room_queue.extendleft(
-                            _RoomQueueEntry(
-                                ev["state_key"], ev["content"]["via"], current_depth + 1
-                            )
-                            for ev in reversed(room_entry.children)
-                        )
-
-                processed_rooms.add(room_id)
             else:
                 # If a previous call got information for this room *and* it is
                 # not a space (or the max-depth has been achieved), include it.
@@ -387,8 +380,6 @@ class SpaceSummaryHandler:
                     room_entry = _RoomEntry(
                         queue_entry.room_id, queue_entry.remote_room
                     )
-                    children_room_entries: Dict[str, JsonDict] = {}
-                    inaccessible_children: Set[str] = set()
                 else:
                     (
                         room_entry,
@@ -398,26 +389,31 @@ class SpaceSummaryHandler:
                         queue_entry,
                         suggested_only,
                     )
-                processed_rooms.add(room_id)
 
-                if room_entry and await self._is_remote_room_accessible(
+            processed_rooms.add(room_id)
+
+            if room_entry:
+                # Remote rooms need their accessibility checked separately.
+                if not is_in_room and not await self._is_remote_room_accessible(
                     requester, queue_entry.room_id, room_entry.room
                 ):
-                    rooms_result.append(room_entry.as_json())
+                    continue
 
-                    # If this room is not at the max-depth, we might want to include
-                    # children.
-                    if max_depth is None or current_depth < max_depth:
-                        room_queue.extendleft(
-                            _RoomQueueEntry(
-                                ev["state_key"],
-                                ev["content"]["via"],
-                                current_depth + 1,
-                                children_room_entries.get(ev["state_key"]),
-                            )
-                            for ev in reversed(room_entry.children)
-                            if ev["state_key"] not in inaccessible_children
+                rooms_result.append(room_entry.as_json())
+
+                # If this room is not at the max-depth, we might want to include
+                # children.
+                if max_depth is None or current_depth < max_depth:
+                    room_queue.extendleft(
+                        _RoomQueueEntry(
+                            ev["state_key"],
+                            ev["content"]["via"],
+                            current_depth + 1,
+                            children_room_entries.get(ev["state_key"]),
                         )
+                        for ev in reversed(room_entry.children)
+                        if ev["state_key"] not in inaccessible_children
+                    )
 
         result: JsonDict = {"rooms": rooms_result}
 
