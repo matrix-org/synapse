@@ -97,6 +97,7 @@ class SendEmailHandler:
         passwd = hs.config.email.email_smtp_pass
         self._smtp_pass = passwd.encode("utf-8") if passwd is not None else None
         self._require_transport_security = hs.config.email.require_transport_security
+        self._enable_tls = hs.config.email.enable_smtp_tls
 
         self._sendmail = _sendmail
 
@@ -153,5 +154,5 @@ class SendEmailHandler:
             password=self._smtp_pass,
             require_auth=self._smtp_user is not None,
             require_tls=self._require_transport_security,
-            tls_hostname=self._smtp_host,
+            tls_hostname=self._smtp_host if self._enable_tls else None,
         )
