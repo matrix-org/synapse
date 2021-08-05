@@ -84,7 +84,7 @@ class RoomSummaryMixin:
     async def requester_can_see_room_entry(
         self,
         room: JsonDict,
-        requester: str,
+        requester: Optional[str],
     ) -> bool:
         # The room should only be allowed in the summary if:
         #     a. the user is in the room;
@@ -108,7 +108,12 @@ class RoomSummaryMixin:
         # Check if the user is a member of any of the allowed rooms
         # from the response.
         allowed_rooms = room.get("allowed_room_ids")
-        if not include_room and allowed_rooms and isinstance(allowed_rooms, list):
+        if (
+            not include_room
+            and requester
+            and allowed_rooms
+            and isinstance(allowed_rooms, list)
+        ):
             include_room = await self._event_auth_handler.is_user_in_rooms(
                 allowed_rooms, requester
             )

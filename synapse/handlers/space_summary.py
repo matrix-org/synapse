@@ -141,7 +141,7 @@ class SpaceSummaryHandler(RoomSummaryMixin):
                     if not fed_room_id or not isinstance(fed_room_id, str):
                         continue
 
-                    include_room = self.requester_can_see_room_entry(room, requester)
+                    include_room = await self.requester_can_see_room_entry(room, requester)
 
                     # Finally, if this isn't the requested room, check ourselves
                     # if we can access the room.
