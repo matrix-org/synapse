@@ -295,9 +295,9 @@ particular server:</p>
 <h1 id="upgrading-to-v1370"><a class="header" href="#upgrading-to-v1370">Upgrading to v1.37.0</a></h1>
 <h2 id="deprecation-of-the-current-spam-checker-interface"><a class="header" href="#deprecation-of-the-current-spam-checker-interface">Deprecation of the current spam checker interface</a></h2>
 <p>The current spam checker interface is deprecated in favour of a new generic modules system.
-Authors of spam checker modules can refer to <a href="https://matrix-org.github.io/synapse/develop/modules.html#porting-an-existing-module-that-uses-the-old-interface">this
+Authors of spam checker modules can refer to <a href="modules.html#porting-an-existing-module-that-uses-the-old-interface">this
 documentation</a>
-to update their modules. Synapse administrators can refer to <a href="https://matrix-org.github.io/synapse/develop/modules.html#using-modules">this
+to update their modules. Synapse administrators can refer to <a href="modules.html#using-modules">this
 documentation</a>
 to update their configuration once the modules they are using have been updated.</p>
 <p>We plan to remove support for the current spam checker interface in August 2021.</p>
@@ -350,8 +350,7 @@ to remove excess writeahead logs in order for Prometheus to recover.
 Instructions for doing so are provided
 <a href="https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183">here</a>.</p>
 <h2 id="dropping-support-for-old-python-postgres-and-sqlite-versions"><a class="header" href="#dropping-support-for-old-python-postgres-and-sqlite-versions">Dropping support for old Python, Postgres and SQLite versions</a></h2>
-<p>In line with our <a href="https://github.com/matrix-org/synapse/blob/release-v1.32.0/docs/deprecation_policy.md">deprecation
-policy</a>,
+<p>In line with our <a href="deprecation_policy.html">deprecation policy</a>,
 we've dropped support for Python 3.5 and PostgreSQL 9.5, as they are no
 longer supported upstream.</p>
 <p>This release of Synapse requires Python 3.6+ and PostgresSQL 9.6+ or
@@ -360,8 +359,7 @@ SQLite 3.22+.</p>
 <p>The deprecated v1 &quot;list accounts&quot; admin API
 (<code>GET /_synapse/admin/v1/users/&lt;user_id&gt;</code>) has been removed in this
 version.</p>
-<p>The <a href="https://github.com/matrix-org/synapse/blob/master/docs/admin_api/user_admin_api.rst#list-accounts">v2 list accounts
-API</a>
+<p>The <a href="admin_api/user_admin_api.html#list-accounts">v2 list accounts API</a>
 has been available since Synapse 1.7.0 (2019-12-13), and is accessible
 under <code>GET /_synapse/admin/v2/users</code>.</p>
 <p>The deprecation of the old endpoint was announced with Synapse 1.28.0
@@ -386,7 +384,7 @@ that the reverse proxy sets [X-Forwarded-Proto]{.title-ref} header to
 [https]{.title-ref} or [http]{.title-ref} to indicate the protocol used
 by the client.</p>
 <p>Synapse also requires the [Host]{.title-ref} header to be preserved.</p>
-<p>See the <a href="../reverse_proxy.html">reverse proxy documentation</a>, where the
+<p>See the <a href="reverse_proxy.html">reverse proxy documentation</a>, where the
 example configurations have been updated to show how to set these
 headers.</p>
 <p>(Users of <a href="https://caddyserver.com/">Caddy</a> are unaffected, since we
@@ -401,7 +399,7 @@ identity providers:</p>
 Connect or OAuth2 identity provider, you will need to add
 <code>[synapse public baseurl]/_synapse/client/oidc/callback</code> to the list
 of permitted &quot;redirect URIs&quot; at the identity provider.</p>
-<p>See the <a href="../openid.html">OpenID docs</a> for more information on setting
+<p>See the <a href="openid.html">OpenID docs</a> for more information on setting
 up OpenID Connect.</p>
 </li>
 <li>
@@ -570,8 +568,7 @@ lock down external access to the Admin API endpoints.</p>
 <p>This release deprecates use of the <code>structured: true</code> logging
 configuration for structured logging. If your logging configuration
 contains <code>structured: true</code> then it should be modified based on the
-<a href="../structured_logging.html">structured logging
-documentation</a>.</p>
+<a href="structured_logging.html">structured logging documentation</a>.</p>
 <p>The <code>structured</code> and <code>drains</code> logging options are now deprecated and
 should be replaced by standard logging configuration of <code>handlers</code> and
 <code>formatters</code>.</p>
@@ -592,13 +589,12 @@ acts the same as the <code>http_client</code> argument previously passed to
 <code>ThirdPartyEventRules</code> modules.</p>
 <h1 id="upgrading-to-v1210"><a class="header" href="#upgrading-to-v1210">Upgrading to v1.21.0</a></h1>
 <h2 id="forwarding-_synapseclient-through-your-reverse-proxy"><a class="header" href="#forwarding-_synapseclient-through-your-reverse-proxy">Forwarding <code>/_synapse/client</code> through your reverse proxy</a></h2>
-<p>The <a href="https://github.com/matrix-org/synapse/blob/develop/docs/reverse_proxy.md">reverse proxy
-documentation</a>
+<p>The <a href="reverse_proxy.html">reverse proxy documentation</a>
 has been updated to include reverse proxy directives for
 <code>/_synapse/client/*</code> endpoints. As the user password reset flow now uses
 endpoints under this prefix, <strong>you must update your reverse proxy
 configurations for user password reset to work</strong>.</p>
-<p>Additionally, note that the <a href="https://github.com/matrix-org/synapse/blob/develop/docs/workers.md">Synapse worker documentation</a> has been updated to</p>
+<p>Additionally, note that the <a href="workers.html">Synapse worker documentation</a> has been updated to</p>
 <p>:   state that the <code>/_synapse/client/password_reset/email/submit_token</code>
 endpoint can be handled</p>
 <p>by all workers. If you make use of Synapse's worker feature, please
@@ -647,7 +643,7 @@ updated.</p>
 <p>When setting up worker processes, we now recommend the use of a Redis
 server for replication. <strong>The old direct TCP connection method is
 deprecated and will be removed in a future release.</strong> See
-<a href="../workers.html">workers</a> for more details.</p>
+<a href="workers.html">workers</a> for more details.</p>
 <h1 id="upgrading-to-v1140"><a class="header" href="#upgrading-to-v1140">Upgrading to v1.14.0</a></h1>
 <p>This version includes a database update which is run as part of the
 upgrade, and which may take a couple of minutes in the case of a large
@@ -760,9 +756,8 @@ Synapse is running.</p>
 affected. If you <em>are</em> affected, you can run a similar query,
 omitting the <code>CONCURRENTLY</code> keyword. Note however that this
 operation may in itself cause Synapse to stop running for some time.
-Synapse admins are reminded that <a href="https://github.com/matrix-org/synapse/blob/master/README.rst#using-postgresql">SQLite is not recommended for use
-outside a test
-environment</a>.</p>
+Synapse admins are reminded that <a href="postgres.html">SQLite is not recommended for use
+outside a test environment</a>.</p>
 </li>
 <li>
 <p>Once the index has been created, the <code>SELECT</code> query in step 1 above
@@ -779,7 +774,7 @@ HTTP requests, the temporary index can be removed:</p>
 <h1 id="upgrading-to-v1100"><a class="header" href="#upgrading-to-v1100">Upgrading to v1.10.0</a></h1>
 <p>Synapse will now log a warning on start up if used with a PostgreSQL
 database that has a non-recommended locale set.</p>
-<p>See <a href="../postgres.html">Postgres</a> for details.</p>
+<p>See <a href="postgres.html">Postgres</a> for details.</p>
 <h1 id="upgrading-to-v180"><a class="header" href="#upgrading-to-v180">Upgrading to v1.8.0</a></h1>
 <p>Specifying a <code>log_file</code> config option will now cause Synapse to refuse
 to start, and should be replaced by with the <code>log_config</code> option.
@@ -873,8 +868,8 @@ section headed <code>email</code>, and be sure to have at least the
 <code>smtp_host, smtp_port</code> and <code>notif_from</code> fields filled out.</p>
 <p>You may also need to set <code>smtp_user</code>, <code>smtp_pass</code>, and
 <code>require_transport_security</code>.</p>
-<p>See the <a href="docs/sample_config.yaml">sample configuration file</a> for more
-details on these settings.</p>
+<p>See the <a href="usage/configuration/homeserver_sample_config.html">sample configuration file</a>
+for more details on these settings.</p>
 <h4 id="delegate-email-to-an-identity-server"><a class="header" href="#delegate-email-to-an-identity-server">Delegate email to an identity server</a></h4>
 <p>Some admins will wish to continue using email verification as part of
 the registration process, but will not immediately have an appropriate
@@ -954,7 +949,7 @@ for its use in the room directory!</p>
 </ul>
 <h1 id="upgrading-to-v120"><a class="header" href="#upgrading-to-v120">Upgrading to v1.2.0</a></h1>
 <p>Some counter metrics have been renamed, with the old names deprecated.
-See <a href="../metrics-howto.html#renaming-of-metrics--deprecation-of-old-names-in-12">the metrics
+See <a href="metrics-howto.html#renaming-of-metrics--deprecation-of-old-names-in-12">the metrics
 documentation</a>
 for details.</p>
 <h1 id="upgrading-to-v110"><a class="header" href="#upgrading-to-v110">Upgrading to v1.1.0</a></h1>
@@ -980,7 +975,7 @@ more details on upgrading your database.</p>
 <p>Synapse v1.0 is the first release to enforce validation of TLS
 certificates for the federation API. It is therefore essential that your
 certificates are correctly configured. See the
-<a href="../MSC1711_certificates_FAQ.html">FAQ</a> for more information.</p>
+<a href="MSC1711_certificates_FAQ.html">FAQ</a> for more information.</p>
 <p>Note, v1.0 installations will also no longer be able to federate with
 servers that have not correctly configured their certificates.</p>
 <p>In rare cases, it may be desirable to disable certificate checking: for
@@ -993,8 +988,8 @@ ways:-</p>
 <li>Configure a whitelist of server domains to trust via
 <code>federation_certificate_verification_whitelist</code>.</li>
 </ul>
-<p>See the <a href="docs/sample_config.yaml">sample configuration file</a> for more
-details on these settings.</p>
+<p>See the <a href="usage/configuration/homeserver_sample_config.html">sample configuration file</a>
+for more details on these settings.</p>
 <h2 id="email-1"><a class="header" href="#email-1">Email</a></h2>
 <p>When a user requests a password reset, Synapse will send an email to the
 user to confirm the request.</p>
@@ -1012,8 +1007,8 @@ section headed <code>email</code>, and be sure to have at least the <code>smtp_h
 <p>If you are absolutely certain that you wish to continue using an
 identity server for password resets, set
 <code>trust_identity_server_for_password_resets</code> to <code>true</code>.</p>
-<p>See the <a href="docs/sample_config.yaml">sample configuration file</a> for more
-details on these settings.</p>
+<p>See the <a href="usage/configuration/homeserver_sample_config.html">sample configuration file</a>
+for more details on these settings.</p>
 <h2 id="new-email-templates"><a class="header" href="#new-email-templates">New email templates</a></h2>
 <p>Some new templates have been added to the default template directory for the purpose of
 the homeserver sending its own password reset emails. If you have configured a
@@ -1028,10 +1023,10 @@ sent to them.</p>
 <h1 id="upgrading-to-v0990"><a class="header" href="#upgrading-to-v0990">Upgrading to v0.99.0</a></h1>
 <p>Please be aware that, before Synapse v1.0 is released around March 2019,
 you will need to replace any self-signed certificates with those
-verified by a root CA. Information on how to do so can be found at <a href="../ACME.html">the
-ACME docs</a>.</p>
+verified by a root CA. Information on how to do so can be found at the
+ACME docs.</p>
 <p>For more information on configuring TLS certificates see the
-<a href="../MSC1711_certificates_FAQ.html">FAQ</a>.</p>
+<a href="MSC1711_certificates_FAQ.html">FAQ</a>.</p>
 <h1 id="upgrading-to-v0340"><a class="header" href="#upgrading-to-v0340">Upgrading to v0.34.0</a></h1>
 <ol>
 <li>
