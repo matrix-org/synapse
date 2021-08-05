@@ -98,16 +98,19 @@ http_proxy/https_proxy environment variables. This proxy was set for:
 - recaptcha validation
 - CAS auth validation
 - OpenID Connect
+- Federation (checking public key revocation)
 
 In this version we have added support for outbound requests for:
-- federation
-- download remote media
-- fetch keys from other servers
-- Identity servers
+- Outbound federation
+- Downloading remote media
+- Fetching public keys of other servers
 
 These requests use the same proxy configuration. If you have a proxy configuration we
 recommend to verify the configuration. It may be necessary to adjust the `no_proxy`
 environment variable.
+
+See [using a forward proxy with Synapse documentation](setup/forward_proxy.md) for
+details.
 
 
 # Upgrading to v1.39.0
