@@ -219,7 +219,10 @@ class FederationServer(FederationBase):
         transaction = Transaction(
             transaction_id=transaction_id,
             destination=destination,
-            **transaction_data,
+            origin=origin,
+            origin_server_ts=transaction_data.get("origin_server_ts"),  # type: ignore
+            pdus=transaction_data.get("pdus"),  # type: ignore
+            edus=transaction_data.get("edus"),
         )
 
         if not transaction_id:
@@ -228,9 +231,7 @@ class FederationServer(FederationBase):
         logger.debug("[%s] Got transaction", transaction_id)
 
         # Reject malformed transactions early: reject if too many PDUs/EDUs
-        if len(transaction.pdus) > 50 or (  # type: ignore
-            hasattr(transaction, "edus") and len(transaction.edus) > 100  # type: ignore
-        ):
+        if len(transaction.pdus) > 50 or len(transaction.edus) > 100:
             logger.info("Transaction PDU or EDU count too large. Returning 400")
             return 400, {}
 
@@ -459,7 +460,7 @@ class FederationServer(FederationBase):
 
         await concurrently_execute(
             _process_edu,
-            getattr(transaction, "edus", []),
+            transaction.edus,
             TRANSACTION_CONCURRENCY_LIMIT,
         )
 
@@ -893,10 +894,12 @@ class FederationServer(FederationBase):
         time_now = self._clock.time_msec()
         pdus = [p.get_pdu_json(time_now) for p in pdu_list]
         return Transaction(
+            # Just need a dummy transaction ID and destination since it won't be used.
+            transaction_id="",
             origin=self.server_name,
             pdus=pdus,
             origin_server_ts=int(time_now),
-            destination=None,
+            destination="",
         ).get_dict()
 
     async def _handle_received_pdu(self, origin: str, pdu: EventBase) -> None:
