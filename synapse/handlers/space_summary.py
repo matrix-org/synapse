@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
-from synapse.api.constants import EventTypes, JoinRules, RoomTypes
+from synapse.api.constants import EventTypes, RoomTypes
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.handlers.room_summary import RoomSummaryMixin
@@ -141,42 +141,13 @@ class SpaceSummaryHandler(RoomSummaryMixin):
                     if not fed_room_id or not isinstance(fed_room_id, str):
                         continue
 
-                    # The room should only be included in the summary if:
-                    #     a. the user is in the room;
-                    #     b. the room is world readable; or
-                    #     c. the user could join the room, e.g. the join rules
-                    #        are set to public or the user is in a space that
-                    #        has been granted access to the room.
-                    #
-                    # Note that we know the user is not in the root room (which is
-                    # why the remote call was made in the first place), but the user
-                    # could be in one of the children rooms and we just didn't know
-                    # about the link.
-
-                    # The API doesn't return the room version so assume that a
-                    # join rule of knock is valid.
-                    include_room = (
-                        room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
-                        or room.get("world_readable") is True
-                    )
-
-                    # Check if the user is a member of any of the allowed rooms
-                    # from the response.
-                    allowed_rooms = room.get("allowed_room_ids")
-                    if (
-                        not include_room
-                        and allowed_rooms
-                        and isinstance(allowed_rooms, list)
-                    ):
-                        include_room = await self._event_auth_handler.is_user_in_rooms(
-                            allowed_rooms, requester
-                        )
+                    include_room = self.requester_can_see_room_entry(room, requester)
 
                     # Finally, if this isn't the requested room, check ourselves
                     # if we can access the room.
                     if not include_room and fed_room_id != queue_entry.room_id:
                         include_room = await self._auth.is_room_accessible(
-                            fed_room_id, requester, None
+                            room_id, requester, None
                         )
 
                     # The user can see the room, include it!

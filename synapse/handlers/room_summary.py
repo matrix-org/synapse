@@ -15,7 +15,12 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional
 
-from synapse.api.constants import EventContentFields, EventTypes, HistoryVisibility
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    HistoryVisibility,
+    JoinRules,
+)
 from synapse.api.errors import NotFoundError
 from synapse.types import JsonDict
 
@@ -76,6 +81,40 @@ class RoomSummaryMixin:
 
         return room_entry
 
+    async def requester_can_see_room_entry(
+        self,
+        room: JsonDict,
+        requester: str,
+    ) -> bool:
+        # The room should only be allowed in the summary if:
+        #     a. the user is in the room;
+        #     b. the room is world readable; or
+        #     c. the user could join the room, e.g. the join rules
+        #        are set to public or the user is in a space that
+        #        has been granted access to the room.
+        #
+        # Note that we know the user is not in the root room (which is
+        # why the remote call was made in the first place), but the user
+        # could be in one of the children rooms and we just didn't know
+        # about the link.
+
+        # The API doesn't return the room version so assume that a
+        # join rule of knock is valid.
+        include_room = (
+            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+            or room.get("world_readable") is True
+        )
+
+        # Check if the user is a member of any of the allowed rooms
+        # from the response.
+        allowed_rooms = room.get("allowed_room_ids")
+        if not include_room and allowed_rooms and isinstance(allowed_rooms, list):
+            include_room = await self._event_auth_handler.is_user_in_rooms(
+                allowed_rooms, requester
+            )
+
+        return include_room
+
 
 class RoomSummaryHandler(RoomSummaryMixin):
     def __init__(self, hs: "HomeServer"):
@@ -91,7 +130,7 @@ class RoomSummaryHandler(RoomSummaryMixin):
         remote_room_hosts: Optional[List[str]],
     ) -> JsonDict:
         """
-        Implementation of the room summary C-S API MSC3244
+        Implementation of the room summary C-S API MSC3266
 
         Args:
             requester:  user id of the user making this request,
@@ -122,8 +161,11 @@ class RoomSummaryHandler(RoomSummaryMixin):
         else:
             room_summary = await self._summarize_remote_room(room_id, remote_room_hosts)
 
-            # TODO validate that the requester has permission to see this room
-            # https://github.com/matrix-org/matrix-doc/pull/3266/files#diff-97aeb566f3ce4bd6ec3b98e71ecbca3d6e86c0407e6a82afbc57e86bf0316607R106-R108
+            # validate that the requester has permission to see this room
+            include_room = self.requester_can_see_room_entry(room_summary, requester)
+
+            if not include_room:
+                raise NotFoundError("Room not found or is not accessible")
 
         # Before returning to the client, remove the allowed_room_ids key.
         room_summary.pop("allowed_room_ids", None)
@@ -173,5 +215,5 @@ class RoomSummaryHandler(RoomSummaryMixin):
         """
         logger.info("Requesting summary for %s via %s", room_id, remote_room_hosts)
 
-        # TODO federation API
+        # TODO federation API, descoped from initial unstable implementation as MSC needs more maturing on that side.
         raise NotFoundError("Room not found or is not accessible")
