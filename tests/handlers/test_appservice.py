@@ -133,11 +133,131 @@ class AppServiceHandlerTestCase(unittest.TestCase):
         self.assertEquals(result.room_id, room_id)
         self.assertEquals(result.servers, servers)
 
-    def _mkservice(self, is_interested):
+    def test_get_3pe_protocols_no_appservices(self):
+        self.mock_store.get_app_services.return_value = []
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols("my-protocol"))
+        )
+        self.mock_as_api.get_3pe_protocol.assert_not_called()
+        self.assertEquals(response, {})
+
+    def test_get_3pe_protocols_no_protocols(self):
+        service = self._mkservice(False, [])
+        self.mock_store.get_app_services.return_value = [service]
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols())
+        )
+        self.mock_as_api.get_3pe_protocol.assert_not_called()
+        self.assertEquals(response, {})
+
+    def test_get_3pe_protocols_protocol_no_response(self):
+        service = self._mkservice(False, ["my-protocol"])
+        self.mock_store.get_app_services.return_value = [service]
+        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(None)
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols())
+        )
+        self.mock_as_api.get_3pe_protocol.assert_called_once_with(
+            service, "my-protocol"
+        )
+        self.assertEquals(response, {})
+
+    def test_get_3pe_protocols_select_one_protocol(self):
+        service = self._mkservice(False, ["my-protocol"])
+        self.mock_store.get_app_services.return_value = [service]
+        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
+            {"x-protocol-data": 42, "instances": []}
+        )
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols("my-protocol"))
+        )
+        self.mock_as_api.get_3pe_protocol.assert_called_once_with(
+            service, "my-protocol"
+        )
+        self.assertEquals(
+            response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
+        )
+
+    def test_get_3pe_protocols_one_protocol(self):
+        service = self._mkservice(False, ["my-protocol"])
+        self.mock_store.get_app_services.return_value = [service]
+        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
+            {"x-protocol-data": 42, "instances": []}
+        )
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols())
+        )
+        self.mock_as_api.get_3pe_protocol.assert_called_once_with(
+            service, "my-protocol"
+        )
+        self.assertEquals(
+            response, {"my-protocol": {"x-protocol-data": 42, "instances": []}}
+        )
+
+    def test_get_3pe_protocols_multiple_protocol(self):
+        service_one = self._mkservice(False, ["my-protocol"])
+        service_two = self._mkservice(False, ["other-protocol"])
+        self.mock_store.get_app_services.return_value = [service_one, service_two]
+        self.mock_as_api.get_3pe_protocol.return_value = make_awaitable(
+            {"x-protocol-data": 42, "instances": []}
+        )
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols())
+        )
+        self.mock_as_api.get_3pe_protocol.assert_called()
+        self.assertEquals(
+            response,
+            {
+                "my-protocol": {"x-protocol-data": 42, "instances": []},
+                "other-protocol": {"x-protocol-data": 42, "instances": []},
+            },
+        )
+
+    def test_get_3pe_protocols_multiple_info(self):
+        service_one = self._mkservice(False, ["my-protocol"])
+        service_two = self._mkservice(False, ["my-protocol"])
+
+        async def get_3pe_protocol(service, unusedProtocol):
+            if service == service_one:
+                return {
+                    "x-protocol-data": 42,
+                    "instances": [{"desc": "Alice's service"}],
+                }
+            if service == service_two:
+                return {
+                    "x-protocol-data": 36,
+                    "x-not-used": 45,
+                    "instances": [{"desc": "Bob's service"}],
+                }
+            raise Exception("Unexpected service")
+
+        self.mock_store.get_app_services.return_value = [service_one, service_two]
+        self.mock_as_api.get_3pe_protocol = get_3pe_protocol
+        response = self.successResultOf(
+            defer.ensureDeferred(self.handler.get_3pe_protocols())
+        )
+        # It's expected that the second service's data doesn't appear in the response
+        self.assertEquals(
+            response,
+            {
+                "my-protocol": {
+                    "x-protocol-data": 42,
+                    "instances": [
+                        {
+                            "desc": "Alice's service",
+                        },
+                        {"desc": "Bob's service"},
+                    ],
+                },
+            },
+        )
+
+    def _mkservice(self, is_interested, protocols=None):
         service = Mock()
         service.is_interested.return_value = make_awaitable(is_interested)
         service.token = "mock_service_token"
         service.url = "mock_service_url"
+        service.protocols = protocols
         return service
 
     def _mkservice_alias(self, is_interested_in_alias):
