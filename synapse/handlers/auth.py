@@ -627,23 +627,28 @@ class AuthHandler(BaseHandler):
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str
-    ) -> bool:
+    ) -> Any:
         """
         Adds the result of out-of-band authentication into an existing auth
         session. Currently used for adding the result of fallback auth.
+
+        Returns:
+            The result of authentication.
         """
         if stagetype not in self.checkers:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-        if "session" not in authdict:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-
-        result = await self.checkers[stagetype].check_auth(authdict, clientip)
-        if result:
-            await self.store.mark_ui_auth_stage_complete(
-                authdict["session"], stagetype, result
+            raise LoginError(
+                400, f"Unknown UIA stage type: {stagetype}", Codes.INVALID_PARAM
             )
-            return True
-        return False
+        if "session" not in authdict:
+            raise LoginError(400, "Missing session ID", Codes.MISSING_PARAM)
+
+        # If authentication fails a LoginError is raised, so if we do get a
+        # result we know authentication has succeeded.
+        result = await self.checkers[stagetype].check_auth(authdict, clientip)
+        await self.store.mark_ui_auth_stage_complete(
+            authdict["session"], stagetype, result
+        )
+        return result
 
     def get_session_id(self, clientdict: Dict[str, Any]) -> Optional[str]:
         """

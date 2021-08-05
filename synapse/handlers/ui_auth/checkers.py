@@ -49,7 +49,7 @@ class UserInteractiveAuthChecker:
             clientip: The IP address of the client.
 
         Raises:
-            SynapseError if authentication failed
+            LoginError if authentication failed.
 
         Returns:
             The result of authentication (to pass back to the client?)
