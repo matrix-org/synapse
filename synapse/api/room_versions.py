@@ -193,7 +193,7 @@ class RoomVersions:
     )
     MSC2716 = RoomVersion(
         "org.matrix.msc2716",
-        RoomDisposition.STABLE,
+        RoomDisposition.UNSTABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
