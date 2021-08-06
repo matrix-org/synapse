@@ -656,7 +656,7 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
         self, user_id: str, state: PresenceState, status_msg: Optional[str]
     ):
         """Set a PresenceState and status_msg and check the result.
-        
+
         Args:
             user_id: User for that the status is to be set.
             PresenceState: The new PresenceState.
