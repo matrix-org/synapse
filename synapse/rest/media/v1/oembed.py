@@ -250,6 +250,14 @@ def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> 
     if video_urls:
         open_graph_response["og:video"] = video_urls[0]
 
+    for tag in tree.xpath("//*/iframe"):
+        if "src" in tag.attrib:
+            open_graph_response["og:iframe"] = tag.attrib["src"]
+            for a in ["width", "height"]:
+                if a in tag.attrib:
+                    open_graph_response["og:iframe:" + a] = tag.attrib[a]
+            break  # we can have only one iframe
+
     description = parse_html_description(tree)
     if description:
         open_graph_response["og:description"] = description
