@@ -23,7 +23,6 @@ from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
-    HttpResponseException,
     InvalidClientCredentialsError,
     ShadowBanError,
     SynapseError,
@@ -783,12 +782,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-            try:
-                data = await handler.get_remote_public_room_list(
-                    server, limit=limit, since_token=since_token
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error()
+            data = await handler.get_remote_public_room_list(
+                server, limit=limit, since_token=since_token
+            )
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -836,17 +832,15 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-            try:
-                data = await handler.get_remote_public_room_list(
-                    server,
-                    limit=limit,
-                    since_token=since_token,
-                    search_filter=search_filter,
-                    include_all_networks=include_all_networks,
-                    third_party_instance_id=third_party_instance_id,
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error()
+            data = await handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
+
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,

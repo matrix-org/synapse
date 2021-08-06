@@ -1108,7 +1108,8 @@ class FederationClient(FederationBase):
             The response from the remote server.
 
         Raises:
-            HttpResponseException: There was an exception returned from the remote server
+            HttpResponseException / RequestSendFailed: There was an exception
+                returned from the remote server
             SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
                 requests over federation
 
