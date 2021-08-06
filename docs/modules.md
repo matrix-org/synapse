@@ -282,6 +282,101 @@ the request is a server admin.
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
 
+#### Password auth provider callbacks
+
+Password auth providers offer a way for server administrators to integrate
+their Synapse installation with an existing authentication system. The callbacks can be
+registered by using the Module API's `register_password_auth_provider_callbacks` method.
+
+To register authentication checkers, the module should register both of:
+
+- `supported_login_types: Dict[str, Iterable[str]]`  
+
+A dict mapping from a login type identifier (such as `m.login.password`) to an
+iterable giving the fields which must be provided by the user in the submission
+to the `/login` API. 
+
+For example, if a module wants to implement a custom login type of 
+`com.example.custom_login`, where the client is expected to pass the fields `secret1`
+and `secret2` and an alternative password authenticator for `m.login.password`, then
+it should register the following dict: 
+
+```python
+{
+    "com.example.custom_login": ("secret1", "secret2"),
+    "m.login.password": ("password",)
+}
+```
+
+- `auth_checkers: Dict[str, CHECK_AUTH]`
+
+A dict mapping from a login type identifier (such as `m.login.password`) to an authentication
+checking method of the following form:
+
+```python
+async def check_auth(
+        username: str,
+        login_type: str,
+        login_dict: JsonDict
+) -> Optional[Union[str, Tuple[str, Optional[Callable]]]]
+```
+
+It is passed the (possibly unqualified) user field provided by the client, 
+the login type, and a dictionary of login secrets passed by the client.
+
+If authentication was successful, then it should return either a str containing
+the user's (canonical) User id or a (user_id, callback) tuple, where the callback is
+called with the result from the `/login` call (see the 
+<a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
+for details).
+
+So continuing the same example, if the module has two authentication checkers, one for 
+`com.example.custom_login` called `self.custom_check` and one for `m.login.password` called
+`self.password_check` then it should register the following dict:
+
+```python
+{
+    "com.example.custom_login": self.custom_check,
+    "m.login.password": self.password_check,
+}
+```
+
+Additionally, the following callbacks are available:
+
+```python
+async def check_3pid_auth(
+    medium: str, 
+    address: str,
+    password: str,
+) -> Optional[Union[str, Tuple[str, Optional[Callable]]]]
+```
+
+This  is called when a user attempts to register or log in with a third party identifier,
+such as email. It is passed the medium (eg. "email"), an address (eg. "jdoe@example.com")
+and the user's password.
+
+The method should return None if the authentication is unsuccessful.
+
+If authentication was successful, then it should return either a str containing
+the user's (canonical) User id or a (user_id, callback) tuple, where the callback is
+called with the result from the `/login` call (see the 
+<a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
+for details).
+
+```python
+async def on_logged_out(
+        user_id: str,
+        device_id: str,
+        access_token: str,
+) -> None
+``` 
+This is called when a user logs out. It is passed the qualified user ID, the ID of the
+deactivated device (if any: access tokens are occasionally created without an associated
+device ID), and the (now deactivated) access token.
+
+The callback must be asynchronous but the logout request will wait for the callback
+to complete.
+
 
 ### Porting an existing module that uses the old interface
 
