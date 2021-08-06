@@ -39,6 +39,7 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
+from synapse.handlers.auth import load_legacy_password_auth_provider
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
@@ -370,6 +371,8 @@ async def start(hs: "HomeServer"):
 
     load_legacy_spam_checkers(hs)
     load_legacy_third_party_event_rules(hs)
+    for module, config in hs.config.password_providers:
+        load_legacy_password_auth_provider(module=module, config=config, api=module_api)
 
     # If we've configured an expiry time for caches, start the background job now.
     setup_expire_lru_cache_entries(hs)
