@@ -138,6 +138,19 @@ class KeyStore(SQLBaseStore):
         for i in invalidations:
             invalidate((i,))
 
+    async def store_server_keys_json_multi(
+        self,
+        entries: List[Tuple[str, str, str, int, int, bytes]],
+    ):
+        await self.db_pool.simple_upsert_many(
+            table="server_keys_json",
+            key_names=("server_name", "key_id", "from_server"),
+            key_values=[e[:3] for e in entries],
+            value_names=("ts_added_ms", "ts_valid_until_ms", "key_json"),
+            value_values=[(e[3], e[4], db_binary_type(e[5])) for e in entries],
+            desc="store_server_keys_json_multi",
+        )
+
     async def store_server_keys_json(
         self,
         server_name: str,

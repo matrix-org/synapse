@@ -544,22 +544,18 @@ class BaseV2KeyFetcher(KeyFetcher):
 
         key_json_bytes = encode_canonical_json(response_json)
 
-        await make_deferred_yieldable(
-            defer.gatherResults(
-                [
-                    run_in_background(
-                        self.store.store_server_keys_json,
-                        server_name=server_name,
-                        key_id=key_id,
-                        from_server=from_server,
-                        ts_now_ms=time_added_ms,
-                        ts_expires_ms=ts_valid_until_ms,
-                        key_json_bytes=key_json_bytes,
-                    )
-                    for key_id in verify_keys
-                ],
-                consumeErrors=True,
-            ).addErrback(unwrapFirstError)
+        await self.store.store_server_keys_json_multi(
+            [
+                (
+                    server_name,
+                    key_id,
+                    from_server,
+                    time_added_ms,
+                    ts_valid_until_ms,
+                    key_json_bytes,
+                )
+                for key_id in verify_keys
+            ],
         )
 
         return verify_keys
