@@ -34,8 +34,6 @@ from typing import (
 )
 
 import twisted.internet.tcp
-from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import IResource
 
@@ -441,10 +439,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_room_shutdown_handler(self) -> RoomShutdownHandler:
         return RoomShutdownHandler(self)
-
-    @cache_in_self
-    def get_sendmail(self) -> Callable[..., defer.Deferred]:
-        return sendmail
 
     @cache_in_self
     def get_state_handler(self) -> StateHandler:

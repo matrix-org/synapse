@@ -47,12 +47,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
-            self.email_attempts.append(msg)
-            return
-
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
@@ -67,7 +61,16 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "https://example.com"
 
-        hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(
+            reactor, smtphost, smtpport, from_addr, to_addrs, msg, **kwargs
+        ):
+            self.email_attempts.append(msg)
+
+        self.email_attempts = []
+        hs.get_send_email_handler()._sendmail = sendmail
+
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -511,11 +514,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
-            self.email_attempts.append(msg)
-
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
@@ -530,7 +528,16 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "https://example.com"
 
-        self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        self.hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(
+            reactor, smtphost, smtpport, from_addr, to_addrs, msg, **kwargs
+        ):
+            self.email_attempts.append(msg)
+
+        self.email_attempts = []
+        self.hs.get_send_email_handler()._sendmail = sendmail
+
         return self.hs
 
     def prepare(self, reactor, clock, hs):
