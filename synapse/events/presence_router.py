@@ -37,7 +37,7 @@ GET_INTERESTED_USERS = Callable[[str], Awaitable[Union[Set[str], str]]]
 
 def load_legacy_presence_router(hs: "HomeServer"):
     """Wrapper that loads a presence router module configured using the old
-    configuration, and registers the hooks they implement.
+    configuration, and registers the hooks it implements.
     """
 
     if hs.config.presence_router_module_class is None:
@@ -138,7 +138,7 @@ class PresenceRouter:
             return {}
 
         # If there are multiple callbacks for get_users_for_state then we want to
-        # return ALL of the extra destinations, this method joins two sets of extra
+        # return all of the extra destinations, this method joins two sets of extra
         # destinations into one
         def combine(
             dict1: Dict[str, Set[UserPresenceState]],
@@ -183,7 +183,7 @@ class PresenceRouter:
             return set()
 
         # If there are multiple callbacks for get_interested_users then we want to
-        # return ALL of the users, this method joins two sets of users into one
+        # return all of the users, this method joins two sets of users into one
         def combine(
             set1: Union[Set[str], str],
             set2: Union[Set[str], str],
