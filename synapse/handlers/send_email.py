@@ -43,7 +43,7 @@ async def _sendmail(
     require_auth: bool = False,
     require_tls: bool = False,
     tls_hostname: Optional[str] = None,
-):
+) -> None:
     """A simple wrapper around ESMTPSenderFactory, to allow substitution in tests
 
     Params:
@@ -79,7 +79,7 @@ async def _sendmail(
     # the IReactorTCP interface claims host has to be a bytes, which seems to be wrong
     reactor.connectTCP(smtphost, smtpport, factory, timeout=30, bindAddress=None)  # type: ignore[arg-type]
 
-    return await make_deferred_yieldable(d)
+    await make_deferred_yieldable(d)
 
 
 class SendEmailHandler:
