@@ -109,21 +109,33 @@ soft_failed_event_counter = Counter(
 )
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class _NewEventInfo:
     """Holds information about a received event, ready for passing to _auth_and_persist_events
 
     Attributes:
         event: the received event
 
-        state: the state at that event
+        state: the state at that event, according to /state_ids from a remote
+           homeserver. Only populated for backfilled events which are going to be a
+           new backwards extremity.
 
-        auth_events: the auth_event map for that event
+        claimed_auth_event_map: a map of (type, state_key) => event for the event's
+            claimed auth_events.
+
+            This can include events which have not yet been persisted, in the case that
+            we are backfilling a batch of events.
+
+            Note: May be incomplete: if we were unable to find all of the claimed auth
+            events. Also, treat the contents with caution: the events might also have
+            been rejected, might not yet have been authorized themselves, or they might
+            be in the wrong room.
+
     """
 
-    event = attr.ib(type=EventBase)
-    state = attr.ib(type=Optional[Sequence[EventBase]], default=None)
-    auth_events = attr.ib(type=Optional[MutableStateMap[EventBase]], default=None)
+    event: EventBase
+    state: Optional[Sequence[EventBase]]
+    claimed_auth_event_map: StateMap[EventBase]
 
 
 class FederationHandler(BaseHandler):
@@ -1086,7 +1098,7 @@ class FederationHandler(BaseHandler):
                 _NewEventInfo(
                     event=ev,
                     state=events_to_state[e_id],
-                    auth_events={
+                    claimed_auth_event_map={
                         (
                             auth_events[a_id].type,
                             auth_events[a_id].state_key,
@@ -2315,7 +2327,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[MutableStateMap[EventBase]] = None,
+        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> None:
         """
@@ -2327,17 +2339,18 @@ class FederationHandler(BaseHandler):
             context:
                 The event context.
 
-                NB that this function potentially modifies it.
             state:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
-            auth_events:
-                Map from (event_type, state_key) to event
 
-                Normally, our calculated auth_events based on the state of the room
-                at the event's position in the DAG, though occasionally (eg if the
-                event is an outlier), may be the auth events claimed by the remote
-                server.
+            claimed_auth_event_map:
+                A map of (type, state_key) => event for the event's claimed auth_events.
+                Possibly incomplete, and possibly including events that are not yet
+                persisted, or authed, or in the right room.
+
+                Only populated where we may not already have persisted these events -
+                for example, when populating outliers.
+
             backfilled: True if the event was backfilled.
         """
         context = await self._check_event_auth(
@@ -2345,7 +2358,7 @@ class FederationHandler(BaseHandler):
             event,
             context,
             state=state,
-            auth_events=auth_events,
+            claimed_auth_event_map=claimed_auth_event_map,
             backfilled=backfilled,
         )
 
@@ -2409,7 +2422,7 @@ class FederationHandler(BaseHandler):
                     event,
                     res,
                     state=ev_info.state,
-                    auth_events=ev_info.auth_events,
+                    claimed_auth_event_map=ev_info.claimed_auth_event_map,
                     backfilled=backfilled,
                 )
             return res
@@ -2675,7 +2688,7 @@ class FederationHandler(BaseHandler):
         event: EventBase,
         context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
-        auth_events: Optional[MutableStateMap[EventBase]] = None,
+        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
         backfilled: bool = False,
     ) -> EventContext:
         """
@@ -2687,21 +2700,19 @@ class FederationHandler(BaseHandler):
             context:
                 The event context.
 
-                NB that this function potentially modifies it.
             state:
                 The state events used to check the event for soft-fail. If this is
                 not provided the current state events will be used.
-            auth_events:
-                Map from (event_type, state_key) to event
 
-                Normally, our calculated auth_events based on the state of the room
-                at the event's position in the DAG, though occasionally (eg if the
-                event is an outlier), may be the auth events claimed by the remote
-                server.
+            claimed_auth_event_map:
+                A map of (type, state_key) => event for the event's claimed auth_events.
+                Possibly incomplete, and possibly including events that are not yet
+                persisted, or authed, or in the right room.
 
-                Also NB that this function adds entries to it.
+                Only populated where we may not already have persisted these events -
+                for example, when populating outliers, or the state for a backwards
+                extremity.
 
-                If this is not provided, it is calculated from the previous state IDs.
             backfilled: True if the event was backfilled.
 
         Returns:
@@ -2710,7 +2721,12 @@ class FederationHandler(BaseHandler):
         room_version = await self.store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
-        if not auth_events:
+        if claimed_auth_event_map:
+            # if we have a copy of the auth events from the event, use that as the
+            # basis for auth.
+            auth_events = claimed_auth_event_map
+        else:
+            # otherwise, we calculate what the auth events *should* be, and use that
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
@@ -2718,18 +2734,11 @@ class FederationHandler(BaseHandler):
             auth_events_x = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
 
-        # This is a hack to fix some old rooms where the initial join event
-        # didn't reference the create event in its auth events.
-        if event.type == EventTypes.Member and not event.auth_event_ids():
-            if len(event.prev_event_ids()) == 1 and event.depth < 5:
-                c = await self.store.get_event(
-                    event.prev_event_ids()[0], allow_none=True
-                )
-                if c and c.type == EventTypes.Create:
-                    auth_events[(c.type, c.state_key)] = c
-
         try:
-            context = await self._update_auth_events_and_context_for_auth(
+            (
+                context,
+                auth_events_for_auth,
+            ) = await self._update_auth_events_and_context_for_auth(
                 origin, event, context, auth_events
             )
         except Exception:
@@ -2742,9 +2751,10 @@ class FederationHandler(BaseHandler):
                 "Ignoring failure and continuing processing of event.",
                 event.event_id,
             )
+            auth_events_for_auth = auth_events
 
         try:
-            event_auth.check(room_version_obj, event, auth_events=auth_events)
+            event_auth.check(room_version_obj, event, auth_events=auth_events_for_auth)
         except AuthError as e:
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
@@ -2769,8 +2779,8 @@ class FederationHandler(BaseHandler):
         origin: str,
         event: EventBase,
         context: EventContext,
-        auth_events: MutableStateMap[EventBase],
-    ) -> EventContext:
+        input_auth_events: StateMap[EventBase],
+    ) -> Tuple[EventContext, StateMap[EventBase]]:
         """Helper for _check_event_auth. See there for docs.
 
         Checks whether a given event has the expected auth events. If it
@@ -2787,7 +2797,7 @@ class FederationHandler(BaseHandler):
             event:
             context:
 
-            auth_events:
+            input_auth_events:
                 Map from (event_type, state_key) to event
 
                 Normally, our calculated auth_events based on the state of the room
@@ -2795,11 +2805,12 @@ class FederationHandler(BaseHandler):
                 event is an outlier), may be the auth events claimed by the remote
                 server.
 
-                Also NB that this function adds entries to it.
-
         Returns:
-            updated context
+            updated context, updated auth event map
         """
+        # take a copy of input_auth_events before we modify it.
+        auth_events: MutableStateMap[EventBase] = dict(input_auth_events)
+
         event_auth_events = set(event.auth_event_ids())
 
         # missing_auth is the set of the event's auth_events which we don't yet have
@@ -2828,7 +2839,7 @@ class FederationHandler(BaseHandler):
                     # The other side isn't around or doesn't implement the
                     # endpoint, so lets just bail out.
                     logger.info("Failed to get event auth from remote: %s", e1)
-                    return context
+                    return context, auth_events
 
                 seen_remotes = await self.store.have_seen_events(
                     event.room_id, [e.event_id for e in remote_auth_chain]
@@ -2859,7 +2870,10 @@ class FederationHandler(BaseHandler):
                             await self.state_handler.compute_event_context(e)
                         )
                         await self._auth_and_persist_event(
-                            origin, e, missing_auth_event_context, auth_events=auth
+                            origin,
+                            e,
+                            missing_auth_event_context,
+                            claimed_auth_event_map=auth,
                         )
 
                         if e.event_id in event_auth_events:
@@ -2877,14 +2891,14 @@ class FederationHandler(BaseHandler):
             # obviously be empty
             # (b) alternatively, why don't we do it earlier?
             logger.info("Skipping auth_event fetch for outlier")
-            return context
+            return context, auth_events
 
         different_auth = event_auth_events.difference(
             e.event_id for e in auth_events.values()
         )
 
         if not different_auth:
-            return context
+            return context, auth_events
 
         logger.info(
             "auth_events refers to events which are not in our calculated auth "
@@ -2910,7 +2924,7 @@ class FederationHandler(BaseHandler):
                 # XXX: should we reject the event in this case? It feels like we should,
                 # but then shouldn't we also do so if we've failed to fetch any of the
                 # auth events?
-                return context
+                return context, auth_events
 
         # now we state-resolve between our own idea of the auth events, and the remote's
         # idea of them.
@@ -2940,7 +2954,7 @@ class FederationHandler(BaseHandler):
             event, context, auth_events
         )
 
-        return context
+        return context, auth_events
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
