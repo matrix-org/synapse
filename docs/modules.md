@@ -304,7 +304,7 @@ it should register the following dict:
 ```python
 {
     "com.example.custom_login": ("secret1", "secret2"),
-    "m.login.password": ("password",)
+    "m.login.password": ("password",),
 }
 ```
 
@@ -395,6 +395,22 @@ more info).
 The module's author should also update any example in the module's configuration to only
 use the new `modules` section in Synapse's configuration file (see [this section](#using-modules)
 for more info).
+
+#### Porting password auth provider modules
+
+There is no longer a `get_db_schema_files` callback provided, any changes to the database
+should now be made by the module using the module API class.
+
+To port a module that has a `check_password` method: 
+- Register `"m.login.password": ("password",)` as a supported login type
+- Register `"m.login.password": self.check_password` as an auth checker
+- Change the arguments of `check_password` to
+  `(username: str, login_type: str, login_dict: JsonDict)`
+- Add the following lines to the top of the `check_password` method:
+  - `user_id = self.module_api.get_qualified_user_id(username)`
+  - `password = login_dict["password"]`
+- Alter `check_password` so that it returns `None` on an authentication failure, and `user_id`
+  on a success
 
 ### Example
 
