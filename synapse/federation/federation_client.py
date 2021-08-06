@@ -43,7 +43,6 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     HttpResponseException,
-    RequestSendFailed,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -1109,22 +1108,20 @@ class FederationClient(FederationBase):
             The response from the remote server.
 
         Raises:
-            HttpResponseException: There was an exception returned from the remote server
+            HttpResponseException / RequestSendFailed: There was an exception
+                returned from the remote server
             SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
                 requests over federation
 
         """
-        try:
-            return await self.transport_layer.get_public_rooms(
-                remote_server,
-                limit,
-                since_token,
-                search_filter,
-                include_all_networks=include_all_networks,
-                third_party_instance_id=third_party_instance_id,
-            )
-        except (RequestSendFailed, HttpResponseException):
-            raise SynapseError(502, "Failed to fetch room list")
+        return await self.transport_layer.get_public_rooms(
+            remote_server,
+            limit,
+            since_token,
+            search_filter,
+            include_all_networks=include_all_networks,
+            third_party_instance_id=third_party_instance_id,
+        )
 
     async def get_missing_events(
         self,
