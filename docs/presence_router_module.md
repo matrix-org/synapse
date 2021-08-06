@@ -1,3 +1,9 @@
+<h2 style="color:red">
+This page of the Synapse documentation is now deprecated. For up to date
+documentation on setting up or writing a presence router module, please see
+<a href="modules.md">this page</a>.
+</h2>
+
 # Presence Router Module
 
 Synapse supports configuring a module that can specify additional users
@@ -115,15 +121,11 @@ class ExamplePresenceRouter:
 
     Args:
         config: A configuration object.
-        api: An instance of Synapse's ModuleApi.
+        module_api: An instance of Synapse's ModuleApi.
     """
-    def __init__(self, config: PresenceRouterConfig, api: ModuleApi):
+    def __init__(self, config: PresenceRouterConfig, module_api: ModuleApi):
         self._config = config
-        self._module_api = api
-        api.register_presence_router_callbacks(
-          get_users_for_states=self.get_users_for_states,
-          get_interested_users=self.get_interested_users,
-        )
+        self._module_api = module_api
 
     @staticmethod
     def parse_config(config_dict: dict) -> PresenceRouterConfig:
@@ -225,8 +227,11 @@ Once you've crafted your module and installed it into the same Python environmen
 Synapse, amend your homeserver config file with the following.
 
 ```yaml
-modules:
-  - module: my_module.ExamplePresenceRouter
+presence:
+  enabled: true
+
+  presence_router:
+    module: my_module.ExamplePresenceRouter
     config:
       # Any configuration options for your module. The below is an example.
       # of setting options for ExamplePresenceRouter.
