@@ -85,8 +85,6 @@ class MatrixFederationAgentTests(unittest.TestCase):
             had_well_known_cache=self.had_well_known_cache,
         )
 
-        self.agent = self._make_agent()
-
     def _make_connection(
         self,
         client_factory: IProtocolFactory,
@@ -261,7 +259,6 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def _do_get(self):
         """test of a GET request with an explicit port"""
-        # recreate the agent with patched env
         self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -358,7 +355,6 @@ class MatrixFederationAgentTests(unittest.TestCase):
             expect_proxy_ssl: True if we expect the request to connect to the proxy via https.
             expected_auth_credentials: credentials we expect to be presented to authenticate at the proxy
         """
-        # recreate the agent with patched env
         self.agent = self._make_agent()
 
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -494,6 +490,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the server name contains an explicit IP (with no port)
         """
+        self.agent = self._make_agent()
+
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.4"] = "1.2.3.4"
 
@@ -528,6 +526,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name contains an explicit IPv6 address
         (with no port)
         """
+        self.agent = self._make_agent()
 
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
@@ -563,6 +562,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name contains an explicit IPv6 address
         (with explicit port)
         """
+        self.agent = self._make_agent()
 
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["::1"] = "::1"
@@ -597,6 +597,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the certificate on the server doesn't match the hostname
         """
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv1"] = "1.2.3.4"
 
@@ -649,6 +651,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         Test the behaviour when the server name contains an explicit IP, but
         the server cert doesn't cover it
         """
+        self.agent = self._make_agent()
+
         # there will be a getaddrinfo on the IP
         self.reactor.lookups["1.2.3.5"] = "1.2.3.5"
 
@@ -679,6 +683,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the server name has no port, no SRV, and no well-known
         """
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -732,6 +737,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_get_well_known(self):
         """Test the behaviour when the .well-known delegates elsewhere"""
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -795,6 +801,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the server name has no port and no SRV record, but
         the .well-known has a 300 redirect
         """
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["target-server"] = "1::f"
@@ -883,6 +891,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when the server name has an *invalid* well-known (and no SRV)
         """
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
         self.reactor.lookups["testserv"] = "1.2.3.4"
@@ -988,6 +997,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """
         Test the behaviour when there is a single SRV record
         """
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [Server(host=b"srvtarget", port=8443)]
         )
@@ -1028,6 +1039,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Test the behaviour when the .well-known redirects to a place where there
         is a SRV.
         """
+        self.agent = self._make_agent()
+
         self.reactor.lookups["testserv"] = "1.2.3.4"
         self.reactor.lookups["srvtarget"] = "5.6.7.8"
 
@@ -1084,6 +1097,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_idna_servername(self):
         """test the behaviour when the server name has idna chars in"""
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service([])
 
@@ -1145,6 +1159,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_idna_srv_target(self):
         """test the behaviour when the target of a SRV record has idna chars"""
+        self.agent = self._make_agent()
 
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [Server(host=b"xn--trget-3qa.com", port=8443)]  # târget.com
@@ -1348,6 +1363,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
     def test_srv_fallbacks(self):
         """Test that other SRV results are tried if the first one fails."""
+        self.agent = self._make_agent()
+
         self.mock_resolver.resolve_service.side_effect = generate_resolve_service(
             [
                 Server(host=b"target.com", port=8443),
