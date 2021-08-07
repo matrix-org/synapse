@@ -68,7 +68,7 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
-from synapse.types import ISynapseReactor, JsonDict
+from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
