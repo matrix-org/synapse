@@ -102,7 +102,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
             ssl: If true, we will expect an ssl connection and wrap
                 server_factory with a TLSMemoryBIOFactory
-                False is set only for connection via http_proxy
+                False is set only for when proxy expect http connection.
+                Otherwise federation requests use always https.
 
             expected_sni: the expected SNI value
 
@@ -321,7 +322,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
     )
     def test_get_via_http_proxy(self):
         """test for federation request through a http proxy"""
-        self._do_get_via_proxy(ssl=False, auth_credentials=None)
+        self._do_get_via_proxy(expect_proxy_ssl=False, auth_credentials=None)
 
     @patch.dict(
         os.environ,
@@ -329,14 +330,14 @@ class MatrixFederationAgentTests(unittest.TestCase):
     )
     def test_get_via_http_proxy_with_auth(self):
         """test for federation request through a http proxy with authentication"""
-        self._do_get_via_proxy(ssl=False, auth_credentials=b"user:pass")
+        self._do_get_via_proxy(expect_proxy_ssl=False, auth_credentials=b"user:pass")
 
     @patch.dict(
         os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
     )
     def test_get_via_https_proxy(self):
         """test for federation request through a https proxy"""
-        self._do_get_via_proxy(ssl=True, auth_credentials=None)
+        self._do_get_via_proxy(expect_proxy_ssl=True, auth_credentials=None)
 
     @patch.dict(
         os.environ,
@@ -344,17 +345,17 @@ class MatrixFederationAgentTests(unittest.TestCase):
     )
     def test_get_via_https_proxy_with_auth(self):
         """test for federation request through a https proxy with authentication"""
-        self._do_get_via_proxy(ssl=True, auth_credentials=b"user:pass")
+        self._do_get_via_proxy(expect_proxy_ssl=True, auth_credentials=b"user:pass")
 
     def _do_get_via_proxy(
         self,
-        ssl: bool = False,
+        expect_proxy_ssl: bool = False,
         auth_credentials: Optional[bytes] = None,
     ):
         """Send a https federation request via an agent and check that it is correctly
             received at the proxy and client. The proxy can use either http or https.
         Args:
-            ssl: True if we expect the request to connect to the proxy via https.
+            expect_proxy_ssl: True if we expect the request to connect to the proxy via https.
             expected_auth_credentials: credentials we expect to be presented to authenticate at the proxy
         """
         # recreate the agent with patched env
@@ -378,9 +379,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
         # make a test server to act as the proxy, and wire up the client
         proxy_server = self._make_connection(
             client_factory,
-            ssl=ssl,
-            tls_sanlist=[b"DNS:proxy.com"] if ssl else None,
-            expected_sni=b"proxy.com" if ssl else None,
+            ssl=expect_proxy_ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if expect_proxy_ssl else None,
+            expected_sni=b"proxy.com" if expect_proxy_ssl else None,
         )
 
         assert isinstance(proxy_server, HTTPChannel)
@@ -428,7 +429,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
 
         # See also comment at `_do_https_request_via_proxy`
         # in ../test_proxyagent.py for more details
-        if ssl:
+        if expect_proxy_ssl:
             assert isinstance(proxy_server_transport, TLSMemoryBIOProtocol)
             proxy_server_transport.wrappedProtocol = server_ssl_protocol
         else:
