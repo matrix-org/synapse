@@ -327,25 +327,25 @@ class MatrixHostnameEndpoint:
 
             endpoint: IStreamClientEndpoint
             try:
-                if self.https_proxy_endpoint and not should_skip_proxy:
+                if self._https_proxy_endpoint and not should_skip_proxy:
                     logger.debug(
                         "Connecting to %s:%i via %s",
                         host.decode("ascii"),
                         port,
-                        self.https_proxy_endpoint,
+                        self._https_proxy_endpoint,
                     )
                     connect_headers = Headers()
                     # Determine whether we need to set Proxy-Authorization headers
-                    if self.https_proxy_creds:
+                    if self._https_proxy_creds:
                         # Set a Proxy-Authorization header
                         connect_headers.addRawHeader(
                             b"Proxy-Authorization",
-                            self.https_proxy_creds.as_proxy_authorization_value(),
+                            self._https_proxy_creds.as_proxy_authorization_value(),
                         )
 
                     endpoint = HTTPConnectProxyEndpoint(
                         self._reactor,
-                        self.https_proxy_endpoint,
+                        self._https_proxy_endpoint,
                         host,
                         port,
                         headers=connect_headers,
