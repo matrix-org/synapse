@@ -95,6 +95,7 @@ class ProxyAgent(_AgentBase):
     Raises:
         ValueError if use_proxy is set and the environment variables
             contain an invalid proxy specification.
+        RuntimeError if no tls_options_factory is given for a https connection
     """
 
     def __init__(
@@ -271,7 +272,7 @@ class ProxyAgent(_AgentBase):
 def http_proxy_endpoint(
     proxy: Optional[bytes],
     reactor: IReactorCore,
-    tls_options_factory: IPolicyForHTTPS,
+    tls_options_factory: Optional[IPolicyForHTTPS],
     **kwargs,
 ) -> Tuple[Optional[IStreamClientEndpoint], Optional[ProxyCredentials]]:
     """Parses an http proxy setting and returns an endpoint for the proxy
@@ -294,6 +295,7 @@ def http_proxy_endpoint(
 
     Raise:
         ValueError if proxy has no hostname or unsupported scheme.
+        RuntimeError if no tls_options_factory is given for a https connection
     """
     if proxy is None:
         return None, None
@@ -305,8 +307,13 @@ def http_proxy_endpoint(
     proxy_endpoint = HostnameEndpoint(reactor, host, port, **kwargs)
 
     if scheme == b"https":
-        tls_options = tls_options_factory.creatorForNetloc(host, port)
-        proxy_endpoint = wrapClientTLS(tls_options, proxy_endpoint)
+        if tls_options_factory:
+            tls_options = tls_options_factory.creatorForNetloc(host, port)
+            proxy_endpoint = wrapClientTLS(tls_options, proxy_endpoint)
+        else:
+            raise RuntimeError(
+                f"No TLS options for a https connection via proxy {proxy!s}"
+            )
 
     return proxy_endpoint, credentials
 

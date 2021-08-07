@@ -29,7 +29,7 @@ from twisted.internet.interfaces import (
     IReactorCore,
     IStreamClientEndpoint,
 )
-from twisted.web.client import URI, Agent, BrowserLikePolicyForHTTPS, HTTPConnectionPool
+from twisted.web.client import URI, Agent, HTTPConnectionPool
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResponse
 
@@ -261,6 +261,10 @@ class MatrixHostnameEndpoint:
             factory to use for fetching client tls options, or none to disable TLS.
         srv_resolver: The SRV resolver to use
         parsed_uri: The parsed URI that we're wanting to connect to.
+
+    Raises:
+        ValueError if the environment variables contain an invalid proxy specification.
+        RuntimeError if no tls_options_factory is given for a https connection
     """
 
     def __init__(
@@ -286,7 +290,7 @@ class MatrixHostnameEndpoint:
         ) = proxyagent.http_proxy_endpoint(
             https_proxy,
             proxy_reactor,
-            tls_client_options_factory or BrowserLikePolicyForHTTPS(),
+            tls_client_options_factory,
         )
 
         # set up the TLS connection params
