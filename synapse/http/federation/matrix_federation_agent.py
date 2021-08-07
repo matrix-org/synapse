@@ -338,21 +338,12 @@ class MatrixHostnameEndpoint:
                         port,
                         self._https_proxy_endpoint,
                     )
-                    connect_headers = Headers()
-                    # Determine whether we need to set Proxy-Authorization headers
-                    if self._https_proxy_creds:
-                        # Set a Proxy-Authorization header
-                        connect_headers.addRawHeader(
-                            b"Proxy-Authorization",
-                            self._https_proxy_creds.as_proxy_authorization_value(),
-                        )
-
                     endpoint = HTTPConnectProxyEndpoint(
                         self._reactor,
                         self._https_proxy_endpoint,
                         host,
                         port,
-                        headers=connect_headers,
+                        proxy_creds=self._https_proxy_creds,
                     )
                 else:
                     logger.debug("Connecting to %s:%i", host.decode("ascii"), port)
