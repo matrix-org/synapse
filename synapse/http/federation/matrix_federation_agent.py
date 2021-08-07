@@ -35,7 +35,7 @@ from twisted.web.iweb import IAgent, IAgentEndpointFactory, IBodyProducer, IResp
 
 from synapse.crypto.context_factory import FederationPolicyForHTTPS
 from synapse.http import proxyagent
-from synapse.http.client import BlacklistingAgentWrapper
+from synapse.http.client import BlacklistingAgentWrapper, BlacklistingReactorWrapper
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 from synapse.http.federation.srv_resolver import Server, SrvResolver
 from synapse.http.federation.well_known_resolver import WellKnownResolver
@@ -64,6 +64,8 @@ class MatrixFederationAgent:
         user_agent:
             The user agent header to use for federation requests.
 
+        ip_whitelist: Allowed IP addresses.
+
         ip_blacklist: Disallowed IP addresses.
 
         proxy_reactor: twisted reactor to use for connections to the proxy server
@@ -84,22 +86,24 @@ class MatrixFederationAgent:
         reactor: ISynapseReactor,
         tls_client_options_factory: Optional[FederationPolicyForHTTPS],
         user_agent: bytes,
+        ip_whitelist: IPSet,
         ip_blacklist: IPSet,
-        proxy_reactor: Optional[ISynapseReactor] = None,
         _srv_resolver: Optional[SrvResolver] = None,
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
+        # proxy_reactor is not blacklisted
+        self.proxy_reactor = reactor
+
+        # We need to use a DNS resolver which filters out blacklisted IP
+        # addresses, to prevent DNS rebinding.
+        reactor = BlacklistingReactorWrapper(reactor, ip_whitelist, ip_blacklist)
+
         self._reactor = reactor
         self._clock = Clock(reactor)
         self._pool = HTTPConnectionPool(reactor)
         self._pool.retryAutomatically = False
         self._pool.maxPersistentPerHost = 5
         self._pool.cachedConnectionTimeout = 2 * 60
-
-        if proxy_reactor is None:
-            self.proxy_reactor = reactor
-        else:
-            self.proxy_reactor = proxy_reactor
 
         self._agent = Agent.usingEndpointFactory(
             self._reactor,

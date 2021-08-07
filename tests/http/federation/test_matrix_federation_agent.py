@@ -240,6 +240,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             reactor=self.reactor,
             tls_client_options_factory=self.tls_factory,
             user_agent="test-agent",  # Note that this is unused since _well_known_resolver is provided.
+            ip_whitelist=IPSet(),
             ip_blacklist=IPSet(),
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=self.well_known_resolver,
@@ -964,6 +965,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
             reactor=self.reactor,
             tls_client_options_factory=tls_factory,
             user_agent=b"test-agent",  # This is unused since _well_known_resolver is passed below.
+            ip_whitelist=IPSet(),
             ip_blacklist=IPSet(),
             _srv_resolver=self.mock_resolver,
             _well_known_resolver=WellKnownResolver(
