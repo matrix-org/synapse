@@ -354,8 +354,8 @@ class MatrixFederationAgentTests(unittest.TestCase):
         """Send a https federation request via an agent and check that it is correctly
             received at the proxy and client. The proxy can use either http or https.
         Args:
-            ssl: True if we expect the request to connect via https to proxy
-            auth_credentials: credentials to authenticate at proxy
+            ssl: True if we expect the request to connect to the proxy via https.
+            expected_auth_credentials: credentials we expect to be presented to authenticate at the proxy
         """
         # recreate the agent with patched env
         self.agent = self._make_agent()

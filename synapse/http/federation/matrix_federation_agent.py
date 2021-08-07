@@ -254,8 +254,8 @@ class MatrixHostnameEndpoint:
 
     Args:
         reactor: twisted reactor to use for underlying requests
-        proxy_reactor: twisted reactor to use for connections to the proxy server
-           reactor might have some blacklisting applied (i.e. for DNS queries),
+        proxy_reactor: twisted reactor to use for connections to the proxy server.
+           'reactor' might have some blacklisting applied (i.e. for DNS queries),
            but we need unblocked access to the proxy.
         tls_client_options_factory:
             factory to use for fetching client tls options, or none to disable TLS.
@@ -279,9 +279,10 @@ class MatrixHostnameEndpoint:
         https_proxy = proxies["https"].encode() if "https" in proxies else None
         self.no_proxy = proxies["no"] if "no" in proxies else None
 
+        # endpoint and credentials to use to connect to the outbound https proxy, if any.
         (
-            self.https_proxy_endpoint,
-            self.https_proxy_creds,
+            self._https_proxy_endpoint,
+            self._https_proxy_creds,
         ) = proxyagent.http_proxy_endpoint(
             https_proxy,
             proxy_reactor,
