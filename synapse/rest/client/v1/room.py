@@ -438,6 +438,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
+        state_events_at_start = []
         for state_event in body["state_events_at_start"]:
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
@@ -500,6 +501,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 )
                 event_id = event.event_id
 
+            state_events_at_start.append(event_id)
             auth_event_ids.append(event_id)
 
         events_to_create = body["events"]
@@ -647,7 +649,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             event_ids.append(base_insertion_event.event_id)
 
         return 200, {
-            "state_events": auth_event_ids,
+            "state_events": state_events_at_start,
             "events": event_ids,
             "next_chunk_id": insertion_event["content"][
                 EventContentFields.MSC2716_NEXT_CHUNK_ID
