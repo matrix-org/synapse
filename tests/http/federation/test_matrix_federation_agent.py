@@ -319,7 +319,7 @@ class MatrixFederationAgentTests(unittest.TestCase):
     )
     def test_get_via_http_proxy(self):
         """test for federation request through a http proxy"""
-        self._do_get_via_proxy(expect_proxy_ssl=False, auth_credentials=None)
+        self._do_get_via_proxy(expect_proxy_ssl=False, expected_auth_credentials=None)
 
     @patch.dict(
         os.environ,
@@ -327,14 +327,16 @@ class MatrixFederationAgentTests(unittest.TestCase):
     )
     def test_get_via_http_proxy_with_auth(self):
         """test for federation request through a http proxy with authentication"""
-        self._do_get_via_proxy(expect_proxy_ssl=False, auth_credentials=b"user:pass")
+        self._do_get_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=b"user:pass"
+        )
 
     @patch.dict(
         os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
     )
     def test_get_via_https_proxy(self):
         """test for federation request through a https proxy"""
-        self._do_get_via_proxy(expect_proxy_ssl=True, auth_credentials=None)
+        self._do_get_via_proxy(expect_proxy_ssl=True, expected_auth_credentials=None)
 
     @patch.dict(
         os.environ,
@@ -342,12 +344,14 @@ class MatrixFederationAgentTests(unittest.TestCase):
     )
     def test_get_via_https_proxy_with_auth(self):
         """test for federation request through a https proxy with authentication"""
-        self._do_get_via_proxy(expect_proxy_ssl=True, auth_credentials=b"user:pass")
+        self._do_get_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=b"user:pass"
+        )
 
     def _do_get_via_proxy(
         self,
         expect_proxy_ssl: bool = False,
-        auth_credentials: Optional[bytes] = None,
+        expected_auth_credentials: Optional[bytes] = None,
     ):
         """Send a https federation request via an agent and check that it is correctly
             received at the proxy and client. The proxy can use either http or https.
@@ -394,9 +398,9 @@ class MatrixFederationAgentTests(unittest.TestCase):
             b"Proxy-Authorization"
         )
 
-        if auth_credentials is not None:
+        if expected_auth_credentials is not None:
             # Compute the correct header value for Proxy-Authorization
-            encoded_credentials = base64.b64encode(auth_credentials)
+            encoded_credentials = base64.b64encode(expected_auth_credentials)
             expected_header_value = b"Basic " + encoded_credentials
 
             # Validate the header's value
