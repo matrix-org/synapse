@@ -252,6 +252,7 @@ To prepare a Pull Request, please:
 4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
 6. for most contributors, that's all - however, if you are a member of the organization `matrix-org`, on GitHub, please request a review from `matrix.org / Synapse Core`.
+7. if you need to update your PR, please avoid rebasing and just add new commits to your branch.
 
 
 ## Changelog
