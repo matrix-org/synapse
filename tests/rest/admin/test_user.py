@@ -2466,7 +2466,8 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
     def test_next_token(self):
         """
         Testing that `next_token` appears at the right place
-        For deleteing media is `next_token` not useful, because
+
+        For deleting media `next_token` is not useful, because
         after deleting media the media has a new order.
         """
 
@@ -2545,8 +2546,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
 
     def test_user_has_no_media_DELETE(self):
         """
-        Tests that a normal lookup for media is successfully
-        if user has no media created
+        Tests that a delete is successful if user has no media
         """
 
         channel = self.make_request(
@@ -2560,7 +2560,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(0, len(channel.json_body["deleted_media"]))
 
     def test_get_media(self):
-        """Tests that a normal lookup for media is successfully"""
+        """Tests that a normal lookup for media is successful"""
 
         number_media = 5
         other_user_tok = self.login("user", "pass")
@@ -2579,7 +2579,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         self._check_fields(channel.json_body["media"])
 
     def test_delete_media(self):
-        """Tests that a normal delete of media is successfully"""
+        """Tests that a normal delete of media is successful"""
 
         number_media = 5
         other_user_tok = self.login("user", "pass")

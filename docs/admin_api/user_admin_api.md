@@ -556,7 +556,7 @@ The following fields are returned in the JSON response body:
 - `next_token`: integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
 
-### Delete media of a user
+### Delete media uploaded by a user
 
 This API deletes the *local* media from the disk of your own server
 that a specific `user_id` has created. This includes any local thumbnails.
@@ -564,9 +564,9 @@ that a specific `user_id` has created. This includes any local thumbnails.
 This API will not affect media that has been uploaded to external
 media repositories (e.g https://github.com/turt2live/matrix-media-repo/).
 
-By default, the API delete ordered by descending creation date and ascending media ID.
-The newest media is on top. You can change the order with parameters
-`order_by` and `dir`. If no `limit` is set the API delete `100` files per request.
+By default, the API deletes media ordered by descending creation date and ascending media ID.
+The newest media is deleted first. You can change the order with parameters
+`order_by` and `dir`. If no `limit` is set the API deletes `100` files per request.
 
 The API is:
 
@@ -598,7 +598,7 @@ after deleting media the remaining media have a new order.
 
 **Parameters**
 
-This API has the same parameters like [List media of a user](#list-media-of-a-user).
+This API has the same parameters as [List media of a user](#list-media-of-a-user).
 With the parameters you can for example limit the number of files to delete at once or
 delete largest/smallest or newest/oldest files first.
 
@@ -1056,4 +1056,3 @@ The following parameters should be set in the URL:
 
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
-

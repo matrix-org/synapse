@@ -12,7 +12,7 @@
 - [Delete local media](#delete-local-media)
   * [Delete a specific local media](#delete-a-specific-local-media)
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
-  * [Delete media of a user](#delete-media-of-a-user)
+  * [Delete media uploaded by a user](#delete-media-uploaded-by-a-user)
 - [Purge Remote Media API](#purge-remote-media-api)
 
 # Querying media
@@ -282,10 +282,10 @@ The following fields are returned in the JSON response body:
 * `deleted_media`: an array of strings - List of deleted `media_id`
 * `total`: integer - Total number of deleted `media_id`
 
-## Delete media of a user
+## Delete media uploaded by a user
 
-Details how to delete multiple media of a user can you find in
-[User Admin API](user_admin_api.md#delete-media-of-a-user).
+You can find details of how to delete multiple media uploaded by a user in
+[User Admin API](user_admin_api.md#delete-media-uploaded-by-a-user).
 
 # Purge Remote Media API
 
