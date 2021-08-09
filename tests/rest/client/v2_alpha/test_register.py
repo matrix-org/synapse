@@ -509,10 +509,6 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         }
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(*args, **kwargs):
-            self.email_attempts.append((args, kwargs))
 
         config["email"] = {
             "enable_notifs": True,
@@ -532,7 +528,13 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "aaa"
 
-        self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        self.hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(*args, **kwargs):
+            self.email_attempts.append((args, kwargs))
+
+        self.email_attempts = []
+        self.hs.get_send_email_handler()._sendmail = sendmail
 
         self.store = self.hs.get_datastore()
 

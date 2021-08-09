@@ -392,9 +392,6 @@ class ApplicationServicesHandler:
                     protocols[p].append(info)
 
         def _merge_instances(infos: List[JsonDict]) -> JsonDict:
-            if not infos:
-                return {}
-
             # Merge the 'instances' lists of multiple results, but just take
             # the other fields from the first as they ought to be identical
             # copy the result so as not to corrupt the cached one
@@ -406,7 +403,9 @@ class ApplicationServicesHandler:
 
             return combined
 
-        return {p: _merge_instances(protocols[p]) for p in protocols.keys()}
+        return {
+            p: _merge_instances(protocols[p]) for p in protocols.keys() if protocols[p]
+        }
 
     async def _get_services_for_event(
         self, event: EventBase

@@ -23,7 +23,6 @@ from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
-    HttpResponseException,
     InvalidClientCredentialsError,
     ShadowBanError,
     SynapseError,
@@ -458,6 +457,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 "state_key": state_event["state_key"],
             }
 
+            # Mark all events as historical
+            event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
+
             # Make the state events float off on their own
             fake_prev_event_id = "$" + random_string(43)
 
@@ -562,7 +564,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             "type": EventTypes.MSC2716_CHUNK,
             "sender": requester.user.to_string(),
             "room_id": room_id,
-            "content": {EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to},
+            "content": {
+                EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to,
+                EventContentFields.MSC2716_HISTORICAL: True,
+            },
             # Since the chunk event is put at the end of the chunk,
             # where the newest-in-time event is, copy the origin_server_ts from
             # the last event we're inserting
@@ -589,10 +594,6 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         for ev in events_to_create:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
-            # Mark all events as historical
-            # This has important semantics within the Synapse internals to backfill properly
-            ev["content"][EventContentFields.MSC2716_HISTORICAL] = True
-
             event_dict = {
                 "type": ev["type"],
                 "origin_server_ts": ev["origin_server_ts"],
@@ -601,6 +602,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 "sender": ev["sender"],  # requester.user.to_string(),
                 "prev_events": prev_event_ids.copy(),
             }
+
+            # Mark all events as historical
+            event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
             event, context = await self.event_creation_handler.create_event(
                 await self._create_requester_for_user_id_from_app_service(
@@ -778,12 +782,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-            try:
-                data = await handler.get_remote_public_room_list(
-                    server, limit=limit, since_token=since_token
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error()
+            data = await handler.get_remote_public_room_list(
+                server, limit=limit, since_token=since_token
+            )
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -831,17 +832,15 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-            try:
-                data = await handler.get_remote_public_room_list(
-                    server,
-                    limit=limit,
-                    since_token=since_token,
-                    search_filter=search_filter,
-                    include_all_networks=include_all_networks,
-                    third_party_instance_id=third_party_instance_id,
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error()
+            data = await handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
+
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,

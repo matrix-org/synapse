@@ -240,7 +240,7 @@ class EventAuthHandler:
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.MSC3083_RESTRICTED
+        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]
