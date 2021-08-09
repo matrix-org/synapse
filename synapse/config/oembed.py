@@ -11,75 +11,145 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
+import logging
 import re
-from urllib import parse as urlparse
+from os import listdir, path
+from urllib.parse import urlparse, urlunparse
 
 from ._base import Config
 from ._util import validate_config
 
+logger = logging.Logger(__name__)
+
 
 class OembedConfig(Config):
     section = "oembed"
+    oembed_providers = {}
 
     def read_config(self, config, **kwargs):
-        # FIXME: oembed_patterns needs sytests
-        self.oembed_patterns = {}
+        oembed_dir = config.get("oembed_providers_dir")
 
-        oembed_endpoints = config.get("oembed_endpoints", {})
-        validate_config(
-            _OEMBED_SCHEMA,
-            oembed_endpoints,
-            ("oembed_endpoints",),
-        )
-        for endpoint, globs in oembed_endpoints.items():
-            for glob in globs:
-                # Convert the glob into a sane regular expression to match against. The
-                # rules followed will be slightly different for the domain portion vs.
-                # the rest.
-                #
-                # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
-                # 2. The domain can have globs, but we limit it to characters that can
-                #    reasonably be a domain part.
-                #    TODO: This does not attempt to handle Unicode domain names.
-                # 3. Other parts allow a glob to be any one, or more, characters.
-                results = urlparse.urlparse(glob)
+        if not oembed_dir:
+            return
 
-                # Ensure the scheme does not have wildcards (and is a sane scheme).
-                if results.scheme not in {"http", "https"}:
-                    raise ValueError(
-                        "Insecure oEmbed glob scheme: %s" % (results.scheme,)
+        oembed_providers = []
+        try:
+            for fname in listdir(oembed_dir):
+                if fname.endswith(".json"):
+                    fpath = path.join(oembed_dir, fname)
+                    try:
+                        with open(fpath) as f:
+                            oembed_providers += json.loads(f.read())
+                    except Exception:
+                        logger.exception(fpath)
+        except Exception:
+            logger.exception(oembed_dir)
+
+        if not oembed_providers:
+            return
+
+        try:
+            validate_config(
+                _OEMBED_SCHEMA,
+                oembed_providers,
+                ("oembed_providers",),
+            )
+        except Exception:
+            pass
+            # logger.exception('oembed_providers')
+            # and go on, this is not a show stopper
+            # return
+
+        for provider in oembed_providers:
+            provider_url = provider["provider_url"].rstrip("/")
+            for endpoint in provider["endpoints"]:
+                if "schemes" not in endpoint:
+                    continue
+
+                patterns = []
+                for s in endpoint["schemes"]:
+                    results = urlparse(s)
+                    pattern = urlunparse(
+                        [
+                            results.scheme,
+                            re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
+                        ]
+                        + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
                     )
+                    patterns.append(re.compile(pattern))
+                endpoint["patterns"] = patterns
 
-                pattern = urlparse.urlunparse(
-                    [
-                        results.scheme,
-                        re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-                    ]
-                    + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-                )
-                self.oembed_patterns[re.compile(pattern)] = endpoint
+            parsed = urlparse(provider_url)
+            self.oembed_providers[re.sub(r"^www\.", "", parsed.netloc)] = provider
+
+    def get_oembed_endpoint(self, url):
+        """
+        Check whether the URL has a oEmbed endpoint and return it.
+
+        Args:
+            url: The URL to check.
+
+        Returns:
+            oEmbed endpoint URL to use or None.
+        """
+
+        parsed = urlparse(url)
+        for key, provider in self.oembed_providers.items():
+            if parsed.netloc.find(key) == -1:
+                continue
+
+            for endpoint in provider["endpoints"]:
+                if "discovery" in endpoint:
+                    pass  # TODO
+
+                if "patterns" not in endpoint:
+                    continue
+
+                for p in endpoint["patterns"]:
+                    if p.fullmatch(url):
+                        return endpoint["url"]
+
+            return
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Oembed ##
-        # A map of globs to API endpoints.
 
-        ### Twitter.
-        "https://publish.twitter.com/oembed":
-          - "https://twitter.com/*/status/*"
-          - "https://*.twitter.com/*/status/*"
-          - "https://twitter.com/*/moments/*"
-          - "https://*.twitter.com/*/moments/*"
+        # Providers json files directory
+        oembed_providers_dir: /etc/matrix-synapse/oembed/
+
+        # oembed directory contains https://oembed.com/providers.json file
+        # that you can place in oembed_providers_dir. Deb package does that for you.
+        # Other custom providers could be added in other .json files, following the
+        # same json format.
         """
 
 
-_HTTPS_URL = "^https://"
+_STRING = {"type": "string"}
+_ARRAY_OF_STRINGS = {"type": "array", "items": _STRING}
+_BOOL = {"type": "boolean"}
 _OEMBED_SCHEMA = {
-    "type": "object",
-    "patternProperties": {
-        _HTTPS_URL: {
-            "type": "array",
-            "items": {"type": "string", "pattern": _HTTPS_URL},
-        }
+    "type": "array",
+    "items": {
+        "type": "object",
+        "required": ["provider_name", "provider_url", "endpoints"],
+        "properties": {
+            "provider_name": _STRING,
+            "provider_url": _STRING,
+            "endpoints": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["url"],
+                    "properties": {
+                        "url": _STRING,
+                        "schemes": _ARRAY_OF_STRINGS,
+                        "discovery": _BOOL,
+                        "formats": _ARRAY_OF_STRINGS,
+                    },
+                },
+            },
+        },
     },
 }

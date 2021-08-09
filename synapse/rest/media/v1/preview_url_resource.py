@@ -101,7 +101,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
-        self.oembed_patterns = hs.config.oembed_patterns
+        self.oembed = hs.config.oembed
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SimpleHttpClient(
@@ -325,23 +325,6 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
-    def _get_oembed_url(self, url: str) -> Optional[str]:
-        """
-        Check whether the URL should be downloaded as oEmbed content instead.
-
-        Args:
-            url: The URL to check.
-
-        Returns:
-            A URL to use instead or None if the original URL should be used.
-        """
-        for url_pattern, endpoint in self.oembed_patterns.items():
-            if url_pattern.fullmatch(url):
-                return endpoint
-
-        # No match.
-        return None
-
     async def _get_oembed_content(self, endpoint: str, url: str) -> OEmbedResult:
         """
         Request content from an oEmbed endpoint.
@@ -417,11 +400,11 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # If this URL can be accessed via oEmbed, use that instead.
         url_to_download: Optional[str] = url
-        oembed_url = self._get_oembed_url(url)
-        if oembed_url:
+        oembed_endpoint = self.oembed.get_oembed_endpoint(url)
+        if oembed_endpoint:
             # The result might be a new URL to download, or it might be HTML content.
             try:
-                oembed_result = await self._get_oembed_content(oembed_url, url)
+                oembed_result = await self._get_oembed_content(oembed_endpoint, url)
                 if oembed_result.url:
                     url_to_download = oembed_result.url
                 elif oembed_result.html:
@@ -482,7 +465,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         else:
             # we can only get here if we did an oembed request and have an oembed_result.html
             assert oembed_result.html is not None
-            assert oembed_url is not None
+            assert oembed_endpoint is not None
 
             html_bytes = oembed_result.html.encode("utf-8")
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
@@ -494,7 +477,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             length = len(html_bytes)
             # If a specific cache age was not given, assume 1 hour.
             expires = oembed_result.cache_age or ONE_HOUR
-            uri = oembed_url
+            uri = oembed_endpoint
             code = 200
             etag = None
 

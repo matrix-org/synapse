@@ -1,1 +1,1 @@
-Added `oembed_endpoints` stanza to `homeserver.yaml`, supprted with `OembedConfig` class.
+Added `oembed_providers_dir` stanza to `homeserver.yaml`, supprted with `OembedConfig` class.

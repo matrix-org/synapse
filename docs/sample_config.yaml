@@ -2608,11 +2608,11 @@ redis:
 
 
 ## Oembed ##
-# A map of globs to API endpoints.
 
-### Twitter.
-"https://publish.twitter.com/oembed":
-  - "https://twitter.com/*/status/*"
-  - "https://*.twitter.com/*/status/*"
-  - "https://twitter.com/*/moments/*"
-  - "https://*.twitter.com/*/moments/*"
+# Providers json files directory
+oembed_providers_dir: /etc/matrix-synapse/oembed/
+
+# oembed directory contains https://oembed.com/providers.json file
+# that you can place in oembed_providers_dir. Deb package does that for you.
+# Other custom providers could be added in other .json files, following the
+# same json format.

@@ -11,13 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import json
 import os
+from unittest.mock import ANY, Mock
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.error import DNSLookupError
 from twisted.test.proto_helpers import AccumulatingProtocol
+
+from synapse.http.client import SimpleHttpClient
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -78,11 +80,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config["media_storage_providers"] = [provider_config]
 
         # Route the HTTP version to an HTTP endpoint so that the tests work.
-        config["oembed_endpoints"] = {
-            "http://publish.twitter.com/oembed": [
-                "http://twitter.com/*/status/*",
-            ],
-        }
+        config["oembed_providers_dir"] = os.path.join(os.environ["TOP"], "oembed")
 
         hs = self.setup_test_homeserver(config=config)
 
@@ -549,15 +547,21 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def test_oembed_photo(self):
         """Test an oEmbed endpoint which returns a 'photo' type which redirects the preview to a new URL."""
-        self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
-        self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        preview_url = "https://twitter.com/matrixdotorg/status/12345"
+        oembed_endpoint = "https://publish.twitter.com/oembed"
+        photo_url = "https://cdn.twitter.com/matrixdotorg"
+
+        mock_client = Mock(SimpleHttpClient)
+        self.resource.children[b"preview_url"].client = mock_client
 
         result = {
             "version": "1.0",
             "type": "photo",
-            "url": "http://cdn.twitter.com/matrixdotorg",
+            "url": photo_url,
         }
-        oembed_content = json.dumps(result).encode("utf-8")
+        mock_get_json = mock_client.get_json
+        mock_get_json.return_value = result
 
         end_content = (
             b"<html><head>"
@@ -565,85 +569,77 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             b'<meta property="og:description" content="hi" />'
             b"</head></html>"
         )
+        end_content_len = len(end_content)
+        end_headers = {
+            b"Content-Length": [str(end_content_len).encode()],
+            b"Content-Type": [b'text/html; charset="utf8"'],
+        }
+
+        def download(url, output_stream, max_size, headers):
+            output_stream.write(end_content)
+
+            return (end_content_len, end_headers, url, 200)
+
+        mock_get_file = mock_client.get_file
+        mock_get_file.side_effect = download
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            "preview_url?url={}".format(preview_url),
             shorthand=False,
             await_result=False,
         )
         self.pump()
 
-        client = self.reactor.tcpClients[0][2].buildProtocol(None)
-        server = AccumulatingProtocol()
-        server.makeConnection(FakeTransport(client, self.reactor))
-        client.makeConnection(FakeTransport(server, self.reactor))
-        client.dataReceived(
-            (
-                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
-            )
-            % (len(oembed_content),)
-            + oembed_content
-        )
-
-        self.pump()
-
-        client = self.reactor.tcpClients[1][2].buildProtocol(None)
-        server = AccumulatingProtocol()
-        server.makeConnection(FakeTransport(client, self.reactor))
-        client.makeConnection(FakeTransport(server, self.reactor))
-        client.dataReceived(
-            (
-                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
-            )
-            % (len(end_content),)
-            + end_content
-        )
-
-        self.pump()
-
-        self.assertEqual(channel.code, 200)
+        # Have this first so you can spot the error if there's one
         self.assertEqual(
             channel.json_body, {"og:title": "Some Title", "og:description": "hi"}
+        )
+        self.assertEqual(channel.code, 200)
+
+        mock_get_json.assert_called_once_with(
+            oembed_endpoint,
+            args={"url": preview_url},
+        )
+        mock_get_file.assert_called_once_with(
+            photo_url,
+            output_stream=ANY,
+            max_size=self.hs.config.max_spider_size,
+            headers={"Accept-Language": self.hs.config.url_preview_accept_language},
         )
 
     def test_oembed_rich(self):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
-        self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        preview_url = "https://twitter.com/matrixdotorg/status/12345"
+        oembed_endpoint = "https://publish.twitter.com/oembed"
+
+        mock_client = Mock(SimpleHttpClient)
+        self.resource.children[b"preview_url"].client = mock_client
 
         result = {
             "version": "1.0",
             "type": "rich",
             "html": "<div>Content Preview</div>",
         }
-        end_content = json.dumps(result).encode("utf-8")
+        mock_get_json = mock_client.get_json
+        mock_get_json.return_value = result
 
         channel = self.make_request(
             "GET",
-            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            "preview_url?url={}".format(preview_url),
             shorthand=False,
             await_result=False,
         )
         self.pump()
 
-        client = self.reactor.tcpClients[0][2].buildProtocol(None)
-        server = AccumulatingProtocol()
-        server.makeConnection(FakeTransport(client, self.reactor))
-        client.makeConnection(FakeTransport(server, self.reactor))
-        client.dataReceived(
-            (
-                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
-            )
-            % (len(end_content),)
-            + end_content
-        )
-
-        self.pump()
-        self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
             {"og:title": None, "og:description": "Content Preview"},
+        )
+        self.assertEqual(channel.code, 200)
+
+        mock_get_json.assert_called_once_with(
+            oembed_endpoint,
+            args={"url": preview_url},
         )
