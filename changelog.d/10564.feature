@@ -1,0 +1,1 @@
+Allow creating a room to be handled by worker processes.
