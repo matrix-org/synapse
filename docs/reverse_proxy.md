@@ -41,9 +41,9 @@ client IP addresses and generate redirect URLs while behind a reverse proxy.
 
 In `homeserver.yaml` set `x_forwarded: true` in the port 8008 section and 
 consider setting `bind_addresses: ['127.0.0.1']` so that the server only
-listens to traffic on localhost (Do not change `bind_addresses` to `127.0.0.1` 
+listens to traffic on localhost. (Do not change `bind_addresses` to `127.0.0.1` 
 when using a containerized Synapse, as that will prevent it from responding
-to proxied traffic).
+to proxied traffic.)
 
 
 ## Reverse-proxy configuration examples
