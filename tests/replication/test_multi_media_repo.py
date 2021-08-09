@@ -229,7 +229,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
     def _count_remote_thumbnails(self) -> int:
         """Count the number of files in our remote thumbnails directory."""
         path = os.path.join(
-            self.hs.get_media_repository().primary_base_path, "remote_thumbnail"
+            self.hs.get_media_repository().primary_base_path, "remote_thumbnails"
         )
         return sum(len(files) for _, _, files in os.walk(path))
 
