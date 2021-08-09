@@ -92,13 +92,12 @@ class MatrixFederationAgent:
         _well_known_resolver: Optional[WellKnownResolver] = None,
     ):
         # proxy_reactor is not blacklisted
-        self.proxy_reactor = reactor
+        proxy_reactor = reactor
 
         # We need to use a DNS resolver which filters out blacklisted IP
         # addresses, to prevent DNS rebinding.
         reactor = BlacklistingReactorWrapper(reactor, ip_whitelist, ip_blacklist)
 
-        self._reactor = reactor
         self._clock = Clock(reactor)
         self._pool = HTTPConnectionPool(reactor)
         self._pool.retryAutomatically = False
@@ -106,10 +105,10 @@ class MatrixFederationAgent:
         self._pool.cachedConnectionTimeout = 2 * 60
 
         self._agent = Agent.usingEndpointFactory(
-            self._reactor,
+            reactor,
             MatrixHostnameEndpointFactory(
                 reactor,
-                self.proxy_reactor,
+                proxy_reactor,
                 tls_client_options_factory,
                 _srv_resolver,
             ),
@@ -118,14 +117,12 @@ class MatrixFederationAgent:
         self.user_agent = user_agent
 
         if _well_known_resolver is None:
-            # Note that the name resolver has already been wrapped in a
-            # IPBlacklistingResolver by MatrixFederationHttpClient.
             _well_known_resolver = WellKnownResolver(
-                self._reactor,
+                reactor,
                 agent=BlacklistingAgentWrapper(
                     ProxyAgent(
-                        self._reactor,
-                        self.proxy_reactor,
+                        reactor,
+                        proxy_reactor,
                         pool=self._pool,
                         contextFactory=tls_client_options_factory,
                         use_proxy=True,
