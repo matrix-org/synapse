@@ -33,6 +33,19 @@ Let's assume that we expect clients to connect to our server at
 `https://example.com:8448`.  The following sections detail the configuration of
 the reverse proxy and the homeserver.
 
+
+## Homeserver Configuration
+
+The HTTP configuration will need to be updated for Synapse to correctly record 
+client IP addresses and generate redirect URLs while behind a reverse proxy. 
+
+In `homeserver.yaml` set `x_forwarded: true` in the port 8008 section and 
+consider setting `bind_addresses: ['127.0.0.1']` so that the server only
+listens to traffic on localhost. (Do not change `bind_addresses` to `127.0.0.1` 
+when using a containerized Synapse, as that will prevent it from responding
+to proxied traffic.)
+
+
 ## Reverse-proxy configuration examples
 
 **NOTE**: You only need one of these.
@@ -238,16 +251,6 @@ relay "matrix_federation" {
     forward to <matrixserver> port 8008 check tcp
 }
 ```
-
-## Homeserver Configuration
-
-You will also want to set `bind_addresses: ['127.0.0.1']` and
-`x_forwarded: true` for port 8008 in `homeserver.yaml` to ensure that
-client IP addresses are recorded correctly.
-
-Having done so, you can then use `https://matrix.example.com` (instead
-of `https://matrix.example.com:8448`) as the "Custom server" when
-connecting to Synapse from a client.
 
 
 ## Health check endpoint
