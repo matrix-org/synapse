@@ -418,6 +418,18 @@ class ReadReceiptsTestCase(unittest.HomeserverTestCase):
         # Test that the first user can't see the other user's hidden read receipt
         self.assertEqual(self._get_read_receipt(), None)
 
+    def test_read_receipt_with_empty_body(self):
+        # Send a message as the first user
+        res = self.helper.send(self.room_id, body="hello", tok=self.tok)
+
+        # Send a read receipt for this message with an empty body
+        channel = self.make_request(
+            "POST",
+            "/rooms/%s/receipt/m.read/%s" % (self.room_id, res["event_id"]),
+            access_token=self.tok2,
+        )
+        self.assertEqual(channel.code, 200)
+
     def _get_read_receipt(self):
         """Syncs and returns the read receipt."""
 

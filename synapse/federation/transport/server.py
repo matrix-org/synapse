@@ -450,21 +450,12 @@ class FederationSendServlet(BaseFederationServerServlet):
                 len(transaction_data.get("edus", [])),
             )
 
-            # We should ideally be getting this from the security layer.
-            # origin = body["origin"]
-
-            # Add some extra data to the transaction dict that isn't included
-            # in the request body.
-            transaction_data.update(
-                transaction_id=transaction_id, destination=self.server_name
-            )
-
         except Exception as e:
             logger.exception(e)
             return 400, {"error": "Invalid transaction"}
 
         code, response = await self.handler.on_incoming_transaction(
-            origin, transaction_data
+            origin, transaction_id, self.server_name, transaction_data
         )
 
         return code, response
