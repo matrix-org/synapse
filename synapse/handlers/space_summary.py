@@ -160,7 +160,7 @@ class SpaceSummaryHandler:
 
                     # The user can see the room, include it!
                     if await self._is_remote_room_accessible(
-                        queue_entry.room_id, requester, fed_room_id, room
+                        requester, fed_room_id, room
                     ):
                         # Before returning to the client, remove the allowed_room_ids
                         # and allowed_spaces keys.
@@ -513,7 +513,7 @@ class SpaceSummaryHandler:
         return False
 
     async def _is_remote_room_accessible(
-        self, requested_room_id: str, requester: str, room_id: str, room: JsonDict
+        self, requester: str, room_id: str, room: JsonDict
     ) -> bool:
         """
         Calculate whether the room received over federation should be shown in the spaces summary.
@@ -523,14 +523,13 @@ class SpaceSummaryHandler:
         * The requester is joined or can join the room (per MSC3173).
         * The history visibility is set to world readable.
 
-        Note that we know the user is not in the requested room (which is why the
-        remote call was made in the first place), but the user could be in one
-        of the children rooms and we just didn't know about the link.
+        Note that the local server is not in the requested room (which is why the
+        remote call was made in the first place), but the user could have access
+        due to an invite, etc.
 
         Args:
-            requested_room_id: The room ID which was requested.
             requester: The user requesting the summary.
-            room_id: The child room ID returned over federation.
+            room_id: The room ID returned over federation.
             room: The summary of the child room returned over federation.
 
         Returns:
@@ -553,13 +552,10 @@ class SpaceSummaryHandler:
             ):
                 return True
 
-        # Finally, if this isn't the requested room, check ourselves
-        # if we can access the room.
-        if room_id != requested_room_id:
-            if await self._is_local_room_accessible(room_id, requester, None):
-                return True
-
-        return False
+        # Finally, check locally if we can access the room. The user might
+        # already be in the room (if it was a child room), or there might be a
+        # pending invite, etc.
+        return await self._is_local_room_accessible(room_id, requester, None)
 
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
