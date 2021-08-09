@@ -1,3 +1,19 @@
+Synapse 1.40.0rc2 (2021-08-04)
+==============================
+
+Bugfixes
+--------
+
+- Fix the `PeriodicallyFlushingMemoryHandler` inhibiting application shutdown because of its background thread. ([\#10517](https://github.com/matrix-org/synapse/issues/10517))
+- Fix a bug introduced in Synapse v1.40.0rc1 that could cause Synapse to respond with an error when clients would update read receipts. ([\#10531](https://github.com/matrix-org/synapse/issues/10531))
+
+
+Internal Changes
+----------------
+
+- Fix release script to open the correct URL for the release. ([\#10516](https://github.com/matrix-org/synapse/issues/10516))
+
+
 Synapse 1.40.0rc1 (2021-08-03)
 ==============================
 
