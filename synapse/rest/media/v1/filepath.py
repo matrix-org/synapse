@@ -114,7 +114,7 @@ class MediaFilePaths:
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s-%s" % (width, height, top_level_type, sub_type, method)
         return os.path.join(
-            "remote_thumbnail",
+            "remote_thumbnails",
             server_name,
             file_id[0:2],
             file_id[2:4],
@@ -133,7 +133,7 @@ class MediaFilePaths:
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
         return os.path.join(
-            "remote_thumbnail",
+            "remote_thumbnails",
             server_name,
             file_id[0:2],
             file_id[2:4],
@@ -144,7 +144,7 @@ class MediaFilePaths:
     def remote_media_thumbnail_dir(self, server_name: str, file_id: str) -> str:
         return os.path.join(
             self.base_path,
-            "remote_thumbnail",
+            "remote_thumbnails",
             server_name,
             file_id[0:2],
             file_id[2:4],
