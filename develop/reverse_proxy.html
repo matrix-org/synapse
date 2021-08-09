@@ -211,6 +211,14 @@ Beware that Apache <em>will</em> canonicalise URIs unless you specify
 <code>https://matrix.example.com</code>, and other servers to connect at
 <code>https://example.com:8448</code>.  The following sections detail the configuration of
 the reverse proxy and the homeserver.</p>
+<h2 id="homeserver-configuration"><a class="header" href="#homeserver-configuration">Homeserver Configuration</a></h2>
+<p>The HTTP configuration will need to be updated for Synapse to correctly record 
+client IP addresses and generate redirect URLs while behind a reverse proxy. </p>
+<p>In <code>homeserver.yaml</code> set <code>x_forwarded: true</code> in the port 8008 section and 
+consider setting <code>bind_addresses: ['127.0.0.1']</code> so that the server only
+listens to traffic on localhost. (Do not change <code>bind_addresses</code> to <code>127.0.0.1</code> 
+when using a containerized Synapse, as that will prevent it from responding
+to proxied traffic.)</p>
 <h2 id="reverse-proxy-configuration-examples"><a class="header" href="#reverse-proxy-configuration-examples">Reverse-proxy configuration examples</a></h2>
 <p><strong>NOTE</strong>: You only need one of these.</p>
 <h3 id="nginx"><a class="header" href="#nginx">nginx</a></h3>
@@ -390,13 +398,6 @@ relay &quot;matrix_federation&quot; {
     forward to &lt;matrixserver&gt; port 8008 check tcp
 }
 </code></pre>
-<h2 id="homeserver-configuration"><a class="header" href="#homeserver-configuration">Homeserver Configuration</a></h2>
-<p>You will also want to set <code>bind_addresses: ['127.0.0.1']</code> and
-<code>x_forwarded: true</code> for port 8008 in <code>homeserver.yaml</code> to ensure that
-client IP addresses are recorded correctly.</p>
-<p>Having done so, you can then use <code>https://matrix.example.com</code> (instead
-of <code>https://matrix.example.com:8448</code>) as the &quot;Custom server&quot; when
-connecting to Synapse from a client.</p>
 <h2 id="health-check-endpoint"><a class="header" href="#health-check-endpoint">Health check endpoint</a></h2>
 <p>Synapse exposes a health check endpoint for use by reverse proxies.
 Each configured HTTP listener has a <code>/health</code> endpoint which always returns
