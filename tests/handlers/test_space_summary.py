@@ -231,13 +231,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         invited_room = self._create_room_with_join_rule(JoinRules.INVITE)
         self.helper.invite(invited_room, targ=user2, tok=self.token)
         restricted_room = self._create_room_with_join_rule(
-            JoinRules.MSC3083_RESTRICTED,
-            room_version=RoomVersions.MSC3083.identifier,
+            JoinRules.RESTRICTED,
+            room_version=RoomVersions.V8.identifier,
             allow=[],
         )
         restricted_accessible_room = self._create_room_with_join_rule(
-            JoinRules.MSC3083_RESTRICTED,
-            room_version=RoomVersions.MSC3083.identifier,
+            JoinRules.RESTRICTED,
+            room_version=RoomVersions.V8.identifier,
             allow=[
                 {
                     "type": RestrictedJoinRuleTypes.ROOM_MEMBERSHIP,
@@ -477,7 +477,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                     {
                         "room_id": restricted_room,
                         "world_readable": False,
-                        "join_rules": JoinRules.MSC3083_RESTRICTED,
+                        "join_rules": JoinRules.RESTRICTED,
                         "allowed_spaces": [],
                     },
                 ),
@@ -486,7 +486,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                     {
                         "room_id": restricted_accessible_room,
                         "world_readable": False,
-                        "join_rules": JoinRules.MSC3083_RESTRICTED,
+                        "join_rules": JoinRules.RESTRICTED,
                         "allowed_spaces": [self.room],
                     },
                 ),
