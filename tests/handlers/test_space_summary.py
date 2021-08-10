@@ -30,7 +30,7 @@ from synapse.handlers.space_summary import _child_events_comparison_key, _RoomEn
 from synapse.rest import admin
 from synapse.rest.client.v1 import login, room
 from synapse.server import HomeServer
-from synapse.types import JsonDict
+from synapse.types import JsonDict, UserID
 
 from tests import unittest
 
@@ -199,6 +199,36 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Note that order matters.
         self.assertEqual(result_room_ids, room_ids)
         self.assertEqual(result_children_ids, children_ids)
+
+    def _poke_fed_invite(self, room_id: str, from_user: str) -> None:
+        """
+        Creates a invite (as if received over federation) for the room from the
+        given hostname.
+
+        Args:
+            room_id: The room ID to issue an invite for.
+            fed_hostname: The user to invite from.
+        """
+        # Poke an invite over federation into the database.
+        fed_handler = self.hs.get_federation_handler()
+        fed_hostname = UserID.from_string(from_user).domain
+        event = make_event_from_dict(
+            {
+                "room_id": room_id,
+                "event_id": "!abcd:" + fed_hostname,
+                "type": EventTypes.Member,
+                "sender": from_user,
+                "state_key": self.user,
+                "content": {"membership": Membership.INVITE},
+                "prev_events": [],
+                "auth_events": [],
+                "depth": 1,
+                "origin_server_ts": 1234,
+            }
+        )
+        self.get_success(
+            fed_handler.on_invite_request(fed_hostname, event, RoomVersions.V6)
+        )
 
     def test_simple_space(self):
         """Test a simple space with a single room."""
@@ -602,24 +632,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         joined_room = self.helper.create_room_as(self.user, tok=self.token)
 
         # Poke an invite over federation into the database.
-        fed_handler = self.hs.get_federation_handler()
-        event = make_event_from_dict(
-            {
-                "room_id": invited_room,
-                "event_id": "!abcd:" + fed_hostname,
-                "type": EventTypes.Member,
-                "sender": "@remote:" + fed_hostname,
-                "state_key": self.user,
-                "content": {"membership": Membership.INVITE},
-                "prev_events": [],
-                "auth_events": [],
-                "depth": 1,
-                "origin_server_ts": 1234,
-            }
-        )
-        self.get_success(
-            fed_handler.on_invite_request(fed_hostname, event, RoomVersions.V6)
-        )
+        self._poke_fed_invite(invited_room, "@remote:" + fed_hostname)
 
         async def summarize_remote_room(
             _self, room, suggested_only, max_children, exclude_rooms
@@ -749,5 +762,51 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (restricted_accessible_room, ()),
             (world_readable_room, ()),
             (joined_room, ()),
+        ]
+        self._assert_rooms(result, expected)
+
+    def test_fed_invited(self):
+        """
+        A room which the user was invited to should be included in the response.
+
+        This differs from test_fed_filtering in that the room itself is being
+        queried over federation, instead of it being included as a sub-room of
+        a space in the response.
+        """
+        fed_hostname = self.hs.hostname + "2"
+        fed_room = "#subroom:" + fed_hostname
+
+        # Poke an invite over federation into the database.
+        self._poke_fed_invite(fed_room, "@remote:" + fed_hostname)
+
+        async def summarize_remote_room(
+            _self, room, suggested_only, max_children, exclude_rooms
+        ):
+            return [
+                _RoomEntry(
+                    fed_room,
+                    {
+                        "room_id": fed_room,
+                        "world_readable": False,
+                        "join_rules": JoinRules.INVITE,
+                    },
+                ),
+            ]
+
+        # Add a room to the space which is on another server.
+        self._add_child(self.space, fed_room, self.token)
+
+        with mock.patch(
+            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            new=summarize_remote_room,
+        ):
+            result = self.get_success(
+                self.handler.get_space_summary(self.user, self.space)
+            )
+
+        expected = [
+            (self.space, [self.room, fed_room]),
+            (self.room, ()),
+            (fed_room, ()),
         ]
         self._assert_rooms(result, expected)

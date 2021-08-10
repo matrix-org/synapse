@@ -189,48 +189,10 @@ class SpaceSummaryHandler:
                     room = room_entry.room
                     fed_room_id = room_entry.room_id
 
-                    # The room should only be included in the summary if:
-                    #     a. the user is in the room;
-                    #     b. the room is world readable; or
-                    #     c. the user could join the room, e.g. the join rules
-                    #        are set to public or the user is in a space that
-                    #        has been granted access to the room.
-                    #
-                    # Note that we know the user is not in the root room (which is
-                    # why the remote call was made in the first place), but the user
-                    # could be in one of the children rooms and we just didn't know
-                    # about the link.
-
-                    # The API doesn't return the room version so assume that a
-                    # join rule of knock is valid.
-                    include_room = (
-                        room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
-                        or room.get("world_readable") is True
-                    )
-
-                    # Check if the user is a member of any of the allowed spaces
-                    # from the response.
-                    allowed_rooms = room.get("allowed_room_ids") or room.get(
-                        "allowed_spaces"
-                    )
-                    if (
-                        not include_room
-                        and allowed_rooms
-                        and isinstance(allowed_rooms, list)
-                    ):
-                        include_room = await self._event_auth_handler.is_user_in_rooms(
-                            allowed_rooms, requester
-                        )
-
-                    # Finally, if this isn't the requested room, check ourselves
-                    # if we can access the room.
-                    if not include_room and fed_room_id != queue_entry.room_id:
-                        include_room = await self._is_room_accessible(
-                            fed_room_id, requester, None
-                        )
-
                     # The user can see the room, include it!
-                    if include_room:
+                    if await self._is_remote_room_accessible(
+                        requester, fed_room_id, room
+                    ):
                         # Before returning to the client, remove the allowed_room_ids
                         # and allowed_spaces keys.
                         room.pop("allowed_room_ids", None)
@@ -488,7 +450,7 @@ class SpaceSummaryHandler:
         Returns:
             A room entry if the room should be returned. None, otherwise.
         """
-        if not await self._is_room_accessible(room_id, requester, origin):
+        if not await self._is_local_room_accessible(room_id, requester, origin):
             return None
 
         room_entry = await self._build_room_entry(room_id, for_federation=bool(origin))
@@ -590,7 +552,7 @@ class SpaceSummaryHandler:
 
         return results
 
-    async def _is_room_accessible(
+    async def _is_local_room_accessible(
         self, room_id: str, requester: Optional[str], origin: Optional[str]
     ) -> bool:
         """
@@ -701,6 +663,51 @@ class SpaceSummaryHandler:
             requester or origin,
         )
         return False
+
+    async def _is_remote_room_accessible(
+        self, requester: str, room_id: str, room: JsonDict
+    ) -> bool:
+        """
+        Calculate whether the room received over federation should be shown in the spaces summary.
+
+        It should be included if:
+
+        * The requester is joined or can join the room (per MSC3173).
+        * The history visibility is set to world readable.
+
+        Note that the local server is not in the requested room (which is why the
+        remote call was made in the first place), but the user could have access
+        due to an invite, etc.
+
+        Args:
+            requester: The user requesting the summary.
+            room_id: The room ID returned over federation.
+            room: The summary of the child room returned over federation.
+
+        Returns:
+            True if the room should be included in the spaces summary.
+        """
+        # The API doesn't return the room version so assume that a
+        # join rule of knock is valid.
+        if (
+            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+            or room.get("world_readable") is True
+        ):
+            return True
+
+        # Check if the user is a member of any of the allowed spaces
+        # from the response.
+        allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
+        if allowed_rooms and isinstance(allowed_rooms, list):
+            if await self._event_auth_handler.is_user_in_rooms(
+                allowed_rooms, requester
+            ):
+                return True
+
+        # Finally, check locally if we can access the room. The user might
+        # already be in the room (if it was a child room), or there might be a
+        # pending invite, etc.
+        return await self._is_local_room_accessible(room_id, requester, None)
 
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
