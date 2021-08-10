@@ -934,9 +934,11 @@ class FederationHandler(BaseHandler):
             return
 
         # Skip processing a marker event if the room version doesn't
-        # support it.
+        # support it or the event is not from the room creator.
         room_version = await self.store.get_room_version(marker_event.room_id)
-        if not room_version.msc2716_historical:
+        create_event = await self.store.get_create_event_for_room(marker_event.room_id)
+        room_creator = create_event.content.get("creator", None)
+        if not room_version.msc2716_historical or marker_event.sender != room_creator:
             return
 
         logger.debug("_handle_marker_event: received %s", marker_event)

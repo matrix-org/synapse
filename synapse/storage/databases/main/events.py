@@ -1770,10 +1770,12 @@ class PersistEventsStore:
             # Not a insertion event
             return
 
-        # Skip processing a insertion event if the room version doesn't
-        # support it.
+        # Skip processing an insertion event if the room version doesn't
+        # support it or the event is not from the room creator.
         room_version = self.store.get_room_version_txn(txn, event.room_id)
-        if not room_version.msc2716_historical:
+        create_event = self.store.get_create_event_for_room_txn(txn, event.room_id)
+        room_creator = create_event.content.get("creator", None)
+        if not room_version.msc2716_historical or event.sender != room_creator:
             return
 
         next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
@@ -1822,9 +1824,11 @@ class PersistEventsStore:
             return
 
         # Skip processing a chunk event if the room version doesn't
-        # support it.
+        # support it or the event is not from the room creator.
         room_version = self.store.get_room_version_txn(txn, event.room_id)
-        if not room_version.msc2716_historical:
+        create_event = self.store.get_create_event_for_room_txn(txn, event.room_id)
+        room_creator = create_event.content.get("creator", None)
+        if not room_version.msc2716_historical or event.sender != room_creator:
             return
 
         chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)

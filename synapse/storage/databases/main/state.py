@@ -178,7 +178,26 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Raises:
             NotFoundError if the room is unknown
         """
-        state_ids = await self.get_current_state_ids(room_id)
+        return await self.db_pool.runInteraction(
+            "get_create_event_for_room_txn",
+            self.get_create_event_for_room_txn,
+            room_id,
+        )
+
+    def get_create_event_for_room_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> EventBase:
+        """Get the create state event for a room.
+        Args:
+            txn: Transaction object
+            room_id: The room ID.
+        Returns:
+            The room creation event.
+        Raises:
+            NotFoundError if the room is unknown
+        """
+
+        state_ids = self.get_current_state_ids_txn(txn, room_id)
         create_id = state_ids.get((EventTypes.Create, ""))
 
         # If we can't find the create event, assume we've hit a dead end
@@ -186,7 +205,7 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
             raise NotFoundError("Unknown room %s" % (room_id,))
 
         # Retrieve the room's create event and return
-        create_event = await self.get_event(create_id)
+        create_event = self.get_event_txn(txn, create_id)
         return create_event
 
     @cached(max_entries=100000, iterable=True)
@@ -200,20 +219,34 @@ class StateGroupWorkerStore(EventsWorkerStore, SQLBaseStore):
         Returns:
             The current state of the room.
         """
-
-        def _get_current_state_ids_txn(txn):
-            txn.execute(
-                """SELECT type, state_key, event_id FROM current_state_events
-                WHERE room_id = ?
-                """,
-                (room_id,),
-            )
-
-            return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
-
         return await self.db_pool.runInteraction(
-            "get_current_state_ids", _get_current_state_ids_txn
+            "get_current_state_ids_txn",
+            self.get_current_state_ids_txn,
+            room_id,
         )
+
+    def get_current_state_ids_txn(
+        self, txn: LoggingTransaction, room_id: str
+    ) -> StateMap[str]:
+        """Get the current state event ids for a room based on the
+        current_state_events table.
+
+        Args:
+            txn: Transaction object
+            room_id: The room to get the state IDs of.
+
+        Returns:
+            The current state of the room.
+        """
+
+        txn.execute(
+            """SELECT type, state_key, event_id FROM current_state_events
+            WHERE room_id = ?
+            """,
+            (room_id,),
+        )
+
+        return {(intern_string(r[0]), intern_string(r[1])): r[2] for r in txn}
 
     # FIXME: how should this be cached?
     async def get_filtered_current_state_ids(
