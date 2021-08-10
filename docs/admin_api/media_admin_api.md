@@ -48,7 +48,8 @@ The API returns a JSON body like the following:
 ## List all media uploaded by a user
 
 Listing all media that has been uploaded by a local user can be achieved through
-the use of the [List media of a user](user_admin_api.md#list-media-of-a-user)
+the use of the
+[List media uploaded by a user](user_admin_api.md#list-media-uploaded-by-a-user)
 Admin API.
 
 # Quarantine media

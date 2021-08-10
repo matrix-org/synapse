@@ -2184,7 +2184,7 @@ class PushersRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
+        self.assertEqual("Can only look up local users", channel.json_body["error"])
 
     def test_get_pushers(self):
         """
@@ -2310,7 +2310,7 @@ class UserMediaRestTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
+        self.assertEqual("Can only look up local users", channel.json_body["error"])
 
     def test_limit_GET(self):
         """Testing list of media with limit"""
@@ -3338,7 +3338,7 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
         )
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
+        self.assertEqual("Can only look up local users", channel.json_body["error"])
 
         channel = self.make_request(
             "POST",

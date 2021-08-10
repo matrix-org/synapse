@@ -445,7 +445,7 @@ The following fields are returned in the JSON response body:
 
 ## User media
 
-### List media of a user
+### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -598,7 +598,8 @@ after deleting media the remaining media have a new order.
 
 **Parameters**
 
-This API has the same parameters as [List media of a user](#list-media-of-a-user).
+This API has the same parameters as
+[List media uploaded by a user](#list-media-uploaded-by-a-user).
 With the parameters you can for example limit the number of files to delete at once or
 delete largest/smallest or newest/oldest files first.
 
