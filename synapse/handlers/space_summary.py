@@ -459,6 +459,64 @@ class SpaceSummaryHandler:
 
         return {"rooms": rooms_result, "events": events_result}
 
+    async def get_federation_hierarchy(
+        self,
+        origin: str,
+        requested_room_id: str,
+        suggested_only: bool,
+    ):
+        """
+        Implementation of the room hierarchy Federation API.
+
+        This is similar to get_room_hierarchy, but does not recurse into the space.
+        It also considers whether anyone on the server may be able to access the
+        room, as opposed to whether a specific user can.
+
+        Args:
+            origin: The server requesting the spaces summary.
+            requested_room_id: The room ID to start the hierarchy at (the "root" room).
+            suggested_only: whether we should only return children with the "suggested"
+                flag set.
+
+        Returns:
+            The JSON hierarchy dictionary.
+        """
+        root_room_entry = await self._summarize_local_room(
+            None, origin, requested_room_id, suggested_only, max_children=None
+        )
+        if root_room_entry is None:
+            # Room is inaccessible to the requesting server.
+            raise SynapseError(404, "Unknown room: %s" % (requested_room_id,))
+
+        children_rooms_result: List[JsonDict] = []
+        inaccessible_children: List[str] = []
+
+        # Iterate through each child and potentially add it, but not it's children,
+        # to the response.
+        for child_room in root_room_entry.children:
+            room_id = child_room.get("state_key")
+            assert isinstance(room_id, str)
+            # If the room is unknown, skip it.
+            if not await self._store.is_host_joined(room_id, self._server_name):
+                continue
+
+            room_entry = await self._summarize_local_room(
+                None, origin, room_id, suggested_only, max_children=0
+            )
+            # If the room is accessible, include it in the results. Otherwise,
+            # note that the requesting server shouldn't bother trying to
+            # summarize it.
+            if room_entry:
+                children_rooms_result.append(room_entry.room)
+            else:
+                inaccessible_children.append(room_id)
+
+        return {
+            "room": root_room_entry.as_json(),
+            "children": children_rooms_result,
+            "inaccessible_children": inaccessible_children,
+        }
+
     async def _summarize_local_room(
         self,
         requester: Optional[str],
@@ -492,8 +550,9 @@ class SpaceSummaryHandler:
 
         room_entry = await self._build_room_entry(room_id, for_federation=bool(origin))
 
-        # If the room is not a space, return just the room information.
-        if room_entry.get("room_type") != RoomTypes.SPACE:
+        # If the room is not a space or the children don't matter, return just
+        # the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE or max_children == 0:
             return _RoomEntry(room_id, room_entry)
 
         # Otherwise, look for child rooms/spaces.
