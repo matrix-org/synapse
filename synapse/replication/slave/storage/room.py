@@ -1,4 +1,4 @@
-# Copyright 2015, 2016 OpenMarket Ltd
+# Copyright 2015-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,15 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.room import RoomWorkerStore
 
 from ._base import BaseSlavedStore
 
 
 class RoomStore(RoomWorkerStore, BaseSlavedStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
-        super().__init__(database, db_conn, hs)
+    """This class is used to tie together worker storage methods
+    and those that can only be called from the main process.
+    """
 
-    def process_replication_rows(self, stream_name, instance_name, token, rows):
-        return super().process_replication_rows(stream_name, instance_name, token, rows)
+    pass
