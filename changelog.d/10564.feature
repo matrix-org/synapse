@@ -1,1 +1,1 @@
-Allow creating a room to be handled by worker processes.
+Add support for routing `/createRoom` to workers.
