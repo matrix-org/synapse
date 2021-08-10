@@ -890,55 +890,6 @@ class RoomWorkerStore(SQLBaseStore):
 
         return total_media_quarantined
 
-    async def get_all_new_public_rooms(
-        self, instance_name: str, last_id: int, current_id: int, limit: int
-    ) -> Tuple[List[Tuple[int, tuple]], int, bool]:
-        """Get updates for public rooms replication stream.
-
-        Args:
-            instance_name: The writer we want to fetch updates from. Unused
-                here since there is only ever one writer.
-            last_id: The token to fetch updates from. Exclusive.
-            current_id: The token to fetch updates up to. Inclusive.
-            limit: The requested limit for the number of rows to return. The
-                function may return more or fewer rows.
-
-        Returns:
-            A tuple consisting of: the updates, a token to use to fetch
-            subsequent updates, and whether we returned fewer rows than exists
-            between the requested tokens due to the limit.
-
-            The token returned can be used in a subsequent call to this
-            function to get further updatees.
-
-            The updates are a list of 2-tuples of stream ID and the row data
-        """
-        if last_id == current_id:
-            return [], current_id, False
-
-        def get_all_new_public_rooms(txn):
-            sql = """
-                SELECT stream_id, room_id, visibility, appservice_id, network_id
-                FROM public_room_list_stream
-                WHERE stream_id > ? AND stream_id <= ?
-                ORDER BY stream_id ASC
-                LIMIT ?
-            """
-
-            txn.execute(sql, (last_id, current_id, limit))
-            updates = [(row[0], row[1:]) for row in txn]
-            limited = False
-            upto_token = current_id
-            if len(updates) >= limit:
-                upto_token = updates[-1][0]
-                limited = True
-
-            return updates, upto_token, limited
-
-        return await self.db_pool.runInteraction(
-            "get_all_new_public_rooms", get_all_new_public_rooms
-        )
-
     async def get_rooms_for_retention_period_in_range(
         self, min_ms: Optional[int], max_ms: Optional[int], include_null: bool = False
     ) -> Dict[str, dict]:
