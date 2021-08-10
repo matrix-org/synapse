@@ -42,6 +42,7 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
+from synapse.util.caches.response_cache import ResponseCache
 from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
@@ -97,6 +98,15 @@ class SpaceSummaryHandler:
         # TODO Allow for multiple workers to share this data.
         # TODO Expire pagination tokens.
         self._pagination_sessions: Dict[_PaginationKey, _PaginationSession] = {}
+
+        # If a user tries to fetch the same page multiple times in quick succession,
+        # only process the first attempt and return its result to subsequent requests.
+        self._pagination_response_cache: ResponseCache[
+            Tuple[str, bool, Optional[int], Optional[int], Optional[str]]
+        ] = ResponseCache(
+            hs.get_clock(),
+            "get_room_hierarchy",
+        )
 
     async def get_space_summary(
         self,
@@ -267,6 +277,33 @@ class SpaceSummaryHandler:
         Returns:
             The JSON hierarchy dictionary.
         """
+        # If a user tries to fetch the same page multiple times in quick succession,
+        # only process the first attempt and return its result to subsequent requests.
+        #
+        # This is due to the pagination process mutating internal state, attempting
+        # to process multiple requests for the same page will result in errors.
+        return await self._pagination_response_cache.wrap(
+            (requested_room_id, suggested_only, max_depth, limit, from_token),
+            self._get_room_hierarchy,
+            requester,
+            requested_room_id,
+            suggested_only,
+            max_depth,
+            limit,
+            from_token,
+        )
+
+    async def _get_room_hierarchy(
+        self,
+        requester: str,
+        requested_room_id: str,
+        suggested_only: bool = False,
+        max_depth: Optional[int] = None,
+        limit: Optional[int] = None,
+        from_token: Optional[str] = None,
+    ) -> JsonDict:
+        """See docstring for SpaceSummaryHandler.get_room_hierarchy."""
+
         # first of all, check that the user is in the room in question (or it's
         # world-readable)
         await self._auth.check_user_in_room_or_world_readable(
