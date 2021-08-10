@@ -23,7 +23,7 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
     RoomTypes,
 )
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.handlers.space_summary import _child_events_comparison_key, _RoomEntry
@@ -123,31 +123,82 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.room = self.helper.create_room_as(self.user, tok=self.token)
         self._add_child(self.space, self.room, self.token)
 
-    def _add_child(self, space_id: str, room_id: str, token: str) -> None:
+    def _add_child(
+        self, space_id: str, room_id: str, token: str, order: Optional[str] = None
+    ) -> None:
         """Add a child room to a space."""
+        content = {"via": [self.hs.hostname]}
+        if order is not None:
+            content["order"] = order
         self.helper.send_state(
             space_id,
             event_type=EventTypes.SpaceChild,
-            body={"via": [self.hs.hostname]},
+            body=content,
             tok=token,
             state_key=room_id,
         )
 
-    def _assert_rooms(self, result: JsonDict, rooms: Iterable[str]) -> None:
-        """Assert that the expected room IDs are in the response."""
-        self.assertCountEqual([room.get("room_id") for room in result["rooms"]], rooms)
-
-    def _assert_events(
-        self, result: JsonDict, events: Iterable[Tuple[str, str]]
+    def _assert_rooms(
+        self, result: JsonDict, rooms_and_children: Iterable[Tuple[str, Iterable[str]]]
     ) -> None:
-        """Assert that the expected parent / child room IDs are in the response."""
+        """
+        Assert that the expected room IDs and events are in the response.
+
+        Args:
+            result: The result from the API call.
+            rooms_and_children: An iterable of tuples where each tuple is:
+                The expected room ID.
+                The expected IDs of any children rooms.
+        """
+        room_ids = []
+        children_ids = []
+        for room_id, children in rooms_and_children:
+            room_ids.append(room_id)
+            if children:
+                children_ids.extend([(room_id, child_id) for child_id in children])
+        self.assertCountEqual(
+            [room.get("room_id") for room in result["rooms"]], room_ids
+        )
         self.assertCountEqual(
             [
                 (event.get("room_id"), event.get("state_key"))
                 for event in result["events"]
             ],
-            events,
+            children_ids,
         )
+
+    def _assert_hierarchy(
+        self, result: JsonDict, rooms_and_children: Iterable[Tuple[str, Iterable[str]]]
+    ) -> None:
+        """
+        Assert that the expected room IDs are in the response.
+
+        Args:
+            result: The result from the API call.
+            rooms_and_children: An iterable of tuples where each tuple is:
+                The expected room ID.
+                The expected IDs of any children rooms.
+        """
+        result_room_ids = []
+        result_children_ids = []
+        for result_room in result["rooms"]:
+            result_room_ids.append(result_room["room_id"])
+            result_children_ids.append(
+                [
+                    (cs["room_id"], cs["state_key"])
+                    for cs in result_room.get("children_state")
+                ]
+            )
+
+        room_ids = []
+        children_ids = []
+        for room_id, children in rooms_and_children:
+            room_ids.append(room_id)
+            children_ids.append([(room_id, child_id) for child_id in children])
+
+        # Note that order matters.
+        self.assertEqual(result_room_ids, room_ids)
+        self.assertEqual(result_children_ids, children_ids)
 
     def _poke_fed_invite(self, room_id: str, from_user: str) -> None:
         """
@@ -184,8 +235,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
         # The result should have the space and the room in it, along with a link
         # from space -> room.
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        self._assert_hierarchy(result, expected)
 
     def test_visibility(self):
         """A user not in a space cannot inspect it."""
@@ -194,6 +250,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
         # The user cannot see the space.
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
+        self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
         # If the space is made world-readable it should return a result.
         self.helper.send_state(
@@ -203,8 +260,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
 
         # Make it not world-readable again and confirm it results in an error.
         self.helper.send_state(
@@ -214,12 +274,15 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
+        self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
         # Join the space and results should be returned.
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        self._assert_rooms(result, [self.space, self.room])
-        self._assert_events(result, [(self.space, self.room)])
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
@@ -290,34 +353,33 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Join the space.
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-
-        self._assert_rooms(
-            result,
-            [
+        expected = [
+            (
                 self.space,
-                self.room,
-                public_room,
-                knock_room,
-                invited_room,
-                restricted_accessible_room,
-                world_readable_room,
-                joined_room,
-            ],
-        )
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, public_room),
-                (self.space, knock_room),
-                (self.space, not_invited_room),
-                (self.space, invited_room),
-                (self.space, restricted_room),
-                (self.space, restricted_accessible_room),
-                (self.space, world_readable_room),
-                (self.space, joined_room),
-            ],
-        )
+                [
+                    self.room,
+                    public_room,
+                    knock_room,
+                    not_invited_room,
+                    invited_room,
+                    restricted_room,
+                    restricted_accessible_room,
+                    world_readable_room,
+                    joined_room,
+                ],
+            ),
+            (self.room, ()),
+            (public_room, ()),
+            (knock_room, ()),
+            (invited_room, ()),
+            (restricted_accessible_room, ()),
+            (world_readable_room, ()),
+            (joined_room, ()),
+        ]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
 
     def test_complex_space(self):
         """
@@ -349,18 +411,144 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_space_summary(self.user, self.space))
 
         # The result should include each room a single time and each link.
-        self._assert_rooms(result, [self.space, self.room, subspace, subroom])
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, room2),
-                (self.space, subspace),
-                (subspace, subroom),
-                (subspace, self.room),
-                (subspace, room2),
-            ],
+        expected = [
+            (self.space, [self.room, room2, subspace]),
+            (self.room, ()),
+            (subspace, [subroom, self.room, room2]),
+            (subroom, ()),
+        ]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
         )
+        self._assert_hierarchy(result, expected)
+
+    def test_pagination(self):
+        """Test simple pagination works."""
+        room_ids = []
+        for i in range(1, 10):
+            room = self.helper.create_room_as(self.user, tok=self.token)
+            self._add_child(self.space, room, self.token, order=str(i))
+            room_ids.append(room)
+        # The room created initially doesn't have an order, so comes last.
+        room_ids.append(self.room)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, limit=7)
+        )
+        # The result should have the space and all of the links, plus some of the
+        # rooms and a pagination token.
+        expected = [(self.space, room_ids)] + [
+            (room_id, ()) for room_id in room_ids[:6]
+        ]
+        self._assert_hierarchy(result, expected)
+        self.assertIn("next_token", result)
+
+        # Check the next page.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(
+                self.user, self.space, limit=5, from_token=result["next_token"]
+            )
+        )
+        # The result should have the space and the room in it, along with a link
+        # from space -> room.
+        expected = [(room_id, ()) for room_id in room_ids[6:]]
+        self._assert_hierarchy(result, expected)
+        self.assertNotIn("next_token", result)
+
+    def test_invalid_pagination_token(self):
+        """"""
+        room_ids = []
+        for i in range(1, 10):
+            room = self.helper.create_room_as(self.user, tok=self.token)
+            self._add_child(self.space, room, self.token, order=str(i))
+            room_ids.append(room)
+        # The room created initially doesn't have an order, so comes last.
+        room_ids.append(self.room)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, limit=7)
+        )
+        self.assertIn("next_token", result)
+
+        # Changing the room ID, suggested-only, or max-depth causes an error.
+        self.get_failure(
+            self.handler.get_room_hierarchy(
+                self.user, self.room, from_token=result["next_token"]
+            ),
+            SynapseError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(
+                self.user,
+                self.space,
+                suggested_only=True,
+                from_token=result["next_token"],
+            ),
+            SynapseError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(
+                self.user, self.space, max_depth=0, from_token=result["next_token"]
+            ),
+            SynapseError,
+        )
+
+        # An invalid token is ignored.
+        self.get_failure(
+            self.handler.get_room_hierarchy(self.user, self.space, from_token="foo"),
+            SynapseError,
+        )
+
+    def test_max_depth(self):
+        """Create a deep tree to test the max depth against."""
+        spaces = [self.space]
+        rooms = [self.room]
+        for _ in range(5):
+            spaces.append(
+                self.helper.create_room_as(
+                    self.user,
+                    tok=self.token,
+                    extra_content={
+                        "creation_content": {
+                            EventContentFields.ROOM_TYPE: RoomTypes.SPACE
+                        }
+                    },
+                )
+            )
+            self._add_child(spaces[-2], spaces[-1], self.token)
+            rooms.append(self.helper.create_room_as(self.user, tok=self.token))
+            self._add_child(spaces[-1], rooms[-1], self.token)
+
+        # Test just the space itself.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, max_depth=0)
+        )
+        expected = [(spaces[0], [rooms[0], spaces[1]])]
+        self._assert_hierarchy(result, expected)
+
+        # A single additional layer.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, max_depth=1)
+        )
+        expected += [
+            (rooms[0], ()),
+            (spaces[1], [rooms[1], spaces[2]]),
+        ]
+        self._assert_hierarchy(result, expected)
+
+        # A few layers.
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space, max_depth=3)
+        )
+        expected += [
+            (rooms[1], ()),
+            (spaces[2], [rooms[2], spaces[3]]),
+            (rooms[2], ()),
+            (spaces[3], [rooms[3], spaces[4]]),
+        ]
+        self._assert_hierarchy(result, expected)
 
     def test_fed_complex(self):
         """
@@ -417,15 +605,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.handler.get_space_summary(self.user, self.space)
             )
 
-        self._assert_rooms(result, [self.space, self.room, subspace, subroom])
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, subspace),
-                (subspace, subroom),
-            ],
-        )
+        expected = [
+            (self.space, [self.room, subspace]),
+            (self.room, ()),
+            (subspace, [subroom]),
+            (subroom, ()),
+        ]
+        self._assert_rooms(result, expected)
 
     def test_fed_filtering(self):
         """
@@ -554,35 +740,30 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.handler.get_space_summary(self.user, self.space)
             )
 
-        self._assert_rooms(
-            result,
-            [
-                self.space,
-                self.room,
+        expected = [
+            (self.space, [self.room, subspace]),
+            (self.room, ()),
+            (
                 subspace,
-                public_room,
-                knock_room,
-                invited_room,
-                restricted_accessible_room,
-                world_readable_room,
-                joined_room,
-            ],
-        )
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, subspace),
-                (subspace, public_room),
-                (subspace, knock_room),
-                (subspace, not_invited_room),
-                (subspace, invited_room),
-                (subspace, restricted_room),
-                (subspace, restricted_accessible_room),
-                (subspace, world_readable_room),
-                (subspace, joined_room),
-            ],
-        )
+                [
+                    public_room,
+                    knock_room,
+                    not_invited_room,
+                    invited_room,
+                    restricted_room,
+                    restricted_accessible_room,
+                    world_readable_room,
+                    joined_room,
+                ],
+            ),
+            (public_room, ()),
+            (knock_room, ()),
+            (invited_room, ()),
+            (restricted_accessible_room, ()),
+            (world_readable_room, ()),
+            (joined_room, ()),
+        ]
+        self._assert_rooms(result, expected)
 
     def test_fed_invited(self):
         """
@@ -623,18 +804,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.handler.get_space_summary(self.user, self.space)
             )
 
-        self._assert_rooms(
-            result,
-            [
-                self.space,
-                self.room,
-                fed_room,
-            ],
-        )
-        self._assert_events(
-            result,
-            [
-                (self.space, self.room),
-                (self.space, fed_room),
-            ],
-        )
+        expected = [
+            (self.space, [self.room, fed_room]),
+            (self.room, ()),
+            (fed_room, ()),
+        ]
+        self._assert_rooms(result, expected)
