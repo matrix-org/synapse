@@ -144,7 +144,7 @@ jobs:
         uses: docker://ubuntu:bionic # For old python and sqlite
         with:
           workdir: /github/workspace
-          entrypoint: .buildkite/scripts/test_old_deps.sh
+          entrypoint: ci/scripts/test_old_deps.sh
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
