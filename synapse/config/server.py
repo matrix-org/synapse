@@ -960,6 +960,8 @@ class ServerConfig(Config):
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
         #
+        # Note: The value is ignored when an HTTP proxy is in use
+        #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
 

@@ -1108,7 +1108,8 @@ class FederationClient(FederationBase):
             The response from the remote server.
 
         Raises:
-            HttpResponseException: There was an exception returned from the remote server
+            HttpResponseException / RequestSendFailed: There was an exception
+                returned from the remote server
             SynapseException: M_FORBIDDEN when the remote server has disallowed publicRoom
                 requests over federation
 
@@ -1290,7 +1291,7 @@ class FederationClient(FederationBase):
         )
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryEventResult:
     """Represents a single event in the result of a successful get_space_summary call.
 
@@ -1299,12 +1300,13 @@ class FederationSpaceSummaryEventResult:
     object attributes.
     """
 
-    event_type = attr.ib(type=str)
-    state_key = attr.ib(type=str)
-    via = attr.ib(type=Sequence[str])
+    event_type: str
+    room_id: str
+    state_key: str
+    via: Sequence[str]
 
     # the raw data, including the above keys
-    data = attr.ib(type=JsonDict)
+    data: JsonDict
 
     @classmethod
     def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryEventResult":
@@ -1321,6 +1323,10 @@ class FederationSpaceSummaryEventResult:
         if not isinstance(event_type, str):
             raise ValueError("Invalid event: 'event_type' must be a str")
 
+        room_id = d.get("room_id")
+        if not isinstance(room_id, str):
+            raise ValueError("Invalid event: 'room_id' must be a str")
+
         state_key = d.get("state_key")
         if not isinstance(state_key, str):
             raise ValueError("Invalid event: 'state_key' must be a str")
@@ -1335,15 +1341,15 @@ class FederationSpaceSummaryEventResult:
         if any(not isinstance(v, str) for v in via):
             raise ValueError("Invalid event: 'via' must be a list of strings")
 
-        return cls(event_type, state_key, via, d)
+        return cls(event_type, room_id, state_key, via, d)
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class FederationSpaceSummaryResult:
     """Represents the data returned by a successful get_space_summary call."""
 
-    rooms = attr.ib(type=Sequence[JsonDict])
-    events = attr.ib(type=Sequence[FederationSpaceSummaryEventResult])
+    rooms: Sequence[JsonDict]
+    events: Sequence[FederationSpaceSummaryEventResult]
 
     @classmethod
     def from_json_dict(cls, d: JsonDict) -> "FederationSpaceSummaryResult":

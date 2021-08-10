@@ -1,0 +1,1 @@
+Fix longstanding bug which caused the user "status" to be reset when the user went offline. Contributed by @dklimpel.

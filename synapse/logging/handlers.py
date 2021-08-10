@@ -45,6 +45,7 @@ class PeriodicallyFlushingMemoryHandler(MemoryHandler):
         self._flushing_thread: Thread = Thread(
             name="PeriodicallyFlushingMemoryHandler flushing thread",
             target=self._flush_periodically,
+            daemon=True,
         )
         self._flushing_thread.start()
 

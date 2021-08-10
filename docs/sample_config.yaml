@@ -210,6 +210,8 @@ presence:
 #
 # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
 #
+# Note: The value is ignored when an HTTP proxy is in use
+#
 #ip_range_blacklist:
 #  - '127.0.0.0/8'
 #  - '10.0.0.0/8'
@@ -718,6 +720,15 @@ caches:
   #
   #expiry_time: 30m
 
+  # Controls how long the results of a /sync request are cached for after
+  # a successful response is returned. A higher duration can help clients with
+  # intermittent connections, at the cost of higher memory usage.
+  #
+  # By default, this is zero, which means that sync responses are not cached
+  # at all.
+  #
+  #sync_response_cache_duration: 2m
+
 
 ## Database ##
 
@@ -969,6 +980,8 @@ media_store_path: "DATADIR/media_store"
 #
 # This must be specified if url_preview_enabled is set. It is recommended that
 # you uncomment the following list as a starting point.
+#
+# Note: The value is ignored when an HTTP proxy is in use
 #
 #url_preview_ip_range_blacklist:
 #  - '127.0.0.0/8'
@@ -2235,6 +2248,14 @@ email:
   # Synapse will refuse to connect unless the server supports STARTTLS.
   #
   #require_transport_security: true
+
+  # Uncomment the following to disable TLS for SMTP.
+  #
+  # By default, if the server supports TLS, it will be used, and the server
+  # must present a certificate that is valid for 'smtp_host'. If this option
+  # is set to false, TLS will not be used.
+  #
+  #enable_tls: false
 
   # notif_from defines the "From" address to use when sending emails.
   # It must be set if email sending is enabled.
