@@ -47,11 +47,9 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-python@v2
       - run: pip install tox
-      - name: Patch Buildkite-specific test script
-        run: |
-          sed -i -e 's/\$BUILDKITE_PULL_REQUEST/${{ github.event.number }}/' \
-            scripts-dev/check-newsfragment
       - run: scripts-dev/check-newsfragment
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
   lint-sdist:
     runs-on: ubuntu-latest
