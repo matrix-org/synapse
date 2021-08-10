@@ -37,4 +37,4 @@ class ExperimentalConfig(Config):
         self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
 
         # MSC3244 (room version capabilities)
-        self.msc3244_enabled: bool = experimental.get("msc3244_enabled", False)
+        self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
