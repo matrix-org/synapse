@@ -230,7 +230,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
-        run: cat sytest-blacklist .buildkite/worker-blacklist > synapse-blacklist-with-workers
+        run: cat sytest-blacklist ci/worker-blacklist > synapse-blacklist-with-workers
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
