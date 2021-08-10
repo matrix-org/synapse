@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 from unittest import mock
 
 from synapse.api.constants import (
@@ -127,7 +127,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self, space_id: str, room_id: str, token: str, order: Optional[str] = None
     ) -> None:
         """Add a child room to a space."""
-        content = {"via": [self.hs.hostname]}
+        content: JsonDict = {"via": [self.hs.hostname]}
         if order is not None:
             content["order"] = order
         self.helper.send_state(
@@ -439,9 +439,8 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         # The result should have the space and all of the links, plus some of the
         # rooms and a pagination token.
-        expected = [(self.space, room_ids)] + [
-            (room_id, ()) for room_id in room_ids[:6]
-        ]
+        expected: List[Tuple[str, Iterable[str]]] = [(self.space, room_ids)]
+        expected += [(room_id, ()) for room_id in room_ids[:6]]
         self._assert_hierarchy(result, expected)
         self.assertIn("next_token", result)
 
@@ -525,7 +524,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.handler.get_room_hierarchy(self.user, self.space, max_depth=0)
         )
-        expected = [(spaces[0], [rooms[0], spaces[1]])]
+        expected: List[Tuple[str, Iterable[str]]] = [(spaces[0], [rooms[0], spaces[1]])]
         self._assert_hierarchy(result, expected)
 
         # A single additional layer.
