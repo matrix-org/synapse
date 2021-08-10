@@ -21,5 +21,3 @@ class RoomStore(RoomWorkerStore, BaseSlavedStore):
     """This class is used to tie together worker storage methods
     and those that can only be called from the main process.
     """
-
-    pass
