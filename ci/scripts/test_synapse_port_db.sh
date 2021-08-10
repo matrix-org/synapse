@@ -20,22 +20,22 @@ pip install -e .
 echo "--- Generate the signing key"
 
 # Generate the server's signing key.
-python -m synapse.app.homeserver --generate-keys -c .buildkite/sqlite-config.yaml
+python -m synapse.app.homeserver --generate-keys -c ci/sqlite-config.yaml
 
 echo "--- Prepare test database"
 
 # Make sure the SQLite3 database is using the latest schema and has no pending background update.
-scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
+scripts-dev/update_database --database-config ci/sqlite-config.yaml
 
 # Create the PostgreSQL database.
-./.buildkite/scripts/postgres_exec.py "CREATE DATABASE synapse"
+./ci/scripts/postgres_exec.py "CREATE DATABASE synapse"
 
 echo "+++ Run synapse_port_db against test database"
-coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
+coverage run scripts/synapse_port_db --sqlite-database ci/test_db.db --postgres-config ci/postgres-config.yaml
 
 # We should be able to run twice against the same database.
 echo "+++ Run synapse_port_db a second time"
-coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
+coverage run scripts/synapse_port_db --sqlite-database ci/test_db.db --postgres-config ci/postgres-config.yaml
 
 #####
 
@@ -44,14 +44,14 @@ coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --p
 echo "--- Prepare empty SQLite database"
 
 # we do this by deleting the sqlite db, and then doing the same again.
-rm .buildkite/test_db.db
+rm ci/test_db.db
 
-scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
+scripts-dev/update_database --database-config ci/sqlite-config.yaml
 
 # re-create the PostgreSQL database.
-./.buildkite/scripts/postgres_exec.py \
+./ci/scripts/postgres_exec.py \
   "DROP DATABASE synapse" \
   "CREATE DATABASE synapse"
 
 echo "+++ Run synapse_port_db against empty database"
-coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
+coverage run scripts/synapse_port_db --sqlite-database ci/test_db.db --postgres-config ci/postgres-config.yaml
