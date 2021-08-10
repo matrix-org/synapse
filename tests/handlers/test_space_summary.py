@@ -586,8 +586,11 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_fed_invited(self):
         """
-        Rooms returned over federation should be properly filtered to only include
-        rooms the user has access to.
+        A room which the user was invited to should be included in the response.
+
+        This differs from test_fed_filtering in that the room itself is being
+        queried over federation, instead of it being included as a sub-room of
+        a space in the response.
         """
         fed_hostname = self.hs.hostname + "2"
         fed_room = "#subroom:" + fed_hostname
