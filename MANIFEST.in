@@ -44,7 +44,6 @@ include book.toml
 include pyproject.toml
 recursive-include changelog.d *
 
-prune .buildkite
 prune .circleci
 prune .github
 prune ci
