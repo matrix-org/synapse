@@ -1459,6 +1459,9 @@ class AuthHandler(BaseHandler):
         )
 
         await self.store.user_delete_threepid(user_id, medium, address)
+        await self.store.delete_all_pushers_with_pushkey_and_user_id(
+            pushkey=address, user_id=user_id
+        )
         return result
 
     async def hash(self, password: str) -> str:
