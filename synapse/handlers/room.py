@@ -464,15 +464,20 @@ class RoomCreationHandler(BaseHandler):
         # the room has been created
         # Calculate the minimum power level needed to clone the room
         event_power_levels = power_levels.get("events", {})
+        assert isinstance(event_power_levels, dict)
         state_default = power_levels.get("state_default", 50)
+        assert isinstance(state_default, int)
         ban = power_levels.get("ban", 50)
+        assert isinstance(ban, int)
         needed_power_level = max(state_default, ban, max(event_power_levels.values()))
 
         # Get the user's current power level, this matches the logic in get_user_power_level,
         # but without the entire state map.
         user_power_levels = power_levels.setdefault("users", {})
+        assert isinstance(user_power_levels, dict)
         users_default = power_levels.get("users_default", 0)
         current_power_level = user_power_levels.get(user_id, users_default)
+        assert isinstance(current_power_level, int)
         # Raise the requester's power level in the new room if necessary
         if current_power_level < needed_power_level:
             user_power_levels[user_id] = needed_power_level
