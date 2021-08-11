@@ -62,6 +62,7 @@ from synapse.rest.admin.users import (
     UserAdminServlet,
     UserMediaRestServlet,
     UserMembershipRestServlet,
+    UsernameAvailableRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
     UsersRestServletV2,
@@ -241,6 +242,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ForwardExtremitiesRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RateLimitRestServlet(hs).register(http_server)
+    UsernameAvailableRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
