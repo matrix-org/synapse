@@ -1825,7 +1825,7 @@ def load_legacy_password_auth_provider(module, config, api: ModuleApi):
 
             async def wrapped_check_password(
                 username: str, login_type: str, login_dict: JsonDict
-            ) -> Optional[str]:
+            ) -> Optional[Tuple[str, Optional[Callable]]]:
                 # We've already made sure f is not None above, but mypy doesn't do well
                 # across function boundaries so we need to tell it f is definitely not
                 # None.
@@ -1837,11 +1837,53 @@ def load_legacy_password_auth_provider(module, config, api: ModuleApi):
                 is_valid = await f(matrix_user_id, password)
 
                 if is_valid:
-                    return matrix_user_id
+                    return matrix_user_id, None
 
                 return None
 
             return wrapped_check_password
+
+        # We need to wrap check_auth as in the old form it could return
+        # just a str, but now it must return Optional[Tuple[str, Optional[Callable]]
+        if f.__name__ == "check_auth":
+
+            async def wrapped_check_auth(
+                username: str, login_type: str, login_dict: JsonDict
+            ) -> Optional[Tuple[str, Optional[Callable]]]:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                result = await f(username, login_type, login_dict)
+
+                if isinstance(result, str):
+                    return result, None
+
+                return result
+
+            return wrapped_check_auth
+
+        # We need to wrap check_3pid_auth as in the old form it could return
+        # just a str, but now it must return Optional[Tuple[str, Optional[Callable]]
+        if f.__name__ == "check_3pid_auth":
+
+            async def wrapped_check_3pid_auth(
+                medium: str, address: str, password: str
+            ) -> Optional[Tuple[str, Optional[Callable]]]:
+                # We've already made sure f is not None above, but mypy doesn't do well
+                # across function boundaries so we need to tell it f is definitely not
+                # None.
+                assert f is not None
+
+                result = await f(medium, address, password)
+
+                if isinstance(result, str):
+                    return result, None
+
+                return result
+
+            return wrapped_check_3pid_auth
 
         def run(*args, **kwargs):
             # mypy doesn't do well across function boundaries so we need to tell it
@@ -1888,12 +1930,12 @@ def load_legacy_password_auth_provider(module, config, api: ModuleApi):
 
 
 CHECK_3PID_AUTH_CALLBACK = Callable[
-    [str, str, str], Awaitable[Optional[Union[str, Tuple[str, Optional[Callable]]]]]
+    [str, str, str], Awaitable[Optional[Tuple[str, Optional[Callable]]]]
 ]
 ON_LOGGED_OUT_CALLBACK = Callable[[str, Optional[str], str], Awaitable]
 CHECK_AUTH_CALLBACK = Callable[
     [str, str, JsonDict],
-    Awaitable[Optional[Union[str, Tuple[str, Optional[Callable]]]]],
+    Awaitable[Optional[Tuple[str, Optional[Callable]]]],
 ]
 
 
@@ -2014,16 +2056,14 @@ class PasswordAuthProvider:
                 continue
 
             if result is not None:
-                # Check whether result is str or tuple
-                if isinstance(result, str):
-                    # If it's a str, set callback function to None
-                    return result, None
+                # Check that the callback returned a Tuple[str, Optional[Callable]]
 
-                # if it's not a str then it should be a tuple
-                if not isinstance(result, Tuple):
+                # "type: ignore" is used on the isinstance checks because mypy thinks
+                # result is always the right type, but as it is 3rd party code it might not be
+                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore
                     logger.warning(
                         "Wrong type returned by module API callback %s: %s, expected"
-                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        " Optional[Tuple[str, Optional[Callable]]]",
                         callback,
                         result,
                     )
@@ -2034,9 +2074,9 @@ class PasswordAuthProvider:
 
                 # the 1st item in the tuple should be a str
                 if not isinstance(str_result, str):
-                    logger.warning(
+                    logger.warning(  # type: ignore[unreachable]
                         "Wrong type returned by module API callback %s: %s, expected"
-                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        " Optional[Tuple[str, Optional[Callable]]]",
                         callback,
                         result,
                     )
@@ -2044,10 +2084,10 @@ class PasswordAuthProvider:
 
                 # the second should be Optional[Callable]
                 if callback_result is not None:
-                    if not isinstance(callback_result, Callable):
+                    if not isinstance(callback_result, Callable):  # type: ignore
                         logger.warning(
                             "Wrong type returned by module API callback %s: %s, expected"
-                            " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                            " Optional[Tuple[str, Optional[Callable]]]",
                             callback,
                             result,
                         )
@@ -2077,16 +2117,14 @@ class PasswordAuthProvider:
                 continue
 
             if result is not None:
-                # Check whether result is str or tuple
-                if isinstance(result, str):
-                    # If it's a str, set callback function to None
-                    return result, None
+                # Check that the callback returned a Tuple[str, Optional[Callable]]
 
-                # if it's not a str then it should be a tuple
-                if not isinstance(result, Tuple):
+                # "type: ignore" is used on the isinstance checks because mypy thinks
+                # result is always the right type, but as it is 3rd party code it might not be
+                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore
                     logger.warning(
                         "Wrong type returned by module API callback %s: %s, expected"
-                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        " Optional[Tuple[str, Optional[Callable]]]",
                         callback,
                         result,
                     )
@@ -2097,9 +2135,9 @@ class PasswordAuthProvider:
 
                 # the 1st item in the tuple should be a str
                 if not isinstance(str_result, str):
-                    logger.warning(
+                    logger.warning(  # type: ignore[unreachable]
                         "Wrong type returned by module API callback %s: %s, expected"
-                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        " Optional[Tuple[str, Optional[Callable]]]",
                         callback,
                         result,
                     )
@@ -2107,10 +2145,10 @@ class PasswordAuthProvider:
 
                 # the second should be Optional[Callable]
                 if callback_result is not None:
-                    if not isinstance(callback_result, Callable):
+                    if not isinstance(callback_result, Callable):  # type: ignore
                         logger.warning(
                             "Wrong type returned by module API callback %s: %s, expected"
-                            " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                            " Optional[Tuple[str, Optional[Callable]]]",
                             callback,
                             result,
                         )

@@ -318,17 +318,17 @@ async def check_auth(
         username: str,
         login_type: str,
         login_dict: JsonDict
-) -> Optional[Union[str, Tuple[str, Optional[Callable]]]]
+) -> Optional[Tuple[str, Optional[Callable]]]
 ```
 
 It is passed the (possibly unqualified) user field provided by the client, 
 the login type, and a dictionary of login secrets passed by the client.
 
-If authentication was successful, then it should return either a str containing
-the user's (canonical) User id or a (user_id, callback) tuple, where the callback is
-called with the result from the `/login` call (see the 
+On a failure it should return None. On a success it should return a (user_id, callback) tuple
+where user_id is a str containing the user's (canonical) matrix id and the callback is a method
+to be called with the result from the `/login` call (see the 
 <a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
-for details).
+for details). This callback can be None.
 
 So continuing the same example, if the module has two authentication checkers, one for 
 `com.example.custom_login` named `self.custom_check` and one for `m.login.password` named
@@ -348,7 +348,7 @@ async def check_3pid_auth(
     medium: str, 
     address: str,
     password: str,
-) -> Optional[Union[str, Tuple[str, Optional[Callable]]]]
+) -> Optional[Tuple[str, Optional[Callable]]]
 ```
 
 This  is called when a user attempts to register or log in with a third party identifier,
@@ -357,11 +357,11 @@ and the user's password.
 
 The method should return None if the authentication is unsuccessful.
 
-If authentication was successful, then it should return either a str containing
-the user's (canonical) User id or a (user_id, callback) tuple, where the callback is
-called with the result from the `/login` call (see the 
+On a failure it should return None. On a success it should return a (user_id, callback) tuple
+where user_id is a str containing the user's (canonical) matrix id and the callback is a method
+to be called with the result from the `/login` call (see the 
 <a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
-for details).
+for details). This callback can be None.
 
 ```python
 async def on_logged_out(
