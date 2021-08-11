@@ -204,6 +204,7 @@
 <ul>
 <li><a href="#delete-a-specific-local-media">Delete a specific local media</a></li>
 <li><a href="#delete-local-media-by-date-or-size">Delete local media by date or size</a></li>
+<li><a href="#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></li>
 </ul>
 </li>
 <li><a href="#purge-remote-media-api">Purge Remote Media API</a></li>
@@ -232,7 +233,8 @@ server admin: see <a href="../usage/administration/admin_api">Admin API</a>.</p>
 </code></pre>
 <h2 id="list-all-media-uploaded-by-a-user"><a class="header" href="#list-all-media-uploaded-by-a-user">List all media uploaded by a user</a></h2>
 <p>Listing all media that has been uploaded by a local user can be achieved through
-the use of the <a href="user_admin_api.html#list-media-of-a-user">List media of a user</a>
+the use of the
+<a href="user_admin_api.html#list-media-uploaded-by-a-user">List media uploaded by a user</a>
 Admin API.</p>
 <h1 id="quarantine-media"><a class="header" href="#quarantine-media">Quarantine media</a></h1>
 <p>Quarantining media means that it is marked as inaccessible by users. It applies
@@ -392,6 +394,9 @@ If <code>false</code> these files will be deleted. Defaults to <code>true</code>
 <li><code>deleted_media</code>: an array of strings - List of deleted <code>media_id</code></li>
 <li><code>total</code>: integer - Total number of deleted <code>media_id</code></li>
 </ul>
+<h2 id="delete-media-uploaded-by-a-user"><a class="header" href="#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></h2>
+<p>You can find details of how to delete multiple media uploaded by a user in
+<a href="user_admin_api.html#delete-media-uploaded-by-a-user">User Admin API</a>.</p>
 <h1 id="purge-remote-media-api"><a class="header" href="#purge-remote-media-api">Purge Remote Media API</a></h1>
 <p>The purge remote media API allows server admins to purge old cached remote media.</p>
 <p>The API is:</p>

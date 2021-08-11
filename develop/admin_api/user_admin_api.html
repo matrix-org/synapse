@@ -553,7 +553,8 @@ member are returned.</p>
 <li><code>joined_rooms</code> - An array of <code>room_id</code>.</li>
 <li><code>total</code> - Number of rooms.</li>
 </ul>
-<h2 id="list-media-of-a-user"><a class="header" href="#list-media-of-a-user">List media of a user</a></h2>
+<h2 id="user-media"><a class="header" href="#user-media">User media</a></h2>
+<h3 id="list-media-uploaded-by-a-user"><a class="header" href="#list-media-uploaded-by-a-user">List media uploaded by a user</a></h3>
 <p>Gets a list of all local media that a specific <code>user_id</code> has created.
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -646,44 +647,56 @@ database, especially for large environments.</p>
 <p><strong>Response</strong></p>
 <p>The following fields are returned in the JSON response body:</p>
 <ul>
-<li>
-<p><code>media</code> - An array of objects, each containing information about a media.
-Media objects contain the following fields:</p>
+<li><code>media</code> - An array of objects, each containing information about a media.
+Media objects contain the following fields:
 <ul>
-<li>
-<p><code>created_ts</code> - integer - Timestamp when the content was uploaded in ms.</p>
-</li>
-<li>
-<p><code>last_access_ts</code> - integer - Timestamp when the content was last accessed in ms.</p>
-</li>
-<li>
-<p><code>media_id</code> - string - The id used to refer to the media.</p>
-</li>
-<li>
-<p><code>media_length</code> - integer - Length of the media in bytes.</p>
-</li>
-<li>
-<p><code>media_type</code> - string - The MIME-type of the media.</p>
-</li>
-<li>
-<p><code>quarantined_by</code> - string - The user ID that initiated the quarantine request
-for this media.</p>
-</li>
-<li>
-<p><code>safe_from_quarantine</code> - bool - Status if this media is safe from quarantining.</p>
-</li>
-<li>
-<p><code>upload_name</code> - string - The name the media was uploaded with.</p>
-</li>
+<li><code>created_ts</code> - integer - Timestamp when the content was uploaded in ms.</li>
+<li><code>last_access_ts</code> - integer - Timestamp when the content was last accessed in ms.</li>
+<li><code>media_id</code> - string - The id used to refer to the media.</li>
+<li><code>media_length</code> - integer - Length of the media in bytes.</li>
+<li><code>media_type</code> - string - The MIME-type of the media.</li>
+<li><code>quarantined_by</code> - string - The user ID that initiated the quarantine request
+for this media.</li>
+<li><code>safe_from_quarantine</code> - bool - Status if this media is safe from quarantining.</li>
+<li><code>upload_name</code> - string - The name the media was uploaded with.</li>
 </ul>
 </li>
-<li>
-<p><code>next_token</code>: integer - Indication for pagination. See above.</p>
-</li>
-<li>
-<p><code>total</code> - integer - Total number of media.</p>
-</li>
+<li><code>next_token</code>: integer - Indication for pagination. See above.</li>
+<li><code>total</code> - integer - Total number of media.</li>
 </ul>
+<h3 id="delete-media-uploaded-by-a-user"><a class="header" href="#delete-media-uploaded-by-a-user">Delete media uploaded by a user</a></h3>
+<p>This API deletes the <em>local</em> media from the disk of your own server
+that a specific <code>user_id</code> has created. This includes any local thumbnails.</p>
+<p>This API will not affect media that has been uploaded to external
+media repositories (e.g https://github.com/turt2live/matrix-media-repo/).</p>
+<p>By default, the API deletes media ordered by descending creation date and ascending media ID.
+The newest media is deleted first. You can change the order with parameters
+<code>order_by</code> and <code>dir</code>. If no <code>limit</code> is set the API deletes <code>100</code> files per request.</p>
+<p>The API is:</p>
+<pre><code>DELETE /_synapse/admin/v1/users/&lt;user_id&gt;/media
+</code></pre>
+<p>To use it, you will need to authenticate by providing an <code>access_token</code> for a
+server admin: <a href="../usage/administration/admin_api">Admin API</a></p>
+<p>A response body like the following is returned:</p>
+<pre><code class="language-json">{
+  &quot;deleted_media&quot;: [
+    &quot;abcdefghijklmnopqrstuvwx&quot;
+  ],
+  &quot;total&quot;: 1
+}
+</code></pre>
+<p>The following fields are returned in the JSON response body:</p>
+<ul>
+<li><code>deleted_media</code>: an array of strings - List of deleted <code>media_id</code></li>
+<li><code>total</code>: integer - Total number of deleted <code>media_id</code></li>
+</ul>
+<p><strong>Note</strong>: There is no <code>next_token</code>. This is not useful for deleting media, because
+after deleting media the remaining media have a new order.</p>
+<p><strong>Parameters</strong></p>
+<p>This API has the same parameters as
+<a href="#list-media-uploaded-by-a-user">List media uploaded by a user</a>.
+With the parameters you can for example limit the number of files to delete at once or
+delete largest/smallest or newest/oldest files first.</p>
 <h2 id="login-as-a-user"><a class="header" href="#login-as-a-user">Login as a user</a></h2>
 <p>Get an access token that can be used to authenticate as that user. Useful for
 when admins wish to do actions on behalf of a user.</p>
