@@ -643,8 +643,8 @@ class AuthHandler(BaseHandler):
         if "session" not in authdict:
             raise LoginError(400, "Missing session ID", Codes.MISSING_PARAM)
 
-        # If authentication fails a LoginError is raised, so if we do get a
-        # result we know authentication has succeeded.
+        # If authentication fails a LoginError is raised. Otherwise, store
+        # the successful result.
         result = await self.checkers[stagetype].check_auth(authdict, clientip)
         await self.store.mark_ui_auth_stage_complete(
             authdict["session"], stagetype, result
