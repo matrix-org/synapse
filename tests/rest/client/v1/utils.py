@@ -47,10 +47,10 @@ class RestHelper:
 
     def create_room_as(
         self,
-        room_creator: str = None,
+        room_creator: Optional[str] = None,
         is_public: bool = True,
-        room_version: str = None,
-        tok: str = None,
+        room_version: Optional[str] = None,
+        tok: Optional[str] = None,
         expect_code: int = 200,
         extra_content: Optional[Dict] = None,
         custom_headers: Optional[

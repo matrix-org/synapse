@@ -45,18 +45,18 @@ The proxy will be **used** for:
 - recaptcha validation
 - CAS auth validation
 - OpenID Connect
+- Outbound federation
 - Federation (checking public key revocation)
+- Fetching public keys of other servers
+- Downloading remote media
 
 It will **not be used** for:
 
 - Application Services
 - Identity servers
-- Outbound federation
 - In worker configurations
   - connections between workers
   - connections from workers to Redis
-- Fetching public keys of other servers
-- Downloading remote media
 
 ## Troubleshooting
 
