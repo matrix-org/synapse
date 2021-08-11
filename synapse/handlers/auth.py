@@ -1887,11 +1887,11 @@ def load_legacy_password_auth_provider(module, config, api: ModuleApi):
     )
 
 
-CHECK_3PID_AUTH = Callable[
+CHECK_3PID_AUTH_CALLBACK = Callable[
     [str, str, str], Awaitable[Optional[Union[str, Tuple[str, Optional[Callable]]]]]
 ]
-ON_LOGGED_OUT = Callable[[str, Optional[str], str], Awaitable]
-CHECK_AUTH = Callable[
+ON_LOGGED_OUT_CALLBACK = Callable[[str, Optional[str], str], Awaitable]
+CHECK_AUTH_CALLBACK = Callable[
     [str, str, JsonDict],
     Awaitable[Optional[Union[str, Tuple[str, Optional[Callable]]]]],
 ]
@@ -1905,21 +1905,21 @@ class PasswordAuthProvider:
 
     def __init__(self):
         # lists of callbacks
-        self.check_3pid_auth_callbacks: List[CHECK_3PID_AUTH] = []
-        self.on_logged_out_callbacks: List[ON_LOGGED_OUT] = []
+        self.check_3pid_auth_callbacks: List[CHECK_3PID_AUTH_CALLBACK] = []
+        self.on_logged_out_callbacks: List[ON_LOGGED_OUT_CALLBACK] = []
 
         # Mapping from login type to login parameters
         self._supported_login_types: Dict[str, Iterable[str]] = {}
 
         # Mapping from login type to auth checker callbacks
-        self.auth_checker_callbacks: Dict[str, List[CHECK_AUTH]] = {}
+        self.auth_checker_callbacks: Dict[str, List[CHECK_AUTH_CALLBACK]] = {}
 
     def register_password_auth_provider_callbacks(
         self,
-        check_3pid_auth: Optional[CHECK_3PID_AUTH] = None,
-        on_logged_out: Optional[ON_LOGGED_OUT] = None,
+        check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
+        on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
         supported_login_types: Optional[Dict[str, Iterable[str]]] = None,
-        auth_checkers: Optional[Dict[str, CHECK_AUTH]] = None,
+        auth_checkers: Optional[Dict[str, CHECK_AUTH_CALLBACK]] = None,
     ):
         # Register check_3pid_auth callback
         if check_3pid_auth is not None:
@@ -1936,7 +1936,7 @@ class PasswordAuthProvider:
                 # If a module is supporting a login_type it must also provide a
                 # callback for authenticating using it
                 if auth_checkers is None or auth_checkers.get(login_type) is None:
-                    raise Exception(
+                    raise RuntimeError(
                         "A module tried to register support for login type: %s without providing"
                         "an authentication method for it" % login_type
                     )
@@ -1950,7 +1950,7 @@ class PasswordAuthProvider:
                         login_type
                     )
                     if fields_currently_supported != fields:
-                        raise Exception(
+                        raise RuntimeError(
                             "A module tried to register support for login type: %s with parameters %s"
                             "but another module had already registered support for that type with parameters %s"
                             % (login_type, fields, fields_currently_supported)
@@ -1966,7 +1966,7 @@ class PasswordAuthProvider:
                     supported_login_types is None
                     or supported_login_types.get(login_type) is None
                 ):
-                    raise Exception(
+                    raise RuntimeError(
                         "A module tried to register an authentication method for login type: %s"
                         "without listing it as a supported login type" % login_type
                     )
@@ -2007,13 +2007,53 @@ class PasswordAuthProvider:
         # Go through all callbacks for the login type until one returns with a value
         # other than None (i.e. until a callback returns a success)
         for callback in self.auth_checker_callbacks[login_type]:
-            result = await callback(username, login_type, login_dict)
+            try:
+                result = await callback(username, login_type, login_dict)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue
+
             if result is not None:
                 # Check whether result is str or tuple
                 if isinstance(result, str):
                     # If it's a str, set callback function to None
                     return result, None
-                # otherwise it's a (str, callback) tuple so return as is
+
+                # if it's not a str then it should be a tuple
+                if not isinstance(result, Tuple):
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # pull out the two parts of the tuple so we can do type checking
+                str_result, callback_result = result
+
+                # the 1st item in the tuple should be a str
+                if not isinstance(str_result, str):
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # the second should be Optional[Callable]
+                if callback_result is not None:
+                    if not isinstance(callback_result, Callable):
+                        logger.warning(
+                            "Wrong type returned by module API callback %s: %s, expected"
+                            " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                            callback,
+                            result,
+                        )
+                        continue
+
+                # The result is a (str, Optional[callback]) tuple so return the successful result
                 return result
 
         # If this point has been reached then none of the callbacks successfully authenticated
@@ -2030,13 +2070,53 @@ class PasswordAuthProvider:
         # after we've finished everything else
 
         for callback in self.check_3pid_auth_callbacks:
-            result = await callback(medium, address, password)
+            try:
+                result = await callback(medium, address, password)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue
+
             if result is not None:
                 # Check whether result is str or tuple
                 if isinstance(result, str):
                     # If it's a str, set callback function to None
                     return result, None
-                # otherwise it's a (str, callback) tuple so return as is
+
+                # if it's not a str then it should be a tuple
+                if not isinstance(result, Tuple):
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # pull out the two parts of the tuple so we can do type checking
+                str_result, callback_result = result
+
+                # the 1st item in the tuple should be a str
+                if not isinstance(str_result, str):
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected"
+                        " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                        callback,
+                        result,
+                    )
+                    continue
+
+                # the second should be Optional[Callable]
+                if callback_result is not None:
+                    if not isinstance(callback_result, Callable):
+                        logger.warning(
+                            "Wrong type returned by module API callback %s: %s, expected"
+                            " Optional[Union[str, Tuple[str, Optional[Callable]]]]",
+                            callback,
+                            result,
+                        )
+                        continue
+
+                # The result is a (str, Optional[callback]) tuple so return the successful result
                 return result
 
         # If this point has been reached then none of the callbacks successfully authenticated
@@ -2049,4 +2129,8 @@ class PasswordAuthProvider:
 
         # call all of the on_logged_out callbacks
         for callback in self.on_logged_out_callbacks:
-            callback(user_id, device_id, access_token)
+            try:
+                callback(user_id, device_id, access_token)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue

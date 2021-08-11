@@ -308,7 +308,7 @@ it should register the following dict:
 }
 ```
 
-- `auth_checkers: Dict[str, CHECK_AUTH]`
+- `auth_checkers: Dict[str, CHECK_AUTH_CALLBACK]`
 
 A dict mapping from a login type identifier (such as `m.login.password`) to an authentication
 checking method of the following form:
@@ -331,7 +331,7 @@ called with the result from the `/login` call (see the
 for details).
 
 So continuing the same example, if the module has two authentication checkers, one for 
-`com.example.custom_login` called `self.custom_check` and one for `m.login.password` called
+`com.example.custom_login` named `self.custom_check` and one for `m.login.password` named
 `self.password_check` then it should register the following dict:
 
 ```python
@@ -404,6 +404,7 @@ should now be made by the module using the module API class.
 To port a module that has a `check_password` method: 
 - Register `"m.login.password": ("password",)` as a supported login type
 - Register `"m.login.password": self.check_password` as an auth checker
+- Set `self.module_api` to point to the `ModuleApi` object given in `__init__`
 - Change the arguments of `check_password` to
   `(username: str, login_type: str, login_dict: JsonDict)`
 - Add the following lines to the top of the `check_password` method:
