@@ -78,7 +78,7 @@ class _PaginationSession:
     """The information that is stored for pagination."""
 
     # The time the pagination session was created, in milliseconds.
-    creatione_time_ms: int
+    creation_time_ms: int
     # The queue of rooms which are still to process.
     room_queue: Deque["_RoomQueueEntry"]
     # A set of rooms which have been processed.
@@ -121,7 +121,7 @@ class SpaceSummaryHandler:
         to_expire = []
 
         for key, value in self._pagination_sessions.items():
-            if value.creatione_time_ms < expire_before:
+            if value.creation_time_ms < expire_before:
                 to_expire.append(key)
 
         for key in to_expire:
