@@ -259,7 +259,9 @@ class DeleteMediaByID(RestServlet):
 
         logging.info("Deleting local media by ID: %s", media_id)
 
-        deleted_media, total = await self.media_repository.delete_local_media(media_id)
+        deleted_media, total = await self.media_repository.delete_local_media_ids(
+            [media_id]
+        )
         return 200, {"deleted_media": deleted_media, "total": total}
 
 

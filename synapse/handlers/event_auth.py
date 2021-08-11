@@ -213,7 +213,7 @@ class EventAuthHandler:
 
             raise AuthError(
                 403,
-                "You do not belong to any of the required rooms to join this room.",
+                "You do not belong to any of the required rooms/spaces to join this room.",
             )
 
     async def has_restricted_join_rules(
