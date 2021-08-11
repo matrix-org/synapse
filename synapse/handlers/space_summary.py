@@ -77,6 +77,8 @@ class _PaginationKey:
 class _PaginationSession:
     """The information that is stored for pagination."""
 
+    # The time the pagination session was created, in milliseconds.
+    creation_time_ms: int
     # The queue of rooms which are still to process.
     room_queue: Deque["_RoomQueueEntry"]
     # A set of rooms which have been processed.
@@ -84,6 +86,9 @@ class _PaginationSession:
 
 
 class SpaceSummaryHandler:
+    # The time a pagination session remains valid for.
+    _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
+
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self._auth = hs.get_auth()
@@ -107,6 +112,21 @@ class SpaceSummaryHandler:
             hs.get_clock(),
             "get_room_hierarchy",
         )
+
+    def _expire_pagination_sessions(self):
+        """Expire pagination session which are old."""
+        expire_before = (
+            self._clock.time_msec() - self._PAGINATION_SESSION_VALIDITY_PERIOD_MS
+        )
+        to_expire = []
+
+        for key, value in self._pagination_sessions.items():
+            if value.creation_time_ms < expire_before:
+                to_expire.append(key)
+
+        for key in to_expire:
+            logger.debug("Expiring pagination session id %s", key)
+            del self._pagination_sessions[key]
 
     async def get_space_summary(
         self,
@@ -312,6 +332,8 @@ class SpaceSummaryHandler:
 
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
+            self._expire_pagination_sessions()
+
             pagination_key = _PaginationKey(
                 requested_room_id, suggested_only, max_depth, from_token
             )
@@ -391,7 +413,7 @@ class SpaceSummaryHandler:
                 requested_room_id, suggested_only, max_depth, next_token
             )
             self._pagination_sessions[pagination_key] = _PaginationSession(
-                room_queue, processed_rooms
+                self._clock.time_msec(), room_queue, processed_rooms
             )
 
         return result
