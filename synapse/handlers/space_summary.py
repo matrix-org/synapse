@@ -526,7 +526,7 @@ class SpaceSummaryHandler:
         children_rooms_result: List[JsonDict] = []
         inaccessible_children: List[str] = []
 
-        # Iterate through each child and potentially add it, but not it's children,
+        # Iterate through each child and potentially add it, but not its children,
         # to the response.
         for child_room in root_room_entry.children:
             room_id = child_room.get("state_key")
