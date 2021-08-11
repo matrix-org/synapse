@@ -46,7 +46,7 @@ recursive-include changelog.d *
 
 prune .circleci
 prune .github
-prune ci
+prune .ci
 prune contrib
 prune debian
 prune demo/etc
