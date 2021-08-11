@@ -385,10 +385,10 @@ class SpaceSummaryHandler:
 
         # If there's additional data, generate a pagination token (and persist state).
         if room_queue:
-            next_token = random_string(24)
-            result["next_token"] = next_token
+            next_batch = random_string(24)
+            result["next_batch"] = next_batch
             pagination_key = _PaginationKey(
-                requested_room_id, suggested_only, max_depth, next_token
+                requested_room_id, suggested_only, max_depth, next_batch
             )
             self._pagination_sessions[pagination_key] = _PaginationSession(
                 room_queue, processed_rooms
