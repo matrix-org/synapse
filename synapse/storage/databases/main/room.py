@@ -1361,21 +1361,17 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             StoreError if the room could not be stored.
         """
         try:
-
-            def store_room_txn(txn):
-                self.db_pool.simple_insert_txn(
-                    txn,
-                    "rooms",
-                    {
-                        "room_id": room_id,
-                        "creator": room_creator_user_id,
-                        "is_public": is_public,
-                        "room_version": room_version.identifier,
-                        "has_auth_chain_index": True,
-                    },
-                )
-
-            await self.db_pool.runInteraction("store_room_txn", store_room_txn)
+            await self.db_pool.simple_insert(
+                "rooms",
+                {
+                    "room_id": room_id,
+                    "creator": room_creator_user_id,
+                    "is_public": is_public,
+                    "room_version": room_version.identifier,
+                    "has_auth_chain_index": True,
+                },
+                desc="store_room",
+            )
         except Exception as e:
             logger.error("store_room with room_id=%s failed: %s", room_id, e)
             raise StoreError(500, "Problem creating room.")
@@ -1409,15 +1405,13 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         )
 
     async def set_room_is_public(self, room_id, is_public):
-        def set_room_is_public_txn(txn):
-            self.db_pool.simple_update_one_txn(
-                txn,
-                table="rooms",
-                keyvalues={"room_id": room_id},
-                updatevalues={"is_public": is_public},
-            )
+        await self.db_pool.simple_update_one(
+            table="rooms",
+            keyvalues={"room_id": room_id},
+            updatevalues={"is_public": is_public},
+            desc="set_room_is_public",
+        )
 
-        await self.db_pool.runInteraction("set_room_is_public", set_room_is_public_txn)
         self.hs.get_notifier().on_new_replication_data()
 
     async def set_room_is_public_appservice(
@@ -1438,36 +1432,31 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
                 list.
         """
 
-        def set_room_is_public_appservice_txn(txn):
-            if is_public:
-                try:
-                    self.db_pool.simple_insert_txn(
-                        txn,
-                        table="appservice_room_list",
-                        values={
-                            "appservice_id": appservice_id,
-                            "network_id": network_id,
-                            "room_id": room_id,
-                        },
-                    )
-                except self.database_engine.module.IntegrityError:
-                    # We've already inserted, nothing to do.
-                    return
-            else:
-                self.db_pool.simple_delete_txn(
-                    txn,
+        if is_public:
+            try:
+                await self.db_pool.simple_insert(
                     table="appservice_room_list",
-                    keyvalues={
+                    values={
                         "appservice_id": appservice_id,
                         "network_id": network_id,
                         "room_id": room_id,
                     },
+                    desc="set_room_is_public_appservice_true",
                 )
+            except self.database_engine.module.IntegrityError:
+                # We've already inserted, nothing to do.
+                return
+        else:
+            await self.db_pool.simple_delete(
+                table="appservice_room_list",
+                keyvalues={
+                    "appservice_id": appservice_id,
+                    "network_id": network_id,
+                    "room_id": room_id,
+                },
+                desc="set_room_is_public_appservice_false",
+            )
 
-        await self.db_pool.runInteraction(
-            "set_room_is_public_appservice",
-            set_room_is_public_appservice_txn,
-        )
         self.hs.get_notifier().on_new_replication_data()
 
     async def add_event_report(
