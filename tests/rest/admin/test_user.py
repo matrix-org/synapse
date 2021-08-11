@@ -22,7 +22,12 @@ from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
+from synapse.api.errors import (
+    Codes,
+    HttpResponseException,
+    ResourceLimitError,
+    SynapseError,
+)
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client.v1 import login, logout, profile, room
 from synapse.rest.client.v2_alpha import devices, sync
@@ -3406,3 +3411,47 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertNotIn("messages_per_second", channel.json_body)
         self.assertNotIn("burst_count", channel.json_body)
+
+
+class UsernameAvailableTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+
+        self.url = "/_synapse/admin/v1/username_available"
+
+        self.registration_handler = Mock()
+
+        self.hs = self.setup_test_homeserver()
+
+        return self.hs
+
+    def test_username_available(self):
+        """
+        The endpoint should return a 200 response if the username does not exist
+        """
+        self.registration_handler.check_username = Mock(return_value=True)
+        url = "%s?username=%s" % (self.url, "foobar")
+        channel = self.make_request("GET", url)
+
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertTrue(channel.json_body["available"])
+
+    def test_username_unavailable(self):
+        """
+        The endpoint should return a 200 response if the username does not exist
+        """
+
+        async def taken_username():
+            raise SynapseError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
+
+        self.registration_handler.check_username = taken_username
+
+        url = "%s?username=%s" % (self.url, "foobar")
+        channel = self.make_request("GET", url)
+
+        self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
+        self.assertEqual(channel.json_body["errcode"], "User ID already taken.")
