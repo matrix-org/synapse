@@ -1110,21 +1110,21 @@ will apply blacklisting of IP addresses.</p>
 <li>recaptcha validation</li>
 <li>CAS auth validation</li>
 <li>OpenID Connect</li>
+<li>Outbound federation</li>
 <li>Federation (checking public key revocation)</li>
+<li>Fetching public keys of other servers</li>
+<li>Downloading remote media</li>
 </ul>
 <p>It will <strong>not be used</strong> for:</p>
 <ul>
 <li>Application Services</li>
 <li>Identity servers</li>
-<li>Outbound federation</li>
 <li>In worker configurations
 <ul>
 <li>connections between workers</li>
 <li>connections from workers to Redis</li>
 </ul>
 </li>
-<li>Fetching public keys of other servers</li>
-<li>Downloading remote media</li>
 </ul>
 <h2 id="troubleshooting-1"><a class="header" href="#troubleshooting-1">Troubleshooting</a></h2>
 <p>If a proxy server is used with TLS (HTTPS) and no connections are established,
@@ -1545,6 +1545,30 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1xx0"><a class="header" href="#upgrading-to-v1xx0">Upgrading to v1.xx.0</a></h1>
+<h2 id="add-support-for-routing-outbound-http-requests-via-a-proxy-for-federation"><a class="header" href="#add-support-for-routing-outbound-http-requests-via-a-proxy-for-federation">Add support for routing outbound HTTP requests via a proxy for federation</a></h2>
+<p>Since Synapse 1.6.0 (2019-11-26) you can set a proxy for outbound HTTP requests via
+http_proxy/https_proxy environment variables. This proxy was set for:</p>
+<ul>
+<li>push</li>
+<li>url previews</li>
+<li>phone-home stats</li>
+<li>recaptcha validation</li>
+<li>CAS auth validation</li>
+<li>OpenID Connect</li>
+<li>Federation (checking public key revocation)</li>
+</ul>
+<p>In this version we have added support for outbound requests for:</p>
+<ul>
+<li>Outbound federation</li>
+<li>Downloading remote media</li>
+<li>Fetching public keys of other servers</li>
+</ul>
+<p>These requests use the same proxy configuration. If you have a proxy configuration we
+recommend to verify the configuration. It may be necessary to adjust the <code>no_proxy</code>
+environment variable.</p>
+<p>See <a href="setup/forward_proxy.html">using a forward proxy with Synapse documentation</a> for
+details.</p>
 <h1 id="upgrading-to-v1390"><a class="header" href="#upgrading-to-v1390">Upgrading to v1.39.0</a></h1>
 <h2 id="deprecation-of-the-current-third-party-rules-module-interface"><a class="header" href="#deprecation-of-the-current-third-party-rules-module-interface">Deprecation of the current third-party rules module interface</a></h2>
 <p>The current third-party rules module interface is deprecated in favour of the new generic
