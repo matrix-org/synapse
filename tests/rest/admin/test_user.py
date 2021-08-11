@@ -3414,28 +3414,35 @@ class RateLimitTestCase(unittest.HomeserverTestCase):
 
 
 class UsernameAvailableTestCase(unittest.HomeserverTestCase):
-
     servlets = [
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        synapse.rest.admin.register_servlets,
+        login.register_servlets,
     ]
 
-    def make_homeserver(self, reactor, clock):
-
+    def prepare(self, reactor, clock, hs):
+        self.register_user("admin", "pass", admin=True)
+        self.admin_user_tok = self.login("admin", "pass")
         self.url = "/_synapse/admin/v1/username_available"
 
-        self.registration_handler = Mock()
+        async def check_username(username):
+            if username == "allowed":
+                return True
+            raise SynapseError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
 
+        handler = self.hs.get_registration_handler()
+        handler.check_username = check_username
+
+    def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-
         return self.hs
 
     def test_username_available(self):
         """
         The endpoint should return a 200 response if the username does not exist
         """
-        self.registration_handler.check_username = Mock(return_value=True)
-        url = "%s?username=%s" % (self.url, "foobar")
-        channel = self.make_request("GET", url)
+
+        url = "%s?username=%s" % (self.url, "allowed")
+        channel = self.make_request("GET", url, None, self.admin_user_tok)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
         self.assertTrue(channel.json_body["available"])
@@ -3445,13 +3452,13 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         The endpoint should return a 200 response if the username does not exist
         """
 
-        async def taken_username():
+        async def check_username(username):
+            print("fibble sibble")
             raise SynapseError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
 
-        self.registration_handler.check_username = taken_username
-
-        url = "%s?username=%s" % (self.url, "foobar")
-        channel = self.make_request("GET", url)
+        url = "%s?username=%s" % (self.url, "disallowed")
+        channel = self.make_request("GET", url, None, self.admin_user_tok)
 
         self.assertEqual(400, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(channel.json_body["errcode"], "User ID already taken.")
+        self.assertEqual(channel.json_body["errcode"], "M_USER_IN_USE")
+        self.assertEqual(channel.json_body["error"], "User ID already taken.")
