@@ -3,14 +3,14 @@
 # schema and run background updates on it.
 server_name: "localhost:8800"
 
-signing_key_path: "ci/test.signing.key"
+signing_key_path: ".ci/test.signing.key"
 
 report_stats: false
 
 database:
   name: "sqlite3"
   args:
-    database: "ci/test_db.db"
+    database: ".ci/test_db.db"
 
 # Suppress the key server warning.
 trusted_key_servers: []

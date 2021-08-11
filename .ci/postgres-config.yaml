@@ -3,7 +3,7 @@
 # CI's Docker setup at the point where this file is considered.
 server_name: "localhost:8800"
 
-signing_key_path: "ci/test.signing.key"
+signing_key_path: ".ci/test.signing.key"
 
 report_stats: false
 
