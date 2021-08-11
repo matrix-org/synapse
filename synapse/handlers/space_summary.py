@@ -412,7 +412,8 @@ class SpaceSummaryHandler:
                             children_room_entries.get(ev["state_key"]),
                         )
                         for ev in reversed(room_entry.children)
-                        if ev["state_key"] not in inaccessible_children
+                        if ev["type"] == EventTypes.SpaceChild
+                        and ev["state_key"] not in inaccessible_children
                     )
 
         result: JsonDict = {"rooms": rooms_result}

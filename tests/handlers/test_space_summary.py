@@ -458,7 +458,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_token", result)
 
     def test_invalid_pagination_token(self):
-        """"""
+        """An invalid pagination token, or changing other parameters, shoudl be rejected."""
         room_ids = []
         for i in range(1, 10):
             room = self.helper.create_room_as(self.user, tok=self.token)
@@ -575,6 +575,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             },
             [
                 {
+                    "type": EventTypes.SpaceChild,
                     "room_id": subspace,
                     "state_key": subroom,
                     "content": {"via": [fed_hostname]},
@@ -731,6 +732,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             # Place each room in the sub-space.
             [
                 {
+                    "type": EventTypes.SpaceChild,
                     "room_id": subspace,
                     "state_key": room_id,
                     "content": {"via": [fed_hostname]},

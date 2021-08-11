@@ -1332,14 +1332,28 @@ class FederationClient(FederationBase):
             if not isinstance(room, dict):
                 raise InvalidResponseError("'room' must be a dict")
 
-            # TODO Validate children_state of the room.
+            # Validate children_state of the room.
+            children_state = room.get("children_state", [])
+            if not isinstance(children_state, Sequence):
+                raise InvalidResponseError("'room.children_state' must be a list")
+            if any(not isinstance(e, dict) for e in children_state):
+                raise InvalidResponseError("Invalid event in 'children_state' list")
+            try:
+                [
+                    FederationSpaceSummaryEventResult.from_json_dict(e)
+                    for e in children_state
+                ]
+            except ValueError as e:
+                raise InvalidResponseError(str(e))
 
+            # Validate the children rooms.
             children = res.get("children", [])
             if not isinstance(children, Sequence):
                 raise InvalidResponseError("'children' must be a list")
             if any(not isinstance(r, dict) for r in children):
                 raise InvalidResponseError("Invalid room in 'children' list")
 
+            # Validate the inaccessible children.
             inaccessible_children = res.get("inaccessible_children", [])
             if not isinstance(inaccessible_children, Sequence):
                 raise InvalidResponseError("'inaccessible_children' must be a list")
