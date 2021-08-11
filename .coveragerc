@@ -1,8 +1,8 @@
 [run]
 branch = True
 parallel = True
-include=$GITHUB_WORKSPACE/synapse/*
-data_file = $GITHUB_WORKSPACE/.coverage
+include=$TOP/synapse/*
+data_file = $TOP/.coverage
 
 [report]
 precision = 2

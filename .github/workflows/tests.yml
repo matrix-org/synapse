@@ -200,6 +200,7 @@ jobs:
         WORKERS: ${{ matrix.workers && 1 }}
         REDIS: ${{ matrix.redis && 1 }}
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+        TOP: ${{ github.workspace }}
 
     strategy:
       fail-fast: false
