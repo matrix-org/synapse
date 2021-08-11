@@ -466,19 +466,19 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         expected: List[Tuple[str, Iterable[str]]] = [(self.space, room_ids)]
         expected += [(room_id, ()) for room_id in room_ids[:6]]
         self._assert_hierarchy(result, expected)
-        self.assertIn("next_token", result)
+        self.assertIn("next_batch", result)
 
         # Check the next page.
         result = self.get_success(
             self.handler.get_room_hierarchy(
-                self.user, self.space, limit=5, from_token=result["next_token"]
+                self.user, self.space, limit=5, from_token=result["next_batch"]
             )
         )
         # The result should have the space and the room in it, along with a link
         # from space -> room.
         expected = [(room_id, ()) for room_id in room_ids[6:]]
         self._assert_hierarchy(result, expected)
-        self.assertNotIn("next_token", result)
+        self.assertNotIn("next_batch", result)
 
     def test_invalid_pagination_token(self):
         """"""
@@ -493,12 +493,12 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.handler.get_room_hierarchy(self.user, self.space, limit=7)
         )
-        self.assertIn("next_token", result)
+        self.assertIn("next_batch", result)
 
         # Changing the room ID, suggested-only, or max-depth causes an error.
         self.get_failure(
             self.handler.get_room_hierarchy(
-                self.user, self.room, from_token=result["next_token"]
+                self.user, self.room, from_token=result["next_batch"]
             ),
             SynapseError,
         )
@@ -507,13 +507,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.user,
                 self.space,
                 suggested_only=True,
-                from_token=result["next_token"],
+                from_token=result["next_batch"],
             ),
             SynapseError,
         )
         self.get_failure(
             self.handler.get_room_hierarchy(
-                self.user, self.space, max_depth=0, from_token=result["next_token"]
+                self.user, self.space, max_depth=0, from_token=result["next_batch"]
             ),
             SynapseError,
         )
