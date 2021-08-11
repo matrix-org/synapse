@@ -140,19 +140,6 @@ class PresenceRouter:
             # Don't include any extra destinations for presence updates
             return {}
 
-        # If there are multiple callbacks for get_users_for_state then we want to
-        # return ALL of the extra destinations, this method joins two sets of extra
-        # destinations into one
-        def combine(
-            dict1: Dict[str, Set[UserPresenceState]],
-            dict2: Dict[str, Set[UserPresenceState]],
-        ) -> Dict[str, Set[UserPresenceState]]:
-            for key, new_entries in dict2.items():
-                old_entries = dict1.get(key, set())
-                dict1[key] = old_entries.union(new_entries)
-
-            return dict1
-
         users_for_states = {}
         # run all the callbacks for get_users_for_states and combine the results
         for callback in self._get_users_for_states_callbacks:
@@ -217,6 +204,13 @@ class PresenceRouter:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
 
+            # If one of the callbacks returns ALL_USERS then we can stop calling all
+            # of the other callbacks, since the set of interested_users is already as
+            # large as it can possibly be
+            if result == PresenceRouter.ALL_USERS:
+                interested_users = PresenceRouter.ALL_USERS
+                break
+
             if not isinstance(result, set):
                 logger.warning(
                     "Wrong type returned by module API callback %s: %s, expected set",
@@ -224,13 +218,6 @@ class PresenceRouter:
                     result,
                 )
                 continue
-
-            # If one of the callbacks returns ALL_USERS then we can stop calling all
-            # of the other callbacks, since the set of interested_users is already as
-            # large as it can possibly be
-            if result == PresenceRouter.ALL_USERS:
-                interested_users = PresenceRouter.ALL_USERS
-                break
 
             # Add the new interested users to the set
             interested_users.update(result)
