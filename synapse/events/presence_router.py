@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import (
     TYPE_CHECKING,
     Awaitable,
@@ -27,12 +28,14 @@ from synapse.api.presence import UserPresenceState
 from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
-    from synapse.server import HomeServer, logger
+    from synapse.server import HomeServer
 
 GET_USERS_FOR_STATES_CALLBACK = Callable[
     [Iterable[UserPresenceState]], Awaitable[Dict[str, Set[UserPresenceState]]]
 ]
 GET_INTERESTED_USERS_CALLBACK = Callable[[str], Awaitable[Union[Set[str], str]]]
+
+logger = logging.getLogger(__name__)
 
 
 def load_legacy_presence_router(hs: "HomeServer"):
