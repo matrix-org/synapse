@@ -27,17 +27,17 @@ from synapse.api.presence import UserPresenceState
 from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
-    from synapse.server import HomeServer
+    from synapse.server import HomeServer, logger
 
-GET_USERS_FOR_STATES = Callable[
+GET_USERS_FOR_STATES_CALLBACK = Callable[
     [Iterable[UserPresenceState]], Awaitable[Dict[str, Set[UserPresenceState]]]
 ]
-GET_INTERESTED_USERS = Callable[[str], Awaitable[Union[Set[str], str]]]
+GET_INTERESTED_USERS_CALLBACK = Callable[[str], Awaitable[Union[Set[str], str]]]
 
 
 def load_legacy_presence_router(hs: "HomeServer"):
     """Wrapper that loads a presence router module configured using the old
-    configuration, and registers the hooks it implements.
+    configuration, and registers the hooks they implement.
     """
 
     if hs.config.presence_router_module_class is None:
@@ -92,19 +92,19 @@ class PresenceRouter:
 
     def __init__(self, hs: "HomeServer"):
         # Initially there are no callbacks
-        self._get_users_for_states_callbacks: List[GET_USERS_FOR_STATES] = []
-        self._get_interested_users_callbacks: List[GET_INTERESTED_USERS] = []
+        self._get_users_for_states_callbacks: List[GET_USERS_FOR_STATES_CALLBACK] = []
+        self._get_interested_users_callbacks: List[GET_INTERESTED_USERS_CALLBACK] = []
 
     def register_presence_router_callbacks(
         self,
-        get_users_for_states: Optional[GET_USERS_FOR_STATES] = None,
-        get_interested_users: Optional[GET_INTERESTED_USERS] = None,
+        get_users_for_states: Optional[GET_USERS_FOR_STATES_CALLBACK] = None,
+        get_interested_users: Optional[GET_INTERESTED_USERS_CALLBACK] = None,
     ):
         # PresenceRouter modules are required to implement both of these methods
         # or neither of them as they are assumed to act in a complementary manner
         paired_methods = [get_users_for_states, get_interested_users]
         if paired_methods.count(None) == 1:
-            raise Exception(
+            raise RuntimeError(
                 "PresenceRouter modules must register neither or both of the paired callbacks: "
                 "[get_users_for_states, get_interested_users]"
             )
@@ -138,7 +138,7 @@ class PresenceRouter:
             return {}
 
         # If there are multiple callbacks for get_users_for_state then we want to
-        # return all of the extra destinations, this method joins two sets of extra
+        # return ALL of the extra destinations, this method joins two sets of extra
         # destinations into one
         def combine(
             dict1: Dict[str, Set[UserPresenceState]],
@@ -153,9 +153,32 @@ class PresenceRouter:
         users_for_states = {}
         # run all the callbacks for get_users_for_states and combine the results
         for callback in self._get_users_for_states_callbacks:
-            users_for_states = combine(
-                users_for_states, await callback(state_updates=state_updates)
-            )
+            try:
+                result = await callback(state_updates)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue
+
+            if not isinstance(result, Dict):
+                logger.warning(
+                    "Wrong type returned by module API callback %s: %s, expected Dict",
+                    callback,
+                    result,
+                )
+                continue
+
+            for key, new_entries in result.items():
+                if not isinstance(new_entries, Set):
+                    logger.warning(
+                        "Wrong type returned by module API callback %s: %s, expected Set",
+                        callback,
+                        new_entries,
+                    )
+                    break
+                if key not in users_for_states:
+                    users_for_states[key] = new_entries
+                else:
+                    users_for_states[key].update(new_entries)
 
         return users_for_states
 
@@ -182,24 +205,31 @@ class PresenceRouter:
             # Don't report any additional interested users
             return set()
 
-        # If there are multiple callbacks for get_interested_users then we want to
-        # return all of the users, this method joins two sets of users into one
-        def combine(
-            set1: Union[Set[str], str],
-            set2: Union[Set[str], str],
-        ) -> Union[Set[str], str]:
-            # if one of the two sets is ALL_USERS then the union is also ALL_USERS
-            if set1 == PresenceRouter.ALL_USERS or set2 == PresenceRouter.ALL_USERS:
-                return PresenceRouter.ALL_USERS
-            else:
-                return set1.union(set2)
-
         interested_users = set()
         # run all the callbacks for get_interested_users and combine the results
         for callback in self._get_interested_users_callbacks:
-            # Ask the custom module for interested users
-            interested_users = combine(
-                interested_users, await callback(user_id=user_id)
-            )
+            try:
+                result = await callback(user_id)
+            except Exception as e:
+                logger.warning("Failed to run module API callback %s: %s", callback, e)
+                continue
+
+            if not isinstance(result, set):
+                logger.warning(
+                    "Wrong type returned by module API callback %s: %s, expected set",
+                    callback,
+                    result,
+                )
+                continue
+
+            # If one of the callbacks returns ALL_USERS then we can stop calling all
+            # of the other callbacks, since the set of interested_users is already as
+            # large as it can possibly be
+            if result == PresenceRouter.ALL_USERS:
+                interested_users = PresenceRouter.ALL_USERS
+                break
+
+            # Add the new interested users to the set
+            interested_users.update(result)
 
         return interested_users

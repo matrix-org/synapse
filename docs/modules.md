@@ -293,38 +293,36 @@ The available presence router callbacks are:
 ```python 
 async def get_users_for_states(
     self,
-    state_updates: Iterable[UserPresenceState],
-) -> Dict[str, Set[UserPresenceState]]:
+    state_updates: Iterable[synapse.api.UserPresenceState],
+) -> Dict[str, Set[synapse.api.UserPresenceState]]:
 ```
 **Requires** `get_interested_users` to also be registered
 
-An asynchronous method that is passed an iterable of user presence state. This method can
-determine whether a given presence update should be sent to certain users. It does this by
-returning a dictionary with keys representing local or remote Matrix User IDs, and values 
-being a python set of synapse.handlers.presence.UserPresenceState instances.
+Called when processing updates to the presence state of one or more users. This callback can
+be used to instruct the server to forward that presence state to specific users. The module
+must return a dictionary that maps from Matrix user IDs (which can be local or remote) to the
+UserPresenceState changes that they should be forwarded.
 
 Synapse will then attempt to send the specified presence updates to each user when possible.
-
 ```python
 async def get_interested_users(self, user_id: str) -> Union[Set[str], str]
 ```
 **Requires** `get_users_for_states` to also be registered
 
-An asynchronous method that is passed a single Matrix User ID. This method is expected to
-return the users that the passed in user may be interested in the presence of. Returned 
-users may be local or remote. The presence routed as a result of what this method returns 
-is sent in addition to the updates already sent between users that share a room together. 
-Presence updates are deduplicated.
+Called when determining which users someone should be able to see the presence state of. This
+callback should return complementary results to `get_users_for_state` or the presence info 
+may not be properly forwarded.
 
-This method should return a python set of Matrix User IDs, or the object 
-`synapse.events.presence_router.PresenceRouter.ALL_USERS` to indicate that the passed user 
-should receive presence information for all known users.
+The callback is given a single Matrix user ID and should return a set of additional Matrix user 
+ID's who's presence state should be queried. The returned users can be local or remote. 
+
+Alternatively the callback can return `synapse.events.presence_router.PresenceRouter.ALL_USERS`
+to indicate that the user should receive updates from all known users.
 
 For clarity, if the user `@alice:example.org` is passed to this method, and the Set 
 `{"@bob:example.com", "@charlie:somewhere.org"}` is returned, this signifies that Alice 
 should receive presence updates sent by Bob and Charlie, regardless of whether these users 
 share a room.
-
 
 ### Porting an existing module that uses the old interface
 
