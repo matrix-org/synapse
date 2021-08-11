@@ -248,7 +248,21 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
 
-        # The user cannot see the space.
+        # The user can see the space since it is publicly joinable.
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
+
+        # If the space is made invite-only, it should no longer be viewable.
+        self.helper.send_state(
+            self.space,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
         self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
@@ -260,7 +274,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        expected = [(self.space, [self.room]), (self.room, ())]
         self._assert_rooms(result, expected)
 
         result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
@@ -277,12 +290,23 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
         # Join the space and results should be returned.
+        self.helper.invite(self.space, targ=user2, tok=self.token)
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
         self._assert_rooms(result, expected)
 
         result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
         self._assert_hierarchy(result, expected)
+
+        # Attempting to view an unknown room returns the same error.
+        self.get_failure(
+            self.handler.get_space_summary(user2, "#not-a-space:" + self.hs.hostname),
+            AuthError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(user2, "#not-a-space:" + self.hs.hostname),
+            AuthError,
+        )
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content

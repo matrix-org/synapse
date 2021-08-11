@@ -38,7 +38,7 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -91,7 +91,6 @@ class SpaceSummaryHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
@@ -153,9 +152,13 @@ class SpaceSummaryHandler:
         Returns:
             summary dict to return
         """
-        # first of all, check that the user is in the room in question (or it's
-        # world-readable)
-        await self._auth.check_user_in_room_or_world_readable(room_id, requester)
+        # First of all, check that the room is accessible.
+        if not await self._is_local_room_accessible(room_id, requester):
+            raise AuthError(
+                403,
+                "User %s not in room %s, and room previews are disabled"
+                % (requester, room_id),
+            )
 
         # the queue of rooms to process
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
@@ -324,11 +327,13 @@ class SpaceSummaryHandler:
     ) -> JsonDict:
         """See docstring for SpaceSummaryHandler.get_room_hierarchy."""
 
-        # first of all, check that the user is in the room in question (or it's
-        # world-readable)
-        await self._auth.check_user_in_room_or_world_readable(
-            requested_room_id, requester
-        )
+        # First of all, check that the room is accessible.
+        if not await self._is_local_room_accessible(requested_room_id, requester):
+            raise AuthError(
+                403,
+                "User %s not in room %s, and room previews are disabled"
+                % (requester, requested_room_id),
+            )
 
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
@@ -612,7 +617,7 @@ class SpaceSummaryHandler:
         return results
 
     async def _is_local_room_accessible(
-        self, room_id: str, requester: Optional[str], origin: Optional[str]
+        self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
         """
         Calculate whether the room should be shown in the spaces summary.
@@ -766,7 +771,7 @@ class SpaceSummaryHandler:
         # Finally, check locally if we can access the room. The user might
         # already be in the room (if it was a child room), or there might be a
         # pending invite, etc.
-        return await self._is_local_room_accessible(room_id, requester, None)
+        return await self._is_local_room_accessible(room_id, requester)
 
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
@@ -783,7 +788,7 @@ class SpaceSummaryHandler:
         stats = await self._store.get_room_with_stats(room_id)
 
         # currently this should be impossible because we call
-        # check_user_in_room_or_world_readable on the room before we get here, so
+        # _is_local_room_accessible on the room before we get here, so
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 
