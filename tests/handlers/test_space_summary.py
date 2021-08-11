@@ -298,6 +298,16 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
         self._assert_hierarchy(result, expected)
 
+        # Attempting to view an unknown room returns the same error.
+        self.get_failure(
+            self.handler.get_space_summary(user2, "#not-a-space:" + self.hs.hostname),
+            AuthError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(user2, "#not-a-space:" + self.hs.hostname),
+            AuthError,
+        )
+
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
     ) -> str:
