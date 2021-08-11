@@ -14,23 +14,10 @@
 
 import logging
 import re
-from http import HTTPStatus
 
-from synapse.api.errors import Codes, SynapseError
-from synapse.appservice import ApplicationService
-from synapse.http.servlet import RestServlet, parse_json_object_from_request
-from synapse.api.errors import (
-    AuthError,
-    Codes,
-    SynapseError,
-)
 from synapse.api.constants import EventContentFields, EventTypes
-from synapse.util.stringutils import random_string
-from synapse.types import (
-    Requester,
-    UserID,
-    create_requester,
-)
+from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.appservice import ApplicationService
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -39,6 +26,8 @@ from synapse.http.servlet import (
     parse_strings_from_args,
 )
 from synapse.rest.client.transactions import HttpTransactionCache
+from synapse.types import Requester, UserID, create_requester
+from synapse.util.stringutils import random_string
 
 logger = logging.getLogger(__name__)
 
