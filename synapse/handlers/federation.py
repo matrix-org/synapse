@@ -334,7 +334,8 @@ class FederationHandler(BaseHandler):
                                 "Found all missing prev_events",
                             )
 
-            if prevs - seen:
+            missing_prevs = prevs - seen
+            if missing_prevs:
                 # We've still not been able to get all of the prev_events for this event.
                 #
                 # In this case, we need to fall back to asking another server in the
@@ -362,8 +363,8 @@ class FederationHandler(BaseHandler):
                 if sent_to_us_directly:
                     logger.warning(
                         "Rejecting: failed to fetch %d prev events: %s",
-                        len(prevs - seen),
-                        shortstr(prevs - seen),
+                        len(missing_prevs),
+                        shortstr(missing_prevs),
                     )
                     raise FederationError(
                         "ERROR",
@@ -376,9 +377,10 @@ class FederationHandler(BaseHandler):
                     )
 
                 logger.info(
-                    "Event %s is missing prev_events: calculating state for a "
+                    "Event %s is missing prev_events %s: calculating state for a "
                     "backwards extremity",
                     event_id,
+                    shortstr(missing_prevs),
                 )
 
                 # Calculate the state after each of the previous events, and
@@ -396,7 +398,7 @@ class FederationHandler(BaseHandler):
 
                     # Ask the remote server for the states we don't
                     # know about
-                    for p in prevs - seen:
+                    for p in missing_prevs:
                         logger.info("Requesting state after missing prev_event %s", p)
 
                         with nested_logging_context(p):
