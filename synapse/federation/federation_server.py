@@ -972,13 +972,21 @@ class FederationServer(FederationBase):
         # the room, so instead of pulling the event out of the DB and parsing
         # the event we just pull out the next event ID and check if that matches.
         if latest_event is not None and latest_origin is not None:
-            (
-                next_origin,
-                next_event_id,
-            ) = await self.store.get_next_staged_event_id_for_room(room_id)
-            if next_origin != latest_origin or next_event_id != latest_event.event_id:
+            result = await self.store.get_next_staged_event_id_for_room(room_id)
+            if result is None:
                 latest_origin = None
                 latest_event = None
+            else:
+                (
+                    next_origin,
+                    next_event_id,
+                ) = result
+                if (
+                    next_origin != latest_origin
+                    or next_event_id != latest_event.event_id
+                ):
+                    latest_origin = None
+                    latest_event = None
 
         if latest_origin is None or latest_event is None:
             next = await self.store.get_next_staged_event_for_room(
