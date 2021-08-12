@@ -197,7 +197,7 @@ class SpaceSummaryHandler:
                 events: Sequence[JsonDict] = []
                 if room_entry:
                     rooms_result.append(room_entry.room)
-                    events = room_entry.children
+                    events = room_entry.children_state_events
 
                 logger.debug(
                     "Query of local room %s returned events %s",
@@ -232,7 +232,7 @@ class SpaceSummaryHandler:
                         room.pop("allowed_spaces", None)
 
                         rooms_result.append(room)
-                        events.extend(room_entry.children)
+                        events.extend(room_entry.children_state_events)
 
                     # All rooms returned don't need visiting again (even if the user
                     # didn't have access to them).
@@ -439,7 +439,7 @@ class SpaceSummaryHandler:
                             current_depth + 1,
                             children_room_entries.get(ev["state_key"]),
                         )
-                        for ev in reversed(room_entry.children)
+                        for ev in reversed(room_entry.children_state_events)
                         if ev["type"] == EventTypes.SpaceChild
                         and ev["state_key"] not in inaccessible_children
                     )
@@ -513,11 +513,12 @@ class SpaceSummaryHandler:
 
             if room_entry:
                 rooms_result.append(room_entry.room)
-                events_result.extend(room_entry.children)
+                events_result.extend(room_entry.children_state_events)
 
                 # add any children to the queue
                 room_queue.extend(
-                    edge_event["state_key"] for edge_event in room_entry.children
+                    edge_event["state_key"]
+                    for edge_event in room_entry.children_state_events
                 )
 
         return {"rooms": rooms_result, "events": events_result}
@@ -556,7 +557,7 @@ class SpaceSummaryHandler:
 
         # Iterate through each child and potentially add it, but not its children,
         # to the response.
-        for child_room in root_room_entry.children:
+        for child_room in root_room_entry.children_state_events:
             room_id = child_room.get("state_key")
             assert isinstance(room_id, str)
             # If the room is unknown, skip it.
@@ -566,15 +567,19 @@ class SpaceSummaryHandler:
             room_entry = await self._summarize_local_room(
                 None, origin, room_id, suggested_only, max_children=0
             )
-            # If the room is accessible, include it in the results. Otherwise,
-            # note that the requesting server shouldn't bother trying to
-            # summarize it.
+            # If the room is accessible, include it in the results.
+            #
+            # Note that only the room summary (without information on children)
+            # is included in the summary.
             if room_entry:
                 children_rooms_result.append(room_entry.room)
+            #  Otherwise, note that the requesting server shouldn't bother
+            #  trying to summarize this room - they do not have access to it.
             else:
                 inaccessible_children.append(room_id)
 
         return {
+            # Include the requested room (including the stripped children events).
             "room": root_room_entry.as_json(),
             "children": children_rooms_result,
             "inaccessible_children": inaccessible_children,
@@ -1034,11 +1039,17 @@ class _RoomEntry:
     # An iterable of the sorted, stripped children events for children of this room.
     #
     # This may not include all children.
-    children: Sequence[JsonDict] = ()
+    children_state_events: Sequence[JsonDict] = ()
 
     def as_json(self) -> JsonDict:
+        """
+        Returns a JSON dictionary suitable for the room hierarchy endpoint.
+
+        It returns the room summary including the stripped m.space.child events
+        as a sub-key.
+        """
         result = dict(self.room)
-        result["children_state"] = self.children
+        result["children_state"] = self.children_state_events
         return result
 
 
