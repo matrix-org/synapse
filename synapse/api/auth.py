@@ -623,7 +623,7 @@ class Auth:
         await self._auth_blocking.check_auth_blocking(*args, **kwargs)
 
     async def is_room_accessible(
-        self, room_id: str, requester: Optional[str], origin: Optional[str]
+        self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
         """
         Calculate whether the room should be shown to the requester.
@@ -728,7 +728,7 @@ class Auth:
                         return True
 
         logger.info(
-            "room %s is unpeekable and requester %s is not a member / not allowed to join, omitting from summary",
+            "room %s is unpeekable and requester %s is not a member / not allowed to join",
             room_id,
             requester or origin,
         )
