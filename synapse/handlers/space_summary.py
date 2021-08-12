@@ -153,7 +153,7 @@ class RoomSummaryMixin:
         return room_entry
 
     async def _is_remote_room_accessible(
-        self, requester: str, room_id: str, room: JsonDict
+        self, requester: Optional[str], room_id: str, room: JsonDict
     ) -> bool:
         """
         Calculate whether the room received over federation should be shown in the summary.
@@ -168,7 +168,7 @@ class RoomSummaryMixin:
         due to an invite, etc.
 
         Args:
-            requester: The user requesting the summary.
+            requester: The user requesting the summary, if authenticated.
             room_id: The room ID returned over federation.
             room: The summary of the child room returned over federation.
 
@@ -186,7 +186,7 @@ class RoomSummaryMixin:
         # Check if the user is a member of any of the allowed spaces
         # from the response.
         allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
-        if allowed_rooms and isinstance(allowed_rooms, list):
+        if requester and allowed_rooms and isinstance(allowed_rooms, list):
             if await self._event_auth_handler.is_user_in_rooms(
                 allowed_rooms, requester
             ):
