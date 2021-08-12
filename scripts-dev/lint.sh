@@ -94,7 +94,7 @@ else
           "scripts-dev/build_debian_packages"
           "scripts-dev/sign_json"
           "scripts-dev/update_database"
-          "contrib" "synctl" "setup.py" "synmark" "stubs" "ci"
+          "contrib" "synctl" "setup.py" "synmark" "stubs" ".ci"
       )
   fi
 fi
