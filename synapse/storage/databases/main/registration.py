@@ -1765,6 +1765,8 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
 
         Args:
             token: The registration token to be checked
+        Returns:
+            True if the token is valid, False otherwise.
         """
         res = await self.db_pool.simple_select_one(
             "registration_tokens",
