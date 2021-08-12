@@ -1,0 +1,1 @@
+Convert `Transaction` and `Edu` objects to attrs.

@@ -824,6 +824,7 @@ class IdentityHandler(BaseHandler):
         room_avatar_url: str,
         room_join_rules: str,
         room_name: str,
+        room_type: Optional[str],
         inviter_display_name: str,
         inviter_avatar_url: str,
         id_access_token: Optional[str] = None,
@@ -843,6 +844,7 @@ class IdentityHandler(BaseHandler):
                 notifications.
             room_join_rules: The join rules of the email (e.g. "public").
             room_name: The m.room.name of the room.
+            room_type: The type of the room from its m.room.create event (e.g "m.space").
             inviter_display_name: The current display name of the
                 inviter.
             inviter_avatar_url: The URL of the inviter's avatar.
@@ -869,6 +871,10 @@ class IdentityHandler(BaseHandler):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+
+        if room_type is not None:
+            invite_config["org.matrix.msc3288.room_type"] = room_type
+
         # If a custom web client location is available, include it in the request.
         if self._web_client_location:
             invite_config["org.matrix.web_client_location"] = self._web_client_location

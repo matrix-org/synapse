@@ -45,14 +45,6 @@ class EmailPusherTests(HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
 
-        # List[Tuple[Deferred, args, kwargs]]
-        self.email_attempts = []
-
-        def sendmail(*args, **kwargs):
-            d = Deferred()
-            self.email_attempts.append((d, args, kwargs))
-            return d
-
         config = self.default_config()
         config["email"] = {
             "enable_notifs": True,
@@ -75,7 +67,17 @@ class EmailPusherTests(HomeserverTestCase):
         config["public_baseurl"] = "aaa"
         config["start_pushers"] = True
 
-        hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        hs = self.setup_test_homeserver(config=config)
+
+        # List[Tuple[Deferred, args, kwargs]]
+        self.email_attempts = []
+
+        def sendmail(*args, **kwargs):
+            d = Deferred()
+            self.email_attempts.append((d, args, kwargs))
+            return d
+
+        hs.get_send_email_handler()._sendmail = sendmail
 
         return hs
 

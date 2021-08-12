@@ -1,3 +1,46 @@
+Synapse 1.40.0 (2021-08-10)
+===========================
+
+No significant changes.
+
+
+Synapse 1.40.0rc3 (2021-08-09)
+==============================
+
+Features
+--------
+
+- Support [MSC3289: room version 8](https://github.com/matrix-org/matrix-doc/pull/3289). ([\#10449](https://github.com/matrix-org/synapse/issues/10449))
+
+
+Bugfixes
+--------
+
+- Mark the experimental room version from [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) as unstable. ([\#10449](https://github.com/matrix-org/synapse/issues/10449))
+
+
+Improved Documentation
+----------------------
+
+- Fix broken links in `upgrade.md`. Contributed by @dklimpel. ([\#10543](https://github.com/matrix-org/synapse/issues/10543))
+
+
+Synapse 1.40.0rc2 (2021-08-04)
+==============================
+
+Bugfixes
+--------
+
+- Fix the `PeriodicallyFlushingMemoryHandler` inhibiting application shutdown because of its background thread. ([\#10517](https://github.com/matrix-org/synapse/issues/10517))
+- Fix a bug introduced in Synapse v1.40.0rc1 that could cause Synapse to respond with an error when clients would update read receipts. ([\#10531](https://github.com/matrix-org/synapse/issues/10531))
+
+
+Internal Changes
+----------------
+
+- Fix release script to open the correct URL for the release. ([\#10516](https://github.com/matrix-org/synapse/issues/10516))
+
+
 Synapse 1.40.0rc1 (2021-08-03)
 ==============================
 

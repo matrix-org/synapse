@@ -23,7 +23,6 @@ from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import (
     AuthError,
     Codes,
-    HttpResponseException,
     InvalidClientCredentialsError,
     MissingClientTokenError,
     ShadowBanError,
@@ -438,6 +437,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
+        state_events_at_start = []
         for state_event in body["state_events_at_start"]:
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
@@ -457,6 +457,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 "sender": state_event["sender"],
                 "state_key": state_event["state_key"],
             }
+
+            # Mark all events as historical
+            event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
             # Make the state events float off on their own
             fake_prev_event_id = "$" + random_string(43)
@@ -500,6 +503,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 )
                 event_id = event.event_id
 
+            state_events_at_start.append(event_id)
             auth_event_ids.append(event_id)
 
         events_to_create = body["events"]
@@ -562,7 +566,10 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             "type": EventTypes.MSC2716_CHUNK,
             "sender": requester.user.to_string(),
             "room_id": room_id,
-            "content": {EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to},
+            "content": {
+                EventContentFields.MSC2716_CHUNK_ID: chunk_id_to_connect_to,
+                EventContentFields.MSC2716_HISTORICAL: True,
+            },
             # Since the chunk event is put at the end of the chunk,
             # where the newest-in-time event is, copy the origin_server_ts from
             # the last event we're inserting
@@ -589,10 +596,6 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
         for ev in events_to_create:
             assert_params_in_dict(ev, ["type", "origin_server_ts", "content", "sender"])
 
-            # Mark all events as historical
-            # This has important semantics within the Synapse internals to backfill properly
-            ev["content"][EventContentFields.MSC2716_HISTORICAL] = True
-
             event_dict = {
                 "type": ev["type"],
                 "origin_server_ts": ev["origin_server_ts"],
@@ -601,6 +604,9 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
                 "sender": ev["sender"],  # requester.user.to_string(),
                 "prev_events": prev_event_ids.copy(),
             }
+
+            # Mark all events as historical
+            event_dict["content"][EventContentFields.MSC2716_HISTORICAL] = True
 
             event, context = await self.event_creation_handler.create_event(
                 await self._create_requester_for_user_id_from_app_service(
@@ -647,7 +653,7 @@ class RoomBatchSendEventRestServlet(TransactionRestServlet):
             event_ids.append(base_insertion_event.event_id)
 
         return 200, {
-            "state_events": auth_event_ids,
+            "state_events": state_events_at_start,
             "events": event_ids,
             "next_chunk_id": insertion_event["content"][
                 EventContentFields.MSC2716_NEXT_CHUNK_ID
@@ -767,12 +773,9 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-            try:
-                data = await handler.get_remote_public_room_list(
-                    server, limit=limit, since_token=since_token
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error()
+            data = await handler.get_remote_public_room_list(
+                server, limit=limit, since_token=since_token
+            )
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit, since_token=since_token
@@ -820,17 +823,15 @@ class PublicRoomListRestServlet(TransactionRestServlet):
                     Codes.INVALID_PARAM,
                 )
 
-            try:
-                data = await handler.get_remote_public_room_list(
-                    server,
-                    limit=limit,
-                    since_token=since_token,
-                    search_filter=search_filter,
-                    include_all_networks=include_all_networks,
-                    third_party_instance_id=third_party_instance_id,
-                )
-            except HttpResponseException as e:
-                raise e.to_synapse_error()
+            data = await handler.get_remote_public_room_list(
+                server,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
+
         else:
             data = await handler.get_local_public_room_list(
                 limit=limit,
@@ -1435,6 +1436,46 @@ class RoomSpaceSummaryRestServlet(RestServlet):
         )
 
 
+class RoomHierarchyRestServlet(RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/org.matrix.msc2946"
+            "/rooms/(?P<room_id>[^/]*)/hierarchy$"
+        ),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__()
+        self._auth = hs.get_auth()
+        self._space_summary_handler = hs.get_space_summary_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
+        requester = await self._auth.get_user_by_req(request, allow_guest=True)
+
+        max_depth = parse_integer(request, "max_depth")
+        if max_depth is not None and max_depth < 0:
+            raise SynapseError(
+                400, "'max_depth' must be a non-negative integer", Codes.BAD_JSON
+            )
+
+        limit = parse_integer(request, "limit")
+        if limit is not None and limit <= 0:
+            raise SynapseError(
+                400, "'limit' must be a positive integer", Codes.BAD_JSON
+            )
+
+        return 200, await self._space_summary_handler.get_room_hierarchy(
+            requester.user.to_string(),
+            room_id,
+            suggested_only=parse_boolean(request, "suggested_only", default=False),
+            max_depth=max_depth,
+            limit=limit,
+            from_token=parse_string(request, "from"),
+        )
+
+
 class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
     PATTERNS = (
         re.compile(
@@ -1491,6 +1532,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomTypingRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RoomSpaceSummaryRestServlet(hs).register(http_server)
+    RoomHierarchyRestServlet(hs).register(http_server)
     if msc3266_enabled:
         RoomSummaryRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
