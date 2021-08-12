@@ -387,6 +387,7 @@ class SpaceSummaryHandler:
             # summarise these rooms.
             inaccessible_children: Set[str] = set()
 
+            # If the room is known locally, summarise it!
             is_in_room = await self._store.is_host_joined(room_id, self._server_name)
             if is_in_room:
                 room_entry = await self._summarize_local_room(
@@ -397,9 +398,15 @@ class SpaceSummaryHandler:
                     # TODO Handle max children.
                     max_children=None,
                 )
+
+            # Otherwise, attempt to use information for federation.
             else:
-                # If a previous call got information for this room *and* it is
-                # not a space (or the max-depth has been achieved), include it.
+                # A previous call might have included information for this room.
+                # It can be used if either:
+                #
+                # 1. The room is not a space.
+                # 2. The maximum depth has been achieved (since no children
+                #    information is needed).
                 if queue_entry.remote_room and (
                     queue_entry.remote_room.get("room_type") != RoomTypes.SPACE
                     or (max_depth is not None and current_depth >= max_depth)
@@ -407,7 +414,9 @@ class SpaceSummaryHandler:
                     room_entry = _RoomEntry(
                         queue_entry.room_id, queue_entry.remote_room
                     )
-                # Otherwise, attempt to fetch the room information over federation.
+
+                # If the above isn't true, attempt to fetch the room
+                # information over federation.
                 else:
                     (
                         room_entry,
@@ -418,19 +427,25 @@ class SpaceSummaryHandler:
                         suggested_only,
                     )
 
-            processed_rooms.add(room_id)
-
-            if room_entry:
-                # Remote rooms need their accessibility checked separately.
-                if not is_in_room and not await self._is_remote_room_accessible(
+                # Ensure this room is accessible to the requester (and not just
+                # the homeserver).
+                if room_entry and not await self._is_remote_room_accessible(
                     requester, queue_entry.room_id, room_entry.room
                 ):
-                    continue
+                    room_entry = None
 
+            # This room has been processed and should be ignored if it appears
+            # elsewhere in the hierarchy.
+            processed_rooms.add(room_id)
+
+            # There may or may not be a room entry based on whether it is
+            # inaccessible to the requesting user.
+            if room_entry:
+                # Add the room (including the stripped m.space.child events).
                 rooms_result.append(room_entry.as_json())
 
-                # If this room is not at the max-depth, we might want to include
-                # children.
+                # If this room is not at the max-depth, check if there are any
+                # children to process.
                 if max_depth is None or current_depth < max_depth:
                     room_queue.extendleft(
                         _RoomQueueEntry(
