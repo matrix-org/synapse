@@ -16,7 +16,7 @@
 
 import logging
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import SynapseError, InvalidAPICallError
 from synapse.http.servlet import (
     RestServlet,
     parse_integer,
@@ -163,6 +163,18 @@ class KeyQueryServlet(RestServlet):
         device_id = requester.device_id
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
+
+        try:
+            device_keys = body["device_keys"]
+        except KeyError:
+            raise InvalidAPICallError("device_keys is a required body parameter")
+
+        for mxid, device_ids in device_keys.items():
+            if not isinstance(device_ids, list):
+                raise InvalidAPICallError(
+                    f"device_ids for {mxid} should be a list of 0 or more strings, not {device_ids!r}",
+                )
+
         result = await self.e2e_keys_handler.query_devices(
             body, timeout, user_id, device_id
         )
