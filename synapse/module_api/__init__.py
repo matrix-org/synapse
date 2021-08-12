@@ -677,7 +677,7 @@ class ModuleApi:
             A list containing the loaded templates, with the orders matching the one of
             the filenames parameter.
         """
-        return self._hs.config.read_templates(filenames, custom_template_directory)
+        return self._hs.config.read_templates(filenames, [custom_template_directory])
 
 
 class PublicRoomListManager:

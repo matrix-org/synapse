@@ -86,7 +86,7 @@ class AccountValidityConfig(Config):
             [
                 account_renewed_template_filename,
                 "account_previously_renewed.html",
-                invalid_token_template_filename,
+                [invalid_token_template_filename],
             ],
-            account_validity_template_dir,
+            [account_validity_template_dir],
         )
