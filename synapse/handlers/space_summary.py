@@ -407,6 +407,7 @@ class SpaceSummaryHandler:
                     room_entry = _RoomEntry(
                         queue_entry.room_id, queue_entry.remote_room
                     )
+                # Otherwise, attempt to fetch the room information over federation.
                 else:
                     (
                         room_entry,
@@ -1013,9 +1014,15 @@ class SpaceSummaryHandler:
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
 class _RoomQueueEntry:
+    # The room ID of this entry.
     room_id: str
+    # The server to query if the room is not known locally.
     via: Sequence[str]
+    # The minimum number of hops necessary to get to this room (compared to the
+    # originally requested room).
     depth: int = 0
+    # The room summary for this room returned via federation. This will only be
+    # used if the room is not known locally (and is not a space).
     remote_room: Optional[JsonDict] = None
 
 
