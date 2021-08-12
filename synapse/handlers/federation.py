@@ -444,7 +444,7 @@ class FederationHandler(BaseHandler):
             return
 
         logger.info("Got %d prev_events", len(missing_events))
-        await self._process_pulled_events(origin, missing_events)
+        await self._process_pulled_events(origin, missing_events, backfilled=False)
 
     async def _get_state_for_room(
         self,
@@ -682,6 +682,7 @@ class FederationHandler(BaseHandler):
         origin: str,
         event: EventBase,
         state: Optional[Iterable[EventBase]],
+        backfilled: bool = False,
     ) -> None:
         """Called when we have a new pdu. We need to do auth checks and put it
         through the StateHandler.
@@ -694,6 +695,9 @@ class FederationHandler(BaseHandler):
             state: Normally None, but if we are handling a gap in the graph
                 (ie, we are missing one or more prev_events), the resolved state at the
                 event
+
+            backfilled: True if this is part of a historical batch of events (inhibits
+                notification to clients, and validation of device keys.)
         """
         logger.debug("Processing event: %s", event)
 
@@ -701,9 +705,14 @@ class FederationHandler(BaseHandler):
             context = await self.state_handler.compute_event_context(
                 event, old_state=state
             )
-            await self._auth_and_persist_event(origin, event, context, state=state)
+            await self._auth_and_persist_event(
+                origin, event, context, state=state, backfilled=backfilled
+            )
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
+
+        if backfilled:
+            return
 
         # For encrypted messages we check that we know about the sending device,
         # if we don't then we mark the device cache for that user as stale.
@@ -905,107 +914,7 @@ class FederationHandler(BaseHandler):
                     f"room {ev.room_id}, when we were backfilling in {room_id}"
                 )
 
-        # ideally we'd sanity check the events here for excess prev_events etc,
-        # but it's hard to reject events at this point without completely
-        # breaking backfill in the same way that it is currently broken by
-        # events whose signature we cannot verify (#3121).
-        #
-        # So for now we accept the events anyway. #3124 tracks this.
-        #
-        # for ev in events:
-        #     self._sanity_check_event(ev)
-
-        # Don't bother processing events we already have.
-        seen_events = await self.store.have_events_in_timeline(
-            {e.event_id for e in events}
-        )
-
-        events = [e for e in events if e.event_id not in seen_events]
-
-        if not events:
-            return
-
-        event_map = {e.event_id: e for e in events}
-
-        event_ids = {e.event_id for e in events}
-
-        # build a list of events whose prev_events weren't in the batch.
-        # (XXX: this will include events whose prev_events we already have; that doesn't
-        # sound right?)
-        edges = [ev.event_id for ev in events if set(ev.prev_event_ids()) - event_ids]
-
-        logger.info("backfill: Got %d events with %d edges", len(events), len(edges))
-
-        # For each edge get the current state.
-
-        state_events = {}
-        events_to_state = {}
-        for e_id in edges:
-            state = await self._get_state_for_room(
-                destination=dest,
-                room_id=room_id,
-                event_id=e_id,
-            )
-            state_events.update({s.event_id: s for s in state})
-            events_to_state[e_id] = state
-
-        required_auth = {
-            a_id
-            for event in events + list(state_events.values())
-            for a_id in event.auth_event_ids()
-        }
-        auth_events = await self.store.get_events(required_auth, allow_rejected=True)
-        auth_events.update(
-            {e_id: event_map[e_id] for e_id in required_auth if e_id in event_map}
-        )
-
-        ev_infos = []
-
-        # Step 1: persist the events in the chunk we fetched state for (i.e.
-        # the backwards extremities), with custom auth events and state
-        for e_id in events_to_state:
-            # For paranoia we ensure that these events are marked as
-            # non-outliers
-            ev = event_map[e_id]
-            assert not ev.internal_metadata.is_outlier()
-
-            ev_infos.append(
-                _NewEventInfo(
-                    event=ev,
-                    state=events_to_state[e_id],
-                    claimed_auth_event_map={
-                        (
-                            auth_events[a_id].type,
-                            auth_events[a_id].state_key,
-                        ): auth_events[a_id]
-                        for a_id in ev.auth_event_ids()
-                        if a_id in auth_events
-                    },
-                )
-            )
-
-        if ev_infos:
-            await self._auth_and_persist_events(
-                dest, room_id, ev_infos, backfilled=True
-            )
-
-        # Step 2: Persist the rest of the events in the chunk one by one
-        events.sort(key=lambda e: e.depth)
-
-        for event in events:
-            if event in events_to_state:
-                continue
-
-            # For paranoia we ensure that these events are marked as
-            # non-outliers
-            assert not event.internal_metadata.is_outlier()
-
-            context = await self.state_handler.compute_event_context(event)
-
-            # We store these one at a time since each event depends on the
-            # previous to work out the state.
-            # TODO: We can probably do something more clever here.
-            await self._auth_and_persist_event(dest, event, context, backfilled=True)
+        await self._process_pulled_events(dest, events, backfilled=True)
 
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
@@ -1372,7 +1281,7 @@ class FederationHandler(BaseHandler):
             )
 
     async def _process_pulled_events(
-        self, origin: str, events: Iterable[EventBase]
+        self, origin: str, events: Iterable[EventBase], backfilled: bool
     ) -> None:
         """Process a batch of events we have pulled from a remote server
 
@@ -1384,6 +1293,8 @@ class FederationHandler(BaseHandler):
         Params:
             origin: The server we received these events from
             events: The received events.
+            backfilled: True if this is part of a historical batch of events (inhibits
+                notification to clients, and validation of device keys.)
         """
 
         # We want to sort these by depth so we process them and
@@ -1392,9 +1303,11 @@ class FederationHandler(BaseHandler):
 
         for ev in sorted_events:
             with nested_logging_context(ev.event_id):
-                await self._process_pulled_event(origin, ev)
+                await self._process_pulled_event(origin, ev, backfilled=backfilled)
 
-    async def _process_pulled_event(self, origin: str, event: EventBase) -> None:
+    async def _process_pulled_event(
+        self, origin: str, event: EventBase, backfilled: bool
+    ) -> None:
         """Process a single event that we have pulled from a remote server
 
         Pulls in any events required to auth the event, persists the received event,
@@ -1411,6 +1324,8 @@ class FederationHandler(BaseHandler):
         Params:
             origin: The server we received this event from
             events: The received event
+            backfilled: True if this is part of a historical batch of events (inhibits
+                notification to clients, and validation of device keys.)
         """
         logger.info("Processing pulled event %s", event)
 
@@ -1439,7 +1354,9 @@ class FederationHandler(BaseHandler):
 
         try:
             state = await self._resolve_state_at_missing_prevs(origin, event)
-            await self._process_received_pdu(origin, event, state=state)
+            await self._process_received_pdu(
+                origin, event, state=state, backfilled=backfilled
+            )
         except FederationError as e:
             if e.code == 403:
                 logger.warning("Pulled event %s failed history check.", event_id)
