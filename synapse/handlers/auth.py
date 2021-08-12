@@ -1459,9 +1459,10 @@ class AuthHandler(BaseHandler):
         )
 
         await self.store.user_delete_threepid(user_id, medium, address)
-        await self.store.delete_all_pushers_with_pushkey_and_user_id(
-            pushkey=address, user_id=user_id
-        )
+        if medium == "email":
+            await self.store.delete_pusher_by_app_id_pushkey_user_id(
+                app_id="m.email", pushkey=address, user_id=user_id
+            )
         return result
 
     async def hash(self, password: str) -> str:
@@ -1730,7 +1731,6 @@ class AuthHandler(BaseHandler):
 
 @attr.s(slots=True)
 class MacaroonGenerator:
-
     hs = attr.ib()
 
     def generate_guest_access_token(self, user_id: str) -> str:
