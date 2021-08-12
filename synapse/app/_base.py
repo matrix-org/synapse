@@ -24,6 +24,7 @@ import traceback
 import warnings
 from typing import TYPE_CHECKING, Awaitable, Callable, Iterable
 
+import auto_compressor
 from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
 
@@ -383,6 +384,9 @@ async def start(hs: "HomeServer"):
     # If we've configured an expiry time for caches, start the background job now.
     setup_expire_lru_cache_entries(hs)
 
+    # Schedule the state compressor to run
+    setup_state_compressor(hs)
+
     # It is now safe to start your Synapse.
     hs.start_listening()
     hs.get_datastore().db_pool.start_profiling()
@@ -415,6 +419,32 @@ async def start(hs: "HomeServer"):
     # Unfortunately only works on Python 3.7
     if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
         atexit.register(gc.freeze)
+
+
+def setup_state_compressor(hs):
+    """Schedules the state compressor to run regularly"""
+    db_config = hs.config.get_single_database().config
+    if db_config["name"] != "psycopg2":
+        return
+
+    db_args = db_config["args"]
+    db_url = "postgresql://{username}:{password}@{host}:{port}/{database}".format(
+        username=db_args["user"],
+        password=db_args["password"],
+        host=db_args["host"],
+        port=db_args["port"],
+        database=db_args["database"],
+    )
+
+    clock = hs.get_clock()
+    clock.looping_call(
+        auto_compressor.compress_largest_rooms,
+        1 * 60 * 1000,
+        db_url=db_url,
+        chunk_size=10,
+        default_levels="100,50,25",
+        number_of_rooms=10,
+    )
 
 
 def setup_sentry(hs):
