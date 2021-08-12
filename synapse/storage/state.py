@@ -56,14 +56,15 @@ class StateFilter:
             appear in `types`.
     """
 
-    types = attr.ib(type=frozendict[str, Optional[Set[str]]])
+    types = attr.ib(type="frozendict[str, Optional[FrozenSet[str]]]")
     include_others = attr.ib(default=False, type=bool)
 
     def __attrs_post_init__(self):
         # If `include_others` is set we canonicalise the filter by removing
         # wildcards from the types dictionary
         if self.include_others:
-            self.types = frozendict(
+            # REVIEW: yucky
+            self.types = frozendict(  # type: ignore[misc] # read-only
                 {k: v for k, v in self.types.items() if v is not None}
             )
 
