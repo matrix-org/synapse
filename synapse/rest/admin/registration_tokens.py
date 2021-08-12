@@ -218,6 +218,7 @@ class RegistrationTokenRestServlet(RestServlet):
         PUT /_synapse/admin/v1/registration_tokens/defg
 
         {
+            "uses_allowed": 5,
             "expiry_time": 4781243146000
         }
 
@@ -225,7 +226,7 @@ class RegistrationTokenRestServlet(RestServlet):
 
         {
             "token": "defg",
-            "uses_allowed": 1,
+            "uses_allowed": 5,
             "pending": 0,
             "completed": 0,
             "expiry_time": 4781243146000
