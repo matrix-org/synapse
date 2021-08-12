@@ -379,8 +379,22 @@ class UsernameAvailabilityRestServlet(RestServlet):
 
 
 class RegistrationTokenValidityRestServlet(RestServlet):
+    """Check the validity of a registration token.
+
+    Example:
+
+        GET /_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity?token=abcd
+
+        200 OK
+
+        {
+            "valid": true
+        }
+    """
+
     PATTERNS = client_patterns(
         f"/org.matrix.msc3231/register/{LoginType.REGISTRATION_TOKEN}/validity",
+        releases=(),
         unstable=True,
     )
 
