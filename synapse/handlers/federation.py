@@ -220,8 +220,6 @@ class FederationHandler(BaseHandler):
         room_id = pdu.room_id
         event_id = pdu.event_id
 
-        logger.info("handling received PDU: %s", pdu)
-
         # We reprocess pdus when we have seen them only as outliers
         existing = await self.store.get_event(
             event_id, allow_none=True, allow_rejected=True
@@ -556,21 +554,14 @@ class FederationHandler(BaseHandler):
             logger.warning("Failed to get prev_events: %s", e)
             return
 
-        logger.info(
-            "Got %d prev_events: %s",
-            len(missing_events),
-            shortstr(missing_events),
-        )
+        logger.info("Got %d prev_events", len(missing_events))
 
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
         for ev in missing_events:
-            logger.info(
-                "Handling received prev_event %s",
-                ev.event_id,
-            )
+            logger.info("Handling received prev_event %s", ev)
             with nested_logging_context(ev.event_id):
                 try:
                     await self.on_receive_pdu(origin, ev, sent_to_us_directly=False)
@@ -1762,10 +1753,8 @@ class FederationHandler(BaseHandler):
         for p, origin in room_queue:
             try:
                 logger.info(
-                    "Processing queued PDU %s which was received "
-                    "while we were joining %s",
-                    p.event_id,
-                    p.room_id,
+                    "Processing queued PDU %s which was received while we were joining",
+                    p,
                 )
                 with nested_logging_context(p.event_id):
                     await self.on_receive_pdu(origin, p, sent_to_us_directly=True)
