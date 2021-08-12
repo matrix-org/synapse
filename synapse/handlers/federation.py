@@ -461,24 +461,7 @@ class FederationHandler(BaseHandler):
             return
 
         logger.info("Got %d prev_events", len(missing_events))
-
-        # We want to sort these by depth so we process them and
-        # tell clients about them in order.
-        missing_events.sort(key=lambda x: x.depth)
-
-        for ev in missing_events:
-            logger.info("Handling received prev_event %s", ev)
-            with nested_logging_context(ev.event_id):
-                try:
-                    await self.on_receive_pdu(origin, ev, sent_to_us_directly=False)
-                except FederationError as e:
-                    if e.code == 403:
-                        logger.warning(
-                            "Received prev_event %s failed history check.",
-                            ev.event_id,
-                        )
-                    else:
-                        raise
+        await self._process_pulled_events(origin, missing_events)
 
     async def _get_state_for_room(
         self,
@@ -1394,6 +1377,39 @@ class FederationHandler(BaseHandler):
                 room_id,
                 event_infos,
             )
+
+    async def _process_pulled_events(
+        self, origin: str, events: Iterable[EventBase]
+    ) -> None:
+        """Process a batch of events we have pulled from a remote server
+
+        Pulls in any events required to auth the events, persists the received events,
+        and notifies clients, if appropriate.
+
+        Assumes the events have already had their signatures and hashes checked.
+
+        Params:
+            origin: The server we received these events from
+            events: The received events.
+        """
+
+        # We want to sort these by depth so we process them and
+        # tell clients about them in order.
+        sorted_events = sorted(events, key=lambda x: x.depth)
+
+        for ev in sorted_events:
+            logger.info("Processing pulled event %s", ev)
+            with nested_logging_context(ev.event_id):
+                try:
+                    await self.on_receive_pdu(origin, ev, sent_to_us_directly=False)
+                except FederationError as e:
+                    if e.code == 403:
+                        logger.warning(
+                            "Pulled event %s failed history check.",
+                            ev.event_id,
+                        )
+                    else:
+                        raise
 
     async def _resolve_state_at_missing_prevs(
         self, dest: str, event: EventBase
