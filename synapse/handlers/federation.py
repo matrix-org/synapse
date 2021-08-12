@@ -2374,7 +2374,6 @@ class FederationHandler(BaseHandler):
         origin: str,
         room_id: str,
         event_infos: Collection[_NewEventInfo],
-        backfilled: bool = False,
     ) -> None:
         """Creates the appropriate contexts and persists events. The events
         should not depend on one another, e.g. this should be used to persist
@@ -2396,7 +2395,6 @@ class FederationHandler(BaseHandler):
                     event,
                     res,
                     claimed_auth_event_map=ev_info.claimed_auth_event_map,
-                    backfilled=backfilled,
                 )
             return res
 
@@ -2413,7 +2411,6 @@ class FederationHandler(BaseHandler):
                 (ev_info.event, context)
                 for ev_info, context in zip(event_infos, contexts)
             ],
-            backfilled=backfilled,
         )
 
     async def _persist_auth_tree(
