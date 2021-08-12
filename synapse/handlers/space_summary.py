@@ -195,7 +195,7 @@ class RoomSummaryMixin:
         # Finally, check locally if we can access the room. The user might
         # already be in the room (if it was a child room), or there might be a
         # pending invite, etc.
-        return await self._auth.is_room_accessible(room_id, requester)
+        return await self._auth.is_room_visible(room_id, requester)
 
 
 class SpaceSummaryHandler(RoomSummaryMixin):
@@ -267,7 +267,7 @@ class SpaceSummaryHandler(RoomSummaryMixin):
             summary dict to return
         """
         # First of all, check that the room is accessible.
-        if not await self._auth.is_room_accessible(room_id, requester):
+        if not await self._auth.is_room_visible(room_id, requester):
             raise AuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
@@ -442,7 +442,7 @@ class SpaceSummaryHandler(RoomSummaryMixin):
         """See docstring for SpaceSummaryHandler.get_room_hierarchy."""
 
         # First of all, check that the room is accessible.
-        if not await self._auth.is_room_accessible(requested_room_id, requester):
+        if not await self._auth.is_room_visible(requested_room_id, requester):
             raise AuthError(
                 403,
                 "User %s not in room %s, and room previews are disabled"
@@ -628,7 +628,7 @@ class SpaceSummaryHandler(RoomSummaryMixin):
         Returns:
             A room entry if the room should be returned. None, otherwise.
         """
-        if not await self._auth.is_room_accessible(room_id, requester, origin):
+        if not await self._auth.is_room_visible(room_id, requester, origin):
             return None
 
         room_entry = await self._build_room_entry(room_id, for_federation=bool(origin))

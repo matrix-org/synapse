@@ -105,7 +105,7 @@ class RoomSummaryHandler(RoomSummaryMixin):
         Returns:
             summary dict to return
         """
-        if not await self._auth.is_room_accessible(room_id, requester, origin):
+        if not await self._auth.is_room_visible(room_id, requester, origin):
             raise NotFoundError("Room not found or is not accessible")
 
         return await self._build_room_entry(room_id, for_federation=bool(origin))

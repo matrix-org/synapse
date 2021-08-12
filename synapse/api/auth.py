@@ -622,23 +622,23 @@ class Auth:
     async def check_auth_blocking(self, *args, **kwargs) -> None:
         await self._auth_blocking.check_auth_blocking(*args, **kwargs)
 
-    async def is_room_accessible(
+    async def is_room_visible(
         self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
         """
         Calculate whether the room should be shown to the requester.
 
-        It should be included if:
+        It should return true if:
 
         * The requester is joined or can join the room (per MSC3173).
         * The origin server has any user that is joined or can join the room.
         * The history visibility is set to world readable.
 
         Args:
-            room_id: The room ID to summarize.
+            room_id: The room ID to check visibility of.
             requester:
-                The user requesting the summary, if it is a local request. None
-                if this is a federation request.
+                The user requesting the summary, if it is a local request.
+                None if this is a federation request.
             origin:
                 The server requesting the summary, if it is a federation request.
                 None if this is a local request.
