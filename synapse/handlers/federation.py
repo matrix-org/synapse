@@ -65,6 +65,7 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers._base import BaseHandler
 from synapse.http.servlet import assert_params_in_dict
 from synapse.logging.context import (
@@ -878,6 +879,9 @@ class FederationHandler(BaseHandler):
         sanity-checking on them. If any of the backfilled events are invalid,
         this method throws a SynapseError.
 
+        We might also raise an InvalidResponseError if the response from the remote
+        server is just bogus.
+
         TODO: make this more useful to distinguish failures of the remote
         server from invalid events (there is probably no point in trying to
         re-fetch invalid events from every other HS in the room.)
@@ -891,6 +895,15 @@ class FederationHandler(BaseHandler):
 
         if not events:
             return
+
+        # if there are any events in the wrong room, the remote server is buggy and
+        # should not be trusted.
+        for ev in events:
+            if ev.room_id != room_id:
+                raise InvalidResponseError(
+                    f"Remote server {dest} returned event {ev.event_id} which is in "
+                    f"room {ev.room_id}, when we were backfilling in {room_id}"
+                )
 
         # ideally we'd sanity check the events here for excess prev_events etc,
         # but it's hard to reject events at this point without completely
@@ -1195,7 +1208,7 @@ class FederationHandler(BaseHandler):
                     # appropriate stuff.
                     # TODO: We can probably do something more intelligent here.
                     return True
-                except SynapseError as e:
+                except (SynapseError, InvalidResponseError) as e:
                     logger.info("Failed to backfill from %s because %s", dom, e)
                     continue
                 except HttpResponseException as e:
