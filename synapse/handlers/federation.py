@@ -227,14 +227,19 @@ class FederationHandler(BaseHandler):
 
         # FIXME: Currently we fetch an event again when we already have it
         # if it has been marked as an outlier.
-
-        already_seen = existing and (
-            not existing.internal_metadata.is_outlier()
-            or pdu.internal_metadata.is_outlier()
-        )
-        if already_seen:
-            logger.debug("Already seen pdu")
-            return
+        if existing:
+            if not existing.internal_metadata.is_outlier():
+                logger.info(
+                    "Ignoring received event %s which we have already seen", event_id
+                )
+                return
+            if pdu.internal_metadata.is_outlier():
+                logger.info(
+                    "Ignoring received outlier %s which we already have as an outlier",
+                    event_id,
+                )
+                return
+            logger.info("De-outliering event %s", event_id)
 
         # do some initial sanity-checking of the event. In particular, make
         # sure it doesn't have hundreds of prev_events or auth_events, which
