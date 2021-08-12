@@ -117,10 +117,6 @@ class _NewEventInfo:
     Attributes:
         event: the received event
 
-        state: the state at that event, according to /state_ids from a remote
-           homeserver. Only populated for backfilled events which are going to be a
-           new backwards extremity.
-
         claimed_auth_event_map: a map of (type, state_key) => event for the event's
             claimed auth_events.
 
@@ -135,7 +131,6 @@ class _NewEventInfo:
     """
 
     event: EventBase
-    state: Optional[Sequence[EventBase]]
     claimed_auth_event_map: StateMap[EventBase]
 
 
@@ -1271,7 +1266,7 @@ class FederationHandler(BaseHandler):
                 else:
                     logger.info("Missing auth event %s", auth_event_id)
 
-            event_infos.append(_NewEventInfo(event, None, auth))
+            event_infos.append(_NewEventInfo(event, auth))
 
         if event_infos:
             await self._auth_and_persist_events(
@@ -2395,14 +2390,11 @@ class FederationHandler(BaseHandler):
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res = await self.state_handler.compute_event_context(
-                    event, old_state=ev_info.state
-                )
+                res = await self.state_handler.compute_event_context(event)
                 res = await self._check_event_auth(
                     origin,
                     event,
                     res,
-                    state=ev_info.state,
                     claimed_auth_event_map=ev_info.claimed_auth_event_map,
                     backfilled=backfilled,
                 )
