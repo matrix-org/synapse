@@ -441,112 +441,6 @@ class FederationHandler(BaseHandler):
         logger.info("Got %d prev_events", len(missing_events))
         await self._process_pulled_events(origin, missing_events, backfilled=False)
 
-    async def _get_state_for_room(
-        self,
-        destination: str,
-        room_id: str,
-        event_id: str,
-    ) -> List[EventBase]:
-        """Requests all of the room state at a given event from a remote
-        homeserver.
-
-        Will also fetch any missing events reported in the `auth_chain_ids`
-        section of `/state_ids`.
-
-        Args:
-            destination: The remote homeserver to query for the state.
-            room_id: The id of the room we're interested in.
-            event_id: The id of the event we want the state at.
-
-        Returns:
-            A list of events in the state, not including the event itself.
-        """
-        (
-            state_event_ids,
-            auth_event_ids,
-        ) = await self.federation_client.get_room_state_ids(
-            destination, room_id, event_id=event_id
-        )
-
-        # Fetch the state events from the DB, and check we have the auth events.
-        event_map = await self.store.get_events(state_event_ids, allow_rejected=True)
-        auth_events_in_store = await self.store.have_seen_events(
-            room_id, auth_event_ids
-        )
-
-        # Check for missing events. We handle state and auth event seperately,
-        # as we want to pull the state from the DB, but we don't for the auth
-        # events. (Note: we likely won't use the majority of the auth chain, and
-        # it can be *huge* for large rooms, so it's worth ensuring that we don't
-        # unnecessarily pull it from the DB).
-        missing_state_events = set(state_event_ids) - set(event_map)
-        missing_auth_events = set(auth_event_ids) - set(auth_events_in_store)
-        if missing_state_events or missing_auth_events:
-            await self._get_events_and_persist(
-                destination=destination,
-                room_id=room_id,
-                events=missing_state_events | missing_auth_events,
-            )
-
-            if missing_state_events:
-                new_events = await self.store.get_events(
-                    missing_state_events, allow_rejected=True
-                )
-                event_map.update(new_events)
-
-                missing_state_events.difference_update(new_events)
-
-                if missing_state_events:
-                    logger.warning(
-                        "Failed to fetch missing state events for %s %s",
-                        event_id,
-                        missing_state_events,
-                    )
-
-            if missing_auth_events:
-                auth_events_in_store = await self.store.have_seen_events(
-                    room_id, missing_auth_events
-                )
-                missing_auth_events.difference_update(auth_events_in_store)
-
-                if missing_auth_events:
-                    logger.warning(
-                        "Failed to fetch missing auth events for %s %s",
-                        event_id,
-                        missing_auth_events,
-                    )
-
-        remote_state = list(event_map.values())
-
-        # check for events which were in the wrong room.
-        #
-        # this can happen if a remote server claims that the state or
-        # auth_events at an event in room A are actually events in room B
-
-        bad_events = [
-            (event.event_id, event.room_id)
-            for event in remote_state
-            if event.room_id != room_id
-        ]
-
-        for bad_event_id, bad_room_id in bad_events:
-            # This is a bogus situation, but since we may only discover it a long time
-            # after it happened, we try our best to carry on, by just omitting the
-            # bad events from the returned auth/state set.
-            logger.warning(
-                "Remote server %s claims event %s in room %s is an auth/state "
-                "event in room %s",
-                destination,
-                bad_event_id,
-                bad_room_id,
-                room_id,
-            )
-
-        if bad_events:
-            remote_state = [e for e in remote_state if e.room_id == room_id]
-
-        return remote_state
-
     async def _get_state_after_missing_prev_event(
         self,
         destination: str,
@@ -563,10 +457,6 @@ class FederationHandler(BaseHandler):
         Returns:
             A list of events in the state, including the event itself
         """
-        # TODO: This function is basically the same as _get_state_for_room. Can
-        #   we make backfill() use it, rather than having two code paths? I think the
-        #   only difference is that backfill() persists the prev events separately.
-
         (
             state_event_ids,
             auth_event_ids,
