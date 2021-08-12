@@ -185,7 +185,9 @@ class StateStoreTestCase(HomeserverTestCase):
             self.storage.state.get_state_for_event(
                 e5.event_id,
                 state_filter=StateFilter(
-                    types=frozendict({EventTypes.Member: frozenset({self.u_alice.to_string()})}),
+                    types=frozendict(
+                        {EventTypes.Member: frozenset({self.u_alice.to_string()})}
+                    ),
                     include_others=True,
                 ),
             )
@@ -205,7 +207,8 @@ class StateStoreTestCase(HomeserverTestCase):
             self.storage.state.get_state_for_event(
                 e5.event_id,
                 state_filter=StateFilter(
-                    types=frozendict({EventTypes.Member: frozenset()}), include_others=True
+                    types=frozendict({EventTypes.Member: frozenset()}),
+                    include_others=True,
                 ),
             )
         )
