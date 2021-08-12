@@ -70,7 +70,9 @@ class RoomSummaryHandler(RoomSummaryMixin):
             room_summary = await self._summarize_remote_room(room_id, remote_room_hosts)
 
             # validate that the requester has permission to see this room
-            include_room = self._is_remote_room_accessible(requester, room_id, room_summary)
+            include_room = self._is_remote_room_accessible(
+                requester, room_id, room_summary
+            )
 
             if not include_room:
                 raise NotFoundError("Room not found or is not accessible")
