@@ -16,17 +16,7 @@ import itertools
 import logging
 import re
 from collections import deque
-from typing import (
-    TYPE_CHECKING,
-    Deque,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Sequence,
-    Set,
-    Tuple,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
 import attr
 
@@ -80,7 +70,7 @@ class _PaginationSession:
     # The time the pagination session was created, in milliseconds.
     creation_time_ms: int
     # The queue of rooms which are still to process.
-    room_queue: Deque["_RoomQueueEntry"]
+    room_queue: List["_RoomQueueEntry"]
     # A set of rooms which have been processed.
     processed_rooms: Set[str]
 
@@ -350,8 +340,8 @@ class SpaceSummaryHandler:
             room_queue = pagination_session.room_queue
             processed_rooms = pagination_session.processed_rooms
         else:
-            # the queue of rooms to process
-            room_queue = deque((_RoomQueueEntry(requested_room_id, ()),))
+            # The queue of rooms to process, the next room is last on the stack.
+            room_queue = [_RoomQueueEntry(requested_room_id, ())]
 
             # Rooms we have already processed.
             processed_rooms = set()
@@ -367,7 +357,7 @@ class SpaceSummaryHandler:
         # Iterate through the queue until we reach the limit or run out of
         # rooms to include.
         while room_queue and len(rooms_result) < limit:
-            queue_entry = room_queue.popleft()
+            queue_entry = room_queue.pop()
             room_id = queue_entry.room_id
             current_depth = queue_entry.depth
             if room_id in processed_rooms:
@@ -447,7 +437,10 @@ class SpaceSummaryHandler:
                 # If this room is not at the max-depth, check if there are any
                 # children to process.
                 if max_depth is None or current_depth < max_depth:
-                    room_queue.extendleft(
+                    # The children get added in reverse order so that the next
+                    # room to process, according to the ordering, is the last
+                    # item in the list.
+                    room_queue.extend(
                         _RoomQueueEntry(
                             ev["state_key"],
                             ev["content"]["via"],
