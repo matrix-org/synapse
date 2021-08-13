@@ -579,7 +579,6 @@ templates:
   #custom_template_directory: /path/to/custom/templates/
 
 
-
 ## TLS ##
 
 # PEM-encoded X509 certificate for TLS.
