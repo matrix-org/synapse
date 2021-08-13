@@ -729,7 +729,7 @@ class RoomSummaryHandler:
         return False
 
     async def _is_remote_room_accessible(
-        self, requester: Optional[str], room_id: str, room: JsonDict
+        self, requester: str, room_id: str, room: JsonDict
     ) -> bool:
         """
         Calculate whether the room received over federation should be shown to the requester.
@@ -744,7 +744,7 @@ class RoomSummaryHandler:
         due to an invite, etc.
 
         Args:
-            requester: The user requesting the summary, if authenticated.
+            requester: The user requesting the summary.
             room_id: The room ID returned over federation.
             room: The summary of the room returned over federation.
 
@@ -762,7 +762,7 @@ class RoomSummaryHandler:
         # Check if the user is a member of any of the allowed spaces
         # from the response.
         allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
-        if requester and allowed_rooms and isinstance(allowed_rooms, list):
+        if allowed_rooms and isinstance(allowed_rooms, list):
             if await self._event_auth_handler.is_user_in_rooms(
                 allowed_rooms, requester
             ):
