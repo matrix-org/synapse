@@ -115,7 +115,7 @@ class EmailRegisterRequestTokenRestServlet(RestServlet):
         # For emails, canonicalise the address.
         # We store all email addresses canonicalised in the DB.
         # (See on_POST in EmailThreepidRequestTokenRestServlet
-        # in synapse/rest/client/v2_alpha/account.py)
+        # in synapse/rest/client/account.py)
         try:
             email = validate_email(body["email"])
         except ValueError as e:
@@ -631,7 +631,7 @@ class RegisterRestServlet(RestServlet):
                         # For emails, canonicalise the address.
                         # We store all email addresses canonicalised in the DB.
                         # (See on_POST in EmailThreepidRequestTokenRestServlet
-                        # in synapse/rest/client/v2_alpha/account.py)
+                        # in synapse/rest/client/account.py)
                         if medium == "email":
                             try:
                                 address = canonicalise_email(address)
