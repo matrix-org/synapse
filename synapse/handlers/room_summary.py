@@ -623,7 +623,7 @@ class RoomSummaryHandler:
             A room entry if the room should be returned. None, otherwise.
         """
         try:
-            room_entry = await self._summarize_local_room(room_id, requester, origin)
+            room_entry = await self._summarize_local_room(requester, origin, room_id)
         except NotFoundError:
             return None
 
