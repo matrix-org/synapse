@@ -78,6 +78,8 @@ class AccountValidityConfig(Config):
         )
 
         # Read and store template content
+        templates_config = config.get("templates", {})
+        custom_template_directory = templates_config.get("custom_template_directory")
         (
             self.account_validity_account_renewed_template,
             self.account_validity_account_previously_renewed_template,
@@ -86,7 +88,7 @@ class AccountValidityConfig(Config):
             [
                 account_renewed_template_filename,
                 "account_previously_renewed.html",
-                [invalid_token_template_filename],
+                invalid_token_template_filename,
             ],
-            [account_validity_template_dir],
+            [custom_template_directory, account_validity_template_dir],
         )

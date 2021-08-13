@@ -168,6 +168,9 @@ class EmailConfig(Config):
             email_config.get("validation_token_lifetime", "1h")
         )
 
+        templates_config = config.get("templates", {})
+        custom_template_directory = templates_config.get("custom_template_directory")
+
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             missing = []
             if not self.email_notif_from:
@@ -257,7 +260,7 @@ class EmailConfig(Config):
                     registration_template_success_html,
                     add_threepid_template_success_html,
                 ],
-                [template_dir],
+                [custom_template_directory, template_dir],
             )
 
             # Render templates that do not contain any placeholders
@@ -297,7 +300,7 @@ class EmailConfig(Config):
                 self.email_notif_template_text,
             ) = self.read_templates(
                 [notif_template_html, notif_template_text],
-                [template_dir],
+                [custom_template_directory, template_dir],
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -320,7 +323,7 @@ class EmailConfig(Config):
                 self.account_validity_template_text,
             ) = self.read_templates(
                 [expiry_template_html, expiry_template_text],
-                [template_dir],
+                [custom_template_directory, template_dir],
             )
 
         subjects_config = email_config.get("subjects", {})
@@ -351,6 +354,9 @@ class EmailConfig(Config):
         return (
             """\
         # Configuration for sending emails from Synapse.
+        #
+        # Server admins can configure custom templates for email content. See
+        # https://matrix-org.github.io/synapse/latest/templates.html for more information.
         #
         email:
           # The hostname of the outgoing SMTP server to use. Defaults to 'localhost'.
@@ -427,49 +433,6 @@ class EmailConfig(Config):
           # to unset, giving no guidance to the identity server.
           #
           #invite_client_location: https://app.element.io
-
-          # Directory in which Synapse will try to find the template files below.
-          # If not set, or the files named below are not found within the template
-          # directory, default templates from within the Synapse package will be used.
-          #
-          # Synapse will look for the following templates in this directory:
-          #
-          # * The contents of email notifications of missed events: 'notif_mail.html' and
-          #   'notif_mail.txt'.
-          #
-          # * The contents of account expiry notice emails: 'notice_expiry.html' and
-          #   'notice_expiry.txt'.
-          #
-          # * The contents of password reset emails sent by the homeserver:
-          #   'password_reset.html' and 'password_reset.txt'
-          #
-          # * An HTML page that a user will see when they follow the link in the password
-          #   reset email. The user will be asked to confirm the action before their
-          #   password is reset: 'password_reset_confirmation.html'
-          #
-          # * HTML pages for success and failure that a user will see when they confirm
-          #   the password reset flow using the page above: 'password_reset_success.html'
-          #   and 'password_reset_failure.html'
-          #
-          # * The contents of address verification emails sent during registration:
-          #   'registration.html' and 'registration.txt'
-          #
-          # * HTML pages for success and failure that a user will see when they follow
-          #   the link in an address verification email sent during registration:
-          #   'registration_success.html' and 'registration_failure.html'
-          #
-          # * The contents of address verification emails sent when an address is added
-          #   to a Matrix account: 'add_threepid.html' and 'add_threepid.txt'
-          #
-          # * HTML pages for success and failure that a user will see when they follow
-          #   the link in an address verification email sent when an address is added
-          #   to a Matrix account: 'add_threepid_success.html' and
-          #   'add_threepid_failure.html'
-          #
-          # You can see the default templates at:
-          # https://github.com/matrix-org/synapse/tree/master/synapse/res/templates
-          #
-          #template_dir: "res/templates"
 
           # Subjects to use when sending emails from Synapse.
           #
