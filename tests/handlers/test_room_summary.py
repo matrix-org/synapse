@@ -624,7 +624,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
             new=summarize_remote_room,
         ):
-            result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+            result = self.get_success(
+                self.handler.get_space_summary(self.user, self.space)
+            )
 
         expected = [
             (self.space, [self.room, subspace]),
@@ -757,7 +759,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
             new=summarize_remote_room,
         ):
-            result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+            result = self.get_success(
+                self.handler.get_space_summary(self.user, self.space)
+            )
 
         expected = [
             (self.space, [self.room, subspace]),
@@ -819,7 +823,9 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
             new=summarize_remote_room,
         ):
-            result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+            result = self.get_success(
+                self.handler.get_space_summary(self.user, self.space)
+            )
 
         expected = [
             (self.space, [self.room, fed_room]),
