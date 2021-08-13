@@ -621,7 +621,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, subspace, self.token)
 
         with mock.patch(
-            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
             new=summarize_remote_room,
         ):
             result = self.get_success(
@@ -756,7 +756,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, subspace, self.token)
 
         with mock.patch(
-            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
             new=summarize_remote_room,
         ):
             result = self.get_success(
@@ -820,7 +820,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, fed_room, self.token)
 
         with mock.patch(
-            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
             new=summarize_remote_room,
         ):
             result = self.get_success(

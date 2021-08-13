@@ -190,7 +190,7 @@ class RoomSummaryHandler:
             max_children = max_rooms_per_space if processed_rooms else None
 
             if is_in_room:
-                room_entry = await self._summarize_local_room_hierarchy(
+                room_entry = await self._summarize_local_room(
                     requester, None, room_id, suggested_only, max_children
                 )
 
@@ -205,7 +205,7 @@ class RoomSummaryHandler:
                     ["%s->%s" % (ev["room_id"], ev["state_key"]) for ev in events],
                 )
             else:
-                fed_rooms = await self._summarize_remote_room_hierarchy(
+                fed_rooms = await self._summarize_remote_room(
                     queue_entry,
                     suggested_only,
                     max_children,
@@ -378,7 +378,7 @@ class RoomSummaryHandler:
 
             is_in_room = await self._store.is_host_joined(room_id, self._server_name)
             if is_in_room:
-                room_entry = await self._summarize_local_room_hierarchy(
+                room_entry = await self._summarize_local_room(
                     requester,
                     None,
                     room_id,
@@ -469,7 +469,7 @@ class RoomSummaryHandler:
                 # already done this room
                 continue
 
-            room_entry = await self._summarize_local_room_hierarchy(
+            room_entry = await self._summarize_local_room(
                 None, origin, room_id, suggested_only, max_rooms_per_space
             )
 
@@ -486,7 +486,7 @@ class RoomSummaryHandler:
 
         return {"rooms": rooms_result, "events": events_result}
 
-    async def _summarize_local_room_hierarchy(
+    async def _summarize_local_room(
         self,
         requester: Optional[str],
         origin: Optional[str],
@@ -514,13 +514,14 @@ class RoomSummaryHandler:
         Returns:
             A room entry if the room should be returned. None, otherwise.
         """
-        try:
-            room_entry = await self._summarize_local_room(requester, origin, room_id)
-        except NotFoundError:
+        if not await self._is_local_room_accessible(room_id, requester, origin):
             return None
 
-        # If the room is not a space, return just the room information.
-        if room_entry.get("room_type") != RoomTypes.SPACE:
+        room_entry = await self._build_room_entry(room_id, for_federation=bool(origin))
+
+        # If the room is not a space or the children don't matter, return just
+        # the room information.
+        if room_entry.get("room_type") != RoomTypes.SPACE or max_children == 0:
             return _RoomEntry(room_id, room_entry)
 
         # Otherwise, look for child rooms/spaces.
@@ -546,7 +547,7 @@ class RoomSummaryHandler:
 
         return _RoomEntry(room_id, room_entry, events_result)
 
-    async def _summarize_remote_room_hierarchy(
+    async def _summarize_remote_room(
         self,
         room: "_RoomQueueEntry",
         suggested_only: bool,
@@ -887,7 +888,19 @@ class RoomSummaryHandler:
         is_in_room = await self._store.is_host_joined(room_id, self._server_name)
 
         if is_in_room:
-            room_summary = await self._summarize_local_room(requester, None, room_id)
+            room_entry = await self._summarize_local_room(
+                requester,
+                None,
+                room_id,
+                # Suggested-only doesn't matter since no children are requested.
+                suggested_only=False,
+                max_children=0,
+            )
+
+            if not room_entry:
+                raise NotFoundError("Room not found or is not accessible")
+
+            room_summary = room_entry.room
 
             # If there was a requester, add their membership.
             if requester:
@@ -905,32 +918,6 @@ class RoomSummaryHandler:
             raise SynapseError(400, "Federation is not currently supported.")
 
         return room_summary
-
-    async def _summarize_local_room(
-        self,
-        requester: Optional[str],
-        origin: Optional[str],
-        room_id: str,
-    ) -> JsonDict:
-        """
-        Generate a room entry for a given room.
-
-        Args:
-            requester:
-                The user requesting the summary, if it is a local request. None
-                if this is a federation request.
-            origin:
-                The server requesting the summary, if it is a federation request.
-                None if this is a local request.
-            room_id: The room ID to summarize.
-
-        Returns:
-            room summary dict to return
-        """
-        if not await self._is_local_room_accessible(room_id, requester, origin):
-            raise NotFoundError("Room not found or is not accessible")
-
-        return await self._build_room_entry(room_id, for_federation=bool(origin))
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
