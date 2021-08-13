@@ -711,7 +711,9 @@ class ServerConfig(Config):
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
         templates_config = config.get("templates", {})
-        self.custom_template_directory = templates_config.get("custom_template_directory")
+        self.custom_template_directory = templates_config.get(
+            "custom_template_directory"
+        )
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -1287,7 +1289,7 @@ class ServerConfig(Config):
         # all domains.
         #
         #next_link_domain_whitelist: ["matrix.org"]
-        
+
         # Templates to use when generating email or HTML page contents.
         #
         templates:

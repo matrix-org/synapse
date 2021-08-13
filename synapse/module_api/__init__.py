@@ -91,7 +91,7 @@ class ModuleApi:
         self._state = hs.get_state_handler()
         self._clock: Clock = hs.get_clock()
         self._send_email_handler = hs.get_send_email_handler()
-        self.custom_template_dir =hs.config.server.custom_template_directory
+        self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
             app_name = self._hs.config.email_app_name
@@ -679,7 +679,8 @@ class ModuleApi:
             the filenames parameter.
         """
         return self._hs.config.read_templates(
-            filenames, [self.custom_template_dir, custom_template_directory],
+            filenames,
+            [self.custom_template_dir, custom_template_directory],
         )
 
 
