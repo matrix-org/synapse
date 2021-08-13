@@ -114,6 +114,7 @@ from synapse.storage.databases.main.monthly_active_users import (
 )
 from synapse.storage.databases.main.presence import PresenceStore
 from synapse.storage.databases.main.room import RoomWorkerStore
+from synapse.storage.databases.main.room_summary import RoomSummaryStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
@@ -250,6 +251,7 @@ class GenericWorkerSlavedStore(
     SearchStore,
     TransactionWorkerStore,
     LockStore,
+    RoomSummaryStore,
     BaseSlavedStore,
 ):
     pass

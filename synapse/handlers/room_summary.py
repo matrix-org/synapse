@@ -28,12 +28,11 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
-from synapse.util.stringutils import random_string
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -87,12 +86,6 @@ class RoomSummaryHandler:
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
 
-        # A map of query information to the current pagination state.
-        #
-        # TODO Allow for multiple workers to share this data.
-        # TODO Expire pagination tokens.
-        self._pagination_sessions: Dict[_PaginationKey, _PaginationSession] = {}
-
         # If a user tries to fetch the same page multiple times in quick succession,
         # only process the first attempt and return its result to subsequent requests.
         self._pagination_response_cache: ResponseCache[
@@ -102,20 +95,12 @@ class RoomSummaryHandler:
             "get_room_hierarchy",
         )
 
-    def _expire_pagination_sessions(self):
+    async def _expire_pagination_sessions(self):
         """Expire pagination session which are old."""
         expire_before = (
             self._clock.time_msec() - self._PAGINATION_SESSION_VALIDITY_PERIOD_MS
         )
-        to_expire = []
-
-        for key, value in self._pagination_sessions.items():
-            if value.creation_time_ms < expire_before:
-                to_expire.append(key)
-
-        for key in to_expire:
-            logger.debug("Expiring pagination session id %s", key)
-            del self._pagination_sessions[key]
+        await self._store.delete_old_room_hierarchy_pagination_sessions(expire_before)
 
     async def get_space_summary(
         self,
@@ -327,17 +312,21 @@ class RoomSummaryHandler:
 
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
-            self._expire_pagination_sessions()
+            await self._expire_pagination_sessions()
 
-            pagination_key = _PaginationKey(
-                requested_room_id, suggested_only, max_depth, from_token
-            )
-            if pagination_key not in self._pagination_sessions:
+            try:
+                pagination_session = (
+                    await self._store.get_room_hierarchy_pagination_session(
+                        requested_room_id, suggested_only, max_depth, from_token
+                    )
+                )
+            except StoreError:
                 raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
             # Load the previous state.
-            pagination_session = self._pagination_sessions[pagination_key]
-            room_queue = pagination_session.room_queue
+            room_queue = [
+                _RoomQueueEntry(*fields) for fields in pagination_session.room_queue
+            ]
             processed_rooms = pagination_session.processed_rooms
         else:
             # The queue of rooms to process, the next room is last on the stack.
@@ -456,13 +445,14 @@ class RoomSummaryHandler:
 
         # If there's additional data, generate a pagination token (and persist state).
         if room_queue:
-            next_batch = random_string(24)
-            result["next_batch"] = next_batch
-            pagination_key = _PaginationKey(
-                requested_room_id, suggested_only, max_depth, next_batch
-            )
-            self._pagination_sessions[pagination_key] = _PaginationSession(
-                self._clock.time_msec(), room_queue, processed_rooms
+            result[
+                "next_batch"
+            ] = await self._store.create_room_hierarchy_pagination_session(
+                requested_room_id,
+                suggested_only,
+                max_depth,
+                [attr.astuple(room_entry) for room_entry in room_queue],  # type: ignore[misc]
+                processed_rooms,
             )
 
         return result

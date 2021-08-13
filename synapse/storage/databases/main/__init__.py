@@ -61,6 +61,7 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
+from .room_summary import RoomSummaryStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .signatures import SignatureStore
@@ -121,6 +122,7 @@ class DataStore(
     ServerMetricsStore,
     EventForwardExtremitiesStore,
     LockStore,
+    RoomSummaryStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
