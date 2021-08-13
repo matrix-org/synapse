@@ -16,7 +16,7 @@
 
 import logging
 
-from synapse.api.errors import SynapseError, InvalidAPICallError
+from synapse.api.errors import InvalidAPICallError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     parse_integer,

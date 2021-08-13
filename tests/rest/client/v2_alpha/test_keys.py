@@ -4,6 +4,7 @@ from synapse.api.errors import Codes
 from synapse.rest import admin
 from synapse.rest.client.v1 import login
 from synapse.rest.client.v2_alpha import keys
+
 from tests import unittest
 
 
