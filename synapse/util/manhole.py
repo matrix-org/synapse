@@ -79,7 +79,10 @@ def manhole(username, password, globals):
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username: password})
 
     rlm = manhole_ssh.TerminalRealm()
-    rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(
+    # mypy ignored here because:
+    # - can't deduce types of lambdas
+    # - variable is Type[ServerProtocol], expr is Callable[[], ServerProtocol]
+    rlm.chainedProtocolFactory = lambda: insults.ServerProtocol(  # type: ignore[misc,assignment]
         SynapseManhole, dict(globals, __name__="__console__")
     )
 
@@ -110,6 +113,7 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         any syntax errors to be sent to the terminal, rather than sentry.
         """
         type, value, tb = sys.exc_info()
+        assert value is not None
         sys.last_type = type
         sys.last_value = value
         sys.last_traceback = tb
@@ -135,9 +139,8 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         """
         sys.last_type, sys.last_value, last_tb = ei = sys.exc_info()
         sys.last_traceback = last_tb
-        try:
-            # We remove the first stack item because it is our own code.
-            lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
-            self.write("".join(lines))
-        finally:
-            last_tb = ei = None
+        assert last_tb is not None
+
+        # We remove the first stack item because it is our own code.
+        lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
+        self.write("".join(lines))
