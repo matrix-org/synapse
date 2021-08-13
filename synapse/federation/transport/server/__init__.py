@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Container, Dict, List, Optional, Tuple, Type
+from typing import Dict, Iterable, List, Optional, Tuple, Type
 
 from typing_extensions import Literal
 
@@ -114,11 +114,10 @@ class PublicRoomList(BaseFederationServlet):
         authenticator: Authenticator,
         ratelimiter: FederationRateLimiter,
         server_name: str,
-        allow_access: bool,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
         self.handler = hs.get_room_list_handler()
-        self.allow_access = allow_access
+        self.allow_access = hs.config.allow_public_rooms_over_federation
 
     async def on_GET(
         self, origin: str, content: Literal[None], query: Dict[bytes, List[bytes]]
@@ -284,23 +283,14 @@ class OpenIdUserInfo(BaseFederationServlet):
         return 200, {"sub": user_id}
 
 
-OPENID_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (OpenIdUserInfo,)
-
-ROOM_LIST_CLASSES: Tuple[Type[PublicRoomList], ...] = (PublicRoomList,)
-
-GROUP_ATTESTATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
-    FederationGroupsRenewAttestaionServlet,
-)
-
-
-DEFAULT_SERVLET_GROUPS = (
-    "federation",
-    "room_list",
-    "group_server",
-    "group_local",
-    "group_attestation",
-    "openid",
-)
+DEFAULT_SERVLET_GROUPS: Dict[str, Iterable[Type[BaseFederationServlet]]] = {
+    "federation": FEDERATION_SERVLET_CLASSES,
+    "room_list": (PublicRoomList,),
+    "group_server": GROUP_SERVER_SERVLET_CLASSES,
+    "group_local": GROUP_LOCAL_SERVLET_CLASSES,
+    "group_attestation": (FederationGroupsRenewAttestaionServlet,),
+    "openid": (OpenIdUserInfo,),
+}
 
 
 def register_servlets(
@@ -308,7 +298,7 @@ def register_servlets(
     resource: HttpServer,
     authenticator: Authenticator,
     ratelimiter: FederationRateLimiter,
-    servlet_groups: Optional[Container[str]] = None,
+    servlet_groups: Optional[Iterable[str]] = None,
 ):
     """Initialize and register servlet classes.
 
@@ -324,56 +314,17 @@ def register_servlets(
             Defaults to ``DEFAULT_SERVLET_GROUPS``.
     """
     if not servlet_groups:
-        servlet_groups = DEFAULT_SERVLET_GROUPS
+        servlet_groups = DEFAULT_SERVLET_GROUPS.keys()
 
-    if "federation" in servlet_groups:
-        for servletclass in FEDERATION_SERVLET_CLASSES:
-            servletclass(
-                hs=hs,
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-            ).register(resource)
+    for servlet_group in servlet_groups:
+        # Skip unknown servlet groups.
+        if servlet_group not in DEFAULT_SERVLET_GROUPS:
+            logger.warning(
+                f"Attempting to register unknown federation servlet: '{servlet_group}'"
+            )
+            continue
 
-    if "openid" in servlet_groups:
-        for servletclass in OPENID_SERVLET_CLASSES:
-            servletclass(
-                hs=hs,
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-            ).register(resource)
-
-    if "room_list" in servlet_groups:
-        for servletclass in ROOM_LIST_CLASSES:
-            servletclass(
-                hs=hs,
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-                allow_access=hs.config.allow_public_rooms_over_federation,
-            ).register(resource)
-
-    if "group_server" in servlet_groups:
-        for servletclass in GROUP_SERVER_SERVLET_CLASSES:
-            servletclass(
-                hs=hs,
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-            ).register(resource)
-
-    if "group_local" in servlet_groups:
-        for servletclass in GROUP_LOCAL_SERVLET_CLASSES:
-            servletclass(
-                hs=hs,
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-            ).register(resource)
-
-    if "group_attestation" in servlet_groups:
-        for servletclass in GROUP_ATTESTATION_SERVLET_CLASSES:
+        for servletclass in DEFAULT_SERVLET_GROUPS[servlet_group]:
             servletclass(
                 hs=hs,
                 authenticator=authenticator,
