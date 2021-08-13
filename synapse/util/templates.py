@@ -27,7 +27,7 @@ if TYPE_CHECKING:
 def build_jinja_env(
     template_search_directories: Iterable[str],
     config: "HomeServerConfig",
-    autoescape: Union[bool, Callable[[str], bool], None] = None,
+    autoescape: Union[bool, Callable[[Optional[str]], bool], None] = None,
 ) -> jinja2.Environment:
     """Set up a Jinja2 environment to load templates from the given search path
 
@@ -56,7 +56,8 @@ def build_jinja_env(
     if autoescape is None:
         autoescape = jinja2.select_autoescape()
 
-    loader = jinja2.FileSystemLoader(template_search_directories)
+    # the type signature of this is wrong
+    loader = jinja2.FileSystemLoader(template_search_directories)  # type: ignore[arg-type]
     env = jinja2.Environment(loader=loader, autoescape=autoescape)
 
     # Update the environment with our custom filters

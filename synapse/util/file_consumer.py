@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import queue
+from typing import Optional
 
 from twisted.internet import threads
 
@@ -51,7 +52,7 @@ class BackgroundFileConsumer:
 
         # Queue of slices of bytes to be written. When producer calls
         # unregister a final None is sent.
-        self._bytes_queue = queue.Queue()
+        self._bytes_queue: queue.Queue[Optional[bytes]] = queue.Queue()
 
         # Deferred that is resolved when finished writing
         self._finished_deferred = None
@@ -59,7 +60,7 @@ class BackgroundFileConsumer:
         # If the _writer thread throws an exception it gets stored here.
         self._write_exception = None
 
-    def registerProducer(self, producer, streaming):
+    def registerProducer(self, producer, streaming) -> None:
         """Part of IConsumer interface
 
         Args:
@@ -81,17 +82,19 @@ class BackgroundFileConsumer:
         if not streaming:
             self._producer.resumeProducing()
 
-    def unregisterProducer(self):
+    def unregisterProducer(self) -> None:
         """Part of IProducer interface"""
         self._producer = None
+        assert self._finished_deferred is not None
         if not self._finished_deferred.called:
             self._bytes_queue.put_nowait(None)
 
-    def write(self, bytes):
+    def write(self, bytes) -> None:
         """Part of IProducer interface"""
         if self._write_exception:
             raise self._write_exception
 
+        assert self._finished_deferred is not None
         if self._finished_deferred.called:
             raise Exception("consumer has closed")
 
@@ -101,9 +104,10 @@ class BackgroundFileConsumer:
         # then we pause the producer.
         if self.streaming and self._bytes_queue.qsize() >= self._PAUSE_ON_QUEUE_SIZE:
             self._paused_producer = True
+            assert self._producer is not None
             self._producer.pauseProducing()
 
-    def _writer(self):
+    def _writer(self) -> None:
         """This is run in a background thread to write to the file."""
         try:
             while self._producer or not self._bytes_queue.empty():
@@ -134,7 +138,7 @@ class BackgroundFileConsumer:
         """Returns a deferred that resolves when finished writing to file"""
         return make_deferred_yieldable(self._finished_deferred)
 
-    def _resume_paused_producer(self):
+    def _resume_paused_producer(self) -> None:
         """Gets called if we should resume producing after being paused"""
         if self._paused_producer and self._producer:
             self._paused_producer = False

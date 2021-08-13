@@ -79,7 +79,7 @@ class Clock:
 
     @defer.inlineCallbacks
     def sleep(self, seconds):
-        d = defer.Deferred()
+        d: defer.Deferred = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
             res = yield d
