@@ -237,7 +237,7 @@ class Config:
     def read_templates(
         self,
         filenames: List[str],
-        custom_template_directories: Optional[List[str]] = None,
+        custom_template_directories: List[Optional[str]] = [],
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -251,7 +251,7 @@ class Config:
         Args:
             filenames: A list of template filenames to read.
 
-            custom_template_directories: A list of directories to try to look for the
+            custom_template_directories: A list of directory to try to look for the
                 templates before using the default Synapse template directory instead.
 
         Raises:
@@ -264,8 +264,8 @@ class Config:
 
         # The loader will first look in the custom template directories (if specified) for the
         # given filename. If it doesn't find it, it will use the default template dir instead
-        if custom_template_directories:
-            for custom_template_directory in custom_template_directories:
+        for custom_template_directory in custom_template_directories:
+            if custom_template_directory:
                 # Check that the given template directory exists
                 if not self.path_exists(custom_template_directory):
                     raise ConfigError(
