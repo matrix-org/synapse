@@ -644,7 +644,7 @@ class Auth:
                 None if this is a local request.
 
         Returns:
-             True if the room should be visible to the requester.
+             True if the room should be visible to the requesting user or server.
         """
         state_ids = await self.store.get_current_state_ids(room_id)
 
