@@ -48,7 +48,7 @@ def _order(*events):
     return sorted(events, key=_child_events_comparison_key)
 
 
-class TestHierarchySort(unittest.TestCase):
+class TestSpaceSummarySort(unittest.TestCase):
     def test_no_order_last(self):
         """An event with no ordering is placed behind those with an ordering."""
         ev1 = _create_event("!abc:test")
@@ -97,7 +97,7 @@ class TestHierarchySort(unittest.TestCase):
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
 
-class RoomHierarchyTestCase(unittest.HomeserverTestCase):
+class SpaceSummaryTestCase(unittest.HomeserverTestCase):
     servlets = [
         admin.register_servlets_for_client_rest_resource,
         room.register_servlets,
@@ -621,7 +621,7 @@ class RoomHierarchyTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, subspace, self.token)
 
         with mock.patch(
-            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
             new=summarize_remote_room,
         ):
             result = self.get_success(self.handler.get_space_summary(self.user, self.space))
@@ -754,7 +754,7 @@ class RoomHierarchyTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, subspace, self.token)
 
         with mock.patch(
-            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
             new=summarize_remote_room,
         ):
             result = self.get_success(self.handler.get_space_summary(self.user, self.space))
@@ -816,7 +816,7 @@ class RoomHierarchyTestCase(unittest.HomeserverTestCase):
         self._add_child(self.space, fed_room, self.token)
 
         with mock.patch(
-            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
             new=summarize_remote_room,
         ):
             result = self.get_success(self.handler.get_space_summary(self.user, self.space))
