@@ -82,7 +82,6 @@ class ClientRestResource(JsonResource):
         # Partially deprecated in r0
         events.register_servlets(hs, client_resource)
 
-        # "v1" + "r0"
         room.register_servlets(hs, client_resource)
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
@@ -92,8 +91,6 @@ class ClientRestResource(JsonResource):
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
-
-        # "v2"
         sync.register_servlets(hs, client_resource)
         filter.register_servlets(hs, client_resource)
         account.register_servlets(hs, client_resource)
