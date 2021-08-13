@@ -268,13 +268,19 @@ Then update the ``users`` table in the database::
 Synapse Development
 ===================
 
-There are three great points of reference for developers:
+The best place to get started is our
+`guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_.
+This is part of our larger `documentation <https://matrix-org.github.io/synapse/latest>`_, which includes
+information for synapse developers as well as synapse administrators.
 
-* Our developer community on Matrix: `#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_,
-* `Documentation specific to development <https://matrix-org.github.io/synapse/latest/development/>`_
-  (`source <docs/development>`_),
-* in particular our `guide for contributors <https://matrix-org.github.io/synapse/latest/development/contributing_guide.html>`_
-  (`source <CONTRIBUTING.md>`_).
+Developers might be particularly interested in:
+
+* `Synapse's database schema <https://matrix-org.github.io/synapse/latest/development/database_schema.html>`_,
+* `notes on Synapse's implementation details <https://matrix-org.github.io/synapse/latest/development/internal_documentation/index.html>`_, and
+* `how we use git <https://matrix-org.github.io/synapse/latest/development/git.html>`_.
+
+Alongside all that, join our developer community on Matrix:
+`#synapse-dev:matrix.org <https://matrix.to/#/#synapse-dev:matrix.org>`_, featuring real humans!
 
 
 Quick start
