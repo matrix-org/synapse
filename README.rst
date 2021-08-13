@@ -1,6 +1,6 @@
-=========================================================
-Synapse |support| |development| |license| |pypi| |python|
-=========================================================
+=========================================================================
+Synapse |support| |development| |documentation| |license| |pypi| |python|
+=========================================================================
 
 .. contents::
 
@@ -459,6 +459,10 @@ This is normally caused by a misconfiguration in your reverse-proxy. See
 .. |development| image:: https://img.shields.io/matrix/synapse-dev:matrix.org?label=development&logo=matrix
   :alt: (discuss development on #synapse-dev:matrix.org)
   :target: https://matrix.to/#/#synapse-dev:matrix.org
+
+.. |documentation| image:: https://img.shields.io/badge/documentation-%E2%9C%93-success
+  :alt: (Rendered documentation on GitHub Pages)
+  :target: https://matrix-org.github.io/synapse/latest/
 
 .. |license| image:: https://img.shields.io/github/license/matrix-org/synapse
   :alt: (check license in LICENSE file)
