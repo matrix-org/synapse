@@ -629,7 +629,7 @@ class RoomSummaryHandler:
         * The history visibility is set to world readable.
 
         Args:
-            room_id: The room ID to check visibility of.
+            room_id: The room ID to check accessibility of.
             requester:
                 The user making the request, if it is a local request.
                 None if this is a federation request.
@@ -638,7 +638,7 @@ class RoomSummaryHandler:
                 None if this is a local request.
 
         Returns:
-             True if the room should be visible to the requesting user or server.
+             True if the room is accessible to the requesting user or server.
         """
         state_ids = await self._store.get_current_state_ids(room_id)
 
@@ -732,9 +732,9 @@ class RoomSummaryHandler:
         self, requester: Optional[str], room_id: str, room: JsonDict
     ) -> bool:
         """
-        Calculate whether the room received over federation should be shown in the summary.
+        Calculate whether the room received over federation should be shown to the requester.
 
-        It should be included if:
+        It should return true if:
 
         * The requester is joined or can join the room (per MSC3173).
         * The history visibility is set to world readable.
@@ -746,10 +746,10 @@ class RoomSummaryHandler:
         Args:
             requester: The user requesting the summary, if authenticated.
             room_id: The room ID returned over federation.
-            room: The summary of the child room returned over federation.
+            room: The summary of the room returned over federation.
 
         Returns:
-            True if the room should be included in the spaces summary.
+            True if the room is accessible to the requesting user.
         """
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
