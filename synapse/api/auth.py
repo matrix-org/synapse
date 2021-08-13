@@ -637,10 +637,10 @@ class Auth:
         Args:
             room_id: The room ID to check visibility of.
             requester:
-                The user requesting the summary, if it is a local request.
+                The user making the request, if it is a local request.
                 None if this is a federation request.
             origin:
-                The server requesting the summary, if it is a federation request.
+                The server making the request, if it is a federation request.
                 None if this is a local request.
 
         Returns:
@@ -656,7 +656,7 @@ class Auth:
             ):
                 return True
 
-            logger.info("room %s is unknown, omitting from summary", room_id)
+            logger.info("room %s is unknown", room_id)
             return False
 
         room_version = await self.store.get_room_version(room_id)
