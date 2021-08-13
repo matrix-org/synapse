@@ -112,6 +112,17 @@ environment variable.
 See [using a forward proxy with Synapse documentation](setup/forward_proxy.md) for
 details.
 
+## Deprecation of `template_dir`
+
+The `template_dir` settings in the `sso`, `account_validity` and `email` sections of the
+configuration file are now deprecated. Server admins should use the new
+`templates.custom_template_directory` setting in the configuration file and use one single
+custom template directory for all aforementioned features. Template file names remain
+unchanged. See [the related documentation](https://matrix-org.github.io/synapse/latest/templates.html)
+for more information and examples.
+
+We plan to remove support for these settings in October 2021.
+
 
 # Upgrading to v1.39.0
 
