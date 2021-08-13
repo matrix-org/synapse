@@ -13,8 +13,9 @@ This document aims to get you started with contributing to this repo!
 - [7. Turn coffee and documentation into code and documentation!](#7-turn-coffee-and-documentation-into-code-and-documentation)
 - [8. Test, test, test!](#8-test-test-test)
   * [Run the linters.](#run-the-linters)
-  * [Run the unit tests.](#run-the-unit-tests)
-  * [Run the integration tests.](#run-the-integration-tests)
+  * [Run the unit tests.](#run-the-unit-tests-twisted-trial)
+  * [Run the integration tests (SyTest).](#run-the-integration-tests-sytesthttpsgithubcommatrix-orgsytest)
+  * [Run the integration tests (Complement).](#run-the-integration-tests-complementhttpsgithubcommatrix-orgcomplement)
 - [9. Submit your patch.](#9-submit-your-patch)
   * [Changelog](#changelog)
     + [How do I know what to call the changelog file before I create the PR?](#how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr)
@@ -197,7 +198,7 @@ The following command will let you run the integration test with the most common
 configuration:
 
 ```sh
-$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:py37
+$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
 ```
 
 This configuration should generally cover  your needs. For more details about other configurations, see [documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
