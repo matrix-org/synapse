@@ -41,8 +41,8 @@ from synapse.http.servlet import (
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
+from synapse.rest.client._base import client_patterns
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
 from synapse.types import (

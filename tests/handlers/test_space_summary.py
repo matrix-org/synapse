@@ -28,7 +28,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
 from synapse.handlers.space_summary import _child_events_comparison_key, _RoomEntry
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import JsonDict, UserID
 

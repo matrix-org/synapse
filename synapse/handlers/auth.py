@@ -73,7 +73,7 @@ from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.rest.client.v1.login import LoginResponse
+    from synapse.rest.client.login import LoginResponse
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)

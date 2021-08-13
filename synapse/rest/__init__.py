@@ -14,39 +14,35 @@
 # limitations under the License.
 from synapse.http.server import JsonResource
 from synapse.rest import admin
-from synapse.rest.client import versions
-from synapse.rest.client.v1 import (
-    directory,
-    events,
-    initial_sync,
-    login as v1_login,
-    logout,
-    presence,
-    profile,
-    push_rule,
-    pusher,
-    room,
-    voip,
-)
-from synapse.rest.client.v2_alpha import (
+from synapse.rest.client import (
     account,
     account_data,
     account_validity,
     auth,
     capabilities,
     devices,
+    directory,
+    events,
     filter,
     groups,
+    initial_sync,
     keys,
     knock,
+    login as v1_login,
+    logout,
     notifications,
     openid,
     password_policy,
+    presence,
+    profile,
+    push_rule,
+    pusher,
     read_marker,
     receipts,
     register,
     relations,
     report_event,
+    room,
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
@@ -56,6 +52,8 @@ from synapse.rest.client.v2_alpha import (
     thirdparty,
     tokenrefresh,
     user_directory,
+    versions,
+    voip,
 )
 
 

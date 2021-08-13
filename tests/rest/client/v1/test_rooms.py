@@ -29,8 +29,7 @@ from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
-from synapse.rest.client.v1 import directory, login, profile, room
-from synapse.rest.client.v2_alpha import account
+from synapse.rest.client import account, directory, login, profile, room
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 

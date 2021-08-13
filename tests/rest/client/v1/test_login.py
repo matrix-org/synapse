@@ -24,9 +24,8 @@ from twisted.web.resource import Resource
 
 import synapse.rest.admin
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import login, logout
-from synapse.rest.client.v2_alpha import devices, register
-from synapse.rest.client.v2_alpha.account import WhoamiRestServlet
+from synapse.rest.client import devices, login, logout, register
+from synapse.rest.client.account import WhoamiRestServlet
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.types import create_requester
 

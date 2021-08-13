@@ -27,8 +27,7 @@ import synapse.rest.admin
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
-from synapse.rest.client.v1 import login, logout, profile, room
-from synapse.rest.client.v2_alpha import devices, sync
+from synapse.rest.client import devices, login, logout, profile, room, sync
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.types import JsonDict, UserID
 

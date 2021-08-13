@@ -14,7 +14,7 @@
 
 
 from synapse.http.servlet import RestServlet, parse_boolean
-from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.client._base import client_patterns
 from synapse.streams.config import PaginationConfig
 
 
