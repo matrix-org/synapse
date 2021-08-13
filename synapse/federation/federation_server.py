@@ -977,7 +977,7 @@ class FederationServer(FederationBase):
                 latest_origin = None
                 latest_event = None
             else:
-                next_origin, next_event_id  = result
+                next_origin, next_event_id = result
                 if (
                     next_origin != latest_origin
                     or next_event_id != latest_event.event_id
