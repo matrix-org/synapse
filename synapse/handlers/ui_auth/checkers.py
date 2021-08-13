@@ -131,7 +131,9 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
             )
             if resp_body["success"]:
                 return True
-        raise LoginError(401, "Captcha authentication failed", errcode=Codes.UNAUTHORIZED)
+        raise LoginError(
+            401, "Captcha authentication failed", errcode=Codes.UNAUTHORIZED
+        )
 
 
 class _BaseThreepidAuthChecker:
@@ -191,7 +193,9 @@ class _BaseThreepidAuthChecker:
             raise AssertionError("Unrecognized threepid medium: %s" % (medium,))
 
         if not threepid:
-            raise LoginError(401, "Unable to get validated threepid", errcode=Codes.UNAUTHORIZED)
+            raise LoginError(
+                401, "Unable to get validated threepid", errcode=Codes.UNAUTHORIZED
+            )
 
         if threepid["medium"] != medium:
             raise LoginError(
