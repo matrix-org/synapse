@@ -43,8 +43,11 @@ from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
-from synapse.logging.context import PreserveLoggingContext
-from synapse.metrics.background_process_metrics import wrap_as_background_process
+from synapse.logging.context import PreserveLoggingContext, defer_to_thread
+from synapse.metrics.background_process_metrics import (
+    run_as_background_process,
+    wrap_as_background_process,
+)
 from synapse.metrics.jemalloc import setup_jemalloc_stats
 from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
@@ -436,14 +439,22 @@ def setup_state_compressor(hs):
         database=db_args["database"],
     )
 
+    def run_state_compressor():
+        run_as_background_process(
+            desc="State Compressor",
+            func=defer_to_thread,
+            reactor=hs.get_reactor(),
+            f=auto_compressor.compress_largest_rooms,
+            db_url=db_url,
+            chunk_size=10,
+            default_levels="100,50,25",
+            number_of_rooms=10,
+        )
+
     clock = hs.get_clock()
     clock.looping_call(
-        auto_compressor.compress_largest_rooms,
+        run_state_compressor,
         1 * 60 * 1000,
-        db_url=db_url,
-        chunk_size=10,
-        default_levels="100,50,25",
-        number_of_rooms=10,
     )
 
 
