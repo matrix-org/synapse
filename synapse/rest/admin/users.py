@@ -225,6 +225,37 @@ class UserRestServletV2(RestServlet):
                         user_id, threepid["medium"], threepid["address"], current_time
                     )
 
+            if "external_ids" in body:
+                # check for required parameters for each external_id
+                # and convert into List[Tuple[str, str]]
+                new_external_ids = []
+                for external_id in body["external_ids"]:
+                    assert_params_in_dict(external_id, ["auth_provider", "external_id"])
+                    new_external_ids.append(
+                        (external_id["auth_provider"], external_id["external_id"])
+                    )
+
+                # get changed external_ids (added and removed)
+                cur_external_ids = await self.store.get_external_ids_by_user(user_id)
+                add_external_ids = set(new_external_ids) - set(cur_external_ids)
+                del_external_ids = set(cur_external_ids) - set(new_external_ids)
+
+                # remove old external_ids
+                for auth_provider, external_id in del_external_ids:
+                    await self.store.remove_user_external_id(
+                        auth_provider,
+                        external_id,
+                        user_id,
+                    )
+
+                # add new external_ids
+                for auth_provider, external_id in add_external_ids:
+                    await self.store.record_user_external_id(
+                        auth_provider,
+                        external_id,
+                        user_id,
+                    )
+
             if "avatar_url" in body and type(body["avatar_url"]) == str:
                 await self.profile_handler.set_avatar_url(
                     target_user, requester, body["avatar_url"], True
