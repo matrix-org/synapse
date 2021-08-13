@@ -237,7 +237,7 @@ class Config:
     def read_templates(
         self,
         filenames: List[str],
-        custom_template_directories: List[Optional[str]] = [],
+        custom_template_directories: Optional[List[Optional[str]]] = None,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
@@ -262,19 +262,23 @@ class Config:
         """
         search_directories = [self.default_template_dir]
 
-        # The loader will first look in the custom template directories (if specified) for the
-        # given filename. If it doesn't find it, it will use the default template dir instead
-        for custom_template_directory in custom_template_directories:
-            if custom_template_directory:
-                # Check that the given template directory exists
-                if not self.path_exists(custom_template_directory):
-                    raise ConfigError(
-                        "Configured template directory does not exist: %s"
-                        % (custom_template_directory,)
-                    )
+        # The loader will first look in the custom template directories (if specified)
+        # for the given filename. If it doesn't find it, it will use the default
+        # template dir instead.
+        if custom_template_directories is not None:
+            for custom_template_directory in custom_template_directories:
+                # Elements in the list might be None if they were retrieved from the
+                # configuration dict using config_dict.get(...).
+                if custom_template_directory:
+                    # Check that the given template directory exists
+                    if not self.path_exists(custom_template_directory):
+                        raise ConfigError(
+                            "Configured template directory does not exist: %s"
+                            % (custom_template_directory,)
+                        )
 
-                # Search the custom template directory as well
-                search_directories.insert(0, custom_template_directory)
+                    # Search the custom template directory as well
+                    search_directories.insert(0, custom_template_directory)
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
