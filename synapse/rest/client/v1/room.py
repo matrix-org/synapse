@@ -1395,14 +1395,14 @@ class RoomSpaceSummaryRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._space_summary_handler = hs.get_space_summary_handler()
+        self._room_summary_handler = hs.get_room_summary_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
 
-        return 200, await self._space_summary_handler.get_space_summary(
+        return 200, await self._room_summary_handler.get_space_summary(
             requester.user.to_string(),
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
@@ -1428,7 +1428,7 @@ class RoomSpaceSummaryRestServlet(RestServlet):
                 400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
             )
 
-        return 200, await self._space_summary_handler.get_space_summary(
+        return 200, await self._room_summary_handler.get_space_summary(
             requester.user.to_string(),
             room_id,
             suggested_only=suggested_only,
@@ -1447,7 +1447,7 @@ class RoomHierarchyRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._space_summary_handler = hs.get_space_summary_handler()
+        self._room_summary_handler = hs.get_room_summary_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -1466,7 +1466,7 @@ class RoomHierarchyRestServlet(RestServlet):
                 400, "'limit' must be a positive integer", Codes.BAD_JSON
             )
 
-        return 200, await self._space_summary_handler.get_room_hierarchy(
+        return 200, await self._room_summary_handler.get_room_hierarchy(
             requester.user.to_string(),
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
@@ -1496,6 +1496,7 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
             requester = await self._auth.get_user_by_req(request, allow_guest=True)
             requester_user_id: Optional[str] = requester.user.to_string()
         except MissingClientTokenError:
+            # auth is optional
             requester_user_id = None
 
         # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
