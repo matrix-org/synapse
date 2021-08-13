@@ -710,7 +710,7 @@ class ServerConfig(Config):
             # Turn the list into a set to improve lookup speed.
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
-        templates_config = config.get("templates", {})
+        templates_config = config.get("templates") or {}
         self.custom_template_directory = templates_config.get(
             "custom_template_directory"
         )

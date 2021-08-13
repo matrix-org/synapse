@@ -78,7 +78,7 @@ class AccountValidityConfig(Config):
         )
 
         # Read and store template content
-        templates_config = config.get("templates", {})
+        templates_config = config.get("templates") or {}
         custom_template_directory = templates_config.get("custom_template_directory")
         (
             self.account_validity_account_renewed_template,

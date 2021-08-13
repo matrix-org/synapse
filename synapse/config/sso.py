@@ -45,7 +45,7 @@ class SSOConfig(Config):
         self.sso_template_dir = sso_config.get("template_dir")
 
         # Read templates from disk
-        templates_config = config.get("templates", {})
+        templates_config = config.get("templates") or {}
         custom_template_directory = templates_config.get("custom_template_directory")
 
         (
