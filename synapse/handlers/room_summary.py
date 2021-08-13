@@ -775,7 +775,7 @@ class RoomSummaryHandler:
 
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
-        Generate en entry suitable for the 'rooms' list in the summary response.
+        Generate en entry summarising a single room.
 
         Args:
             room_id: The room ID to summarize.
@@ -870,13 +870,13 @@ class RoomSummaryHandler:
         remote_room_hosts: Optional[List[str]] = None,
     ) -> JsonDict:
         """
-        Implementation of the room summary C-S API MSC3266
+        Implementation of the room summary C-S API from MSC3266
 
         Args:
-            requester:  user id of the user making this request,
-                can be None for unauthenticated requests
+            requester:  user id of the user making this request, will be None
+                for unauthenticated requests
 
-            room_id: room id to start the summary at
+            room_id: room id to summarise.
 
             remote_room_hosts: a list of homeservers to try fetching data through
                 if we don't know it ourselves
@@ -889,6 +889,7 @@ class RoomSummaryHandler:
         if is_in_room:
             room_summary = await self._summarize_local_room(requester, None, room_id)
 
+            # If there was a requester, add their membership.
             if requester:
                 (
                     membership,
@@ -899,20 +900,9 @@ class RoomSummaryHandler:
 
                 room_summary["membership"] = membership or "leave"
         else:
-            room_summary = await self._summarize_remote_room(room_id, remote_room_hosts)
-
-            # validate that the requester has permission to see this room
-            include_room = self._is_remote_room_accessible(
-                requester, room_id, room_summary
-            )
-
-            if not include_room:
-                raise NotFoundError("Room not found or is not accessible")
-
-        # Before returning to the client, remove the allowed_room_ids
-        # and allowed_spaces keys.
-        room_summary.pop("allowed_room_ids", None)
-        room_summary.pop("allowed_spaces", None)
+            # TODO federation API, descoped from initial unstable implementation
+            #      as MSC needs more maturing on that side.
+            raise SynapseError(400, "Federation is not currently supported.")
 
         return room_summary
 
@@ -941,26 +931,6 @@ class RoomSummaryHandler:
             raise NotFoundError("Room not found or is not accessible")
 
         return await self._build_room_entry(room_id, for_federation=bool(origin))
-
-    async def _summarize_remote_room(
-        self,
-        room_id: str,
-        remote_room_hosts: Optional[List[str]],
-    ) -> JsonDict:
-        """
-        Request room summary entry for a given room by querying a remote server.
-
-        Args:
-            room_id: The room to summarize.
-            remote_room_hosts: List of homeservers to attempt to fetch the data from.
-
-        Returns:
-            summary dict to return
-        """
-        logger.info("Requesting summary for %s via %s", room_id, remote_room_hosts)
-
-        # TODO federation API, descoped from initial unstable implementation as MSC needs more maturing on that side.
-        raise NotFoundError("Room not found or is not accessible")
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
