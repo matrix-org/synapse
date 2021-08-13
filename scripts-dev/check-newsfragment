@@ -11,7 +11,7 @@ set -e
 git remote set-branches --add origin develop
 git fetch -q origin develop
 
-pr="$BUILDKITE_PULL_REQUEST"
+pr="$PULL_REQUEST_NUMBER"
 
 # if there are changes in the debian directory, check that the debian changelog
 # has been updated

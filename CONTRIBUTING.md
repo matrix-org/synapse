@@ -155,7 +155,7 @@ source ./env/bin/activate
 ./scripts-dev/lint.sh path/to/file1.py path/to/file2.py path/to/folder
 ```
 
-## Run the unit tests.
+## Run the unit tests (Twisted trial).
 
 The unit tests run parts of Synapse, including your changes, to see if anything
 was broken. They are slower than the linters but will typically catch more errors.
@@ -186,7 +186,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 ```
 
 
-## Run the integration tests.
+## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
 
 The integration tests are a more comprehensive suite of tests. They
 run a full version of Synapse, including your changes, to check if
@@ -203,6 +203,43 @@ $ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v 
 This configuration should generally cover  your needs. For more details about other configurations, see [documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
 
 
+## Run the integration tests ([Complement](https://github.com/matrix-org/complement)).
+
+[Complement](https://github.com/matrix-org/complement) is a suite of black box tests that can be run on any homeserver implementation. It can also be thought of as end-to-end (e2e) tests.
+
+It's often nice to develop on Synapse and write Complement tests at the same time.
+Here is how to run your local Synapse checkout against your local Complement checkout.
+
+(checkout [`complement`](https://github.com/matrix-org/complement) alongside your `synapse` checkout)
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh
+```
+
+To run a specific test file, you can pass the test name at the end of the command. The name passed comes from the naming structure in your Complement tests. If you're unsure of the name, you can do a full run and copy it from the test output:
+
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory
+```
+
+To run a specific test, you can specify the whole name structure:
+
+```sh
+COMPLEMENT_DIR=../complement ./scripts-dev/complement.sh TestBackfillingHistory/parallel/Backfilled_historical_events_resolve_with_proper_state_in_correct_order
+```
+
+
+### Access database for homeserver after Complement test runs.
+
+If you're curious what the database looks like after you run some tests, here are some steps to get you going in Synapse:
+
+ 1. In your Complement test comment out `defer deployment.Destroy(t)` and replace with `defer time.Sleep(2 * time.Hour)` to keep the homeserver running after the tests complete
+ 1. Start the Complement tests
+ 1. Find the name of the container, `docker ps -f name=complement_` (this will filter for just the Compelement related Docker containers)
+ 1. Access the container replacing the name with what you found in the previous step: `docker exec -it complement_1_hs_with_application_service.hs1_2 /bin/bash`
+ 1. Install sqlite (database driver), `apt-get update && apt-get install -y sqlite3`
+ 1. Then run `sqlite3` and open the database `.open /conf/homeserver.db` (this db path comes from the Synapse homeserver.yaml)
+
+
 # 9. Submit your patch.
 
 Once you're happy with your patch, it's time to prepare a Pull Request.
@@ -215,6 +252,7 @@ To prepare a Pull Request, please:
 4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
 6. for most contributors, that's all - however, if you are a member of the organization `matrix-org`, on GitHub, please request a review from `matrix.org / Synapse Core`.
+7. if you need to update your PR, please avoid rebasing and just add new commits to your branch.
 
 
 ## Changelog

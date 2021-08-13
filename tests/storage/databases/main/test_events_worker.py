@@ -14,7 +14,10 @@
 import json
 
 from synapse.logging.context import LoggingContext
+from synapse.rest import admin
+from synapse.rest.client.v1 import login, room
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
+from synapse.util.async_helpers import yieldable_gather_results
 
 from tests import unittest
 
@@ -94,3 +97,50 @@ class HaveSeenEventsTestCase(unittest.HomeserverTestCase):
             res = self.get_success(self.store.have_seen_events("room1", ["event10"]))
             self.assertEquals(res, {"event10"})
             self.assertEquals(ctx.get_resource_usage().db_txn_count, 0)
+
+
+class EventCacheTestCase(unittest.HomeserverTestCase):
+    """Test that the various layers of event cache works."""
+
+    servlets = [
+        admin.register_servlets,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs):
+        self.store: EventsWorkerStore = hs.get_datastore()
+
+        self.user = self.register_user("user", "pass")
+        self.token = self.login(self.user, "pass")
+
+        self.room = self.helper.create_room_as(self.user, tok=self.token)
+
+        res = self.helper.send(self.room, tok=self.token)
+        self.event_id = res["event_id"]
+
+        # Reset the event cache so the tests start with it empty
+        self.store._get_event_cache.clear()
+
+    def test_simple(self):
+        """Test that we cache events that we pull from the DB."""
+
+        with LoggingContext("test") as ctx:
+            self.get_success(self.store.get_event(self.event_id))
+
+            # We should have fetched the event from the DB
+            self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)
+
+    def test_dedupe(self):
+        """Test that if we request the same event multiple times we only pull it
+        out once.
+        """
+
+        with LoggingContext("test") as ctx:
+            d = yieldable_gather_results(
+                self.store.get_event, [self.event_id, self.event_id]
+            )
+            self.get_success(d)
+
+            # We should have fetched the event from the DB
+            self.assertEqual(ctx.get_resource_usage().evt_db_fetch_count, 1)

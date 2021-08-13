@@ -1,0 +1,1 @@
+Reduce errors in PostgreSQL logs due to concurrent serialization errors.

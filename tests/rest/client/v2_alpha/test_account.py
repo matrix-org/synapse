@@ -24,6 +24,7 @@ import pkg_resources
 import synapse.rest.admin
 from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes, HttpResponseException
+from synapse.appservice import ApplicationService
 from synapse.rest.client.v1 import login, room
 from synapse.rest.client.v2_alpha import account, register
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
@@ -46,12 +47,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
-            self.email_attempts.append(msg)
-            return
-
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
@@ -66,7 +61,16 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "https://example.com"
 
-        hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(
+            reactor, smtphost, smtpport, from_addr, to_addrs, msg, **kwargs
+        ):
+            self.email_attempts.append(msg)
+
+        self.email_attempts = []
+        hs.get_send_email_handler()._sendmail = sendmail
+
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -397,7 +401,7 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertTrue(self.get_success(store.get_user_deactivated_status(user_id)))
 
         # Check that this access token has been invalidated.
-        channel = self.make_request("GET", "account/whoami")
+        channel = self.make_request("GET", "account/whoami", access_token=tok)
         self.assertEqual(channel.code, 401)
 
     def test_pending_invites(self):
@@ -458,6 +462,46 @@ class DeactivateTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
 
 
+class WhoamiTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        login.register_servlets,
+        account.register_servlets,
+        register.register_servlets,
+    ]
+
+    def test_GET_whoami(self):
+        device_id = "wouldgohere"
+        user_id = self.register_user("kermit", "test")
+        tok = self.login("kermit", "test", device_id=device_id)
+
+        whoami = self.whoami(tok)
+        self.assertEqual(whoami, {"user_id": user_id, "device_id": device_id})
+
+    def test_GET_whoami_appservices(self):
+        user_id = "@as:test"
+        as_token = "i_am_an_app_service"
+
+        appservice = ApplicationService(
+            as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": user_id, "exclusive": True}]},
+            sender=user_id,
+        )
+        self.hs.get_datastore().services_cache.append(appservice)
+
+        whoami = self.whoami(as_token)
+        self.assertEqual(whoami, {"user_id": user_id})
+        self.assertFalse(hasattr(whoami, "device_id"))
+
+    def whoami(self, tok):
+        channel = self.make_request("GET", "account/whoami", {}, access_token=tok)
+        self.assertEqual(channel.code, 200)
+        return channel.json_body
+
+
 class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -470,11 +514,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
-            self.email_attempts.append(msg)
-
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
@@ -489,7 +528,16 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "https://example.com"
 
-        self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        self.hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(
+            reactor, smtphost, smtpport, from_addr, to_addrs, msg, **kwargs
+        ):
+            self.email_attempts.append(msg)
+
+        self.email_attempts = []
+        self.hs.get_send_email_handler()._sendmail = sendmail
+
         return self.hs
 
     def prepare(self, reactor, clock, hs):

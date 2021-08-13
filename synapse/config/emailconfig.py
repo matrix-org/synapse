@@ -80,6 +80,12 @@ class EmailConfig(Config):
         self.require_transport_security = email_config.get(
             "require_transport_security", False
         )
+        self.enable_smtp_tls = email_config.get("enable_tls", True)
+        if self.require_transport_security and not self.enable_smtp_tls:
+            raise ConfigError(
+                "email.require_transport_security requires email.enable_tls to be true"
+            )
+
         if "app_name" in email_config:
             self.email_app_name = email_config["app_name"]
         else:
@@ -367,6 +373,14 @@ class EmailConfig(Config):
           # Synapse will refuse to connect unless the server supports STARTTLS.
           #
           #require_transport_security: true
+
+          # Uncomment the following to disable TLS for SMTP.
+          #
+          # By default, if the server supports TLS, it will be used, and the server
+          # must present a certificate that is valid for 'smtp_host'. If this option
+          # is set to false, TLS will not be used.
+          #
+          #enable_tls: false
 
           # notif_from defines the "From" address to use when sending emails.
           # It must be set if email sending is enabled.

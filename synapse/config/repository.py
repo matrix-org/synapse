@@ -12,15 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import os
 from collections import namedtuple
 from typing import Dict, List
+from urllib.request import getproxies_environment  # type: ignore
 
 from synapse.config.server import DEFAULT_IP_RANGE_BLACKLIST, generate_ip_set
 from synapse.python_dependencies import DependencyException, check_requirements
 from synapse.util.module_loader import load_module
 
 from ._base import Config, ConfigError
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_THUMBNAIL_SIZES = [
     {"width": 32, "height": 32, "method": "crop"},
@@ -35,6 +39,9 @@ THUMBNAIL_SIZE_YAML = """\
         #    height: %(height)i
         #    method: %(method)s
 """
+
+HTTP_PROXY_SET_WARNING = """\
+The Synapse config url_preview_ip_range_blacklist will be ignored as an HTTP(s) proxy is configured."""
 
 ThumbnailRequirement = namedtuple(
     "ThumbnailRequirement", ["width", "height", "method", "media_type"]
@@ -180,12 +187,17 @@ class ContentRepositoryConfig(Config):
                     e.message  # noqa: B306, DependencyException.message is a property
                 )
 
+            proxy_env = getproxies_environment()
             if "url_preview_ip_range_blacklist" not in config:
-                raise ConfigError(
-                    "For security, you must specify an explicit target IP address "
-                    "blacklist in url_preview_ip_range_blacklist for url previewing "
-                    "to work"
-                )
+                if "http" not in proxy_env or "https" not in proxy_env:
+                    raise ConfigError(
+                        "For security, you must specify an explicit target IP address "
+                        "blacklist in url_preview_ip_range_blacklist for url previewing "
+                        "to work"
+                    )
+            else:
+                if "http" in proxy_env or "https" in proxy_env:
+                    logger.warning("".join(HTTP_PROXY_SET_WARNING))
 
             # we always blacklist '0.0.0.0' and '::', which are supposed to be
             # unroutable addresses.
@@ -291,6 +303,8 @@ class ContentRepositoryConfig(Config):
         #
         # This must be specified if url_preview_enabled is set. It is recommended that
         # you uncomment the following list as a starting point.
+        #
+        # Note: The value is ignored when an HTTP proxy is in use
         #
         #url_preview_ip_range_blacklist:
 %(ip_range_blacklist)s
