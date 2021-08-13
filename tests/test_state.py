@@ -166,7 +166,6 @@ class StateTestCase(unittest.TestCase):
                 "get_storage",
                 "get_auth",
                 "get_state_handler",
-                "get_event_auth_handler",
                 "get_clock",
                 "get_state_resolution_handler",
                 "get_account_validity_handler",
