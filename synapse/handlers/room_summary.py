@@ -93,7 +93,6 @@ class RoomSummaryHandler:
         self._clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
-        self._event_auth_handler = hs.get_event_auth_handler()
         self._event_serializer = hs.get_event_client_serializer()
         self._server_name = hs.hostname
         self._federation_client = hs.get_federation_client()
@@ -141,7 +140,7 @@ class RoomSummaryHandler:
         Args:
             requester:  user id of the user making this request
 
-            room_id: room id to start the hierarchy from
+            room_id: room id to start the summary at
 
             suggested_only: whether we should only return children with the "suggested"
                 flag set.
@@ -617,51 +616,6 @@ class RoomSummaryHandler:
 
         return results
 
-    async def _is_remote_room_accessible(
-        self, requester: Optional[str], room_id: str, room: JsonDict
-    ) -> bool:
-        """
-        Calculate whether the room received over federation should be shown in the summary.
-
-        It should be included if:
-
-        * The requester is joined or can join the room (per MSC3173).
-        * The history visibility is set to world readable.
-
-        Note that the local server is not in the requested room (which is why the
-        remote call was made in the first place), but the user could have access
-        due to an invite, etc.
-
-        Args:
-            requester: The user requesting the summary, if authenticated.
-            room_id: The room ID returned over federation.
-            room: The summary of the child room returned over federation.
-
-        Returns:
-            True if the room should be included in the spaces summary.
-        """
-        # The API doesn't return the room version so assume that a
-        # join rule of knock is valid.
-        if (
-            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
-            or room.get("world_readable") is True
-        ):
-            return True
-
-        # Check if the user is a member of any of the allowed spaces
-        # from the response.
-        allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
-        if requester and allowed_rooms and isinstance(allowed_rooms, list):
-            if await self._event_auth_handler.is_user_in_rooms(
-                allowed_rooms, requester
-            ):
-                return True
-
-        # Finally, check locally if we can access the room. The user might
-        # already be in the room (if it was a child room), or there might be a
-        # pending invite, etc.
-        return await self._is_local_room_accessible(room_id, requester)
-
     async def _is_local_room_accessible(
         self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
@@ -774,6 +728,113 @@ class RoomSummaryHandler:
         )
         return False
 
+    async def _is_remote_room_accessible(
+        self, requester: Optional[str], room_id: str, room: JsonDict
+    ) -> bool:
+        """
+        Calculate whether the room received over federation should be shown in the summary.
+
+        It should be included if:
+
+        * The requester is joined or can join the room (per MSC3173).
+        * The history visibility is set to world readable.
+
+        Note that the local server is not in the requested room (which is why the
+        remote call was made in the first place), but the user could have access
+        due to an invite, etc.
+
+        Args:
+            requester: The user requesting the summary, if authenticated.
+            room_id: The room ID returned over federation.
+            room: The summary of the child room returned over federation.
+
+        Returns:
+            True if the room should be included in the spaces summary.
+        """
+        # The API doesn't return the room version so assume that a
+        # join rule of knock is valid.
+        if (
+            room.get("join_rules") in (JoinRules.PUBLIC, JoinRules.KNOCK)
+            or room.get("world_readable") is True
+        ):
+            return True
+
+        # Check if the user is a member of any of the allowed spaces
+        # from the response.
+        allowed_rooms = room.get("allowed_room_ids") or room.get("allowed_spaces")
+        if requester and allowed_rooms and isinstance(allowed_rooms, list):
+            if await self._event_auth_handler.is_user_in_rooms(
+                allowed_rooms, requester
+            ):
+                return True
+
+        # Finally, check locally if we can access the room. The user might
+        # already be in the room (if it was a child room), or there might be a
+        # pending invite, etc.
+        return await self._is_local_room_accessible(room_id, requester)
+
+    async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
+        """
+        Generate en entry suitable for the 'rooms' list in the summary response.
+
+        Args:
+            room_id: The room ID to summarize.
+            for_federation: True if this is a summary requested over federation
+                (which includes additional fields).
+
+        Returns:
+            The JSON dictionary for the room.
+        """
+        stats = await self._store.get_room_with_stats(room_id)
+
+        # currently this should be impossible because we call
+        # _is_local_room_accessible on the room before we get here, so
+        # there should always be an entry
+        assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
+
+        current_state_ids = await self._store.get_current_state_ids(room_id)
+        create_event = await self._store.get_event(
+            current_state_ids[(EventTypes.Create, "")]
+        )
+
+        entry = {
+            "room_id": stats["room_id"],
+            "name": stats["name"],
+            "topic": stats["topic"],
+            "canonical_alias": stats["canonical_alias"],
+            "num_joined_members": stats["joined_members"],
+            "avatar_url": stats["avatar"],
+            "join_rules": stats["join_rules"],
+            "world_readable": (
+                stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
+            ),
+            "guest_can_join": stats["guest_access"] == "can_join",
+            "creation_ts": create_event.origin_server_ts,
+            "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
+        }
+
+        # Federation requests need to provide additional information so the
+        # requested server is able to filter the response appropriately.
+        if for_federation:
+            room_version = await self._store.get_room_version(room_id)
+            if await self._event_auth_handler.has_restricted_join_rules(
+                current_state_ids, room_version
+            ):
+                allowed_rooms = (
+                    await self._event_auth_handler.get_rooms_that_allow_join(
+                        current_state_ids
+                    )
+                )
+                if allowed_rooms:
+                    entry["allowed_room_ids"] = allowed_rooms
+                    # TODO Remove this key once the API is stable.
+                    entry["allowed_spaces"] = allowed_rooms
+
+        # Filter out Nones – rather omit the field altogether
+        room_entry = {k: v for k, v in entry.items() if v is not None}
+
+        return room_entry
+
     async def _get_child_events(self, room_id: str) -> Iterable[EventBase]:
         """
         Get the child events for a given room.
@@ -854,68 +915,6 @@ class RoomSummaryHandler:
         room_summary.pop("allowed_spaces", None)
 
         return room_summary
-
-    async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
-        """
-        Generate en entry suitable for the 'rooms' list in the summary response.
-
-        Args:
-            room_id: The room ID to summarize.
-            for_federation: True if this is a summary requested over federation
-                (which includes additional fields).
-
-        Returns:
-            The JSON dictionary for the room.
-        """
-        stats = await self._store.get_room_with_stats(room_id)
-
-        # currently this should be impossible because we call
-        # _is_local_room_accessible on the room before we get here, so
-        # there should always be an entry
-        assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
-
-        current_state_ids = await self._store.get_current_state_ids(room_id)
-        create_event = await self._store.get_event(
-            current_state_ids[(EventTypes.Create, "")]
-        )
-
-        entry = {
-            "room_id": stats["room_id"],
-            "name": stats["name"],
-            "topic": stats["topic"],
-            "canonical_alias": stats["canonical_alias"],
-            "num_joined_members": stats["joined_members"],
-            "avatar_url": stats["avatar"],
-            "join_rules": stats["join_rules"],
-            "world_readable": (
-                stats["history_visibility"] == HistoryVisibility.WORLD_READABLE
-            ),
-            "guest_can_join": stats["guest_access"] == "can_join",
-            "creation_ts": create_event.origin_server_ts,
-            "room_type": create_event.content.get(EventContentFields.ROOM_TYPE),
-        }
-
-        # Federation requests need to provide additional information so the
-        # requested server is able to filter the response appropriately.
-        if for_federation:
-            room_version = await self._store.get_room_version(room_id)
-            if await self._event_auth_handler.has_restricted_join_rules(
-                current_state_ids, room_version
-            ):
-                allowed_rooms = (
-                    await self._event_auth_handler.get_rooms_that_allow_join(
-                        current_state_ids
-                    )
-                )
-                if allowed_rooms:
-                    entry["allowed_room_ids"] = allowed_rooms
-                    # TODO Remove this key once the API is stable.
-                    entry["allowed_spaces"] = allowed_rooms
-
-        # Filter out Nones – rather omit the field altogether
-        room_entry = {k: v for k, v in entry.items() if v is not None}
-
-        return room_entry
 
     async def _summarize_local_room(
         self,

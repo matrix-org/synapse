@@ -69,7 +69,6 @@ class Auth:
         )
 
         self._auth_blocking = AuthBlocking(self.hs)
-        self._event_auth_handler = hs.get_event_auth_handler()
 
         self._track_appservice_user_ips = hs.config.track_appservice_user_ips
         self._macaroon_secret_key = hs.config.macaroon_secret_key
