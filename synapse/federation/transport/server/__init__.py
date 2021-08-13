@@ -22,59 +22,10 @@ from synapse.federation.transport.server._base import (
     Authenticator,
     BaseFederationServlet,
 )
-from synapse.federation.transport.server.federation import (
-    FederationBackfillServlet,
-    FederationClientKeysClaimServlet,
-    FederationClientKeysQueryServlet,
-    FederationEventAuthServlet,
-    FederationEventServlet,
-    FederationGetMissingEventsServlet,
-    FederationMakeJoinServlet,
-    FederationMakeKnockServlet,
-    FederationMakeLeaveServlet,
-    FederationQueryServlet,
-    FederationSendServlet,
-    FederationSpaceSummaryServlet,
-    FederationStateIdsServlet,
-    FederationStateV1Servlet,
-    FederationThirdPartyInviteExchangeServlet,
-    FederationUserDevicesQueryServlet,
-    FederationV1InviteServlet,
-    FederationV1SendJoinServlet,
-    FederationV1SendKnockServlet,
-    FederationV1SendLeaveServlet,
-    FederationV2InviteServlet,
-    FederationV2SendJoinServlet,
-    FederationV2SendLeaveServlet,
-    FederationVersionServlet,
-    On3pidBindServlet,
-    OpenIdUserInfo,
-    RoomComplexityServlet,
-)
-from synapse.federation.transport.server.groups_local import (
-    FederationGroupsBulkPublicisedServlet,
-    FederationGroupsLocalInviteServlet,
-    FederationGroupsRemoveLocalUserServlet,
-)
+from synapse.federation.transport.server.federation import FEDERATION_SERVLET_CLASSES
+from synapse.federation.transport.server.groups_local import GROUP_LOCAL_SERVLET_CLASSES
 from synapse.federation.transport.server.groups_server import (
-    FederationGroupsAcceptInviteServlet,
-    FederationGroupsAddRoomsConfigServlet,
-    FederationGroupsAddRoomsServlet,
-    FederationGroupsCategoriesServlet,
-    FederationGroupsCategoryServlet,
-    FederationGroupsInvitedUsersServlet,
-    FederationGroupsInviteServlet,
-    FederationGroupsJoinServlet,
-    FederationGroupsProfileServlet,
-    FederationGroupsRemoveUserServlet,
-    FederationGroupsRoleServlet,
-    FederationGroupsRolesServlet,
-    FederationGroupsRoomsServlet,
-    FederationGroupsSettingJoinPolicyServlet,
-    FederationGroupsSummaryRoomsServlet,
-    FederationGroupsSummaryServlet,
-    FederationGroupsSummaryUsersServlet,
-    FederationGroupsUsersServlet,
+    GROUP_SERVER_SERVLET_CLASSES,
 )
 from synapse.http.server import HttpServer, JsonResource
 from synapse.http.servlet import (
@@ -275,68 +226,67 @@ class FederationGroupsRenewAttestaionServlet(BaseFederationServlet):
         return 200, new_content
 
 
-FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
-    FederationSendServlet,
-    FederationEventServlet,
-    FederationStateV1Servlet,
-    FederationStateIdsServlet,
-    FederationBackfillServlet,
-    FederationQueryServlet,
-    FederationMakeJoinServlet,
-    FederationMakeLeaveServlet,
-    FederationEventServlet,
-    FederationV1SendJoinServlet,
-    FederationV2SendJoinServlet,
-    FederationV1SendLeaveServlet,
-    FederationV2SendLeaveServlet,
-    FederationV1InviteServlet,
-    FederationV2InviteServlet,
-    FederationGetMissingEventsServlet,
-    FederationEventAuthServlet,
-    FederationClientKeysQueryServlet,
-    FederationUserDevicesQueryServlet,
-    FederationClientKeysClaimServlet,
-    FederationThirdPartyInviteExchangeServlet,
-    On3pidBindServlet,
-    FederationVersionServlet,
-    RoomComplexityServlet,
-    FederationSpaceSummaryServlet,
-    FederationV1SendKnockServlet,
-    FederationMakeKnockServlet,
-)
+class OpenIdUserInfo(BaseFederationServlet):
+    """
+    Exchange a bearer token for information about a user.
+
+    The response format should be compatible with:
+        http://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
+
+    GET /openid/userinfo?access_token=ABDEFGH HTTP/1.1
+
+    HTTP/1.1 200 OK
+    Content-Type: application/json
+
+    {
+        "sub": "@userpart:example.org",
+    }
+    """
+
+    PATH = "/openid/userinfo"
+
+    REQUIRE_AUTH = False
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_federation_server()
+
+    async def on_GET(
+        self,
+        origin: Optional[str],
+        content: Literal[None],
+        query: Dict[bytes, List[bytes]],
+    ) -> Tuple[int, JsonDict]:
+        token = parse_string_from_args(query, "access_token")
+        if token is None:
+            return (
+                401,
+                {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
+            )
+
+        user_id = await self.handler.on_openid_userinfo(token)
+
+        if user_id is None:
+            return (
+                401,
+                {
+                    "errcode": "M_UNKNOWN_TOKEN",
+                    "error": "Access Token unknown or expired",
+                },
+            )
+
+        return 200, {"sub": user_id}
+
 
 OPENID_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (OpenIdUserInfo,)
 
 ROOM_LIST_CLASSES: Tuple[Type[PublicRoomList], ...] = (PublicRoomList,)
-
-GROUP_SERVER_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
-    FederationGroupsProfileServlet,
-    FederationGroupsSummaryServlet,
-    FederationGroupsRoomsServlet,
-    FederationGroupsUsersServlet,
-    FederationGroupsInvitedUsersServlet,
-    FederationGroupsInviteServlet,
-    FederationGroupsAcceptInviteServlet,
-    FederationGroupsJoinServlet,
-    FederationGroupsRemoveUserServlet,
-    FederationGroupsSummaryRoomsServlet,
-    FederationGroupsCategoriesServlet,
-    FederationGroupsCategoryServlet,
-    FederationGroupsRolesServlet,
-    FederationGroupsRoleServlet,
-    FederationGroupsSummaryUsersServlet,
-    FederationGroupsAddRoomsServlet,
-    FederationGroupsAddRoomsConfigServlet,
-    FederationGroupsSettingJoinPolicyServlet,
-)
-
-
-GROUP_LOCAL_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
-    FederationGroupsLocalInviteServlet,
-    FederationGroupsRemoveLocalUserServlet,
-    FederationGroupsBulkPublicisedServlet,
-)
-
 
 GROUP_ATTESTATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationGroupsRenewAttestaionServlet,

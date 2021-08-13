@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Type
 
 from synapse.api.errors import SynapseError
 from synapse.federation.transport.server._base import (
@@ -104,3 +104,10 @@ class FederationGroupsBulkPublicisedServlet(BaseGroupsLocalServlet):
         )
 
         return 200, resp
+
+
+GROUP_LOCAL_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
+    FederationGroupsLocalInviteServlet,
+    FederationGroupsRemoveLocalUserServlet,
+    FederationGroupsBulkPublicisedServlet,
+)

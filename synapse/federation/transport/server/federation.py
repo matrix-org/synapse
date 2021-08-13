@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Union
+from typing import Dict, List, Mapping, Optional, Sequence, Tuple, Type, Union
 
 from typing_extensions import Literal
 
@@ -518,54 +518,6 @@ class On3pidBindServlet(BaseFederationServerServlet):
         return 200, {}
 
 
-class OpenIdUserInfo(BaseFederationServerServlet):
-    """
-    Exchange a bearer token for information about a user.
-
-    The response format should be compatible with:
-        http://openid.net/specs/openid-connect-core-1_0.html#UserInfoResponse
-
-    GET /openid/userinfo?access_token=ABDEFGH HTTP/1.1
-
-    HTTP/1.1 200 OK
-    Content-Type: application/json
-
-    {
-        "sub": "@userpart:example.org",
-    }
-    """
-
-    PATH = "/openid/userinfo"
-
-    REQUIRE_AUTH = False
-
-    async def on_GET(
-        self,
-        origin: Optional[str],
-        content: Literal[None],
-        query: Dict[bytes, List[bytes]],
-    ) -> Tuple[int, JsonDict]:
-        token = parse_string_from_args(query, "access_token")
-        if token is None:
-            return (
-                401,
-                {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
-            )
-
-        user_id = await self.handler.on_openid_userinfo(token)
-
-        if user_id is None:
-            return (
-                401,
-                {
-                    "errcode": "M_UNKNOWN_TOKEN",
-                    "error": "Access Token unknown or expired",
-                },
-            )
-
-        return 200, {"sub": user_id}
-
-
 class FederationVersionServlet(BaseFederationServlet):
     PATH = "/version"
 
@@ -679,3 +631,34 @@ class RoomComplexityServlet(BaseFederationServlet):
 
         complexity = await self._store.get_room_complexity(room_id)
         return 200, complexity
+
+
+FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
+    FederationSendServlet,
+    FederationEventServlet,
+    FederationStateV1Servlet,
+    FederationStateIdsServlet,
+    FederationBackfillServlet,
+    FederationQueryServlet,
+    FederationMakeJoinServlet,
+    FederationMakeLeaveServlet,
+    FederationEventServlet,
+    FederationV1SendJoinServlet,
+    FederationV2SendJoinServlet,
+    FederationV1SendLeaveServlet,
+    FederationV2SendLeaveServlet,
+    FederationV1InviteServlet,
+    FederationV2InviteServlet,
+    FederationGetMissingEventsServlet,
+    FederationEventAuthServlet,
+    FederationClientKeysQueryServlet,
+    FederationUserDevicesQueryServlet,
+    FederationClientKeysClaimServlet,
+    FederationThirdPartyInviteExchangeServlet,
+    On3pidBindServlet,
+    FederationVersionServlet,
+    RoomComplexityServlet,
+    FederationSpaceSummaryServlet,
+    FederationV1SendKnockServlet,
+    FederationMakeKnockServlet,
+)

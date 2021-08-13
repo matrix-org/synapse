@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Type
 
 from typing_extensions import Literal
 
@@ -729,3 +729,25 @@ class FederationGroupsSettingJoinPolicyServlet(BaseGroupsServerServlet):
         )
 
         return 200, new_content
+
+
+GROUP_SERVER_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
+    FederationGroupsProfileServlet,
+    FederationGroupsSummaryServlet,
+    FederationGroupsRoomsServlet,
+    FederationGroupsUsersServlet,
+    FederationGroupsInvitedUsersServlet,
+    FederationGroupsInviteServlet,
+    FederationGroupsAcceptInviteServlet,
+    FederationGroupsJoinServlet,
+    FederationGroupsRemoveUserServlet,
+    FederationGroupsSummaryRoomsServlet,
+    FederationGroupsCategoriesServlet,
+    FederationGroupsCategoryServlet,
+    FederationGroupsRolesServlet,
+    FederationGroupsRoleServlet,
+    FederationGroupsSummaryUsersServlet,
+    FederationGroupsAddRoomsServlet,
+    FederationGroupsAddRoomsConfigServlet,
+    FederationGroupsSettingJoinPolicyServlet,
+)
