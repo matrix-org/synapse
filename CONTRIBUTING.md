@@ -97,19 +97,20 @@ to work on.
 
 # 7. Turn coffee and documentation into code and documentation!
 
+There is a growing amount of documentation located in the [`docs`](docs)
+directory, with a rendered version [available online](https://matrix-org.github.io/synapse).
+This documentation is intended primarily for sysadmins running their
+own Synapse instance, as well as developers interacting externally with
+Synapse. [`docs/development`](docs/development) exists primarily to house documentation for
+Synapse developers. [`docs/admin_api`](docs/admin_api) houses documentation
+regarding Synapse's Admin API, which is used mostly by sysadmins and external
+service developers.
+
 Synapse's code style is documented [here](docs/code_style.md). Please follow
 it, including the conventions for the [sample configuration
 file](docs/code_style.md#configuration-file-format).
 
-There is a growing amount of documentation located in the [docs](docs)
-directory. This documentation is intended primarily for sysadmins running their
-own Synapse instance, as well as developers interacting externally with
-Synapse. [docs/dev](docs/dev) exists primarily to house documentation for
-Synapse developers. [docs/admin_api](docs/admin_api) houses documentation
-regarding Synapse's Admin API, which is used mostly by sysadmins and external
-service developers.
-
-If you add new files added to either of these folders, please use [GitHub-Flavoured
+If you add new files to our documentation, please use [GitHub-Flavoured
 Markdown](https://guides.github.com/features/mastering-markdown/).
 
 Some documentation also exists in [Synapse's GitHub
