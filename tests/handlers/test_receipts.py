@@ -286,6 +286,36 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
             ],
         )
 
+    def test_handles_string_data(self):
+        self._test_filters_hidden(
+            [
+                {
+                    "content": {
+                        "$14356419edgd14394fHBLK:matrix.org": {
+                            "m.read": {
+                                "@rikj:jki.re": "string",
+                            }
+                        },
+                    },
+                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                    "type": "m.receipt",
+                },
+            ],
+            [
+                {
+                    "content": {
+                        "$14356419edgd14394fHBLK:matrix.org": {
+                            "m.read": {
+                                "@rikj:jki.re": "string",
+                            }
+                        },
+                    },
+                    "room_id": "!jEsUZKDJdhlrceRyVU:example.org",
+                    "type": "m.receipt",
+                },
+            ],
+        )
+
     def _test_filters_hidden(
         self, events: List[JsonDict], expected_output: List[JsonDict]
     ):
