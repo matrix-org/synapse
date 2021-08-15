@@ -173,7 +173,9 @@ class ProxyAgent(_AgentBase):
             raise ValueError(f"Invalid URI {uri!r}")
 
         parsed_uri = URI.fromBytes(uri)
-        pool_key = (parsed_uri.scheme, parsed_uri.host, parsed_uri.port)
+        pool_key = (
+            f"{parsed_uri.scheme.decode()}{parsed_uri.host.decode()}{parsed_uri.port}"
+        )
         request_path = parsed_uri.originForm
 
         should_skip_proxy = False
@@ -198,8 +200,9 @@ class ProxyAgent(_AgentBase):
                     self.http_proxy_creds.as_proxy_authorization_value(),
                 )
             # Cache *all* connections under the same key, since we are only
-            # connecting to a single destination, the proxy:
-            pool_key = ("http-proxy", self.http_proxy_endpoint)
+            # connecting to a single destination, the proxy
+            # The URL of proxy is not important for the key
+            pool_key = "http-proxy"
             endpoint = self.http_proxy_endpoint
             request_path = uri
         elif (
