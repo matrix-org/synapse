@@ -173,9 +173,7 @@ class ProxyAgent(_AgentBase):
             raise ValueError(f"Invalid URI {uri!r}")
 
         parsed_uri = URI.fromBytes(uri)
-        pool_key = (
-            f"{parsed_uri.scheme.decode()}{parsed_uri.host.decode()}{parsed_uri.port}"
-        )
+        pool_key = f"{parsed_uri.scheme!r}{parsed_uri.host!r}{parsed_uri.port}"
         request_path = parsed_uri.originForm
 
         should_skip_proxy = False
