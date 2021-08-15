@@ -1,0 +1,1 @@
+Fix errors on /sync when read receipt data is a string with MSC2285 enabled. Contributed by @SimonBrandner.
