@@ -1097,28 +1097,3 @@ class RateLimitRestServlet(RestServlet):
         await self.store.delete_ratelimit_for_user(user_id)
 
         return 200, {}
-
-
-class UsernameAvailableRestServlet(RestServlet):
-    """An admin API to check if a given username is available, regardless of whether registration is enabled.
-
-    Example:
-        GET /_synapse/admin/v1/username_available?username=foo
-        200 OK
-        {
-            "available": true
-        }
-    """
-
-    PATTERNS = admin_patterns("/username_available")
-
-    def __init__(self, hs: "HomeServer"):
-        self.auth = hs.get_auth()
-        self.registration_handler = hs.get_registration_handler()
-
-    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        await assert_requester_is_admin(self.auth, request)
-
-        username = parse_string(request, "username", required=True)
-        await self.registration_handler.check_username(username)
-        return 200, {"available": True}

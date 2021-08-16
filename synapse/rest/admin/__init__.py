@@ -51,6 +51,7 @@ from synapse.rest.admin.rooms import (
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
+from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
@@ -62,7 +63,6 @@ from synapse.rest.admin.users import (
     UserAdminServlet,
     UserMediaRestServlet,
     UserMembershipRestServlet,
-    UsernameAvailableRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
     UsersRestServletV2,
