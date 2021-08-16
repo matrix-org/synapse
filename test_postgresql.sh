@@ -9,4 +9,4 @@ set -e
 docker build docker/ -f docker/Dockerfile-pgtests -t synapsepgtests
 
 # Run, mounting the current directory into /src
-docker run --rm -it -v $(pwd)\:/src synapsepgtests
+docker run --rm -it -v "$(pwd)$(printf '\:')"/src synapsepgtests
