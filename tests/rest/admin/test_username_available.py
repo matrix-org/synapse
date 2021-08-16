@@ -24,11 +24,11 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         synapse.rest.admin.register_servlets,
         login.register_servlets,
     ]
+    url = "/_synapse/admin/v1/username_available"
 
     def prepare(self, reactor, clock, hs):
         self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
-        self.url = "/_synapse/admin/v1/username_available"
 
         async def check_username(username):
             if username == "allowed":
@@ -37,10 +37,6 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
 
         handler = self.hs.get_registration_handler()
         handler.check_username = check_username
-
-    def make_homeserver(self, reactor, clock):
-        self.hs = self.setup_test_homeserver()
-        return self.hs
 
     def test_username_available(self):
         """
