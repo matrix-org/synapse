@@ -396,10 +396,11 @@ class FrozenEvent(EventBase):
         return self.__repr__()
 
     def __repr__(self):
-        return "<FrozenEvent event_id=%r, type=%r, state_key=%r>" % (
+        return "<FrozenEvent event_id=%r, type=%r, state_key=%r, outlier=%s>" % (
             self.get("event_id", None),
             self.get("type", None),
             self.get("state_key", None),
+            self.internal_metadata.is_outlier(),
         )
 
 
