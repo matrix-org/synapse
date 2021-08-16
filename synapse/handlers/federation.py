@@ -319,14 +319,14 @@ class FederationHandler(BaseHandler):
                                 % (event_id, e)
                             ) from e
 
-                        # Update the set of things we've seen after trying to
-                        # fetch the missing stuff
-                        seen = await self.store.have_events_in_timeline(prevs)
+                    # Update the set of things we've seen after trying to
+                    # fetch the missing stuff
+                    seen = await self.store.have_events_in_timeline(prevs)
 
-                        if not prevs - seen:
-                            logger.info(
-                                "Found all missing prev_events",
-                            )
+                    if not prevs - seen:
+                        logger.info(
+                            "Found all missing prev_events",
+                        )
 
             missing_prevs = prevs - seen
             if missing_prevs:
