@@ -1404,7 +1404,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             lock=False,
         )
 
-    async def set_room_is_public(self, room_id, is_public):
+    async def set_room_is_public(self, room_id: str, is_public: bool) -> None:
         await self.db_pool.simple_update_one(
             table="rooms",
             keyvalues={"room_id": room_id},
