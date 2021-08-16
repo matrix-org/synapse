@@ -327,32 +327,15 @@ class FederationHandler(BaseHandler):
                         if not missing_prevs:
                             logger.info("Found all missing prev_events")
 
-                if missing_prevs:
-                    # We've still not been able to get all of the prev_events for this event.
-                    #
-                    # In this case, we need to fall back to asking another server in the
-                    # federation for the state at this event. That's ok provided we then
-                    # resolve the state against other bits of the DAG before using it (which
-                    # will ensure that you can't just take over a room by sending an event,
-                    # withholding its prev_events, and declaring yourself to be an admin in
-                    # the subsequent state request).
-                    #
-                    # Now, if we're pulling this event as a missing prev_event, then clearly
-                    # this event is not going to become the only forward-extremity and we are
-                    # guaranteed to resolve its state against our existing forward
-                    # extremities, so that should be fine.
-                    #
-                    # On the other hand, if this event was pushed to us, it is possible for
-                    # it to become the only forward-extremity in the room, and we would then
-                    # trust its state to be the state for the whole room. This is very bad.
-                    # Further, if the event was pushed to us, there is no excuse for us not to
-                    # have all the prev_events. We therefore reject any such events.
-                    #
-                    # XXX this really feels like it could/should be merged with the above,
-                    # but there is an interaction with min_depth that I'm not really
-                    # following.
-
-                    if sent_to_us_directly:
+                    if missing_prevs:
+                        # since this event was pushed to us, it is possible for it to
+                        # become the only forward-extremity in the room, and we would then
+                        # trust its state to be the state for the whole room. This is very
+                        # bad. Further, if the event was pushed to us, there is no excuse
+                        # for us not to have all the prev_events. (XXX: apart from
+                        # min_depth?)
+                        #
+                        # We therefore reject any such events.
                         logger.warning(
                             "Rejecting: failed to fetch %d prev events: %s",
                             len(missing_prevs),
@@ -368,6 +351,27 @@ class FederationHandler(BaseHandler):
                             affected=pdu.event_id,
                         )
 
+                if missing_prevs:
+                    # We don't have all of the prev_events for this event.
+                    #
+                    # In this case, we need to fall back to asking another server in the
+                    # federation for the state at this event. That's ok provided we then
+                    # resolve the state against other bits of the DAG before using it (which
+                    # will ensure that you can't just take over a room by sending an event,
+                    # withholding its prev_events, and declaring yourself to be an admin in
+                    # the subsequent state request).
+
+                    # this should now be unreachable if the event was pushed to us
+                    assert not sent_to_us_directly
+
+                    # Since we're pulling this event as a missing prev_event, then clearly
+                    # this event is not going to become the only forward-extremity and we are
+                    # guaranteed to resolve its state against our existing forward
+                    # extremities, so that should be fine.
+                    #
+                    # XXX this really feels like it could/should be merged with the above,
+                    # but there is an interaction with min_depth that I'm not really
+                    # following.
                     logger.info(
                         "Event %s is missing prev_events %s: calculating state for a "
                         "backwards extremity",
