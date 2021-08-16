@@ -33,7 +33,9 @@ if TYPE_CHECKING:
 GET_USERS_FOR_STATES_CALLBACK = Callable[
     [Iterable[UserPresenceState]], Awaitable[Dict[str, Set[UserPresenceState]]]
 ]
-GET_INTERESTED_USERS_CALLBACK = Callable[[str], Awaitable[Union[Set[str], str]]]
+GET_INTERESTED_USERS_CALLBACK = Callable[
+    [str], Awaitable[Union[Set[str], "PresenceRouter.ALL_USERS"]]
+]
 
 logger = logging.getLogger(__name__)
 
@@ -208,10 +210,9 @@ class PresenceRouter:
             # of the other callbacks, since the set of interested_users is already as
             # large as it can possibly be
             if result == PresenceRouter.ALL_USERS:
-                interested_users = PresenceRouter.ALL_USERS
-                break
+                return PresenceRouter.ALL_USERS
 
-            if not isinstance(result, set):
+            if not isinstance(result, Set):
                 logger.warning(
                     "Wrong type returned by module API callback %s: %s, expected set",
                     callback,

@@ -32,6 +32,7 @@ from twisted.internet import defer
 from twisted.web.resource import IResource
 
 from synapse.events import EventBase
+from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -112,6 +113,11 @@ class ModuleApi:
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._presence_router = hs.get_presence_router()
+
+    #################################################################################
+    # Constants for modules to ues
+
+    PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
