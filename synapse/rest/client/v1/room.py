@@ -993,11 +993,19 @@ class RoomSpaceSummaryRestServlet(RestServlet):
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
 
+        max_rooms_per_space = parse_integer(request, "max_rooms_per_space")
+        if max_rooms_per_space is not None and max_rooms_per_space < 0:
+            raise SynapseError(
+                400,
+                "Value for 'max_rooms_per_space' must be a non-negative integer",
+                Codes.BAD_JSON,
+            )
+
         return 200, await self._room_summary_handler.get_space_summary(
             requester.user.to_string(),
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
-            max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
+            max_rooms_per_space=max_rooms_per_space,
         )
 
     # TODO When switching to the stable endpoint, remove the POST handler.
@@ -1014,10 +1022,17 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             )
 
         max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
-            raise SynapseError(
-                400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
-            )
+        if max_rooms_per_space is not None:
+            if not isinstance(max_rooms_per_space, int):
+                raise SynapseError(
+                    400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
+                )
+            if max_rooms_per_space < 0:
+                raise SynapseError(
+                    400,
+                    "Value for 'max_rooms_per_space' must be a non-negative integer",
+                    Codes.BAD_JSON,
+                )
 
         return 200, await self._room_summary_handler.get_space_summary(
             requester.user.to_string(),
