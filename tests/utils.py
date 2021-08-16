@@ -168,9 +168,6 @@ def default_config(name, parse=False):
         # We need a sane default_room_version, otherwise attempts to create
         # rooms will fail.
         "default_room_version": DEFAULT_ROOM_VERSION,
-        # disable user directory updates, because they get done in the
-        # background, which upsets the test runner.
-        "update_user_directory": False,
         "caches": {"global_factor": 1},
         "listeners": [{"port": 0, "type": "http"}],
     }

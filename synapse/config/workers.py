@@ -295,6 +295,19 @@ class WorkerConfig(Config):
             self.worker_name is None and notify_appservices_instance == "master"
         ) or self.worker_name == notify_appservices_instance
 
+        # Whether this worker should update the user directory tables.
+        #
+        # As a note for developers, this task is currently not shardable, and thus should
+        # only be handled by a single process.
+        #
+        # No effort is made here to ensure only a single instance of this task running.
+        update_user_directory_instance = (
+            config.get("update_user_directory_on_worker") or "master"
+        )
+        self.should_update_user_directory = (
+            self.worker_name is None and update_user_directory_instance == "master"
+        ) or self.worker_name == update_user_directory_instance
+
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Workers ##
@@ -331,15 +344,22 @@ class WorkerConfig(Config):
         #  events: worker1
         #  typing: worker1
 
-        # The worker that is used to run background tasks (e.g. cleaning up expired
-        # data). If not provided this defaults to the main process.
+        # The name of the worker that is used to run background tasks (e.g. cleaning
+        # up expired data). If not provided this defaults to the main process.
         #
         #run_background_tasks_on: worker1
 
-        # The worker that is used to notify application services of new traffic within
-        # their configured namespace. If not provided this defaults to the main process.
+        # The name of the worker that is used to notify application services of new
+        # traffic within their configured namespace. If not provided this defaults
+        # to the main process.
         #
         #notify_appservices_from_worker: worker2
+
+        # The name of the worker that is used to update the user directory tables as
+        # users are created, update their room memberships as well as their profiles.
+        # If not provided this defaults to the main process.
+        #
+        #update_user_directory_on_worker: worker3
 
         # A shared secret used by the replication APIs to authenticate HTTP requests
         # from workers.
