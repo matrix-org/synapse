@@ -3452,10 +3452,6 @@ class UsernameAvailableTestCase(unittest.HomeserverTestCase):
         The endpoint should return a 200 response if the username does not exist
         """
 
-        async def check_username(username):
-            print("fibble sibble")
-            raise SynapseError(400, "User ID already taken.", errcode=Codes.USER_IN_USE)
-
         url = "%s?username=%s" % (self.url, "disallowed")
         channel = self.make_request("GET", url, None, self.admin_user_tok)
 
