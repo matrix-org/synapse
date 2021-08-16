@@ -201,8 +201,7 @@ class ReceiptEventSource:
                     except AttributeError:
                         # Due to https://github.com/matrix-org/synapse/issues/10376
                         # there are cases where user_rr is a string, in those cases
-                        # we just copy the user_rr
-                        new_users[rr_user_id] = user_rr
+                        # we just ignore the read receipt
                         pass
 
                 # Set new users unless empty
