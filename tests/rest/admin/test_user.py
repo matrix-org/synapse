@@ -25,11 +25,7 @@ from parameterized import parameterized
 
 import synapse.rest.admin
 from synapse.api.constants import UserTypes
-from synapse.api.errors import (
-    Codes,
-    HttpResponseException,
-    ResourceLimitError,
-)
+from synapse.api.errors import Codes, HttpResponseException, ResourceLimitError
 from synapse.api.room_versions import RoomVersions
 from synapse.rest.client.v1 import login, logout, profile, room
 from synapse.rest.client.v2_alpha import devices, sync
