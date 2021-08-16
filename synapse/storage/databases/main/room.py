@@ -1433,19 +1433,21 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         """
 
         if is_public:
-            try:
-                await self.db_pool.simple_insert(
-                    table="appservice_room_list",
-                    values={
-                        "appservice_id": appservice_id,
-                        "network_id": network_id,
-                        "room_id": room_id,
-                    },
-                    desc="set_room_is_public_appservice_true",
-                )
-            except self.database_engine.module.IntegrityError:
-                # We've already inserted, nothing to do.
-                return
+            await self.db_pool.simple_upsert(
+                table="appservice_room_list",
+                keyvalues={
+                    "appservice_id": appservice_id,
+                    "network_id": network_id,
+                    "room_id": room_id,
+                },
+                values={},
+                insertion_values={
+                    "appservice_id": appservice_id,
+                    "network_id": network_id,
+                    "room_id": room_id,
+                },
+                desc="set_room_is_public_appservice_true",
+            )
         else:
             await self.db_pool.simple_delete(
                 table="appservice_room_list",
