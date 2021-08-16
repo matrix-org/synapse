@@ -23,7 +23,7 @@ import psycopg2
 # We use "postgres" as a database because it's bound to exist and the "synapse" one
 # doesn't exist yet.
 db_conn = psycopg2.connect(
-    user="postgres", host="postgres", password="postgres", dbname="postgres"
+    user="postgres", host="localhost", password="postgres", dbname="postgres"
 )
 db_conn.autocommit = True
 cur = db_conn.cursor()

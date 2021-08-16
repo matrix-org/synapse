@@ -443,8 +443,9 @@ The following fields are returned in the JSON response body:
 - `joined_rooms` - An array of `room_id`.
 - `total` - Number of rooms.
 
+## User media
 
-## List media of a user
+### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -543,7 +544,6 @@ The following fields are returned in the JSON response body:
 
 - `media` - An array of objects, each containing information about a media.
   Media objects contain the following fields:
-
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
   - `media_id` - string - The id used to refer to the media.
@@ -551,12 +551,57 @@ The following fields are returned in the JSON response body:
   - `media_type` - string - The MIME-type of the media.
   - `quarantined_by` - string - The user ID that initiated the quarantine request
     for this media.
-
   - `safe_from_quarantine` - bool - Status if this media is safe from quarantining.
   - `upload_name` - string - The name the media was uploaded with.
-
 - `next_token`: integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
+
+### Delete media uploaded by a user
+
+This API deletes the *local* media from the disk of your own server
+that a specific `user_id` has created. This includes any local thumbnails.
+
+This API will not affect media that has been uploaded to external
+media repositories (e.g https://github.com/turt2live/matrix-media-repo/).
+
+By default, the API deletes media ordered by descending creation date and ascending media ID.
+The newest media is deleted first. You can change the order with parameters
+`order_by` and `dir`. If no `limit` is set the API deletes `100` files per request.
+
+The API is:
+
+```
+DELETE /_synapse/admin/v1/users/<user_id>/media
+```
+
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: [Admin API](../usage/administration/admin_api)
+
+A response body like the following is returned:
+
+```json
+{
+  "deleted_media": [
+    "abcdefghijklmnopqrstuvwx"
+  ],
+  "total": 1
+}
+```
+
+The following fields are returned in the JSON response body:
+
+* `deleted_media`: an array of strings - List of deleted `media_id`
+* `total`: integer - Total number of deleted `media_id`
+
+**Note**: There is no `next_token`. This is not useful for deleting media, because
+after deleting media the remaining media have a new order.
+
+**Parameters**
+
+This API has the same parameters as
+[List media uploaded by a user](#list-media-uploaded-by-a-user).
+With the parameters you can for example limit the number of files to delete at once or
+delete largest/smallest or newest/oldest files first.
 
 ## Login as a user
 
@@ -1012,4 +1057,3 @@ The following parameters should be set in the URL:
 
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
-
