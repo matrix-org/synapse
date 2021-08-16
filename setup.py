@@ -152,6 +152,11 @@ setup(
     long_description=long_description,
     long_description_content_type="text/x-rst",
     python_requires="~=3.6",
+    entry_points={
+        'console_scripts': [
+            'homeserver = synapse.app.homeserver:main'
+        ]
+    },
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: Communications :: Chat",
