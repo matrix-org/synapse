@@ -287,6 +287,11 @@ class ReceiptsTestCase(unittest.HomeserverTestCase):
         )
 
     def test_handles_string_data(self):
+        """
+        Tests that an invalid shape for read-receipts is handled.
+        Context: https://github.com/matrix-org/synapse/issues/10603
+        """
+
         self._test_filters_hidden(
             [
                 {
