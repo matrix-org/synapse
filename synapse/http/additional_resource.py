@@ -32,7 +32,7 @@ class AdditionalResource(DirectServeJsonResource):
     and exception handling.
     """
 
-    def __init__(self, hs: "HomeServer", handler: Request):
+    def __init__(self, hs: "HomeServer", handler):
         """Initialise AdditionalResource
 
         The ``handler`` should return a deferred which completes when it has
@@ -41,7 +41,7 @@ class AdditionalResource(DirectServeJsonResource):
 
         Args:
             hs: homeserver
-            handler (twisted.internet.defer.Deferred):
+            handler ((twisted.web.server.Request) -> twisted.internet.defer.Deferred):
                 function to be called to handle the request.
         """
         super().__init__()

@@ -28,7 +28,7 @@ from synapse.logging.context import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 
-SERVER_CACHE: Dict[bytes, List[Server]] = {}
+SERVER_CACHE: Dict[bytes, List] = {}
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
