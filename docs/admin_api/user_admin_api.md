@@ -1060,8 +1060,12 @@ The following parameters should be set in the URL:
 
 ### Check username availability
 
-Checks to see if a username is available, and valid, for the server. This will
-work even if registration is disabled on the server, unlike the Client-Server endpoint counterpart.
+Checks to see if a username is available, and valid, for the server. See [the client-server 
+API](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available)
+for more information.
+
+This endpoint will work even if registration is disabled on the server, unlike 
+`/_matrix/client/r0/register/available`.
 
 The API is:
 
