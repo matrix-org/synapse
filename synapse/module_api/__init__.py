@@ -680,7 +680,7 @@ class ModuleApi:
         """
         return self._hs.config.read_templates(
             filenames,
-            [self.custom_template_dir, custom_template_directory],
+            (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )
 
 

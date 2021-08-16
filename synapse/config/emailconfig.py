@@ -260,7 +260,9 @@ class EmailConfig(Config):
                     registration_template_success_html,
                     add_threepid_template_success_html,
                 ],
-                [custom_template_directory, template_dir],
+                (
+                    td for td in (custom_template_directory, template_dir,) if td
+                ),  # Filter out template_dir if not provided
             )
 
             # Render templates that do not contain any placeholders
@@ -300,7 +302,7 @@ class EmailConfig(Config):
                 self.email_notif_template_text,
             ) = self.read_templates(
                 [notif_template_html, notif_template_text],
-                [custom_template_directory, template_dir],
+                (td for td in (custom_template_directory, template_dir,) if td),
             )
 
             self.email_notif_for_new_users = email_config.get(
@@ -323,7 +325,7 @@ class EmailConfig(Config):
                 self.account_validity_template_text,
             ) = self.read_templates(
                 [expiry_template_html, expiry_template_text],
-                [custom_template_directory, template_dir],
+                (td for td in (custom_template_directory, template_dir,) if td),
             )
 
         subjects_config = email_config.get("subjects", {})

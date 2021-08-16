@@ -90,5 +90,9 @@ class AccountValidityConfig(Config):
                 "account_previously_renewed.html",
                 invalid_token_template_filename,
             ],
-            [custom_template_directory, account_validity_template_dir],
+            (
+                td
+                for td in (custom_template_directory, account_validity_template_dir,)
+                if td
+            ),
         )

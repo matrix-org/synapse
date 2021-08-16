@@ -66,7 +66,7 @@ class SSOConfig(Config):
                 "sso_auth_success.html",
                 "sso_auth_bad_user.html",
             ],
-            [custom_template_directory, self.sso_template_dir],
+            (td for td in (custom_template_directory, self.sso_template_dir,) if td),
         )
 
         # These templates have no placeholders, so render them here
