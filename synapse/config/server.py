@@ -711,9 +711,17 @@ class ServerConfig(Config):
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
         templates_config = config.get("templates") or {}
+        if not isinstance(templates_config, dict):
+            raise ConfigError("The 'templates' section must be a dictionary")
+
         self.custom_template_directory = templates_config.get(
             "custom_template_directory"
         )
+        if (
+            self.custom_template_directory is not None
+            and not isinstance(self.custom_template_directory, str)
+        ):
+            raise ConfigError("'custom_template_directory' must be a string")
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)

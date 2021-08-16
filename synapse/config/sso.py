@@ -45,8 +45,10 @@ class SSOConfig(Config):
         self.sso_template_dir = sso_config.get("template_dir")
 
         # Read templates from disk
-        templates_config = config.get("templates") or {}
-        custom_template_directory = templates_config.get("custom_template_directory")
+        custom_template_directories = (
+            self.root.server.custom_template_directory,
+            self.sso_template_dir,
+        )
 
         (
             self.sso_login_idp_picker_template,
@@ -66,7 +68,7 @@ class SSOConfig(Config):
                 "sso_auth_success.html",
                 "sso_auth_bad_user.html",
             ],
-            (td for td in (custom_template_directory, self.sso_template_dir,) if td),
+            (td for td in custom_template_directories if td),
         )
 
         # These templates have no placeholders, so render them here
