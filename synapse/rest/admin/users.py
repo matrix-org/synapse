@@ -229,6 +229,14 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
+        # convert into List[Tuple[str, str]]
+        if external_ids is not None:
+            new_external_ids = []
+            for external_id in external_ids:
+                new_external_ids.append(
+                    (external_id["auth_provider"], external_id["external_id"])
+                )
+
         if user:  # modify user
             if "displayname" in body:
                 await self.profile_handler.set_displayname(
@@ -255,13 +263,6 @@ class UserRestServletV2(RestServlet):
                     )
 
             if external_ids is not None:
-                # convert into List[Tuple[str, str]]
-                new_external_ids = []
-                for external_id in external_ids:
-                    new_external_ids.append(
-                        (external_id["auth_provider"], external_id["external_id"])
-                    )
-
                 # get changed external_ids (added and removed)
                 cur_external_ids = await self.store.get_external_ids_by_user(user_id)
                 add_external_ids = set(new_external_ids) - set(cur_external_ids)
@@ -367,6 +368,14 @@ class UserRestServletV2(RestServlet):
                             lang=None,  # We don't know a user's language here
                             data={},
                         )
+
+            if external_ids is not None:
+                for auth_provider, external_id in new_external_ids:
+                    await self.store.record_user_external_id(
+                        auth_provider,
+                        external_id,
+                        user_id,
+                    )
 
             if "avatar_url" in body and isinstance(body["avatar_url"], str):
                 await self.profile_handler.set_avatar_url(

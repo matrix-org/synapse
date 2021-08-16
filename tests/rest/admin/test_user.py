@@ -1411,6 +1411,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
             "admin": False,
             "displayname": "Bob's name",
             "threepids": [{"medium": "email", "address": "bob@bob.bob"}],
+            "external_ids": [
+                {
+                    "external_id": "external_id1",
+                    "auth_provider": "auth_provider1",
+                },
+            ],
             "avatar_url": "mxc://fibble/wibble",
         }
 
@@ -1426,6 +1432,12 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("Bob's name", channel.json_body["displayname"])
         self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
         self.assertEqual("bob@bob.bob", channel.json_body["threepids"][0]["address"])
+        self.assertEqual(
+            "external_id1", channel.json_body["external_ids"][0]["external_id"]
+        )
+        self.assertEqual(
+            "auth_provider1", channel.json_body["external_ids"][0]["auth_provider"]
+        )
         self.assertFalse(channel.json_body["admin"])
         self.assertEqual("mxc://fibble/wibble", channel.json_body["avatar_url"])
         self._check_fields(channel.json_body)
