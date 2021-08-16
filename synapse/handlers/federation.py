@@ -295,8 +295,8 @@ class FederationHandler(BaseHandler):
             missing_prevs = prevs - seen
 
             if missing_prevs:
-                if min_depth is not None and pdu.depth > min_depth:
-                    if sent_to_us_directly:
+                if sent_to_us_directly:
+                    if min_depth is not None and pdu.depth > min_depth:
                         # If we're missing stuff, ensure we only fetch stuff one
                         # at a time.
                         logger.info(
