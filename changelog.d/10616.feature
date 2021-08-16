@@ -1,0 +1,1 @@
+Allow a single worker to both notify appservices and update the user directory by removing the dependence on the `worker_type` worker config option.
