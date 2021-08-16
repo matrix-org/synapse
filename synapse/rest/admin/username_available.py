@@ -14,21 +14,17 @@
 import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Tuple
-from synapse.http.servlet import (
-    RestServlet,
-    parse_string,
-)
+
+from synapse.http.servlet import RestServlet, parse_string
 from synapse.http.site import SynapseRequest
-from synapse.rest.admin._base import (
-    admin_patterns,
-    assert_requester_is_admin,
-)
+from synapse.rest.admin._base import admin_patterns, assert_requester_is_admin
 from synapse.types import JsonDict
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
 
 class UsernameAvailableRestServlet(RestServlet):
     """An admin API to check if a given username is available, regardless of whether registration is enabled.

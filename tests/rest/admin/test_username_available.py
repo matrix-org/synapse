@@ -13,13 +13,11 @@
 # limitations under the License.
 
 import synapse.rest.admin
-from synapse.api.errors import (
-    Codes,
-    SynapseError,
-)
+from synapse.api.errors import Codes, SynapseError
 from synapse.rest.client.v1 import login
 
 from tests import unittest
+
 
 class UsernameAvailableTestCase(unittest.HomeserverTestCase):
     servlets = [

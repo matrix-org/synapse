@@ -38,7 +38,7 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -77,6 +77,8 @@ class _PaginationKey:
 class _PaginationSession:
     """The information that is stored for pagination."""
 
+    # The time the pagination session was created, in milliseconds.
+    creation_time_ms: int
     # The queue of rooms which are still to process.
     room_queue: Deque["_RoomQueueEntry"]
     # A set of rooms which have been processed.
@@ -84,9 +86,11 @@ class _PaginationSession:
 
 
 class SpaceSummaryHandler:
+    # The time a pagination session remains valid for.
+    _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
+
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
-        self._auth = hs.get_auth()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
@@ -107,6 +111,21 @@ class SpaceSummaryHandler:
             hs.get_clock(),
             "get_room_hierarchy",
         )
+
+    def _expire_pagination_sessions(self):
+        """Expire pagination session which are old."""
+        expire_before = (
+            self._clock.time_msec() - self._PAGINATION_SESSION_VALIDITY_PERIOD_MS
+        )
+        to_expire = []
+
+        for key, value in self._pagination_sessions.items():
+            if value.creation_time_ms < expire_before:
+                to_expire.append(key)
+
+        for key in to_expire:
+            logger.debug("Expiring pagination session id %s", key)
+            del self._pagination_sessions[key]
 
     async def get_space_summary(
         self,
@@ -133,9 +152,13 @@ class SpaceSummaryHandler:
         Returns:
             summary dict to return
         """
-        # first of all, check that the user is in the room in question (or it's
-        # world-readable)
-        await self._auth.check_user_in_room_or_world_readable(room_id, requester)
+        # First of all, check that the room is accessible.
+        if not await self._is_local_room_accessible(room_id, requester):
+            raise AuthError(
+                403,
+                "User %s not in room %s, and room previews are disabled"
+                % (requester, room_id),
+            )
 
         # the queue of rooms to process
         room_queue = deque((_RoomQueueEntry(room_id, ()),))
@@ -304,14 +327,18 @@ class SpaceSummaryHandler:
     ) -> JsonDict:
         """See docstring for SpaceSummaryHandler.get_room_hierarchy."""
 
-        # first of all, check that the user is in the room in question (or it's
-        # world-readable)
-        await self._auth.check_user_in_room_or_world_readable(
-            requested_room_id, requester
-        )
+        # First of all, check that the room is accessible.
+        if not await self._is_local_room_accessible(requested_room_id, requester):
+            raise AuthError(
+                403,
+                "User %s not in room %s, and room previews are disabled"
+                % (requester, requested_room_id),
+            )
 
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
+            self._expire_pagination_sessions()
+
             pagination_key = _PaginationKey(
                 requested_room_id, suggested_only, max_depth, from_token
             )
@@ -385,13 +412,13 @@ class SpaceSummaryHandler:
 
         # If there's additional data, generate a pagination token (and persist state).
         if room_queue:
-            next_token = random_string(24)
-            result["next_token"] = next_token
+            next_batch = random_string(24)
+            result["next_batch"] = next_batch
             pagination_key = _PaginationKey(
-                requested_room_id, suggested_only, max_depth, next_token
+                requested_room_id, suggested_only, max_depth, next_batch
             )
             self._pagination_sessions[pagination_key] = _PaginationSession(
-                room_queue, processed_rooms
+                self._clock.time_msec(), room_queue, processed_rooms
             )
 
         return result
@@ -590,7 +617,7 @@ class SpaceSummaryHandler:
         return results
 
     async def _is_local_room_accessible(
-        self, room_id: str, requester: Optional[str], origin: Optional[str]
+        self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
         """
         Calculate whether the room should be shown in the spaces summary.
@@ -744,7 +771,7 @@ class SpaceSummaryHandler:
         # Finally, check locally if we can access the room. The user might
         # already be in the room (if it was a child room), or there might be a
         # pending invite, etc.
-        return await self._is_local_room_accessible(room_id, requester, None)
+        return await self._is_local_room_accessible(room_id, requester)
 
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
@@ -761,7 +788,7 @@ class SpaceSummaryHandler:
         stats = await self._store.get_room_with_stats(room_id)
 
         # currently this should be impossible because we call
-        # check_user_in_room_or_world_readable on the room before we get here, so
+        # _is_local_room_accessible on the room before we get here, so
         # there should always be an entry
         assert stats is not None, "unable to retrieve stats for %s" % (room_id,)
 

@@ -1,0 +1,1 @@
+Fix a bug introduced in v1.37.1 where an error could occur in the asyncronous processing of PDUs when the queue was empty.

@@ -11,7 +11,7 @@
 #  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
-from typing import Any, Iterable, Optional, Tuple
+from typing import Any, Iterable, List, Optional, Tuple
 from unittest import mock
 
 from synapse.api.constants import (
@@ -127,7 +127,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self, space_id: str, room_id: str, token: str, order: Optional[str] = None
     ) -> None:
         """Add a child room to a space."""
-        content = {"via": [self.hs.hostname]}
+        content: JsonDict = {"via": [self.hs.hostname]}
         if order is not None:
             content["order"] = order
         self.helper.send_state(
@@ -248,7 +248,21 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
 
-        # The user cannot see the space.
+        # The user can see the space since it is publicly joinable.
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+        expected = [(self.space, [self.room]), (self.room, ())]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
+        self._assert_hierarchy(result, expected)
+
+        # If the space is made invite-only, it should no longer be viewable.
+        self.helper.send_state(
+            self.space,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
         self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
         self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
@@ -260,7 +274,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             tok=self.token,
         )
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
-        expected = [(self.space, [self.room]), (self.room, ())]
         self._assert_rooms(result, expected)
 
         result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
@@ -277,12 +290,23 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.get_failure(self.handler.get_room_hierarchy(user2, self.space), AuthError)
 
         # Join the space and results should be returned.
+        self.helper.invite(self.space, targ=user2, tok=self.token)
         self.helper.join(self.space, user2, tok=token2)
         result = self.get_success(self.handler.get_space_summary(user2, self.space))
         self._assert_rooms(result, expected)
 
         result = self.get_success(self.handler.get_room_hierarchy(user2, self.space))
         self._assert_hierarchy(result, expected)
+
+        # Attempting to view an unknown room returns the same error.
+        self.get_failure(
+            self.handler.get_space_summary(user2, "#not-a-space:" + self.hs.hostname),
+            AuthError,
+        )
+        self.get_failure(
+            self.handler.get_room_hierarchy(user2, "#not-a-space:" + self.hs.hostname),
+            AuthError,
+        )
 
     def _create_room_with_join_rule(
         self, join_rule: str, room_version: Optional[str] = None, **extra_content
@@ -439,23 +463,22 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         )
         # The result should have the space and all of the links, plus some of the
         # rooms and a pagination token.
-        expected = [(self.space, room_ids)] + [
-            (room_id, ()) for room_id in room_ids[:6]
-        ]
+        expected: List[Tuple[str, Iterable[str]]] = [(self.space, room_ids)]
+        expected += [(room_id, ()) for room_id in room_ids[:6]]
         self._assert_hierarchy(result, expected)
-        self.assertIn("next_token", result)
+        self.assertIn("next_batch", result)
 
         # Check the next page.
         result = self.get_success(
             self.handler.get_room_hierarchy(
-                self.user, self.space, limit=5, from_token=result["next_token"]
+                self.user, self.space, limit=5, from_token=result["next_batch"]
             )
         )
         # The result should have the space and the room in it, along with a link
         # from space -> room.
         expected = [(room_id, ()) for room_id in room_ids[6:]]
         self._assert_hierarchy(result, expected)
-        self.assertNotIn("next_token", result)
+        self.assertNotIn("next_batch", result)
 
     def test_invalid_pagination_token(self):
         """"""
@@ -470,12 +493,12 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.handler.get_room_hierarchy(self.user, self.space, limit=7)
         )
-        self.assertIn("next_token", result)
+        self.assertIn("next_batch", result)
 
         # Changing the room ID, suggested-only, or max-depth causes an error.
         self.get_failure(
             self.handler.get_room_hierarchy(
-                self.user, self.room, from_token=result["next_token"]
+                self.user, self.room, from_token=result["next_batch"]
             ),
             SynapseError,
         )
@@ -484,13 +507,13 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 self.user,
                 self.space,
                 suggested_only=True,
-                from_token=result["next_token"],
+                from_token=result["next_batch"],
             ),
             SynapseError,
         )
         self.get_failure(
             self.handler.get_room_hierarchy(
-                self.user, self.space, max_depth=0, from_token=result["next_token"]
+                self.user, self.space, max_depth=0, from_token=result["next_batch"]
             ),
             SynapseError,
         )
@@ -525,7 +548,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         result = self.get_success(
             self.handler.get_room_hierarchy(self.user, self.space, max_depth=0)
         )
-        expected = [(spaces[0], [rooms[0], spaces[1]])]
+        expected: List[Tuple[str, Iterable[str]]] = [(spaces[0], [rooms[0], spaces[1]])]
         self._assert_hierarchy(result, expected)
 
         # A single additional layer.
