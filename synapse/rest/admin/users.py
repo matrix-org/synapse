@@ -172,7 +172,7 @@ class UserRestServletV2(RestServlet):
 
         target_user = UserID.from_string(user_id)
         if not self.hs.is_mine(target_user):
-            raise SynapseError(400, "Can only lookup local users")
+            raise SynapseError(400, "Can only look up local users")
 
         ret = await self.admin_handler.get_user(target_user)
 
@@ -796,7 +796,7 @@ class PushersRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(400, "Can only lookup local users")
+            raise SynapseError(400, "Can only look up local users")
 
         if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
@@ -811,10 +811,10 @@ class PushersRestServlet(RestServlet):
 class UserMediaRestServlet(RestServlet):
     """
     Gets information about all uploaded local media for a specific `user_id`.
+    With DELETE request you can delete all this media.
 
     Example:
-        http://localhost:8008/_synapse/admin/v1/users/
-        @user:server/media
+        http://localhost:8008/_synapse/admin/v1/users/@user:server/media
 
     Args:
         The parameters `from` and `limit` are required for pagination.
@@ -830,6 +830,7 @@ class UserMediaRestServlet(RestServlet):
         self.is_mine = hs.is_mine
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
+        self.media_repository = hs.get_media_repository()
 
     async def on_GET(
         self, request: SynapseRequest, user_id: str
@@ -840,7 +841,7 @@ class UserMediaRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(400, "Can only lookup local users")
+            raise SynapseError(400, "Can only look up local users")
 
         user = await self.store.get_user_by_id(user_id)
         if user is None:
@@ -897,6 +898,73 @@ class UserMediaRestServlet(RestServlet):
             ret["next_token"] = start + len(media)
 
         return 200, ret
+
+    async def on_DELETE(
+        self, request: SynapseRequest, user_id: str
+    ) -> Tuple[int, JsonDict]:
+        # This will always be set by the time Twisted calls us.
+        assert request.args is not None
+
+        await assert_requester_is_admin(self.auth, request)
+
+        if not self.is_mine(UserID.from_string(user_id)):
+            raise SynapseError(400, "Can only look up local users")
+
+        user = await self.store.get_user_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Unknown user")
+
+        start = parse_integer(request, "from", default=0)
+        limit = parse_integer(request, "limit", default=100)
+
+        if start < 0:
+            raise SynapseError(
+                400,
+                "Query parameter from must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        if limit < 0:
+            raise SynapseError(
+                400,
+                "Query parameter limit must be a string representing a positive integer.",
+                errcode=Codes.INVALID_PARAM,
+            )
+
+        # If neither `order_by` nor `dir` is set, set the default order
+        # to newest media is on top for backward compatibility.
+        if b"order_by" not in request.args and b"dir" not in request.args:
+            order_by = MediaSortOrder.CREATED_TS.value
+            direction = "b"
+        else:
+            order_by = parse_string(
+                request,
+                "order_by",
+                default=MediaSortOrder.CREATED_TS.value,
+                allowed_values=(
+                    MediaSortOrder.MEDIA_ID.value,
+                    MediaSortOrder.UPLOAD_NAME.value,
+                    MediaSortOrder.CREATED_TS.value,
+                    MediaSortOrder.LAST_ACCESS_TS.value,
+                    MediaSortOrder.MEDIA_LENGTH.value,
+                    MediaSortOrder.MEDIA_TYPE.value,
+                    MediaSortOrder.QUARANTINED_BY.value,
+                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
+                ),
+            )
+            direction = parse_string(
+                request, "dir", default="f", allowed_values=("f", "b")
+            )
+
+        media, _ = await self.store.get_local_media_by_user_paginate(
+            start, limit, user_id, order_by, direction
+        )
+
+        deleted_media, total = await self.media_repository.delete_local_media_ids(
+            ([row["media_id"] for row in media])
+        )
+
+        return 200, {"deleted_media": deleted_media, "total": total}
 
 
 class UserTokenRestServlet(RestServlet):
@@ -1017,7 +1085,7 @@ class RateLimitRestServlet(RestServlet):
         await assert_requester_is_admin(self.auth, request)
 
         if not self.hs.is_mine_id(user_id):
-            raise SynapseError(400, "Can only lookup local users")
+            raise SynapseError(400, "Can only look up local users")
 
         if not await self.store.get_user_by_id(user_id):
             raise NotFoundError("User not found")
