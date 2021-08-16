@@ -227,7 +227,7 @@ the username <code>matrix</code>:</p>
 <p>This gives a Python REPL in which <code>hs</code> gives access to the
 <code>synapse.server.HomeServer</code> object - which in turn gives access to many other
 parts of the process.</p>
-<p>Note that any call which returns a coroutine will need to be wrapped in <code>ensureDeferred</code>.</p>
+<p>Note that, prior to Synapse 1.41, any call which returns a coroutine will need to be wrapped in <code>ensureDeferred</code>.</p>
 <p>As a simple example, retrieving an event from the database:</p>
 <pre><code class="language-pycon">&gt;&gt;&gt; from twisted.internet import defer
 &gt;&gt;&gt; defer.ensureDeferred(hs.get_datastore().get_event('$1416420717069yeQaw:matrix.org'))
