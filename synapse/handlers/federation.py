@@ -285,17 +285,16 @@ class FederationHandler(BaseHandler):
         #  - Fetching any missing prev events to fill in gaps in the graph
         #  - Fetching state if we have a hole in the graph
         if not pdu.internal_metadata.is_outlier():
-            # We only backfill backwards to the min depth.
-            min_depth = await self.get_min_depth_for_context(pdu.room_id)
-
-            logger.debug("min_depth: %d", min_depth)
-
             prevs = set(pdu.prev_event_ids())
             seen = await self.store.have_events_in_timeline(prevs)
             missing_prevs = prevs - seen
 
             if missing_prevs:
                 if sent_to_us_directly:
+                    # We only backfill backwards to the min depth.
+                    min_depth = await self.get_min_depth_for_context(pdu.room_id)
+                    logger.debug("min_depth: %d", min_depth)
+
                     if min_depth is not None and pdu.depth > min_depth:
                         # If we're missing stuff, ensure we only fetch stuff one
                         # at a time.
