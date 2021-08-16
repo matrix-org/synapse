@@ -547,7 +547,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self.handler = hs.get_space_summary_handler()
+        self.handler = hs.get_room_summary_handler()
 
     async def on_GET(
         self,
@@ -608,7 +608,7 @@ class FederationRoomHierarchyServlet(BaseFederationServlet):
         server_name: str,
     ):
         super().__init__(hs, authenticator, ratelimiter, server_name)
-        self.handler = hs.get_space_summary_handler()
+        self.handler = hs.get_room_summary_handler()
 
     async def on_GET(
         self,
