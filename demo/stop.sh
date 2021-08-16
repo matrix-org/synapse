@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# Speed up script by not using unicode.
+LC_ALL=C
+LANG=C
+
 DIR="$( cd "$( dirname "$0" )" && pwd )"
 
 FILES=$(find "$DIR" -name "*.pid" -type f);
