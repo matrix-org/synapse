@@ -370,10 +370,7 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif (
-            room_version.msc3083_join_rules
-            and join_rule == JoinRules.MSC3083_RESTRICTED
-        ):
+        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.

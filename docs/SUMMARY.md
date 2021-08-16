@@ -7,6 +7,7 @@
   - [Installation](setup/installation.md)
   - [Using Postgres](postgres.md)
   - [Configuring a Reverse Proxy](reverse_proxy.md)
+  - [Configuring a Forward/Outbound Proxy](setup/forward_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
   - [Delegation](delegate.md)
 

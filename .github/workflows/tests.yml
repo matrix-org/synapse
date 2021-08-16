@@ -8,7 +8,7 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-  
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -38,20 +38,15 @@ jobs:
     if: ${{ github.base_ref == 'develop'  || contains(github.base_ref, 'release-') }}
     runs-on: ubuntu-latest
     steps:
-      # Note: This and the script can be simplified once we drop Buildkite. See:
-      #   https://github.com/actions/checkout/issues/266#issuecomment-638346893
-      #   https://github.com/actions/checkout/issues/416
       - uses: actions/checkout@v2
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
       - uses: actions/setup-python@v2
       - run: pip install tox
-      - name: Patch Buildkite-specific test script
-        run: |
-          sed -i -e 's/\$BUILDKITE_PULL_REQUEST/${{ github.event.number }}/' \
-            scripts-dev/check-newsfragment
       - run: scripts-dev/check-newsfragment
+        env:
+          PULL_REQUEST_NUMBER: ${{ github.event.number }}
 
   lint-sdist:
     runs-on: ubuntu-latest
@@ -144,7 +139,7 @@ jobs:
         uses: docker://ubuntu:bionic # For old python and sqlite
         with:
           workdir: /github/workspace
-          entrypoint: .buildkite/scripts/test_old_deps.sh
+          entrypoint: .ci/scripts/test_old_deps.sh
         env:
           TRIAL_FLAGS: "--jobs=2"
       - name: Dump logs
@@ -197,12 +192,12 @@ jobs:
       volumes:
         - ${{ github.workspace }}:/src
       env:
-        BUILDKITE_BRANCH: ${{ github.head_ref }}
         POSTGRES: ${{ matrix.postgres && 1}}
         MULTI_POSTGRES: ${{ (matrix.postgres == 'multi-postgres') && 1}}
         WORKERS: ${{ matrix.workers && 1 }}
         REDIS: ${{ matrix.redis && 1 }}
         BLACKLIST: ${{ matrix.workers && 'synapse-blacklist-with-workers' }}
+        TOP: ${{ github.workspace }}
 
     strategy:
       fail-fast: false
@@ -232,7 +227,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - name: Prepare test blacklist
-        run: cat sytest-blacklist .buildkite/worker-blacklist > synapse-blacklist-with-workers
+        run: cat sytest-blacklist .ci/worker-blacklist > synapse-blacklist-with-workers
       - name: Run SyTest
         run: /bootstrap.sh synapse
         working-directory: /src
@@ -252,6 +247,8 @@ jobs:
     if: ${{ !failure() && !cancelled() }} # Allow previous steps to be skipped, but not fail
     needs: linting-done
     runs-on: ubuntu-latest
+    env:
+      TOP: ${{ github.workspace }}
     strategy:
       matrix:
         include:
@@ -281,13 +278,7 @@ jobs:
       - uses: actions/setup-python@v2
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Patch Buildkite-specific test scripts
-        run: |
-          sed -i -e 's/host="postgres"/host="localhost"/' .buildkite/scripts/postgres_exec.py
-          sed -i -e 's/host: postgres/host: localhost/' .buildkite/postgres-config.yaml
-          sed -i -e 's|/src/||' .buildkite/{sqlite,postgres}-config.yaml
-          sed -i -e 's/\$TOP/\$GITHUB_WORKSPACE/' .coveragerc
-      - run: .buildkite/scripts/test_synapse_port_db.sh
+      - run: .ci/scripts/test_synapse_port_db.sh
 
   complement:
     if: ${{ !failure() && !cancelled() }}
@@ -374,6 +365,11 @@ jobs:
           rc=0
           results=$(jq -r 'to_entries[] | [.key,.value.result] | join(" ")' <<< $NEEDS_CONTEXT)
           while read job result ; do
+              # The newsfile lint may be skipped on non PR builds
+              if [ $result == "skipped" ] && [ $job == "lint-newsfile" ]; then
+                continue
+              fi
+
               if [ "$result" != "success" ]; then
                   echo "::set-failed ::Job $job returned $result"
                   rc=1

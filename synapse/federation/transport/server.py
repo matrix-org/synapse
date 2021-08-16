@@ -450,21 +450,12 @@ class FederationSendServlet(BaseFederationServerServlet):
                 len(transaction_data.get("edus", [])),
             )
 
-            # We should ideally be getting this from the security layer.
-            # origin = body["origin"]
-
-            # Add some extra data to the transaction dict that isn't included
-            # in the request body.
-            transaction_data.update(
-                transaction_id=transaction_id, destination=self.server_name
-            )
-
         except Exception as e:
             logger.exception(e)
             return 400, {"error": "Invalid transaction"}
 
         code, response = await self.handler.on_incoming_transaction(
-            origin, transaction_data
+            origin, transaction_id, self.server_name, transaction_data
         )
 
         return code, response
@@ -1945,6 +1936,33 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
         )
 
 
+class FederationRoomHierarchyServlet(BaseFederationServlet):
+    PREFIX = FEDERATION_UNSTABLE_PREFIX + "/org.matrix.msc2946"
+    PATH = "/hierarchy/(?P<room_id>[^/]*)"
+
+    def __init__(
+        self,
+        hs: HomeServer,
+        authenticator: Authenticator,
+        ratelimiter: FederationRateLimiter,
+        server_name: str,
+    ):
+        super().__init__(hs, authenticator, ratelimiter, server_name)
+        self.handler = hs.get_space_summary_handler()
+
+    async def on_GET(
+        self,
+        origin: str,
+        content: Literal[None],
+        query: Mapping[bytes, Sequence[bytes]],
+        room_id: str,
+    ) -> Tuple[int, JsonDict]:
+        suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
+        return 200, await self.handler.get_federation_hierarchy(
+            origin, room_id, suggested_only
+        )
+
+
 class RoomComplexityServlet(BaseFederationServlet):
     """
     Indicates to other servers how complex (and therefore likely
@@ -2008,6 +2026,7 @@ FEDERATION_SERVLET_CLASSES: Tuple[Type[BaseFederationServlet], ...] = (
     FederationVersionServlet,
     RoomComplexityServlet,
     FederationSpaceSummaryServlet,
+    FederationRoomHierarchyServlet,
     FederationV1SendKnockServlet,
     FederationMakeKnockServlet,
 )

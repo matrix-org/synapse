@@ -629,14 +629,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # We don't update the event cache hit ratio as it completely throws off
         # the hit ratio counts. After all, we don't populate the cache if we
         # miss it here
-        event_map = self._get_events_from_cache(
-            member_event_ids, allow_rejected=False, update_metrics=False
-        )
+        event_map = self._get_events_from_cache(member_event_ids, update_metrics=False)
 
         missing_member_event_ids = []
         for event_id in member_event_ids:
             ev_entry = event_map.get(event_id)
-            if ev_entry:
+            if ev_entry and not ev_entry.event.rejected_reason:
                 if ev_entry.event.membership == Membership.JOIN:
                     users_in_room[ev_entry.event.state_key] = ProfileInfo(
                         display_name=ev_entry.event.content.get("displayname", None),
