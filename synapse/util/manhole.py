@@ -141,6 +141,13 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         sys.last_traceback = last_tb
         assert last_tb is not None
 
-        # We remove the first stack item because it is our own code.
-        lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
-        self.write("".join(lines))
+        try:
+            # We remove the first stack item because it is our own code.
+            lines = traceback.format_exception(ei[0], ei[1], last_tb.tb_next)
+            self.write("".join(lines))
+        finally:
+            # On the line below, last_tb and ei appear to be dead.
+            # It's unclear whether there is a reason behind this line.
+            # It conceivably could be because an exception raised in this block
+            # will keep the local frame (containing these local variables) around.
+            last_tb = ei = None  # type: ignore
