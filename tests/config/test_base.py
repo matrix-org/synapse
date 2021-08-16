@@ -127,6 +127,11 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
         # Test that the file has the expected content.
         self.assertEqual(template.render(), "hello world")
 
+        # Cleanup the temporary directories manually since we're not using a context
+        # manager.
+        for td in tempdirs:
+            td.cleanup()
+
     def test_loading_template_from_nonexistent_custom_directory(self):
         with self.assertRaises(ConfigError):
             self.hs.config.read_templates(
