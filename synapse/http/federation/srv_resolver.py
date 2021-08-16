@@ -28,10 +28,10 @@ from synapse.logging.context import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 
-SERVER_CACHE: Dict = {}
+SERVER_CACHE: Dict[bytes, List[Server]] = {}
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(auto_attribs=True, slots=True, frozen=True)
 class Server:
     """
     Our record of an individual server which can be tried to reach a destination.
@@ -45,11 +45,11 @@ class Server:
             the epoch
     """
 
-    host: bytes = attr.ib()
-    port: int = attr.ib()
-    priority: int = attr.ib(default=0)
-    weight: int = attr.ib(default=0)
-    expires: int = attr.ib(default=0)
+    host: bytes
+    port: int
+    priority: int = 0
+    weight: int = 0
+    expires: int = 0
 
 
 def _sort_server_list(server_list):
@@ -110,8 +110,8 @@ class SrvResolver:
     def __init__(
         self,
         dns_client=client,
-        cache: Dict = SERVER_CACHE,
-        get_time: Callable = time.time,
+        cache: Dict[bytes, List[Server]] = SERVER_CACHE,
+        get_time: Callable[[], float] = time.time,
     ):
         self._dns_client = dns_client
         self._cache = cache

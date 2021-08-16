@@ -198,8 +198,7 @@ class ProxyAgent(_AgentBase):
                     self.http_proxy_creds.as_proxy_authorization_value(),
                 )
             # Cache *all* connections under the same key, since we are only
-            # connecting to a single destination, the proxy
-            # The URL of proxy is not important for the key
+            # connecting to a single destination, the proxy:
             pool_key = "http-proxy"
             endpoint = self.http_proxy_endpoint
             request_path = uri
