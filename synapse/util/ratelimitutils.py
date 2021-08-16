@@ -15,7 +15,8 @@
 import collections
 import contextlib
 import logging
-from typing import DefaultDict
+import typing
+from typing import DefaultDict, Iterator
 
 from twisted.internet import defer
 
@@ -28,17 +29,14 @@ from synapse.logging.context import (
 )
 from synapse.util import Clock
 
+if typing.TYPE_CHECKING:
+    from contextlib import _GeneratorContextManager
+
 logger = logging.getLogger(__name__)
 
 
 class FederationRateLimiter:
     def __init__(self, clock: Clock, config: FederationRateLimitConfig):
-        """
-        Args:
-            clock
-            config
-        """
-
         def new_limiter():
             return _PerHostRatelimiter(clock=clock, config=config)
 
@@ -46,7 +44,7 @@ class FederationRateLimiter:
             str, "_PerHostRatelimiter"
         ] = collections.defaultdict(new_limiter)
 
-    def ratelimit(self, host: str):
+    def ratelimit(self, host: str) -> "_GeneratorContextManager[defer.Deferred]":
         """Used to ratelimit an incoming request from a given host
 
         Example usage:
@@ -96,7 +94,7 @@ class _PerHostRatelimiter:
         self.request_times = []
 
     @contextlib.contextmanager
-    def ratelimit(self):
+    def ratelimit(self) -> Iterator[defer.Deferred]:
         # `contextlib.contextmanager` takes a generator and turns it into a
         # context manager. The generator should only yield once with a value
         # to be returned by manager.
@@ -109,7 +107,7 @@ class _PerHostRatelimiter:
         finally:
             self._on_exit(request_id)
 
-    def _on_enter(self, request_id):
+    def _on_enter(self, request_id) -> defer.Deferred:
         time_now = self.clock.time_msec()
 
         # remove any entries from request_times which aren't within the window
@@ -184,7 +182,7 @@ class _PerHostRatelimiter:
         ret_defer.addBoth(on_both)
         return make_deferred_yieldable(ret_defer)
 
-    def _on_exit(self, request_id):
+    def _on_exit(self, request_id) -> None:
         logger.debug("Ratelimit [%s]: Processed req", id(request_id))
         self.current_processing.discard(request_id)
         try:
