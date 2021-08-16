@@ -1106,8 +1106,6 @@ class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
 
 
 def register_servlets(hs: "HomeServer", http_server, is_worker=False):
-    msc3266_enabled = hs.config.experimental.msc3266_enabled
-
     RoomStateEventRestServlet(hs).register(http_server)
     RoomMemberListRestServlet(hs).register(http_server)
     JoinedRoomMemberListRestServlet(hs).register(http_server)
@@ -1122,7 +1120,7 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomEventContextServlet(hs).register(http_server)
     RoomSpaceSummaryRestServlet(hs).register(http_server)
     RoomHierarchyRestServlet(hs).register(http_server)
-    if msc3266_enabled:
+    if hs.config.experimental.msc3266_enabled:
         RoomSummaryRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     JoinedRoomsRestServlet(hs).register(http_server)
