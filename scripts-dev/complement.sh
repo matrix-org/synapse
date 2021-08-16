@@ -24,7 +24,7 @@
 set -e
 
 # Change to the repository root
-cd "$(dirname $0)/.."
+cd "$(dirname "$0")/.."
 
 # Check for a user-specified Complement checkout
 if [[ -z "$COMPLEMENT_DIR" ]]; then
