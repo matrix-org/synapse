@@ -189,7 +189,7 @@ class ReceiptEventSource:
                 new_users = {}
                 for rr_user_id, user_rr in m_read.items():
                     try:
-                        hidden = user_rr.get("hidden", None)
+                        hidden = user_rr.get("hidden")
                     except AttributeError:
                         # Due to https://github.com/matrix-org/synapse/issues/10376
                         # there are cases where user_rr is a string, in those cases
