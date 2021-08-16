@@ -275,12 +275,25 @@ class WorkerConfig(Config):
         # be able to run on only a single instance (meaning that they don't
         # depend on any in-memory state of a particular worker).
         #
-        # No effort is made to ensure only a single instance of these tasks is
-        # running.
+        # No effort is made here to ensure only a single instance of these tasks
+        # are running.
         background_tasks_instance = config.get("run_background_tasks_on") or "master"
         self.run_background_tasks = (
             self.worker_name is None and background_tasks_instance == "master"
         ) or self.worker_name == background_tasks_instance
+
+        # Whether this worker should notify appservices of traffic within their namespace.
+        #
+        # As a note for developers, this task is currently not shardable, and thus should
+        # only be handled by a single process.
+        #
+        # No effort is made here to ensure only a single instance of this task running.
+        notify_appservices_instance = (
+            config.get("notify_appservices_from_worker") or "master"
+        )
+        self.should_notify_appservices = (
+            self.worker_name is None and notify_appservices_instance == "master"
+        ) or self.worker_name == notify_appservices_instance
 
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
@@ -322,6 +335,11 @@ class WorkerConfig(Config):
         # data). If not provided this defaults to the main process.
         #
         #run_background_tasks_on: worker1
+
+        # The worker that is used to notify application services of new traffic within
+        # their configured namespace. If not provided this defaults to the main process.
+        #
+        #notify_appservices_from_worker: worker2
 
         # A shared secret used by the replication APIs to authenticate HTTP requests
         # from workers.
