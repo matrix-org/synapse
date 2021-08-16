@@ -298,11 +298,11 @@ class UserRestServletV2(RestServlet):
 
             if password is not None:
                 logout_devices = True
-                password_hash = await self.auth_handler.hash(password)
+                new_password_hash = await self.auth_handler.hash(password)
 
                 await self.set_password_handler.set_password(
                     target_user.to_string(),
-                    password_hash,
+                    new_password_hash,
                     logout_devices,
                     requester,
                 )
