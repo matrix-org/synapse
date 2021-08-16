@@ -319,10 +319,9 @@ def register_servlets(
     for servlet_group in servlet_groups:
         # Skip unknown servlet groups.
         if servlet_group not in DEFAULT_SERVLET_GROUPS:
-            logger.warning(
+            raise RuntimeError(
                 f"Attempting to register unknown federation servlet: '{servlet_group}'"
             )
-            continue
 
         for servletclass in DEFAULT_SERVLET_GROUPS[servlet_group]:
             servletclass(
