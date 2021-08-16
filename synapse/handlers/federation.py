@@ -292,9 +292,9 @@ class FederationHandler(BaseHandler):
 
             prevs = set(pdu.prev_event_ids())
             seen = await self.store.have_events_in_timeline(prevs)
+            missing_prevs = prevs - seen
 
             if min_depth is not None and pdu.depth > min_depth:
-                missing_prevs = prevs - seen
                 if sent_to_us_directly and missing_prevs:
                     # If we're missing stuff, ensure we only fetch stuff one
                     # at a time.
@@ -322,13 +322,11 @@ class FederationHandler(BaseHandler):
                     # Update the set of things we've seen after trying to
                     # fetch the missing stuff
                     seen = await self.store.have_events_in_timeline(prevs)
+                    missing_prevs = prevs - seen
 
-                    if not prevs - seen:
-                        logger.info(
-                            "Found all missing prev_events",
-                        )
+                    if not missing_prevs:
+                        logger.info("Found all missing prev_events")
 
-            missing_prevs = prevs - seen
             if missing_prevs:
                 # We've still not been able to get all of the prev_events for this event.
                 #
