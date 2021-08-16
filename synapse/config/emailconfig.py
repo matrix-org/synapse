@@ -257,7 +257,9 @@ class EmailConfig(Config):
                     registration_template_success_html,
                     add_threepid_template_success_html,
                 ],
-                (td for td in (template_dir,) if td),  # Filter out template_dir if not provided
+                (
+                    td for td in (template_dir,) if td
+                ),  # Filter out template_dir if not provided
             )
 
             # Render templates that do not contain any placeholders
