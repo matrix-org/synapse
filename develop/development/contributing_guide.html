@@ -205,8 +205,9 @@
 <li><a href="#8-test-test-test">8. Test, test, test!</a>
 <ul>
 <li><a href="#run-the-linters">Run the linters.</a></li>
-<li><a href="#run-the-unit-tests">Run the unit tests.</a></li>
-<li><a href="#run-the-integration-tests">Run the integration tests.</a></li>
+<li><a href="#run-the-unit-tests-twisted-trial">Run the unit tests.</a></li>
+<li><a href="#run-the-integration-tests-sytest">Run the integration tests (SyTest).</a></li>
+<li><a href="#run-the-integration-tests-complement">Run the integration tests (Complement).</a></li>
 </ul>
 </li>
 <li><a href="#9-submit-your-patch">9. Submit your patch.</a>
@@ -331,7 +332,7 @@ anything was broken. They are slower than the unit tests but will
 typically catch more errors.</p>
 <p>The following command will let you run the integration test with the most common
 configuration:</p>
-<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:py37
+<pre><code class="language-sh">$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
 </code></pre>
 <p>This configuration should generally cover  your needs. For more details about other configurations, see <a href="https://github.com/matrix-org/sytest/blob/develop/docker/README.md">documentation in the SyTest repo</a>.</p>
 <h2 id="run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa"><a class="header" href="#run-the-integration-tests-a-hrefhttpsgithubcommatrix-orgcomplementcomplementa">Run the integration tests (<a href="https://github.com/matrix-org/complement">Complement</a>).</a></h2>
