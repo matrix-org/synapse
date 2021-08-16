@@ -187,7 +187,14 @@ class ReceiptEventSource:
 
                 new_users = {}
                 for rr_user_id, user_rr in m_read.items():
-                    hidden = user_rr.get("hidden", None)
+                    try:
+                        hidden = user_rr.get("hidden")
+                    except AttributeError:
+                        # Due to https://github.com/matrix-org/synapse/issues/10376
+                        # there are cases where user_rr is a string, in those cases
+                        # we just ignore the read receipt
+                        continue
+
                     if hidden is not True or rr_user_id == user_id:
                         new_users[rr_user_id] = user_rr.copy()
                         # If hidden has a value replace hidden with the correct prefixed key
