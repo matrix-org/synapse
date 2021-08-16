@@ -557,7 +557,14 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
         room_id: str,
     ) -> Tuple[int, JsonDict]:
         suggested_only = parse_boolean_from_args(query, "suggested_only", default=False)
+
         max_rooms_per_space = parse_integer_from_args(query, "max_rooms_per_space")
+        if max_rooms_per_space is not None and max_rooms_per_space < 0:
+            raise SynapseError(
+                400,
+                "Value for 'max_rooms_per_space' must be a non-negative integer",
+                Codes.BAD_JSON,
+            )
 
         exclude_rooms = parse_strings_from_args(query, "exclude_rooms", default=[])
 
@@ -586,10 +593,17 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
             raise SynapseError(400, "bad value for 'exclude_rooms'", Codes.BAD_JSON)
 
         max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
-            raise SynapseError(
-                400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
-            )
+        if max_rooms_per_space is not None:
+            if not isinstance(max_rooms_per_space, int):
+                raise SynapseError(
+                    400, "bad value for 'max_rooms_per_space'", Codes.BAD_JSON
+                )
+            if max_rooms_per_space < 0:
+                raise SynapseError(
+                    400,
+                    "Value for 'max_rooms_per_space' must be a non-negative integer",
+                    Codes.BAD_JSON,
+                )
 
         return 200, await self.handler.federation_space_summary(
             origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
