@@ -3,6 +3,10 @@
 # This script builds the Docker image to run the PostgreSQL tests, and then runs
 # the tests.
 
+# Speed up script by not using unicode.
+LC_ALL=C
+LANG=C
+
 set -e
 
 # Build, and tag
