@@ -19,8 +19,7 @@ from twisted.internet.defer import succeed
 import synapse.rest.admin
 from synapse.api.constants import LoginType
 from synapse.handlers.ui_auth.checkers import UserInteractiveAuthChecker
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import account, auth, devices, register
+from synapse.rest.client import account, auth, devices, login, register
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.types import JsonDict, UserID
 

@@ -1,3 +1,30 @@
+Synapse 1.40.0 (2021-08-10)
+===========================
+
+No significant changes.
+
+
+Synapse 1.40.0rc3 (2021-08-09)
+==============================
+
+Features
+--------
+
+- Support [MSC3289: room version 8](https://github.com/matrix-org/matrix-doc/pull/3289). ([\#10449](https://github.com/matrix-org/synapse/issues/10449))
+
+
+Bugfixes
+--------
+
+- Mark the experimental room version from [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) as unstable. ([\#10449](https://github.com/matrix-org/synapse/issues/10449))
+
+
+Improved Documentation
+----------------------
+
+- Fix broken links in `upgrade.md`. Contributed by @dklimpel. ([\#10543](https://github.com/matrix-org/synapse/issues/10543))
+
+
 Synapse 1.40.0rc2 (2021-08-04)
 ==============================
 

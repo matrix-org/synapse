@@ -447,31 +447,6 @@ class CachesStream(Stream):
         )
 
 
-class PublicRoomsStream(Stream):
-    """The public rooms list changed"""
-
-    PublicRoomsStreamRow = namedtuple(
-        "PublicRoomsStreamRow",
-        (
-            "room_id",  # str
-            "visibility",  # str
-            "appservice_id",  # str, optional
-            "network_id",  # str, optional
-        ),
-    )
-
-    NAME = "public_rooms"
-    ROW_TYPE = PublicRoomsStreamRow
-
-    def __init__(self, hs):
-        store = hs.get_datastore()
-        super().__init__(
-            hs.get_instance_name(),
-            current_token_without_instance(store.get_current_public_room_stream_id),
-            store.get_all_new_public_rooms,
-        )
-
-
 class DeviceListsStream(Stream):
     """Either a user has updated their devices or a remote server needs to be
     told about a device update.

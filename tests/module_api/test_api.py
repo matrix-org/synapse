@@ -20,7 +20,7 @@ from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, presence, room
+from synapse.rest.client import login, presence, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence
@@ -78,6 +78,16 @@ class ModuleApiTestCase(HomeserverTestCase):
         # Check that the displayname was assigned
         displayname = self.get_success(self.store.get_profile_displayname("bob"))
         self.assertEqual(displayname, "Bobberino")
+
+    def test_get_userinfo_by_id(self):
+        user_id = self.register_user("alice", "1234")
+        found_user = self.get_success(self.module_api.get_userinfo_by_id(user_id))
+        self.assertEqual(found_user.user_id.to_string(), user_id)
+        self.assertIdentical(found_user.is_admin, False)
+
+    def test_get_userinfo_by_id__no_user_found(self):
+        found_user = self.get_success(self.module_api.get_userinfo_by_id("@alice:test"))
+        self.assertIsNone(found_user)
 
     def test_sending_events_into_room(self):
         """Tests that a module can send events into a room"""

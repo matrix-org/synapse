@@ -22,7 +22,7 @@ from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, presence, room
+from synapse.rest.client import login, presence, room
 from synapse.types import JsonDict, StreamToken, create_requester
 
 from tests.handlers.test_sync import generate_sync_config

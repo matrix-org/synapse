@@ -45,7 +45,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -91,6 +91,7 @@ class ModuleApi:
         self._state = hs.get_state_handler()
         self._clock: Clock = hs.get_clock()
         self._send_email_handler = hs.get_send_email_handler()
+        self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
             app_name = self._hs.config.email_app_name
@@ -173,6 +174,16 @@ class ModuleApi:
     def email_app_name(self) -> str:
         """The application name configured in the homeserver's configuration."""
         return self._hs.config.email.email_app_name
+
+    async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
+        """Get user info by user_id
+
+        Args:
+            user_id: Fully qualified user id.
+        Returns:
+            UserInfo object if a user was found, otherwise None
+        """
+        return await self._store.get_userinfo_by_id(user_id)
 
     async def get_user_by_req(
         self,
@@ -667,7 +678,10 @@ class ModuleApi:
             A list containing the loaded templates, with the orders matching the one of
             the filenames parameter.
         """
-        return self._hs.config.read_templates(filenames, custom_template_directory)
+        return self._hs.config.read_templates(
+            filenames,
+            (td for td in (self.custom_template_dir, custom_template_directory) if td),
+        )
 
 
 class PublicRoomListManager:

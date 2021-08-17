@@ -15,8 +15,7 @@
 import os
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import sync
+from synapse.rest.client import login, room, sync
 
 from tests import unittest
 
