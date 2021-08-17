@@ -17,7 +17,7 @@ import hashlib
 import hmac
 
 from synapse.http.servlet import RestServlet
-from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.client._base import client_patterns
 
 
 class VoipRestServlet(RestServlet):

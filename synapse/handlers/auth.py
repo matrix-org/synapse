@@ -73,7 +73,7 @@ from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.rest.client.v1.login import LoginResponse
+    from synapse.rest.client.login import LoginResponse
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -461,7 +461,7 @@ class AuthHandler(BaseHandler):
 
         If no auth flows have been completed successfully, raises an
         InteractiveAuthIncompleteError. To handle this, you can use
-        synapse.rest.client.v2_alpha._base.interactive_auth_handler as a
+        synapse.rest.client._base.interactive_auth_handler as a
         decorator.
 
         Args:
@@ -543,7 +543,7 @@ class AuthHandler(BaseHandler):
             # Note that the registration endpoint explicitly removes the
             # "initial_device_display_name" parameter if it is provided
             # without a "password" parameter. See the changes to
-            # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
+            # synapse.rest.client.register.RegisterRestServlet.on_POST
             # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
             if not clientdict:
                 clientdict = session.clientdict
