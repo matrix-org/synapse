@@ -214,6 +214,7 @@ expressions:
     ^/_matrix/federation/v1/send/
 
     # Client API requests
+    ^/_matrix/client/(api/v1|r0|unstable)/createRoom$
     ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
