@@ -386,6 +386,40 @@ for a list of possible parameters), and a boolean indicating whether the user pe
 the request is a server admin.</p>
 <p>Modules can modify the <code>request_content</code> (by e.g. adding events to its <code>initial_state</code>),
 or deny the room's creation by raising a <code>module_api.errors.SynapseError</code>.</p>
+<h4 id="presence-router-callbacks"><a class="header" href="#presence-router-callbacks">Presence router callbacks</a></h4>
+<p>Presence router callbacks allow module developers to specify additional users (local or remote)
+to receive certain presence updates from local users. Presence router callbacks can be 
+registered using the module API's <code>register_presence_router_callbacks</code> method.</p>
+<p>The available presence router callbacks are:</p>
+<pre><code class="language-python">async def get_users_for_states(
+    self,
+    state_updates: Iterable[&quot;synapse.api.UserPresenceState&quot;],
+) -&gt; Dict[str, Set[&quot;synapse.api.UserPresenceState&quot;]]:
+</code></pre>
+<p><strong>Requires</strong> <code>get_interested_users</code> to also be registered</p>
+<p>Called when processing updates to the presence state of one or more users. This callback can
+be used to instruct the server to forward that presence state to specific users. The module
+must return a dictionary that maps from Matrix user IDs (which can be local or remote) to the
+<code>UserPresenceState</code> changes that they should be forwarded.</p>
+<p>Synapse will then attempt to send the specified presence updates to each user when possible.</p>
+<pre><code class="language-python">async def get_interested_users(
+        self, 
+        user_id: str
+) -&gt; Union[Set[str], &quot;synapse.module_api.PRESENCE_ALL_USERS&quot;]
+</code></pre>
+<p><strong>Requires</strong> <code>get_users_for_states</code> to also be registered</p>
+<p>Called when determining which users someone should be able to see the presence state of. This
+callback should return complementary results to <code>get_users_for_state</code> or the presence information 
+may not be properly forwarded.</p>
+<p>The callback is given the Matrix user ID for a local user that is requesting presence data and
+should return the Matrix user IDs of the users whose presence state they are allowed to
+query. The returned users can be local or remote. </p>
+<p>Alternatively the callback can return <code>synapse.module_api.PRESENCE_ALL_USERS</code>
+to indicate that the user should receive updates from all known users.</p>
+<p>For example, if the user <code>@alice:example.org</code> is passed to this method, and the Set 
+<code>{&quot;@bob:example.com&quot;, &quot;@charlie:somewhere.org&quot;}</code> is returned, this signifies that Alice 
+should receive presence updates sent by Bob and Charlie, regardless of whether these users 
+share a room.</p>
 <h3 id="porting-an-existing-module-that-uses-the-old-interface"><a class="header" href="#porting-an-existing-module-that-uses-the-old-interface">Porting an existing module that uses the old interface</a></h3>
 <p>In order to port a module that uses Synapse's old module interface, its author needs to:</p>
 <ul>
