@@ -84,7 +84,7 @@ class BaseConfigTestCase(unittest.HomeserverTestCase):
             tempfile.TemporaryDirectory(),
         ]
 
-        # Create one template in each directory, which content is the index of the
+        # Create one template in each directory, whose content is the index of the
         # directory in the list.
         template_filename = "my_template.html.j2"
         for i in range(len(tempdirs)):
