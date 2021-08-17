@@ -259,10 +259,11 @@ class SyncRestServlet(RestServlet):
         # Corresponding synapse issue: https://github.com/matrix-org/synapse/issues/10456
         response["device_one_time_keys_count"] = sync_result.device_one_time_keys_count
 
-        if sync_result.device_unused_fallback_key_types:
-            response[
-                "org.matrix.msc2732.device_unused_fallback_key_types"
-            ] = sync_result.device_unused_fallback_key_types
+        # https://github.com/matrix-org/matrix-doc/blob/54255851f642f84a4f1aaf7bc063eebe3d76752b/proposals/2732-olm-fallback-keys.md
+        # states that this field should always be included, as long as the server supports the feature.
+        response[
+            "org.matrix.msc2732.device_unused_fallback_key_types"
+        ] = sync_result.device_unused_fallback_key_types
 
         if joined:
             response["rooms"][Membership.JOIN] = joined
