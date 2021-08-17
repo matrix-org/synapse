@@ -289,8 +289,8 @@ class FederationHandler(BaseHandler):
             seen = await self.store.have_events_in_timeline(prevs)
             missing_prevs = prevs - seen
 
-            if missing_prevs:
-                if sent_to_us_directly:
+            if sent_to_us_directly:
+                if missing_prevs:
                     # We only backfill backwards to the min depth.
                     min_depth = await self.get_min_depth_for_context(pdu.room_id)
                     logger.debug("min_depth: %d", min_depth)
@@ -351,7 +351,8 @@ class FederationHandler(BaseHandler):
                             affected=pdu.event_id,
                         )
 
-                else:
+            else:
+                if missing_prevs:
                     state = await self._resolve_state_at_missing_prevs(origin, pdu)
 
         # A second round of checks for all events. Check that the event passes auth
