@@ -42,13 +42,13 @@ class StateCompressorConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
-        # The state compressor is an experimental tool which attempts to 
+        # The state compressor is an experimental tool which attempts to
         # reduce the number of rows in the state_groups_state table
         # of postgres databases.
         #
         # For more information please see
         # https://matrix-org.github.io/synapse/latest/state_compressor.html
-        # 
+        #
         state_compressor:
         #  enabled: true
         #  # The (rough) number of state groups to load at one time
@@ -58,5 +58,5 @@ class StateCompressorConfig(Config):
         #  # The default level sizes for the compressor to use
         #  default_levels: 100,50,25
         #  # How frequently to run the state compressor
-        #  time_between_runs: 1d   
+        #  time_between_runs: 1d
         """
