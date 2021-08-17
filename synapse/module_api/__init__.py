@@ -58,6 +58,8 @@ This package defines the 'stable' API which can be used by extension modules whi
 are loaded into Synapse.
 """
 
+PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
+
 __all__ = [
     "errors",
     "make_deferred_yieldable",
@@ -71,6 +73,7 @@ __all__ = [
     "DirectServeHtmlResource",
     "DirectServeJsonResource",
     "ModuleApi",
+    "PRESENCE_ALL_USERS",
 ]
 
 logger = logging.getLogger(__name__)
@@ -113,11 +116,6 @@ class ModuleApi:
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._presence_router = hs.get_presence_router()
-
-    #################################################################################
-    # Constants for modules to ues
-
-    PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.

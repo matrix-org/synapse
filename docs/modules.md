@@ -304,11 +304,12 @@ must return a dictionary that maps from Matrix user IDs (which can be local or r
 `UserPresenceState` changes that they should be forwarded.
 
 Synapse will then attempt to send the specified presence updates to each user when possible.
+
 ```python
 async def get_interested_users(
         self, 
         user_id: str
-) -> Union[Set[str], "synapse.module_api.ModuleApi.PRESENCE_ALL_USERS"]
+) -> Union[Set[str], "synapse.module_api.PRESENCE_ALL_USERS"]
 ```
 **Requires** `get_users_for_states` to also be registered
 
@@ -320,7 +321,7 @@ The callback is given the Matrix user ID for the user that's requesting presence
 should return the Matrix user IDs of the users whose presence state they are allowed to
 query. The returned users can be local or remote. 
 
-Alternatively the callback can return `synapse.module_api.ModuleApi.PRESENCE_ALL_USERS`
+Alternatively the callback can return `synapse.module_api.PRESENCE_ALL_USERS`
 to indicate that the user should receive updates from all known users.
 
 For example, if the user `@alice:example.org` is passed to this method, and the Set 
