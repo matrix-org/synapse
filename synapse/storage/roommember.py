@@ -14,8 +14,7 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import attr
 
@@ -45,7 +44,10 @@ class ProfileInfo:
     display_name: Optional[str]
 
 
-# "members" points to a truncated list of (user_id, event_id) tuples for users of
-# a given membership type, suitable for use in calculating heroes for a room.
-# "count" points to the total numberr of users of a given membership type.
-MemberSummary = namedtuple("MemberSummary", ("members", "count"))
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class MemberSummary:
+    # A truncated list of (user_id, event_id) tuples for users of a given
+    # membership type, suitable for use in calculating heroes for a room.
+    members: List[Tuple[str, str]]
+    # The total number of users of a given membership type.
+    count: int

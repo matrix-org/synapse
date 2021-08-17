@@ -701,7 +701,7 @@ class SyncHandler:
         name_id = state_ids.get((EventTypes.Name, ""))
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ""))
 
-        summary = {}
+        summary: JsonDict = {}
         empty_ms = MemberSummary([], 0)
 
         # TODO: only send these when they change.
