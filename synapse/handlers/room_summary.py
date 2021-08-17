@@ -28,7 +28,7 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import AuthError, Codes, SynapseError
+from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -75,7 +75,7 @@ class _PaginationSession:
     processed_rooms: Set[str]
 
 
-class SpaceSummaryHandler:
+class RoomSummaryHandler:
     # The time a pagination session remains valid for.
     _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
 
@@ -412,7 +412,7 @@ class SpaceSummaryHandler:
                         room_entry,
                         children_room_entries,
                         inaccessible_children,
-                    ) = await self._summarize_remote_room_hiearchy(
+                    ) = await self._summarize_remote_room_hierarchy(
                         queue_entry,
                         suggested_only,
                     )
@@ -724,7 +724,7 @@ class SpaceSummaryHandler:
 
         return results
 
-    async def _summarize_remote_room_hiearchy(
+    async def _summarize_remote_room_hierarchy(
         self, room: "_RoomQueueEntry", suggested_only: bool
     ) -> Tuple[Optional["_RoomEntry"], Dict[str, JsonDict], Set[str]]:
         """
@@ -781,25 +781,25 @@ class SpaceSummaryHandler:
         self, room_id: str, requester: Optional[str], origin: Optional[str] = None
     ) -> bool:
         """
-        Calculate whether the room should be shown in the spaces summary.
+        Calculate whether the room should be shown to the requester.
 
-        It should be included if:
+        It should return true if:
 
         * The requester is joined or can join the room (per MSC3173).
         * The origin server has any user that is joined or can join the room.
         * The history visibility is set to world readable.
 
         Args:
-            room_id: The room ID to summarize.
+            room_id: The room ID to check accessibility of.
             requester:
-                The user requesting the summary, if it is a local request. None
-                if this is a federation request.
+                The user making the request, if it is a local request.
+                None if this is a federation request.
             origin:
-                The server requesting the summary, if it is a federation request.
+                The server making the request, if it is a federation request.
                 None if this is a local request.
 
         Returns:
-             True if the room should be included in the spaces summary.
+             True if the room is accessible to the requesting user or server.
         """
         state_ids = await self._store.get_current_state_ids(room_id)
 
@@ -893,9 +893,9 @@ class SpaceSummaryHandler:
         self, requester: str, room_id: str, room: JsonDict
     ) -> bool:
         """
-        Calculate whether the room received over federation should be shown in the spaces summary.
+        Calculate whether the room received over federation should be shown to the requester.
 
-        It should be included if:
+        It should return true if:
 
         * The requester is joined or can join the room (per MSC3173).
         * The history visibility is set to world readable.
@@ -907,10 +907,10 @@ class SpaceSummaryHandler:
         Args:
             requester: The user requesting the summary.
             room_id: The room ID returned over federation.
-            room: The summary of the child room returned over federation.
+            room: The summary of the room returned over federation.
 
         Returns:
-            True if the room should be included in the spaces summary.
+            True if the room is accessible to the requesting user.
         """
         # The API doesn't return the room version so assume that a
         # join rule of knock is valid.
@@ -936,7 +936,7 @@ class SpaceSummaryHandler:
 
     async def _build_room_entry(self, room_id: str, for_federation: bool) -> JsonDict:
         """
-        Generate en entry suitable for the 'rooms' list in the summary response.
+        Generate en entry summarising a single room.
 
         Args:
             room_id: The room ID to summarize.
@@ -1023,6 +1023,61 @@ class SpaceSummaryHandler:
         # filter out any events without a "via" (which implies it has been redacted),
         # and order to ensure we return stable results.
         return sorted(filter(_has_valid_via, events), key=_child_events_comparison_key)
+
+    async def get_room_summary(
+        self,
+        requester: Optional[str],
+        room_id: str,
+        remote_room_hosts: Optional[List[str]] = None,
+    ) -> JsonDict:
+        """
+        Implementation of the room summary C-S API from MSC3266
+
+        Args:
+            requester:  user id of the user making this request, will be None
+                for unauthenticated requests
+
+            room_id: room id to summarise.
+
+            remote_room_hosts: a list of homeservers to try fetching data through
+                if we don't know it ourselves
+
+        Returns:
+            summary dict to return
+        """
+        is_in_room = await self._store.is_host_joined(room_id, self._server_name)
+
+        if is_in_room:
+            room_entry = await self._summarize_local_room(
+                requester,
+                None,
+                room_id,
+                # Suggested-only doesn't matter since no children are requested.
+                suggested_only=False,
+                max_children=0,
+            )
+
+            if not room_entry:
+                raise NotFoundError("Room not found or is not accessible")
+
+            room_summary = room_entry.room
+
+            # If there was a requester, add their membership.
+            if requester:
+                (
+                    membership,
+                    _,
+                ) = await self._store.get_local_current_membership_for_user_in_room(
+                    requester, room_id
+                )
+
+                room_summary["membership"] = membership or "leave"
+        else:
+            # TODO federation API, descoped from initial unstable implementation
+            #      as MSC needs more maturing on that side.
+            raise SynapseError(400, "Federation is not currently supported.")
+
+        return room_summary
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

@@ -24,12 +24,14 @@ from synapse.api.errors import (
     AuthError,
     Codes,
     InvalidClientCredentialsError,
+    MissingClientTokenError,
     ShadowBanError,
     SynapseError,
 )
 from synapse.api.filtering import Filter
 from synapse.events.utils import format_event_for_client_v2
 from synapse.http.servlet import (
+    ResolveRoomIdMixin,
     RestServlet,
     assert_params_in_dict,
     parse_boolean,
@@ -44,14 +46,7 @@ from synapse.rest.client.transactions import HttpTransactionCache
 from synapse.rest.client.v2_alpha._base import client_patterns
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import (
-    JsonDict,
-    RoomAlias,
-    RoomID,
-    StreamToken,
-    ThirdPartyInstanceID,
-    UserID,
-)
+from synapse.types import JsonDict, StreamToken, ThirdPartyInstanceID, UserID
 from synapse.util import json_decoder
 from synapse.util.stringutils import parse_and_validate_server_name, random_string
 
@@ -266,10 +261,10 @@ class RoomSendEventRestServlet(TransactionRestServlet):
 
 
 # TODO: Needs unit testing for room ID + alias joins
-class JoinRoomAliasServlet(TransactionRestServlet):
+class JoinRoomAliasServlet(ResolveRoomIdMixin, TransactionRestServlet):
     def __init__(self, hs):
         super().__init__(hs)
-        self.room_member_handler = hs.get_room_member_handler()
+        super(ResolveRoomIdMixin, self).__init__(hs)  # ensure the Mixin is set up
         self.auth = hs.get_auth()
 
     def register(self, http_server):
@@ -292,24 +287,13 @@ class JoinRoomAliasServlet(TransactionRestServlet):
             # cheekily send invalid bodies.
             content = {}
 
-        if RoomID.is_valid(room_identifier):
-            room_id = room_identifier
-
-            # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
-            args: Dict[bytes, List[bytes]] = request.args  # type: ignore
-
-            remote_room_hosts = parse_strings_from_args(
-                args, "server_name", required=False
-            )
-        elif RoomAlias.is_valid(room_identifier):
-            handler = self.room_member_handler
-            room_alias = RoomAlias.from_string(room_identifier)
-            room_id_obj, remote_room_hosts = await handler.lookup_room_alias(room_alias)
-            room_id = room_id_obj.to_string()
-        else:
-            raise SynapseError(
-                400, "%s was not legal room ID or room alias" % (room_identifier,)
-            )
+        # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+        remote_room_hosts = parse_strings_from_args(args, "server_name", required=False)
+        room_id, remote_room_hosts = await self.resolve_room_id(
+            room_identifier,
+            remote_room_hosts,
+        )
 
         await self.room_member_handler.update_membership(
             requester=requester,
@@ -1002,18 +986,26 @@ class RoomSpaceSummaryRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._space_summary_handler = hs.get_space_summary_handler()
+        self._room_summary_handler = hs.get_room_summary_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self._auth.get_user_by_req(request, allow_guest=True)
 
-        return 200, await self._space_summary_handler.get_space_summary(
+        max_rooms_per_space = parse_integer(request, "max_rooms_per_space")
+        if max_rooms_per_space is not None and max_rooms_per_space < 0:
+            raise SynapseError(
+                400,
+                "Value for 'max_rooms_per_space' must be a non-negative integer",
+                Codes.BAD_JSON,
+            )
+
+        return 200, await self._room_summary_handler.get_space_summary(
             requester.user.to_string(),
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
-            max_rooms_per_space=parse_integer(request, "max_rooms_per_space"),
+            max_rooms_per_space=max_rooms_per_space,
         )
 
     # TODO When switching to the stable endpoint, remove the POST handler.
@@ -1030,12 +1022,19 @@ class RoomSpaceSummaryRestServlet(RestServlet):
             )
 
         max_rooms_per_space = content.get("max_rooms_per_space")
-        if max_rooms_per_space is not None and not isinstance(max_rooms_per_space, int):
-            raise SynapseError(
-                400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
-            )
+        if max_rooms_per_space is not None:
+            if not isinstance(max_rooms_per_space, int):
+                raise SynapseError(
+                    400, "'max_rooms_per_space' must be an integer", Codes.BAD_JSON
+                )
+            if max_rooms_per_space < 0:
+                raise SynapseError(
+                    400,
+                    "Value for 'max_rooms_per_space' must be a non-negative integer",
+                    Codes.BAD_JSON,
+                )
 
-        return 200, await self._space_summary_handler.get_space_summary(
+        return 200, await self._room_summary_handler.get_space_summary(
             requester.user.to_string(),
             room_id,
             suggested_only=suggested_only,
@@ -1054,7 +1053,7 @@ class RoomHierarchyRestServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._auth = hs.get_auth()
-        self._space_summary_handler = hs.get_space_summary_handler()
+        self._room_summary_handler = hs.get_room_summary_handler()
 
     async def on_GET(
         self, request: SynapseRequest, room_id: str
@@ -1073,13 +1072,51 @@ class RoomHierarchyRestServlet(RestServlet):
                 400, "'limit' must be a positive integer", Codes.BAD_JSON
             )
 
-        return 200, await self._space_summary_handler.get_room_hierarchy(
+        return 200, await self._room_summary_handler.get_room_hierarchy(
             requester.user.to_string(),
             room_id,
             suggested_only=parse_boolean(request, "suggested_only", default=False),
             max_depth=max_depth,
             limit=limit,
             from_token=parse_string(request, "from"),
+        )
+
+
+class RoomSummaryRestServlet(ResolveRoomIdMixin, RestServlet):
+    PATTERNS = (
+        re.compile(
+            "^/_matrix/client/unstable/im.nheko.summary"
+            "/rooms/(?P<room_identifier>[^/]*)/summary$"
+        ),
+    )
+
+    def __init__(self, hs: "HomeServer"):
+        super().__init__(hs)
+        self._auth = hs.get_auth()
+        self._room_summary_handler = hs.get_room_summary_handler()
+
+    async def on_GET(
+        self, request: SynapseRequest, room_identifier: str
+    ) -> Tuple[int, JsonDict]:
+        try:
+            requester = await self._auth.get_user_by_req(request, allow_guest=True)
+            requester_user_id: Optional[str] = requester.user.to_string()
+        except MissingClientTokenError:
+            # auth is optional
+            requester_user_id = None
+
+        # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+        args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+        remote_room_hosts = parse_strings_from_args(args, "via", required=False)
+        room_id, remote_room_hosts = await self.resolve_room_id(
+            room_identifier,
+            remote_room_hosts,
+        )
+
+        return 200, await self._room_summary_handler.get_room_summary(
+            requester_user_id,
+            room_id,
+            remote_room_hosts,
         )
 
 
@@ -1098,6 +1135,8 @@ def register_servlets(hs: "HomeServer", http_server, is_worker=False):
     RoomEventContextServlet(hs).register(http_server)
     RoomSpaceSummaryRestServlet(hs).register(http_server)
     RoomHierarchyRestServlet(hs).register(http_server)
+    if hs.config.experimental.msc3266_enabled:
+        RoomSummaryRestServlet(hs).register(http_server)
     RoomEventServlet(hs).register(http_server)
     JoinedRoomsRestServlet(hs).register(http_server)
     RoomAliasListServlet(hs).register(http_server)

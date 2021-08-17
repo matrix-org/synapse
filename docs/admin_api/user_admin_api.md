@@ -1057,3 +1057,23 @@ The following parameters should be set in the URL:
 
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
+
+### Check username availability
+
+Checks to see if a username is available, and valid, for the server. See [the client-server 
+API](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available)
+for more information.
+
+This endpoint will work even if registration is disabled on the server, unlike 
+`/_matrix/client/r0/register/available`.
+
+The API is:
+
+```
+POST /_synapse/admin/v1/username_availabile?username=$localpart
+```
+
+The request and response format is the same as the [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
+
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: [Admin API](../usage/administration/admin_api)
