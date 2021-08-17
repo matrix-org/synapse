@@ -604,6 +604,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
     ) -> None:
         """Remove a mapping from an external user id to a mxid
 
+        If the mapping is not found, this method does nothing.
+
         Args:
             auth_provider: identifier for the remote auth provider
             external_id: id on that system
