@@ -47,6 +47,7 @@
     - [Workers](workers.md)
       - [Using `synctl` with Workers](synctl_workers.md)
       - [Systemd](systemd-with-workers/README.md)
+    - [State Compressor](state_compressor.md)
   - [Administration](usage/administration/README.md)
     - [Admin API](usage/administration/admin_api/README.md)
       - [Account Validity](admin_api/account_validity.md)
