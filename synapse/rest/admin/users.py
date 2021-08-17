@@ -229,13 +229,19 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
-        # convert into List[Tuple[str, str]]
+        # convert List[Dict[str, str]] into List[Tuple[str, str]]
         if external_ids is not None:
             new_external_ids = []
             for external_id in external_ids:
                 new_external_ids.append(
                     (external_id["auth_provider"], external_id["external_id"])
                 )
+
+        # convert List[Dict[str, str]] into List[Tuple[str, str]]
+        if threepids is not None:
+            new_threepids = []
+            for threepid in threepids:
+                new_threepids.append((threepid["medium"], threepid["address"]))
 
         if user:  # modify user
             if "displayname" in body:
@@ -244,22 +250,29 @@ class UserRestServletV2(RestServlet):
                 )
 
             if threepids is not None:
-                # remove old threepids from user
-                old_threepids = await self.store.user_get_threepids(user_id)
-                for threepid in old_threepids:
+                # get changed threepids (added and removed)
+                # convert List[Dict[str, Any]] into List[Tuple[str, str]]
+                cur_threepids = []
+                for threepid in await self.store.user_get_threepids(user_id):
+                    cur_threepids.append((threepid["medium"], threepid["address"]))
+                add_threepids = set(new_threepids) - set(cur_threepids)
+                del_threepids = set(cur_threepids) - set(new_threepids)
+
+                # remove old threepids
+                for medium, address in del_threepids:
                     try:
                         await self.auth_handler.delete_threepid(
-                            user_id, threepid["medium"], threepid["address"], None
+                            user_id, medium, address, None
                         )
                     except Exception:
                         logger.exception("Failed to remove threepids")
                         raise SynapseError(500, "Failed to remove threepids")
 
-                # add new threepids to user
+                # add new threepids
                 current_time = self.hs.get_clock().time_msec()
-                for threepid in threepids:
+                for medium, address in add_threepids:
                     await self.auth_handler.add_threepid(
-                        user_id, threepid["medium"], threepid["address"], current_time
+                        user_id, medium, address, current_time
                     )
 
             if external_ids is not None:
@@ -349,9 +362,9 @@ class UserRestServletV2(RestServlet):
 
             if threepids is not None:
                 current_time = self.hs.get_clock().time_msec()
-                for threepid in threepids:
+                for medium, address in new_threepids:
                     await self.auth_handler.add_threepid(
-                        user_id, threepid["medium"], threepid["address"], current_time
+                        user_id, medium, address, current_time
                     )
                     if (
                         self.hs.config.email_enable_notifs
@@ -363,8 +376,8 @@ class UserRestServletV2(RestServlet):
                             kind="email",
                             app_id="m.email",
                             app_display_name="Email Notifications",
-                            device_display_name=threepid["address"],
-                            pushkey=threepid["address"],
+                            device_display_name=address,
+                            pushkey=address,
                             lang=None,  # We don't know a user's language here
                             data={},
                         )
