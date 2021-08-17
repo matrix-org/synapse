@@ -137,7 +137,7 @@ class PresenceRouter:
           presence updates each user should receive.
         """
 
-        # Bail out early without if we don't have any callbacks to run.
+        # Bail out early if we don't have any callbacks to run.
         if len(self._get_users_for_states_callbacks) == 0:
             # Don't include any extra destinations for presence updates
             return {}
@@ -167,10 +167,7 @@ class PresenceRouter:
                         new_entries,
                     )
                     break
-                if key not in users_for_states:
-                    users_for_states[key] = new_entries
-                else:
-                    users_for_states[key].update(new_entries)
+                users_for_states.setdefault(key, set()).update(new_entries)
 
         return users_for_states
 

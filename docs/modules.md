@@ -317,7 +317,7 @@ Called when determining which users someone should be able to see the presence s
 callback should return complementary results to `get_users_for_state` or the presence information 
 may not be properly forwarded.
 
-The callback is given the Matrix user ID for the user that's requesting presence data and
+The callback is given the Matrix user ID for a local user that is requesting presence data and
 should return the Matrix user IDs of the users whose presence state they are allowed to
 query. The returned users can be local or remote. 
 
