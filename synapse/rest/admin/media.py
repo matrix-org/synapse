@@ -17,16 +17,15 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import AuthError, Codes, NotFoundError, SynapseError
-from synapse.storage.databases.main.media_repository import MediaSortOrder
 from synapse.http.server import HttpServer
-from synapse.http.servlet import RestServlet, parse_boolean, parse_integer
+from synapse.http.servlet import RestServlet, parse_boolean, parse_integer, parse_string
 from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import (
     admin_patterns,
     assert_requester_is_admin,
     assert_user_is_admin,
 )
-from synapse.http.servlet import parse_string
+from synapse.storage.databases.main.media_repository import MediaSortOrder
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -341,7 +340,7 @@ class UserMediaRestServlet(RestServlet):
         self.media_repository = hs.get_media_repository()
 
     async def on_GET(
-            self, request: SynapseRequest, user_id: str
+        self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
@@ -408,7 +407,7 @@ class UserMediaRestServlet(RestServlet):
         return 200, ret
 
     async def on_DELETE(
-            self, request: SynapseRequest, user_id: str
+        self, request: SynapseRequest, user_id: str
     ) -> Tuple[int, JsonDict]:
         # This will always be set by the time Twisted calls us.
         assert request.args is not None
