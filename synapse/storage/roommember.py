@@ -15,6 +15,7 @@
 
 import logging
 from collections import namedtuple
+from typing import Optional
 
 import attr
 
@@ -38,9 +39,11 @@ class GetRoomsForUserWithStreamOrdering:
     event_pos: PersistedEventPosition
 
 
-# We store this using a namedtuple so that we save about 3x space over using a
-# dict.
-ProfileInfo = namedtuple("ProfileInfo", ("avatar_url", "display_name"))
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class ProfileInfo:
+    avatar_url: Optional[str]
+    display_name: Optional[str]
+
 
 # "members" points to a truncated list of (user_id, event_id) tuples for users of
 # a given membership type, suitable for use in calculating heroes for a room.
