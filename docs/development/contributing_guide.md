@@ -2,29 +2,6 @@
 
 This document aims to get you started with contributing to this repo!
 
-- [1. Who can contribute to Synapse?](#1-who-can-contribute-to-synapse)
-- [2. What do I need?](#2-what-do-i-need)
-- [3. Get the source.](#3-get-the-source)
-- [4. Install the dependencies](#4-install-the-dependencies)
-    * [Under Unix (macOS, Linux, BSD, ...)](#under-unix-macos-linux-bsd-)
-    * [Under Windows](#under-windows)
-- [5. Get in touch.](#5-get-in-touch)
-- [6. Pick an issue.](#6-pick-an-issue)
-- [7. Turn coffee and documentation into code and documentation!](#7-turn-coffee-and-documentation-into-code-and-documentation)
-- [8. Test, test, test!](#8-test-test-test)
-    * [Run the linters.](#run-the-linters)
-    * [Run the unit tests.](#run-the-unit-tests)
-    * [Run the integration tests.](#run-the-integration-tests)
-- [9. Submit your patch.](#9-submit-your-patch)
-    * [Changelog](#changelog)
-        + [How do I know what to call the changelog file before I create the PR?](#how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr)
-        + [Debian changelog](#debian-changelog)
-    * [Sign off](#sign-off)
-- [10. Turn feedback into better code.](#10-turn-feedback-into-better-code)
-- [11. Find a new issue.](#11-find-a-new-issue)
-- [Notes for maintainers on merging PRs etc](#notes-for-maintainers-on-merging-prs-etc)
-- [Conclusion](#conclusion)
-
 # 1. Who can contribute to Synapse?
 
 Everyone is welcome to contribute code to [matrix.org
@@ -95,9 +72,9 @@ Fix your favorite problem or perhaps find a [Good First Issue](https://github.co
 to work on.
 
 
-# 7. Turn coffee and documentation into code and documentation!
+# 7. Turn coffee into code and documentation!
 
-There is a growing amount of documentation located in the [`docs`](docs)
+There is a growing amount of documentation located in the `docs`
 directory, with a rendered version [available online](https://matrix-org.github.io/synapse).
 This documentation is intended primarily for sysadmins running their
 own Synapse instance, as well as developers interacting externally with
