@@ -81,6 +81,16 @@ with a body of:
             "address": "<user_mail_2>"
         }
     ],
+    "external_ids": [
+        {
+            "auth_provider": "<provider1>",
+            "external_id": "<user_id_provider_1>"
+        },
+        {
+            "auth_provider": "<provider2>",
+            "external_id": "<user_id_provider_2>"
+        }
+    ],
     "avatar_url": "<avatar_url>",
     "admin": false,
     "deactivated": false
@@ -90,26 +100,34 @@ with a body of:
 To use it, you will need to authenticate by providing an `access_token` for a
 server admin: [Admin API](../usage/administration/admin_api)
 
+Returns HTTP status code:
+- `201` - When a new user object was created.
+- `200` - When a user was modified.
+
 URL parameters:
 
 - `user_id`: fully-qualified user id: for example, `@user:server.com`.
 
 Body parameters:
 
-- `password`, optional. If provided, the user's password is updated and all
+- `password` - string, optional. If provided, the user's password is updated and all
   devices are logged out.
-
-- `displayname`, optional, defaults to the value of `user_id`.
-
-- `threepids`, optional, allows setting the third-party IDs (email, msisdn)
+- `displayname` - string, optional, defaults to the value of `user_id`.
+- `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
+  - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
+  - `address` - string. Value of third-party ID.
   belonging to a user.
-
-- `avatar_url`, optional, must be a
+- `external_ids` - array, optional. Allow setting the identifier of the external identity
+  provider for SSO (Single sign-on). Details in
+  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
+  section `sso` and `oidc_providers`.
+  - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
+    in homeserver configuration.
+  - `external_id` - string, user ID in the external identity provider.
+- `avatar_url` - string, optional, must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
-
-- `admin`, optional, defaults to `false`.
-
-- `deactivated`, optional. If unspecified, deactivation state will be left
+- `admin` - bool, optional, defaults to `false`.
+- `deactivated` - bool, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
   deactivating users see [Deactivate Account](#deactivate-account).

@@ -599,6 +599,28 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             desc="record_user_external_id",
         )
 
+    async def remove_user_external_id(
+        self, auth_provider: str, external_id: str, user_id: str
+    ) -> None:
+        """Remove a mapping from an external user id to a mxid
+
+        If the mapping is not found, this method does nothing.
+
+        Args:
+            auth_provider: identifier for the remote auth provider
+            external_id: id on that system
+            user_id: complete mxid that it is mapped to
+        """
+        await self.db_pool.simple_delete(
+            table="user_external_ids",
+            keyvalues={
+                "auth_provider": auth_provider,
+                "external_id": external_id,
+                "user_id": user_id,
+            },
+            desc="remove_user_external_id",
+        )
+
     async def get_user_by_external_id(
         self, auth_provider: str, external_id: str
     ) -> Optional[str]:
