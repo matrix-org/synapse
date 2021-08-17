@@ -168,9 +168,6 @@ class EmailConfig(Config):
             email_config.get("validation_token_lifetime", "1h")
         )
 
-        templates_config = config.get("templates") or {}
-        custom_template_directory = templates_config.get("custom_template_directory")
-
         if self.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
             missing = []
             if not self.email_notif_from:

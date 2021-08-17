@@ -717,9 +717,8 @@ class ServerConfig(Config):
         self.custom_template_directory = templates_config.get(
             "custom_template_directory"
         )
-        if (
-            self.custom_template_directory is not None
-            and not isinstance(self.custom_template_directory, str)
+        if self.custom_template_directory is not None and not isinstance(
+            self.custom_template_directory, str
         ):
             raise ConfigError("'custom_template_directory' must be a string")
 
