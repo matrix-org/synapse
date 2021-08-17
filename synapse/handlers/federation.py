@@ -352,9 +352,7 @@ class FederationHandler(BaseHandler):
                         )
 
                 else:
-                    state = await self._resolve_state_at_missing_prevs(
-                        origin, pdu, room_id, event_id, missing_prevs, seen
-                    )
+                    state = await self._resolve_state_at_missing_prevs(origin, pdu)
 
         # A second round of checks for all events. Check that the event passes auth
         # based on `auth_events`, this allows us to assert that the event would
@@ -1397,9 +1395,14 @@ class FederationHandler(BaseHandler):
                 event_infos,
             )
 
-    async def _resolve_state_at_missing_prevs(
-        self, dest, event, room_id, event_id, missing_prevs, seen
-    ):
+    async def _resolve_state_at_missing_prevs(self, dest, event):
+        room_id = event.room_id
+        event_id = event.event_id
+
+        prevs = set(event.prev_event_ids())
+        seen = await self.store.have_events_in_timeline(prevs)
+        missing_prevs = prevs - seen
+
         # We don't have all of the prev_events for this event.
         #
         # In this case, we need to fall back to asking another server in the
