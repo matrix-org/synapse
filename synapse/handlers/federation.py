@@ -351,7 +351,7 @@ class FederationHandler(BaseHandler):
                             affected=pdu.event_id,
                         )
 
-                if missing_prevs:
+                else:
                     # We don't have all of the prev_events for this event.
                     #
                     # In this case, we need to fall back to asking another server in the
@@ -360,10 +360,7 @@ class FederationHandler(BaseHandler):
                     # will ensure that you can't just take over a room by sending an event,
                     # withholding its prev_events, and declaring yourself to be an admin in
                     # the subsequent state request).
-
-                    # this should now be unreachable if the event was pushed to us
-                    assert not sent_to_us_directly
-
+                    #
                     # Since we're pulling this event as a missing prev_event, then clearly
                     # this event is not going to become the only forward-extremity and we are
                     # guaranteed to resolve its state against our existing forward
