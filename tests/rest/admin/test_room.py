@@ -22,7 +22,7 @@ from parameterized import parameterized_class
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, Membership
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import directory, events, login, room
+from synapse.rest.client import directory, events, login, room
 
 from tests import unittest
 

@@ -34,7 +34,7 @@ from synapse.rest.admin._base import (
     assert_requester_is_admin,
     assert_user_is_admin,
 )
-from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.client._base import client_patterns
 from synapse.storage.databases.main.media_repository import MediaSortOrder
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, UserID
@@ -504,7 +504,7 @@ class UserRegisterServlet(RestServlet):
             raise SynapseError(403, "HMAC incorrect")
 
         # Reuse the parts of RegisterRestServlet to reduce code duplication
-        from synapse.rest.client.v2_alpha.register import RegisterRestServlet
+        from synapse.rest.client.register import RegisterRestServlet
 
         register = RegisterRestServlet(self.hs)
 

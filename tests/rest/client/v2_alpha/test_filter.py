@@ -15,7 +15,7 @@
 from twisted.internet import defer
 
 from synapse.api.errors import Codes
-from synapse.rest.client.v2_alpha import filter
+from synapse.rest.client import filter
 
 from tests import unittest
 
