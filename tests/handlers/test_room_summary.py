@@ -23,10 +23,10 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
     RoomTypes,
 )
-from synapse.api.errors import AuthError, SynapseError
+from synapse.api.errors import AuthError, NotFoundError, SynapseError
 from synapse.api.room_versions import RoomVersions
 from synapse.events import make_event_from_dict
-from synapse.handlers.space_summary import _child_events_comparison_key, _RoomEntry
+from synapse.handlers.room_summary import _child_events_comparison_key, _RoomEntry
 from synapse.rest import admin
 from synapse.rest.client import login, room
 from synapse.server import HomeServer
@@ -106,7 +106,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs: HomeServer):
         self.hs = hs
-        self.handler = self.hs.get_space_summary_handler()
+        self.handler = self.hs.get_room_summary_handler()
 
         # Create a user.
         self.user = self.register_user("user", "pass")
@@ -481,7 +481,7 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.assertNotIn("next_batch", result)
 
     def test_invalid_pagination_token(self):
-        """"""
+        """An invalid pagination token, or changing other parameters, shoudl be rejected."""
         room_ids = []
         for i in range(1, 10):
             room = self.helper.create_room_as(self.user, tok=self.token)
@@ -581,33 +581,40 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         subspace = "#subspace:" + fed_hostname
         subroom = "#subroom:" + fed_hostname
 
+        # Generate some good data, and some bad data:
+        #
+        # * Event *back* to the root room.
+        # * Unrelated events / rooms
+        # * Multiple levels of events (in a not-useful order, e.g. grandchild
+        #   events before child events).
+
+        # Note that these entries are brief, but should contain enough info.
+        requested_room_entry = _RoomEntry(
+            subspace,
+            {
+                "room_id": subspace,
+                "world_readable": True,
+                "room_type": RoomTypes.SPACE,
+            },
+            [
+                {
+                    "type": EventTypes.SpaceChild,
+                    "room_id": subspace,
+                    "state_key": subroom,
+                    "content": {"via": [fed_hostname]},
+                }
+            ],
+        )
+        child_room = {
+            "room_id": subroom,
+            "world_readable": True,
+        }
+
         async def summarize_remote_room(
             _self, room, suggested_only, max_children, exclude_rooms
         ):
-            # Return some good data, and some bad data:
-            #
-            # * Event *back* to the root room.
-            # * Unrelated events / rooms
-            # * Multiple levels of events (in a not-useful order, e.g. grandchild
-            #   events before child events).
-
-            # Note that these entries are brief, but should contain enough info.
             return [
-                _RoomEntry(
-                    subspace,
-                    {
-                        "room_id": subspace,
-                        "world_readable": True,
-                        "room_type": RoomTypes.SPACE,
-                    },
-                    [
-                        {
-                            "room_id": subspace,
-                            "state_key": subroom,
-                            "content": {"via": [fed_hostname]},
-                        }
-                    ],
-                ),
+                requested_room_entry,
                 _RoomEntry(
                     subroom,
                     {
@@ -617,11 +624,14 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
                 ),
             ]
 
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+            return requested_room_entry, {subroom: child_room}, set()
+
         # Add a room to the space which is on another server.
         self._add_child(self.space, subspace, self.token)
 
         with mock.patch(
-            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
             new=summarize_remote_room,
         ):
             result = self.get_success(
@@ -635,6 +645,15 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (subroom, ()),
         ]
         self._assert_rooms(result, expected)
+
+        with mock.patch(
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            new=summarize_remote_room_hierarchy,
+        ):
+            result = self.get_success(
+                self.handler.get_room_hierarchy(self.user, self.space)
+            )
+        self._assert_hierarchy(result, expected)
 
     def test_fed_filtering(self):
         """
@@ -657,106 +676,112 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Poke an invite over federation into the database.
         self._poke_fed_invite(invited_room, "@remote:" + fed_hostname)
 
+        # Note that these entries are brief, but should contain enough info.
+        children_rooms = (
+            (
+                public_room,
+                {
+                    "room_id": public_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.PUBLIC,
+                },
+            ),
+            (
+                knock_room,
+                {
+                    "room_id": knock_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.KNOCK,
+                },
+            ),
+            (
+                not_invited_room,
+                {
+                    "room_id": not_invited_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.INVITE,
+                },
+            ),
+            (
+                invited_room,
+                {
+                    "room_id": invited_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.INVITE,
+                },
+            ),
+            (
+                restricted_room,
+                {
+                    "room_id": restricted_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.RESTRICTED,
+                    "allowed_spaces": [],
+                },
+            ),
+            (
+                restricted_accessible_room,
+                {
+                    "room_id": restricted_accessible_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.RESTRICTED,
+                    "allowed_spaces": [self.room],
+                },
+            ),
+            (
+                world_readable_room,
+                {
+                    "room_id": world_readable_room,
+                    "world_readable": True,
+                    "join_rules": JoinRules.INVITE,
+                },
+            ),
+            (
+                joined_room,
+                {
+                    "room_id": joined_room,
+                    "world_readable": False,
+                    "join_rules": JoinRules.INVITE,
+                },
+            ),
+        )
+
+        subspace_room_entry = _RoomEntry(
+            subspace,
+            {
+                "room_id": subspace,
+                "world_readable": True,
+            },
+            # Place each room in the sub-space.
+            [
+                {
+                    "type": EventTypes.SpaceChild,
+                    "room_id": subspace,
+                    "state_key": room_id,
+                    "content": {"via": [fed_hostname]},
+                }
+                for room_id, _ in children_rooms
+            ],
+        )
+
         async def summarize_remote_room(
             _self, room, suggested_only, max_children, exclude_rooms
         ):
-            # Note that these entries are brief, but should contain enough info.
-            rooms = [
-                _RoomEntry(
-                    public_room,
-                    {
-                        "room_id": public_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.PUBLIC,
-                    },
-                ),
-                _RoomEntry(
-                    knock_room,
-                    {
-                        "room_id": knock_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.KNOCK,
-                    },
-                ),
-                _RoomEntry(
-                    not_invited_room,
-                    {
-                        "room_id": not_invited_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.INVITE,
-                    },
-                ),
-                _RoomEntry(
-                    invited_room,
-                    {
-                        "room_id": invited_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.INVITE,
-                    },
-                ),
-                _RoomEntry(
-                    restricted_room,
-                    {
-                        "room_id": restricted_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.RESTRICTED,
-                        "allowed_spaces": [],
-                    },
-                ),
-                _RoomEntry(
-                    restricted_accessible_room,
-                    {
-                        "room_id": restricted_accessible_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.RESTRICTED,
-                        "allowed_spaces": [self.room],
-                    },
-                ),
-                _RoomEntry(
-                    world_readable_room,
-                    {
-                        "room_id": world_readable_room,
-                        "world_readable": True,
-                        "join_rules": JoinRules.INVITE,
-                    },
-                ),
-                _RoomEntry(
-                    joined_room,
-                    {
-                        "room_id": joined_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.INVITE,
-                    },
-                ),
+            return [subspace_room_entry] + [
+                # A copy is made of the room data since the allowed_spaces key
+                # is removed.
+                _RoomEntry(child_room[0], dict(child_room[1]))
+                for child_room in children_rooms
             ]
 
-            # Also include the subspace.
-            rooms.insert(
-                0,
-                _RoomEntry(
-                    subspace,
-                    {
-                        "room_id": subspace,
-                        "world_readable": True,
-                    },
-                    # Place each room in the sub-space.
-                    [
-                        {
-                            "room_id": subspace,
-                            "state_key": room.room_id,
-                            "content": {"via": [fed_hostname]},
-                        }
-                        for room in rooms
-                    ],
-                ),
-            )
-            return rooms
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+            return subspace_room_entry, dict(children_rooms), set()
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, subspace, self.token)
 
         with mock.patch(
-            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
             new=summarize_remote_room,
         ):
             result = self.get_success(
@@ -788,6 +813,15 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ]
         self._assert_rooms(result, expected)
 
+        with mock.patch(
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            new=summarize_remote_room_hierarchy,
+        ):
+            result = self.get_success(
+                self.handler.get_room_hierarchy(self.user, self.space)
+            )
+        self._assert_hierarchy(result, expected)
+
     def test_fed_invited(self):
         """
         A room which the user was invited to should be included in the response.
@@ -802,25 +836,28 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         # Poke an invite over federation into the database.
         self._poke_fed_invite(fed_room, "@remote:" + fed_hostname)
 
+        fed_room_entry = _RoomEntry(
+            fed_room,
+            {
+                "room_id": fed_room,
+                "world_readable": False,
+                "join_rules": JoinRules.INVITE,
+            },
+        )
+
         async def summarize_remote_room(
             _self, room, suggested_only, max_children, exclude_rooms
         ):
-            return [
-                _RoomEntry(
-                    fed_room,
-                    {
-                        "room_id": fed_room,
-                        "world_readable": False,
-                        "join_rules": JoinRules.INVITE,
-                    },
-                ),
-            ]
+            return [fed_room_entry]
+
+        async def summarize_remote_room_hierarchy(_self, room, suggested_only):
+            return fed_room_entry, {}, set()
 
         # Add a room to the space which is on another server.
         self._add_child(self.space, fed_room, self.token)
 
         with mock.patch(
-            "synapse.handlers.space_summary.SpaceSummaryHandler._summarize_remote_room",
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room",
             new=summarize_remote_room,
         ):
             result = self.get_success(
@@ -833,3 +870,90 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
             (fed_room, ()),
         ]
         self._assert_rooms(result, expected)
+
+        with mock.patch(
+            "synapse.handlers.room_summary.RoomSummaryHandler._summarize_remote_room_hierarchy",
+            new=summarize_remote_room_hierarchy,
+        ):
+            result = self.get_success(
+                self.handler.get_room_hierarchy(self.user, self.space)
+            )
+        self._assert_hierarchy(result, expected)
+
+
+class RoomSummaryTestCase(unittest.HomeserverTestCase):
+    servlets = [
+        admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, hs: HomeServer):
+        self.hs = hs
+        self.handler = self.hs.get_room_summary_handler()
+
+        # Create a user.
+        self.user = self.register_user("user", "pass")
+        self.token = self.login("user", "pass")
+
+        # Create a simple room.
+        self.room = self.helper.create_room_as(self.user, tok=self.token)
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
+
+    def test_own_room(self):
+        """Test a simple room created by the requester."""
+        result = self.get_success(self.handler.get_room_summary(self.user, self.room))
+        self.assertEqual(result.get("room_id"), self.room)
+
+    def test_visibility(self):
+        """A user not in a private room cannot get its summary."""
+        user2 = self.register_user("user2", "pass")
+        token2 = self.login("user2", "pass")
+
+        # The user cannot see the room.
+        self.get_failure(self.handler.get_room_summary(user2, self.room), NotFoundError)
+
+        # If the room is made world-readable it should return a result.
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": HistoryVisibility.WORLD_READABLE},
+            tok=self.token,
+        )
+        result = self.get_success(self.handler.get_room_summary(user2, self.room))
+        self.assertEqual(result.get("room_id"), self.room)
+
+        # Make it not world-readable again and confirm it results in an error.
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.RoomHistoryVisibility,
+            body={"history_visibility": HistoryVisibility.JOINED},
+            tok=self.token,
+        )
+        self.get_failure(self.handler.get_room_summary(user2, self.room), NotFoundError)
+
+        # If the room is made public it should return a result.
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.PUBLIC},
+            tok=self.token,
+        )
+        result = self.get_success(self.handler.get_room_summary(user2, self.room))
+        self.assertEqual(result.get("room_id"), self.room)
+
+        # Join the space, make it invite-only again and results should be returned.
+        self.helper.join(self.room, user2, tok=token2)
+        self.helper.send_state(
+            self.room,
+            event_type=EventTypes.JoinRules,
+            body={"join_rule": JoinRules.INVITE},
+            tok=self.token,
+        )
+        result = self.get_success(self.handler.get_room_summary(user2, self.room))
+        self.assertEqual(result.get("room_id"), self.room)
