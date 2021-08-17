@@ -293,13 +293,7 @@ class FederationHandler(BaseHandler):
             prevs = set(pdu.prev_event_ids())
             seen = await self.store.have_events_in_timeline(prevs)
 
-            if min_depth is not None and pdu.depth < min_depth:
-                # This is so that we don't notify the user about this
-                # message, to work around the fact that some events will
-                # reference really really old events we really don't want to
-                # send to the clients.
-                pdu.internal_metadata.outlier = True
-            elif min_depth is not None and pdu.depth > min_depth:
+            if min_depth is not None and pdu.depth > min_depth:
                 missing_prevs = prevs - seen
                 if sent_to_us_directly and missing_prevs:
                     # If we're missing stuff, ensure we only fetch stuff one
@@ -2375,6 +2369,7 @@ class FederationHandler(BaseHandler):
                 not event.internal_metadata.is_outlier()
                 and not backfilled
                 and not context.rejected
+                and (await self.store.get_min_depth(event.room_id)) <= event.depth
             ):
                 await self.action_generator.handle_push_actions_for_event(
                     event, context
