@@ -1395,7 +1395,38 @@ class FederationHandler(BaseHandler):
                 event_infos,
             )
 
-    async def _resolve_state_at_missing_prevs(self, dest, event):
+    async def _resolve_state_at_missing_prevs(
+        self, dest: str, event: EventBase
+    ) -> Optional[Iterable[EventBase]]:
+        """Calculate the state at an event with missing prev_events.
+
+        This is used when we have pulled a batch of events from a remote server, and
+        still don't have all the prev_events.
+
+        If we already have all the prev_events for `event`, this method does nothing.
+
+        Otherwise, the missing prevs become new backwards extremities, and we fall back
+        to asking the remote server for the state after each missing `prev_event`,
+        and resolving across them.
+
+        That's ok provided we then resolve the state against other bits of the DAG
+        before using it - in other words, that the received event `event` is not going
+        to become the only forwards_extremity in the room (which will ensure that you
+        can't just take over a room by sending an event, withholding its prev_events,
+        and declaring yourself to be an admin in the subsequent state request).
+
+        In other words: we should only call this method if `event` has been *pulled*
+        as part of a batch of missing prev events, or similar.
+
+        Params:
+            dest: the remote server to ask for state at the missing prevs. Typically,
+                this will be the server we got `event` from.
+            event: an event to check for missing prevs.
+
+        Returns:
+            if we already had all the prev events, `None`. Otherwise, returns a list of
+            the events in the state at `event`.
+        """
         room_id = event.room_id
         event_id = event.event_id
 
@@ -1406,19 +1437,6 @@ class FederationHandler(BaseHandler):
         if not missing_prevs:
             return None
 
-        # We don't have all of the prev_events for this event.
-        #
-        # In this case, we need to fall back to asking another server in the
-        # federation for the state at this event. That's ok provided we then
-        # resolve the state against other bits of the DAG before using it (which
-        # will ensure that you can't just take over a room by sending an event,
-        # withholding its prev_events, and declaring yourself to be an admin in
-        # the subsequent state request).
-        #
-        # Since we're pulling this event as a missing prev_event, then clearly
-        # this event is not going to become the only forward-extremity and we are
-        # guaranteed to resolve its state against our existing forward
-        # extremities, so that should be fine.
         logger.info(
             "Event %s is missing prev_events %s: calculating state for a "
             "backwards extremity",
@@ -1483,7 +1501,7 @@ class FederationHandler(BaseHandler):
             state = [event_map[e] for e in state_map.values()]
         except Exception:
             logger.warning(
-                "Error attempting to resolve state at missing " "prev_events",
+                "Error attempting to resolve state at missing prev_events",
                 exc_info=True,
             )
             raise FederationError(
