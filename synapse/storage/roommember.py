@@ -16,6 +16,10 @@
 import logging
 from collections import namedtuple
 
+import attr
+
+from synapse.types import PersistedEventPosition
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,9 +27,11 @@ RoomsForUser = namedtuple(
     "RoomsForUser", ("room_id", "sender", "membership", "event_id", "stream_ordering")
 )
 
-GetRoomsForUserWithStreamOrdering = namedtuple(
-    "GetRoomsForUserWithStreamOrdering", ("room_id", "event_pos")
-)
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class GetRoomsForUserWithStreamOrdering:
+    room_id: str
+    event_pos: PersistedEventPosition
 
 
 # We store this using a namedtuple so that we save about 3x space over using a

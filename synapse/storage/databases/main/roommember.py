@@ -522,7 +522,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _get_users_server_still_shares_room_with_txn,
         )
 
-    async def get_rooms_for_user(self, user_id: str, on_invalidate=None):
+    async def get_rooms_for_user(
+        self, user_id: str, on_invalidate=None
+    ) -> FrozenSet[str]:
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
