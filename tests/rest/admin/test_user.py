@@ -1694,10 +1694,15 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(2, len(channel.json_body["threepids"]))
-        self.assertEqual("email", channel.json_body["threepids"][0]["medium"])
-        self.assertEqual("bob1@bob.bob", channel.json_body["threepids"][0]["address"])
-        self.assertEqual("email", channel.json_body["threepids"][1]["medium"])
-        self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][1]["address"])
+        # result does not always have the same sort order, therefore it becomes sorted
+        sorted_result = sorted(
+            channel.json_body["threepids"], key=lambda k: k["address"]
+        )
+        self.assertEqual("email", sorted_result[0]["medium"])
+        self.assertEqual("bob1@bob.bob", sorted_result[0]["address"])
+        self.assertEqual("email", sorted_result[1]["medium"])
+        self.assertEqual("bob2@bob.bob", sorted_result[1]["address"])
+        self._check_fields(channel.json_body)
 
         # Set a new and remove a threepid
         channel = self.make_request(
@@ -1719,6 +1724,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertEqual("email", channel.json_body["threepids"][1]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][1]["address"])
+        self._check_fields(channel.json_body)
 
         # Get user
         channel = self.make_request(
@@ -1734,6 +1740,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual("bob2@bob.bob", channel.json_body["threepids"][0]["address"])
         self.assertEqual("email", channel.json_body["threepids"][1]["medium"])
         self.assertEqual("bob3@bob.bob", channel.json_body["threepids"][1]["address"])
+        self._check_fields(channel.json_body)
 
         # Remove threepids
         channel = self.make_request(
@@ -1745,6 +1752,7 @@ class UserRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(200, channel.code, msg=channel.json_body)
         self.assertEqual("@user:test", channel.json_body["name"])
         self.assertEqual(0, len(channel.json_body["threepids"]))
+        self._check_fields(channel.json_body)
 
     def test_set_external_id(self):
         """
