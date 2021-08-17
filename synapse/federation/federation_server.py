@@ -1003,6 +1003,7 @@ class FederationServer(FederationBase):
         # has started processing).
         while True:
             async with lock:
+                logger.info("handling received PDU: %s", event)
                 try:
                     await self.handler.on_receive_pdu(
                         origin, event, sent_to_us_directly=True

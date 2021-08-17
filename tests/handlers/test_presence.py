@@ -33,7 +33,7 @@ from synapse.handlers.presence import (
     handle_update,
 )
 from synapse.rest import admin
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest

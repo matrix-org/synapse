@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.storage.databases.main import stats
 
 from tests import unittest

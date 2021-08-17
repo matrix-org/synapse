@@ -17,7 +17,7 @@ import logging
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
-from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.client._base import client_patterns
 from synapse.streams.config import PaginationConfig
 
 logger = logging.getLogger(__name__)

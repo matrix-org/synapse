@@ -23,7 +23,7 @@ from synapse.http.servlet import (
     parse_string,
 )
 from synapse.push import PusherConfigException
-from synapse.rest.client.v2_alpha._base import client_patterns
+from synapse.rest.client._base import client_patterns
 
 logger = logging.getLogger(__name__)
 
