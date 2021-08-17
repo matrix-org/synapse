@@ -32,6 +32,7 @@ from twisted.internet import defer
 from twisted.web.resource import IResource
 
 from synapse.events import EventBase
+from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
 from synapse.http.server import (
     DirectServeHtmlResource,
@@ -45,7 +46,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -56,6 +57,8 @@ if TYPE_CHECKING:
 This package defines the 'stable' API which can be used by extension modules which
 are loaded into Synapse.
 """
+
+PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
 
 __all__ = [
     "errors",
@@ -70,6 +73,7 @@ __all__ = [
     "DirectServeHtmlResource",
     "DirectServeJsonResource",
     "ModuleApi",
+    "PRESENCE_ALL_USERS",
 ]
 
 logger = logging.getLogger(__name__)
@@ -111,6 +115,7 @@ class ModuleApi:
         self._spam_checker = hs.get_spam_checker()
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._presence_router = hs.get_presence_router()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -129,6 +134,11 @@ class ModuleApi:
     def register_third_party_rules_callbacks(self):
         """Registers callbacks for third party event rules capabilities."""
         return self._third_party_event_rules.register_third_party_rules_callbacks
+
+    @property
+    def register_presence_router_callbacks(self):
+        """Registers callbacks for presence router capabilities."""
+        return self._presence_router.register_presence_router_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.
@@ -173,6 +183,16 @@ class ModuleApi:
     def email_app_name(self) -> str:
         """The application name configured in the homeserver's configuration."""
         return self._hs.config.email.email_app_name
+
+    async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
+        """Get user info by user_id
+
+        Args:
+            user_id: Fully qualified user id.
+        Returns:
+            UserInfo object if a user was found, otherwise None
+        """
+        return await self._store.get_userinfo_by_id(user_id)
 
     async def get_user_by_req(
         self,
@@ -667,7 +687,10 @@ class ModuleApi:
             A list containing the loaded templates, with the orders matching the one of
             the filenames parameter.
         """
-        return self._hs.config.read_templates(filenames, custom_template_directory)
+        return self._hs.config.read_templates(
+            filenames,
+            (td for td in (custom_template_directory,) if td),
+        )
 
 
 class PublicRoomListManager:

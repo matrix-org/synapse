@@ -1184,8 +1184,7 @@ class PresenceHandler(BasePresenceHandler):
         new_fields = {"state": presence}
 
         if not ignore_status_msg:
-            msg = status_msg if presence != PresenceState.OFFLINE else None
-            new_fields["status_msg"] = msg
+            new_fields["status_msg"] = status_msg
 
         if presence == PresenceState.ONLINE or (
             presence == PresenceState.BUSY and self._busy_presence_enabled
@@ -1478,7 +1477,7 @@ def format_user_presence_state(
         content["user_id"] = state.user_id
     if state.last_active_ts:
         content["last_active_ago"] = now - state.last_active_ts
-    if state.status_msg and state.state != PresenceState.OFFLINE:
+    if state.status_msg:
         content["status_msg"] = state.status_msg
     if state.state == PresenceState.ONLINE:
         content["currently_active"] = state.currently_active
@@ -1840,9 +1839,7 @@ def handle_timeout(
             # don't set them as offline.
             sync_or_active = max(state.last_user_sync_ts, state.last_active_ts)
             if now - sync_or_active > SYNC_ONLINE_TIMEOUT:
-                state = state.copy_and_replace(
-                    state=PresenceState.OFFLINE, status_msg=None
-                )
+                state = state.copy_and_replace(state=PresenceState.OFFLINE)
                 changed = True
     else:
         # We expect to be poked occasionally by the other side.
@@ -1850,7 +1847,7 @@ def handle_timeout(
         # no one gets stuck online forever.
         if now - state.last_federation_update_ts > FEDERATION_TIMEOUT:
             # The other side seems to have disappeared.
-            state = state.copy_and_replace(state=PresenceState.OFFLINE, status_msg=None)
+            state = state.copy_and_replace(state=PresenceState.OFFLINE)
             changed = True
 
     return state if changed else None

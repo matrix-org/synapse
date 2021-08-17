@@ -1,1 +1,0 @@
-Fix a bug which caused an explicit assignment of power-level 0 to a user to be misinterpreted in rare circumstances.

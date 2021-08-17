@@ -384,7 +384,7 @@ class EventAuthTestCase(unittest.TestCase):
             },
         )
         event_auth.check(
-            RoomVersions.MSC3083,
+            RoomVersions.V8,
             authorised_join_event,
             auth_events,
             do_sig_check=False,
@@ -400,7 +400,7 @@ class EventAuthTestCase(unittest.TestCase):
             "@inviter:foo.test"
         )
         event_auth.check(
-            RoomVersions.MSC3083,
+            RoomVersions.V8,
             _join_event(
                 pleb,
                 additional_content={
@@ -414,7 +414,7 @@ class EventAuthTestCase(unittest.TestCase):
         # A join which is missing an authorised server is rejected.
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC3083,
+                RoomVersions.V8,
                 _join_event(pleb),
                 auth_events,
                 do_sig_check=False,
@@ -427,7 +427,7 @@ class EventAuthTestCase(unittest.TestCase):
         )
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC3083,
+                RoomVersions.V8,
                 _join_event(
                     pleb,
                     additional_content={
@@ -442,7 +442,7 @@ class EventAuthTestCase(unittest.TestCase):
         # *would* be valid, but is sent be a different user.)
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC3083,
+                RoomVersions.V8,
                 _member_event(
                     pleb,
                     "join",
@@ -459,7 +459,7 @@ class EventAuthTestCase(unittest.TestCase):
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "ban")
         with self.assertRaises(AuthError):
             event_auth.check(
-                RoomVersions.MSC3083,
+                RoomVersions.V8,
                 authorised_join_event,
                 auth_events,
                 do_sig_check=False,
@@ -468,7 +468,7 @@ class EventAuthTestCase(unittest.TestCase):
         # A user who left can re-join.
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "leave")
         event_auth.check(
-            RoomVersions.MSC3083,
+            RoomVersions.V8,
             authorised_join_event,
             auth_events,
             do_sig_check=False,
@@ -478,7 +478,7 @@ class EventAuthTestCase(unittest.TestCase):
         # be authorised since the user is already joined.)
         auth_events[("m.room.member", pleb)] = _member_event(pleb, "join")
         event_auth.check(
-            RoomVersions.MSC3083,
+            RoomVersions.V8,
             _join_event(pleb),
             auth_events,
             do_sig_check=False,
@@ -490,7 +490,7 @@ class EventAuthTestCase(unittest.TestCase):
             pleb, "invite", sender=creator
         )
         event_auth.check(
-            RoomVersions.MSC3083,
+            RoomVersions.V8,
             _join_event(pleb),
             auth_events,
             do_sig_check=False,
