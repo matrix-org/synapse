@@ -30,6 +30,7 @@ class RoomsForUser:
     membership: str
     event_id: str
     stream_ordering: int
+    room_version_id: str
 
 
 @attr.s(slots=True, frozen=True, weakref_slot=True, auto_attribs=True)
