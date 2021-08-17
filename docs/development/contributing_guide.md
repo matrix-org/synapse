@@ -87,8 +87,12 @@ Synapse's code style is documented [here](docs/code_style.md). Please follow
 it, including the conventions for the [sample configuration
 file](docs/code_style.md#configuration-file-format).
 
-If you add new files to our documentation, please use [GitHub-Flavoured
-Markdown](https://guides.github.com/features/mastering-markdown/).
+We welcome improvements and additions to our documentation itself! When
+writing new pages, please
+[build `docs` to a book](https://github.com/matrix-org/synapse/tree/develop/docs#adding-to-the-documentation)
+to check that your contributions render correctly. Speaking of Markdown,
+we use
+[GitHub-Flavoured Markdown](https://guides.github.com/features/mastering-markdown/).
 
 Some documentation also exists in [Synapse's GitHub
 Wiki](https://github.com/matrix-org/synapse/wiki), although this is primarily
