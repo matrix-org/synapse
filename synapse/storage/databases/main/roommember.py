@@ -307,7 +307,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached()
-    async def get_invited_rooms_for_local_user(self, user_id: str) -> RoomsForUser:
+    async def get_invited_rooms_for_local_user(
+        self, user_id: str
+    ) -> List[RoomsForUser]:
         """Get all the rooms the *local* user is invited to.
 
         Args:

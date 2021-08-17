@@ -23,9 +23,13 @@ from synapse.types import PersistedEventPosition
 logger = logging.getLogger(__name__)
 
 
-RoomsForUser = namedtuple(
-    "RoomsForUser", ("room_id", "sender", "membership", "event_id", "stream_ordering")
-)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RoomsForUser:
+    room_id: str
+    sender: str
+    membership: str
+    event_id: str
+    stream_ordering: int
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
