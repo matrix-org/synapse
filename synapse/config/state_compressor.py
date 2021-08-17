@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.config._base import Config
+from synapse.config._base import Config, ConfigError
+from synapse.python_dependencies import DependencyException, check_requirements
 
 
 class StateCompressorConfig(Config):
@@ -20,11 +21,22 @@ class StateCompressorConfig(Config):
 
     def read_config(self, config, **kwargs):
         compressor_config = config.get("state_compressor", {})
-        self.enabled = compressor_config.get("enabled", False)
-        self.chunk_size = compressor_config.get("chunk_size", 500)
-        self.number_of_rooms = compressor_config.get("number_of_rooms", 5)
-        self.default_levels = compressor_config.get("default_levels", "100,50,25")
-        self.time_between_runs = self.parse_duration(
+        self.compressor_enabled = compressor_config.get("enabled", False)
+
+        if not self.compressor_enabled:
+            return
+
+        try:
+            check_requirements("auto_compressor")
+        except DependencyException as e:
+            raise ConfigError(e.message)
+
+        self.compressor_chunk_size = compressor_config.get("chunk_size", 500)
+        self.compressor_number_of_rooms = compressor_config.get("number_of_rooms", 5)
+        self.compressor_default_levels = compressor_config.get(
+            "default_levels", "100,50,25"
+        )
+        self.time_between_compressor_runs = self.parse_duration(
             compressor_config.get("time_between_runs", "1d")
         )
 

@@ -454,16 +454,16 @@ def setup_state_compressor(hs):
             reactor=hs.get_reactor(),
             f=auto_compressor.compress_largest_rooms,
             db_url=db_url,
-            chunk_size=compressor_config.chunk_size,
-            default_levels=compressor_config.default_levels,
-            number_of_rooms=compressor_config.number_of_rooms,
+            chunk_size=compressor_config.compressor_chunk_size,
+            default_levels=compressor_config.compressor_default_levels,
+            number_of_rooms=compressor_config.compressor_number_of_rooms,
         )
 
     # Call the compressor every `time_between_runs` milliseconds
     clock = hs.get_clock()
     clock.looping_call(
         run_state_compressor,
-        compressor_config.time_between_runs,
+        compressor_config.time_between_compressor_runs,
     )
 
 

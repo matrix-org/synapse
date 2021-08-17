@@ -114,6 +114,8 @@ CONDITIONAL_REQUIREMENTS = {
     "redis": ["txredisapi>=1.4.7", "hiredis"],
     # Required to use experimental `caches.track_memory_usage` config option.
     "cache_memory": ["pympler"],
+    # Needs to be manually installed to use
+    "auto_compressor": ["auto_compressor"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS: Set[str] = set()
