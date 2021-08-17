@@ -1413,10 +1413,6 @@ class FederationHandler(BaseHandler):
         # this event is not going to become the only forward-extremity and we are
         # guaranteed to resolve its state against our existing forward
         # extremities, so that should be fine.
-        #
-        # XXX this really feels like it could/should be merged with the above,
-        # but there is an interaction with min_depth that I'm not really
-        # following.
         logger.info(
             "Event %s is missing prev_events %s: calculating state for a "
             "backwards extremity",
