@@ -426,10 +426,17 @@ async def start(hs: "HomeServer"):
 
 def setup_state_compressor(hs):
     """Schedules the state compressor to run regularly"""
-    db_config = hs.config.get_single_database().config
+    compressor_config = hs.config.statecompressor
+    # Check that compressor is enabled
+    if not compressor_config.enabled:
+        return
+
+    # Check that the database being used is postgres
+    db_config = hs.config.database.get_single_database().config
     if db_config["name"] != "psycopg2":
         return
 
+    # construct the database URL from the database config
     db_args = db_config["args"]
     db_url = "postgresql://{username}:{password}@{host}:{port}/{database}".format(
         username=db_args["user"],
@@ -439,6 +446,7 @@ def setup_state_compressor(hs):
         database=db_args["database"],
     )
 
+    # The method to be called periodically
     def run_state_compressor():
         run_as_background_process(
             desc="State Compressor",
@@ -446,15 +454,16 @@ def setup_state_compressor(hs):
             reactor=hs.get_reactor(),
             f=auto_compressor.compress_largest_rooms,
             db_url=db_url,
-            chunk_size=10,
-            default_levels="100,50,25",
-            number_of_rooms=10,
+            chunk_size=compressor_config.chunk_size,
+            default_levels=compressor_config.default_levels,
+            number_of_rooms=compressor_config.number_of_rooms,
         )
 
+    # Call the compressor every `time_between_runs` milliseconds
     clock = hs.get_clock()
     clock.looping_call(
         run_state_compressor,
-        1 * 60 * 1000,
+        compressor_config.time_between_runs,
     )
 
 
