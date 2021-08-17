@@ -43,9 +43,9 @@ from synapse.rest.client import (
     relations,
     report_event,
     room,
+    room_batch,
     room_keys,
     room_upgrade_rest_servlet,
-    roomv2,
     sendtodevice,
     shared_rooms,
     sync,
@@ -113,7 +113,7 @@ class ClientRestResource(JsonResource):
         user_directory.register_servlets(hs, client_resource)
         groups.register_servlets(hs, client_resource)
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
-        roomv2.register_servlets(hs, client_resource)
+        room_batch.register_servlets(hs, client_resource)
         capabilities.register_servlets(hs, client_resource)
         account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)
