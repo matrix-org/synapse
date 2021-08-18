@@ -16,7 +16,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from synapse.api.constants import LoginType
-from synapse.api.errors import SynapseError
+from synapse.api.errors import LoginError, SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.http.server import respond_with_html
 from synapse.http.servlet import RestServlet, parse_string
@@ -95,29 +95,32 @@ class AuthRestServlet(RestServlet):
 
             authdict = {"response": response, "session": session}
 
-            success = await self.auth_handler.add_oob_auth(
-                LoginType.RECAPTCHA, authdict, request.getClientIP()
-            )
-
-            if success:
-                html = self.success_template.render()
-            else:
+            try:
+                await self.auth_handler.add_oob_auth(
+                    LoginType.RECAPTCHA, authdict, request.getClientIP()
+                )
+            except LoginError as e:
+                # Authentication failed, let user try again
                 html = self.recaptcha_template.render(
                     session=session,
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
                     sitekey=self.hs.config.recaptcha_public_key,
+                    error=e.msg,
                 )
+            else:
+                # No LoginError was raised, so authentication was successful
+                html = self.success_template.render()
+
         elif stagetype == LoginType.TERMS:
             authdict = {"session": session}
 
-            success = await self.auth_handler.add_oob_auth(
-                LoginType.TERMS, authdict, request.getClientIP()
-            )
-
-            if success:
-                html = self.success_template.render()
-            else:
+            try:
+                await self.auth_handler.add_oob_auth(
+                    LoginType.TERMS, authdict, request.getClientIP()
+                )
+            except LoginError as e:
+                # Authentication failed, let user try again
                 html = self.terms_template.render(
                     session=session,
                     terms_url="%s_matrix/consent?v=%s"
@@ -127,10 +130,16 @@ class AuthRestServlet(RestServlet):
                     ),
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),
+                    error=e.msg,
                 )
+            else:
+                # No LoginError was raised, so authentication was successful
+                html = self.success_template.render()
+
         elif stagetype == LoginType.SSO:
             # The SSO fallback workflow should not post here,
             raise SynapseError(404, "Fallback SSO auth does not support POST requests.")
+
         else:
             raise SynapseError(404, "Unknown auth stage type")
 

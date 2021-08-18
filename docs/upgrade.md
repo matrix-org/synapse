@@ -125,6 +125,14 @@ environment variable.
 See [using a forward proxy with Synapse documentation](setup/forward_proxy.md) for
 details.
 
+## User-interactive authentication fallback templates can now display errors
+
+This may affect you if you make use of custom HTML templates for the
+[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
+[terms](../synapse/res/templates/terms.html) fallback pages.
+
+The template is now provided an `error` variable if the authentication
+process failed. See the default templates linked above for an example.
 
 # Upgrading to v1.39.0
 
