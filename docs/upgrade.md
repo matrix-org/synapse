@@ -123,6 +123,12 @@ for more information and examples.
 
 We plan to remove support for these settings in October 2021.
 
+## `/_synapse/admin/v1/users/{userId}/media` must be handled by media workers
+
+The [media repository worker documentation](https://matrix-org.github.io/synapse/latest/workers.html#synapseappmedia_repository)
+has been updated to reflect that calls to `/_synapse/admin/v1/users/{userId}/media`
+must now be handled by media repository workers. This is due to the new `DELETE` method
+of this endpoint modifying the media store.
 
 # Upgrading to v1.39.0
 
