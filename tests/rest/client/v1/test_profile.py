@@ -14,7 +14,7 @@
 
 """Tests REST events for /profile paths."""
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client import login, profile, room
 
 from tests import unittest
 

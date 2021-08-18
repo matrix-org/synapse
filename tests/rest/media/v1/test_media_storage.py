@@ -30,7 +30,7 @@ from twisted.internet.defer import Deferred
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage

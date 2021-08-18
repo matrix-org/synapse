@@ -21,8 +21,7 @@ from synapse.api.constants import (
     ReadReceiptEventFields,
     RelationTypes,
 )
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import knock, read_marker, receipts, sync
+from synapse.rest.client import knock, login, read_marker, receipts, room, sync
 
 from tests import unittest
 from tests.federation.transport.test_knocking import (
