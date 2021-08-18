@@ -23,7 +23,7 @@ from synapse.types import PersistedEventPosition
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, weakref_slot=True, auto_attribs=True)
 class RoomsForUser:
     room_id: str
     sender: str
@@ -32,19 +32,19 @@ class RoomsForUser:
     stream_ordering: int
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, weakref_slot=True, auto_attribs=True)
 class GetRoomsForUserWithStreamOrdering:
     room_id: str
     event_pos: PersistedEventPosition
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, weakref_slot=True, auto_attribs=True)
 class ProfileInfo:
     avatar_url: Optional[str]
     display_name: Optional[str]
 
 
-@attr.s(slots=True, frozen=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, weakref_slot=True, auto_attribs=True)
 class MemberSummary:
     # A truncated list of (user_id, event_id) tuples for users of a given
     # membership type, suitable for use in calculating heroes for a room.
