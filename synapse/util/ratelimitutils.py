@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 class FederationRateLimiter:
     def __init__(self, clock: Clock, config: FederationRateLimitConfig):
-        def new_limiter():
+        def new_limiter() -> "_PerHostRatelimiter":
             return _PerHostRatelimiter(clock=clock, config=config)
 
         self.ratelimiters: DefaultDict[

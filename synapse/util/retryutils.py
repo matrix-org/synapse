@@ -51,7 +51,9 @@ class NotRetryingDestination(Exception):
         self.destination = destination
 
 
-async def get_retry_limiter(destination, clock, store, ignore_backoff=False, **kwargs):
+async def get_retry_limiter(
+    destination, clock, store, ignore_backoff=False, **kwargs
+) -> "RetryDestinationLimiter":
     """For a given destination check if we have previously failed to
     send a request there and are waiting before retrying the destination.
     If we are not ready to retry the destination, this will raise a
@@ -216,7 +218,7 @@ class RetryDestinationLimiter:
             if self.failure_ts is None:
                 self.failure_ts = retry_last_ts
 
-        async def store_retry_timings():
+        async def store_retry_timings() -> None:
             try:
                 await self.store.set_destination_retry_timings(
                     self.destination,

@@ -15,6 +15,8 @@
 import logging
 import re
 
+from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,13 +30,13 @@ logger = logging.getLogger(__name__)
 MAX_EMAIL_ADDRESS_LENGTH = 500
 
 
-def check_3pid_allowed(hs, medium, address):
+def check_3pid_allowed(hs: HomeServer, medium: str, address: str) -> bool:
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
-        hs (synapse.server.HomeServer): server
-        medium (str): 3pid medium - e.g. email, msisdn
-        address (str): address within that medium (e.g. "wotan@matrix.org")
+        hs: server
+        medium: 3pid medium - e.g. email, msisdn
+        address: address within that medium (e.g. "wotan@matrix.org")
             msisdns need to first have been canonicalised
     Returns:
         bool: whether the 3PID medium/address is allowed to be added to this HS

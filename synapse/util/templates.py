@@ -111,5 +111,5 @@ def _create_mxc_to_http_filter(
     return mxc_to_http_filter
 
 
-def _format_ts_filter(value: int, format: str):
+def _format_ts_filter(value: int, format: str) -> str:
     return time.strftime(format, time.localtime(value / 1000))

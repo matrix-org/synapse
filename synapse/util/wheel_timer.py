@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Generic, List, TypeVar
 
 
 class _Entry:
@@ -21,7 +22,10 @@ class _Entry:
         self.queue = []
 
 
-class WheelTimer:
+T = TypeVar("T")
+
+
+class WheelTimer(Generic[T]):
     """Stores arbitrary objects that will be returned after their timers have
     expired.
     """
@@ -36,13 +40,13 @@ class WheelTimer:
         self.entries = []
         self.current_tick = 0
 
-    def insert(self, now, obj, then):
+    def insert(self, now: int, obj: T, then: int) -> None:
         """Inserts object into timer.
 
         Args:
-            now (int): Current time in msec
-            obj (object): Object to be inserted
-            then (int): When to return the object strictly after.
+            now: Current time in msec
+            obj: Object to be inserted
+            then: When to return the object strictly after.
         """
         then_key = int(then / self.bucket_size) + 1
 
@@ -70,7 +74,7 @@ class WheelTimer:
 
         self.entries[-1].queue.append(obj)
 
-    def fetch(self, now):
+    def fetch(self, now: int) -> List[T]:
         """Fetch any objects that have timed out
 
         Args:
