@@ -80,13 +80,20 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         """
         A room with an unknown room version should not break sync (and should be excluded).
         """
+        inviter = self.register_user("creator", "pass", admin=True)
+        inviter_tok = self.login("@creator:test", "pass")
+
         user = self.register_user("user", "pass")
         tok = self.login("user", "pass")
 
         # Create a room as the user.
         joined_room = self.helper.create_room_as(user, tok=tok)
 
-        # Both rooms should appear in the sync response.
+        # Invite the user to the room as someone else.
+        invite_room = self.helper.create_room_as(inviter, tok=inviter_tok)
+        self.helper.invite(invite_room, targ=user, tok=inviter_tok)
+
+        # The rooms should appear in the sync response.
         requester = create_requester(user)
         result = self.get_success(
             self.sync_handler.wait_for_sync_for_user(
@@ -94,23 +101,25 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             )
         )
         self.assertIn(joined_room, [r.room_id for r in result.joined])
+        self.assertIn(invite_room, [r.room_id for r in result.invited])
 
         # Poke the database and update the room version to an unknown one.
-        self.get_success(
-            self.hs.get_datastores().main.db_pool.simple_update(
-                "rooms",
-                keyvalues={"room_id": joined_room},
-                updatevalues={"room_version": "unknown-room-version"},
-                desc="updated-room-version",
+        for room_id in (joined_room, invite_room):
+            self.get_success(
+                self.hs.get_datastores().main.db_pool.simple_update(
+                    "rooms",
+                    keyvalues={"room_id": room_id},
+                    updatevalues={"room_version": "unknown-room-version"},
+                    desc="updated-room-version",
+                )
             )
-        )
 
         # Blow away the cache.
         self.get_success(
             self.store.get_rooms_for_user_with_stream_ordering.invalidate_all()
         )
 
-        # The room should be excluded from the sync response.
+        # The rooms should be excluded from the sync response.
         # Get a new request key.
         result = self.get_success(
             self.sync_handler.wait_for_sync_for_user(
@@ -118,6 +127,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
             )
         )
         self.assertNotIn(joined_room, [r.room_id for r in result.joined])
+        self.assertNotIn(invite_room, [r.room_id for r in result.invited])
 
         # TODO Test a partial sync (by providing a since_token).
 
