@@ -19,8 +19,7 @@ from typing import Optional
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import register, relations
+from synapse.rest.client import login, register, relations, room
 
 from tests import unittest
 

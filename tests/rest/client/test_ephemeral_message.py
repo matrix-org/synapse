@@ -13,7 +13,7 @@
 # limitations under the License.
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest import admin
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 
 from tests import unittest
 

@@ -16,6 +16,9 @@ function captchaDone() {
 <body>
 <form id="registrationForm" method="post" action="{{ myurl }}">
     <div>
+        {% if error is defined %}
+            <p class="error"><strong>Error: {{ error }}</strong></p>
+        {% endif %}
         <p>
         Hello! We need to prevent computer programs and other automated
         things from creating accounts on this server.

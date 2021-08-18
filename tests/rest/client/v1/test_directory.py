@@ -15,7 +15,7 @@
 import json
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client import directory, login, room
 from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string
 

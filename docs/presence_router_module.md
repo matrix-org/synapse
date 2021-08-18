@@ -1,3 +1,9 @@
+<h2 style="color:red">
+This page of the Synapse documentation is now deprecated. For up to date
+documentation on setting up or writing a presence router module, please see
+<a href="modules.md">this page</a>.
+</h2>
+
 # Presence Router Module
 
 Synapse supports configuring a module that can specify additional users
