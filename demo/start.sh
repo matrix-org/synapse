@@ -80,7 +80,7 @@ for port in 8080 8081 8082; do
         } >> "$DIR"/etc/$port.config
 
         # Generate tls keys
-        openssl req -x509 -newkey rsa:4096 -keyout "$DIR"/etc/localhost"$(printf '\:')"$https_port.tls.key -out "$DIR"/etc/localhost"$(printf '\:')"$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
+        openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
 
         # Reduce the blacklist
         blacklist=$(cat <<-BLACK
