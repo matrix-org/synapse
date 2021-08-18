@@ -44,7 +44,7 @@ class FederationRateLimiter:
             str, "_PerHostRatelimiter"
         ] = collections.defaultdict(new_limiter)
 
-    def ratelimit(self, host: str) -> "_GeneratorContextManager[defer.Deferred]":
+    def ratelimit(self, host: str) -> "_GeneratorContextManager[defer.Deferred[None]]":
         """Used to ratelimit an incoming request from a given host
 
         Example usage:
@@ -83,7 +83,7 @@ class _PerHostRatelimiter:
         # map from request_id object to Deferred for requests which are ready
         # for processing but have been queued
         self.ready_request_queue: collections.OrderedDict[
-            object, defer.Deferred
+            object, defer.Deferred[None]
         ] = collections.OrderedDict()
 
         # request id objects for requests which are in progress
@@ -94,7 +94,7 @@ class _PerHostRatelimiter:
         self.request_times = []
 
     @contextlib.contextmanager
-    def ratelimit(self) -> Iterator[defer.Deferred]:
+    def ratelimit(self) -> Iterator[defer.Deferred[None]]:
         # `contextlib.contextmanager` takes a generator and turns it into a
         # context manager. The generator should only yield once with a value
         # to be returned by manager.
@@ -107,7 +107,7 @@ class _PerHostRatelimiter:
         finally:
             self._on_exit(request_id)
 
-    def _on_enter(self, request_id) -> defer.Deferred:
+    def _on_enter(self, request_id) -> defer.Deferred[None]:
         time_now = self.clock.time_msec()
 
         # remove any entries from request_times which aren't within the window
@@ -125,9 +125,9 @@ class _PerHostRatelimiter:
 
         self.request_times.append(time_now)
 
-        def queue_request():
+        def queue_request() -> "defer.Deferred[None]":
             if len(self.current_processing) >= self.concurrent_requests:
-                queue_defer: defer.Deferred = defer.Deferred()
+                queue_defer: defer.Deferred[None] = defer.Deferred()
                 self.ready_request_queue[request_id] = queue_defer
                 logger.info(
                     "Ratelimiter: queueing request (queue now %i items)",

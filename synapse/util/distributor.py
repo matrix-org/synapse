@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Callable, Dict, List
+from typing import Any, Callable, Dict, List
 
 from twisted.internet import defer
 
@@ -95,7 +95,7 @@ class Signal:
         Each observer callable may return a Deferred."""
         self.observers.append(observer)
 
-    def fire(self, *args, **kwargs) -> defer.Deferred:
+    def fire(self, *args, **kwargs) -> defer.Deferred[List[Any]]:
         """Invokes every callable in the observer list, passing in the args and
         kwargs. Exceptions thrown by observers are logged but ignored. It is
         not an error to fire a signal with no observers.
