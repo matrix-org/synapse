@@ -87,4 +87,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          filename: .ci/twisted_trunk_build_failed_template.md
+          filename: .ci/twisted_trunk_build_failed_issue_template.md
