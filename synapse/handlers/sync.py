@@ -701,7 +701,7 @@ class SyncHandler:
         name_id = state_ids.get((EventTypes.Name, ""))
         canonical_alias_id = state_ids.get((EventTypes.CanonicalAlias, ""))
 
-        summary = {}
+        summary: JsonDict = {}
         empty_ms = MemberSummary([], 0)
 
         # TODO: only send these when they change.
@@ -2076,21 +2076,23 @@ class SyncHandler:
         # If the membership's stream ordering is after the given stream
         # ordering, we need to go and work out if the user was in the room
         # before.
-        for room_id, event_pos in joined_rooms:
-            if not event_pos.persisted_after(room_key):
-                joined_room_ids.add(room_id)
+        for joined_room in joined_rooms:
+            if not joined_room.event_pos.persisted_after(room_key):
+                joined_room_ids.add(joined_room.room_id)
                 continue
 
-            logger.info("User joined room after current token: %s", room_id)
+            logger.info("User joined room after current token: %s", joined_room.room_id)
 
             extrems = (
                 await self.store.get_forward_extremities_for_room_at_stream_ordering(
-                    room_id, event_pos.stream
+                    joined_room.room_id, joined_room.event_pos.stream
                 )
             )
-            users_in_room = await self.state.get_current_users_in_room(room_id, extrems)
+            users_in_room = await self.state.get_current_users_in_room(
+                joined_room.room_id, extrems
+            )
             if user_id in users_in_room:
-                joined_room_ids.add(room_id)
+                joined_room_ids.add(joined_room.room_id)
 
         return frozenset(joined_room_ids)
 
