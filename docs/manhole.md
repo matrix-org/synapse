@@ -75,10 +75,11 @@ manhole_settings:
 ## Accessing synapse manhole
 
 Then restart synapse, and point an ssh client at port 9000 on localhost, using
-the username and password configured in `homeserver.yaml`
+the username and password configured in `homeserver.yaml` - with the default 
+configuration, this would be:
 
 ```bash
-ssh -p9000 user@localhost
+ssh -p9000 matrix@localhost
 ```
 
 Then enter the password when prompted.
