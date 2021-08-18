@@ -6,6 +6,8 @@ on:
 
   workflow_dispatch:
 
+  push:
+
 jobs:
   mypy:
     runs-on: ubuntu-latest
@@ -14,9 +16,8 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
       - run: |
+          .ci/patch_for_twisted_trunk.sh
           pip install tox
-          tox --notest -e mypy
-          .tox/env/mypy/bin/pip install git+https://github.com/twisted/twisted
           tox -e mypy
 
   trial:
@@ -29,9 +30,8 @@ jobs:
           python-version: 3.6
           
       - run: |
+          .ci/patch_for_twisted_trunk.sh
           pip install tox
-          tox --notest -e py
-          .tox/env/mypy/bin/pip install git+https://github.com/twisted/twisted
           tox -e py
 
       - name: Dump logs
@@ -48,8 +48,27 @@ jobs:
   sytest:
     runs-on: ubuntu-latest
     container:
-        image: matrixdotorg/sytest-synapse:bionic
+      image: matrixdotorg/sytest-synapse:bullseye
+      volumes:
+        - ${{ github.workspace }}:/src
 
     steps:
       - uses: actions/checkout@v2
+      - name: Patch dependencies
+        run: .ci/patch_for_twisted_trunk.sh
+        working-directory: /src
+      - name: Run SyTest
+        run: /bootstrap.sh synapse
+        working-directory: /src
+      - name: Summarise results.tap
+        if: ${{ always() }}
+        run: /sytest/scripts/tap_to_gha.pl /logs/results.tap
+      - name: Upload SyTest logs
+        uses: actions/upload-artifact@v2
+        if: ${{ always() }}
+        with:
+          name: Sytest Logs - ${{ job.status }} - (${{ join(matrix.*, ', ') }})
+          path: |
+            /logs/results.tap
+            /logs/**/*.log*
         
