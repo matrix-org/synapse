@@ -1579,6 +1579,12 @@ recommend to verify the configuration. It may be necessary to adjust the <code>n
 environment variable.</p>
 <p>See <a href="setup/forward_proxy.html">using a forward proxy with Synapse documentation</a> for
 details.</p>
+<h2 id="user-interactive-authentication-fallback-templates-can-now-display-errors"><a class="header" href="#user-interactive-authentication-fallback-templates-can-now-display-errors">User-interactive authentication fallback templates can now display errors</a></h2>
+<p>This may affect you if you make use of custom HTML templates for the
+<a href="../synapse/res/templates/recaptcha.html">reCAPTCHA</a> or
+<a href="../synapse/res/templates/terms.html">terms</a> fallback pages.</p>
+<p>The template is now provided an <code>error</code> variable if the authentication
+process failed. See the default templates linked above for an example.</p>
 <h1 id="upgrading-to-v1390"><a class="header" href="#upgrading-to-v1390">Upgrading to v1.39.0</a></h1>
 <h2 id="deprecation-of-the-current-third-party-rules-module-interface"><a class="header" href="#deprecation-of-the-current-third-party-rules-module-interface">Deprecation of the current third-party rules module interface</a></h2>
 <p>The current third-party rules module interface is deprecated in favour of the new generic
