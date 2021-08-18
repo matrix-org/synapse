@@ -28,7 +28,7 @@ from synapse.logging.context import make_deferred_yieldable
 
 logger = logging.getLogger(__name__)
 
-SERVER_CACHE: Dict[bytes, List] = {}
+SERVER_CACHE: Dict[bytes, List["Server"]] = {}
 
 
 @attr.s(auto_attribs=True, slots=True, frozen=True)
@@ -52,7 +52,7 @@ class Server:
     expires: int = 0
 
 
-def _sort_server_list(server_list):
+def _sort_server_list(server_list: List[Server]) -> List[Server]:
     """Given a list of SRV records sort them into priority order and shuffle
     each priority with the given weight.
     """
