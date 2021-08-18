@@ -15,10 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
-      - run: |
-          .ci/patch_for_twisted_trunk.sh
-          pip install tox
-          tox -e mypy
+      - run: .ci/patch_for_twisted_trunk.sh
+      - run: pip install tox
+      - run: tox -e mypy
 
   trial:
     runs-on: ubuntu-latest
@@ -29,10 +28,9 @@ jobs:
         with:
           python-version: 3.6
           
-      - run: |
-          .ci/patch_for_twisted_trunk.sh
-          pip install tox
-          tox -e py
+      - run: .ci/patch_for_twisted_trunk.sh
+      - run: pip install tox
+      - run: tox -e py
 
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
@@ -48,7 +46,7 @@ jobs:
   sytest:
     runs-on: ubuntu-latest
     container:
-      image: matrixdotorg/sytest-synapse:bullseye
+      image: matrixdotorg/sytest-synapse:buster
       volumes:
         - ${{ github.workspace }}:/src
 
