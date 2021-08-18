@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional
+
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
@@ -89,6 +91,14 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         user = self.register_user("user", "pass")
         tok = self.login("user", "pass")
 
+        # Do an initial sync on a different device.
+        requester = create_requester(user)
+        initial_result = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(
+                requester, sync_config=generate_sync_config(user, device_id="dev")
+            )
+        )
+
         # Create a room as the user.
         joined_room = self.helper.create_room_as(user, tok=tok)
 
@@ -114,10 +124,21 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         # The rooms should appear in the sync response.
-        requester = create_requester(user)
         result = self.get_success(
             self.sync_handler.wait_for_sync_for_user(
                 requester, sync_config=generate_sync_config(user)
+            )
+        )
+        self.assertIn(joined_room, [r.room_id for r in result.joined])
+        self.assertIn(invite_room, [r.room_id for r in result.invited])
+        self.assertIn(knock_room, [r.room_id for r in result.knocked])
+
+        # Test a incremental sync (by providing a since_token).
+        result = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(
+                requester,
+                sync_config=generate_sync_config(user, device_id="dev"),
+                since_token=initial_result.next_batch,
             )
         )
         self.assertIn(joined_room, [r.room_id for r in result.joined])
@@ -135,10 +156,11 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
                 )
             )
 
-        # Blow away the cache.
+        # Blow away caches (supported room versions can only change due to a restart).
         self.get_success(
             self.store.get_rooms_for_user_with_stream_ordering.invalidate_all()
         )
+        self.store._get_event_cache.clear()
 
         # The rooms should be excluded from the sync response.
         # Get a new request key.
@@ -151,13 +173,25 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         self.assertNotIn(invite_room, [r.room_id for r in result.invited])
         self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
-        # TODO Test a partial sync (by providing a since_token).
+        # The rooms should also not be in an incremental sync.
+        result = self.get_success(
+            self.sync_handler.wait_for_sync_for_user(
+                requester,
+                sync_config=generate_sync_config(user, device_id="dev"),
+                since_token=initial_result.next_batch,
+            )
+        )
+        self.assertNotIn(joined_room, [r.room_id for r in result.joined])
+        self.assertNotIn(invite_room, [r.room_id for r in result.invited])
+        self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
 
 _request_key = 0
 
 
-def generate_sync_config(user_id: str) -> SyncConfig:
+def generate_sync_config(
+    user_id: str, device_id: Optional[str] = "device_id"
+) -> SyncConfig:
     """Generate a sync config (with a unique request key)."""
     global _request_key
     _request_key += 1
@@ -166,5 +200,5 @@ def generate_sync_config(user_id: str) -> SyncConfig:
         filter_collection=DEFAULT_FILTER_COLLECTION,
         is_guest=False,
         request_key=("request_key", _request_key),
-        device_id="device_id",
+        device_id=device_id,
     )
