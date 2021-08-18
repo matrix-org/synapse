@@ -428,7 +428,7 @@ class PusherWorkerStore(SQLBaseStore):
 
             if ids:
                 self.db_pool.updates._background_update_progress_txn(
-                    txn, "remove_deactivated_pushers", {"last_user": ids[-1]}
+                    txn, "remove_deleted_email_pushers", {"last_pusher": ids[-1]}
                 )
 
             return len(ids)
