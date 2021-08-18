@@ -868,7 +868,7 @@ class FederationHandler(BaseHandler):
     @log_function
     async def backfill(
         self, dest: str, room_id: str, limit: int, extremities: List[str]
-    ) -> List[EventBase]:
+    ) -> None:
         """Trigger a backfill request to `dest` for the given `room_id`
 
         This will attempt to get more events from the remote. If the other side
@@ -890,7 +890,7 @@ class FederationHandler(BaseHandler):
         )
 
         if not events:
-            return []
+            return
 
         # ideally we'd sanity check the events here for excess prev_events etc,
         # but it's hard to reject events at this point without completely
@@ -910,7 +910,7 @@ class FederationHandler(BaseHandler):
         events = [e for e in events if e.event_id not in seen_events]
 
         if not events:
-            return []
+            return
 
         event_map = {e.event_id: e for e in events}
 
@@ -993,8 +993,6 @@ class FederationHandler(BaseHandler):
             # previous to work out the state.
             # TODO: We can probably do something more clever here.
             await self._auth_and_persist_event(dest, event, context, backfilled=True)
-
-        return events
 
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
