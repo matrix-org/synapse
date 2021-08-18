@@ -48,6 +48,11 @@ class PusherWorkerStore(SQLBaseStore):
             self._remove_stale_pushers,
         )
 
+        self.db_pool.updates.register_background_update_handler(
+            "remove_delete_email_pushers",
+            self._remove_deleted_email_pushers,
+        )
+
     def _decode_pushers_rows(self, rows: Iterable[dict]) -> Iterator[PusherConfig]:
         """JSON-decode the data in the rows returned from the `pushers` table
 
@@ -385,6 +390,57 @@ class PusherWorkerStore(SQLBaseStore):
 
         if number_deleted < batch_size:
             await self.db_pool.updates._end_background_update("remove_stale_pushers")
+
+        return number_deleted
+
+    async def _remove_deleted_email_pushers(
+        self, progress: dict, batch_size: int
+    ) -> int:
+        """A background update that deletes all pushers for email addresses no longer
+        associated with a user.
+        """
+
+        last_pusher = progress.get("last_pusher", 0)
+
+        def _delete_pushers(txn) -> int:
+
+            sql = """
+                SELECT p.id, p.user_name, p.add_id, p.pushkey
+                FROM pushers AS p
+                    JOIN user_threepids AS t ON t.user_id=p.user_name
+                WHERE p.app_id = 'm.email'
+                    AND t.medium = 'email'
+                    AND t.address = p.pushkey
+                    AND p.id > ?
+                ORDER BY p.id ASC
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_pusher, batch_size))
+            ids = [row[0] for row in txn]
+
+            for row in txn:
+                self.db_pool.simple_delete_txn(
+                    txn,
+                    "pushers",
+                    {"user_name": row[1], "app_id": row[2], "pushkey": row[3]},
+                )
+
+            if ids:
+                self.db_pool.updates._background_update_progress_txn(
+                    txn, "remove_deactivated_pushers", {"last_user": ids[-1]}
+                )
+
+            return len(ids)
+
+        number_deleted = await self.db_pool.runInteraction(
+            "_remove_deleted_email_pushers", _delete_pushers
+        )
+
+        if number_deleted < batch_size:
+            await self.db_pool.updates._end_background_update(
+                "remove_deleted_email_pushers"
+            )
 
         return number_deleted
 
