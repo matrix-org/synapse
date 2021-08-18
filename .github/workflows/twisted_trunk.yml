@@ -71,4 +71,20 @@ jobs:
           path: |
             /logs/results.tap
             /logs/**/*.log*
-        
+
+  # open an issue if the build fails, so we know about it.
+  open-issue:
+    if: failure()
+    needs:
+      - mypy
+      - trial
+      - sytest
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          filename: .ci/twisted_trunk_build_failed_template.md
