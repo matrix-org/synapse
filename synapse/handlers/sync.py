@@ -86,20 +86,20 @@ LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
 SyncRequestKey = Tuple[Any, ...]
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class SyncConfig:
-    user = attr.ib(type=UserID)
-    filter_collection = attr.ib(type=FilterCollection)
-    is_guest = attr.ib(type=bool)
-    request_key = attr.ib(type=SyncRequestKey)
-    device_id = attr.ib(type=Optional[str])
+    user: UserID
+    filter_collection: FilterCollection
+    is_guest: bool
+    request_key: SyncRequestKey
+    device_id: Optional[str]
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class TimelineBatch:
-    prev_batch = attr.ib(type=StreamToken)
-    events = attr.ib(type=List[EventBase])
-    limited = attr.ib(type=bool)
+    prev_batch: StreamToken
+    events: List[EventBase]
+    limited: bool
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -113,16 +113,16 @@ class TimelineBatch:
 # if there are updates for it, which we check after the instance has been created.
 # This should not be a big deal because we update the notification counts afterwards as
 # well anyway.
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class JoinedSyncResult:
-    room_id = attr.ib(type=str)
-    timeline = attr.ib(type=TimelineBatch)
-    state = attr.ib(type=StateMap[EventBase])
-    ephemeral = attr.ib(type=List[JsonDict])
-    account_data = attr.ib(type=List[JsonDict])
-    unread_notifications = attr.ib(type=JsonDict)
-    summary = attr.ib(type=Optional[JsonDict])
-    unread_count = attr.ib(type=int)
+    room_id: str
+    timeline: TimelineBatch
+    state: StateMap[EventBase]
+    ephemeral: List[JsonDict]
+    account_data: List[JsonDict]
+    unread_notifications: JsonDict
+    summary: Optional[JsonDict]
+    unread_count: int
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -138,12 +138,12 @@ class JoinedSyncResult:
         )
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ArchivedSyncResult:
-    room_id = attr.ib(type=str)
-    timeline = attr.ib(type=TimelineBatch)
-    state = attr.ib(type=StateMap[EventBase])
-    account_data = attr.ib(type=List[JsonDict])
+    room_id: str
+    timeline: TimelineBatch
+    state: StateMap[EventBase]
+    account_data: List[JsonDict]
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -152,37 +152,37 @@ class ArchivedSyncResult:
         return bool(self.timeline or self.state or self.account_data)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class InvitedSyncResult:
-    room_id = attr.ib(type=str)
-    invite = attr.ib(type=EventBase)
+    room_id: str
+    invite: EventBase
 
     def __bool__(self) -> bool:
         """Invited rooms should always be reported to the client"""
         return True
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class KnockedSyncResult:
-    room_id = attr.ib(type=str)
-    knock = attr.ib(type=EventBase)
+    room_id: str
+    knock: EventBase
 
     def __bool__(self) -> bool:
         """Knocked rooms should always be reported to the client"""
         return True
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class GroupsSyncResult:
-    join = attr.ib(type=JsonDict)
-    invite = attr.ib(type=JsonDict)
-    leave = attr.ib(type=JsonDict)
+    join: JsonDict
+    invite: JsonDict
+    leave: JsonDict
 
     def __bool__(self) -> bool:
         return bool(self.join or self.invite or self.leave)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class DeviceLists:
     """
     Attributes:
@@ -190,27 +190,27 @@ class DeviceLists:
         left: List of user_ids whose devices we no longer track
     """
 
-    changed = attr.ib(type=Collection[str])
-    left = attr.ib(type=Collection[str])
+    changed: Collection[str]
+    left: Collection[str]
 
     def __bool__(self) -> bool:
         return bool(self.changed or self.left)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class _RoomChanges:
     """The set of room entries to include in the sync, plus the set of joined
     and left room IDs since last sync.
     """
 
-    room_entries = attr.ib(type=List["RoomSyncResultBuilder"])
-    invited = attr.ib(type=List[InvitedSyncResult])
-    knocked = attr.ib(type=List[KnockedSyncResult])
-    newly_joined_rooms = attr.ib(type=List[str])
-    newly_left_rooms = attr.ib(type=List[str])
+    room_entries: List["RoomSyncResultBuilder"]
+    invited: List[InvitedSyncResult]
+    knocked: List[KnockedSyncResult]
+    newly_joined_rooms: List[str]
+    newly_left_rooms: List[str]
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class SyncResult:
     """
     Attributes:
@@ -230,18 +230,18 @@ class SyncResult:
         groups: Group updates, if any
     """
 
-    next_batch = attr.ib(type=StreamToken)
-    presence = attr.ib(type=List[JsonDict])
-    account_data = attr.ib(type=List[JsonDict])
-    joined = attr.ib(type=List[JoinedSyncResult])
-    invited = attr.ib(type=List[InvitedSyncResult])
-    knocked = attr.ib(type=List[KnockedSyncResult])
-    archived = attr.ib(type=List[ArchivedSyncResult])
-    to_device = attr.ib(type=List[JsonDict])
-    device_lists = attr.ib(type=DeviceLists)
-    device_one_time_keys_count = attr.ib(type=JsonDict)
-    device_unused_fallback_key_types = attr.ib(type=List[str])
-    groups = attr.ib(type=Optional[GroupsSyncResult])
+    next_batch: StreamToken
+    presence: List[JsonDict]
+    account_data: List[JsonDict]
+    joined: List[JoinedSyncResult]
+    invited: List[InvitedSyncResult]
+    knocked: List[KnockedSyncResult]
+    archived: List[ArchivedSyncResult]
+    to_device: List[JsonDict]
+    device_lists: DeviceLists
+    device_one_time_keys_count: JsonDict
+    device_unused_fallback_key_types: List[str]
+    groups: Optional[GroupsSyncResult]
 
     def __bool__(self) -> bool:
         """Make the result appear empty if there are no updates. This is used
@@ -2160,7 +2160,7 @@ def _calculate_state(
     return {event_id_to_key[e]: e for e in state_ids}
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class SyncResultBuilder:
     """Used to help build up a new SyncResult for a user
 
@@ -2182,23 +2182,23 @@ class SyncResultBuilder:
         to_device (list)
     """
 
-    sync_config = attr.ib(type=SyncConfig)
-    full_state = attr.ib(type=bool)
-    since_token = attr.ib(type=Optional[StreamToken])
-    now_token = attr.ib(type=StreamToken)
-    joined_room_ids = attr.ib(type=FrozenSet[str])
+    sync_config: SyncConfig
+    full_state: bool
+    since_token: Optional[StreamToken]
+    now_token: StreamToken
+    joined_room_ids: FrozenSet[str]
 
-    presence = attr.ib(type=List[JsonDict], default=attr.Factory(list))
-    account_data = attr.ib(type=List[JsonDict], default=attr.Factory(list))
-    joined = attr.ib(type=List[JoinedSyncResult], default=attr.Factory(list))
-    invited = attr.ib(type=List[InvitedSyncResult], default=attr.Factory(list))
-    knocked = attr.ib(type=List[KnockedSyncResult], default=attr.Factory(list))
-    archived = attr.ib(type=List[ArchivedSyncResult], default=attr.Factory(list))
-    groups = attr.ib(type=Optional[GroupsSyncResult], default=None)
-    to_device = attr.ib(type=List[JsonDict], default=attr.Factory(list))
+    presence: List[JsonDict] = attr.Factory(list)
+    account_data: List[JsonDict] = attr.Factory(list)
+    joined: List[JoinedSyncResult] = attr.Factory(list)
+    invited: List[InvitedSyncResult] = attr.Factory(list)
+    knocked: List[KnockedSyncResult] = attr.Factory(list)
+    archived: List[ArchivedSyncResult] = attr.Factory(list)
+    groups: Optional[GroupsSyncResult] = None
+    to_device: List[JsonDict] = attr.Factory(list)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class RoomSyncResultBuilder:
     """Stores information needed to create either a `JoinedSyncResult` or
     `ArchivedSyncResult`.
@@ -2214,10 +2214,10 @@ class RoomSyncResultBuilder:
         upto_token: Latest point to return events from.
     """
 
-    room_id = attr.ib(type=str)
-    rtype = attr.ib(type=str)
-    events = attr.ib(type=Optional[List[EventBase]])
-    newly_joined = attr.ib(type=bool)
-    full_state = attr.ib(type=bool)
-    since_token = attr.ib(type=Optional[StreamToken])
-    upto_token = attr.ib(type=StreamToken)
+    room_id: str
+    rtype: str
+    events: Optional[List[EventBase]]
+    newly_joined: bool
+    full_state: bool
+    since_token: Optional[StreamToken]
+    upto_token: StreamToken
