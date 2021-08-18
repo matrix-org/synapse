@@ -209,6 +209,8 @@ expressions:
     ^/_matrix/federation/v1/user/devices/
     ^/_matrix/federation/v1/get_groups_publicised$
     ^/_matrix/key/v2/query
+    ^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
+    ^/_matrix/federation/unstable/org.matrix.msc2946/hierarchy/
 
     # Inbound federation transaction request
     ^/_matrix/federation/v1/send/
@@ -220,6 +222,7 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
+    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
     ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
     ^/_matrix/client/(api/v1|r0|unstable)/devices$
     ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
@@ -256,6 +259,7 @@ ensure that the purge history admin API is not used while pagination requests
 for the room are in flight:
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
+    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/hierarchy$
 
 Additionally, the following endpoints should be included if Synapse is configured
 to use SSO (you only need to include the ones for whichever SSO provider you're
