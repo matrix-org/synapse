@@ -623,7 +623,7 @@ class ModuleApi:
             msec: How long to wait between calls in milliseconds.
             *args: Positional arguments to pass to function.
             desc: The background task's description. Default to the function's name.
-            run_on_all_workers: Whether to run this on all instances, rather
+            run_on_all_instances: Whether to run this on all instances, rather
                 than just the instance configured to run background tasks.
             **kwargs: Key arguments to pass to function.
         """
