@@ -1,1 +1,0 @@
-Allow editing a user's `external_ids` via the "Edit User" admin API. Contributed by @dklimpel.
