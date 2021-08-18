@@ -765,7 +765,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             address: threepid address e.g. me@example.com
 
         Returns:
-            user id or None if no user id/threepid mapping exists
+            user id, or None if no user id/threepid mapping exists
         """
         ret = self.db_pool.simple_select_one_txn(
             txn,

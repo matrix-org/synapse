@@ -229,19 +229,20 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
-        # convert List[Dict[str, str]] into List[Tuple[str, str]]
+        # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if external_ids is not None:
             new_external_ids = []
-            for external_id in external_ids:
-                new_external_ids.append(
-                    (external_id["auth_provider"], external_id["external_id"])
-                )
+            new_external_ids = {
+                (external_id["auth_provider"], external_id["external_id"])
+                for external_id in external_ids
+            }
 
-        # convert List[Dict[str, str]] into List[Tuple[str, str]]
+        # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if threepids is not None:
-            new_threepids = []
-            for threepid in threepids:
-                new_threepids.append((threepid["medium"], threepid["address"]))
+            new_threepids = {
+                (threepid["medium"], threepid["address"])
+                for threepid in threepids
+            }
 
         if user:  # modify user
             if "displayname" in body:
@@ -251,12 +252,13 @@ class UserRestServletV2(RestServlet):
 
             if threepids is not None:
                 # get changed threepids (added and removed)
-                # convert List[Dict[str, Any]] into List[Tuple[str, str]]
-                cur_threepids = []
-                for threepid in await self.store.user_get_threepids(user_id):
-                    cur_threepids.append((threepid["medium"], threepid["address"]))
-                add_threepids = set(new_threepids) - set(cur_threepids)
-                del_threepids = set(cur_threepids) - set(new_threepids)
+                # convert List[Dict[str, Any]] into Set[Tuple[str, str]]
+                cur_threepids = {
+                    (threepid["medium"], threepid["address"])
+                    for threepid in await self.store.user_get_threepids(user_id)
+                }
+                add_threepids = new_threepids - cur_threepids
+                del_threepids = cur_threepids - new_threepids
 
                 # remove old threepids
                 for medium, address in del_threepids:
@@ -277,9 +279,11 @@ class UserRestServletV2(RestServlet):
 
             if external_ids is not None:
                 # get changed external_ids (added and removed)
-                cur_external_ids = await self.store.get_external_ids_by_user(user_id)
-                add_external_ids = set(new_external_ids) - set(cur_external_ids)
-                del_external_ids = set(cur_external_ids) - set(new_external_ids)
+                cur_external_ids = set(
+                    await self.store.get_external_ids_by_user(user_id)
+                )
+                add_external_ids = new_external_ids - cur_external_ids
+                del_external_ids = cur_external_ids - new_external_ids
 
                 # remove old external_ids
                 for auth_provider, external_id in del_external_ids:
