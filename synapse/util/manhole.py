@@ -61,7 +61,7 @@ EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
-def manhole(username, password, globals):
+def manhole(settings, globals):
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
@@ -75,6 +75,11 @@ def manhole(username, password, globals):
     Returns:
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
+    username = settings.get("username")
+    password = settings.get("password")
+    priv_key = settings.get("priv_key") or Key.fromString(PRIVATE_KEY)
+    pub_key = settings.get("pub_key") or Key.fromString(PUBLIC_KEY)
+
     if not isinstance(password, bytes):
         password = password.encode("ascii")
 
@@ -86,8 +91,8 @@ def manhole(username, password, globals):
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.publicKeys[b"ssh-rsa"] = Key.fromString(PUBLIC_KEY)
-    factory.privateKeys[b"ssh-rsa"] = Key.fromString(PRIVATE_KEY)
+    factory.privateKeys[b"ssh-rsa"] = priv_key
+    factory.publicKeys[b"ssh-rsa"] = pub_key
 
     return factory
 

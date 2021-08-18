@@ -25,6 +25,8 @@ import attr
 import yaml
 from netaddr import AddrFormatError, IPNetwork, IPSet
 
+from twisted.conch.ssh.keys import Key
+
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
@@ -649,6 +651,39 @@ class ServerConfig(Config):
                 )
             )
 
+        manhole_settings = config.get("manhole_settings", {})
+        manhole_username = manhole_settings.get("username", "matrix")
+        manhole_password = manhole_settings.get("password", "rabbithole")
+        manhole_priv_key_file = manhole_settings.get("ssh_priv_key", None)
+        manhole_pub_key_file = manhole_settings.get("ssh_pub_key", None)
+
+        manhole_priv_key = None
+        if manhole_priv_key_file is not None:
+            try:
+                manhole_priv_key = Key.fromFile(manhole_priv_key_file)
+            except Exception as e:
+                raise ConfigError(
+                    "Failed to open manhole private key file %s: %s"
+                    % (manhole_priv_key_file, e)
+                )
+
+        manhole_pub_key = None
+        if manhole_pub_key_file is not None:
+            try:
+                manhole_pub_key = Key.fromFile(manhole_pub_key_file)
+            except Exception as e:
+                raise ConfigError(
+                    "Failed to open manhole public key file %s: %s"
+                    % (manhole_pub_key_file, e)
+                )
+
+        self.manhole_settings = {
+            "username": manhole_username,
+            "password": manhole_password,
+            "priv_key": manhole_priv_key,
+            "pub_key": manhole_pub_key,
+        }
+
         metrics_port = config.get("metrics_port")
         if metrics_port:
             logger.warning(METRICS_PORT_WARNING)
@@ -1055,6 +1090,13 @@ class ServerConfig(Config):
           #- port: 9000
           #  bind_addresses: ['::1', '127.0.0.1']
           #  type: manhole
+
+        # Connection settings for the manhole
+        manhole_settings:
+        #  username: matrix
+        #  password: rabbithole
+        #  ssh_priv_key: CONFDIR/id_rsa
+        #  ssh_pub_key: CONFDIR/id_rsa.pub
 
         # Forward extremities can build up in a room due to networking delays between
         # homeservers. Once this happens in a large room, calculation of the state of

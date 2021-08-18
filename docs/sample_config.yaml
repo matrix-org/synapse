@@ -335,6 +335,13 @@ listeners:
   #  bind_addresses: ['::1', '127.0.0.1']
   #  type: manhole
 
+# Connection settings for the manhole
+manhole_settings:
+#  username: matrix
+#  password: rabbithole
+#  ssh_priv_key: CONFDIR/id_rsa
+#  ssh_pub_key: CONFDIR/id_rsa.pub
+
 # Forward extremities can build up in a room due to networking delays between
 # homeservers. Once this happens in a large room, calculation of the state of
 # that room can become quite expensive. To mitigate this, once the number of

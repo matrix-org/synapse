@@ -229,7 +229,12 @@ def listen_metrics(bind_addresses, port):
         start_http_server(port, addr=host, registry=RegistryProxy)
 
 
-def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: dict):
+def listen_manhole(
+    bind_addresses: Iterable[str],
+    port: int,
+    manhole_settings: dict,
+    manhole_globals: dict,
+):
     # twisted.conch.manhole 21.1.0 uses "int_from_bytes", which produces a confusing
     # warning. It's fixed by https://github.com/twisted/twisted/pull/1522), so
     # suppress the warning for now.
@@ -244,7 +249,7 @@ def listen_manhole(bind_addresses: Iterable[str], port: int, manhole_globals: di
     listen_tcp(
         bind_addresses,
         port,
-        manhole(username="matrix", password="rabbithole", globals=manhole_globals),
+        manhole(settings=manhole_settings, globals=manhole_globals),
     )
 
 
