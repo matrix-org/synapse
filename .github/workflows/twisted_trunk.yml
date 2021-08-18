@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - run: false
       - uses: actions/checkout@v2
       - run: sudo apt-get -qq install xmlsec1
       - uses: actions/setup-python@v2
@@ -54,6 +55,7 @@ jobs:
         - ${{ github.workspace }}:/src
 
     steps:
+      - run: false
       - uses: actions/checkout@v2
       - name: Patch dependencies
         run: .ci/patch_for_twisted_trunk.sh
