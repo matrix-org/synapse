@@ -110,6 +110,23 @@ class FederationClient(FederationBase):
             reset_expiry_on_get=False,
         )
 
+        # A cache for fetching the room hierarchy over federation.
+        #
+        # Some stale data over federation is OK, but must be refreshed
+        # periodically since the local server is in the room.
+        #
+        # It is a map of (room ID, suggested-only) -> the response of
+        # get_room_hierarchy.
+        self._get_room_hierarchy_cache: ExpiringCache[
+            Tuple[str, bool], Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]
+        ] = ExpiringCache(
+            cache_name="get_room_hierarchy_cache",
+            clock=self._clock,
+            max_len=1000,
+            expiry_ms=5 * 60 * 1000,
+            reset_expiry_on_get=False,
+        )
+
     def _clear_tried_cache(self):
         """Clear pdu_destination_tried cache"""
         now = self._clock.time_msec()
@@ -1319,6 +1336,10 @@ class FederationClient(FederationBase):
                remote servers
         """
 
+        cached_result = self._get_room_hierarchy_cache.get((room_id, suggested_only))
+        if cached_result:
+            return cached_result
+
         async def send_request(
             destination: str,
         ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
@@ -1365,7 +1386,7 @@ class FederationClient(FederationBase):
             return room, children, inaccessible_children
 
         try:
-            return await self._try_destination_list(
+            result = await self._try_destination_list(
                 "fetch room hierarchy",
                 destinations,
                 send_request,
@@ -1417,7 +1438,11 @@ class FederationClient(FederationBase):
 
             # It isn't clear from the response whether some of the rooms are
             # not accessible.
-            return requested_room, children, ()
+            result = (requested_room, children, ())
+
+        # Cache the result to avoid fetching data over federation every time.
+        self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
+        return result
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
