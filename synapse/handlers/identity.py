@@ -251,8 +251,6 @@ class IdentityHandler(BaseHandler):
         """
         if threepid.get("id_server"):
             id_servers = [threepid["id_server"]]
-        elif self.hs.config.bind_new_user_emails_to_sydent:
-            id_servers = [self.hs.config.bind_new_user_emails_to_sydent]
         else:
             id_servers = await self.store.get_id_servers_user_bound(
                 user_id=mxid, medium=threepid["medium"], address=threepid["address"]
@@ -311,6 +309,9 @@ class IdentityHandler(BaseHandler):
         # Note that destination_is has to be the real id_server, not
         # the server we connect to.
         id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
+
+        if self.hs.config.bind_new_user_emails_to_sydent:
+            id_server_url = self.hs.config.bind_new_user_emails_to_sydent
 
         url = "%s/_matrix/identity/api/v1/3pid/unbind" % (id_server_url,)
 
