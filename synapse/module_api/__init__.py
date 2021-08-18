@@ -604,9 +604,14 @@ class ModuleApi:
         msec: float,
         *args,
         desc: Optional[str] = None,
+        run_on_all_instances: bool = False,
         **kwargs,
     ):
         """Wraps a function as a background process and calls it repeatedly.
+
+        NOTE: Will only run on the instance that is configured to run
+        background processes (which is the main process by default), unless
+        `run_on_all_workers` is set.
 
         Waits `msec` initially before calling `f` for the first time.
 
@@ -618,12 +623,14 @@ class ModuleApi:
             msec: How long to wait between calls in milliseconds.
             *args: Positional arguments to pass to function.
             desc: The background task's description. Default to the function's name.
+            run_on_all_instances: Whether to run this on all instances, rather
+                than just the instance configured to run background tasks.
             **kwargs: Key arguments to pass to function.
         """
         if desc is None:
             desc = f.__name__
 
-        if self._hs.config.run_background_tasks:
+        if self._hs.config.run_background_tasks or run_on_all_instances:
             self._clock.looping_call(
                 run_as_background_process,
                 msec,

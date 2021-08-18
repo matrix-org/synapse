@@ -214,6 +214,7 @@ expressions:
     ^/_matrix/federation/v1/send/
 
     # Client API requests
+    ^/_matrix/client/(api/v1|r0|unstable)/createRoom$
     ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
@@ -425,10 +426,12 @@ Handles the media repository. It can handle all endpoints starting with:
     ^/_synapse/admin/v1/user/.*/media.*$
     ^/_synapse/admin/v1/media/.*$
     ^/_synapse/admin/v1/quarantine_media/.*$
+    ^/_synapse/admin/v1/users/.*/media$
 
 You should also set `enable_media_repo: False` in the shared configuration
 file to stop the main synapse running background jobs related to managing the
-media repository.
+media repository. Note that doing so will prevent the main process from being
+able to handle the above endpoints.
 
 In the `media_repository` worker configuration file, configure the http listener to
 expose the `media` resource. For example:
