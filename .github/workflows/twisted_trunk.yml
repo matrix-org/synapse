@@ -24,13 +24,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
+      - run: sudo apt-get -qq install xmlsec1
       - uses: actions/setup-python@v2
         with:
           python-version: 3.6
-          
       - run: .ci/patch_for_twisted_trunk.sh
       - run: pip install tox
       - run: tox -e py
+        env:
+          TRIAL_FLAGS: "--jobs=2"
 
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
