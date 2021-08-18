@@ -1577,6 +1577,11 @@ custom template directory for all aforementioned features. Template file names r
 unchanged. See <a href="https://matrix-org.github.io/synapse/latest/templates.html">the related documentation</a>
 for more information and examples.</p>
 <p>We plan to remove support for these settings in October 2021.</p>
+<h2 id="_synapseadminv1usersuseridmedia-must-be-handled-by-media-workers"><a class="header" href="#_synapseadminv1usersuseridmedia-must-be-handled-by-media-workers"><code>/_synapse/admin/v1/users/{userId}/media</code> must be handled by media workers</a></h2>
+<p>The <a href="https://matrix-org.github.io/synapse/latest/workers.html#synapseappmedia_repository">media repository worker documentation</a>
+has been updated to reflect that calls to <code>/_synapse/admin/v1/users/{userId}/media</code>
+must now be handled by media repository workers. This is due to the new <code>DELETE</code> method
+of this endpoint modifying the media store.</p>
 <h1 id="upgrading-to-v1390"><a class="header" href="#upgrading-to-v1390">Upgrading to v1.39.0</a></h1>
 <h2 id="deprecation-of-the-current-third-party-rules-module-interface"><a class="header" href="#deprecation-of-the-current-third-party-rules-module-interface">Deprecation of the current third-party rules module interface</a></h2>
 <p>The current third-party rules module interface is deprecated in favour of the new generic
@@ -8389,10 +8394,12 @@ For example:</p>
 ^/_synapse/admin/v1/user/.*/media.*$
 ^/_synapse/admin/v1/media/.*$
 ^/_synapse/admin/v1/quarantine_media/.*$
+^/_synapse/admin/v1/users/.*/media$
 </code></pre>
 <p>You should also set <code>enable_media_repo: False</code> in the shared configuration
 file to stop the main synapse running background jobs related to managing the
-media repository.</p>
+media repository. Note that doing so will prevent the main process from being
+able to handle the above endpoints.</p>
 <p>In the <code>media_repository</code> worker configuration file, configure the http listener to
 expose the <code>media</code> resource. For example:</p>
 <pre><code class="language-yaml">    worker_listeners:
