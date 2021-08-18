@@ -651,11 +651,11 @@ class ServerConfig(Config):
                 )
             )
 
-        manhole_settings = config.get("manhole_settings", {})
-        manhole_username = manhole_settings.get("username", "matrix")
-        manhole_password = manhole_settings.get("password", "rabbithole")
-        manhole_priv_key_file = manhole_settings.get("ssh_priv_key", None)
-        manhole_pub_key_file = manhole_settings.get("ssh_pub_key", None)
+        manhole_settings = config.get("manhole_settings") or {}
+        manhole_username = manhole_settings.get("username") or "matrix"
+        manhole_password = manhole_settings.get("password") or "rabbithole"
+        manhole_priv_key_file = manhole_settings.get("ssh_priv_key") or None
+        manhole_pub_key_file = manhole_settings.get("ssh_pub_key") or None
 
         manhole_priv_key = None
         if manhole_priv_key_file is not None:
