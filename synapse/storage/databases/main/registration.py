@@ -1058,6 +1058,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                 delta equal to 10% of the validity period.
         """
         now_ms = self._clock.time_msec()
+        assert self._account_validity_period is not None
         expiration_ts = now_ms + self._account_validity_period
 
         if use_delta:

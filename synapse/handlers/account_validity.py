@@ -398,6 +398,7 @@ class AccountValidityHandler:
         """
         now = self.clock.time_msec()
         if expiration_ts is None:
+            assert self._account_validity_period is not None
             expiration_ts = now + self._account_validity_period
 
         await self.store.set_account_validity_for_user(
