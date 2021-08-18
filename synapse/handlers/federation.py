@@ -203,18 +203,13 @@ class FederationHandler(BaseHandler):
 
         self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
 
-    async def on_receive_pdu(
-        self, origin: str, pdu: EventBase, sent_to_us_directly: bool = False
-    ) -> None:
-        """Process a PDU received via a federation /send/ transaction, or
-        via backfill of missing prev_events
+    async def on_receive_pdu(self, origin: str, pdu: EventBase) -> None:
+        """Process a PDU received via a federation /send/ transaction
 
         Args:
             origin: server which initiated the /send/ transaction. Will
                 be used to fetch missing events or state.
             pdu: received PDU
-            sent_to_us_directly: True if this event was pushed to us; False if
-                we pulled it as the result of a missing prev_event.
         """
 
         room_id = pdu.room_id
@@ -276,8 +271,6 @@ class FederationHandler(BaseHandler):
             )
             return None
 
-        state = None
-
         # Check that the event passes auth based on the state at the event. This is
         # done for events that are to be added to the timeline (non-outliers).
         #
@@ -285,83 +278,72 @@ class FederationHandler(BaseHandler):
         #  - Fetching any missing prev events to fill in gaps in the graph
         #  - Fetching state if we have a hole in the graph
         if not pdu.internal_metadata.is_outlier():
-            if sent_to_us_directly:
-                prevs = set(pdu.prev_event_ids())
-                seen = await self.store.have_events_in_timeline(prevs)
-                missing_prevs = prevs - seen
+            prevs = set(pdu.prev_event_ids())
+            seen = await self.store.have_events_in_timeline(prevs)
+            missing_prevs = prevs - seen
+
+            if missing_prevs:
+                # We only backfill backwards to the min depth.
+                min_depth = await self.get_min_depth_for_context(pdu.room_id)
+                logger.debug("min_depth: %d", min_depth)
+
+                if min_depth is not None and pdu.depth > min_depth:
+                    # If we're missing stuff, ensure we only fetch stuff one
+                    # at a time.
+                    logger.info(
+                        "Acquiring room lock to fetch %d missing prev_events: %s",
+                        len(missing_prevs),
+                        shortstr(missing_prevs),
+                    )
+                    with (await self._room_pdu_linearizer.queue(pdu.room_id)):
+                        logger.info(
+                            "Acquired room lock to fetch %d missing prev_events",
+                            len(missing_prevs),
+                        )
+
+                        try:
+                            await self._get_missing_events_for_pdu(
+                                origin, pdu, prevs, min_depth
+                            )
+                        except Exception as e:
+                            raise Exception(
+                                "Error fetching missing prev_events for %s: %s"
+                                % (event_id, e)
+                            ) from e
+
+                    # Update the set of things we've seen after trying to
+                    # fetch the missing stuff
+                    seen = await self.store.have_events_in_timeline(prevs)
+                    missing_prevs = prevs - seen
+
+                    if not missing_prevs:
+                        logger.info("Found all missing prev_events")
 
                 if missing_prevs:
-                    # We only backfill backwards to the min depth.
-                    min_depth = await self.get_min_depth_for_context(pdu.room_id)
-                    logger.debug("min_depth: %d", min_depth)
+                    # since this event was pushed to us, it is possible for it to
+                    # become the only forward-extremity in the room, and we would then
+                    # trust its state to be the state for the whole room. This is very
+                    # bad. Further, if the event was pushed to us, there is no excuse
+                    # for us not to have all the prev_events. (XXX: apart from
+                    # min_depth?)
+                    #
+                    # We therefore reject any such events.
+                    logger.warning(
+                        "Rejecting: failed to fetch %d prev events: %s",
+                        len(missing_prevs),
+                        shortstr(missing_prevs),
+                    )
+                    raise FederationError(
+                        "ERROR",
+                        403,
+                        (
+                            "Your server isn't divulging details about prev_events "
+                            "referenced in this event."
+                        ),
+                        affected=pdu.event_id,
+                    )
 
-                    if min_depth is not None and pdu.depth > min_depth:
-                        # If we're missing stuff, ensure we only fetch stuff one
-                        # at a time.
-                        logger.info(
-                            "Acquiring room lock to fetch %d missing prev_events: %s",
-                            len(missing_prevs),
-                            shortstr(missing_prevs),
-                        )
-                        with (await self._room_pdu_linearizer.queue(pdu.room_id)):
-                            logger.info(
-                                "Acquired room lock to fetch %d missing prev_events",
-                                len(missing_prevs),
-                            )
-
-                            try:
-                                await self._get_missing_events_for_pdu(
-                                    origin, pdu, prevs, min_depth
-                                )
-                            except Exception as e:
-                                raise Exception(
-                                    "Error fetching missing prev_events for %s: %s"
-                                    % (event_id, e)
-                                ) from e
-
-                        # Update the set of things we've seen after trying to
-                        # fetch the missing stuff
-                        seen = await self.store.have_events_in_timeline(prevs)
-                        missing_prevs = prevs - seen
-
-                        if not missing_prevs:
-                            logger.info("Found all missing prev_events")
-
-                    if missing_prevs:
-                        # since this event was pushed to us, it is possible for it to
-                        # become the only forward-extremity in the room, and we would then
-                        # trust its state to be the state for the whole room. This is very
-                        # bad. Further, if the event was pushed to us, there is no excuse
-                        # for us not to have all the prev_events. (XXX: apart from
-                        # min_depth?)
-                        #
-                        # We therefore reject any such events.
-                        logger.warning(
-                            "Rejecting: failed to fetch %d prev events: %s",
-                            len(missing_prevs),
-                            shortstr(missing_prevs),
-                        )
-                        raise FederationError(
-                            "ERROR",
-                            403,
-                            (
-                                "Your server isn't divulging details about prev_events "
-                                "referenced in this event."
-                            ),
-                            affected=pdu.event_id,
-                        )
-
-            else:
-                state = await self._resolve_state_at_missing_prevs(origin, pdu)
-
-        # A second round of checks for all events. Check that the event passes auth
-        # based on `auth_events`, this allows us to assert that the event would
-        # have been allowed at some point. If an event passes this check its OK
-        # for it to be used as part of a returned `/state` request, as either
-        # a) we received the event as part of the original join and so trust it, or
-        # b) we'll do a state resolution with existing state before it becomes
-        # part of the "current state", which adds more protection.
-        await self._process_received_pdu(origin, pdu, state=state)
+        await self._process_received_pdu(origin, pdu, state=None)
 
     async def _get_missing_events_for_pdu(
         self, origin: str, pdu: EventBase, prevs: Set[str], min_depth: int
@@ -1838,7 +1820,7 @@ class FederationHandler(BaseHandler):
                     p,
                 )
                 with nested_logging_context(p.event_id):
-                    await self.on_receive_pdu(origin, p, sent_to_us_directly=True)
+                    await self.on_receive_pdu(origin, p)
             except Exception as e:
                 logger.warning(
                     "Error handling queued PDU %s from %s: %s", p.event_id, origin, e
