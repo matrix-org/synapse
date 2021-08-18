@@ -1372,51 +1372,52 @@ class FederationClient(FederationBase):
                 failover_on_unknown_endpoint=True,
             )
         except SynapseError as e:
+            # If an unexpected error occurred, re-raise it.
+            if e.code != 502:
+                raise
+
             # Fallback to the old federation API and translate the results if
             # no servers implement the new API.
             #
             # The algorithm below is a bit inefficient as it only attempts to
-            # get information for the requested room, but the legacy API may
+            # parse information for the requested room, but the legacy API may
             # return additional layers.
-            if e.code == 502:
-                legacy_result = await self.get_space_summary(
-                    destinations,
-                    room_id,
-                    suggested_only,
-                    max_rooms_per_space=None,
-                    exclude_rooms=[],
-                )
+            legacy_result = await self.get_space_summary(
+                destinations,
+                room_id,
+                suggested_only,
+                max_rooms_per_space=None,
+                exclude_rooms=[],
+            )
 
-                # Find the requested room in the response (and remove it).
-                for _i, room in enumerate(legacy_result.rooms):
-                    if room.get("room_id") == room_id:
-                        break
-                else:
-                    # The requested room was not returned, nothing we can do.
-                    raise
-                requested_room = legacy_result.rooms.pop(_i)
+            # Find the requested room in the response (and remove it).
+            for _i, room in enumerate(legacy_result.rooms):
+                if room.get("room_id") == room_id:
+                    break
+            else:
+                # The requested room was not returned, nothing we can do.
+                raise
+            requested_room = legacy_result.rooms.pop(_i)
 
-                # Find any children events of the requested room.
-                children_events = []
-                children_room_ids = set()
-                for event in legacy_result.events:
-                    if event.room_id == room_id:
-                        children_events.append(event.data)
-                        children_room_ids.add(event.state_key)
-                # And add them under the requested room.
-                requested_room["children_state"] = children_events
+            # Find any children events of the requested room.
+            children_events = []
+            children_room_ids = set()
+            for event in legacy_result.events:
+                if event.room_id == room_id:
+                    children_events.append(event.data)
+                    children_room_ids.add(event.state_key)
+            # And add them under the requested room.
+            requested_room["children_state"] = children_events
 
-                # Find the children rooms.
-                children = []
-                for room in legacy_result.rooms:
-                    if room.get("room_id") in children_room_ids:
-                        children.append(room)
+            # Find the children rooms.
+            children = []
+            for room in legacy_result.rooms:
+                if room.get("room_id") in children_room_ids:
+                    children.append(room)
 
-                # It isn't clear from the response whether some of the rooms are
-                # not accessible.
-                return requested_room, children, ()
-
-            raise
+            # It isn't clear from the response whether some of the rooms are
+            # not accessible.
+            return requested_room, children, ()
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)
