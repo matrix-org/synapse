@@ -1,1 +1,0 @@
-Flatten the `synapse.rest.client` package by moving the contents of `v1` and `v2_alpha` into the parent.

@@ -38,7 +38,6 @@ from synapse.replication.slave.storage.groups import SlavedGroupServerStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.room import RoomStore
 from synapse.server import HomeServer
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
@@ -58,7 +57,6 @@ class AdminCmdSlavedStore(
     SlavedPushRuleStore,
     SlavedEventStore,
     SlavedClientIpStore,
-    RoomStore,
     BaseSlavedStore,
 ):
     pass
