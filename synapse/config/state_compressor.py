@@ -20,8 +20,8 @@ class StateCompressorConfig(Config):
     section = "statecompressor"
 
     def read_config(self, config, **kwargs):
-        compressor_config = config.get("state_compressor", {})
-        self.compressor_enabled = compressor_config.get("enabled", False)
+        compressor_config = config.get("state_compressor") or {}
+        self.compressor_enabled = compressor_config.get("enabled") or False
 
         if not self.compressor_enabled:
             return
@@ -31,13 +31,13 @@ class StateCompressorConfig(Config):
         except DependencyException as e:
             raise ConfigError(e.message)
 
-        self.compressor_chunk_size = compressor_config.get("chunk_size", 500)
-        self.compressor_number_of_rooms = compressor_config.get("number_of_rooms", 5)
-        self.compressor_default_levels = compressor_config.get(
-            "default_levels", "100,50,25"
+        self.compressor_chunk_size = compressor_config.get("chunk_size") or 500
+        self.compressor_number_of_rooms = compressor_config.get("number_of_rooms") or 5
+        self.compressor_default_levels = (
+            compressor_config.get("default_levels") or "100,50,25"
         )
         self.time_between_compressor_runs = self.parse_duration(
-            compressor_config.get("time_between_runs", "1d")
+            compressor_config.get("time_between_runs") or "1d"
         )
 
     def generate_config_section(self, **kwargs):
