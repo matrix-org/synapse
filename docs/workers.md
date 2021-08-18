@@ -430,7 +430,8 @@ Handles the media repository. It can handle all endpoints starting with:
 
 You should also set `enable_media_repo: False` in the shared configuration
 file to stop the main synapse running background jobs related to managing the
-media repository.
+media repository. Note that doing so will prevent the main process from being
+able to handle the above endpoints.
 
 In the `media_repository` worker configuration file, configure the http listener to
 expose the `media` resource. For example:
