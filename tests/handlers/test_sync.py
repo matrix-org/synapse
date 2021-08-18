@@ -12,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import Codes, ResourceLimitError
 from synapse.api.filtering import DEFAULT_FILTER_COLLECTION
+from synapse.api.room_versions import RoomVersions
 from synapse.handlers.sync import SyncConfig
 from synapse.rest import admin
-from synapse.rest.client import login, room
+from synapse.rest.client import knock, login, room
 from synapse.server import HomeServer
 from synapse.types import UserID, create_requester
 
@@ -29,6 +31,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
 
     servlets = [
         admin.register_servlets,
+        knock.register_servlets,
         login.register_servlets,
         room.register_servlets,
     ]
@@ -93,6 +96,23 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         invite_room = self.helper.create_room_as(inviter, tok=inviter_tok)
         self.helper.invite(invite_room, targ=user, tok=inviter_tok)
 
+        knock_room = self.helper.create_room_as(
+            inviter, room_version=RoomVersions.V7.identifier, tok=inviter_tok
+        )
+        self.helper.send_state(
+            knock_room,
+            EventTypes.JoinRules,
+            {"join_rule": JoinRules.KNOCK},
+            tok=inviter_tok,
+        )
+        channel = self.make_request(
+            "POST",
+            "/_matrix/client/r0/knock/%s" % (knock_room,),
+            b"{}",
+            tok,
+        )
+        self.assertEquals(200, channel.code, channel.result)
+
         # The rooms should appear in the sync response.
         requester = create_requester(user)
         result = self.get_success(
@@ -102,9 +122,10 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertIn(joined_room, [r.room_id for r in result.joined])
         self.assertIn(invite_room, [r.room_id for r in result.invited])
+        self.assertIn(knock_room, [r.room_id for r in result.knocked])
 
         # Poke the database and update the room version to an unknown one.
-        for room_id in (joined_room, invite_room):
+        for room_id in (joined_room, invite_room, knock_room):
             self.get_success(
                 self.hs.get_datastores().main.db_pool.simple_update(
                     "rooms",
@@ -128,6 +149,7 @@ class SyncTestCase(tests.unittest.HomeserverTestCase):
         )
         self.assertNotIn(joined_room, [r.room_id for r in result.joined])
         self.assertNotIn(invite_room, [r.room_id for r in result.invited])
+        self.assertNotIn(knock_room, [r.room_id for r in result.knocked])
 
         # TODO Test a partial sync (by providing a since_token).
 
