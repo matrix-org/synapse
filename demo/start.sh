@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
 
-# Speed up script by not using unicode.
-LC_ALL=C
-LANG=C
-
 set -e
 
 DIR="$( cd "$( dirname "$0" )" && pwd )"
