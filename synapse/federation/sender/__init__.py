@@ -19,10 +19,10 @@ from typing import TYPE_CHECKING, Dict, Hashable, Iterable, List, Optional, Set,
 
 import attr
 from prometheus_client import Counter
-from twisted.internet.interfaces import IDelayedCall
 from typing_extensions import Literal
 
 from twisted.internet import defer
+from twisted.internet.interfaces import IDelayedCall
 
 import synapse.metrics
 from synapse.api.presence import UserPresenceState
@@ -285,7 +285,9 @@ class FederationSender(AbstractFederationSender):
         )
 
         # wake up destinations that have outstanding PDUs to be caught up
-        self._catchup_after_startup_timer: Optional[IDelayedCall] = self.clock.call_later(
+        self._catchup_after_startup_timer: Optional[
+            IDelayedCall
+        ] = self.clock.call_later(
             CATCH_UP_STARTUP_DELAY_SEC,
             run_as_background_process,
             "wake_destinations_needing_catchup",

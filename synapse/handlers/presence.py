@@ -28,6 +28,7 @@ from bisect import bisect
 from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
+    Any,
     Callable,
     Collection,
     Dict,
@@ -37,7 +38,7 @@ from typing import (
     Optional,
     Set,
     Tuple,
-    Union, Any,
+    Union,
 )
 
 from prometheus_client import Counter
