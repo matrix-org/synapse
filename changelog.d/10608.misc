@@ -1,1 +1,1 @@
-Type hints for proxyagent and srv_resolver.
+Improve type hints for the proxy agent and SRV resolver modules. Contributed by @dklimpel.
