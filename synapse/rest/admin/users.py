@@ -231,7 +231,6 @@ class UserRestServletV2(RestServlet):
 
         # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if external_ids is not None:
-            new_external_ids = []
             new_external_ids = {
                 (external_id["auth_provider"], external_id["external_id"])
                 for external_id in external_ids
@@ -240,8 +239,7 @@ class UserRestServletV2(RestServlet):
         # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if threepids is not None:
             new_threepids = {
-                (threepid["medium"], threepid["address"])
-                for threepid in threepids
+                (threepid["medium"], threepid["address"]) for threepid in threepids
             }
 
         if user:  # modify user
