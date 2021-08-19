@@ -355,8 +355,6 @@ This  is called when a user attempts to register or log in with a third party id
 such as email. It is passed the medium (eg. "email"), an address (eg. "jdoe@example.com")
 and the user's password.
 
-The method should return None if the authentication is unsuccessful.
-
 On a failure it should return None. On a success it should return a (user_id, callback) tuple
 where user_id is a str containing the user's (canonical) matrix id and the callback is a method
 to be called with the result from the `/login` call (see the 
