@@ -754,16 +754,18 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         )
         return user_id
 
-    def get_user_id_by_threepid_txn(self, txn, medium, address):
+    def get_user_id_by_threepid_txn(
+        self, txn, medium: str, address: str
+    ) -> Optional[str]:
         """Returns user id from threepid
 
         Args:
             txn (cursor):
-            medium (str): threepid medium e.g. email
-            address (str): threepid address e.g. me@example.com
+            medium: threepid medium e.g. email
+            address: threepid address e.g. me@example.com
 
         Returns:
-            str|None: user id or None if no user id/threepid mapping exists
+            user id, or None if no user id/threepid mapping exists
         """
         ret = self.db_pool.simple_select_one_txn(
             txn,
@@ -776,14 +778,21 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             return ret["user_id"]
         return None
 
-    async def user_add_threepid(self, user_id, medium, address, validated_at, added_at):
+    async def user_add_threepid(
+        self,
+        user_id: str,
+        medium: str,
+        address: str,
+        validated_at: int,
+        added_at: int,
+    ) -> None:
         await self.db_pool.simple_upsert(
             "user_threepids",
             {"medium": medium, "address": address},
             {"user_id": user_id, "validated_at": validated_at, "added_at": added_at},
         )
 
-    async def user_get_threepids(self, user_id):
+    async def user_get_threepids(self, user_id) -> List[Dict[str, Any]]:
         return await self.db_pool.simple_select_list(
             "user_threepids",
             {"user_id": user_id},
@@ -791,7 +800,9 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             "user_get_threepids",
         )
 
-    async def user_delete_threepid(self, user_id, medium, address) -> None:
+    async def user_delete_threepid(
+        self, user_id: str, medium: str, address: str
+    ) -> None:
         await self.db_pool.simple_delete(
             "user_threepids",
             keyvalues={"user_id": user_id, "medium": medium, "address": address},
