@@ -75,6 +75,9 @@ class _PaginationSession:
 
 
 class RoomSummaryHandler:
+    # A unique key used for pagination sessions for the room hierarchy endpoint.
+    _PAGINATION_SESSION_KEY = "room_hierarchy_pagination"
+
     # The time a pagination session remains valid for.
     _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
 
@@ -94,13 +97,6 @@ class RoomSummaryHandler:
             hs.get_clock(),
             "get_room_hierarchy",
         )
-
-    async def _expire_pagination_sessions(self):
-        """Expire pagination session which are old."""
-        expire_before = (
-            self._clock.time_msec() - self._PAGINATION_SESSION_VALIDITY_PERIOD_MS
-        )
-        await self._store.delete_old_room_hierarchy_pagination_sessions(expire_before)
 
     async def get_space_summary(
         self,
@@ -310,24 +306,25 @@ class RoomSummaryHandler:
                 % (requester, requested_room_id),
             )
 
+        # A unique token for this pagination.
+        pagination_key = f"{requester}|{requested_room_id}|{suggested_only}|{max_depth}"
+
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
-            await self._expire_pagination_sessions()
-
             try:
-                pagination_session = (
-                    await self._store.get_room_hierarchy_pagination_session(
-                        requested_room_id, suggested_only, max_depth, from_token
-                    )
+                pagination_session = await self._store.get_session(
+                    key=self._PAGINATION_SESSION_KEY,
+                    session_id=from_token,
+                    segment=pagination_key,
                 )
             except StoreError:
                 raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
             # Load the previous state.
             room_queue = [
-                _RoomQueueEntry(*fields) for fields in pagination_session.room_queue
+                _RoomQueueEntry(*fields) for fields in pagination_session["room_queue"]
             ]
-            processed_rooms = pagination_session.processed_rooms
+            processed_rooms = set(pagination_session["processed_rooms"])
         else:
             # The queue of rooms to process, the next room is last on the stack.
             room_queue = [_RoomQueueEntry(requested_room_id, ())]
@@ -445,14 +442,16 @@ class RoomSummaryHandler:
 
         # If there's additional data, generate a pagination token (and persist state).
         if room_queue:
-            result[
-                "next_batch"
-            ] = await self._store.create_room_hierarchy_pagination_session(
-                requested_room_id,
-                suggested_only,
-                max_depth,
-                [attr.astuple(room_entry) for room_entry in room_queue],  # type: ignore[misc]
-                processed_rooms,
+            result["next_batch"] = await self._store.create_session(
+                key=self._PAGINATION_SESSION_KEY,
+                value={
+                    "room_queue": [
+                        attr.astuple(room_entry) for room_entry in room_queue
+                    ],
+                    "processed_rooms": list(processed_rooms),
+                },
+                expiry_ms=self._PAGINATION_SESSION_VALIDITY_PERIOD_MS,
+                segment=pagination_key,
             )
 
         return result

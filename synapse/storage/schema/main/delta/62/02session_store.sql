@@ -14,12 +14,11 @@
  * limitations under the License.
  */
 
-CREATE TABLE IF NOT EXISTS room_hierarchy_pagination_sessions(
+CREATE TABLE IF NOT EXISTS sessions(
+    key TEXT NOT NULL,  -- The unique key for this type of session.
     session_id TEXT NOT NULL,  -- The session ID passed to the client.
-    creation_time BIGINT NOT NULL,  -- The time this session was created (epoch time in milliseconds).
-    room_id TEXT NOT NULL,  -- The room ID of the pagination session.
-    suggested_only BOOLEAN NOT NULL, -- Whether to only include suggested rooms/spaces.
-    max_depth int, -- The maximum depth to fetch.
-    pagination_state TEXT NOT NULL,  -- A JSON dictionary of persisted state.
-    UNIQUE (session_id)
+    value TEXT NOT NULL, -- A JSON dictionary to persist.
+    segment TEXT NOT NULL,  -- A key which separates the data
+    expiry_time_ms BIGINT NOT NULL,  -- The time this session will expire (epoch time in milliseconds).
+    UNIQUE (key, session_id, segment)
 );
