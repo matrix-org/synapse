@@ -108,6 +108,8 @@ CONDITIONAL_REQUIREMENTS["dev"] = CONDITIONAL_REQUIREMENTS["lint"] + [
     "click==7.1.2",
     "redbaron==0.9.2",
     "GitPython==3.1.14",
+    "commonmark==0.9.1",
+    "pygithub==1.55",
 ]
 
 CONDITIONAL_REQUIREMENTS["mypy"] = ["mypy==0.812", "mypy-zope==0.2.13"]

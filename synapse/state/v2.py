@@ -36,7 +36,7 @@ import synapse.state
 from synapse import event_auth
 from synapse.api.constants import EventTypes
 from synapse.api.errors import AuthError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
+from synapse.api.room_versions import RoomVersion
 from synapse.events import EventBase
 from synapse.types import MutableStateMap, StateMap
 from synapse.util import Clock
@@ -53,7 +53,7 @@ _AWAIT_AFTER_ITERATIONS = 100
 async def resolve_events_with_store(
     clock: Clock,
     room_id: str,
-    room_version: str,
+    room_version: RoomVersion,
     state_sets: Sequence[StateMap[str]],
     event_map: Optional[Dict[str, EventBase]],
     state_res_store: "synapse.state.StateResolutionStore",
@@ -497,7 +497,7 @@ async def _reverse_topological_power_sort(
 async def _iterative_auth_checks(
     clock: Clock,
     room_id: str,
-    room_version: str,
+    room_version: RoomVersion,
     event_ids: List[str],
     base_state: StateMap[str],
     event_map: Dict[str, EventBase],
@@ -519,7 +519,6 @@ async def _iterative_auth_checks(
         Returns the final updated state
     """
     resolved_state = dict(base_state)
-    room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
     for idx, event_id in enumerate(event_ids, start=1):
         event = event_map[event_id]
@@ -538,7 +537,7 @@ async def _iterative_auth_checks(
                 if ev.rejected_reason is None:
                     auth_events[(ev.type, ev.state_key)] = ev
 
-        for key in event_auth.auth_types_for_event(event):
+        for key in event_auth.auth_types_for_event(room_version, event):
             if key in resolved_state:
                 ev_id = resolved_state[key]
                 ev = await _get_event(room_id, ev_id, event_map, state_res_store)
@@ -548,7 +547,7 @@ async def _iterative_auth_checks(
 
         try:
             event_auth.check(
-                room_version_obj,
+                room_version,
                 event,
                 auth_events,
                 do_sig_check=False,

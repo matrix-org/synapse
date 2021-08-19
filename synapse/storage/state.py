@@ -570,8 +570,8 @@ class StateGroupStorage:
         event_id: str,
         room_id: str,
         prev_group: Optional[int],
-        delta_ids: Optional[dict],
-        current_state_ids: dict,
+        delta_ids: Optional[StateMap[str]],
+        current_state_ids: StateMap[str],
     ) -> int:
         """Store a new set of state, returning a newly assigned state group.
 

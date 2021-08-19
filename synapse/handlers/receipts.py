@@ -14,9 +14,10 @@
 import logging
 from typing import TYPE_CHECKING, List, Optional, Tuple
 
+from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
 from synapse.handlers._base import BaseHandler
-from synapse.types import JsonDict, ReadReceipt, get_domain_from_id
+from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -137,7 +138,7 @@ class ReceiptsHandler(BaseHandler):
         return True
 
     async def received_client_receipt(
-        self, room_id: str, receipt_type: str, user_id: str, event_id: str,
+        self, room_id: str, receipt_type: str, user_id: str, event_id: str, hidden: bool,
         extra_content: Optional[JsonDict] = None,
     ) -> None:
         """Called when a client tells us a local user has read up to the given
@@ -148,23 +149,67 @@ class ReceiptsHandler(BaseHandler):
             receipt_type=receipt_type,
             user_id=user_id,
             event_ids=[event_id],
-            data={"ts": int(self.clock.time_msec()), **(extra_content or {})},
+            data={"ts": int(self.clock.time_msec()), "hidden": hidden, **(extra_content or {})},
         )
 
         is_new = await self._handle_new_receipts([receipt])
         if not is_new:
             return
 
-        if self.federation_sender:
+        if self.federation_sender and not (
+            self.hs.config.experimental.msc2285_enabled and hidden
+        ):
             await self.federation_sender.send_read_receipt(receipt)
 
 
 class ReceiptEventSource:
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
+        self.config = hs.config
+
+    @staticmethod
+    def filter_out_hidden(events: List[JsonDict], user_id: str) -> List[JsonDict]:
+        visible_events = []
+
+        # filter out hidden receipts the user shouldn't see
+        for event in events:
+            content = event.get("content", {})
+            new_event = event.copy()
+            new_event["content"] = {}
+
+            for event_id in content.keys():
+                event_content = content.get(event_id, {})
+                m_read = event_content.get("m.read", {})
+
+                # If m_read is missing copy over the original event_content as there is nothing to process here
+                if not m_read:
+                    new_event["content"][event_id] = event_content.copy()
+                    continue
+
+                new_users = {}
+                for rr_user_id, user_rr in m_read.items():
+                    hidden = user_rr.get("hidden", None)
+                    if hidden is not True or rr_user_id == user_id:
+                        new_users[rr_user_id] = user_rr.copy()
+                        # If hidden has a value replace hidden with the correct prefixed key
+                        if hidden is not None:
+                            new_users[rr_user_id].pop("hidden")
+                            new_users[rr_user_id][
+                                ReadReceiptEventFields.MSC2285_HIDDEN
+                            ] = hidden
+
+                # Set new users unless empty
+                if len(new_users.keys()) > 0:
+                    new_event["content"][event_id] = {"m.read": new_users}
+
+            # Append new_event to visible_events unless empty
+            if len(new_event["content"].keys()) > 0:
+                visible_events.append(new_event)
+
+        return visible_events
 
     async def get_new_events(
-        self, from_key: int, room_ids: List[str], **kwargs
+        self, from_key: int, room_ids: List[str], user: UserID, **kwargs
     ) -> Tuple[List[JsonDict], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()
@@ -175,6 +220,9 @@ class ReceiptEventSource:
         events = await self.store.get_linearized_receipts_for_rooms(
             room_ids, from_key=from_key, to_key=to_key
         )
+
+        if self.config.experimental.msc2285_enabled:
+            events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
         return (events, to_key)
 
