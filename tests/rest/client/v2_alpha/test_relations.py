@@ -19,8 +19,7 @@ from typing import Optional
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import register, relations
+from synapse.rest.client import login, register, relations, room
 
 from tests import unittest
 
@@ -273,7 +272,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         prev_token = None
         found_event_ids = []
-        encoded_key = urllib.parse.quote_plus("👍".encode("utf-8"))
+        encoded_key = urllib.parse.quote_plus("👍".encode())
         for _ in range(20):
             from_token = ""
             if prev_token:

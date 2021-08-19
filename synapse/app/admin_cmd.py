@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2019 Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,11 +35,9 @@ from synapse.replication.slave.storage.devices import SlavedDeviceStore
 from synapse.replication.slave.storage.events import SlavedEventStore
 from synapse.replication.slave.storage.filtering import SlavedFilteringStore
 from synapse.replication.slave.storage.groups import SlavedGroupServerStore
-from synapse.replication.slave.storage.presence import SlavedPresenceStore
 from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.room import RoomStore
 from synapse.server import HomeServer
 from synapse.util.logcontext import LoggingContext
 from synapse.util.versionstring import get_version_string
@@ -54,14 +51,12 @@ class AdminCmdSlavedStore(
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
     SlavedFilteringStore,
-    SlavedPresenceStore,
     SlavedGroupServerStore,
     SlavedDeviceInboxStore,
     SlavedDeviceStore,
     SlavedPushRuleStore,
     SlavedEventStore,
     SlavedClientIpStore,
-    RoomStore,
     BaseSlavedStore,
 ):
     pass

@@ -11,4 +11,4 @@ a fresh config using Synapse by following the instructions in
 
 ```yaml
 {{#include ../../sample_log_config.yaml}}
-``__`
+```

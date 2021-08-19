@@ -93,7 +93,7 @@ _background_process_db_sched_duration = Counter(
 # map from description to a counter, so that we can name our logcontexts
 # incrementally. (It actually duplicates _background_process_start_count, but
 # it's much simpler to do so than to try to combine them.)
-_background_process_counts = {}  # type: Dict[str, int]
+_background_process_counts: Dict[str, int] = {}
 
 # Set of all running background processes that became active active since the
 # last time metrics were scraped (i.e. background processes that performed some
@@ -103,7 +103,7 @@ _background_process_counts = {}  # type: Dict[str, int]
 # background processes stacking up behind a lock or linearizer, where we then
 # only need to iterate over and update metrics for the process that have
 # actually been active and can ignore the idle ones.
-_background_processes_active_since_last_scrape = set()  # type: Set[_BackgroundProcess]
+_background_processes_active_since_last_scrape: "Set[_BackgroundProcess]" = set()
 
 # A lock that covers the above set and dict
 _bg_metrics_lock = threading.Lock()
@@ -137,8 +137,7 @@ class _Collector:
             _background_process_db_txn_duration,
             _background_process_db_sched_duration,
         ):
-            for r in m.collect():
-                yield r
+            yield from m.collect()
 
 
 REGISTRY.register(_Collector())

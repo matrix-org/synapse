@@ -124,7 +124,7 @@ class Measure:
             assert isinstance(curr_context, LoggingContext)
             parent_context = curr_context
         self._logging_context = LoggingContext(str(curr_context), parent_context)
-        self.start = None  # type: Optional[int]
+        self.start: Optional[int] = None
 
     def __enter__(self) -> "Measure":
         if self.start is not None:
@@ -133,11 +133,16 @@ class Measure:
         self.start = self.clock.time()
         self._logging_context.__enter__()
         in_flight.register((self.name,), self._update_in_flight)
+
+        logger.debug("Entering block %s", self.name)
+
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if self.start is None:
             raise RuntimeError("Measure() block exited without being entered")
+
+        logger.debug("Exiting block %s", self.name)
 
         duration = self.clock.time() - self.start
         usage = self.get_resource_usage()

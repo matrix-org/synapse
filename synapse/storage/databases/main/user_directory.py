@@ -365,7 +365,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return False
 
     async def update_profile_in_user_dir(
-        self, user_id: str, display_name: str, avatar_url: str
+        self, user_id: str, display_name: Optional[str], avatar_url: Optional[str]
     ) -> None:
         """
         Update or add a user's profile in the user directory.
@@ -377,7 +377,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             avatar_url = None
 
         def _update_profile_in_user_dir_txn(txn):
-            new_entry = self.db_pool.simple_upsert_txn(
+            self.db_pool.simple_upsert_txn(
                 txn,
                 table="user_directory",
                 keyvalues={"user_id": user_id},
@@ -388,8 +388,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             if isinstance(self.database_engine, PostgresEngine):
                 # We weight the localpart most highly, then display name and finally
                 # server name
-                if self.database_engine.can_native_upsert:
-                    sql = """
+                sql = """
                         INSERT INTO user_directory_search(user_id, vector)
                         VALUES (?,
                             setweight(to_tsvector('simple', ?), 'A')
@@ -397,58 +396,15 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                             || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
                         ) ON CONFLICT (user_id) DO UPDATE SET vector=EXCLUDED.vector
                     """
-                    txn.execute(
-                        sql,
-                        (
-                            user_id,
-                            get_localpart_from_id(user_id),
-                            get_domain_from_id(user_id),
-                            display_name,
-                        ),
-                    )
-                else:
-                    # TODO: Remove this code after we've bumped the minimum version
-                    # of postgres to always support upserts, so we can get rid of
-                    # `new_entry` usage
-                    if new_entry is True:
-                        sql = """
-                            INSERT INTO user_directory_search(user_id, vector)
-                            VALUES (?,
-                                setweight(to_tsvector('simple', ?), 'A')
-                                || setweight(to_tsvector('simple', ?), 'D')
-                                || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
-                            )
-                        """
-                        txn.execute(
-                            sql,
-                            (
-                                user_id,
-                                get_localpart_from_id(user_id),
-                                get_domain_from_id(user_id),
-                                display_name,
-                            ),
-                        )
-                    elif new_entry is False:
-                        sql = """
-                            UPDATE user_directory_search
-                            SET vector = setweight(to_tsvector('simple', ?), 'A')
-                                || setweight(to_tsvector('simple', ?), 'D')
-                                || setweight(to_tsvector('simple', COALESCE(?, '')), 'B')
-                            WHERE user_id = ?
-                        """
-                        txn.execute(
-                            sql,
-                            (
-                                get_localpart_from_id(user_id),
-                                get_domain_from_id(user_id),
-                                display_name,
-                                user_id,
-                            ),
-                        )
-                    else:
-                        raise RuntimeError(
-                            "upsert returned None when 'can_native_upsert' is False"
-                        )
+                txn.execute(
+                    sql,
+                    (
+                        user_id,
+                        get_localpart_from_id(user_id),
+                        get_domain_from_id(user_id),
+                        display_name,
+                    ),
+                )
             elif isinstance(self.database_engine, Sqlite3Engine):
                 value = "%s %s" % (user_id, display_name) if display_name else user_id
                 self.db_pool.simple_upsert_txn(

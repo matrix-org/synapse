@@ -182,14 +182,14 @@ def create_requester(
     )
 
 
-def get_domain_from_id(string):
+def get_domain_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
     return string[idx + 1 :]
 
 
-def get_localpart_from_id(string):
+def get_localpart_from_id(string: str) -> str:
     idx = string.find(":")
     if idx == -1:
         raise SynapseError(400, "Invalid ID: %r" % (string,))
@@ -210,7 +210,7 @@ class DomainSpecificString(metaclass=abc.ABCMeta):
         'domain' : The domain part of the name
     """
 
-    SIGIL = abc.abstractproperty()  # type: str  # type: ignore
+    SIGIL: str = abc.abstractproperty()  # type: ignore
 
     localpart = attr.ib(type=str)
     domain = attr.ib(type=str)
@@ -284,14 +284,14 @@ class RoomAlias(DomainSpecificString):
 
 @attr.s(slots=True, frozen=True, repr=False)
 class RoomID(DomainSpecificString):
-    """Structure representing a room id. """
+    """Structure representing a room id."""
 
     SIGIL = "!"
 
 
 @attr.s(slots=True, frozen=True, repr=False)
 class EventID(DomainSpecificString):
-    """Structure representing an event id. """
+    """Structure representing an event id."""
 
     SIGIL = "$"
 
@@ -304,7 +304,7 @@ class GroupID(DomainSpecificString):
 
     @classmethod
     def from_string(cls: Type[DS], s: str) -> DS:
-        group_id = super().from_string(s)  # type: DS # type: ignore
+        group_id: DS = super().from_string(s)  # type: ignore
 
         if not group_id.localpart:
             raise SynapseError(400, "Group ID cannot be empty", Codes.INVALID_PARAM)
@@ -404,7 +404,7 @@ def map_username_to_mxid_localpart(
     return username.decode("ascii")
 
 
-@attr.s(frozen=True, slots=True, cmp=False)
+@attr.s(frozen=True, slots=True, order=False)
 class RoomStreamToken:
     """Tokens are positions between events. The token "s1" comes after event 1.
 
@@ -577,10 +577,10 @@ class RoomStreamToken:
             entries = []
             for name, pos in self.instance_map.items():
                 instance_id = await store.get_id_for_instance(name)
-                entries.append("{}.{}".format(instance_id, pos))
+                entries.append(f"{instance_id}.{pos}")
 
             encoded_map = "~".join(entries)
-            return "m{}~{}".format(self.stream, encoded_map)
+            return f"m{self.stream}~{encoded_map}"
         else:
             return "s%d" % (self.stream,)
 
@@ -600,7 +600,7 @@ class StreamToken:
     groups_key = attr.ib(type=int)
 
     _SEPARATOR = "_"
-    START = None  # type: StreamToken
+    START: "StreamToken"
 
     @classmethod
     async def from_string(cls, store: "DataStore", string: str) -> "StreamToken":
@@ -751,3 +751,32 @@ def get_verify_key_from_cross_signing_key(key_info):
     # and return that one key
     for key_id, key_data in keys.items():
         return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class UserInfo:
+    """Holds information about a user. Result of get_userinfo_by_id.
+
+    Attributes:
+        user_id:  ID of the user.
+        appservice_id:  Application service ID that created this user.
+        consent_server_notice_sent:  Version of policy documents the user has been sent.
+        consent_version:  Version of policy documents the user has consented to.
+        creation_ts:  Creation timestamp of the user.
+        is_admin:  True if the user is an admin.
+        is_deactivated:  True if the user has been deactivated.
+        is_guest:  True if the user is a guest user.
+        is_shadow_banned:  True if the user has been shadow-banned.
+        user_type:  User type (None for normal user, 'support' and 'bot' other options).
+    """
+
+    user_id: UserID
+    appservice_id: Optional[int]
+    consent_server_notice_sent: Optional[str]
+    consent_version: Optional[str]
+    user_type: Optional[str]
+    creation_ts: int
+    is_admin: bool
+    is_deactivated: bool
+    is_guest: bool
+    is_shadow_banned: bool

@@ -64,16 +64,16 @@ class SynapseRequest(Request):
     def __init__(self, channel, *args, max_request_body_size=1024, **kw):
         Request.__init__(self, channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
-        self.site = channel.site  # type: SynapseSite
+        self.site: SynapseSite = channel.site
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
 
         # The requester, if authenticated. For federation requests this is the
         # server name, for client requests this is the Requester object.
-        self._requester = None  # type: Optional[Union[Requester, str]]
+        self._requester: Optional[Union[Requester, str]] = None
 
         # we can't yet create the logcontext, as we don't know the method.
-        self.logcontext = None  # type: Optional[LoggingContext]
+        self.logcontext: Optional[LoggingContext] = None
 
         global _next_request_seq
         self.request_seq = _next_request_seq
@@ -152,7 +152,7 @@ class SynapseRequest(Request):
         Returns:
             The redacted URI as a string.
         """
-        uri = self.uri  # type: Union[bytes, str]
+        uri: Union[bytes, str] = self.uri
         if isinstance(uri, bytes):
             uri = uri.decode("ascii", errors="replace")
         return redact_uri(uri)
@@ -167,7 +167,7 @@ class SynapseRequest(Request):
         Returns:
             The request method as a string.
         """
-        method = self.method  # type: Union[bytes, str]
+        method: Union[bytes, str] = self.method
         if isinstance(method, bytes):
             return self.method.decode("ascii")
         return method
@@ -384,7 +384,7 @@ class SynapseRequest(Request):
         # authenticated (e.g. and admin is puppetting a user) then we log both.
         requester, authenticated_entity = self.get_authenticated_entity()
         if authenticated_entity:
-            requester = "{}.{}".format(authenticated_entity, requester)
+            requester = f"{authenticated_entity}.{requester}"
 
         self.site.access_logger.log(
             log_level,
@@ -434,8 +434,8 @@ class XForwardedForRequest(SynapseRequest):
     """
 
     # the client IP and ssl flag, as extracted from the headers.
-    _forwarded_for = None  # type: Optional[_XForwardedForAddress]
-    _forwarded_https = False  # type: bool
+    _forwarded_for: "Optional[_XForwardedForAddress]" = None
+    _forwarded_https: bool = False
 
     def requestReceived(self, command, path, version):
         # this method is called by the Channel once the full request has been

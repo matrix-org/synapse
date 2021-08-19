@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -32,7 +31,12 @@ from synapse.api.urls import (
     SERVER_KEY_V2_PREFIX,
 )
 from synapse.app import _base
-from synapse.app._base import max_request_body_size, register_start
+from synapse.app._base import (
+    handle_startup_exception,
+    max_request_body_size,
+    redirect_stdio_to_logs,
+    register_start,
+)
 from synapse.config._base import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 from synapse.config.logger import setup_logging
@@ -60,42 +64,41 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.room import RoomStore
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events, login, presence, room
-from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
-from synapse.rest.client.v1.profile import (
-    ProfileAvatarURLRestServlet,
-    ProfileDisplaynameRestServlet,
-    ProfileRestServlet,
-)
-from synapse.rest.client.v1.push_rule import PushRuleRestServlet
-from synapse.rest.client.v1.voip import VoipRestServlet
-from synapse.rest.client.v2_alpha import (
+from synapse.rest.client import (
     account_data,
+    events,
     groups,
+    login,
+    presence,
     read_marker,
     receipts,
+    room,
     room_keys,
     sync,
     tags,
     user_directory,
 )
-from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
-from synapse.rest.client.v2_alpha.account_data import (
-    AccountDataServlet,
-    RoomAccountDataServlet,
-)
-from synapse.rest.client.v2_alpha.devices import DevicesRestServlet
-from synapse.rest.client.v2_alpha.keys import (
+from synapse.rest.client._base import client_patterns
+from synapse.rest.client.account import ThreepidRestServlet
+from synapse.rest.client.account_data import AccountDataServlet, RoomAccountDataServlet
+from synapse.rest.client.devices import DevicesRestServlet
+from synapse.rest.client.initial_sync import InitialSyncRestServlet
+from synapse.rest.client.keys import (
     KeyChangesServlet,
     KeyQueryServlet,
     OneTimeKeyServlet,
 )
-from synapse.rest.client.v2_alpha.register import RegisterRestServlet
-from synapse.rest.client.v2_alpha.sendtodevice import SendToDeviceRestServlet
+from synapse.rest.client.profile import (
+    ProfileAvatarURLRestServlet,
+    ProfileDisplaynameRestServlet,
+    ProfileRestServlet,
+)
+from synapse.rest.client.push_rule import PushRuleRestServlet
+from synapse.rest.client.register import RegisterRestServlet
+from synapse.rest.client.sendtodevice import SendToDeviceRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
+from synapse.rest.client.voip import VoipRestServlet
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
@@ -103,12 +106,14 @@ from synapse.server import HomeServer
 from synapse.storage.databases.main.censor_events import CensorEventsStore
 from synapse.storage.databases.main.client_ips import ClientIpWorkerStore
 from synapse.storage.databases.main.e2e_room_keys import EndToEndRoomKeyStore
+from synapse.storage.databases.main.lock import LockStore
 from synapse.storage.databases.main.media_repository import MediaRepositoryStore
 from synapse.storage.databases.main.metrics import ServerMetricsStore
 from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import PresenceStore
+from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
@@ -232,7 +237,7 @@ class GenericWorkerSlavedStore(
     ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
-    RoomStore,
+    RoomWorkerStore,
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,
@@ -244,6 +249,7 @@ class GenericWorkerSlavedStore(
     ServerMetricsStore,
     SearchStore,
     TransactionWorkerStore,
+    LockStore,
     BaseSlavedStore,
 ):
     pass
@@ -263,7 +269,7 @@ class GenericWorkerServer(HomeServer):
             site_tag = port
 
         # We always include a health resource.
-        resources = {"/health": HealthResource()}  # type: Dict[str, IResource]
+        resources: Dict[str, IResource] = {"/health": HealthResource()}
 
         for res in listener_config.http_options.resources:
             for name in res.names:
@@ -354,6 +360,10 @@ class GenericWorkerServer(HomeServer):
                 if name == "replication":
                     resources[REPLICATION_PREFIX] = ReplicationRestResource(self)
 
+        # Attach additional resources registered by modules.
+        resources.update(self._module_web_resources)
+        self._module_web_resources_consumed = True
+
         root_resource = create_resource_tree(resources, OptionsResource())
 
         _base.listen_tcp(
@@ -384,10 +394,8 @@ class GenericWorkerServer(HomeServer):
             elif listener.type == "metrics":
                 if not self.config.enable_metrics:
                     logger.warning(
-                        (
-                            "Metrics listener configured, but "
-                            "enable_metrics is not True!"
-                        )
+                        "Metrics listener configured, but "
+                        "enable_metrics is not True!"
                     )
                 else:
                     _base.listen_metrics(listener.bind_addresses, listener.port)
@@ -465,13 +473,20 @@ def start(config_options):
 
     setup_logging(hs, config, use_worker_options=True)
 
-    hs.setup()
+    try:
+        hs.setup()
 
-    # Ensure the replication streamer is always started in case we write to any
-    # streams. Will no-op if no streams can be written to by this worker.
-    hs.get_replication_streamer()
+        # Ensure the replication streamer is always started in case we write to any
+        # streams. Will no-op if no streams can be written to by this worker.
+        hs.get_replication_streamer()
+    except Exception as e:
+        handle_startup_exception(e)
 
     register_start(_base.start, hs)
+
+    # redirect stdio to the logs, if configured.
+    if not hs.config.no_redirect_stdio:
+        redirect_stdio_to_logs()
 
     _base.start_worker_reactor("synapse-generic-worker", config)
 

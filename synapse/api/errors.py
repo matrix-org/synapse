@@ -75,6 +75,9 @@ class Codes:
     INVALID_SIGNATURE = "M_INVALID_SIGNATURE"
     USER_DEACTIVATED = "M_USER_DEACTIVATED"
     BAD_ALIAS = "M_BAD_ALIAS"
+    # For restricted join rules.
+    UNABLE_AUTHORISE_JOIN = "M_UNABLE_TO_AUTHORISE_JOIN"
+    UNABLE_TO_GRANT_JOIN = "M_UNABLE_TO_GRANT_JOIN"
 
 
 class CodeMessageException(RuntimeError):
@@ -118,7 +121,7 @@ class RedirectException(CodeMessageException):
         super().__init__(code=http_code, msg=msg)
         self.location = location
 
-        self.cookies = []  # type: List[bytes]
+        self.cookies: List[bytes] = []
 
 
 class SynapseError(CodeMessageException):
@@ -160,7 +163,7 @@ class ProxiedRequestError(SynapseError):
     ):
         super().__init__(code, msg, errcode)
         if additional_fields is None:
-            self._additional_fields = {}  # type: Dict
+            self._additional_fields: Dict = {}
         else:
             self._additional_fields = dict(additional_fields)
 
@@ -449,7 +452,7 @@ class IncompatibleRoomVersionError(SynapseError):
         super().__init__(
             code=400,
             msg="Your homeserver does not support the features required to "
-            "join this room",
+            "interact with this room",
             errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
         )
 

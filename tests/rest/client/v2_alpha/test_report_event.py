@@ -15,8 +15,7 @@
 import json
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import report_event
+from synapse.rest.client import login, report_event, room
 
 from tests import unittest
 
@@ -41,7 +40,7 @@ class ReportEventTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id, user=self.admin_user, tok=self.admin_user_tok)
         resp = self.helper.send(self.room_id, tok=self.admin_user_tok)
         self.event_id = resp["event_id"]
-        self.report_path = "rooms/{}/report/{}".format(self.room_id, self.event_id)
+        self.report_path = f"rooms/{self.room_id}/report/{self.event_id}"
 
     def test_reason_str_and_score_int(self):
         data = {"reason": "this makes me sad", "score": -100}

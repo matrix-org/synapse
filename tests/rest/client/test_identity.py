@@ -15,7 +15,7 @@
 import json
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests import unittest
 

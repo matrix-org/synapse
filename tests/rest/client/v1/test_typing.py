@@ -17,7 +17,7 @@
 
 from unittest.mock import Mock
 
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 from synapse.types import UserID
 
 from tests import unittest
@@ -26,7 +26,7 @@ PATH_PREFIX = "/_matrix/client/api/v1"
 
 
 class RoomTypingTestCase(unittest.HomeserverTestCase):
-    """ Tests /rooms/$room_id/typing/$user_id REST API. """
+    """Tests /rooms/$room_id/typing/$user_id REST API."""
 
     user_id = "@sid:red"
 

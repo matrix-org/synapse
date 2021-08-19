@@ -1,1 +1,0 @@
-Update opentracing to inject the right context into the carrier.

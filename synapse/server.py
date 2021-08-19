@@ -1,6 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,9 +34,8 @@ from typing import (
 )
 
 import twisted.internet.tcp
-from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
+from twisted.web.resource import IResource
 
 from synapse.api.auth import Auth
 from synapse.api.filtering import Filtering
@@ -66,7 +63,6 @@ from synapse.groups.attestations import GroupAttestationSigning, GroupAttestionR
 from synapse.groups.groups_server import GroupsServerHandler, GroupsServerWorkerHandler
 from synapse.handlers.account_data import AccountDataHandler
 from synapse.handlers.account_validity import AccountValidityHandler
-from synapse.handlers.acme import AcmeHandler
 from synapse.handlers.admin import AdminHandler
 from synapse.handlers.appservice import ApplicationServicesHandler
 from synapse.handlers.auth import AuthHandler, MacaroonGenerator
@@ -103,10 +99,10 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
-from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -249,15 +245,47 @@ class HomeServer(metaclass=abc.ABCMeta):
         # the key we use to sign events and requests
         self.signing_key = config.key.signing_key[0]
         self.config = config
-        self._listening_services = []  # type: List[twisted.internet.tcp.Port]
-        self.start_time = None  # type: Optional[int]
+        self._listening_services: List[twisted.internet.tcp.Port] = []
+        self.start_time: Optional[int] = None
 
         self._instance_id = random_string(5)
         self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
-        self.datastores = None  # type: Optional[Databases]
+        self.datastores: Optional[Databases] = None
+
+        self._module_web_resources: Dict[str, IResource] = {}
+        self._module_web_resources_consumed = False
+
+    def register_module_web_resource(self, path: str, resource: IResource):
+        """Allows a module to register a web resource to be served at the given path.
+
+        If multiple modules register a resource for the same path, the module that
+        appears the highest in the configuration file takes priority.
+
+        Args:
+            path: The path to register the resource for.
+            resource: The resource to attach to this path.
+
+        Raises:
+            SynapseError(500): A module tried to register a web resource after the HTTP
+                listeners have been started.
+        """
+        if self._module_web_resources_consumed:
+            raise RuntimeError(
+                "Tried to register a web resource from a module after startup",
+            )
+
+        # Don't register a resource that's already been registered.
+        if path not in self._module_web_resources.keys():
+            self._module_web_resources[path] = resource
+        else:
+            logger.warning(
+                "Module tried to register a web resource for path %s but another module"
+                " has already registered a resource for this path.",
+                path,
+            )
 
     def get_instance_id(self) -> str:
         """A unique ID for this synapse process instance.
@@ -413,10 +441,6 @@ class HomeServer(metaclass=abc.ABCMeta):
         return RoomShutdownHandler(self)
 
     @cache_in_self
-    def get_sendmail(self) -> Callable[..., defer.Deferred]:
-        return sendmail
-
-    @cache_in_self
     def get_state_handler(self) -> StateHandler:
         return StateHandler(self)
 
@@ -493,10 +517,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_e2e_room_keys_handler(self) -> E2eRoomKeysHandler:
         return E2eRoomKeysHandler(self)
-
-    @cache_in_self
-    def get_acme_handler(self) -> AcmeHandler:
-        return AcmeHandler(self)
 
     @cache_in_self
     def get_admin_handler(self) -> AdminHandler:
@@ -651,7 +671,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_spam_checker(self) -> SpamChecker:
-        return SpamChecker(self)
+        return SpamChecker()
 
     @cache_in_self
     def get_third_party_event_rules(self) -> ThirdPartyEventRules:
@@ -752,8 +772,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountDataHandler(self)
 
     @cache_in_self
-    def get_space_summary_handler(self) -> SpaceSummaryHandler:
-        return SpaceSummaryHandler(self)
+    def get_room_summary_handler(self) -> RoomSummaryHandler:
+        return RoomSummaryHandler(self)
 
     @cache_in_self
     def get_event_auth_handler(self) -> EventAuthHandler:

@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from prometheus_client import Counter
 
-from synapse.api.constants import EventTypes, ThirdPartyEntityKind
+from synapse.api.constants import EventTypes, Membership, ThirdPartyEntityKind
 from synapse.api.errors import CodeMessageException
 from synapse.events import EventBase
 from synapse.events.utils import serialize_event
@@ -88,9 +88,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         super().__init__(hs)
         self.clock = hs.get_clock()
 
-        self.protocol_meta_cache = ResponseCache(
+        self.protocol_meta_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
-        )  # type: ResponseCache[Tuple[str, str]]
+        )
 
     async def query_user(self, service, user_id):
         if service.url is None:
@@ -247,9 +247,14 @@ class ApplicationServiceApi(SimpleHttpClient):
                 e,
                 time_now,
                 as_client_event=True,
-                is_invite=(
+                # If this is an invite or a knock membership event, and we're interested
+                # in this user, then include any stripped state alongside the event.
+                include_stripped_room_state=(
                     e.type == EventTypes.Member
-                    and e.membership == "invite"
+                    and (
+                        e.membership == Membership.INVITE
+                        or e.membership == Membership.KNOCK
+                    )
                     and service.is_interested_in_user(e.state_key)
                 ),
             )

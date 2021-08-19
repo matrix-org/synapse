@@ -174,14 +174,7 @@ class NewRegistrationTokenRestServlet(RestServlet):
                 400, "expiry_time must not be in the past", Codes.INVALID_PARAM
             )
 
-        res = await self.store.create_registration_token(
-            token, uses_allowed, expiry_time
-        )
-        if not res:
-            # Creation failed, probably the token already exists
-            raise SynapseError(
-                400, f"Token already exists: {token}", Codes.INVALID_PARAM
-            )
+        await self.store.create_registration_token(token, uses_allowed, expiry_time)
 
         resp = {
             "token": token,

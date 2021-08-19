@@ -1,1 +1,0 @@
-Fix bug where the server would attempt to fetch the same history in the room from a remote server multiple times in parallel.

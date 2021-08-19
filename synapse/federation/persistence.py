@@ -45,7 +45,7 @@ class TransactionActions:
             `None` if we have not previously responded to this transaction or a
             2-tuple of `(int, dict)` representing the response code and response body.
         """
-        transaction_id = transaction.transaction_id  # type: ignore
+        transaction_id = transaction.transaction_id
         if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")
 
@@ -56,7 +56,7 @@ class TransactionActions:
         self, origin: str, transaction: Transaction, code: int, response: JsonDict
     ) -> None:
         """Persist how we responded to a transaction."""
-        transaction_id = transaction.transaction_id  # type: ignore
+        transaction_id = transaction.transaction_id
         if not transaction_id:
             raise RuntimeError("Cannot persist a transaction with no transaction_id")
 

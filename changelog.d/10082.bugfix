@@ -1,1 +1,0 @@
-Fixed a bug causing replication requests to fail when receiving a lot of events via federation.

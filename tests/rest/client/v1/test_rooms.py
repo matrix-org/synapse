@@ -19,15 +19,17 @@
 
 import json
 from typing import Iterable
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 from urllib import parse as urlparse
+
+from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
+from synapse.api.errors import HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
-from synapse.rest.client.v1 import directory, login, profile, room
-from synapse.rest.client.v2_alpha import account
+from synapse.rest.client import account, directory, login, profile, room
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 
@@ -64,7 +66,7 @@ class RoomBase(unittest.HomeserverTestCase):
 
 
 class RoomPermissionsTestCase(RoomBase):
-    """ Tests room permissions. """
+    """Tests room permissions."""
 
     user_id = "@sid1:red"
     rmcreator_id = "@notme:red"
@@ -377,7 +379,7 @@ class RoomPermissionsTestCase(RoomBase):
 
 
 class RoomsMemberListTestCase(RoomBase):
-    """ Tests /rooms/$room_id/members/list REST events."""
+    """Tests /rooms/$room_id/members/list REST events."""
 
     user_id = "@sid1:red"
 
@@ -416,7 +418,7 @@ class RoomsMemberListTestCase(RoomBase):
 
 
 class RoomsCreateTestCase(RoomBase):
-    """ Tests /rooms and /rooms/$room_id REST events. """
+    """Tests /rooms and /rooms/$room_id REST events."""
 
     user_id = "@sid1:red"
 
@@ -502,7 +504,7 @@ class RoomsCreateTestCase(RoomBase):
 
 
 class RoomTopicTestCase(RoomBase):
-    """ Tests /rooms/$room_id/topic REST events. """
+    """Tests /rooms/$room_id/topic REST events."""
 
     user_id = "@sid1:red"
 
@@ -566,7 +568,7 @@ class RoomTopicTestCase(RoomBase):
 
 
 class RoomMemberStateTestCase(RoomBase):
-    """ Tests /rooms/$room_id/members/$user_id/state REST events. """
+    """Tests /rooms/$room_id/members/$user_id/state REST events."""
 
     user_id = "@sid1:red"
 
@@ -790,7 +792,7 @@ class RoomJoinRatelimitTestCase(RoomBase):
 
 
 class RoomMessagesTestCase(RoomBase):
-    """ Tests /rooms/$room_id/messages/$user_id/$msg_id REST events. """
+    """Tests /rooms/$room_id/messages/$user_id/$msg_id REST events."""
 
     user_id = "@sid1:red"
 
@@ -838,7 +840,7 @@ class RoomMessagesTestCase(RoomBase):
 
 
 class RoomInitialSyncTestCase(RoomBase):
-    """ Tests /rooms/$room_id/initialSync. """
+    """Tests /rooms/$room_id/initialSync."""
 
     user_id = "@sid1:red"
 
@@ -879,7 +881,7 @@ class RoomInitialSyncTestCase(RoomBase):
 
 
 class RoomMessageListTestCase(RoomBase):
-    """ Tests /rooms/$room_id/messages REST events. """
+    """Tests /rooms/$room_id/messages REST events."""
 
     user_id = "@sid1:red"
 
@@ -1124,6 +1126,93 @@ class PublicRoomsRestrictedTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200, channel.result)
 
 
+class PublicRoomsTestRemoteSearchFallbackTestCase(unittest.HomeserverTestCase):
+    """Test that we correctly fallback to local filtering if a remote server
+    doesn't support search.
+    """
+
+    servlets = [
+        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        room.register_servlets,
+        login.register_servlets,
+    ]
+
+    def make_homeserver(self, reactor, clock):
+        return self.setup_test_homeserver(federation_client=Mock())
+
+    def prepare(self, reactor, clock, hs):
+        self.register_user("user", "pass")
+        self.token = self.login("user", "pass")
+
+        self.federation_client = hs.get_federation_client()
+
+    def test_simple(self):
+        "Simple test for searching rooms over federation"
+        self.federation_client.get_public_rooms.side_effect = (
+            lambda *a, **k: defer.succeed({})
+        )
+
+        search_filter = {"generic_search_term": "foobar"}
+
+        channel = self.make_request(
+            "POST",
+            b"/_matrix/client/r0/publicRooms?server=testserv",
+            content={"filter": search_filter},
+            access_token=self.token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.federation_client.get_public_rooms.assert_called_once_with(
+            "testserv",
+            limit=100,
+            since_token=None,
+            search_filter=search_filter,
+            include_all_networks=False,
+            third_party_instance_id=None,
+        )
+
+    def test_fallback(self):
+        "Test that searching public rooms over federation falls back if it gets a 404"
+
+        # The `get_public_rooms` should be called again if the first call fails
+        # with a 404, when using search filters.
+        self.federation_client.get_public_rooms.side_effect = (
+            HttpResponseException(404, "Not Found", b""),
+            defer.succeed({}),
+        )
+
+        search_filter = {"generic_search_term": "foobar"}
+
+        channel = self.make_request(
+            "POST",
+            b"/_matrix/client/r0/publicRooms?server=testserv",
+            content={"filter": search_filter},
+            access_token=self.token,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+
+        self.federation_client.get_public_rooms.assert_has_calls(
+            [
+                call(
+                    "testserv",
+                    limit=100,
+                    since_token=None,
+                    search_filter=search_filter,
+                    include_all_networks=False,
+                    third_party_instance_id=None,
+                ),
+                call(
+                    "testserv",
+                    limit=None,
+                    since_token=None,
+                    search_filter=None,
+                    include_all_networks=False,
+                    third_party_instance_id=None,
+                ),
+            ]
+        )
+
+
 class PerRoomProfilesForbiddenTestCase(unittest.HomeserverTestCase):
 
     servlets = [
@@ -1206,7 +1295,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/join".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/join",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1220,7 +1309,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )
@@ -1234,7 +1323,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/kick".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/kick",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.second_tok,
         )
@@ -1248,7 +1337,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/ban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/ban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1260,7 +1349,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/unban".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/unban",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1272,7 +1361,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/invite".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/invite",
             content={"reason": reason, "user_id": self.second_user_id},
             access_token=self.creator_tok,
         )
@@ -1291,7 +1380,7 @@ class RoomMembershipReasonTestCase(unittest.HomeserverTestCase):
         reason = "hello"
         channel = self.make_request(
             "POST",
-            "/_matrix/client/r0/rooms/{}/leave".format(self.room_id),
+            f"/_matrix/client/r0/rooms/{self.room_id}/leave",
             content={"reason": reason},
             access_token=self.second_tok,
         )

@@ -24,8 +24,7 @@ import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import groups
+from synapse.rest.client import groups, login, room
 
 from tests import unittest
 from tests.server import FakeSite, make_request
@@ -66,7 +65,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         # Create a new group
         channel = self.make_request(
             "POST",
-            "/create_group".encode("ascii"),
+            b"/create_group",
             access_token=self.admin_user_tok,
             content={"localpart": "test"},
         )
@@ -129,9 +128,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)"""
-        channel = self.make_request(
-            "GET", "/joined_groups".encode("ascii"), access_token=access_token
-        )
+        channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 

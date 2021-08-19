@@ -1,1 +1,0 @@
-Fix a bug introduced in Synapse 1.33.0 which caused replication requests to fail when receiving a lot of very large events via federation.

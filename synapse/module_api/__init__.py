@@ -12,17 +12,43 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import email.utils
 import logging
-from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Dict,
+    Generator,
+    Iterable,
+    List,
+    Optional,
+    Tuple,
+)
+
+import jinja2
 
 from twisted.internet import defer
+from twisted.web.resource import IResource
 
 from synapse.events import EventBase
+from synapse.events.presence_router import PresenceRouter
 from synapse.http.client import SimpleHttpClient
+from synapse.http.server import (
+    DirectServeHtmlResource,
+    DirectServeJsonResource,
+    respond_with_html,
+)
+from synapse.http.servlet import parse_json_object_from_request
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
+from synapse.util import Clock
+from synapse.util.caches.descriptors import cached
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -32,7 +58,23 @@ This package defines the 'stable' API which can be used by extension modules whi
 are loaded into Synapse.
 """
 
-__all__ = ["errors", "make_deferred_yieldable", "run_in_background", "ModuleApi"]
+PRESENCE_ALL_USERS = PresenceRouter.ALL_USERS
+
+__all__ = [
+    "errors",
+    "make_deferred_yieldable",
+    "parse_json_object_from_request",
+    "respond_with_html",
+    "run_in_background",
+    "cached",
+    "UserID",
+    "DatabasePool",
+    "LoggingTransaction",
+    "DirectServeHtmlResource",
+    "DirectServeJsonResource",
+    "ModuleApi",
+    "PRESENCE_ALL_USERS",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +84,7 @@ class ModuleApi:
     can register new users etc if necessary.
     """
 
-    def __init__(self, hs, auth_handler):
+    def __init__(self, hs: "HomeServer", auth_handler):
         self._hs = hs
 
         self._store = hs.get_datastore()
@@ -51,10 +93,70 @@ class ModuleApi:
         self._server_name = hs.hostname
         self._presence_stream = hs.get_event_sources().sources["presence"]
         self._state = hs.get_state_handler()
+        self._clock: Clock = hs.get_clock()
+        self._send_email_handler = hs.get_send_email_handler()
+        self.custom_template_dir = hs.config.server.custom_template_directory
+
+        try:
+            app_name = self._hs.config.email_app_name
+
+            self._from_string = self._hs.config.email_notif_from % {"app": app_name}
+        except (KeyError, TypeError):
+            # If substitution failed (which can happen if the string contains
+            # placeholders other than just "app", or if the type of the placeholder is
+            # not a string), fall back to the bare strings.
+            self._from_string = self._hs.config.email_notif_from
+
+        self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
         # We expose these as properties below in order to attach a helpful docstring.
-        self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
+        self._http_client: SimpleHttpClient = hs.get_simple_http_client()
         self._public_room_list_manager = PublicRoomListManager(hs)
+
+        self._spam_checker = hs.get_spam_checker()
+        self._account_validity_handler = hs.get_account_validity_handler()
+        self._third_party_event_rules = hs.get_third_party_event_rules()
+        self._presence_router = hs.get_presence_router()
+
+    #################################################################################
+    # The following methods should only be called during the module's initialisation.
+
+    @property
+    def register_spam_checker_callbacks(self):
+        """Registers callbacks for spam checking capabilities."""
+        return self._spam_checker.register_callbacks
+
+    @property
+    def register_account_validity_callbacks(self):
+        """Registers callbacks for account validity capabilities."""
+        return self._account_validity_handler.register_account_validity_callbacks
+
+    @property
+    def register_third_party_rules_callbacks(self):
+        """Registers callbacks for third party event rules capabilities."""
+        return self._third_party_event_rules.register_third_party_rules_callbacks
+
+    @property
+    def register_presence_router_callbacks(self):
+        """Registers callbacks for presence router capabilities."""
+        return self._presence_router.register_presence_router_callbacks
+
+    def register_web_resource(self, path: str, resource: IResource):
+        """Registers a web resource to be served at the given path.
+
+        This function should be called during initialisation of the module.
+
+        If multiple modules register a resource for the same path, the module that
+        appears the highest in the configuration file takes priority.
+
+        Args:
+            path: The path to register the resource for.
+            resource: The resource to attach to this path.
+        """
+        self._hs.register_module_web_resource(path, resource)
+
+    #########################################################################
+    # The following methods can be called by the module at any point in time.
 
     @property
     def http_client(self):
@@ -73,22 +175,66 @@ class ModuleApi:
         """
         return self._public_room_list_manager
 
-    def get_user_by_req(self, req, allow_guest=False):
+    @property
+    def public_baseurl(self) -> str:
+        """The configured public base URL for this homeserver."""
+        return self._hs.config.public_baseurl
+
+    @property
+    def email_app_name(self) -> str:
+        """The application name configured in the homeserver's configuration."""
+        return self._hs.config.email.email_app_name
+
+    async def get_userinfo_by_id(self, user_id: str) -> Optional[UserInfo]:
+        """Get user info by user_id
+
+        Args:
+            user_id: Fully qualified user id.
+        Returns:
+            UserInfo object if a user was found, otherwise None
+        """
+        return await self._store.get_userinfo_by_id(user_id)
+
+    async def get_user_by_req(
+        self,
+        req: SynapseRequest,
+        allow_guest: bool = False,
+        allow_expired: bool = False,
+    ) -> Requester:
         """Check the access_token provided for a request
 
         Args:
-            req (twisted.web.server.Request): Incoming HTTP request
-            allow_guest (bool): True if guest users should be allowed. If this
+            req: Incoming HTTP request
+            allow_guest: True if guest users should be allowed. If this
                 is False, and the access token is for a guest user, an
                 AuthError will be thrown
+            allow_expired: True if expired users should be allowed. If this
+                is False, and the access token is for an expired user, an
+                AuthError will be thrown
+
         Returns:
-            twisted.internet.defer.Deferred[synapse.types.Requester]:
-                the requester for this request
+            The requester for this request
+
         Raises:
-            synapse.api.errors.AuthError: if no user by that token exists,
+            InvalidClientCredentialsError: if no user by that token exists,
                 or the token is invalid.
         """
-        return self._auth.get_user_by_req(req, allow_guest)
+        return await self._auth.get_user_by_req(
+            req,
+            allow_guest,
+            allow_expired=allow_expired,
+        )
+
+    async def is_user_admin(self, user_id: str) -> bool:
+        """Checks if a user is a server admin.
+
+        Args:
+            user_id: The Matrix ID of the user to check.
+
+        Returns:
+            True if the user is a server admin, False otherwise.
+        """
+        return await self._store.is_server_admin(UserID.from_string(user_id))
 
     def get_qualified_user_id(self, username):
         """Qualify a user id, if necessary
@@ -105,6 +251,32 @@ class ModuleApi:
         if username.startswith("@"):
             return username
         return UserID(username, self._hs.hostname).to_string()
+
+    async def get_profile_for_user(self, localpart: str) -> ProfileInfo:
+        """Look up the profile info for the user with the given localpart.
+
+        Args:
+            localpart: The localpart to look up profile information for.
+
+        Returns:
+            The profile information (i.e. display name and avatar URL).
+        """
+        return await self._store.get_profileinfo(localpart)
+
+    async def get_threepids_for_user(self, user_id: str) -> List[Dict[str, str]]:
+        """Look up the threepids (email addresses and phone numbers) associated with the
+        given Matrix user ID.
+
+        Args:
+            user_id: The Matrix user ID to look up threepids for.
+
+        Returns:
+            A list of threepids, each threepid being represented by a dictionary
+            containing a "medium" key which value is "email" for email addresses and
+            "msisdn" for phone numbers, and an "address" key which value is the
+            threepid's address.
+        """
+        return await self._store.user_get_threepids(user_id)
 
     def check_user_exists(self, user_id):
         """Check if user exists.
@@ -140,7 +312,7 @@ class ModuleApi:
             "Using deprecated ModuleApi.register which creates a dummy user device."
         )
         user_id = yield self.register_user(localpart, displayname, emails or [])
-        _, access_token = yield self.register_device(user_id)
+        _, access_token, _, _ = yield self.register_device(user_id)
         return user_id, access_token
 
     def register_user(
@@ -333,7 +505,7 @@ class ModuleApi:
     @defer.inlineCallbacks
     def get_state_events_in_room(
         self, room_id: str, types: Iterable[Tuple[str, Optional[str]]]
-    ) -> Generator[defer.Deferred, Any, defer.Deferred]:
+    ) -> Generator[defer.Deferred, Any, Iterable[EventBase]]:
         """Gets current state events for the given room.
 
         (This is exposed for compatibility with the old SpamCheckerApi. We should
@@ -435,6 +607,98 @@ class ModuleApi:
             presence_handler.get_federation_queue().send_presence_to_destinations(
                 presence_events, destination
             )
+
+    def looping_background_call(
+        self,
+        f: Callable,
+        msec: float,
+        *args,
+        desc: Optional[str] = None,
+        run_on_all_instances: bool = False,
+        **kwargs,
+    ):
+        """Wraps a function as a background process and calls it repeatedly.
+
+        NOTE: Will only run on the instance that is configured to run
+        background processes (which is the main process by default), unless
+        `run_on_all_workers` is set.
+
+        Waits `msec` initially before calling `f` for the first time.
+
+        Args:
+            f: The function to call repeatedly. f can be either synchronous or
+                asynchronous, and must follow Synapse's logcontext rules.
+                More info about logcontexts is available at
+                https://matrix-org.github.io/synapse/latest/log_contexts.html
+            msec: How long to wait between calls in milliseconds.
+            *args: Positional arguments to pass to function.
+            desc: The background task's description. Default to the function's name.
+            run_on_all_instances: Whether to run this on all instances, rather
+                than just the instance configured to run background tasks.
+            **kwargs: Key arguments to pass to function.
+        """
+        if desc is None:
+            desc = f.__name__
+
+        if self._hs.config.run_background_tasks or run_on_all_instances:
+            self._clock.looping_call(
+                run_as_background_process,
+                msec,
+                desc,
+                f,
+                *args,
+                **kwargs,
+            )
+        else:
+            logger.warning(
+                "Not running looping call %s as the configuration forbids it",
+                f,
+            )
+
+    async def send_mail(
+        self,
+        recipient: str,
+        subject: str,
+        html: str,
+        text: str,
+    ):
+        """Send an email on behalf of the homeserver.
+
+        Args:
+            recipient: The email address for the recipient.
+            subject: The email's subject.
+            html: The email's HTML content.
+            text: The email's text content.
+        """
+        await self._send_email_handler.send_email(
+            email_address=recipient,
+            subject=subject,
+            app_name=self.email_app_name,
+            html=html,
+            text=text,
+        )
+
+    def read_templates(
+        self,
+        filenames: List[str],
+        custom_template_directory: Optional[str] = None,
+    ) -> List[jinja2.Template]:
+        """Read and load the content of the template files at the given location.
+        By default, Synapse will look for these templates in its configured template
+        directory, but another directory to search in can be provided.
+
+        Args:
+            filenames: The name of the template files to look for.
+            custom_template_directory: An additional directory to look for the files in.
+
+        Returns:
+            A list containing the loaded templates, with the orders matching the one of
+            the filenames parameter.
+        """
+        return self._hs.config.read_templates(
+            filenames,
+            (td for td in (self.custom_template_dir, custom_template_directory) if td),
+        )
 
 
 class PublicRoomListManager:
