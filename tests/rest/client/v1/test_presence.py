@@ -17,7 +17,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 from synapse.handlers.presence import PresenceHandler
-from synapse.rest.client.v1 import presence
+from synapse.rest.client import presence
 from synapse.types import UserID
 
 from tests import unittest

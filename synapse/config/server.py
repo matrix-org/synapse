@@ -248,6 +248,7 @@ class ServerConfig(Config):
             self.use_presence = config.get("use_presence", True)
 
         # Custom presence router module
+        # This is the legacy way of configuring it (the config should now be put in the modules section)
         self.presence_router_module_class = None
         self.presence_router_config = None
         presence_router_config = presence_config.get("presence_router")
@@ -710,6 +711,18 @@ class ServerConfig(Config):
             # Turn the list into a set to improve lookup speed.
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
+        templates_config = config.get("templates") or {}
+        if not isinstance(templates_config, dict):
+            raise ConfigError("The 'templates' section must be a dictionary")
+
+        self.custom_template_directory = templates_config.get(
+            "custom_template_directory"
+        )
+        if self.custom_template_directory is not None and not isinstance(
+            self.custom_template_directory, str
+        ):
+            raise ConfigError("'custom_template_directory' must be a string")
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
@@ -858,20 +871,6 @@ class ServerConfig(Config):
           #
           #enabled: false
 
-          # Presence routers are third-party modules that can specify additional logic
-          # to where presence updates from users are routed.
-          #
-          presence_router:
-            # The custom module's class. Uncomment to use a custom presence router module.
-            #
-            #module: "my_custom_router.PresenceRouter"
-
-            # Configuration options of the custom module. Refer to your module's
-            # documentation for available options.
-            #
-            #config:
-            #  example_option: 'something'
-
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
         # 'false'. Note that profile data is also available via the federation
@@ -959,6 +958,8 @@ class ServerConfig(Config):
         # listed here, since they correspond to unroutable addresses.)
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+        #
+        # Note: The value is ignored when an HTTP proxy is in use
         #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
@@ -1282,6 +1283,19 @@ class ServerConfig(Config):
         # all domains.
         #
         #next_link_domain_whitelist: ["matrix.org"]
+
+        # Templates to use when generating email or HTML page contents.
+        #
+        templates:
+          # Directory in which Synapse will try to find template files to use to generate
+          # email or HTML page contents.
+          # If not set, or a file is not found within the template directory, a default
+          # template from within the Synapse package will be used.
+          #
+          # See https://matrix-org.github.io/synapse/latest/templates.html for more
+          # information about using custom templates.
+          #
+          #custom_template_directory: /path/to/custom/templates/
         """
             % locals()
         )

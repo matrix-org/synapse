@@ -18,8 +18,7 @@ from twisted.internet import defer
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import user_directory
+from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest

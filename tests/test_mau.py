@@ -17,7 +17,7 @@
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes, HttpResponseException, SynapseError
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v2_alpha import register, sync
+from synapse.rest.client import register, sync
 
 from tests import unittest
 from tests.unittest import override_config

@@ -62,7 +62,7 @@ class JoinRules:
     INVITE = "invite"
     PRIVATE = "private"
     # As defined for MSC3083.
-    MSC3083_RESTRICTED = "restricted"
+    RESTRICTED = "restricted"
 
 
 class RestrictedJoinRuleTypes:
@@ -126,6 +126,14 @@ class EventTypes:
 
 class ToDeviceEventTypes:
     RoomKeyRequest = "m.room_key_request"
+
+
+class DeviceKeyAlgorithms:
+    """Spec'd algorithms for the generation of per-device keys"""
+
+    ED25519 = "ed25519"
+    CURVE25519 = "curve25519"
+    SIGNED_CURVE25519 = "signed_curve25519"
 
 
 class EduTypes:
@@ -198,9 +206,6 @@ class EventContentFields:
     MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
     # For "marker" events
     MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
-    MSC2716_MARKER_INSERTION_PREV_EVENTS = (
-        "org.matrix.msc2716.marker.insertion_prev_events"
-    )
 
 
 class RoomTypes:
@@ -224,3 +229,7 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"

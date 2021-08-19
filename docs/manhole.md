@@ -67,7 +67,7 @@ This gives a Python REPL in which `hs` gives access to the
 `synapse.server.HomeServer` object - which in turn gives access to many other
 parts of the process.
 
-Note that any call which returns a coroutine will need to be wrapped in `ensureDeferred`.
+Note that, prior to Synapse 1.41, any call which returns a coroutine will need to be wrapped in `ensureDeferred`.
 
 As a simple example, retrieving an event from the database:
 

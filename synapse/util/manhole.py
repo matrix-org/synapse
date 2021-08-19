@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import sys
 import traceback
 
@@ -20,6 +21,7 @@ from twisted.conch.insults import insults
 from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
+from twisted.internet import defer
 
 PUBLIC_KEY = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHhGATaW4KhE23+7nrH4jFx3yLq9OjaEs5"
@@ -141,3 +143,15 @@ class SynapseManholeInterpreter(ManholeInterpreter):
             self.write("".join(lines))
         finally:
             last_tb = ei = None
+
+    def displayhook(self, obj):
+        """
+        We override the displayhook so that we automatically convert coroutines
+        into Deferreds. (Our superclass' displayhook will take care of the rest,
+        by displaying the Deferred if it's ready, or registering a callback
+        if it's not).
+        """
+        if inspect.iscoroutine(obj):
+            super().displayhook(defer.ensureDeferred(obj))
+        else:
+            super().displayhook(obj)

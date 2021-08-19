@@ -13,8 +13,7 @@
 # limitations under the License.
 import synapse.rest.admin
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import capabilities
+from synapse.rest.client import capabilities, login
 
 from tests import unittest
 from tests.unittest import override_config
