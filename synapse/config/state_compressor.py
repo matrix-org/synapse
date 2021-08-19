@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from synapse.config._base import Config, ConfigError
+from synapse.config._util import validate_config
 from synapse.python_dependencies import DependencyException, check_requirements
 
 
@@ -21,6 +22,7 @@ class StateCompressorConfig(Config):
 
     def read_config(self, config, **kwargs):
         compressor_config = config.get("state_compressor") or {}
+        validate_config(_STATE_COMPRESSOR_SCHEMA, compressor_config, ("state_compressor",))
         self.compressor_enabled = compressor_config.get("enabled") or False
 
         if not self.compressor_enabled:
@@ -42,6 +44,8 @@ class StateCompressorConfig(Config):
 
     def generate_config_section(self, **kwargs):
         return """\
+        ## State compressor ##
+
         # The state compressor is an experimental tool which attempts to
         # reduce the number of rows in the state_groups_state table
         # of postgres databases.
@@ -50,13 +54,38 @@ class StateCompressorConfig(Config):
         # https://matrix-org.github.io/synapse/latest/state_compressor.html
         #
         state_compressor:
-        #  enabled: true
-        #  # The (rough) number of state groups to load at one time
-        #  chunk_size: 500
-        #  # The number of rooms to compress on each run
-        #  number_of_rooms: 5
-        #  # The default level sizes for the compressor to use
-        #  default_levels: 100,50,25
-        #  # How frequently to run the state compressor
-        #  time_between_runs: 1d
+          # Whether the state compressor should run (defaults to false)
+          # Uncomment to enable it - Note, this requires the 'auto-compressor'
+          # library to be installed
+          #
+          #enabled: true
+
+          # The (rough) number of state groups to load at one time. Defaults
+          # to 500.
+          #
+          #chunk_size: 1000 
+
+          # The number of rooms to compress on each run. Defaults to 5.
+          #
+          #number_of_rooms: 1
+
+          # The default level sizes for the compressor to use. Defaults to
+          # 100,50,25.
+          #
+          #default_levels: 128,64,32.
+
+          # How frequently to run the state compressor. Defaults to 1d
+          #
+          #time_between_runs: 1w
         """
+
+
+_STATE_COMPRESSOR_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "enabled": {"type": "boolean"},
+        "chunk_size": {"type": "number"},
+        "default_levels": {"type": "string"},
+        "time_between_runs": {"type": "string"},
+    },
+}
