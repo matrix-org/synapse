@@ -356,18 +356,13 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
-        avatar_event = await self.store.get_event(
-            room_state_ids[(EventTypes.RoomAvatar, "")]
-        )
-        avatar_url = avatar_event.content.get("url")
-
         room_vars: Dict[str, Any] = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
-            "avatar_url": avatar_url,
+            "avatar_url": await self._get_room_avatar(room_state_ids),
         }
 
         if not is_invite:
@@ -398,6 +393,16 @@ class Mailer:
                     room_vars["notifs"].append(notifvars)
 
         return room_vars
+
+    async def _get_room_avatar(
+        self,
+        room_state_ids: StateMap[str],
+    ) -> Optional[str]:
+        event_id = room_state_ids.get((EventTypes.RoomAvatar, ""))
+        if event_id:
+            ev = await self.store.get_event(event_id)
+            return ev.content["url"]
+        return None
 
     async def _get_notif_vars(
         self,
