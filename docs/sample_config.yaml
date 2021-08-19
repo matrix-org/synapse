@@ -1176,7 +1176,8 @@ url_preview_accept_language:
 #enable_3pid_lookup: true
 
 # Require users to submit a token during registration.
-# Tokens can be generated with the admin API (once it exists).
+# Tokens can be managed using the admin API:
+# https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
 # Note that `enable_registration` must be set to `true`.
 # Disabling this option will not delete any tokens previously generated.
 # Defaults to false. Uncomment the following to require tokens:
