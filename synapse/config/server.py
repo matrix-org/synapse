@@ -663,7 +663,7 @@ class ServerConfig(Config):
             )
 
         manhole_settings = config.get("manhole_settings") or {}
-        validate_config(_MANHOLE_SETTINGS_SCHEME, manhole_settings, ())
+        validate_config(_MANHOLE_SETTINGS_SCHEMA, manhole_settings, ())
 
         manhole_username = manhole_settings.get("username", "matrix")
         manhole_password = manhole_settings.get("password", "rabbithole")
@@ -1508,7 +1508,7 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                     return
 
 
-_MANHOLE_SETTINGS_SCHEME = {
+_MANHOLE_SETTINGS_SCHEMA = {
     "type": "object",
     "properties": {
         "username": {"type": "string"},
