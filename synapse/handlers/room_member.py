@@ -80,7 +80,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
 
-        self.member_linearizer = Linearizer(name="member")
+        self.member_linearizer: Linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -558,6 +558,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # global profile.
             content.pop("displayname", None)
             content.pop("avatar_url", None)
+            # content may now be emtpy
+            content_specified = len(content) == 0
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
