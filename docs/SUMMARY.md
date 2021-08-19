@@ -21,6 +21,7 @@
     - [Homeserver Sample Config File](usage/configuration/homeserver_sample_config.md)
     - [Logging Sample Config File](usage/configuration/logging_sample_config.md)
     - [Structured Logging](structured_logging.md)
+    - [Templates](templates.md)
     - [User Authentication](usage/configuration/user_authentication/README.md)
       - [Single-Sign On]()
         - [OpenID Connect](openid.md)
