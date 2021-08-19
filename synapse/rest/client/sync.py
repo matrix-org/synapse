@@ -30,6 +30,7 @@ from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict, StreamToken
 from synapse.util import json_decoder
 
+from ...logging import issue9533_logger
 from ._base import client_patterns, set_timeline_upper_limit
 
 if TYPE_CHECKING:
@@ -185,6 +186,9 @@ class SyncRestServlet(RestServlet):
                 full_state=full_state,
             )
 
+        issue9533_logger.debug(
+            "Sync body generated, next batch: %s", sync_result.next_batch
+        )
         # the client may have disconnected by now; don't bother to serialize the
         # response if so.
         if request._disconnected:
@@ -246,6 +250,9 @@ class SyncRestServlet(RestServlet):
 
         if sync_result.to_device:
             response["to_device"] = {"events": sync_result.to_device}
+            issue9533_logger.debug(
+                "to_device sent down in sync %s", response["to_device"]
+            )
 
         if sync_result.device_lists.changed:
             response["device_lists"]["changed"] = list(sync_result.device_lists.changed)
