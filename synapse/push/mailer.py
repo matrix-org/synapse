@@ -258,7 +258,7 @@ class Mailer:
         # actually sort our so-called rooms_in_order list, most recent room first
         rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
 
-        rooms = []
+        rooms: List[Dict[str, Any]] = []
 
         for r in rooms_in_order:
             roomvars = await self._get_room_vars(
@@ -356,12 +356,18 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
+        avatar_event = await self.store.get_event(
+            room_state_ids[(EventTypes.RoomAvatar, "")]
+        )
+        avatar_url = avatar_event.content.get("url")
+
         room_vars: Dict[str, Any] = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
+            "avatar_url": avatar_url,
         }
 
         if not is_invite:
