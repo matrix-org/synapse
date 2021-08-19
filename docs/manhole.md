@@ -56,7 +56,7 @@ listeners:
 
 The following config options are available:
 
-- `username`- The username for the manhole (defaults to `matrix`)
+- `username` - The username for the manhole (defaults to `matrix`)
 - `password` - The password for the manhole (defaults to `rabbithole`)
 - `ssh_priv_key` - The path to a private SSH key (defaults to a hardcoded value)
 - `ssh_pub_key` - The path to a public SSH key (defaults to a hardcoded value)
@@ -82,7 +82,7 @@ configuration, this would be:
 ssh -p9000 matrix@localhost
 ```
 
-Then enter the password when prompted.
+Then enter the password when prompted (the default is `rabbithole`)
 
 This gives a Python REPL in which `hs` gives access to the
 `synapse.server.HomeServer` object - which in turn gives access to many other

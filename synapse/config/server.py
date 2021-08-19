@@ -32,6 +32,7 @@ from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
+from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
@@ -216,6 +217,16 @@ class ListenerConfig:
 
     # http_options is only populated if type=http
     http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
+
+
+@attr.s(frozen=True)
+class ManholeConfig:
+    """Object describing the configuration of the manhole"""
+
+    username = attr.ib(type=str, validator=attr.validators.instance_of(str))
+    password = attr.ib(type=str, validator=attr.validators.instance_of(str))
+    priv_key = attr.ib(type=Optional[Key])
+    pub_key = attr.ib(type=Optional[Key])
 
 
 class ServerConfig(Config):
@@ -652,37 +663,37 @@ class ServerConfig(Config):
             )
 
         manhole_settings = config.get("manhole_settings") or {}
-        manhole_username = manhole_settings.get("username") or "matrix"
-        manhole_password = manhole_settings.get("password") or "rabbithole"
-        manhole_priv_key_file = manhole_settings.get("ssh_priv_key") or None
-        manhole_pub_key_file = manhole_settings.get("ssh_pub_key") or None
+        validate_config(_MANHOLE_SETTINGS_SCHEME, manhole_settings, ())
+
+        manhole_username = manhole_settings.get("username", "matrix")
+        manhole_password = manhole_settings.get("password", "rabbithole")
+        manhole_priv_key_path = manhole_settings.get("ssh_priv_key_path")
+        manhole_pub_key_path = manhole_settings.get("ssh_pub_key_path")
 
         manhole_priv_key = None
-        if manhole_priv_key_file is not None:
+        if manhole_priv_key_path is not None:
             try:
-                manhole_priv_key = Key.fromFile(manhole_priv_key_file)
+                manhole_priv_key = Key.fromFile(manhole_priv_key_path)
             except Exception as e:
                 raise ConfigError(
-                    "Failed to open manhole private key file %s: %s"
-                    % (manhole_priv_key_file, e)
-                )
+                    f"Failed to open manhole private key file {manhole_priv_key_path}"
+                ) from e
 
         manhole_pub_key = None
-        if manhole_pub_key_file is not None:
+        if manhole_pub_key_path is not None:
             try:
-                manhole_pub_key = Key.fromFile(manhole_pub_key_file)
+                manhole_pub_key = Key.fromFile(manhole_pub_key_path)
             except Exception as e:
                 raise ConfigError(
-                    "Failed to open manhole public key file %s: %s"
-                    % (manhole_pub_key_file, e)
-                )
+                    f"Failed to open manhole public key file {manhole_pub_key_path}"
+                ) from e
 
-        self.manhole_settings = {
-            "username": manhole_username,
-            "password": manhole_password,
-            "priv_key": manhole_priv_key,
-            "pub_key": manhole_pub_key,
-        }
+        self.manhole_settings = ManholeConfig(
+            username=manhole_username,
+            password=manhole_password,
+            priv_key=manhole_priv_key,
+            pub_key=manhole_pub_key,
+        )
 
         metrics_port = config.get("metrics_port")
         if metrics_port:
@@ -750,7 +761,13 @@ class ServerConfig(Config):
         return any(listener.tls for listener in self.listeners)
 
     def generate_config_section(
-        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
+        self,
+        server_name,
+        data_dir_path,
+        open_private_ports,
+        listeners,
+        config_dir_path,
+        **kwargs,
     ):
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
@@ -1092,11 +1109,22 @@ class ServerConfig(Config):
           #  type: manhole
 
         # Connection settings for the manhole
+        #
         manhole_settings:
-        #  username: matrix
-        #  password: rabbithole
-        #  ssh_priv_key: CONFDIR/id_rsa
-        #  ssh_pub_key: CONFDIR/id_rsa.pub
+
+          # The username for the manhole. This defaults to matrix
+          #
+          # username: matrix
+
+          # The password for the manhole. This defaults to rabbithole
+          #
+          # password: rabbithole
+
+          # The private and public SSH key pair used to encrypt the manhole traffic.
+          # If these are left unset, then hardcoded and non-secret keys are used!
+          #
+          # ssh_priv_key_path: %(config_dir_path)s/id_rsa
+          # ssh_pub_key_path: %(config_dir_path)s/id_rsa.pub
 
         # Forward extremities can build up in a room due to networking delays between
         # homeservers. Once this happens in a large room, calculation of the state of
@@ -1453,3 +1481,14 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
+
+
+_MANHOLE_SETTINGS_SCHEME = {
+    "type": "object",
+    "properties": {
+        "username": {"type": "string"},
+        "password": {"type": "string"},
+        "ssh_priv_key_path": {"type": "string"},
+        "ssh_pub_key_path": {"type": "string"},
+    },
+}

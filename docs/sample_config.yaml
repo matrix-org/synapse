@@ -336,11 +336,22 @@ listeners:
   #  type: manhole
 
 # Connection settings for the manhole
+#
 manhole_settings:
-#  username: matrix
-#  password: rabbithole
-#  ssh_priv_key: CONFDIR/id_rsa
-#  ssh_pub_key: CONFDIR/id_rsa.pub
+
+  # The username for the manhole. This defaults to matrix
+  #
+  # username: matrix
+
+  # The password for the manhole. This defaults to rabbithole
+  #
+  # password: rabbithole
+
+  # The private and public SSH key pair used to encrypt the manhole traffic.
+  # If these are left unset, then hardcoded and non-secret keys are used!
+  #
+  # ssh_priv_key_path: CONFDIR/id_rsa
+  # ssh_pub_key_path: CONFDIR/id_rsa.pub
 
 # Forward extremities can build up in a room due to networking delays between
 # homeservers. Once this happens in a large room, calculation of the state of

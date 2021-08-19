@@ -36,6 +36,7 @@ from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
+from synapse.config.server import ManholeConfig
 from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
@@ -232,7 +233,7 @@ def listen_metrics(bind_addresses, port):
 def listen_manhole(
     bind_addresses: Iterable[str],
     port: int,
-    manhole_settings: dict,
+    manhole_settings: ManholeConfig,
     manhole_globals: dict,
 ):
     # twisted.conch.manhole 21.1.0 uses "int_from_bytes", which produces a confusing

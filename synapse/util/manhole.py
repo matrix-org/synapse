@@ -75,10 +75,14 @@ def manhole(settings, globals):
     Returns:
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
-    username = settings.get("username")
-    password = settings.get("password")
-    priv_key = settings.get("priv_key") or Key.fromString(PRIVATE_KEY)
-    pub_key = settings.get("pub_key") or Key.fromString(PUBLIC_KEY)
+    username = settings.username
+    password = settings.password
+    priv_key = settings.priv_key
+    if priv_key is None:
+        priv_key = Key.fromString(PRIVATE_KEY)
+    pub_key = settings.pub_key
+    if pub_key is None:
+        pub_key = Key.fromString(PUBLIC_KEY)
 
     if not isinstance(password, bytes):
         password = password.encode("ascii")
