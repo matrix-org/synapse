@@ -58,23 +58,23 @@ for port in 8080 8081 8082; do
 										compress: false
 					PORTLISTENERS
 
-		  # Disable tls for the servers
-			printf '\n\n# Disable tls on the servers.'
-			echo '# DO NOT USE IN PRODUCTION'
-			echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true'
-			echo 'federation_verify_certificates: false'
+				  # Disable tls for the servers
+					printf '\n\n# Disable tls on the servers.'
+					echo '# DO NOT USE IN PRODUCTION'
+					echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true'
+					echo 'federation_verify_certificates: false'
 
-			# Set tls paths
-			echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
-			echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
+					# Set tls paths
+					echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
+					echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
 
-			# Ignore keys from the trusted keys server
-			echo '# Ignore keys from the trusted keys server'
-			echo 'trusted_key_servers:'
-			echo '  - server_name: "matrix.org"'
-			echo '    accept_keys_insecurely: true'
-
+					# Ignore keys from the trusted keys server
+					echo '# Ignore keys from the trusted keys server'
+					echo 'trusted_key_servers:'
+					echo '  - server_name: "matrix.org"'
+					echo '    accept_keys_insecurely: true'
 		} >> "$DIR"/etc/$port.config
+
     # Generate tls keys
     openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
 
