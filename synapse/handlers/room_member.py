@@ -49,6 +49,7 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
 from ._base import BaseHandler
+from .profile import MAX_DISPLAYNAME_LEN
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -548,8 +549,10 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
 
         if (
-            not self.allow_per_room_profiles and not is_requester_server_notices_user
-        ) or requester.shadow_banned:
+            (not self.allow_per_room_profiles and not is_requester_server_notices_user)
+            or requester.shadow_banned
+            or len(content.get("displayname", "")) > MAX_DISPLAYNAME_LEN
+        ):
             # Strip profile data, knowing that new profile data will be added to the
             # event's content in event_creation_handler.create_event() using the target's
             # global profile.
