@@ -1,1 +1,1 @@
-Log exceptions in tests to stderr.
+Log errors in tests to stderr.

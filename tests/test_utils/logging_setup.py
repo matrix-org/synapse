@@ -36,7 +36,7 @@ class ToTwistedHandler(logging.Handler):
 def setup_logging():
     """Configure the python logging appropriately for the tests.
 
-    Logs will end up in _trial_temp. Exceptions are additionally
+    Logs will end up in _trial_temp. Errors are additionally
     logged to stderr.
     """
     root_logger = logging.getLogger()
@@ -45,17 +45,19 @@ def setup_logging():
         "%(asctime)s - %(name)s - %(lineno)d - "
         "%(levelname)s - %(request)s - %(message)s"
     )
+    formatter = logging.Formatter(log_format)
+    filter = LoggingContextFilter()
 
     to_twisted_handler = ToTwistedHandler()
-    formatter = logging.Formatter(log_format)
     to_twisted_handler.setFormatter(formatter)
-    to_twisted_handler.addFilter(LoggingContextFilter())
+    to_twisted_handler.addFilter(filter)
     root_logger.addHandler(to_twisted_handler)
 
-    exception_handler = logging.StreamHandler(sys.stderr)
-    exception_handler.setLevel(logging.ERROR)
-    exception_handler.setFormatter(formatter)
-    root_logger.addHandler(exception_handler)
+    error_handler = logging.StreamHandler(sys.stderr)
+    error_handler.setLevel(logging.ERROR)
+    error_handler.setFormatter(formatter)
+    error_handler.addFilter(filter)
+    root_logger.addHandler(error_handler)
 
     log_level = os.environ.get("SYNAPSE_TEST_LOG_LEVEL", "ERROR")
     root_logger.setLevel(log_level)
