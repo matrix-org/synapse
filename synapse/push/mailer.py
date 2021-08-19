@@ -401,7 +401,9 @@ class Mailer:
         event_id = room_state_ids.get((EventTypes.RoomAvatar, ""))
         if event_id:
             ev = await self.store.get_event(event_id)
-            return ev.content["url"]
+            url = ev.content.get("url")
+            if isinstance(url, str):
+                return url
         return None
 
     async def _get_notif_vars(
