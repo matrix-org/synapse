@@ -110,8 +110,9 @@ process failed. See the default templates linked above for an example.
 ## The spaces summary APIs can now be handled by workers
 
 The [available worker applications documentation](https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications)
-has been updated to reflect that calls to the `/spaces` and `/hierarchy` endpoints
-can now go to workers for both clients API and federation requests.
+has been updated to reflect that calls to the `/spaces`, `/hierarchy`, and
+`/summary` endpoints can now be routed to workers for both client API and
+federation requests.
 
 # Upgrading to v1.41.0
 
