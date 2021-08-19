@@ -22,8 +22,7 @@ from twisted.internet import defer
 import synapse
 from synapse.handlers.auth import load_legacy_password_auth_provider
 from synapse.module_api import ModuleApi
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import devices
+from synapse.rest.client import devices, login
 from synapse.types import JsonDict
 
 from tests import unittest

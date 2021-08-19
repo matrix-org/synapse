@@ -37,6 +37,7 @@ from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
+from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.handlers.auth import load_legacy_password_auth_provider
@@ -371,6 +372,7 @@ async def start(hs: "HomeServer"):
 
     load_legacy_spam_checkers(hs)
     load_legacy_third_party_event_rules(hs)
+    load_legacy_presence_router(hs)
     for module, config in hs.config.password_providers:
         load_legacy_password_auth_provider(module=module, config=config, api=module_api)
 

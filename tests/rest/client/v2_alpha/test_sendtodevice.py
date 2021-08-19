@@ -13,8 +13,7 @@
 # limitations under the License.
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import sendtodevice, sync
+from synapse.rest.client import login, sendtodevice, sync
 
 from tests.unittest import HomeserverTestCase, override_config
 

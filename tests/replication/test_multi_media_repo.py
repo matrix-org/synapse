@@ -22,7 +22,7 @@ from twisted.web.http import HTTPChannel
 from twisted.web.server import Request
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.server import HomeServer
 
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file

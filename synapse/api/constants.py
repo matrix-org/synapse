@@ -62,7 +62,7 @@ class JoinRules:
     INVITE = "invite"
     PRIVATE = "private"
     # As defined for MSC3083.
-    MSC3083_RESTRICTED = "restricted"
+    RESTRICTED = "restricted"
 
 
 class RestrictedJoinRuleTypes:
