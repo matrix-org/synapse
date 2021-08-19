@@ -220,8 +220,6 @@ class FederationHandler(BaseHandler):
         room_id = pdu.room_id
         event_id = pdu.event_id
 
-        logger.info("handling received PDU: %s", pdu)
-
         # We reprocess pdus when we have seen them only as outliers
         existing = await self.store.get_event(
             event_id, allow_none=True, allow_rejected=True
@@ -229,14 +227,19 @@ class FederationHandler(BaseHandler):
 
         # FIXME: Currently we fetch an event again when we already have it
         # if it has been marked as an outlier.
-
-        already_seen = existing and (
-            not existing.internal_metadata.is_outlier()
-            or pdu.internal_metadata.is_outlier()
-        )
-        if already_seen:
-            logger.debug("Already seen pdu")
-            return
+        if existing:
+            if not existing.internal_metadata.is_outlier():
+                logger.info(
+                    "Ignoring received event %s which we have already seen", event_id
+                )
+                return
+            if pdu.internal_metadata.is_outlier():
+                logger.info(
+                    "Ignoring received outlier %s which we already have as an outlier",
+                    event_id,
+                )
+                return
+            logger.info("De-outliering event %s", event_id)
 
         # do some initial sanity-checking of the event. In particular, make
         # sure it doesn't have hundreds of prev_events or auth_events, which
@@ -331,7 +334,8 @@ class FederationHandler(BaseHandler):
                                 "Found all missing prev_events",
                             )
 
-            if prevs - seen:
+            missing_prevs = prevs - seen
+            if missing_prevs:
                 # We've still not been able to get all of the prev_events for this event.
                 #
                 # In this case, we need to fall back to asking another server in the
@@ -359,8 +363,8 @@ class FederationHandler(BaseHandler):
                 if sent_to_us_directly:
                     logger.warning(
                         "Rejecting: failed to fetch %d prev events: %s",
-                        len(prevs - seen),
-                        shortstr(prevs - seen),
+                        len(missing_prevs),
+                        shortstr(missing_prevs),
                     )
                     raise FederationError(
                         "ERROR",
@@ -373,9 +377,10 @@ class FederationHandler(BaseHandler):
                     )
 
                 logger.info(
-                    "Event %s is missing prev_events: calculating state for a "
+                    "Event %s is missing prev_events %s: calculating state for a "
                     "backwards extremity",
                     event_id,
+                    shortstr(missing_prevs),
                 )
 
                 # Calculate the state after each of the previous events, and
@@ -393,7 +398,7 @@ class FederationHandler(BaseHandler):
 
                     # Ask the remote server for the states we don't
                     # know about
-                    for p in prevs - seen:
+                    for p in missing_prevs:
                         logger.info("Requesting state after missing prev_event %s", p)
 
                         with nested_logging_context(p):
@@ -556,21 +561,14 @@ class FederationHandler(BaseHandler):
             logger.warning("Failed to get prev_events: %s", e)
             return
 
-        logger.info(
-            "Got %d prev_events: %s",
-            len(missing_events),
-            shortstr(missing_events),
-        )
+        logger.info("Got %d prev_events", len(missing_events))
 
         # We want to sort these by depth so we process them and
         # tell clients about them in order.
         missing_events.sort(key=lambda x: x.depth)
 
         for ev in missing_events:
-            logger.info(
-                "Handling received prev_event %s",
-                ev.event_id,
-            )
+            logger.info("Handling received prev_event %s", ev)
             with nested_logging_context(ev.event_id):
                 try:
                     await self.on_receive_pdu(origin, ev, sent_to_us_directly=False)
@@ -1762,10 +1760,8 @@ class FederationHandler(BaseHandler):
         for p, origin in room_queue:
             try:
                 logger.info(
-                    "Processing queued PDU %s which was received "
-                    "while we were joining %s",
-                    p.event_id,
-                    p.room_id,
+                    "Processing queued PDU %s which was received while we were joining",
+                    p,
                 )
                 with nested_logging_context(p.event_id):
                     await self.on_receive_pdu(origin, p, sent_to_us_directly=True)

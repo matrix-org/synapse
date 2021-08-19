@@ -17,7 +17,7 @@
 
 from unittest.mock import Mock
 
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 from synapse.types import UserID
 
 from tests import unittest

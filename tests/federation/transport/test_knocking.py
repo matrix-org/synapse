@@ -18,7 +18,7 @@ from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import builder
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
