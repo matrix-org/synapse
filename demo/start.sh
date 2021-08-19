@@ -32,58 +32,54 @@ for port in 8080 8081 8082; do
 
     if ! grep -F "Customisation made by demo/start.sh" -q  "$DIR"/etc/$port.config; then
         {
-            printf '\n\n# Customisation made by demo/start.sh\n'
-            echo "public_baseurl: http://localhost:$port/"
-            echo 'enable_registration: true'
-        } >> "$DIR"/etc/$port.config
+					printf '\n\n# Customisation made by demo/start.sh\n'
+					echo "public_baseurl: http://localhost:$port/"
+					echo 'enable_registration: true'
 
-        # Warning, this heredoc depends on the interaction of tabs and spaces. Please don't
-        # accidentaly bork me with your fancy settings.
-		listeners=$(cat <<-PORTLISTENERS
-		# Configure server to listen on both $https_port and $port
-		# This overides some of the default settings above
-		listeners:
-		  - port: $https_port
-		    type: http
-		    tls: true
-		    resources:
-		      - names: [client, federation]
+		      # Warning, this heredoc depends on the interaction of tabs and spaces. Please don't
+		      # accidentaly bork me with your fancy settings.
+					cat <<-PORTLISTENERS
+							# Configure server to listen on both $https_port and $port
+							# This overides some of the default settings above
+							listeners:
+								- port: $https_port
+									type: http
+									tls: true
+									resources:
+										- names: [client, federation]
 
-		  - port: $port
-		    tls: false
-		    bind_addresses: ['::1', '127.0.0.1']
-		    type: http
-		    x_forwarded: true
-		    resources:
-		      - names: [client, federation]
-		        compress: false
-		PORTLISTENERS
-		)
-        {
-            echo "${listeners}"
+								- port: $port
+									tls: false
+									bind_addresses: ['::1', '127.0.0.1']
+									type: http
+									x_forwarded: true
+									resources:
+										- names: [client, federation]
+										compress: false
+					PORTLISTENERS
 
-            # Disable tls for the servers
-            printf '\n\n# Disable tls on the servers.'
-            echo '# DO NOT USE IN PRODUCTION'
-            echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true'
-            echo 'federation_verify_certificates: false'
+		  # Disable tls for the servers
+			printf '\n\n# Disable tls on the servers.'
+			echo '# DO NOT USE IN PRODUCTION'
+			echo 'use_insecure_ssl_client_just_for_testing_do_not_use: true'
+			echo 'federation_verify_certificates: false'
 
-            # Set tls paths
-            echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
-            echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
+			# Set tls paths
+			echo "tls_certificate_path: \"$DIR/etc/localhost:$https_port.tls.crt\""
+			echo "tls_private_key_path: \"$DIR/etc/localhost:$https_port.tls.key\""
 
-            # Ignore keys from the trusted keys server
-            echo '# Ignore keys from the trusted keys server'
-            echo 'trusted_key_servers:'
-            echo '  - server_name: "matrix.org"'
-            echo '    accept_keys_insecurely: true'
-        } >> "$DIR"/etc/$port.config
+			# Ignore keys from the trusted keys server
+			echo '# Ignore keys from the trusted keys server'
+			echo 'trusted_key_servers:'
+			echo '  - server_name: "matrix.org"'
+			echo '    accept_keys_insecurely: true'
 
-        # Generate tls keys
-        openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
+		} >> "$DIR"/etc/$port.config
+    # Generate tls keys
+    openssl req -x509 -newkey rsa:4096 -keyout $DIR/etc/localhost\:$https_port.tls.key -out $DIR/etc/localhost\:$https_port.tls.crt -days 365 -nodes -subj "/O=matrix"
 
-        # Reduce the blacklist
-        blacklist=$(cat <<-BLACK
+    # Reduce the blacklist
+    blacklist=$(cat <<-BLACK
 		# Set the blacklist so that it doesn't include 127.0.0.1, ::1
 		federation_ip_range_blacklist:
 		  - '10.0.0.0/8'
