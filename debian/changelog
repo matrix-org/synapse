@@ -1,3 +1,9 @@
+matrix-synapse-py3 (1.42.0~rc1) UNRELEASED; urgency=medium
+
+  * etc/matrix-synapse/oembed directory for providers.json and custom json files
+
+ -- Srdjan <srdjan@catalyst.net.nz>  Fri, 20 Aug 2021 12:49:08 +1000
+
 matrix-synapse-py3 (1.41.0) stable; urgency=medium
 
   * New synapse release 1.41.0.
