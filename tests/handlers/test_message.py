@@ -18,7 +18,7 @@ from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.types import create_requester
 from synapse.util.stringutils import random_string
 

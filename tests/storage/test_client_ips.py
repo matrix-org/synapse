@@ -17,7 +17,7 @@ from unittest.mock import Mock
 
 import synapse.rest.admin
 from synapse.http.site import XForwardedForRequest
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 
 from tests import unittest
 from tests.server import make_request

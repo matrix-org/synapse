@@ -25,8 +25,7 @@ import synapse.rest.admin
 from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import account, register
+from synapse.rest.client import account, login, register, room
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
 
 from tests import unittest
