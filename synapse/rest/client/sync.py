@@ -203,7 +203,6 @@ class SyncRestServlet(RestServlet):
         time_now = self.clock.time_msec()
         # We know that the the requester has an access token since appservices
         # cannot use sync.
-        assert requester.access_token_id is not None
         response_content = await self.encode_response(
             time_now, sync_result, requester.access_token_id, filter_collection
         )
@@ -215,7 +214,7 @@ class SyncRestServlet(RestServlet):
         self,
         time_now: int,
         sync_result: SyncResult,
-        access_token_id: int,
+        access_token_id: Optional[int],
         filter: FilterCollection,
     ) -> JsonDict:
         logger.debug("Formatting events in sync response")
@@ -322,7 +321,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[JoinedSyncResult],
         time_now: int,
-        token_id: int,
+        token_id: Optional[int],
         event_fields: List[str],
         event_formatter: Callable[[JsonDict], JsonDict],
     ) -> JsonDict:
@@ -358,7 +357,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[InvitedSyncResult],
         time_now: int,
-        token_id: int,
+        token_id: Optional[int],
         event_formatter: Callable[[JsonDict], JsonDict],
     ) -> JsonDict:
         """
@@ -396,7 +395,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[KnockedSyncResult],
         time_now: int,
-        token_id: int,
+        token_id: Optional[int],
         event_formatter: Callable[[Dict], Dict],
     ) -> Dict[str, Dict[str, Any]]:
         """
@@ -450,7 +449,7 @@ class SyncRestServlet(RestServlet):
         self,
         rooms: List[ArchivedSyncResult],
         time_now: int,
-        token_id: int,
+        token_id: Optional[int],
         event_fields: List[str],
         event_formatter: Callable[[JsonDict], JsonDict],
     ) -> JsonDict:
@@ -485,7 +484,7 @@ class SyncRestServlet(RestServlet):
         self,
         room: Union[JoinedSyncResult, ArchivedSyncResult],
         time_now: int,
-        token_id: int,
+        token_id: Optional[int],
         joined: bool,
         only_fields: Optional[List[str]],
         event_formatter: Callable[[JsonDict], JsonDict],
