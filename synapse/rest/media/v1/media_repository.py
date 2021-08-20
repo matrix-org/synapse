@@ -836,7 +836,9 @@ class MediaRepository:
 
         return {"deleted": deleted}
 
-    async def delete_local_media(self, media_id: str) -> Tuple[List[str], int]:
+    async def delete_local_media_ids(
+        self, media_ids: List[str]
+    ) -> Tuple[List[str], int]:
         """
         Delete the given local or remote media ID from this server
 
@@ -845,7 +847,7 @@ class MediaRepository:
         Returns:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
-        return await self._remove_local_media_from_disk([media_id])
+        return await self._remove_local_media_from_disk(media_ids)
 
     async def delete_old_local_media(
         self,

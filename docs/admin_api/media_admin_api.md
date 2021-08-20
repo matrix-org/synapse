@@ -12,6 +12,7 @@
 - [Delete local media](#delete-local-media)
   * [Delete a specific local media](#delete-a-specific-local-media)
   * [Delete local media by date or size](#delete-local-media-by-date-or-size)
+  * [Delete media uploaded by a user](#delete-media-uploaded-by-a-user)
 - [Purge Remote Media API](#purge-remote-media-api)
 
 # Querying media
@@ -47,7 +48,8 @@ The API returns a JSON body like the following:
 ## List all media uploaded by a user
 
 Listing all media that has been uploaded by a local user can be achieved through
-the use of the [List media of a user](user_admin_api.md#list-media-of-a-user)
+the use of the
+[List media uploaded by a user](user_admin_api.md#list-media-uploaded-by-a-user)
 Admin API.
 
 # Quarantine media
@@ -280,6 +282,11 @@ The following fields are returned in the JSON response body:
 
 * `deleted_media`: an array of strings - List of deleted `media_id`
 * `total`: integer - Total number of deleted `media_id`
+
+## Delete media uploaded by a user
+
+You can find details of how to delete multiple media uploaded by a user in
+[User Admin API](user_admin_api.md#delete-media-uploaded-by-a-user).
 
 # Purge Remote Media API
 

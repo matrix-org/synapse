@@ -24,8 +24,7 @@ import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import groups
+from synapse.rest.client import groups, login, room
 
 from tests import unittest
 from tests.server import FakeSite, make_request

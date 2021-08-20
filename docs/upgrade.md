@@ -85,6 +85,72 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.xx.0
+
+## Removal of old Room Admin API
+
+The following admin APIs were deprecated in [Synapse 1.25](https://github.com/matrix-org/synapse/blob/v1.25.0/CHANGES.md#removal-warning)
+(released on 2021-01-13) and have now been removed:
+
+-   `POST /_synapse/admin/v1/purge_room`
+-   `POST /_synapse/admin/v1/shutdown_room/<room_id>`
+
+Any scripts still using the above APIs should be converted to use the
+[Delete Room API](https://matrix-org.github.io/synapse/latest/admin_api/rooms.html#delete-room-api).
+
+## User-interactive authentication fallback templates can now display errors
+
+This may affect you if you make use of custom HTML templates for the
+[reCAPTCHA](../synapse/res/templates/recaptcha.html) or
+[terms](../synapse/res/templates/terms.html) fallback pages.
+
+The template is now provided an `error` variable if the authentication
+process failed. See the default templates linked above for an example.
+
+
+# Upgrading to v1.41.0
+
+## Add support for routing outbound HTTP requests via a proxy for federation
+
+Since Synapse 1.6.0 (2019-11-26) you can set a proxy for outbound HTTP requests via
+http_proxy/https_proxy environment variables. This proxy was set for:
+- push
+- url previews
+- phone-home stats
+- recaptcha validation
+- CAS auth validation
+- OpenID Connect
+- Federation (checking public key revocation)
+
+In this version we have added support for outbound requests for:
+- Outbound federation
+- Downloading remote media
+- Fetching public keys of other servers
+
+These requests use the same proxy configuration. If you have a proxy configuration we
+recommend to verify the configuration. It may be necessary to adjust the `no_proxy`
+environment variable.
+
+See [using a forward proxy with Synapse documentation](setup/forward_proxy.md) for
+details.
+
+## Deprecation of `template_dir`
+
+The `template_dir` settings in the `sso`, `account_validity` and `email` sections of the
+configuration file are now deprecated. Server admins should use the new
+`templates.custom_template_directory` setting in the configuration file and use one single
+custom template directory for all aforementioned features. Template file names remain
+unchanged. See [the related documentation](https://matrix-org.github.io/synapse/latest/templates.html)
+for more information and examples.
+
+We plan to remove support for these settings in October 2021.
+
+## `/_synapse/admin/v1/users/{userId}/media` must be handled by media workers
+
+The [media repository worker documentation](https://matrix-org.github.io/synapse/latest/workers.html#synapseappmedia_repository)
+has been updated to reflect that calls to `/_synapse/admin/v1/users/{userId}/media`
+must now be handled by media repository workers. This is due to the new `DELETE` method
+of this endpoint modifying the media store.
 
 # Upgrading to v1.39.0
 
