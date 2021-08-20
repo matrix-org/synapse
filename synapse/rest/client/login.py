@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from typing_extensions import TypedDict
 
@@ -104,7 +104,7 @@ class LoginRestServlet(RestServlet):
             burst_count=self.hs.config.rc_login_account.burst_count,
         )
 
-    def on_GET(self, request: SynapseRequest):
+    def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         flows = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
@@ -151,7 +151,7 @@ class LoginRestServlet(RestServlet):
 
         return 200, {"flows": flows}
 
-    async def on_POST(self, request: SynapseRequest):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, LoginResponse]:
         login_submission = parse_json_object_from_request(request)
 
         if self._msc2918_enabled:
@@ -211,7 +211,7 @@ class LoginRestServlet(RestServlet):
         login_submission: JsonDict,
         appservice: ApplicationService,
         should_issue_refresh_token: bool = False,
-    ):
+    ) -> LoginResponse:
         identifier = login_submission.get("identifier")
         logger.info("Got appservice login request with identifier: %r", identifier)
 
@@ -461,10 +461,7 @@ class RefreshTokenServlet(RestServlet):
         self._clock = hs.get_clock()
         self.access_token_lifetime = hs.config.access_token_lifetime
 
-    async def on_POST(
-        self,
-        request: SynapseRequest,
-    ):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         refresh_submission = parse_json_object_from_request(request)
 
         assert_params_in_dict(refresh_submission, ["refresh_token"])
@@ -569,7 +566,7 @@ class SsoRedirectServlet(RestServlet):
 class CasTicketServlet(RestServlet):
     PATTERNS = client_patterns("/login/cas/ticket", v1=True)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._cas_handler = hs.get_cas_handler()
 
@@ -591,7 +588,7 @@ class CasTicketServlet(RestServlet):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
     if hs.config.access_token_lifetime is not None:
         RefreshTokenServlet(hs).register(http_server)
