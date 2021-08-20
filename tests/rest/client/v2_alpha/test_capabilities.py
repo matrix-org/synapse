@@ -102,7 +102,8 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertFalse(capabilities["m.change_password"]["enabled"])
 
-    def test_get_does_not_include_msc3244_fields_by_default(self):
+    @override_config({"experimental_features": {"msc3244_enabled": False}})
+    def test_get_does_not_include_msc3244_fields_when_disabled(self):
         localpart = "user"
         password = "pass"
         user = self.register_user(localpart, password)
@@ -120,7 +121,6 @@ class CapabilitiesTestCase(unittest.HomeserverTestCase):
             "org.matrix.msc3244.room_capabilities", capabilities["m.room_versions"]
         )
 
-    @override_config({"experimental_features": {"msc3244_enabled": True}})
     def test_get_does_include_msc3244_fields_when_enabled(self):
         localpart = "user"
         password = "pass"
