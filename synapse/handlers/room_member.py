@@ -560,7 +560,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if len(content.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
             content.pop("displayname", None)
 
-        if len(content.get("avatar_url", None)) > MAX_AVATAR_URL_LEN:
+        if len(content.get("avatar_url", "")) > MAX_AVATAR_URL_LEN:
             content.pop("avatar_url", None)
 
         effective_membership_state = action
