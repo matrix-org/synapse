@@ -1328,7 +1328,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
     async def create_registration_token(
         self, token: str, uses_allowed: Optional[int], expiry_time: Optional[int]
-    ) -> None:
+    ) -> bool:
         """Create a new registration token. Used by the admin API.
 
         Args:
@@ -1354,9 +1354,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
             )
 
             if row is not None:
-                raise SynapseError(
-                    400, f"Token already exists: {token}", Codes.INVALID_PARAM
-                )
+                # Token already exists
+                return False
 
             self.db_pool.simple_insert_txn(
                 txn,
@@ -1369,6 +1368,8 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     "expiry_time": expiry_time,
                 },
             )
+
+            return True
 
         return await self.db_pool.runInteraction(
             "create_registration_token", _create_registration_token_txn

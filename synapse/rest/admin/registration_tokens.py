@@ -176,7 +176,34 @@ class NewRegistrationTokenRestServlet(RestServlet):
                 400, "expiry_time must not be in the past", Codes.INVALID_PARAM
             )
 
-        await self.store.create_registration_token(token, uses_allowed, expiry_time)
+        created = await self.store.create_registration_token(
+            token, uses_allowed, expiry_time
+        )
+
+        if "token" not in body:
+            # The token was generated. If it could not be created because
+            # that token already exists, then try a few more times before
+            # reporting a failure.
+            i = 0
+            while not created and i < 3:
+                token = "".join(random.choices(self.allowed_chars, k=length))
+                created = await self.store.create_registration_token(
+                    token, uses_allowed, expiry_time
+                )
+                i += 1
+            if not created:
+                raise SynapseError(
+                    500,
+                    "The generated token already exists. Try again with a greater length.",
+                    Codes.UNKNOWN,
+                )
+
+        elif not created:
+            # The token was specified in the request, but it already exists
+            # so could not be created.
+            raise SynapseError(
+                400, f"Token already exists: {token}", Codes.INVALID_PARAM
+            )
 
         resp = {
             "token": token,
