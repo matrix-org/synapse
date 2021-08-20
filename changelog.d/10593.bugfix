@@ -1,0 +1,1 @@
+Reject Client-Server `/keys/query` requests which provide `device_ids` incorrectly.
