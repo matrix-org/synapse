@@ -218,8 +218,10 @@ Path parameters:
 The request body must be a JSON object and can contain the following fields:
 - `uses_allowed`: The integer number of times the token can be used to complete
   a registration before it becomes invalid.
+  If `null` the token will have an unlimited number of uses.
 - `expiry_time`: The latest time the token is valid. Given as the number of
   milliseconds since 1970-01-01 00:00:00 UTC (the start of the Unix epoch).
+  If `null` the token will not expire.
 
 If a field is omitted its value is not modified.
 
