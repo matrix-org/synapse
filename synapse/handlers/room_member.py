@@ -557,11 +557,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             content.pop("displayname", None)
             content.pop("avatar_url", None)
 
-        if len(content.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
-            content.pop("displayname", None)
+        if len(content.get("displayname") or "") > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(403, "Display name too long")
 
-        if len(content.get("avatar_url", "")) > MAX_AVATAR_URL_LEN:
-            content.pop("avatar_url", None)
+        if len(content.get("avatar_url") or "") > MAX_AVATAR_URL_LEN:
+            raise SynapseError(403, "Avatar URL too long")
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
