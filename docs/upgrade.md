@@ -86,7 +86,7 @@ process, for example:
     ```
 
 
-# Upgrading to v1.xx.0
+# Upgrading to v1.41.0
 
 ## Add support for routing outbound HTTP requests via a proxy for federation
 
