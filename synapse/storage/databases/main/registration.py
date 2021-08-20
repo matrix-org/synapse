@@ -1343,8 +1343,23 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
         Returns:
             Whether the row was inserted or not.
         """
-        try:
-            await self.db_pool.simple_insert(
+
+        def _create_registration_token_txn(txn):
+            row = self.db_pool.simple_select_one_txn(
+                txn,
+                "registration_tokens",
+                keyvalues={"token": token},
+                retcols=["token"],
+                allow_none=True,
+            )
+
+            if row is not None:
+                raise SynapseError(
+                    400, f"Token already exists: {token}", Codes.INVALID_PARAM
+                )
+
+            self.db_pool.simple_insert_txn(
+                txn,
                 "registration_tokens",
                 values={
                     "token": token,
@@ -1353,12 +1368,11 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
                     "completed": 0,
                     "expiry_time": expiry_time,
                 },
-                desc="create_registration_token",
             )
-        except self.database_engine.module.IntegrityError:
-            raise SynapseError(
-                400, f"Token already exists: {token}", Codes.INVALID_PARAM
-            )
+
+        return await self.db_pool.runInteraction(
+            "create_registration_token", _create_registration_token_txn
+        )
 
     async def update_registration_token(
         self, token: str, updatevalues: Dict[str, Optional[int]]
