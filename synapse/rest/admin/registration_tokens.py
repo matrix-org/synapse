@@ -61,8 +61,10 @@ class ListRegistrationTokensRestServlet(RestServlet):
             ]
         }
 
-    The optional query parameter `valid` is used to the response to only
-    valid or invalid tokens. It can be `true` or `false`.
+    The optional query parameter `valid` can be used to filter the response.
+    If it is `true`, only valid tokens are returned. If it is `false`, only
+    tokens that have expired or have had all uses exhausted are returned.
+    If it is omitted, all tokens are returned regardless of validity.
     """
 
     PATTERNS = admin_patterns("/registration_tokens$")
@@ -262,26 +264,29 @@ class RegistrationTokenRestServlet(RestServlet):
 
         # Only add uses_allowed to new_attributes if it is present and valid
         if "uses_allowed" in body:
-            ua = body["uses_allowed"]
-            if not (ua is None or (isinstance(ua, int) and ua >= 0)):
+            uses_allowed = body["uses_allowed"]
+            if not (
+                uses_allowed is None
+                or (isinstance(uses_allowed, int) and uses_allowed >= 0)
+            ):
                 raise SynapseError(
                     400,
                     "uses_allowed must be a non-negative integer or null",
                     Codes.INVALID_PARAM,
                 )
-            new_attributes["uses_allowed"] = ua
+            new_attributes["uses_allowed"] = uses_allowed
 
         if "expiry_time" in body:
-            et = body["expiry_time"]
-            if not isinstance(et, (int, type(None))):
+            expiry_time = body["expiry_time"]
+            if not isinstance(expiry_time, (int, type(None))):
                 raise SynapseError(
                     400, "expiry_time must be an integer or null", Codes.INVALID_PARAM
                 )
-            if isinstance(et, int) and et < self.clock.time_msec():
+            if isinstance(expiry_time, int) and expiry_time < self.clock.time_msec():
                 raise SynapseError(
                     400, "expiry_time must not be in the past", Codes.INVALID_PARAM
                 )
-            new_attributes["expiry_time"] = et
+            new_attributes["expiry_time"] = expiry_time
 
         if len(new_attributes) == 0:
             # Nothing to update, get token info to return

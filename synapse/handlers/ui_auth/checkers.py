@@ -263,11 +263,11 @@ class RegistrationTokenAuthChecker(UserInteractiveAuthChecker):
         if "session" not in authdict:
             raise LoginError(400, "Missing UIA session", Codes.MISSING_PARAM)
 
-        # Import here to avoid a cyclic dependency
+        # Get these here to avoid cyclic dependencies
         from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 
-        # Retrieve the auth handler here to avoid a cyclic dependency
         auth_handler = self.hs.get_auth_handler()
+
         session = authdict["session"]
         token = authdict["token"]
 

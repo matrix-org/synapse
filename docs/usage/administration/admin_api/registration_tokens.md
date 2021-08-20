@@ -5,6 +5,7 @@ registration requests, as proposed in [MSC3231](https://github.com/govynnus/matr
 To use it, you will need to enable the `registration_requires_token` config
 option, and authenticate by providing an `access_token` for a server admin:
 see [Admin API](../../usage/administration/admin_api).
+Note that this API is still experimental; not all clients may support it yet.
 
 
 ## Registration token objects
@@ -23,9 +24,6 @@ These objects have the following fields:
   complete a registration.
 - `expiry_time`: The latest time the token is valid. Given as the number of
   milliseconds since 1970-01-01 00:00:00 UTC (the start of the Unix epoch).
-  A more human friendly format will be provided at some point, but in the
-  meantime you can remove the milliseconds and use the `date` command.
-  For example, `date -d '@1625394937'`.
 
 
 ## List all tokens
@@ -40,8 +38,8 @@ GET /_synapse/admin/v1/registration_tokens
 
 Optional query parameters:
 - `valid`: `true` or `false`. If `true`, only valid tokens are returned.
-  If `false`, only invalid tokens are returned. If omitted, all tokens are
-  returned regardless of validity.
+  If `false`, only tokens that have expired or have had all uses exhausted are
+  returned. If omitted, all tokens are returned regardless of validity.
 
 Example:
 
