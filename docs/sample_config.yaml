@@ -2609,10 +2609,10 @@ redis:
 
 ## Oembed ##
 
-# Providers json files directory
-oembed_providers_dir: /etc/matrix-synapse/oembed/
-
+# Providers json files directory.
 # oembed directory contains https://oembed.com/providers.json file
 # that you can place in oembed_providers_dir. Deb package does that for you.
-# Other custom providers could be added in other .json files, following the
+# Other custom providers can be added in other .json files, following the
 # same json format.
+#
+oembed_providers_dir: /etc/matrix-synapse/oembed/

@@ -79,7 +79,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         config["media_storage_providers"] = [provider_config]
 
-        # Route the HTTP version to an HTTP endpoint so that the tests work.
         config["oembed_providers_dir"] = os.path.join(os.environ["TOP"], "oembed")
 
         hs = self.setup_test_homeserver(config=config)
