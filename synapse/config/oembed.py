@@ -15,6 +15,7 @@ import json
 import logging
 import re
 from os import listdir, path
+from typing import Any, Dict
 from urllib.parse import urlparse, urlunparse
 
 from ._base import Config
@@ -25,7 +26,7 @@ logger = logging.Logger(__name__)
 
 class OembedConfig(Config):
     section = "oembed"
-    oembed_providers = {}
+    oembed_providers : Dict[str, Dict[str, Any]] = {}
 
     def read_config(self, config, **kwargs):
         oembed_dir = config.get("oembed_providers_dir")
