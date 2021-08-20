@@ -95,7 +95,10 @@ from synapse.rest.client.profile import (
     ProfileRestServlet,
 )
 from synapse.rest.client.push_rule import PushRuleRestServlet
-from synapse.rest.client.register import RegisterRestServlet
+from synapse.rest.client.register import (
+    RegisterRestServlet,
+    RegistrationTokenValidityRestServlet,
+)
 from synapse.rest.client.sendtodevice import SendToDeviceRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
 from synapse.rest.client.voip import VoipRestServlet
@@ -279,6 +282,7 @@ class GenericWorkerServer(HomeServer):
                     resource = JsonResource(self, canonical_json=False)
 
                     RegisterRestServlet(self).register(resource)
+                    RegistrationTokenValidityRestServlet(self).register(resource)
                     login.register_servlets(self, resource)
                     ThreepidRestServlet(self).register(resource)
                     DevicesRestServlet(self).register(resource)
