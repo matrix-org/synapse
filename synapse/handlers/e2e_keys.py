@@ -168,6 +168,22 @@ class E2eKeysHandler:
                 ) = await self.store.get_user_devices_from_cache(query_list)
                 for user_id, devices in remote_results.items():
                     user_devices = results.setdefault(user_id, {})
+
+                    cached_cross_master = user_id in cross_signing_keys["master_keys"]
+                    self_sig_key = cross_signing_keys["self_signing_keys"].get(
+                        user_id, {}
+                    )
+                    cached_cross_selfsigning = bool(self_sig_key)
+
+                    # check if we are missing only one of cross-signing master or
+                    # self-signing key, but the other one is cached.
+                    # as we need both, this will issue a federation request.
+                    # if we don't have any of the keys, either the user doesn't have
+                    # cross-signing set up, or we did not fetch the
+                    # cross-signing keys yet since the device list is not (yet) updated.
+                    if cached_cross_master ^ cached_cross_selfsigning:
+                        user_ids_not_in_cache.add(user_id)
+
                     for device_id, device in devices.items():
                         keys = device.get("keys", None)
                         device_display_name = device.get("device_display_name", None)
@@ -178,21 +194,9 @@ class E2eKeysHandler:
                                 unsigned["device_display_name"] = device_display_name
                             user_devices[device_id] = result
 
-                # check for missing cross-signing keys.
-                for user_id in remote_queries.keys():
-                    cached_cross_master = user_id in cross_signing_keys["master_keys"]
-                    cached_cross_selfsigning = (
-                        user_id in cross_signing_keys["self_signing_keys"]
-                    )
-
-                    # check if we are missing only one of cross-signing master or
-                    # self-signing key, but the other one is cached.
-                    # as we need both, this will issue a federation request.
-                    # if we don't have any of the keys, either the user doesn't have
-                    # cross-signing set up, or the cached device list
-                    # is not (yet) updated.
-                    if cached_cross_master ^ cached_cross_selfsigning:
-                        user_ids_not_in_cache.add(user_id)
+                            # TODO: invalidate device cache if we have cached
+                            # device keys but not cross-signing keys,
+                            # although the user should have cross-signing keys.
 
                 # add those users to the list to fetch over federation.
                 for user_id in user_ids_not_in_cache:
@@ -234,6 +238,9 @@ class E2eKeysHandler:
                     # probably be tracking their device lists. However, we haven't
                     # done an initial sync on the device list so we do it now.
                     try:
+                        # here, we fetch the user's device list
+                        # and cross signing keys,
+                        # and update our cache with them.
                         if self._is_master:
                             user_devices = await self.device_handler.device_list_updater.user_device_resync(
                                 user_id
@@ -247,6 +254,15 @@ class E2eKeysHandler:
                         user_results = results.setdefault(user_id, {})
                         for device in user_devices:
                             user_results[device["device_id"]] = device["keys"]
+
+                        # update the result with the devicelist's cross-signing keys
+                        cross_signing_keys["master_keys"][user_id] = user_devices.get(
+                            "master_key"
+                        )
+                        cross_signing_keys["self_signing_keys"][
+                            user_id
+                        ] = user_devices.get("self_signing_key")
+
                         user_ids_updated.append(user_id)
                     except Exception as e:
                         failures[destination] = _exception_to_failure(e)
@@ -260,6 +276,11 @@ class E2eKeysHandler:
                 for user_id in user_ids_updated:
                     destination_query.pop(user_id)
 
+                # There's still some leftover destination queries:
+                # either we don't share a room with the user,
+                # or explicit devices were requested.
+                # Now fetch the device keys via /user/keys/query,
+                # and don't cache these results.
                 try:
                     remote_result = await self.federation.query_client_keys(
                         destination, {"device_keys": destination_query}, timeout=timeout
