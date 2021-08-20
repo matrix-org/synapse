@@ -1026,6 +1026,7 @@ class RoomWorkerStore(SQLBaseStore):
 class _BackgroundUpdates:
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
     ADD_ROOMS_ROOM_VERSION_COLUMN = "add_rooms_room_version_column"
+    POPULATE_ROOMS_CREATOR_COLUMN = "populate_rooms_creator_column"
     POPULATE_ROOM_DEPTH_MIN_DEPTH2 = "populate_room_depth_min_depth2"
     REPLACE_ROOM_DEPTH_MIN_DEPTH = "replace_room_depth_min_depth"
 
@@ -1057,6 +1058,11 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.ADD_ROOMS_ROOM_VERSION_COLUMN,
             self._background_add_rooms_room_version_column,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
+            self._background_populate_rooms_creator_column,
         )
 
         # BG updates to change the type of room_depth.min_depth
@@ -1202,6 +1208,60 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         if end:
             await self.db_pool.updates._end_background_update(
                 _BackgroundUpdates.ADD_ROOMS_ROOM_VERSION_COLUMN
+            )
+
+        return batch_size
+
+    async def _background_populate_rooms_creator_column(
+        self, progress: dict, batch_size: int
+    ):
+        """Background update to go and add creator information to `rooms`
+        table from `current_state_events` table.
+        """
+
+        last_room_id = progress.get("room_id", "")
+
+        def _background_populate_rooms_creator_column_txn(txn: LoggingTransaction):
+            sql = """
+                SELECT room_id, json FROM current_state_events
+                INNER JOIN event_json USING (room_id, event_id)
+                WHERE room_id > ? AND type = 'm.room.create' AND state_key = ''
+                ORDER BY room_id
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_room_id, batch_size))
+
+            new_last_room_id = ""
+            for room_id, event_json in txn:
+                event_dict = db_to_json(event_json)
+
+                creator = event_dict.get("content").get("creator")
+
+                self.db_pool.simple_update_txn(
+                    txn,
+                    table="rooms",
+                    keyvalues={"room_id": room_id},
+                    updatevalues={"creator": creator},
+                )
+                new_last_room_id = room_id
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
+                {"room_id": new_last_room_id},
+            )
+
+            return False
+
+        end = await self.db_pool.runInteraction(
+            "_background_populate_rooms_creator_column",
+            _background_populate_rooms_creator_column_txn,
+        )
+
+        if end:
+            await self.db_pool.updates._end_background_update(
+                _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN
             )
 
         return batch_size
@@ -1376,6 +1436,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         # mark the room as having an auth chain cover index.
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
+        create_event = await self.store.get_create_event_for_room(room_id)
+        room_creator = create_event.content.get("creator", None)
+
         await self.db_pool.simple_upsert(
             desc="upsert_room_on_join",
             table="rooms",
@@ -1383,7 +1446,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             values={"room_version": room_version.identifier},
             insertion_values={
                 "is_public": False,
-                "creator": "",
+                "creator": room_creator,
                 "has_auth_chain_index": has_auth_chain_index,
             },
             # rooms has a unique constraint on room_id, so no need to lock when doing an
@@ -1454,6 +1517,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         # mark the room as having an auth chain cover index.
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
+        create_event = await self.store.get_create_event_for_room(room_id)
+        room_creator = create_event.content.get("creator", None)
+
         await self.db_pool.simple_upsert(
             desc="maybe_store_room_on_outlier_membership",
             table="rooms",
@@ -1462,7 +1528,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             insertion_values={
                 "room_version": room_version.identifier,
                 "is_public": False,
-                "creator": "",
+                "creator": room_creator,
                 "has_auth_chain_index": has_auth_chain_index,
             },
             # rooms has a unique constraint on room_id, so no need to lock when doing an
