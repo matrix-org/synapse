@@ -2,8 +2,7 @@ from http import HTTPStatus
 
 from synapse.api.errors import Codes
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import keys
+from synapse.rest.client import keys, login
 
 from tests import unittest
 
