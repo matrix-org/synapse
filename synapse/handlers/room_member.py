@@ -36,6 +36,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.types import (
     JsonDict,
     Requester,
@@ -49,7 +50,6 @@ from synapse.util.async_helpers import Linearizer
 from synapse.util.distributor import user_left_room
 
 from ._base import BaseHandler
-from .profile import MAX_DISPLAYNAME_LEN
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -549,17 +549,19 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         )
 
         if (
-            (not self.allow_per_room_profiles and not is_requester_server_notices_user)
-            or requester.shadow_banned
-            or len(content.get("displayname", "")) > MAX_DISPLAYNAME_LEN
-        ):
+            not self.allow_per_room_profiles and not is_requester_server_notices_user
+        ) or requester.shadow_banned:
             # Strip profile data, knowing that new profile data will be added to the
             # event's content in event_creation_handler.create_event() using the target's
             # global profile.
             content.pop("displayname", None)
             content.pop("avatar_url", None)
-            # content may now be emtpy
-            content_specified = len(content) == 0
+
+        if len(content.get("displayname", "")) > MAX_DISPLAYNAME_LEN:
+            content.pop("displayname", None)
+
+        if len(content.get("avatar_url", None)) > MAX_AVATAR_URL_LEN:
+            content.pop("avatar_url", None)
 
         effective_membership_state = action
         if action in ["kick", "unban"]:
