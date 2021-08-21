@@ -22,6 +22,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from synapse.api.constants import EventTypes, JoinRules
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
+from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.search import SearchStore
@@ -1333,7 +1334,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             keyvalues={"room_id": room_id},
             retcol="MAX(stream_ordering)",
             allow_none=True,
-            desc="upsert_room_on_join",
+            desc="has_auth_chain_index_fallback",
         )
 
         return max_ordering is None
@@ -1410,7 +1411,9 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         self.config = hs.config
 
-    async def upsert_room_on_join(self, room_id: str, room_version: RoomVersion):
+    async def upsert_room_on_join(
+        self, room_id: str, room_version: RoomVersion, auth_events: List[EventBase]
+    ):
         """Ensure that the room is stored in the table
 
         Called when we join a room over federation, and overwrites any room version
@@ -1421,7 +1424,17 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         # mark the room as having an auth chain cover index.
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
-        create_event = await self.store.get_create_event_for_room(room_id)
+        create_event = None
+        for e in auth_events:
+            if (e.type, e.state_key) == (EventTypes.Create, ""):
+                create_event = e
+                break
+
+        if create_event is None:
+            # If the state doesn't have a create event then the room is
+            # invalid, and it would fail auth checks anyway.
+            raise StoreError(400, "No create event in state")
+
         room_creator = create_event.content.get("creator", None)
 
         await self.db_pool.simple_upsert(
@@ -1451,7 +1464,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         # mark the room as having an auth chain cover index.
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
-        create_event = await self.store.get_create_event_for_room(room_id)
+        create_event = await self.get_create_event_for_room(room_id)
         room_creator = create_event.content.get("creator", None)
 
         await self.db_pool.simple_upsert(
