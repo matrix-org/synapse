@@ -1232,6 +1232,9 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
                 )
                 new_last_room_id = room_id
 
+            if new_last_room_id == "":
+                return True
+
             self.db_pool.updates._background_update_progress_txn(
                 txn,
                 _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
