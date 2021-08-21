@@ -189,6 +189,37 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         self.assertEqual(400, int(channel2.result["code"]), msg=channel2.result["body"])
         self.assertEqual(channel2.json_body["errcode"], Codes.INVALID_PARAM)
 
+    def test_create_unable_to_generate_token(self):
+        """Check right error is raised when server can't generate unique token."""
+        # Create all possible single character tokens
+        tokens = []
+        for c in string.ascii_letters + string.digits + "-_":
+            tokens.append(
+                {
+                    "token": c,
+                    "uses_allowed": None,
+                    "pending": 0,
+                    "completed": 0,
+                    "expiry_time": None,
+                }
+            )
+        self.get_success(
+            self.store.db_pool.simple_insert_many(
+                "registration_tokens",
+                tokens,
+                "create_all_registration_tokens",
+            )
+        )
+
+        # Check creating a single character token fails with a 500 status code
+        channel = self.make_request(
+            "POST",
+            self.url + "/new",
+            {"length": 1},
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(500, int(channel.result["code"]), msg=channel.result["body"])
+
     def test_create_uses_allowed(self):
         """Check you can only create a token with good values for uses_allowed."""
         # Should work with 0 (token is invalid from the start)
