@@ -24,6 +24,8 @@ These objects have the following fields:
   complete a registration.
 - `expiry_time`: The latest time the token is valid. Given as the number of
   milliseconds since 1970-01-01 00:00:00 UTC (the start of the Unix epoch).
+  To convert this into a human-readable form you can remove the milliseconds
+  and use the `date` command. For example, `date -d '@1625394937'`.
 
 
 ## List all tokens
@@ -217,7 +219,8 @@ Path parameters:
 
 The request body must be a JSON object and can contain the following fields:
 - `uses_allowed`: The integer number of times the token can be used to complete
-  a registration before it becomes invalid.
+  a registration before it becomes invalid. By setting `uses_allowed` to `0`
+  the token can be easily made invalid without deleting it.
   If `null` the token will have an unlimited number of uses.
 - `expiry_time`: The latest time the token is valid. Given as the number of
   milliseconds since 1970-01-01 00:00:00 UTC (the start of the Unix epoch).
