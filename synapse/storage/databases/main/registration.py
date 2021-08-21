@@ -1363,7 +1363,7 @@ class RegistrationWorkerStore(CacheInvalidationWorkerStore):
 
         raise SynapseError(
             500,
-            "Unable to generate a registration token. Try again with a greater length",
+            "Unable to generate a unique registration token. Try again with a greater length",
             Codes.UNKNOWN,
         )
 
