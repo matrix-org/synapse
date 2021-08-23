@@ -396,8 +396,18 @@ class PusherWorkerStore(SQLBaseStore):
     async def _remove_deleted_email_pushers(
         self, progress: dict, batch_size: int
     ) -> int:
-        """A background update that deletes all pushers for email addresses no longer
-        associated with a user.
+        """A background update that deletes all pushers for deleted email addresses.
+
+        In previous versions of synapse, when users deleted their email address, it didn't
+        also delete all the pushers for that email address. This background update removes
+        those to prevent unwanted emails
+
+        Args:
+            progress: dict used to store progress of this background update
+            batch_size: the maximum number of rows to retrieve in a single select query
+
+        Returns:
+            The number of deleted rows
         """
 
         last_pusher = progress.get("last_pusher", 0)
@@ -407,7 +417,7 @@ class PusherWorkerStore(SQLBaseStore):
             sql = """
                 SELECT p.id, p.user_name, p.app_id, p.pushkey
                 FROM pushers AS p
-                    LEFT JOIN user_threepids AS t 
+                    LEFT JOIN user_threepids AS t
                         ON t.user_id=p.user_name
                         AND t.medium = 'email'
                         AND t.address = p.pushkey
