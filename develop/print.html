@@ -6184,7 +6184,7 @@ Edit your Synapse config file and change the <code>oidc_config</code> section:</
         localpart_template: &quot;{{ user.preferred_username.split('@')[0] }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
 </code></pre>
-<h3 id="a-hrefhttpsgithubcomdexidpdexdexa"><a class="header" href="#a-hrefhttpsgithubcomdexidpdexdexa"><a href="https://github.com/dexidp/dex">Dex</a></a></h3>
+<h3 id="dex"><a class="header" href="#dex">Dex</a></h3>
 <p><a href="https://github.com/dexidp/dex">Dex</a> is a simple, open-source, certified OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
 external database, it can be configured with static passwords in a config file.</p>
@@ -6213,7 +6213,7 @@ to install Dex.</p>
         localpart_template: &quot;{{ user.name }}&quot;
         display_name_template: &quot;{{ user.name|capitalize }}&quot;
 </code></pre>
-<h3 id="a-hrefhttpswwwkeycloakorgdocslatestserver_adminsso-protocolskeycloaka"><a class="header" href="#a-hrefhttpswwwkeycloakorgdocslatestserver_adminsso-protocolskeycloaka"><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a></a></h3>
+<h3 id="keycloak"><a class="header" href="#keycloak">Keycloak</a></h3>
 <p><a href="https://www.keycloak.org/docs/latest/server_admin/#sso-protocols">Keycloak</a> is an opensource IdP maintained by Red Hat.</p>
 <p>Follow the <a href="https://www.keycloak.org/getting-started">Getting Started Guide</a> to install Keycloak and set up a realm.</p>
 <ol>
@@ -6262,7 +6262,8 @@ to install Dex.</p>
         localpart_template: &quot;{{ user.preferred_username }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
 </code></pre>
-<h3 id="a-hrefhttpsauth0comauth0a"><a class="header" href="#a-hrefhttpsauth0comauth0a"><a href="https://auth0.com/">Auth0</a></a></h3>
+<h3 id="auth0"><a class="header" href="#auth0">Auth0</a></h3>
+<p><a href="https://auth0.com/">Auth0</a> is a hosted SaaS IdP solution.</p>
 <ol>
 <li>
 <p>Create a regular web application for Synapse</p>
@@ -6305,7 +6306,7 @@ to install Dex.</p>
         display_name_template: &quot;{{ user.name }}&quot;
 </code></pre>
 <h3 id="github"><a class="header" href="#github">GitHub</a></h3>
-<p>GitHub is a bit special as it is not an OpenID Connect compliant provider, but
+<p><a href="https://developer.github.com/apps/building-oauth-apps/authorizing-oauth-apps">GitHub</a> is a bit special as it is not an OpenID Connect compliant provider, but
 just a regular OAuth2 provider.</p>
 <p>The <a href="https://developer.github.com/v3/users/#get-the-authenticated-user"><code>/user</code> API endpoint</a>
 can be used to retrieve information on the authenticated user. As the Synapse
@@ -6334,11 +6335,12 @@ does not return a <code>sub</code> property, an alternative <code>subject_claim<
         localpart_template: &quot;{{ user.login }}&quot;
         display_name_template: &quot;{{ user.name }}&quot;
 </code></pre>
-<h3 id="a-hrefhttpsdevelopersgooglecomidentityprotocolsoauth2openid-connectgooglea"><a class="header" href="#a-hrefhttpsdevelopersgooglecomidentityprotocolsoauth2openid-connectgooglea"><a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a></a></h3>
+<h3 id="google"><a class="header" href="#google">Google</a></h3>
+<p><a href="https://developers.google.com/identity/protocols/oauth2/openid-connect">Google</a> is an OpenID certified authentication and authorisation provider.</p>
 <ol>
 <li>Set up a project in the Google API Console (see
 https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).</li>
-<li>add an &quot;OAuth Client ID&quot; for a Web Application under &quot;Credentials&quot;.</li>
+<li>Add an &quot;OAuth Client ID&quot; for a Web Application under &quot;Credentials&quot;.</li>
 <li>Copy the Client ID and Client Secret, and add the following to your synapse config:
 <pre><code class="language-yaml">oidc_providers:
   - idp_id: google
