@@ -95,7 +95,7 @@ class Signal:
         Each observer callable may return a Deferred."""
         self.observers.append(observer)
 
-    def fire(self, *args, **kwargs) -> defer.Deferred[List[Any]]:
+    def fire(self, *args, **kwargs) -> "defer.Deferred[List[Any]]":
         """Invokes every callable in the observer list, passing in the args and
         kwargs. Exceptions thrown by observers are logged but ignored. It is
         not an error to fire a signal with no observers.

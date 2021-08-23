@@ -94,7 +94,7 @@ class _PerHostRatelimiter:
         self.request_times = []
 
     @contextlib.contextmanager
-    def ratelimit(self) -> Iterator[defer.Deferred[None]]:
+    def ratelimit(self) -> "Iterator[defer.Deferred[None]]":
         # `contextlib.contextmanager` takes a generator and turns it into a
         # context manager. The generator should only yield once with a value
         # to be returned by manager.
@@ -107,7 +107,7 @@ class _PerHostRatelimiter:
         finally:
             self._on_exit(request_id)
 
-    def _on_enter(self, request_id) -> defer.Deferred[None]:
+    def _on_enter(self, request_id) -> "defer.Deferred[None]":
         time_now = self.clock.time_msec()
 
         # remove any entries from request_times which aren't within the window
