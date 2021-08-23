@@ -450,3 +450,51 @@ The synapse config will look like this:
       config:
         email_template: "{{ user.email }}"
 ```
+
+## Django OAuth Toolkit
+
+[django-oauth-toolkit](https://github.com/jazzband/django-oauth-toolkit) is a
+Django application providing out of the box all the endpoints, data and logic
+needed to add OAuth2 capabilities to your Django projects. It supports
+[OpenID Connect too](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html).
+
+Configuration on Django's side:
+
+1. Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:
+* `Redirect uris`: https://synapse.example.com/_synapse/client/oidc/callback
+* `Client type`: `Confidential`
+* `Authorization grant type`: `Authorization code`
+* `Algorithm`: `HMAC with SHA-2 256`
+2. You can [customize the claims](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#customizing-the-oidc-responses) Django gives to synapse (optional):
+   <details>
+    <summary>Code sample</summary>
+
+    ```python
+    class CustomOAuth2Validator(OAuth2Validator):
+
+        def get_additional_claims(self, request):
+            return {
+                "sub": request.user.email,
+                "email": request.user.email,
+                "first_name": request.user.first_name,
+                "last_name": request.user.last_name,
+            }
+    ```
+   </details>
+Your synapse config is then:
+
+```yaml
+oidc_providers:
+  - idp_id: django_example
+    idp_name: "Django Example"
+    issuer: "https://example.com/o/"
+    client_id: "your-client-id"  # CHANGE ME
+    client_secret: "your-client-secret"  # CHANGE ME
+    scopes: ["openid"]
+    user_profile_method: "userinfo_endpoint"  # needed because oauth-toolkit does not include user information in the authorization response
+    user_mapping_provider:
+      config:
+        localpart_template: "{{ user.email.split('@')[0] }}"
+        display_name_template: "{{ user.first_name }} {{ user.last_name }}"
+        email_template: "{{ user.email }}"
+```
