@@ -454,13 +454,13 @@ Django application providing out of the box all the endpoints, data and logic
 needed to add OAuth2 capabilities to your Django projects. It supports
 [OpenID Connect too](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html).
 
-**Configuration on Django's side:**
+Configuration on Django's side:
 
 1. Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:
-  * `Redirect uris`: https://synapse.example.com/_synapse/client/oidc/callback
-  * `Client type`: `Confidential`
-  * `Authorization grant type`: `Authorization code`
-  * `Algorithm`: `HMAC with SHA-2 256`
+* `Redirect uris`: https://synapse.example.com/_synapse/client/oidc/callback
+* `Client type`: `Confidential`
+* `Authorization grant type`: `Authorization code`
+* `Algorithm`: `HMAC with SHA-2 256`
 2. You can [customize the claims](https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#customizing-the-oidc-responses) Django gives to synapse (optional):
    <details>
     <summary>Code sample</summary>
@@ -476,8 +476,8 @@ needed to add OAuth2 capabilities to your Django projects. It supports
                 "last_name": request.user.last_name,
             }
     ```
-  </details>
-3. Your synapse config is then:
+   </details>
+Your synapse config is then:
 
 ```yaml
 oidc_providers:
