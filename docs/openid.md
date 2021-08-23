@@ -79,7 +79,7 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
-### [Dex][dex-idp]
+### Dex
 
 [Dex][dex-idp] is a simple, open-source, certified OpenID Connect Provider.
 Although it is designed to help building a full-blown provider with an
@@ -117,7 +117,7 @@ oidc_providers:
         localpart_template: "{{ user.name }}"
         display_name_template: "{{ user.name|capitalize }}"
 ```
-### [Keycloak][keycloak-idp]
+### Keycloak
 
 [Keycloak][keycloak-idp] is an opensource IdP maintained by Red Hat.
 
@@ -166,7 +166,9 @@ oidc_providers:
         localpart_template: "{{ user.preferred_username }}"
         display_name_template: "{{ user.name }}"
 ```
-### [Auth0][auth0]
+### Auth0
+
+[Auth0][auth0] is a hosted SaaS IdP solution.
 
 1. Create a regular web application for Synapse
 2. Set the Allowed Callback URLs to `[synapse public baseurl]/_synapse/client/oidc/callback`
@@ -209,7 +211,7 @@ oidc_providers:
 
 ### GitHub
 
-GitHub is a bit special as it is not an OpenID Connect compliant provider, but
+[GitHub][github-idp] is a bit special as it is not an OpenID Connect compliant provider, but
 just a regular OAuth2 provider.
 
 The [`/user` API endpoint](https://developer.github.com/v3/users/#get-the-authenticated-user)
@@ -242,11 +244,13 @@ oidc_providers:
         display_name_template: "{{ user.name }}"
 ```
 
-### [Google][google-idp]
+### Google
+
+[Google][google-idp] is an OpenID certified authentication and authorisation provider.
 
 1. Set up a project in the Google API Console (see
    https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).
-2. add an "OAuth Client ID" for a Web Application under "Credentials".
+2. Add an "OAuth Client ID" for a Web Application under "Credentials".
 3. Copy the Client ID and Client Secret, and add the following to your synapse config:
    ```yaml
    oidc_providers:
