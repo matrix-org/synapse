@@ -64,7 +64,7 @@ class StateFilter:
         # wildcards from the types dictionary
         if self.include_others:
             # REVIEW: yucky
-            self.types = frozendict(  # type: ignore[misc] # read-only
+            self.types: "frozendict[str, Optional[FrozenSet[str]]]" = frozendict(  # type: ignore[misc,no-redef] # read-only
                 {k: v for k, v in self.types.items() if v is not None}
             )
 
@@ -259,14 +259,15 @@ class StateFilter:
 
         return len(self.concrete_types())
 
-    def filter_state(self, state_dict: StateMap[T]) -> StateMap[T]:
-        """Returns the state filtered with by this StateFilter
+    def filter_state(self, state_dict: StateMap[T]) -> MutableStateMap[T]:
+        """Returns the state filtered with by this StateFilter.
 
         Args:
             state: The state map to filter
 
         Returns:
-            The filtered state map
+            The filtered state map.
+            This is a copy, so it's safe to mutate.
         """
         if self.is_full():
             return dict(state_dict)
