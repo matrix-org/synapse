@@ -328,10 +328,11 @@ For example, if the user `@alice:example.org` is passed to this method, and the 
 `{"@bob:example.com", "@charlie:somewhere.org"}` is returned, this signifies that Alice 
 should receive presence updates sent by Bob and Charlie, regardless of whether these users 
 share a room.
+
 #### Password auth provider callbacks
 
 Password auth providers offer a way for server administrators to integrate
-their Synapse installation with an existing authentication system. The callbacks can be
+their Synapse installation with an external authentication system. The callbacks can be
 registered by using the Module API's `register_password_auth_provider_callbacks` method.
 
 To register authentication checkers, the module should register both of:

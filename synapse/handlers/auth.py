@@ -1946,7 +1946,7 @@ CHECK_AUTH_CALLBACK = Callable[
 
 class PasswordAuthProvider:
     """
-    A class that the AuthHandler calls when doing authenticating users
+    A class that the AuthHandler calls when authenticating users
     It allows modules to provide alternative methods for authentication
     """
 
@@ -1985,7 +1985,7 @@ class PasswordAuthProvider:
                 if auth_checkers is None or auth_checkers.get(login_type) is None:
                     raise RuntimeError(
                         "A module tried to register support for login type: %s without providing"
-                        "an authentication method for it" % login_type
+                        " an authentication method for it" % login_type
                     )
                 # 2 modules supporting the same login type must expect the same fields
                 # e.g. 1 can't expect "pass" if the other expects "password"
@@ -1999,7 +1999,7 @@ class PasswordAuthProvider:
                     if fields_currently_supported != fields:
                         raise RuntimeError(
                             "A module tried to register support for login type: %s with parameters %s"
-                            "but another module had already registered support for that type with parameters %s"
+                            " but another module had already registered support for that type with parameters %s"
                             % (login_type, fields, fields_currently_supported)
                         )
 
@@ -2015,7 +2015,7 @@ class PasswordAuthProvider:
                 ):
                     raise RuntimeError(
                         "A module tried to register an authentication method for login type: %s"
-                        "without listing it as a supported login type" % login_type
+                        " without listing it as a supported login type" % login_type
                     )
                 # Add the new method to the list of auth_checker_callbacks
                 callback_list = self.auth_checker_callbacks.get(login_type, [])
@@ -2065,7 +2065,7 @@ class PasswordAuthProvider:
 
                 # "type: ignore" is used on the isinstance checks because mypy thinks
                 # result is always the right type, but as it is 3rd party code it might not be
-                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore
+                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore[arg-type]
                     logger.warning(
                         "Wrong type returned by module API callback %s: %s, expected"
                         " Optional[Tuple[str, Optional[Callable]]]",
@@ -2089,7 +2089,7 @@ class PasswordAuthProvider:
 
                 # the second should be Optional[Callable]
                 if callback_result is not None:
-                    if not isinstance(callback_result, Callable):  # type: ignore
+                    if not isinstance(callback_result, Callable):  # type: ignore[arg-type]
                         logger.warning(
                             "Wrong type returned by module API callback %s: %s, expected"
                             " Optional[Tuple[str, Optional[Callable]]]",
@@ -2126,7 +2126,7 @@ class PasswordAuthProvider:
 
                 # "type: ignore" is used on the isinstance checks because mypy thinks
                 # result is always the right type, but as it is 3rd party code it might not be
-                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore
+                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore[arg-type]
                     logger.warning(
                         "Wrong type returned by module API callback %s: %s, expected"
                         " Optional[Tuple[str, Optional[Callable]]]",
@@ -2150,7 +2150,7 @@ class PasswordAuthProvider:
 
                 # the second should be Optional[Callable]
                 if callback_result is not None:
-                    if not isinstance(callback_result, Callable):  # type: ignore
+                    if not isinstance(callback_result, Callable):  # type: ignore[arg-type]
                         logger.warning(
                             "Wrong type returned by module API callback %s: %s, expected"
                             " Optional[Tuple[str, Optional[Callable]]]",

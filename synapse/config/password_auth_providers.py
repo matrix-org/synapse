@@ -25,7 +25,7 @@ class PasswordAuthProviderConfig(Config):
     section = "authproviders"
 
     def read_config(self, config, **kwargs):
-        """Parses the old account validity config. The config format looks like this:
+        """Parses the old password auth providers config. The config format looks like this:
 
         password_providers:
            # Example config for an LDAP auth provider

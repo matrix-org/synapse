@@ -144,6 +144,7 @@ class ModuleApi:
 
     @property
     def register_password_auth_provider_callbacks(self):
+        """Registers callbacks for password auth provider capabilities."""
         return self._password_auth_provider.register_password_auth_provider_callbacks
 
     def register_web_resource(self, path: str, resource: IResource):
