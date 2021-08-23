@@ -33,6 +33,9 @@ class RegistrationConfig(Config):
         self.registrations_require_3pid = config.get("registrations_require_3pid", [])
         self.allowed_local_3pids = config.get("allowed_local_3pids", [])
         self.enable_3pid_lookup = config.get("enable_3pid_lookup", True)
+        self.registration_requires_token = config.get(
+            "registration_requires_token", False
+        )
         self.registration_shared_secret = config.get("registration_shared_secret")
 
         self.bcrypt_rounds = config.get("bcrypt_rounds", 12)
@@ -140,6 +143,9 @@ class RegistrationConfig(Config):
                 "mechanism by removing the `access_token_lifetime` option."
             )
 
+        # The fallback template used for authenticating using a registration token
+        self.registration_token_template = self.read_template("registration_token.html")
+
         # The success template used during fallback auth.
         self.fallback_success_template = self.read_template("auth_success.html")
 
@@ -198,6 +204,15 @@ class RegistrationConfig(Config):
         # Enable 3PIDs lookup requests to identity servers from this server.
         #
         #enable_3pid_lookup: true
+
+        # Require users to submit a token during registration.
+        # Tokens can be managed using the admin API:
+        # https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
+        # Note that `enable_registration` must be set to `true`.
+        # Disabling this option will not delete any tokens previously generated.
+        # Defaults to false. Uncomment the following to require tokens:
+        #
+        #registration_requires_token: true
 
         # If set, allows registration of standard or admin accounts by anyone who
         # has the shared secret, even if registration is otherwise disabled.

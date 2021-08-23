@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import json
 import urllib.parse
+
+from parameterized import parameterized
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 
 from tests import unittest
 
@@ -45,31 +46,23 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             self.other_user_device_id,
         )
 
-    def test_no_auth(self):
+    @parameterized.expand(["GET", "PUT", "DELETE"])
+    def test_no_auth(self, method: str):
         """
         Try to get a device of an user without authentication.
         """
-        channel = self.make_request("GET", self.url, b"{}")
+        channel = self.make_request(method, self.url, b"{}")
 
         self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
 
-        channel = self.make_request("PUT", self.url, b"{}")
-
-        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
-
-        channel = self.make_request("DELETE", self.url, b"{}")
-
-        self.assertEqual(401, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.MISSING_TOKEN, channel.json_body["errcode"])
-
-    def test_requester_is_no_admin(self):
+    @parameterized.expand(["GET", "PUT", "DELETE"])
+    def test_requester_is_no_admin(self, method: str):
         """
         If the user is not a server admin, an error is returned.
         """
         channel = self.make_request(
-            "GET",
+            method,
             self.url,
             access_token=self.other_user_token,
         )
@@ -77,25 +70,8 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
         self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
 
-        channel = self.make_request(
-            "PUT",
-            self.url,
-            access_token=self.other_user_token,
-        )
-
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
-
-        channel = self.make_request(
-            "DELETE",
-            self.url,
-            access_token=self.other_user_token,
-        )
-
-        self.assertEqual(403, int(channel.result["code"]), msg=channel.result["body"])
-        self.assertEqual(Codes.FORBIDDEN, channel.json_body["errcode"])
-
-    def test_user_does_not_exist(self):
+    @parameterized.expand(["GET", "PUT", "DELETE"])
+    def test_user_does_not_exist(self, method: str):
         """
         Tests that a lookup for a user that does not exist returns a 404
         """
@@ -105,7 +81,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         )
 
         channel = self.make_request(
-            "GET",
+            method,
             url,
             access_token=self.admin_user_tok,
         )
@@ -113,25 +89,8 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         self.assertEqual(404, channel.code, msg=channel.json_body)
         self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
 
-        channel = self.make_request(
-            "PUT",
-            url,
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(404, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
-
-        channel = self.make_request(
-            "DELETE",
-            url,
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(404, channel.code, msg=channel.json_body)
-        self.assertEqual(Codes.NOT_FOUND, channel.json_body["errcode"])
-
-    def test_user_is_not_local(self):
+    @parameterized.expand(["GET", "PUT", "DELETE"])
+    def test_user_is_not_local(self, method: str):
         """
         Tests that a lookup for a user that is not a local returns a 400
         """
@@ -141,25 +100,7 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         )
 
         channel = self.make_request(
-            "GET",
-            url,
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
-
-        channel = self.make_request(
-            "PUT",
-            url,
-            access_token=self.admin_user_tok,
-        )
-
-        self.assertEqual(400, channel.code, msg=channel.json_body)
-        self.assertEqual("Can only lookup local users", channel.json_body["error"])
-
-        channel = self.make_request(
-            "DELETE",
+            method,
             url,
             access_token=self.admin_user_tok,
         )
@@ -219,12 +160,11 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
             * (synapse.handlers.device.MAX_DEVICE_DISPLAY_NAME_LEN + 1)
         }
 
-        body = json.dumps(update)
         channel = self.make_request(
             "PUT",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content=update,
         )
 
         self.assertEqual(400, channel.code, msg=channel.json_body)
@@ -275,12 +215,11 @@ class DeviceRestTestCase(unittest.HomeserverTestCase):
         Tests a normal successful update of display name
         """
         # Set new display_name
-        body = json.dumps({"display_name": "new displayname"})
         channel = self.make_request(
             "PUT",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"display_name": "new displayname"},
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)
@@ -529,12 +468,11 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
         """
         Tests that a remove of a device that does not exist returns 200.
         """
-        body = json.dumps({"devices": ["unknown_device1", "unknown_device2"]})
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"devices": ["unknown_device1", "unknown_device2"]},
         )
 
         # Delete unknown devices returns status 200
@@ -560,12 +498,11 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
             device_ids.append(str(d["device_id"]))
 
         # Delete devices
-        body = json.dumps({"devices": device_ids})
         channel = self.make_request(
             "POST",
             self.url,
             access_token=self.admin_user_tok,
-            content=body.encode(encoding="utf_8"),
+            content={"devices": device_ids},
         )
 
         self.assertEqual(200, channel.code, msg=channel.json_body)

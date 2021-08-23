@@ -18,7 +18,7 @@ from typing import Any, Dict, List, Optional
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 
 from tests import unittest
 

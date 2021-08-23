@@ -20,7 +20,7 @@ from parameterized import parameterized
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client import login, profile, room
 from synapse.rest.media.v1.filepath import MediaFilePaths
 
 from tests import unittest

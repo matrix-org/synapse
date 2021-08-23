@@ -237,13 +237,14 @@ class Config:
     def read_templates(
         self,
         filenames: List[str],
-        custom_template_directory: Optional[str] = None,
+        custom_template_directories: Optional[Iterable[str]] = None,
     ) -> List[jinja2.Template]:
         """Load a list of template files from disk using the given variables.
 
         This function will attempt to load the given templates from the default Synapse
-        template directory. If `custom_template_directory` is supplied, that directory
-        is tried first.
+        template directory. If `custom_template_directories` is supplied, any directory
+        in this list is tried (in the order they appear in the list) before trying
+        Synapse's default directory.
 
         Files read are treated as Jinja templates. The templates are not rendered yet
         and have autoescape enabled.
@@ -251,8 +252,8 @@ class Config:
         Args:
             filenames: A list of template filenames to read.
 
-            custom_template_directory: A directory to try to look for the templates
-                before using the default Synapse template directory instead.
+            custom_template_directories: A list of directory to try to look for the
+                templates before using the default Synapse template directory instead.
 
         Raises:
             ConfigError: if the file's path is incorrect or otherwise cannot be read.
@@ -260,20 +261,26 @@ class Config:
         Returns:
             A list of jinja2 templates.
         """
-        search_directories = [self.default_template_dir]
+        search_directories = []
 
-        # The loader will first look in the custom template directory (if specified) for the
-        # given filename. If it doesn't find it, it will use the default template dir instead
-        if custom_template_directory:
-            # Check that the given template directory exists
-            if not self.path_exists(custom_template_directory):
-                raise ConfigError(
-                    "Configured template directory does not exist: %s"
-                    % (custom_template_directory,)
-                )
+        # The loader will first look in the custom template directories (if specified)
+        # for the given filename. If it doesn't find it, it will use the default
+        # template dir instead.
+        if custom_template_directories is not None:
+            for custom_template_directory in custom_template_directories:
+                # Check that the given template directory exists
+                if not self.path_exists(custom_template_directory):
+                    raise ConfigError(
+                        "Configured template directory does not exist: %s"
+                        % (custom_template_directory,)
+                    )
 
-            # Search the custom template directory as well
-            search_directories.insert(0, custom_template_directory)
+                # Search the custom template directory as well
+                search_directories.append(custom_template_directory)
+
+        # Append the default directory at the end of the list so Jinja can fallback on it
+        # if a template is missing from any custom directory.
+        search_directories.append(self.default_template_dir)
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(search_directories)
