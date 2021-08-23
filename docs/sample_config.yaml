@@ -338,17 +338,17 @@ listeners:
 # Connection settings for the manhole
 #
 manhole_settings:
-
-  # The username for the manhole. This defaults to matrix
+  # The username for the manhole. This defaults to 'matrix'
   #
-  # username: matrix
+  #username: manhole
 
-  # The password for the manhole. This defaults to rabbithole
+  # The password for the manhole. This defaults to 'rabbithole'
   #
-  # password: rabbithole
+  #password: mypassword
 
   # The private and public SSH key pair used to encrypt the manhole traffic.
   # If these are left unset, then hardcoded and non-secret keys are used!
+  # This is an issue unless the manhole is only ever accessed locally
   #
   # ssh_priv_key_path: CONFDIR/id_rsa
   # ssh_pub_key_path: CONFDIR/id_rsa.pub
