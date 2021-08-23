@@ -82,7 +82,7 @@ configuration, this would be:
 ssh -p9000 matrix@localhost
 ```
 
-Then enter the password when prompted (the default is `rabbithole`)
+Then enter the password when prompted (the default is `rabbithole`).
 
 This gives a Python REPL in which `hs` gives access to the
 `synapse.server.HomeServer` object - which in turn gives access to many other

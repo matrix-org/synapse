@@ -663,7 +663,9 @@ class ServerConfig(Config):
             )
 
         manhole_settings = config.get("manhole_settings") or {}
-        validate_config(_MANHOLE_SETTINGS_SCHEMA, manhole_settings, ())
+        validate_config(
+            _MANHOLE_SETTINGS_SCHEMA, manhole_settings, ("manhole_settings",)
+        )
 
         manhole_username = manhole_settings.get("username", "matrix")
         manhole_password = manhole_settings.get("password", "rabbithole")
@@ -676,7 +678,7 @@ class ServerConfig(Config):
                 manhole_priv_key = Key.fromFile(manhole_priv_key_path)
             except Exception as e:
                 raise ConfigError(
-                    f"Failed to open manhole private key file {manhole_priv_key_path}"
+                    f"Failed to read manhole private key file {manhole_priv_key_path}"
                 ) from e
 
         manhole_pub_key = None
@@ -685,7 +687,7 @@ class ServerConfig(Config):
                 manhole_pub_key = Key.fromFile(manhole_pub_key_path)
             except Exception as e:
                 raise ConfigError(
-                    f"Failed to open manhole public key file {manhole_pub_key_path}"
+                    f"Failed to read manhole public key file {manhole_pub_key_path}"
                 ) from e
 
         self.manhole_settings = ManholeConfig(
@@ -1123,17 +1125,17 @@ class ServerConfig(Config):
         # Connection settings for the manhole
         #
         manhole_settings:
-
-          # The username for the manhole. This defaults to matrix
+          # The username for the manhole. This defaults to 'matrix'
           #
-          # username: matrix
+          #username: manhole
 
-          # The password for the manhole. This defaults to rabbithole
+          # The password for the manhole. This defaults to 'rabbithole'
           #
-          # password: rabbithole
+          #password: mypassword
 
           # The private and public SSH key pair used to encrypt the manhole traffic.
           # If these are left unset, then hardcoded and non-secret keys are used!
+          # This is an issue unless the manhole is only ever accessed locally
           #
           # ssh_priv_key_path: %(config_dir_path)s/id_rsa
           # ssh_pub_key_path: %(config_dir_path)s/id_rsa.pub
