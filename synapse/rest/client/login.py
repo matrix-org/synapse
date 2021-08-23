@@ -104,6 +104,12 @@ class LoginRestServlet(RestServlet):
             burst_count=self.hs.config.rc_login_account.burst_count,
         )
 
+        # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
+        # The reason for this is to ensure that the auth_provider_ids are registered
+        # with SsoHandler, which in turn ensures that the login/registration prometheus
+        # counters are initialised for the auth_provider_ids.
+        _load_sso_handlers(hs)
+
     def on_GET(self, request: SynapseRequest):
         flows = []
         if self.jwt_enabled:
@@ -499,12 +505,7 @@ class SsoRedirectServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
         # register themselves with the main SSOHandler.
-        if hs.config.cas_enabled:
-            hs.get_cas_handler()
-        if hs.config.saml2_enabled:
-            hs.get_saml_handler()
-        if hs.config.oidc_enabled:
-            hs.get_oidc_handler()
+        _load_sso_handlers(hs)
         self._sso_handler = hs.get_sso_handler()
         self._msc2858_enabled = hs.config.experimental.msc2858_enabled
         self._public_baseurl = hs.config.public_baseurl
@@ -598,3 +599,12 @@ def register_servlets(hs, http_server):
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasTicketServlet(hs).register(http_server)
+
+
+def _load_sso_handlers(hs: "HomeServer"):
+    if hs.config.cas.cas_enabled:
+        hs.get_cas_handler()
+    if hs.config.saml2.saml2_enabled:
+        hs.get_saml_handler()
+    if hs.config.oidc.oidc_enabled:
+        hs.get_oidc_handler()
