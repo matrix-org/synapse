@@ -43,6 +43,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     HttpResponseException,
+    RequestSendFailed,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -558,7 +559,11 @@ class FederationClient(FederationBase):
 
             try:
                 return await callback(destination)
-            except InvalidResponseError as e:
+            except (
+                RequestSendFailed,
+                InvalidResponseError,
+                NotRetryingDestination,
+            ) as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
             except UnsupportedRoomVersionError:
                 raise
