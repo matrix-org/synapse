@@ -246,9 +246,11 @@ oidc_providers:
 
 ### Google
 
+[Google][google-idp] is an OpenID certified authentication and authorisation provider.
+
 1. Set up a project in the Google API Console (see
    https://developers.google.com/identity/protocols/oauth2/openid-connect#appsetup).
-2. add an "OAuth Client ID" for a Web Application under "Credentials".
+2. Add an "OAuth Client ID" for a Web Application under "Credentials".
 3. Copy the Client ID and Client Secret, and add the following to your synapse config:
    ```yaml
    oidc_providers:
