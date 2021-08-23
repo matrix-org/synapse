@@ -20,7 +20,7 @@ from synapse.events import EventBase
 from synapse.federation.units import Transaction
 from synapse.handlers.presence import UserPresenceState
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, presence, room
+from synapse.rest.client import login, presence, room
 from synapse.types import create_requester
 
 from tests.events.test_presence_router import send_presence_update, sync_presence

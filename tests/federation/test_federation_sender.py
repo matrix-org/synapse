@@ -21,7 +21,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import RoomEncryptionAlgorithms
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.types import JsonDict, ReadReceipt
 
 from tests.test_utils import make_awaitable

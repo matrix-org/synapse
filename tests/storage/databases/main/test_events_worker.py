@@ -15,7 +15,7 @@ import json
 
 from synapse.logging.context import LoggingContext
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.storage.databases.main.events_worker import EventsWorkerStore
 from synapse.util.async_helpers import yieldable_gather_results
 
