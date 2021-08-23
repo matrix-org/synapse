@@ -1,0 +1,1 @@
+Update our periodic test of Synapse against Twisted trunk to avoid opening duplicate issues.
