@@ -6518,6 +6518,54 @@ documentation on setting up SiWA.</p>
       config:
         email_template: &quot;{{ user.email }}&quot;
 </code></pre>
+<h2 id="django-oauth-toolkit"><a class="header" href="#django-oauth-toolkit">Django OAuth Toolkit</a></h2>
+<p><a href="https://github.com/jazzband/django-oauth-toolkit">django-oauth-toolkit</a> is a
+Django application providing out of the box all the endpoints, data and logic
+needed to add OAuth2 capabilities to your Django projects. It supports
+<a href="https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html">OpenID Connect too</a>.</p>
+<p>Configuration on Django's side:</p>
+<ol>
+<li>Add an application: https://example.com/admin/oauth2_provider/application/add/ and choose parameters like this:</li>
+</ol>
+<ul>
+<li><code>Redirect uris</code>: https://synapse.example.com/_synapse/client/oidc/callback</li>
+<li><code>Client type</code>: <code>Confidential</code></li>
+<li><code>Authorization grant type</code>: <code>Authorization code</code></li>
+<li><code>Algorithm</code>: <code>HMAC with SHA-2 256</code></li>
+</ul>
+<ol start="2">
+<li>
+<p>You can <a href="https://django-oauth-toolkit.readthedocs.io/en/latest/oidc.html#customizing-the-oidc-responses">customize the claims</a> Django gives to synapse (optional):</p>
+<details>
+ <summary>Code sample</summary>
+<pre><code class="language-python">class CustomOAuth2Validator(OAuth2Validator):
+
+    def get_additional_claims(self, request):
+        return {
+            &quot;sub&quot;: request.user.email,
+            &quot;email&quot;: request.user.email,
+            &quot;first_name&quot;: request.user.first_name,
+            &quot;last_name&quot;: request.user.last_name,
+        }
+</code></pre>
+</details>
+</li>
+</ol>
+<p>Your synapse config is then:</p>
+<pre><code class="language-yaml">oidc_providers:
+  - idp_id: django_example
+    idp_name: &quot;Django Example&quot;
+    issuer: &quot;https://example.com/o/&quot;
+    client_id: &quot;your-client-id&quot;  # CHANGE ME
+    client_secret: &quot;your-client-secret&quot;  # CHANGE ME
+    scopes: [&quot;openid&quot;]
+    user_profile_method: &quot;userinfo_endpoint&quot;  # needed because oauth-toolkit does not include user information in the authorization response
+    user_mapping_provider:
+      config:
+        localpart_template: &quot;{{ user.email.split('@')[0] }}&quot;
+        display_name_template: &quot;{{ user.first_name }} {{ user.last_name }}&quot;
+        email_template: &quot;{{ user.email }}&quot;
+</code></pre>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="sso-mapping-providers"><a class="header" href="#sso-mapping-providers">SSO Mapping Providers</a></h1>
 <p>A mapping provider is a Python class (loaded via a Python module) that
 works out how to map attributes of a SSO response to Matrix-specific
