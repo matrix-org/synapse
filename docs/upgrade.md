@@ -107,6 +107,11 @@ This may affect you if you make use of custom HTML templates for the
 The template is now provided an `error` variable if the authentication
 process failed. See the default templates linked above for an example.
 
+# Upgrading to v1.42.0
+
+## Removal of out-of-date email pushers
+Users will stop receiving message updates via email for addresses that were
+once, but not still, linked to their account.
 
 # Upgrading to v1.41.0
 
