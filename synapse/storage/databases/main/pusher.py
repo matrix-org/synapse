@@ -405,12 +405,14 @@ class PusherWorkerStore(SQLBaseStore):
         def _delete_pushers(txn) -> int:
 
             sql = """
-                SELECT p.id, p.user_name, p.add_id, p.pushkey
+                SELECT p.id, p.user_name, p.app_id, p.pushkey
                 FROM pushers AS p
-                    JOIN user_threepids AS t ON t.user_id=p.user_name
-                WHERE p.app_id = 'm.email'
-                    AND t.medium = 'email'
-                    AND t.address = p.pushkey
+                    LEFT JOIN user_threepids AS t 
+                        ON t.user_id=p.user_name
+                        AND t.medium = 'email'
+                        AND t.address = p.pushkey
+                WHERE t.user_id is NULL
+                    AND p.app_id = 'm.email'
                     AND p.id > ?
                 ORDER BY p.id ASC
                 LIMIT ?
