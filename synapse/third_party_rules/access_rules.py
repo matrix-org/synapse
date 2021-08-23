@@ -504,7 +504,7 @@ class RoomAccessRules(object):
         )  # type: EventBase
 
         # If the room is publicly joinable, revert that upon freezing the room.
-        if frozen is True and(
+        if frozen is True and (
             current_join_rules is None
             or current_join_rules.content["join_rule"] == "public"
         ):
