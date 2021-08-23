@@ -34,8 +34,7 @@ class SessionStore(SQLBaseStore):
     """
     A store for generic session data.
 
-    Each type of session should provide a unique key and optionally can segment
-    their data (e.g. by user or room).
+    Each type of session should provide a unique type (to separate sessions).
 
     Sessions are automatically removed when they expire.
     """
@@ -53,19 +52,17 @@ class SessionStore(SQLBaseStore):
             self._clock.looping_call(self._delete_expired_sessions, 30 * 60 * 1000)
 
     async def create_session(
-        self, key: str, value: JsonDict, expiry_ms: int, segment: str = ""
+        self, session_type: str, value: JsonDict, expiry_ms: int
     ) -> str:
         """
         Creates a new pagination session for the room hierarchy endpoint.
 
         Args:
-            key: The unique key for this type of session.
-            value: The value to store with this key.
+            session_type: The type for this session.
+            value: The value to store.
             expiry_ms: How long before an item is evicted from the cache
                 in milliseconds. Default is 0, indicating items never get
                 evicted based on time.
-            segment: A unique value which segments this session type. Optional.
-                This can be used separate data based on user, room, etc.
 
         Returns:
             The newly created session ID.
@@ -84,10 +81,9 @@ class SessionStore(SQLBaseStore):
                     table="sessions",
                     values={
                         "session_id": session_id,
-                        "key": key,
+                        "session_type": session_type,
                         "value": json_encoder.encode(value),
                         "expiry_time_ms": self.hs.get_clock().time_msec() + expiry_ms,
-                        "segment": segment,
                     },
                     desc="create_session",
                 )
@@ -97,31 +93,28 @@ class SessionStore(SQLBaseStore):
                 attempts += 1
         raise StoreError(500, "Couldn't generate a session ID.")
 
-    async def get_session(
-        self, key: str, session_id: str, segment: str = ""
-    ) -> JsonDict:
+    async def get_session(self, session_type: str, session_id: str) -> JsonDict:
         """
         Retrieve data stored with create_session
 
         Args:
-            key: The unique key for this type of session.
+            session_type: The type for this session.
             session_id: The session ID returned from create_session.
-            segment: A unique value for this session. Optional, defaults to None.
 
         Raises:
             StoreError if the session cannot be found.
         """
 
         def _get_session(
-            txn: LoggingTransaction, key: str, session_id: str, segment: str, ts: int
+            txn: LoggingTransaction, session_type: str, session_id: str, ts: int
         ) -> JsonDict:
             # This includes the expiry time since items are only periodically
             # deleted, not upon expiry.
             select_sql = """
             SELECT value FROM sessions WHERE
-            key = ? AND session_id = ? AND segment = ? AND expiry_time_ms > ?
+            session_type = ? AND session_id = ? AND expiry_time_ms > ?
             """
-            txn.execute(select_sql, [key, session_id, segment, ts])
+            txn.execute(select_sql, [session_type, session_id, ts])
             row = txn.fetchone()
 
             if not row:
@@ -132,9 +125,8 @@ class SessionStore(SQLBaseStore):
         return await self.db_pool.runInteraction(
             "get_session",
             _get_session,
-            key,
+            session_type,
             session_id,
-            segment,
             self._clock.time_msec(),
         )
 

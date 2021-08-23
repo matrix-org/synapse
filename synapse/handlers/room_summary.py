@@ -76,7 +76,7 @@ class _PaginationSession:
 
 class RoomSummaryHandler:
     # A unique key used for pagination sessions for the room hierarchy endpoint.
-    _PAGINATION_SESSION_KEY = "room_hierarchy_pagination"
+    _PAGINATION_SESSION_TYPE = "room_hierarchy_pagination"
 
     # The time a pagination session remains valid for.
     _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
@@ -306,18 +306,24 @@ class RoomSummaryHandler:
                 % (requester, requested_room_id),
             )
 
-        # A unique token for this pagination.
-        pagination_key = f"{requester}|{requested_room_id}|{suggested_only}|{max_depth}"
-
         # If this is continuing a previous session, pull the persisted data.
         if from_token:
             try:
                 pagination_session = await self._store.get_session(
-                    key=self._PAGINATION_SESSION_KEY,
+                    session_type=self._PAGINATION_SESSION_TYPE,
                     session_id=from_token,
-                    segment=pagination_key,
                 )
             except StoreError:
+                raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
+
+            # If the requester, room ID, suggested-only, or max depth were modified
+            # the session is invalid.
+            if (
+                requester != pagination_session["requester"]
+                or requested_room_id != pagination_session["room_id"]
+                or suggested_only != pagination_session["suggested_only"]
+                or max_depth != pagination_session["max_depth"]
+            ):
                 raise SynapseError(400, "Unknown pagination token", Codes.INVALID_PARAM)
 
             # Load the previous state.
@@ -443,15 +449,20 @@ class RoomSummaryHandler:
         # If there's additional data, generate a pagination token (and persist state).
         if room_queue:
             result["next_batch"] = await self._store.create_session(
-                key=self._PAGINATION_SESSION_KEY,
+                session_type=self._PAGINATION_SESSION_TYPE,
                 value={
+                    # Information which must be identical across pagination.
+                    "requester": requester,
+                    "room_id": requested_room_id,
+                    "suggested_only": suggested_only,
+                    "max_depth": max_depth,
+                    # The stored state.
                     "room_queue": [
                         attr.astuple(room_entry) for room_entry in room_queue
                     ],
                     "processed_rooms": list(processed_rooms),
                 },
                 expiry_ms=self._PAGINATION_SESSION_VALIDITY_PERIOD_MS,
-                segment=pagination_key,
             )
 
         return result

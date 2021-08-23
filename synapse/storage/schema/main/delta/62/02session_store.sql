@@ -15,10 +15,9 @@
  */
 
 CREATE TABLE IF NOT EXISTS sessions(
-    key TEXT NOT NULL,  -- The unique key for this type of session.
+    session_type TEXT NOT NULL,  -- The unique key for this type of session.
     session_id TEXT NOT NULL,  -- The session ID passed to the client.
     value TEXT NOT NULL, -- A JSON dictionary to persist.
-    segment TEXT NOT NULL,  -- A key which separates the data
     expiry_time_ms BIGINT NOT NULL,  -- The time this session will expire (epoch time in milliseconds).
-    UNIQUE (key, session_id, segment)
+    UNIQUE (session_type, session_id)
 );
