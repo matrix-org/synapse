@@ -14,8 +14,10 @@
 
 import logging
 import re
+import typing
 
-from synapse.server import HomeServer
+if typing.TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ logger = logging.getLogger(__name__)
 MAX_EMAIL_ADDRESS_LENGTH = 500
 
 
-def check_3pid_allowed(hs: HomeServer, medium: str, address: str) -> bool:
+def check_3pid_allowed(hs: "HomeServer", medium: str, address: str) -> bool:
     """Checks whether a given format of 3PID is allowed to be used on this HS
 
     Args:
