@@ -1,1 +1,0 @@
-No longer build `.dev` packages for Ubuntu 20.10 LTS Groovy Gorilla, which has now EOLed.

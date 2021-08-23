@@ -35,7 +35,6 @@ from synapse.rest.admin._base import (
     assert_user_is_admin,
 )
 from synapse.rest.client._base import client_patterns
-from synapse.storage.databases.main.media_repository import MediaSortOrder
 from synapse.storage.databases.main.stats import UserSortOrder
 from synapse.types import JsonDict, UserID
 
@@ -229,13 +228,18 @@ class UserRestServletV2(RestServlet):
         if not isinstance(deactivate, bool):
             raise SynapseError(400, "'deactivated' parameter is not of type boolean")
 
-        # convert into List[Tuple[str, str]]
+        # convert List[Dict[str, str]] into Set[Tuple[str, str]]
         if external_ids is not None:
-            new_external_ids = []
-            for external_id in external_ids:
-                new_external_ids.append(
-                    (external_id["auth_provider"], external_id["external_id"])
-                )
+            new_external_ids = {
+                (external_id["auth_provider"], external_id["external_id"])
+                for external_id in external_ids
+            }
+
+        # convert List[Dict[str, str]] into Set[Tuple[str, str]]
+        if threepids is not None:
+            new_threepids = {
+                (threepid["medium"], threepid["address"]) for threepid in threepids
+            }
 
         if user:  # modify user
             if "displayname" in body:
@@ -244,29 +248,39 @@ class UserRestServletV2(RestServlet):
                 )
 
             if threepids is not None:
-                # remove old threepids from user
-                old_threepids = await self.store.user_get_threepids(user_id)
-                for threepid in old_threepids:
+                # get changed threepids (added and removed)
+                # convert List[Dict[str, Any]] into Set[Tuple[str, str]]
+                cur_threepids = {
+                    (threepid["medium"], threepid["address"])
+                    for threepid in await self.store.user_get_threepids(user_id)
+                }
+                add_threepids = new_threepids - cur_threepids
+                del_threepids = cur_threepids - new_threepids
+
+                # remove old threepids
+                for medium, address in del_threepids:
                     try:
                         await self.auth_handler.delete_threepid(
-                            user_id, threepid["medium"], threepid["address"], None
+                            user_id, medium, address, None
                         )
                     except Exception:
                         logger.exception("Failed to remove threepids")
                         raise SynapseError(500, "Failed to remove threepids")
 
-                # add new threepids to user
+                # add new threepids
                 current_time = self.hs.get_clock().time_msec()
-                for threepid in threepids:
+                for medium, address in add_threepids:
                     await self.auth_handler.add_threepid(
-                        user_id, threepid["medium"], threepid["address"], current_time
+                        user_id, medium, address, current_time
                     )
 
             if external_ids is not None:
                 # get changed external_ids (added and removed)
-                cur_external_ids = await self.store.get_external_ids_by_user(user_id)
-                add_external_ids = set(new_external_ids) - set(cur_external_ids)
-                del_external_ids = set(cur_external_ids) - set(new_external_ids)
+                cur_external_ids = set(
+                    await self.store.get_external_ids_by_user(user_id)
+                )
+                add_external_ids = new_external_ids - cur_external_ids
+                del_external_ids = cur_external_ids - new_external_ids
 
                 # remove old external_ids
                 for auth_provider, external_id in del_external_ids:
@@ -349,9 +363,9 @@ class UserRestServletV2(RestServlet):
 
             if threepids is not None:
                 current_time = self.hs.get_clock().time_msec()
-                for threepid in threepids:
+                for medium, address in new_threepids:
                     await self.auth_handler.add_threepid(
-                        user_id, threepid["medium"], threepid["address"], current_time
+                        user_id, medium, address, current_time
                     )
                     if (
                         self.hs.config.email_enable_notifs
@@ -363,8 +377,8 @@ class UserRestServletV2(RestServlet):
                             kind="email",
                             app_id="m.email",
                             app_display_name="Email Notifications",
-                            device_display_name=threepid["address"],
-                            pushkey=threepid["address"],
+                            device_display_name=address,
+                            pushkey=address,
                             lang=None,  # We don't know a user's language here
                             data={},
                         )
@@ -849,165 +863,6 @@ class PushersRestServlet(RestServlet):
         filtered_pushers = [p.as_dict() for p in pushers]
 
         return 200, {"pushers": filtered_pushers, "total": len(filtered_pushers)}
-
-
-class UserMediaRestServlet(RestServlet):
-    """
-    Gets information about all uploaded local media for a specific `user_id`.
-    With DELETE request you can delete all this media.
-
-    Example:
-        http://localhost:8008/_synapse/admin/v1/users/@user:server/media
-
-    Args:
-        The parameters `from` and `limit` are required for pagination.
-        By default, a `limit` of 100 is used.
-    Returns:
-        A list of media and an integer representing the total number of
-        media that exist given for this user
-    """
-
-    PATTERNS = admin_patterns("/users/(?P<user_id>[^/]+)/media$")
-
-    def __init__(self, hs: "HomeServer"):
-        self.is_mine = hs.is_mine
-        self.auth = hs.get_auth()
-        self.store = hs.get_datastore()
-        self.media_repository = hs.get_media_repository()
-
-    async def on_GET(
-        self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        await assert_requester_is_admin(self.auth, request)
-
-        if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(400, "Can only look up local users")
-
-        user = await self.store.get_user_by_id(user_id)
-        if user is None:
-            raise NotFoundError("Unknown user")
-
-        start = parse_integer(request, "from", default=0)
-        limit = parse_integer(request, "limit", default=100)
-
-        if start < 0:
-            raise SynapseError(
-                400,
-                "Query parameter from must be a string representing a positive integer.",
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        if limit < 0:
-            raise SynapseError(
-                400,
-                "Query parameter limit must be a string representing a positive integer.",
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        # If neither `order_by` nor `dir` is set, set the default order
-        # to newest media is on top for backward compatibility.
-        if b"order_by" not in request.args and b"dir" not in request.args:
-            order_by = MediaSortOrder.CREATED_TS.value
-            direction = "b"
-        else:
-            order_by = parse_string(
-                request,
-                "order_by",
-                default=MediaSortOrder.CREATED_TS.value,
-                allowed_values=(
-                    MediaSortOrder.MEDIA_ID.value,
-                    MediaSortOrder.UPLOAD_NAME.value,
-                    MediaSortOrder.CREATED_TS.value,
-                    MediaSortOrder.LAST_ACCESS_TS.value,
-                    MediaSortOrder.MEDIA_LENGTH.value,
-                    MediaSortOrder.MEDIA_TYPE.value,
-                    MediaSortOrder.QUARANTINED_BY.value,
-                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-                ),
-            )
-            direction = parse_string(
-                request, "dir", default="f", allowed_values=("f", "b")
-            )
-
-        media, total = await self.store.get_local_media_by_user_paginate(
-            start, limit, user_id, order_by, direction
-        )
-
-        ret = {"media": media, "total": total}
-        if (start + limit) < total:
-            ret["next_token"] = start + len(media)
-
-        return 200, ret
-
-    async def on_DELETE(
-        self, request: SynapseRequest, user_id: str
-    ) -> Tuple[int, JsonDict]:
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
-        await assert_requester_is_admin(self.auth, request)
-
-        if not self.is_mine(UserID.from_string(user_id)):
-            raise SynapseError(400, "Can only look up local users")
-
-        user = await self.store.get_user_by_id(user_id)
-        if user is None:
-            raise NotFoundError("Unknown user")
-
-        start = parse_integer(request, "from", default=0)
-        limit = parse_integer(request, "limit", default=100)
-
-        if start < 0:
-            raise SynapseError(
-                400,
-                "Query parameter from must be a string representing a positive integer.",
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        if limit < 0:
-            raise SynapseError(
-                400,
-                "Query parameter limit must be a string representing a positive integer.",
-                errcode=Codes.INVALID_PARAM,
-            )
-
-        # If neither `order_by` nor `dir` is set, set the default order
-        # to newest media is on top for backward compatibility.
-        if b"order_by" not in request.args and b"dir" not in request.args:
-            order_by = MediaSortOrder.CREATED_TS.value
-            direction = "b"
-        else:
-            order_by = parse_string(
-                request,
-                "order_by",
-                default=MediaSortOrder.CREATED_TS.value,
-                allowed_values=(
-                    MediaSortOrder.MEDIA_ID.value,
-                    MediaSortOrder.UPLOAD_NAME.value,
-                    MediaSortOrder.CREATED_TS.value,
-                    MediaSortOrder.LAST_ACCESS_TS.value,
-                    MediaSortOrder.MEDIA_LENGTH.value,
-                    MediaSortOrder.MEDIA_TYPE.value,
-                    MediaSortOrder.QUARANTINED_BY.value,
-                    MediaSortOrder.SAFE_FROM_QUARANTINE.value,
-                ),
-            )
-            direction = parse_string(
-                request, "dir", default="f", allowed_values=("f", "b")
-            )
-
-        media, _ = await self.store.get_local_media_by_user_paginate(
-            start, limit, user_id, order_by, direction
-        )
-
-        deleted_media, total = await self.media_repository.delete_local_media_ids(
-            ([row["media_id"] for row in media])
-        )
-
-        return 200, {"deleted_media": deleted_media, "total": total}
 
 
 class UserTokenRestServlet(RestServlet):

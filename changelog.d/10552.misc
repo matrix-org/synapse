@@ -1,1 +1,0 @@
-Update `/batch_send` endpoint to only return `state_events` created by the `state_events_from_before` passed in.
