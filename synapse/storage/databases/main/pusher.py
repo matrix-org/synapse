@@ -429,21 +429,24 @@ class PusherWorkerStore(SQLBaseStore):
             """
 
             txn.execute(sql, (last_pusher, batch_size))
-            ids = [row[0] for row in txn]
 
+            last = None
+            num_deleted = 0
             for row in txn:
+                last = row[0]
+                num_deleted += 1
                 self.db_pool.simple_delete_txn(
                     txn,
                     "pushers",
                     {"user_name": row[1], "app_id": row[2], "pushkey": row[3]},
                 )
 
-            if ids:
+            if last is not None:
                 self.db_pool.updates._background_update_progress_txn(
-                    txn, "remove_deleted_email_pushers", {"last_pusher": ids[-1]}
+                    txn, "remove_deleted_email_pushers", {"last_pusher": last}
                 )
 
-            return len(ids)
+            return num_deleted
 
         number_deleted = await self.db_pool.runInteraction(
             "_remove_deleted_email_pushers", _delete_pushers
