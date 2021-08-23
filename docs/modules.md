@@ -335,30 +335,37 @@ Password auth providers offer a way for server administrators to integrate
 their Synapse installation with an external authentication system. The callbacks can be
 registered by using the Module API's `register_password_auth_provider_callbacks` method.
 
-To register authentication checkers, the module should register both of:
+To register authentication checkers, the module should register:
 
-- `supported_login_types: Dict[str, Iterable[str]]`  
+```
+ auth_checkers: Dict[Tuple[str,Tuple], CHECK_AUTH_CALLBACK]
+```
 
-A dict mapping from a login type identifier (such as `m.login.password`) to an
-iterable giving the fields which must be provided by the user in the submission
+A dict mapping from tuples of a login type identifier (such as `m.login.password`) and a
+tuple of field names (such as `("password", "secret_thing")`) to authentication checking
+methods.
+
+The login type and field names are the things that are provided by the user in their submission
 to the `/login` API. 
 
-For example, if a module wants to implement a custom login type of 
-`com.example.custom_login`, where the client is expected to pass the fields `secret1`
-and `secret2` and an alternative password authenticator for `m.login.password`, then
-it should register the following dict: 
+For example, if a module implements authentication checkers for two different login types: 
+-  `com.example.custom_login` 
+    - Expects `secret1` and `secret2` fields to be sent to `/login`
+    - Is checked by the method: `self.custom_login_check`
+- `m.login.password`
+    - Expects a `password` field to be sent to `/login`
+    - Is checked by the method: `self.password_checker` 
+    
+Then it should register the following dict:
 
 ```python
-{
-    "com.example.custom_login": ("secret1", "secret2"),
-    "m.login.password": ("password",),
+{ 
+    ("com.example.custom_login", ("secret1", "secret2")): self.check_custom_login,
+    ("m.login.password", ("password",)): self.password_checker,
 }
 ```
 
-- `auth_checkers: Dict[str, CHECK_AUTH_CALLBACK]`
-
-A dict mapping from a login type identifier (such as `m.login.password`) to an authentication
-checking method of the following form:
+An authentication checking method should be of the following form:
 
 ```python
 async def check_auth(
@@ -368,27 +375,16 @@ async def check_auth(
 ) -> Optional[Tuple[str, Optional[Callable]]]
 ```
 
-It is passed the (possibly unqualified) user field provided by the client, 
+It is passed the user field provided by the client (which might not be in `@username:server` form), 
 the login type, and a dictionary of login secrets passed by the client.
 
 On a failure it should return None. On a success it should return a (user_id, callback) tuple
-where user_id is a str containing the user's (canonical) matrix id and the callback is a method
-to be called with the result from the `/login` call (see the 
+where user_id is a str containing the user's matrix id (i.e. in `@username:server` form) and the 
+callback is a method to be called with the result from the `/login` call (see the 
 <a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
 for details). This callback can be None.
 
-So continuing the same example, if the module has two authentication checkers, one for 
-`com.example.custom_login` named `self.custom_check` and one for `m.login.password` named
-`self.password_check` then it should register the following dict:
-
-```python
-{
-    "com.example.custom_login": self.custom_check,
-    "m.login.password": self.password_check,
-}
-```
-
-Additionally, the following callbacks are available:
+Aditionally the module can register:
 
 ```python
 async def check_3pid_auth(
@@ -403,8 +399,8 @@ such as email. It is passed the medium (eg. "email"), an address (eg. "jdoe@exam
 and the user's password.
 
 On a failure it should return None. On a success it should return a (user_id, callback) tuple
-where user_id is a str containing the user's (canonical) matrix id and the callback is a method
-to be called with the result from the `/login` call (see the 
+where user_id is a str containing the user's matrix id (i.e. in `@username:server` form) and the 
+callback is a method to be called with the result from the `/login` call (see the 
 <a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
 for details). This callback can be None.
 
@@ -447,8 +443,7 @@ There is no longer a `get_db_schema_files` callback provided, any changes to the
 should now be made by the module using the module API class.
 
 To port a module that has a `check_password` method: 
-- Register `"m.login.password": ("password",)` as a supported login type
-- Register `"m.login.password": self.check_password` as an auth checker
+- Register `("m.login.password", ("password",): self.check_password` as an auth checker
 - Set `self.module_api` to point to the `ModuleApi` object given in `__init__`
 - Change the arguments of `check_password` to
   `(username: str, login_type: str, login_dict: JsonDict)`

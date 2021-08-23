@@ -1919,19 +1919,18 @@ def load_legacy_password_auth_provider(module, config, api: ModuleApi):
     # dictionary of login_type->check_auth_method mappings
     check_auth = async_wrapper(getattr(provider, "check_auth", None))
     if check_auth is not None:
-        for login_type in supported_login_types:
-            auth_checkers[login_type] = check_auth
+        for login_type, fields in supported_login_types.items():
+            # need tuple(fields) since fields can be any Iterable type (so may not be hashable)
+            auth_checkers[(login_type, tuple(fields))] = check_auth
 
     # if it has a "check_password" method then it should handle all auth checks
     # with login type of LoginType.PASSWORD
     check_password = async_wrapper(getattr(provider, "check_password", None))
     if check_password is not None:
-        supported_login_types[LoginType.PASSWORD] = ("password",)
-        auth_checkers[LoginType.PASSWORD] = check_password
+        # need to use a tuple here for ("password",) not a list since lists aren't hashable
+        auth_checkers[(LoginType.PASSWORD, ("password",))] = check_password
 
-    api.register_password_auth_provider_callbacks(
-        hooks, supported_login_types=supported_login_types, auth_checkers=auth_checkers
-    )
+    api.register_password_auth_provider_callbacks(hooks, auth_checkers=auth_checkers)
 
 
 CHECK_3PID_AUTH_CALLBACK = Callable[
@@ -1965,8 +1964,7 @@ class PasswordAuthProvider:
         self,
         check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
         on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
-        supported_login_types: Optional[Dict[str, Iterable[str]]] = None,
-        auth_checkers: Optional[Dict[str, CHECK_AUTH_CALLBACK]] = None,
+        auth_checkers: Optional[Dict[Tuple[str, Tuple], CHECK_AUTH_CALLBACK]] = None,
     ):
         # Register check_3pid_auth callback
         if check_3pid_auth is not None:
@@ -1976,17 +1974,23 @@ class PasswordAuthProvider:
         if on_logged_out is not None:
             self.on_logged_out_callbacks.append(on_logged_out)
 
-        # register a new supported login_type
-        if supported_login_types is not None:
+        if auth_checkers is not None:
+            supported_login_types = auth_checkers.keys()
+            # register a new supported login_type
             # Iterate through all of the types being registered
-            for login_type, fields in supported_login_types.items():
-                # If a module is supporting a login_type it must also provide a
-                # callback for authenticating using it
-                if auth_checkers is None or auth_checkers.get(login_type) is None:
-                    raise RuntimeError(
-                        "A module tried to register support for login type: %s without providing"
-                        " an authentication method for it" % login_type
-                    )
+            for login_type, fields in supported_login_types:
+                # Note: fields may be empty here. This would allow a modules auth checker to
+                # be called with just 'login_type' and no password or other secrets
+
+                # Need to check that all the field names are strings or will get nasty error later
+                for f in fields:
+                    if not isinstance(f, str):
+                        raise RuntimeError(
+                            "A module tried to register support for login type: %s with parameters %s"
+                            " but all parameter names must be strings"
+                            % (login_type, fields)
+                        )
+
                 # 2 modules supporting the same login type must expect the same fields
                 # e.g. 1 can't expect "pass" if the other expects "password"
                 # so throw an exception if that happens
@@ -2003,20 +2007,9 @@ class PasswordAuthProvider:
                             % (login_type, fields, fields_currently_supported)
                         )
 
-        # register an authentication callback for specific login types
-        if auth_checkers is not None:
+            # register an authentication callback for specific login types
             # Iterate through all of the callbacks being registered
-            for login_type, callback in auth_checkers.items():
-                # If a module is providing a callback for a login type, then it must also register it as
-                # a supported login_type (in order to provide information on what fields it accepts)
-                if (
-                    supported_login_types is None
-                    or supported_login_types.get(login_type) is None
-                ):
-                    raise RuntimeError(
-                        "A module tried to register an authentication method for login type: %s"
-                        " without listing it as a supported login type" % login_type
-                    )
+            for (login_type, _), callback in auth_checkers.items():
                 # Add the new method to the list of auth_checker_callbacks
                 callback_list = self.auth_checker_callbacks.get(login_type, [])
                 callback_list.append(callback)
