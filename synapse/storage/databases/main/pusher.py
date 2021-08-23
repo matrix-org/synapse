@@ -49,7 +49,7 @@ class PusherWorkerStore(SQLBaseStore):
         )
 
         self.db_pool.updates.register_background_update_handler(
-            "remove_delete_email_pushers",
+            "remove_deleted_email_pushers",
             self._remove_deleted_email_pushers,
         )
 
