@@ -1,0 +1,1 @@
+Only process replacement from `check_event_allowed` module callbacks after calling every callback.

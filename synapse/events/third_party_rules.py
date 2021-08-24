@@ -214,6 +214,7 @@ class ThirdPartyEventRules:
         # the hashes and signatures.
         event.freeze()
 
+        final_replacement_data = None
         for callback in self._check_event_allowed_callbacks:
             try:
                 res, replacement_data = await callback(event, state_events)
@@ -221,14 +222,15 @@ class ThirdPartyEventRules:
                 logger.warning("Failed to run module API callback %s: %s", callback, e)
                 continue
 
-            # Return if the event shouldn't be allowed or if the module came up with a
-            # replacement dict for the event.
             if res is False:
+                # Return if the event shouldn't be allowed.
                 return res, None
-            elif isinstance(replacement_data, dict):
-                return True, replacement_data
+            elif isinstance(replacement_data, dict) and final_replacement_data is None:
+                # If the module returned with replacement data, and is the first one to do
+                # so, we store it to return it later, and continue to the next callback.
+                final_replacement_data = replacement_data
 
-        return True, None
+        return True, final_replacement_data
 
     async def on_create_room(
         self, requester: Requester, config: dict, is_requester_admin: bool
