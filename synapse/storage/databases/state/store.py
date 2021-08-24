@@ -333,7 +333,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 inflight_cache_misses.append(group)
                 continue
             elif not db_state_filter.include_others:
-                # TODO IS THIS USEFUL
                 # Try looking to see if the same filter but with include_others
                 # is being looked up.
                 result = self._state_group_inflight_cache.get(
