@@ -611,7 +611,7 @@ class Saml2UserMappingProvider:
         self.saml_response_to_user_attributes_callback: Optional[
             SAML_RESPONSE_TO_USER_ATTRIBUTES_CALLBACK
         ] = None
-        self.saml_attributes: Tuple[Set[str], Set[str]] = set(), set()
+        self.saml_attributes: Tuple[Set[str], Set[str]] = (set(), set())
         self.module_has_registered = False
 
     def register_saml2_user_mapping_provider_callbacks(
