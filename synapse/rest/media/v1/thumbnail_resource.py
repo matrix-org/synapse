@@ -451,10 +451,14 @@ class ThumbnailResource(DirectServeJsonResource):
                             info,
                         )
                     )
+            # Pick the most appropriate thumbnail. Some values of `desired_width` and
+            # `desired_height` may result in a tie, in which case we avoid comparing on
+            # the thumbnail info dictionary and pick the thumbnail that appears earlier
+            # in the list of candidates.
             if crop_info_list:
-                thumbnail_info = min(crop_info_list)[-1]
+                thumbnail_info = min(crop_info_list, key=lambda t: t[:-1])[-1]
             elif crop_info_list2:
-                thumbnail_info = min(crop_info_list2)[-1]
+                thumbnail_info = min(crop_info_list2, key=lambda t: t[:-1])[-1]
         elif desired_method == "scale":
             # Thumbnails that match equal or larger sizes of desired width/height.
             info_list: List[Tuple[int, bool, int, Dict[str, Any]]] = []
@@ -477,10 +481,14 @@ class ThumbnailResource(DirectServeJsonResource):
                     info_list2.append(
                         (size_quality, type_quality, length_quality, info)
                     )
+            # Pick the most appropriate thumbnail. Some values of `desired_width` and
+            # `desired_height` may result in a tie, in which case we avoid comparing on
+            # the thumbnail info dictionary and pick the thumbnail that appears earlier
+            # in the list of candidates.
             if info_list:
-                thumbnail_info = min(info_list)[-1]
+                thumbnail_info = min(info_list, key=lambda t: t[:-1])[-1]
             elif info_list2:
-                thumbnail_info = min(info_list2)[-1]
+                thumbnail_info = min(info_list2, key=lambda t: t[:-1])[-1]
 
         if thumbnail_info:
             return FileInfo(
