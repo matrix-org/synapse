@@ -337,6 +337,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             event: EventBase,
             state_events: StateMap[EventBase],
         ) -> Tuple[bool, dict]:
+            """Modifies the content of the provided event."""
             d = unfreeze(event.get_dict())
             d["content"]["foo"] = "bar"
             return True, d
@@ -345,29 +346,31 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             event: EventBase,
             state_events: StateMap[EventBase],
         ) -> Tuple[bool, dict]:
+            """Modifies the content of the provided event with a different value than
+            `replace`.
+            """
             d = unfreeze(event.get_dict())
-            d["content"]["foo"] = "bar"
+            d["content"]["foo"] = "baz"
             return True, d
 
         async def allow_no_replace(
             event: EventBase,
             state_events: StateMap[EventBase],
         ) -> Tuple[bool, None]:
+            """Allows an event without modifying it."""
             return True, None
 
-        callback_replace = Mock()
-        callback_replace.side_effect = replace
+        # Wrap the callbacks in Mocks so we can check they've been called.
+        callback_replace = Mock(side_effect=replace)
+        callback_more_replace = Mock(side_effect=more_replace)
+        callback_allow_no_replace = Mock(side_effect=allow_no_replace)
 
-        callback_more_replace = Mock()
-        callback_more_replace.side_effect = more_replace
-
-        callback_allow_no_replace = Mock()
-        callback_allow_no_replace.side_effect = allow_no_replace
-
+        # Add the callbacks to the internal list.
         self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
             callback_replace, callback_more_replace, callback_allow_no_replace,
         ]
 
+        # Send and get the event.
         res = self.helper.send(self.room_id, tok=self.tok)
 
         event_id = res["event_id"]
@@ -378,6 +381,11 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.result["code"], b"200", channel.result)
 
+        # Test that:
+        #   * the event has been replaced with its new content
+        #   * the content used for the replacement is the one returned by the 1st callback
+        #   * the 2nd and 3rd callback are called despite the 1st one returning a
+        #     replacement for the event
         self.assertEqual(channel.json_body["content"]["foo"], "bar", channel.json_body)
         self.assertEqual(callback_more_replace.call_count, 1)
         self.assertEqual(callback_allow_no_replace.call_count, 1)
