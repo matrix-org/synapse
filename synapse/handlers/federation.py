@@ -135,14 +135,9 @@ class _NewEventInfo:
 
 
 class FederationHandler(BaseHandler):
-    """Handles events that originated from federation.
-    Responsible for:
-    a) handling received Pdus before handing them on as Events to the rest
-    of the homeserver (including auth and state conflict resolutions)
-    b) converting events that were produced by local clients that may need
-    to be sent to remote homeservers.
-    c) doing the necessary dances to invite remote users and join remote
-    rooms.
+    """Handles general incoming federation requests
+
+    Incoming events are *not* handled here, for which see FederationEventHandler.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -169,6 +164,7 @@ class FederationHandler(BaseHandler):
         self.http_client = hs.get_proxied_blacklisted_http_client()
         self._instance_name = hs.get_instance_name()
         self._replication = hs.get_replication_data_handler()
+        self._federation_event_handler = hs.get_federation_event_handler()
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
