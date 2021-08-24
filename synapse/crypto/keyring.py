@@ -43,7 +43,11 @@ from synapse.api.errors import (
 from synapse.config.key import TrustedKeyServer
 from synapse.events import EventBase
 from synapse.events.utils import prune_event_dict
-from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.logging.context import (
+    defer_to_thread,
+    make_deferred_yieldable,
+    run_in_background,
+)
 from synapse.storage.keys import FetchKeyResult
 from synapse.types import JsonDict
 from synapse.util import unwrapFirstError
@@ -161,6 +165,7 @@ class Keyring:
         self, hs: "HomeServer", key_fetchers: "Optional[Iterable[KeyFetcher]]" = None
     ):
         self.clock = hs.get_clock()
+        self.reactor = hs.get_reactor()
 
         if key_fetchers is None:
             key_fetchers = (
@@ -288,7 +293,9 @@ class Keyring:
             verify_key = key_result.verify_key
             json_object = verify_request.get_json_object()
             try:
-                verify_signed_json(
+                await defer_to_thread(
+                    self.reactor,
+                    verify_signed_json,
                     json_object,
                     verify_request.server_name,
                     verify_key,
