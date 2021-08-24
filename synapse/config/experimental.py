@@ -37,7 +37,7 @@ class ExperimentalConfig(Config):
         self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
 
         # MSC3244 (room version capabilities)
-        self.msc3244_enabled: bool = experimental.get("msc3244_enabled", False)
+        self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
 
         # MSC3283 (set displayname, avatar_url and change 3pid capabilities)
         self.msc3283_enabled: bool = experimental.get("msc3283_enabled", False)
