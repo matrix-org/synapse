@@ -1,3 +1,12 @@
+Synapse 1.41.0 (2021-08-24)
+===========================
+
+Features
+--------
+
+- Enable room capabilities ([MSC3244](https://github.com/matrix-org/matrix-doc/pull/3244)) by default and set room version 8 as the preferred room version for restricted rooms. ([\#10571](https://github.com/matrix-org/synapse/issues/10571))
+
+
 Synapse 1.41.0rc1 (2021-08-18)
 ==============================
 
