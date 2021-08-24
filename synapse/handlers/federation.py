@@ -135,7 +135,6 @@ class FederationHandler(BaseHandler):
         self._state_resolution_handler = hs.get_state_resolution_handler()
         self.server_name = hs.hostname
         self.keyring = hs.get_keyring()
-        self.action_generator = hs.get_action_generator()
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -2031,7 +2030,9 @@ class FederationHandler(BaseHandler):
                 )
 
         # all looks good, we can persist the event.
-        await self._run_push_actions_and_persist_event(event, context)
+        await self._federation_event_handler._run_push_actions_and_persist_event(
+            event, context
+        )
         return event, context
 
     async def _check_join_restrictions(
@@ -2204,37 +2205,9 @@ class FederationHandler(BaseHandler):
             backfilled=backfilled,
         )
 
-        await self._run_push_actions_and_persist_event(event, context, backfilled)
-
-    async def _run_push_actions_and_persist_event(
-        self, event: EventBase, context: EventContext, backfilled: bool = False
-    ):
-        """Run the push actions for a received event, and persist it.
-
-        Args:
-            event: The event itself.
-            context: The event context.
-            backfilled: True if the event was backfilled.
-        """
-        try:
-            if (
-                not event.internal_metadata.is_outlier()
-                and not backfilled
-                and not context.rejected
-                and (await self.store.get_min_depth(event.room_id)) <= event.depth
-            ):
-                await self.action_generator.handle_push_actions_for_event(
-                    event, context
-                )
-
-            await self._federation_event_handler.persist_events_and_notify(
-                event.room_id, [(event, context)], backfilled=backfilled
-            )
-        except Exception:
-            run_in_background(
-                self.store.remove_push_actions_from_staging, event.event_id
-            )
-            raise
+        await self._federation_event_handler._run_push_actions_and_persist_event(
+            event, context, backfilled
+        )
 
     async def _auth_and_persist_events(
         self,

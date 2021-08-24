@@ -25,6 +25,7 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers._base import BaseHandler
+from synapse.logging.context import run_in_background
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
@@ -67,6 +68,7 @@ class FederationEventHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
+        self.action_generator = hs.get_action_generator()
 
         self.federation_client = hs.get_federation_client()
 
@@ -506,6 +508,36 @@ class FederationEventHandler(BaseHandler):
             prev_group=prev_group,
             delta_ids=state_updates,
         )
+
+    async def _run_push_actions_and_persist_event(
+        self, event: EventBase, context: EventContext, backfilled: bool = False
+    ):
+        """Run the push actions for a received event, and persist it.
+
+        Args:
+            event: The event itself.
+            context: The event context.
+            backfilled: True if the event was backfilled.
+        """
+        try:
+            if (
+                not event.internal_metadata.is_outlier()
+                and not backfilled
+                and not context.rejected
+                and (await self.store.get_min_depth(event.room_id)) <= event.depth
+            ):
+                await self.action_generator.handle_push_actions_for_event(
+                    event, context
+                )
+
+            await self.persist_events_and_notify(
+                event.room_id, [(event, context)], backfilled=backfilled
+            )
+        except Exception:
+            run_in_background(
+                self.store.remove_push_actions_from_staging, event.event_id
+            )
+            raise
 
     async def persist_events_and_notify(
         self,
