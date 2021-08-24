@@ -74,24 +74,27 @@ to work on.
 
 # 7. Turn coffee into code and documentation!
 
-There is a growing amount of documentation located in the `docs`
+There is a growing amount of documentation located in the
+[`docs`](https://github.com/matrix-org/synapse/tree/develop/docs)
 directory, with a rendered version [available online](https://matrix-org.github.io/synapse).
 This documentation is intended primarily for sysadmins running their
 own Synapse instance, as well as developers interacting externally with
-Synapse. [`docs/development`](docs/development) exists primarily to house documentation for
-Synapse developers. [`docs/admin_api`](docs/admin_api) houses documentation
+Synapse.
+[`docs/development`](https://github.com/matrix-org/synapse/tree/develop/docs/development)
+exists primarily to house documentation for
+Synapse developers.
+[`docs/admin_api`](https://github.com/matrix-org/synapse/tree/develop/docs/admin_api) houses documentation
 regarding Synapse's Admin API, which is used mostly by sysadmins and external
 service developers.
 
-Synapse's code style is documented [here](docs/code_style.md). Please follow
+Synapse's code style is documented [here](../code_style.md). Please follow
 it, including the conventions for the [sample configuration
-file](docs/code_style.md#configuration-file-format).
+file](../code_style.md#configuration-file-format).
 
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please
 [build `docs` to a book](https://github.com/matrix-org/synapse/tree/develop/docs#adding-to-the-documentation)
-to check that your contributions render correctly. Speaking of Markdown,
-we use
+to check that your contributions render correctly. The `docs` are written in 
 [GitHub-Flavoured Markdown](https://guides.github.com/features/mastering-markdown/).
 
 Some documentation also exists in [Synapse's GitHub
@@ -412,7 +415,7 @@ By now, you know the drill!
 # Notes for maintainers on merging PRs etc
 
 There are some notes for those with commit access to the project on how we
-manage git [here](docs/development/git.md).
+manage git [here](git.md).
 
 # Conclusion
 
