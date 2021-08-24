@@ -117,6 +117,7 @@ class ModuleApi:
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._presence_router = hs.get_presence_router()
+        self._saml2_user_mapping_provider = hs.get_saml2_user_mapping_provider()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -140,6 +141,13 @@ class ModuleApi:
     def register_presence_router_callbacks(self):
         """Registers callbacks for presence router capabilities."""
         return self._presence_router.register_presence_router_callbacks
+
+    @property
+    def register_saml2_user_mapping_provider_callbacks(self):
+        """Registers callbacks for presence router capabilities."""
+        return (
+            self._saml2_user_mapping_provider.register_saml2_user_mapping_provider_callbacks
+        )
 
     def register_web_resource(self, path: str, resource: IResource):
         """Registers a web resource to be served at the given path.

@@ -213,3 +213,31 @@ def re_word_boundary(r: str) -> str:
     # we can't use \b as it chokes on unicode. however \W seems to be okay
     # as shorthand for [^0-9A-Za-z_].
     return r"(^|\W)%s(\W|$)" % (r,)
+
+
+def dict_merge(merge_dict, into_dict):
+    """Do a deep merge of two dicts
+
+    Recursively merges `merge_dict` into `into_dict`:
+      * For keys where both `merge_dict` and `into_dict` have a dict value, the values
+        are recursively merged
+      * For all other keys, the values in `into_dict` (if any) are overwritten with
+        the value from `merge_dict`.
+
+    Args:
+        merge_dict (dict): dict to merge
+        into_dict (dict): target dict
+    """
+    for k, v in merge_dict.items():
+        if k not in into_dict:
+            into_dict[k] = v
+            continue
+
+        current_val = into_dict[k]
+
+        if isinstance(v, dict) and isinstance(current_val, dict):
+            dict_merge(v, current_val)
+            continue
+
+        # otherwise we just overwrite
+        into_dict[k] = v

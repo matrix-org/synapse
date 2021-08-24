@@ -25,7 +25,7 @@ class SAML2MetadataResource(Resource):
 
     def __init__(self, hs):
         Resource.__init__(self)
-        self.sp_config = hs.config.saml2_sp_config
+        self.sp_config = hs.get_saml_handler().saml2_sp_config
 
     def render_GET(self, request):
         metadata_xml = saml2.metadata.create_metadata_string(

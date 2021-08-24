@@ -100,6 +100,7 @@ from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
 from synapse.handlers.room_summary import RoomSummaryHandler
+from synapse.handlers.saml import Saml2UserMappingProvider
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
@@ -728,6 +729,10 @@ class HomeServer(metaclass=abc.ABCMeta):
         from synapse.handlers.saml import SamlHandler
 
         return SamlHandler(self)
+
+    @cache_in_self
+    def get_saml2_user_mapping_provider(self) -> "Saml2UserMappingProvider":
+        return Saml2UserMappingProvider(self)
 
     @cache_in_self
     def get_oidc_handler(self) -> "OidcHandler":

@@ -1544,7 +1544,9 @@ saml2_config:
   #
   # Default values will be used for the 'entityid' and 'service' settings,
   # so it is not normally necessary to specify them unless you need to
-  # override them.
+  # override them. Note that setting 'service.sp.required_attributes' or
+  # 'service.sp.optional_attributes' here will override anything configured
+  # by a module that registers saml2 user mapping provider callbacks
   #
   sp_config:
     # Point this to the IdP's metadata. You must provide either a local
@@ -1622,18 +1624,14 @@ saml2_config:
   #
   #saml_session_lifetime: 5m
 
-  # An external module can be provided here as a custom solution to
-  # mapping attributes returned from a saml provider onto a matrix user.
+  # Setting for the default mapping provider which maps attributes returned
+  # from a saml provider onto a matrix user. Custom solutions can be used by
+  # adding a module that provides these features to the 'modules' config
+  # section, in which case the following section will be ignored.
   #
   user_mapping_provider:
-    # The custom module's class. Uncomment to use a custom module.
-    #
-    #module: mapping_provider.SamlMappingProvider
-
     # Custom configuration values for the module. Below options are
-    # intended for the built-in provider, they should be changed if
-    # using a custom module. This section will be passed as a Python
-    # dictionary to the module's `parse_config` method.
+    # intended for the built-in provider.
     #
     config:
       # The SAML attribute (after mapping via the attribute maps) to use

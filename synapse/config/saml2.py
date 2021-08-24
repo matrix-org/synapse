@@ -18,6 +18,7 @@ from typing import Any, List
 
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
+from synapse.util import dict_merge
 from synapse.util.module_loader import load_module, load_python_module
 
 from ._base import Config, ConfigError
@@ -31,34 +32,6 @@ DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.saml.DefaultSamlMappingProvide
 LEGACY_USER_MAPPING_PROVIDER = (
     "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
 )
-
-
-def _dict_merge(merge_dict, into_dict):
-    """Do a deep merge of two dicts
-
-    Recursively merges `merge_dict` into `into_dict`:
-      * For keys where both `merge_dict` and `into_dict` have a dict value, the values
-        are recursively merged
-      * For all other keys, the values in `into_dict` (if any) are overwritten with
-        the value from `merge_dict`.
-
-    Args:
-        merge_dict (dict): dict to merge
-        into_dict (dict): target dict
-    """
-    for k, v in merge_dict.items():
-        if k not in into_dict:
-            into_dict[k] = v
-            continue
-
-        current_val = into_dict[k]
-
-        if isinstance(v, dict) and isinstance(current_val, dict):
-            _dict_merge(v, current_val)
-            continue
-
-        # otherwise we just overwrite
-        into_dict[k] = v
 
 
 class SAML2Config(Config):
@@ -99,11 +72,15 @@ class SAML2Config(Config):
         ump_dict = saml2_config.get("user_mapping_provider") or {}
 
         # Use the default user mapping provider if not set
+        # NOTE this is the legacy way of using custom modules
+        # New style-modules should be placed in the 'modules:' config section
         ump_dict.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
         if ump_dict.get("module") == LEGACY_USER_MAPPING_PROVIDER:
             ump_dict["module"] = DEFAULT_USER_MAPPING_PROVIDER
 
         # Ensure a config is present
+        # This is the config for the default mapping provider, or the legacy
+        # way of configuring a custom module
         ump_dict["config"] = ump_dict.get("config") or {}
 
         if ump_dict["module"] == DEFAULT_USER_MAPPING_PROVIDER:
@@ -132,59 +109,30 @@ class SAML2Config(Config):
             self.saml2_user_mapping_provider_config,
         ) = load_module(ump_dict, ("saml2_config", "user_mapping_provider"))
 
-        # Ensure loaded user mapping module has defined all necessary methods
-        # Note parse_config() is already checked during the call to load_module
-        required_methods = [
-            "get_saml_attributes",
-            "saml_response_to_user_attributes",
-            "get_remote_user_id",
-        ]
-        missing_methods = [
-            method
-            for method in required_methods
-            if not hasattr(self.saml2_user_mapping_provider_class, method)
-        ]
-        if missing_methods:
-            raise ConfigError(
-                "Class specified by saml2_config."
-                "user_mapping_provider.module is missing required "
-                "methods: %s" % (", ".join(missing_methods),)
-            )
-
-        # Get the desired saml auth response attributes from the module
-        saml2_config_dict = self._default_saml_config_dict(
-            *self.saml2_user_mapping_provider_class.get_saml_attributes(
-                self.saml2_user_mapping_provider_config
-            )
-        )
-        _dict_merge(
-            merge_dict=saml2_config.get("sp_config", {}), into_dict=saml2_config_dict
+        # This is only the *base* config since a custom user mapping provider can change
+        # the values of 'service.sp.required_attributes' and 'service.sp.optional_attributes'
+        self.base_sp_config = self._default_sp_config_dict()
+        dict_merge(
+            merge_dict=saml2_config.get("sp_config", {}), into_dict=self.base_sp_config
         )
 
-        config_path = saml2_config.get("config_path", None)
-        if config_path is not None:
-            mod = load_python_module(config_path)
-            config = getattr(mod, "CONFIG", None)
-            if config is None:
+        sp_config_path = saml2_config.get("config_path", None)
+        if sp_config_path is not None:
+            mod = load_python_module(sp_config_path)
+            sp_config_from_file = getattr(mod, "CONFIG", None)
+            if sp_config_from_file is None:
                 raise ConfigError(
                     "Config path specified by saml2_config.config_path does not "
                     "have a CONFIG property."
                 )
-            _dict_merge(merge_dict=config, into_dict=saml2_config_dict)
-
-        import saml2.config
-
-        self.saml2_sp_config = saml2.config.SPConfig()
-        self.saml2_sp_config.load(saml2_config_dict)
+            dict_merge(merge_dict=sp_config_from_file, into_dict=self.base_sp_config)
 
         # session lifetime: in milliseconds
         self.saml2_session_lifetime = self.parse_duration(
             saml2_config.get("saml_session_lifetime", "15m")
         )
 
-    def _default_saml_config_dict(
-        self, required_attributes: set, optional_attributes: set
-    ):
+    def _default_sp_config_dict(self):
         """Generate a configuration dictionary with required and optional attributes that
         will be needed to process new user registration
 
@@ -203,10 +151,6 @@ class SAML2Config(Config):
         if public_baseurl is None:
             raise ConfigError("saml2_config requires a public_baseurl to be set")
 
-        if self.saml2_grandfathered_mxid_source_attribute:
-            optional_attributes.add(self.saml2_grandfathered_mxid_source_attribute)
-        optional_attributes -= required_attributes
-
         metadata_url = public_baseurl + "_synapse/client/saml2/metadata.xml"
         response_url = public_baseurl + "_synapse/client/saml2/authn_response"
         return {
@@ -218,8 +162,6 @@ class SAML2Config(Config):
                             (response_url, saml2.BINDING_HTTP_POST)
                         ]
                     },
-                    "required_attributes": list(required_attributes),
-                    "optional_attributes": list(optional_attributes),
                     # "name_id_format": saml2.saml.NAMEID_FORMAT_PERSISTENT,
                 }
             },
@@ -257,7 +199,9 @@ class SAML2Config(Config):
           #
           # Default values will be used for the 'entityid' and 'service' settings,
           # so it is not normally necessary to specify them unless you need to
-          # override them.
+          # override them. Note that setting 'service.sp.required_attributes' or
+          # 'service.sp.optional_attributes' here will override anything configured
+          # by a module that registers saml2 user mapping provider callbacks
           #
           sp_config:
             # Point this to the IdP's metadata. You must provide either a local
@@ -335,18 +279,14 @@ class SAML2Config(Config):
           #
           #saml_session_lifetime: 5m
 
-          # An external module can be provided here as a custom solution to
-          # mapping attributes returned from a saml provider onto a matrix user.
+          # Setting for the default mapping provider which maps attributes returned
+          # from a saml provider onto a matrix user. Custom solutions can be used by
+          # adding a module that provides these features to the 'modules' config
+          # section, in which case the following section will be ignored.
           #
           user_mapping_provider:
-            # The custom module's class. Uncomment to use a custom module.
-            #
-            #module: mapping_provider.SamlMappingProvider
-
             # Custom configuration values for the module. Below options are
-            # intended for the built-in provider, they should be changed if
-            # using a custom module. This section will be passed as a Python
-            # dictionary to the module's `parse_config` method.
+            # intended for the built-in provider.
             #
             config:
               # The SAML attribute (after mapping via the attribute maps) to use
