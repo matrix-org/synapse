@@ -15,7 +15,7 @@
 
 
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -414,9 +414,9 @@ class ThumbnailResource(DirectServeJsonResource):
 
         if desired_method == "crop":
             # Thumbnails that match equal or larger sizes of desired width/height.
-            crop_info_list = []
+            crop_info_list: List[Tuple[int, int, int, bool, int, Dict[str, Any]]] = []
             # Other thumbnails.
-            crop_info_list2 = []
+            crop_info_list2: List[Tuple[int, int, int, bool, int, Dict[str, Any]]] = []
             for info in thumbnail_infos:
                 # Skip thumbnails generated with different methods.
                 if info["thumbnail_method"] != "crop":
@@ -457,9 +457,9 @@ class ThumbnailResource(DirectServeJsonResource):
                 thumbnail_info = min(crop_info_list2)[-1]
         elif desired_method == "scale":
             # Thumbnails that match equal or larger sizes of desired width/height.
-            info_list = []
+            info_list: List[Tuple[int, bool, int, Dict[str, Any]]] = []
             # Other thumbnails.
-            info_list2 = []
+            info_list2: List[Tuple[int, bool, int, Dict[str, Any]]] = []
 
             for info in thumbnail_infos:
                 # Skip thumbnails generated with different methods.
