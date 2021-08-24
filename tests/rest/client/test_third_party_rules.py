@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import threading
-from typing import Dict
+from typing import Dict, Tuple
 from unittest.mock import Mock
 
 from synapse.events import EventBase
@@ -327,3 +327,57 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         correctly.
         """
         self.helper.create_room_as(self.user_id, tok=self.tok, expect_code=403)
+
+    @unittest.DEBUG
+    def test_replacing_does_not_skip(self):
+        """Tests that returning replacement content for an event in a check_event_allowed
+        callback doesn't skip subsequent callbacks.
+        """
+        async def replace(
+            event: EventBase,
+            state_events: StateMap[EventBase],
+        ) -> Tuple[bool, dict]:
+            d = unfreeze(event.get_dict())
+            d["content"]["foo"] = "bar"
+            return True, d
+
+        async def more_replace(
+            event: EventBase,
+            state_events: StateMap[EventBase],
+        ) -> Tuple[bool, dict]:
+            d = unfreeze(event.get_dict())
+            d["content"]["foo"] = "bar"
+            return True, d
+
+        async def allow_no_replace(
+            event: EventBase,
+            state_events: StateMap[EventBase],
+        ) -> Tuple[bool, None]:
+            return True, None
+
+        callback_replace = Mock()
+        callback_replace.side_effect = replace
+
+        callback_more_replace = Mock()
+        callback_more_replace.side_effect = more_replace
+
+        callback_allow_no_replace = Mock()
+        callback_allow_no_replace.side_effect = allow_no_replace
+
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
+            callback_replace, callback_more_replace, callback_allow_no_replace,
+        ]
+
+        res = self.helper.send(self.room_id, tok=self.tok)
+
+        event_id = res["event_id"]
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+
+        self.assertEqual(channel.json_body["content"]["foo"], "bar", channel.json_body)
+        self.assertEqual(callback_more_replace.call_count, 1)
+        self.assertEqual(callback_allow_no_replace.call_count, 1)
