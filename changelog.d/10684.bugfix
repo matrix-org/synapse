@@ -1,1 +1,1 @@
-Fix edge case error when requesting thumbnails.
+Fix error when a thumbnail is requested and there are multiple thumbnails with the same quality rating.
