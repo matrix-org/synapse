@@ -82,14 +82,7 @@ from synapse.replication.http.federation import (
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
-from synapse.types import (
-    JsonDict,
-    PersistedEventPosition,
-    RoomStreamToken,
-    StateMap,
-    UserID,
-    get_domain_from_id,
-)
+from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer, concurrently_execute
 from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
@@ -2872,46 +2865,11 @@ class FederationHandler(BaseHandler):
 
             if not backfilled:  # Never notify for backfilled events
                 for event in events:
-                    await self._notify_persisted_event(event, max_stream_token)
+                    await self._federation_event_handler._notify_persisted_event(
+                        event, max_stream_token
+                    )
 
             return max_stream_token.stream
-
-    async def _notify_persisted_event(
-        self, event: EventBase, max_stream_token: RoomStreamToken
-    ) -> None:
-        """Checks to see if notifier/pushers should be notified about the
-        event or not.
-
-        Args:
-            event:
-            max_stream_id: The max_stream_id returned by persist_events
-        """
-
-        extra_users = []
-        if event.type == EventTypes.Member:
-            target_user_id = event.state_key
-
-            # We notify for memberships if its an invite for one of our
-            # users
-            if event.internal_metadata.is_outlier():
-                if event.membership != Membership.INVITE:
-                    if not self.is_mine_id(target_user_id):
-                        return
-
-            target_user = UserID.from_string(target_user_id)
-            extra_users.append(target_user)
-        elif event.internal_metadata.is_outlier():
-            return
-
-        # the event has been persisted so it should have a stream ordering.
-        assert event.internal_metadata.stream_ordering
-
-        event_pos = PersistedEventPosition(
-            self._instance_name, event.internal_metadata.stream_ordering
-        )
-        self.notifier.on_new_room_event(
-            event, event_pos, max_stream_token, extra_users=extra_users
-        )
 
     async def _clean_room_for_join(self, room_id: str) -> None:
         """Called to clean up any data in DB for a given room, ready for the

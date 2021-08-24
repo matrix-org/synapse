@@ -18,14 +18,20 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 from prometheus_client import Counter
 
 from synapse import event_auth
-from synapse.api.constants import EventTypes, RejectedReason
+from synapse.api.constants import EventTypes, Membership, RejectedReason
 from synapse.api.errors import AuthError, RequestSendFailed
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers._base import BaseHandler
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import (
+    MutableStateMap,
+    PersistedEventPosition,
+    RoomStreamToken,
+    StateMap,
+    UserID,
+)
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -58,6 +64,9 @@ class FederationEventHandler(BaseHandler):
         self._event_auth_handler = hs.get_event_auth_handler()
 
         self.federation_client = hs.get_federation_client()
+
+        self.is_mine_id = hs.is_mine_id
+        self._instance_name = hs.get_instance_name()
 
         # TODO: remove once we don't need to call back to the FederationHandler
         self._hs = hs
@@ -486,4 +495,41 @@ class FederationEventHandler(BaseHandler):
             prev_state_ids=prev_state_ids,
             prev_group=prev_group,
             delta_ids=state_updates,
+        )
+
+    async def _notify_persisted_event(
+        self, event: EventBase, max_stream_token: RoomStreamToken
+    ) -> None:
+        """Checks to see if notifier/pushers should be notified about the
+        event or not.
+
+        Args:
+            event:
+            max_stream_token: The max_stream_id returned by persist_events
+        """
+
+        extra_users = []
+        if event.type == EventTypes.Member:
+            target_user_id = event.state_key
+
+            # We notify for memberships if its an invite for one of our
+            # users
+            if event.internal_metadata.is_outlier():
+                if event.membership != Membership.INVITE:
+                    if not self.is_mine_id(target_user_id):
+                        return
+
+            target_user = UserID.from_string(target_user_id)
+            extra_users.append(target_user)
+        elif event.internal_metadata.is_outlier():
+            return
+
+        # the event has been persisted so it should have a stream ordering.
+        assert event.internal_metadata.stream_ordering
+
+        event_pos = PersistedEventPosition(
+            self._instance_name, event.internal_metadata.stream_ordering
+        )
+        self.notifier.on_new_room_event(
+            event, event_pos, max_stream_token, extra_users=extra_users
         )
