@@ -85,7 +85,7 @@ class MultiKeyResponseCache(Generic[KV]):
     def __len__(self) -> int:
         return self.size()
 
-    def get(self, key: KV) -> Optional[defer.Deferred]:
+    def get(self, key: KV) -> "Optional[defer.Deferred[RV]]":
         """Look up the given key.
 
         Returns a new Deferred (which also doesn't follow the synapse
@@ -110,7 +110,7 @@ class MultiKeyResponseCache(Generic[KV]):
 
     def _set(
         self, context: MultiKeyResponseCacheContext[KV], deferred: defer.Deferred
-    ) -> defer.Deferred:
+    ) -> "defer.Deferred[RV]":
         """Set the entry for the given key to the given deferred.
 
         *deferred* should run its callbacks in the sentinel logcontext (ie,
@@ -164,7 +164,7 @@ class MultiKeyResponseCache(Generic[KV]):
         *args: Any,
         cache_context: bool = False,
         **kwargs: Any,
-    ) -> defer.Deferred[RV]:
+    ) -> "defer.Deferred[RV]":
         """Perform a *set* call, taking care of logcontexts
 
         Makes a call to *callback(*args, **kwargs)*, which should
