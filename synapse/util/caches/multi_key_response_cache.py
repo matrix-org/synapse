@@ -54,7 +54,7 @@ class MultiKeyResponseCacheContext(Generic[KV]):
     """
 
 
-class MultiKeyResponseCache(Generic[KV]):
+class MultiKeyResponseCache(Generic[KV, RV]):
     """
     This caches a deferred response. Until the deferred completes it will be
     returned from the cache. This means that if the client retries the request
@@ -69,7 +69,7 @@ class MultiKeyResponseCache(Generic[KV]):
         # This is poorly-named: it includes both complete and incomplete results.
         # We keep complete results rather than switching to absolute values because
         # that makes it easier to cache Failure results.
-        self.pending_result_cache: Dict[KV, ObservableDeferred] = {}
+        self.pending_result_cache: Dict[KV, ObservableDeferred[RV]] = {}
 
         self.clock = clock
         self.timeout_sec = timeout_ms / 1000.0
@@ -109,7 +109,7 @@ class MultiKeyResponseCache(Generic[KV]):
             return None
 
     def _set(
-        self, context: MultiKeyResponseCacheContext[KV], deferred: defer.Deferred
+        self, context: MultiKeyResponseCacheContext[KV], deferred: "defer.Deferred[RV]"
     ) -> "defer.Deferred[RV]":
         """Set the entry for the given key to the given deferred.
 

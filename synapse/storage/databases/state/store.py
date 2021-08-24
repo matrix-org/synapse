@@ -38,6 +38,12 @@ logger = logging.getLogger(__name__)
 # XXX
 UNKNOWN = Any  # TODO
 
+
+InflightStateGroupCacheKey = Union[
+    Tuple[int, StateFilter], Tuple[int, str, Optional[str]]
+]
+
+
 MAX_STATE_DELTA_HOPS = 100
 
 
@@ -99,9 +105,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             500000,
         )
 
-        # XXX ADD TYPE
         self._state_group_inflight_cache: MultiKeyResponseCache[
-            ...
+            InflightStateGroupCacheKey, Dict[int, StateMap[str]]
         ] = MultiKeyResponseCache(
             self.hs.get_clock(),
             "*stateGroupInflightCache*",
@@ -418,9 +423,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             # make a list of keys for us to store in the in-flight cache
             # this should list all the keys that the request will pick up from
             # the database.
-            keys: List[
-                Union[Tuple[int, StateFilter], Tuple[int, str, Optional[str]]]
-            ] = []
+            keys: List[InflightStateGroupCacheKey] = []
             for group in inflight_cache_misses:
                 if db_state_filter.include_others:
                     # We can't properly add cache keys for all the 'other'
