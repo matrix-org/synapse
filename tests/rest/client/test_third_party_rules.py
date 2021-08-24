@@ -333,6 +333,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         """Tests that returning replacement content for an event in a check_event_allowed
         callback doesn't skip subsequent callbacks.
         """
+
         async def replace(
             event: EventBase,
             state_events: StateMap[EventBase],
@@ -367,7 +368,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
         # Add the callbacks to the internal list.
         self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
-            callback_replace, callback_more_replace, callback_allow_no_replace,
+            callback_replace,
+            callback_more_replace,
+            callback_allow_no_replace,
         ]
 
         # Send and get the event.
