@@ -423,10 +423,13 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             ] = []
             for group in inflight_cache_misses:
                 if db_state_filter.include_others:
-                    # we can't intelligently cache include_others under any other keys
-                    # because we don't know what keys are included.
+                    # We can't properly add cache keys for all the 'other'
+                    # state keys that `include_others` specifies (since there are
+                    # an unlimited number of 'other' state keys), but we can
+                    # add a cache key with the exact state filter in use
+                    # (in addition to cache keys specifying the definite state
+                    # keys we are requesting).
                     keys.append((group, db_state_filter))
-                    continue
 
                 for event_type, state_keys in db_state_filter.types.items():
                     if state_keys is None:
