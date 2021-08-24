@@ -1,6 +1,6 @@
 # Contributing
 
-This document aims to get you started with contributing to this repo!
+This document aims to get you started with contributing to Synapse!
 
 # 1. Who can contribute to Synapse?
 
