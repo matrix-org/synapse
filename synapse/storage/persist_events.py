@@ -170,7 +170,9 @@ class _EventPeristenceQueue(Generic[_PersistResult]):
             end_item = queue[-1]
         else:
             # need to make a new queue item
-            deferred = ObservableDeferred(defer.Deferred(), consumeErrors=True)
+            deferred: ObservableDeferred[_PersistResult] = ObservableDeferred(
+                defer.Deferred(), consumeErrors=True
+            )
 
             end_item = _EventPersistQueueItem(
                 events_and_contexts=[],
@@ -307,7 +309,7 @@ class EventsPersistenceStorage:
             matched the transcation ID; the existing event is returned in such
             a case.
         """
-        partitioned = {}  # type: Dict[str, List[Tuple[EventBase, EventContext]]]
+        partitioned: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
         for event, ctx in events_and_contexts:
             partitioned.setdefault(event.room_id, []).append((event, ctx))
 
@@ -384,7 +386,7 @@ class EventsPersistenceStorage:
             A dictionary of event ID to event ID we didn't persist as we already
             had another event persisted with the same TXN ID.
         """
-        replaced_events = {}  # type: Dict[str, str]
+        replaced_events: Dict[str, str] = {}
         if not events_and_contexts:
             return replaced_events
 
@@ -440,16 +442,14 @@ class EventsPersistenceStorage:
             # Set of remote users which were in rooms the server has left. We
             # should check if we still share any rooms and if not we mark their
             # device lists as stale.
-            potentially_left_users = set()  # type: Set[str]
+            potentially_left_users: Set[str] = set()
 
             if not backfilled:
                 with Measure(self._clock, "_calculate_state_and_extrem"):
                     # Work out the new "current state" for each room.
                     # We do this by working out what the new extremities are and then
                     # calculating the state from that.
-                    events_by_room = (
-                        {}
-                    )  # type: Dict[str, List[Tuple[EventBase, EventContext]]]
+                    events_by_room: Dict[str, List[Tuple[EventBase, EventContext]]] = {}
                     for event, context in chunk:
                         events_by_room.setdefault(event.room_id, []).append(
                             (event, context)
@@ -622,9 +622,9 @@ class EventsPersistenceStorage:
         )
 
         # Remove any events which are prev_events of any existing events.
-        existing_prevs = await self.persist_events_store._get_events_which_are_prevs(
-            result
-        )  # type: Collection[str]
+        existing_prevs: Collection[
+            str
+        ] = await self.persist_events_store._get_events_which_are_prevs(result)
         result.difference_update(existing_prevs)
 
         # Finally handle the case where the new events have soft-failed prev

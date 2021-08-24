@@ -73,7 +73,7 @@ https://hub.docker.com/r/matrixdotorg/synapse/.
 To make effective use of the workers, you will need to configure an HTTP
 reverse-proxy such as nginx or haproxy, which will direct incoming requests to
 the correct worker, or to the main synapse instance. See
-[reverse_proxy.md](reverse_proxy.md) for information on setting up a reverse
+[the reverse proxy documentation](reverse_proxy.md) for information on setting up a reverse
 proxy.
 
 When using workers, each worker process has its own configuration file which
@@ -170,8 +170,8 @@ Finally, you need to start your worker processes. This can be done with either
 `synctl` or your distribution's preferred service manager such as `systemd`. We
 recommend the use of `systemd` where available: for information on setting up
 `systemd` to start synapse workers, see
-[systemd-with-workers](systemd-with-workers). To use `synctl`, see
-[synctl_workers.md](synctl_workers.md).
+[Systemd with Workers](systemd-with-workers). To use `synctl`, see
+[Using synctl with Workers](synctl_workers.md).
 
 
 ## Available worker applications
@@ -214,6 +214,7 @@ expressions:
     ^/_matrix/federation/v1/send/
 
     # Client API requests
+    ^/_matrix/client/(api/v1|r0|unstable)/createRoom$
     ^/_matrix/client/(api/v1|r0|unstable)/publicRooms$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/joined_members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
@@ -235,6 +236,7 @@ expressions:
     # Registration/login requests
     ^/_matrix/client/(api/v1|r0|unstable)/login$
     ^/_matrix/client/(r0|unstable)/register$
+    ^/_matrix/client/unstable/org.matrix.msc3231/register/org.matrix.msc3231.login.registration_token/validity$
 
     # Event sending requests
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/redact
@@ -425,10 +427,12 @@ Handles the media repository. It can handle all endpoints starting with:
     ^/_synapse/admin/v1/user/.*/media.*$
     ^/_synapse/admin/v1/media/.*$
     ^/_synapse/admin/v1/quarantine_media/.*$
+    ^/_synapse/admin/v1/users/.*/media$
 
 You should also set `enable_media_repo: False` in the shared configuration
 file to stop the main synapse running background jobs related to managing the
-media repository.
+media repository. Note that doing so will prevent the main process from being
+able to handle the above endpoints.
 
 In the `media_repository` worker configuration file, configure the http listener to
 expose the `media` resource. For example:

@@ -127,9 +127,6 @@ class DataStore(
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        self._public_room_id_gen = StreamIdGenerator(
-            db_conn, "public_room_list_stream", "stream_id"
-        )
         self._device_list_id_gen = StreamIdGenerator(
             db_conn,
             "device_lists_stream",
@@ -170,6 +167,7 @@ class DataStore(
                 sequence_name="cache_invalidation_stream_seq",
                 writers=[],
             )
+
         else:
             self._cache_id_gen = None
 
@@ -249,7 +247,7 @@ class DataStore(
         name: Optional[str] = None,
         guests: bool = True,
         deactivated: bool = False,
-        order_by: UserSortOrder = UserSortOrder.USER_ID.value,
+        order_by: str = UserSortOrder.USER_ID.value,
         direction: str = "f",
     ) -> Tuple[List[JsonDict], int]:
         """Function to retrieve a paginated list of users from
@@ -297,27 +295,22 @@ class DataStore(
 
             where_clause = "WHERE " + " AND ".join(filters) if len(filters) > 0 else ""
 
-            sql_base = """
+            sql_base = f"""
                 FROM users as u
                 LEFT JOIN profiles AS p ON u.name = '@' || p.user_id || ':' || ?
-                {}
-                """.format(
-                where_clause
-            )
+                {where_clause}
+                """
             sql = "SELECT COUNT(*) as total_users " + sql_base
             txn.execute(sql, args)
             count = txn.fetchone()[0]
 
-            sql = """
-                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned, displayname, avatar_url
+            sql = f"""
+                SELECT name, user_type, is_guest, admin, deactivated, shadow_banned,
+                displayname, avatar_url, creation_ts * 1000 as creation_ts
                 {sql_base}
                 ORDER BY {order_by_column} {order}, u.name ASC
                 LIMIT ? OFFSET ?
-            """.format(
-                sql_base=sql_base,
-                order_by_column=order_by_column,
-                order=order,
-            )
+            """
             args += [limit, start]
             txn.execute(sql, args)
             users = self.db_pool.cursor_to_dict(txn)

@@ -43,6 +43,7 @@ from twisted.internet import defer
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import IReactorTime
 from twisted.internet.task import _EPSILON, Cooperator
+from twisted.web.client import ResponseFailed
 from twisted.web.http_headers import Headers
 from twisted.web.iweb import IBodyProducer, IResponse
 
@@ -58,7 +59,6 @@ from synapse.api.errors import (
 from synapse.http import QuieterFileBodyProducer
 from synapse.http.client import (
     BlacklistingAgentWrapper,
-    BlacklistingReactorWrapper,
     BodyExceededMaxSize,
     ByteWriteable,
     encode_query_args,
@@ -68,7 +68,7 @@ from synapse.http.federation.matrix_federation_agent import MatrixFederationAgen
 from synapse.logging import opentracing
 from synapse.logging.context import make_deferred_yieldable
 from synapse.logging.opentracing import set_tag, start_active_span, tags
-from synapse.types import ISynapseReactor, JsonDict
+from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import timeout_deferred
 from synapse.util.metrics import Measure
@@ -105,7 +105,7 @@ class ByteParser(ByteWriteable, Generic[T], abc.ABC):
     the parsed data.
     """
 
-    CONTENT_TYPE = abc.abstractproperty()  # type: str  # type: ignore
+    CONTENT_TYPE: str = abc.abstractproperty()  # type: ignore
     """The expected content type of the response, e.g. `application/json`. If
     the content type doesn't match we fail the request.
     """
@@ -262,6 +262,15 @@ async def _handle_response(
             request.uri.decode("ascii"),
         )
         raise RequestSendFailed(e, can_retry=True) from e
+    except ResponseFailed as e:
+        logger.warning(
+            "{%s} [%s] Failed to read response - %s %s",
+            request.txn_id,
+            request.destination,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=True) from e
     except Exception as e:
         logger.warning(
             "{%s} [%s] Error reading response %s %s: %s",
@@ -315,13 +324,7 @@ class MatrixFederationHttpClient:
         self.signing_key = hs.signing_key
         self.server_name = hs.hostname
 
-        # We need to use a DNS resolver which filters out blacklisted IP
-        # addresses, to prevent DNS rebinding.
-        self.reactor = BlacklistingReactorWrapper(
-            hs.get_reactor(),
-            hs.config.federation_ip_range_whitelist,
-            hs.config.federation_ip_range_blacklist,
-        )  # type: ISynapseReactor
+        self.reactor = hs.get_reactor()
 
         user_agent = hs.version_string
         if hs.config.user_agent_suffix:
@@ -332,6 +335,7 @@ class MatrixFederationHttpClient:
             self.reactor,
             tls_client_options_factory,
             user_agent,
+            hs.config.federation_ip_range_whitelist,
             hs.config.federation_ip_range_blacklist,
         )
 
@@ -494,7 +498,7 @@ class MatrixFederationHttpClient:
         )
 
         # Inject the span into the headers
-        headers_dict = {}  # type: Dict[bytes, List[bytes]]
+        headers_dict: Dict[bytes, List[bytes]] = {}
         opentracing.inject_header_dict(headers_dict, request.destination)
 
         headers_dict[b"User-Agent"] = [self.version_string_bytes]
@@ -523,9 +527,9 @@ class MatrixFederationHttpClient:
                             destination_bytes, method_bytes, url_to_sign_bytes, json
                         )
                         data = encode_canonical_json(json)
-                        producer = QuieterFileBodyProducer(
+                        producer: Optional[IBodyProducer] = QuieterFileBodyProducer(
                             BytesIO(data), cooperator=self._cooperator
-                        )  # type: Optional[IBodyProducer]
+                        )
                     else:
                         producer = None
                         auth_headers = self.build_auth_headers(
@@ -1137,6 +1141,24 @@ class MatrixFederationHttpClient:
                 msg,
             )
             raise SynapseError(502, msg, Codes.TOO_LARGE)
+        except defer.TimeoutError as e:
+            logger.warning(
+                "{%s} [%s] Timed out reading response - %s %s",
+                request.txn_id,
+                request.destination,
+                request.method,
+                request.uri.decode("ascii"),
+            )
+            raise RequestSendFailed(e, can_retry=True) from e
+        except ResponseFailed as e:
+            logger.warning(
+                "{%s} [%s] Failed to read response - %s %s",
+                request.txn_id,
+                request.destination,
+                request.method,
+                request.uri.decode("ascii"),
+            )
+            raise RequestSendFailed(e, can_retry=True) from e
         except Exception as e:
             logger.warning(
                 "{%s} [%s] Error reading response: %s",

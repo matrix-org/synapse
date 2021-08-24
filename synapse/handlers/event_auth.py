@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import TYPE_CHECKING, Collection, List, Optional, Union
 
 from synapse import event_auth
@@ -20,15 +21,17 @@ from synapse.api.constants import (
     Membership,
     RestrictedJoinRuleTypes,
 )
-from synapse.api.errors import AuthError
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
-from synapse.types import StateMap
+from synapse.types import StateMap, get_domain_from_id
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
+
+logger = logging.getLogger(__name__)
 
 
 class EventAuthHandler:
@@ -39,6 +42,7 @@ class EventAuthHandler:
     def __init__(self, hs: "HomeServer"):
         self._clock = hs.get_clock()
         self._store = hs.get_datastore()
+        self._server_name = hs.hostname
 
     async def check_from_context(
         self, room_version: str, event, context, do_sig_check=True
@@ -81,14 +85,75 @@ class EventAuthHandler:
         # introduce undesirable "state reset" behaviour.
         #
         # All of which sounds a bit tricky so we don't bother for now.
-
         auth_ids = []
-        for etype, state_key in event_auth.auth_types_for_event(event):
+        for etype, state_key in event_auth.auth_types_for_event(
+            event.room_version, event
+        ):
             auth_ev_id = current_state_ids.get((etype, state_key))
             if auth_ev_id:
                 auth_ids.append(auth_ev_id)
 
         return auth_ids
+
+    async def get_user_which_could_invite(
+        self, room_id: str, current_state_ids: StateMap[str]
+    ) -> str:
+        """
+        Searches the room state for a local user who has the power level necessary
+        to invite other users.
+
+        Args:
+            room_id: The room ID under search.
+            current_state_ids: The current state of the room.
+
+        Returns:
+            The MXID of the user which could issue an invite.
+
+        Raises:
+            SynapseError if no appropriate user is found.
+        """
+        power_level_event_id = current_state_ids.get((EventTypes.PowerLevels, ""))
+        invite_level = 0
+        users_default_level = 0
+        if power_level_event_id:
+            power_level_event = await self._store.get_event(power_level_event_id)
+            invite_level = power_level_event.content.get("invite", invite_level)
+            users_default_level = power_level_event.content.get(
+                "users_default", users_default_level
+            )
+            users = power_level_event.content.get("users", {})
+        else:
+            users = {}
+
+        # Find the user with the highest power level.
+        users_in_room = await self._store.get_users_in_room(room_id)
+        # Only interested in local users.
+        local_users_in_room = [
+            u for u in users_in_room if get_domain_from_id(u) == self._server_name
+        ]
+        chosen_user = max(
+            local_users_in_room,
+            key=lambda user: users.get(user, users_default_level),
+            default=None,
+        )
+
+        # Return the chosen if they can issue invites.
+        user_power_level = users.get(chosen_user, users_default_level)
+        if chosen_user and user_power_level >= invite_level:
+            logger.debug(
+                "Found a user who can issue invites  %s with power level %d >= invite level %d",
+                chosen_user,
+                user_power_level,
+                invite_level,
+            )
+            return chosen_user
+
+        # No user was found.
+        raise SynapseError(
+            400,
+            "Unable to find a user which could issue an invite",
+            Codes.UNABLE_TO_GRANT_JOIN,
+        )
 
     async def check_host_in_room(self, room_id: str, host: str) -> bool:
         with Measure(self._clock, "check_host_in_room"):
@@ -134,9 +199,21 @@ class EventAuthHandler:
         # in any of them.
         allowed_rooms = await self.get_rooms_that_allow_join(state_ids)
         if not await self.is_user_in_rooms(allowed_rooms, user_id):
+
+            # If this is a remote request, the user might be in an allowed room
+            # that we do not know about.
+            if get_domain_from_id(user_id) != self._server_name:
+                for room_id in allowed_rooms:
+                    if not await self._store.is_host_joined(room_id, self._server_name):
+                        raise SynapseError(
+                            400,
+                            f"Unable to check if {user_id} is in allowed rooms.",
+                            Codes.UNABLE_AUTHORISE_JOIN,
+                        )
+
             raise AuthError(
                 403,
-                "You do not belong to any of the required rooms to join this room.",
+                "You do not belong to any of the required rooms/spaces to join this room.",
             )
 
     async def has_restricted_join_rules(
@@ -163,7 +240,7 @@ class EventAuthHandler:
 
         # If the join rule is not restricted, this doesn't apply.
         join_rules_event = await self._store.get_event(join_rules_event_id)
-        return join_rules_event.content.get("join_rule") == JoinRules.MSC3083_RESTRICTED
+        return join_rules_event.content.get("join_rule") == JoinRules.RESTRICTED
 
     async def get_rooms_that_allow_join(
         self, state_ids: StateMap[str]

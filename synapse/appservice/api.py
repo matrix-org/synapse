@@ -88,9 +88,9 @@ class ApplicationServiceApi(SimpleHttpClient):
         super().__init__(hs)
         self.clock = hs.get_clock()
 
-        self.protocol_meta_cache = ResponseCache(
+        self.protocol_meta_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "as_protocol_meta", timeout_ms=HOUR_IN_MS
-        )  # type: ResponseCache[Tuple[str, str]]
+        )
 
     async def query_user(self, service, user_id):
         if service.url is None:

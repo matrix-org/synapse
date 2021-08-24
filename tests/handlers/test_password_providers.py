@@ -20,8 +20,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 import synapse
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import devices
+from synapse.rest.client import devices, login
 from synapse.types import JsonDict
 
 from tests import unittest
