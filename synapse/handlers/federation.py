@@ -33,7 +33,6 @@ from typing import (
 )
 
 import attr
-from prometheus_client import Counter
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
@@ -61,7 +60,6 @@ from synapse.api.errors import (
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion, RoomVersions
 from synapse.crypto.event_signing import compute_event_signature
-from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
@@ -102,11 +100,6 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
-
-soft_failed_event_counter = Counter(
-    "synapse_federation_soft_failed_events_total",
-    "Events received over federation that we marked as soft_failed",
-)
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -2411,104 +2404,6 @@ class FederationHandler(BaseHandler):
             room_id, [(event, new_event_context)]
         )
 
-    async def _check_for_soft_fail(
-        self,
-        event: EventBase,
-        state: Optional[Iterable[EventBase]],
-        backfilled: bool,
-        origin: str,
-    ) -> None:
-        """Checks if we should soft fail the event; if so, marks the event as
-        such.
-
-        Args:
-            event
-            state: The state at the event if we don't have all the event's prev events
-            backfilled: Whether the event is from backfill
-            origin: The host the event originates from.
-        """
-        # For new (non-backfilled and non-outlier) events we check if the event
-        # passes auth based on the current state. If it doesn't then we
-        # "soft-fail" the event.
-        if backfilled or event.internal_metadata.is_outlier():
-            return
-
-        extrem_ids_list = await self.store.get_latest_event_ids_in_room(event.room_id)
-        extrem_ids = set(extrem_ids_list)
-        prev_event_ids = set(event.prev_event_ids())
-
-        if extrem_ids == prev_event_ids:
-            # If they're the same then the current state is the same as the
-            # state at the event, so no point rechecking auth for soft fail.
-            return
-
-        room_version = await self.store.get_room_version_id(event.room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
-        # Calculate the "current state".
-        if state is not None:
-            # If we're explicitly given the state then we won't have all the
-            # prev events, and so we have a gap in the graph. In this case
-            # we want to be a little careful as we might have been down for
-            # a while and have an incorrect view of the current state,
-            # however we still want to do checks as gaps are easy to
-            # maliciously manufacture.
-            #
-            # So we use a "current state" that is actually a state
-            # resolution across the current forward extremities and the
-            # given state at the event. This should correctly handle cases
-            # like bans, especially with state res v2.
-
-            state_sets_d = await self.state_store.get_state_groups(
-                event.room_id, extrem_ids
-            )
-            state_sets: List[Iterable[EventBase]] = list(state_sets_d.values())
-            state_sets.append(state)
-            current_states = await self.state_handler.resolve_events(
-                room_version, state_sets, event
-            )
-            current_state_ids: StateMap[str] = {
-                k: e.event_id for k, e in current_states.items()
-            }
-        else:
-            current_state_ids = await self.state_handler.get_current_state_ids(
-                event.room_id, latest_event_ids=extrem_ids
-            )
-
-        logger.debug(
-            "Doing soft-fail check for %s: state %s",
-            event.event_id,
-            current_state_ids,
-        )
-
-        # Now check if event pass auth against said current state
-        auth_types = auth_types_for_event(room_version_obj, event)
-        current_state_ids_list = [
-            e for k, e in current_state_ids.items() if k in auth_types
-        ]
-
-        auth_events_map = await self.store.get_events(current_state_ids_list)
-        current_auth_events = {
-            (e.type, e.state_key): e for e in auth_events_map.values()
-        }
-
-        try:
-            event_auth.check(room_version_obj, event, auth_events=current_auth_events)
-        except AuthError as e:
-            logger.warning(
-                "Soft-failing %r (from %s) because %s",
-                event,
-                e,
-                origin,
-                extra={
-                    "room_id": event.room_id,
-                    "mxid": event.sender,
-                    "hs": origin,
-                },
-            )
-            soft_failed_event_counter.inc()
-            event.internal_metadata.soft_failed = True
-
     async def on_get_missing_events(
         self,
         origin: str,
@@ -2615,7 +2510,9 @@ class FederationHandler(BaseHandler):
             context.rejected = RejectedReason.AUTH_ERROR
 
         if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled, origin=origin)
+            await self._federation_event_handler._check_for_soft_fail(
+                event, state, backfilled, origin=origin
+            )
 
         if event.type == EventTypes.GuestAccess and not context.rejected:
             await self.maybe_kick_guest_users(event)
