@@ -26,7 +26,6 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Sequence,
     Set,
     Tuple,
     Union,
@@ -77,14 +76,12 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
-    ReplicationFederationSendEventsRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
 )
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, StateMap, get_domain_from_id
 from synapse.util.async_helpers import Linearizer, concurrently_execute
-from synapse.util.iterutils import batch_iter
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 from synapse.visibility import filter_events_for_server
@@ -143,15 +140,12 @@ class FederationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_proxied_blacklisted_http_client()
-        self._instance_name = hs.get_instance_name()
         self._replication = hs.get_replication_data_handler()
         self._federation_event_handler = hs.get_federation_event_handler()
 
-        self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
         self._clean_room_for_join_client = ReplicationCleanRoomRestServlet.make_client(
             hs
         )
@@ -177,8 +171,6 @@ class FederationHandler(BaseHandler):
         self._room_backfill = Linearizer("room_backfill")
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
-
-        self._ephemeral_messages_enabled = hs.config.enable_ephemeral_messages
 
     async def on_receive_pdu(self, origin: str, pdu: EventBase) -> None:
         """Process a PDU received via a federation /send/ transaction
@@ -1594,7 +1586,7 @@ class FederationHandler(BaseHandler):
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
         context = await self.state_handler.compute_event_context(event)
-        stream_id = await self.persist_events_and_notify(
+        stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
         return event.event_id, stream_id
@@ -1784,7 +1776,9 @@ class FederationHandler(BaseHandler):
         )
 
         context = await self.state_handler.compute_event_context(event)
-        await self.persist_events_and_notify(event.room_id, [(event, context)])
+        await self._federation_event_handler.persist_events_and_notify(
+            event.room_id, [(event, context)]
+        )
 
         return event
 
@@ -1811,7 +1805,7 @@ class FederationHandler(BaseHandler):
         await self.federation_client.send_leave(host_list, event)
 
         context = await self.state_handler.compute_event_context(event)
-        stream_id = await self.persist_events_and_notify(
+        stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
 
@@ -2233,7 +2227,7 @@ class FederationHandler(BaseHandler):
                     event, context
                 )
 
-            await self.persist_events_and_notify(
+            await self._federation_event_handler.persist_events_and_notify(
                 event.room_id, [(event, context)], backfilled=backfilled
             )
         except Exception:
@@ -2278,7 +2272,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        await self.persist_events_and_notify(
+        await self._federation_event_handler.persist_events_and_notify(
             room_id,
             [
                 (ev_info.event, context)
@@ -2383,7 +2377,7 @@ class FederationHandler(BaseHandler):
                 events_to_context[e.event_id].rejected = RejectedReason.AUTH_ERROR
 
         if auth_events or state:
-            await self.persist_events_and_notify(
+            await self._federation_event_handler.persist_events_and_notify(
                 room_id,
                 [
                     (e, events_to_context[e.event_id])
@@ -2395,7 +2389,7 @@ class FederationHandler(BaseHandler):
             event, old_state=state
         )
 
-        return await self.persist_events_and_notify(
+        return await self._federation_event_handler.persist_events_and_notify(
             room_id, [(event, new_event_context)]
         )
 
@@ -2812,64 +2806,6 @@ class FederationHandler(BaseHandler):
             raise SynapseError(502, "Third party certificate could not be checked")
         if "valid" not in response or not response["valid"]:
             raise AuthError(403, "Third party certificate was invalid")
-
-    async def persist_events_and_notify(
-        self,
-        room_id: str,
-        event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
-        backfilled: bool = False,
-    ) -> int:
-        """Persists events and tells the notifier/pushers about them, if
-        necessary.
-
-        Args:
-            room_id: The room ID of events being persisted.
-            event_and_contexts: Sequence of events with their associated
-                context that should be persisted. All events must belong to
-                the same room.
-            backfilled: Whether these events are a result of
-                backfilling or not
-
-        Returns:
-            The stream ID after which all events have been persisted.
-        """
-        if not event_and_contexts:
-            return self.store.get_current_events_token()
-
-        instance = self.config.worker.events_shard_config.get_instance(room_id)
-        if instance != self._instance_name:
-            # Limit the number of events sent over replication. We choose 200
-            # here as that is what we default to in `max_request_body_size(..)`
-            for batch in batch_iter(event_and_contexts, 200):
-                result = await self._send_events(
-                    instance_name=instance,
-                    store=self.store,
-                    room_id=room_id,
-                    event_and_contexts=batch,
-                    backfilled=backfilled,
-                )
-            return result["max_stream_id"]
-        else:
-            assert self.storage.persistence
-
-            # Note that this returns the events that were persisted, which may not be
-            # the same as were passed in if some were deduplicated due to transaction IDs.
-            events, max_stream_token = await self.storage.persistence.persist_events(
-                event_and_contexts, backfilled=backfilled
-            )
-
-            if self._ephemeral_messages_enabled:
-                for event in events:
-                    # If there's an expiry timestamp on the event, schedule its expiry.
-                    self._message_handler.maybe_schedule_expiry(event)
-
-            if not backfilled:  # Never notify for backfilled events
-                for event in events:
-                    await self._federation_event_handler._notify_persisted_event(
-                        event, max_stream_token
-                    )
-
-            return max_stream_token.stream
 
     async def _clean_room_for_join(self, room_id: str) -> None:
         """Called to clean up any data in DB for a given room, ready for the

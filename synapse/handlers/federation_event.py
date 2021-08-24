@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Tuple
 
 from prometheus_client import Counter
 
@@ -25,6 +25,9 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers._base import BaseHandler
+from synapse.replication.http.federation import (
+    ReplicationFederationSendEventsRestServlet,
+)
 from synapse.types import (
     MutableStateMap,
     PersistedEventPosition,
@@ -32,6 +35,7 @@ from synapse.types import (
     StateMap,
     UserID,
 )
+from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -62,11 +66,17 @@ class FederationEventHandler(BaseHandler):
         self.state_handler = hs.get_state_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
+        self._message_handler = hs.get_message_handler()
 
         self.federation_client = hs.get_federation_client()
 
         self.is_mine_id = hs.is_mine_id
         self._instance_name = hs.get_instance_name()
+
+        self.config = hs.config
+        self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
+
+        self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
 
         # TODO: remove once we don't need to call back to the FederationHandler
         self._hs = hs
@@ -496,6 +506,62 @@ class FederationEventHandler(BaseHandler):
             prev_group=prev_group,
             delta_ids=state_updates,
         )
+
+    async def persist_events_and_notify(
+        self,
+        room_id: str,
+        event_and_contexts: Sequence[Tuple[EventBase, EventContext]],
+        backfilled: bool = False,
+    ) -> int:
+        """Persists events and tells the notifier/pushers about them, if
+        necessary.
+
+        Args:
+            room_id: The room ID of events being persisted.
+            event_and_contexts: Sequence of events with their associated
+                context that should be persisted. All events must belong to
+                the same room.
+            backfilled: Whether these events are a result of
+                backfilling or not
+
+        Returns:
+            The stream ID after which all events have been persisted.
+        """
+        if not event_and_contexts:
+            return self.store.get_current_events_token()
+
+        instance = self.config.worker.events_shard_config.get_instance(room_id)
+        if instance != self._instance_name:
+            # Limit the number of events sent over replication. We choose 200
+            # here as that is what we default to in `max_request_body_size(..)`
+            for batch in batch_iter(event_and_contexts, 200):
+                result = await self._send_events(
+                    instance_name=instance,
+                    store=self.store,
+                    room_id=room_id,
+                    event_and_contexts=batch,
+                    backfilled=backfilled,
+                )
+            return result["max_stream_id"]
+        else:
+            assert self.storage.persistence
+
+            # Note that this returns the events that were persisted, which may not be
+            # the same as were passed in if some were deduplicated due to transaction IDs.
+            events, max_stream_token = await self.storage.persistence.persist_events(
+                event_and_contexts, backfilled=backfilled
+            )
+
+            if self._ephemeral_messages_enabled:
+                for event in events:
+                    # If there's an expiry timestamp on the event, schedule its expiry.
+                    self._message_handler.maybe_schedule_expiry(event)
+
+            if not backfilled:  # Never notify for backfilled events
+                for event in events:
+                    await self._notify_persisted_event(event, max_stream_token)
+
+            return max_stream_token.stream
 
     async def _notify_persisted_event(
         self, event: EventBase, max_stream_token: RoomStreamToken
