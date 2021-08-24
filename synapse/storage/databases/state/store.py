@@ -274,6 +274,50 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         race conditions could occur and the cache could be made less effective.
         """
 
+        def try_collect_satisfactory_inflight_requests(
+            group: int,
+            mut_inflight_requests: List[Tuple[int, Deferred[Dict[int, StateMap[str]]]]],
+        ) -> bool:
+            """
+            Tries to collect existing in-flight requests that would give us all
+            the desired state for the given group.
+
+            Returns true if successful, or false if not.
+            If successful, adds more in-flight requests to the `mut_inflight_requests` list.
+            """
+            original_inflight_requests = len(mut_inflight_requests)
+            for event_type, state_keys in state_filter.types.items():
+                # First see if any requests are looking up ALL state keys for this
+                # event type.
+                result = self._state_group_inflight_cache.get((group, event_type, None))
+                if result is not None:
+                    inflight_requests.append((group, make_deferred_yieldable(result)))
+                    continue
+
+                if state_keys is None:
+                    # We want all state keys, but there isn't a request in-flight
+                    # wanting them all, so we have to give up here.
+                    del mut_inflight_requests[original_inflight_requests:]
+                    return False
+                else:
+                    # If we are only interested in certain state keys,
+                    # we can see if other in-flight requests would manage to
+                    # give us all the wanted state keys.
+                    for state_key in state_keys:
+                        result = self._state_group_inflight_cache.get(
+                            (group, event_type, state_key)
+                        )
+                        if result is None:
+                            # There isn't an in-flight request already requesting
+                            # this, so give up here.
+                            del mut_inflight_requests[original_inflight_requests:]
+                            return False
+
+                        inflight_requests.append(
+                            (group, make_deferred_yieldable(result))
+                        )
+            return True
+
         state_filter = state_filter or StateFilter.all()
         member_filter, non_member_filter = state_filter.get_member_split()
 
@@ -342,31 +386,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     inflight_requests.append((group, make_deferred_yieldable(result)))
                     continue
 
-            for event_type, state_keys in state_filter.types.items():
-                result = self._state_group_inflight_cache.get((group, event_type, None))
-                if result is not None:
-                    inflight_requests.append((group, make_deferred_yieldable(result)))
-                    continue
+            if try_collect_satisfactory_inflight_requests(group, inflight_requests):
+                # succeeded in finding in-flight requests that could be combined
+                # together to give all the state we need for this group.
+                continue
 
-                if state_keys is not None:
-                    got_all_state_keys = False
-                    for state_key in state_keys:
-                        result = self._state_group_inflight_cache.get(
-                            (group, event_type, state_key)
-                        )
-                        if result is not None:
-                            inflight_requests.append(
-                                (group, make_deferred_yieldable(result))
-                            )
-                        else:
-                            break
-                    else:
-                        got_all_state_keys = True
-
-                    if not got_all_state_keys:
-                        # we still have to request against this group.
-                        inflight_cache_misses.append(group)
-                        break
+            inflight_cache_misses.append(group)
 
         # SERVICE CACHE MISSES
         if inflight_cache_misses:
