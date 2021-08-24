@@ -1,3 +1,9 @@
+<h2 style="color:red">
+Parts of this section of the Synapse documentation are now deprecated. For up to date
+documentation on setting up or writing a saml mapping provider module, please 
+see <a href="modules.md">this page</a>.
+</h2>
+
 # SSO Mapping Providers
 
 A mapping provider is a Python class (loaded via a Python module) that

@@ -329,6 +329,76 @@ For example, if the user `@alice:example.org` is passed to this method, and the 
 should receive presence updates sent by Bob and Charlie, regardless of whether these users 
 share a room.
 
+#### Saml User Mapping Provider Callbacks
+
+Saml user mapping provider callbacks are used to work out how to map
+attributes of an SSO response to Matrix-specific user attributes.
+
+As an example, a SSO service may return the email address
+"john.smith@example.com" for a user and Synapse will need to figure out how
+to turn that into a displayname when creating a Matrix user for this individual.
+It may choose `John Smith`, or `Smith, John [Example.com]` or any number of
+variations.
+
+A module with mapping provider functionality must register all of the following:
+
+```python
+saml_attributes: Tuple[Set[str], Set[str]]
+```
+A tuple of two sets, the first being the SAML auth response attributes that are
+required for the module to function, and the second set being the attributes which
+can be used if available, but are not necessary.
+
+```python
+async def get_remote_user_id(
+        self,
+        saml_response: "saml2.response.AuthnResponse",
+        client_redirect_url: Optional[str],
+    ) -> str
+```
+This callback is used to extract the *remote* user id for a user. It is provided with a SAML
+auth response object to extract the information from, and the URL that the client will
+be redirected to after authentication - which may be None. It should return an
+immutable identifier for the user (Commonly the `uid` field of the response). The module should
+return a unique identifier for each user. If no mapping can be made then it should raise a 
+`synapse.ModuleApi.errors.MappingException`.
+
+```python
+async def saml_response_to_user_attributes(
+        self,
+        saml_response: "saml2.response.AuthnResponse",
+        failures: int,
+        client_redirect_url: str,
+    ) -> dict
+```
+This callback is used to extract certain attributes for a new user. 
+It is provided with a SAML auth response object to extract the information from, a number representing
+the number of times the returned matrix user id mapping has failed and the URL that the client will
+be redirected to after authentication.
+
+It should return a dict which will be used by Synapse to build a new user. 
+The following keys are allowed:  
+* `mxid_localpart` - A string, the local part of the matrix user ID for the new user. 
+                     If this is `None`, the user is prompted to pick their own username.
+                     This is only used during a user's first login. Once a localpart has 
+                     been associated with a remote user ID (see `get_remote_user_id`) it
+                     cannot be updated.  
+* `displayname` - The displayname of the new user. If not provided, it will default to 
+                  the value of `mxid_localpart`.  
+* `emails` - A list of emails for the new user. If not provided, it will default to an empty list.
+
+For example, if this method returns `john.doe` as the value of `mxid_localpart` in the returned
+dict, and that is already taken on the homeserver, this method will be called again with the
+same parameters but with `failures=1`. The method should then return a different `mxid_localpart`
+value, such as `john.doe1`.
+
+If no mapping can be made then it should raise a `synapse.ModuleApi.errors.MappingException`.
+
+Alternatively it may raise a `synapse.ModuleApi.errors.RedirectException` to redirect the user to another
+page which prompts for additional information. After which, it is the module's responsibility
+to either redirect back to `client_redirect_url` (including any additional information)
+or to complete registration using methods from the ModuleApi. TODO: explain what this means in more detail
+
 ### Porting an existing module that uses the old interface
 
 In order to port a module that uses Synapse's old module interface, its author needs to:
