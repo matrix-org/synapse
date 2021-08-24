@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Iterable, List, Optional, Sequence, Tuple
+from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Sequence, Tuple
 
 from prometheus_client import Counter
+
+from twisted.internet import defer
 
 from synapse import event_auth
 from synapse.api.constants import EventTypes, Membership, RejectedReason
@@ -25,7 +27,12 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers._base import BaseHandler
-from synapse.logging.context import run_in_background
+from synapse.handlers.federation import _NewEventInfo
+from synapse.logging.context import (
+    make_deferred_yieldable,
+    nested_logging_context,
+    run_in_background,
+)
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
@@ -79,6 +86,50 @@ class FederationEventHandler(BaseHandler):
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
+
+    async def _auth_and_persist_events(
+        self,
+        origin: str,
+        room_id: str,
+        event_infos: Collection[_NewEventInfo],
+    ) -> None:
+        """Creates the appropriate contexts and persists events. The events
+        should not depend on one another, e.g. this should be used to persist
+        a bunch of outliers, but not a chunk of individual events that depend
+        on each other for state calculations.
+
+        Notifies about the events where appropriate.
+        """
+
+        if not event_infos:
+            return
+
+        async def prep(ev_info: _NewEventInfo):
+            event = ev_info.event
+            with nested_logging_context(suffix=event.event_id):
+                res = await self.state_handler.compute_event_context(event)
+                res = await self._check_event_auth(
+                    origin,
+                    event,
+                    res,
+                    claimed_auth_event_map=ev_info.claimed_auth_event_map,
+                )
+            return res
+
+        contexts = await make_deferred_yieldable(
+            defer.gatherResults(
+                [run_in_background(prep, ev_info) for ev_info in event_infos],
+                consumeErrors=True,
+            )
+        )
+
+        await self.persist_events_and_notify(
+            room_id,
+            [
+                (ev_info.event, context)
+                for ev_info, context in zip(event_infos, contexts)
+            ],
+        )
 
     async def _auth_and_persist_event(
         self,

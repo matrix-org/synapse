@@ -19,17 +19,7 @@ import itertools
 import logging
 from collections.abc import Container
 from http import HTTPStatus
-from typing import (
-    TYPE_CHECKING,
-    Collection,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    Union,
-)
+from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 from signedjson.key import decode_verify_key_bytes
@@ -1131,7 +1121,7 @@ class FederationHandler(BaseHandler):
             event_infos.append(_NewEventInfo(event, auth))
 
         if event_infos:
-            await self._auth_and_persist_events(
+            await self._federation_event_handler._auth_and_persist_events(
                 destination,
                 room_id,
                 event_infos,
@@ -2163,50 +2153,6 @@ class FederationHandler(BaseHandler):
 
     async def get_min_depth_for_context(self, context: str) -> int:
         return await self.store.get_min_depth(context)
-
-    async def _auth_and_persist_events(
-        self,
-        origin: str,
-        room_id: str,
-        event_infos: Collection[_NewEventInfo],
-    ) -> None:
-        """Creates the appropriate contexts and persists events. The events
-        should not depend on one another, e.g. this should be used to persist
-        a bunch of outliers, but not a chunk of individual events that depend
-        on each other for state calculations.
-
-        Notifies about the events where appropriate.
-        """
-
-        if not event_infos:
-            return
-
-        async def prep(ev_info: _NewEventInfo):
-            event = ev_info.event
-            with nested_logging_context(suffix=event.event_id):
-                res = await self.state_handler.compute_event_context(event)
-                res = await self._federation_event_handler._check_event_auth(
-                    origin,
-                    event,
-                    res,
-                    claimed_auth_event_map=ev_info.claimed_auth_event_map,
-                )
-            return res
-
-        contexts = await make_deferred_yieldable(
-            defer.gatherResults(
-                [run_in_background(prep, ev_info) for ev_info in event_infos],
-                consumeErrors=True,
-            )
-        )
-
-        await self._federation_event_handler.persist_events_and_notify(
-            room_id,
-            [
-                (ev_info.event, context)
-                for ev_info, context in zip(event_infos, contexts)
-            ],
-        )
 
     async def _persist_auth_tree(
         self,
