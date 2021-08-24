@@ -64,8 +64,10 @@ class StateFilter:
         # wildcards from the types dictionary
         if self.include_others:
             # REVIEW: yucky
-            self.types: "frozendict[str, Optional[FrozenSet[str]]]" = frozendict(  # type: ignore[misc,no-redef] # read-only
-                {k: v for k, v in self.types.items() if v is not None}
+            object.__setattr__(
+                self,
+                "types",
+                frozendict({k: v for k, v in self.types.items() if v is not None}),
             )
 
     @staticmethod
