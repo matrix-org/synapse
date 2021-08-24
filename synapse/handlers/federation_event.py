@@ -1129,7 +1129,40 @@ class FederationEventHandler:
 
         await concurrently_execute(get_event, event_ids, 5)
         logger.info("Fetched %i events of %i requested", len(event_map), len(event_ids))
-        await self._auth_and_persist_fetched_events(destination, room_id, event_map)
+
+        # we now need to auth the events in an order which ensures that each event's
+        # auth_events are authed before the event itself.
+        #
+        # XXX: it might be possible to kick this process off in parallel with fetching
+        # the events.
+        while event_map:
+            # build a dict of events whose auth events are not in the queue.
+            roots = {
+                eid: ev
+                for eid, ev in event_map.items()
+                if not any(aid in event_map for aid in ev.auth_event_ids())
+            }
+
+            if not roots:
+                # if *none* of the remaining events are ready, that means
+                # we have a loop. This either means a bug in our logic, or that
+                # somebody has managed to create a loop (which requires finding a
+                # hash collision in room v2 and later).
+                logger.warning(
+                    "Loop found in auth events while fetching missing state/auth "
+                    "events: %s",
+                    shortstr(event_map.keys()),
+                )
+                return
+
+            logger.info(
+                "Persisting %i of %i remaining events", len(roots), len(event_map)
+            )
+
+            await self._auth_and_persist_fetched_events(destination, room_id, roots)
+
+            for eid in roots.keys():
+                del event_map[eid]
 
     async def _auth_and_persist_fetched_events(
         self, origin: str, room_id: str, event_map: Dict[str, EventBase]
