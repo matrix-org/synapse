@@ -53,6 +53,7 @@
       - [Media](admin_api/media_admin_api.md)
       - [Purge History](admin_api/purge_history_api.md)
       - [Register Users](admin_api/register_api.md)
+      - [Registration Tokens](usage/administration/admin_api/registration_tokens.md)
       - [Manipulate Room Membership](admin_api/room_membership.md)
       - [Rooms](admin_api/rooms.md)
       - [Server Notices](admin_api/server_notices.md)

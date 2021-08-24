@@ -13,12 +13,19 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import SynapseError
-from synapse.http.server import respond_with_html
-from synapse.http.servlet import RestServlet
+from twisted.web.server import Request
+
+from synapse.http.server import HttpServer, respond_with_html
+from synapse.http.servlet import RestServlet, parse_string
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -26,11 +33,7 @@ logger = logging.getLogger(__name__)
 class AccountValidityRenewServlet(RestServlet):
     PATTERNS = client_patterns("/account_validity/renew$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.hs = hs
@@ -46,18 +49,14 @@ class AccountValidityRenewServlet(RestServlet):
             hs.config.account_validity.account_validity_invalid_token_template
         )
 
-    async def on_GET(self, request):
-        if b"token" not in request.args:
-            raise SynapseError(400, "Missing renewal token")
-        renewal_token = request.args[b"token"][0]
+    async def on_GET(self, request: Request) -> None:
+        renewal_token = parse_string(request, "token", required=True)
 
         (
             token_valid,
             token_stale,
             expiration_ts,
-        ) = await self.account_activity_handler.renew_account(
-            renewal_token.decode("utf8")
-        )
+        ) = await self.account_activity_handler.renew_account(renewal_token)
 
         if token_valid:
             status_code = 200
@@ -77,11 +76,7 @@ class AccountValidityRenewServlet(RestServlet):
 class AccountValiditySendMailServlet(RestServlet):
     PATTERNS = client_patterns("/account_validity/send_mail$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.hs = hs
@@ -91,7 +86,7 @@ class AccountValiditySendMailServlet(RestServlet):
             hs.config.account_validity.account_validity_renew_by_email_enabled
         )
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_expired=True)
         user_id = requester.user.to_string()
         await self.account_activity_handler.send_renewal_email_to_user(user_id)
@@ -99,6 +94,6 @@ class AccountValiditySendMailServlet(RestServlet):
         return 200, {}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AccountValidityRenewServlet(hs).register(http_server)
     AccountValiditySendMailServlet(hs).register(http_server)
