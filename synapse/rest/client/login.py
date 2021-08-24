@@ -602,6 +602,13 @@ def register_servlets(hs, http_server):
 
 
 def _load_sso_handlers(hs: "HomeServer"):
+    """Ensure that the SSO handlers are loaded, if they are enabled by configuration.
+
+    This is mostly useful to ensure that the CAS/SAML/OIDC handlers register themselves
+    with the main SsoHandler.
+
+    It's safe to call this multiple times.
+    """
     if hs.config.cas.cas_enabled:
         hs.get_cas_handler()
     if hs.config.saml2.saml2_enabled:
