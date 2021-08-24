@@ -80,8 +80,48 @@ class FederationEventHandler(BaseHandler):
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
 
-        # TODO: remove once we don't need to call back to the FederationHandler
-        self._hs = hs
+    async def _auth_and_persist_event(
+        self,
+        origin: str,
+        event: EventBase,
+        context: EventContext,
+        state: Optional[Iterable[EventBase]] = None,
+        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
+        backfilled: bool = False,
+    ) -> None:
+        """
+        Process an event by performing auth checks and then persisting to the database.
+
+        Args:
+            origin: The host the event originates from.
+            event: The event itself.
+            context:
+                The event context.
+
+            state:
+                The state events used to check the event for soft-fail. If this is
+                not provided the current state events will be used.
+
+            claimed_auth_event_map:
+                A map of (type, state_key) => event for the event's claimed auth_events.
+                Possibly incomplete, and possibly including events that are not yet
+                persisted, or authed, or in the right room.
+
+                Only populated where we may not already have persisted these events -
+                for example, when populating outliers.
+
+            backfilled: True if the event was backfilled.
+        """
+        context = await self._check_event_auth(
+            origin,
+            event,
+            context,
+            state=state,
+            claimed_auth_event_map=claimed_auth_event_map,
+            backfilled=backfilled,
+        )
+
+        await self._run_push_actions_and_persist_event(event, context, backfilled)
 
     async def _check_event_auth(
         self,
@@ -368,7 +408,7 @@ class FederationEventHandler(BaseHandler):
                         missing_auth_event_context = (
                             await self.state_handler.compute_event_context(e)
                         )
-                        await self._hs.get_federation_handler()._auth_and_persist_event(
+                        await self._auth_and_persist_event(
                             origin,
                             e,
                             missing_auth_event_context,
