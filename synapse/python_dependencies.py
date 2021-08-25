@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 # [1] https://pip.pypa.io/en/stable/reference/pip_install/#requirement-specifiers.
 
 REQUIREMENTS = [
+    # we use the TYPE_CHECKER.redefine method added in jsonschema 3.0.0
     "jsonschema>=3.0.0",
     "frozendict>=1",
     "unpaddedbase64>=1.1.0",
