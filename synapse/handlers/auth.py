@@ -1198,11 +1198,12 @@ class AuthHandler(BaseHandler):
 
         known_login_type = False
 
-        # get all of the login_types registered by modules
+        # Check if login_type matches a type registered by one of the modules
+        # We don't need to remove LoginType.PASSWORD from the list if password login is
+        # disabled, since if that were the case then by this point we know that the
+        # login_type is not LoginType.PASSWORD
         supported_login_types = self.password_auth_provider.get_supported_login_types()
         # check if the login type being used is supported by a module
-        # note that if LoginType.PASSWORD has been disabled then login_type has already been
-        # checked for that by this point
         if login_type in supported_login_types:
             # Make a note that this login type is supported by the server
             known_login_type = True
@@ -1801,7 +1802,15 @@ class MacaroonGenerator:
         return macaroon
 
 
-def load_legacy_password_auth_provider(module, config, api: ModuleApi):
+def load_legacy_password_auth_providers(hs: "HomeServer"):
+    module_api = hs.get_module_api()
+    for module, config in hs.config.password_providers:
+        load_single_legacy_password_auth_provider(
+            module=module, config=config, api=module_api
+        )
+
+
+def load_single_legacy_password_auth_provider(module, config, api: ModuleApi):
     try:
         provider = module(config=config, account_handler=api)
     except Exception as e:
@@ -1934,12 +1943,17 @@ def load_legacy_password_auth_provider(module, config, api: ModuleApi):
 
 
 CHECK_3PID_AUTH_CALLBACK = Callable[
-    [str, str, str], Awaitable[Optional[Tuple[str, Optional[Callable]]]]
+    [str, str, str],
+    Awaitable[
+        Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]
+    ],
 ]
 ON_LOGGED_OUT_CALLBACK = Callable[[str, Optional[str], str], Awaitable]
 CHECK_AUTH_CALLBACK = Callable[
     [str, str, JsonDict],
-    Awaitable[Optional[Tuple[str, Optional[Callable]]]],
+    Awaitable[
+        Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]
+    ],
 ]
 
 
@@ -1975,10 +1989,9 @@ class PasswordAuthProvider:
             self.on_logged_out_callbacks.append(on_logged_out)
 
         if auth_checkers is not None:
-            supported_login_types = auth_checkers.keys()
             # register a new supported login_type
             # Iterate through all of the types being registered
-            for login_type, fields in supported_login_types:
+            for (login_type, fields), callback in auth_checkers.items():
                 # Note: fields may be empty here. This would allow a modules auth checker to
                 # be called with just 'login_type' and no password or other secrets
 
@@ -2007,10 +2020,7 @@ class PasswordAuthProvider:
                             % (login_type, fields, fields_currently_supported)
                         )
 
-            # register an authentication callback for specific login types
-            # Iterate through all of the callbacks being registered
-            for (login_type, _), callback in auth_checkers.items():
-                # Add the new method to the list of auth_checker_callbacks
+                # Add the new method to the list of auth_checker_callbacks for this login type
                 callback_list = self.auth_checker_callbacks.get(login_type, [])
                 callback_list.append(callback)
                 self.auth_checker_callbacks[login_type] = callback_list
@@ -2027,7 +2037,7 @@ class PasswordAuthProvider:
 
     async def check_auth(
         self, username: str, login_type: str, login_dict: JsonDict
-    ) -> Optional[Tuple[str, Optional[Callable]]]:
+    ) -> Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]:
         """Check if the user has presented valid login credentials
 
         Args:
@@ -2055,10 +2065,10 @@ class PasswordAuthProvider:
 
             if result is not None:
                 # Check that the callback returned a Tuple[str, Optional[Callable]]
-
-                # "type: ignore" is used on the isinstance checks because mypy thinks
+                # "type: ignore[unreachable]" is used after some isinstance checks because mypy thinks
                 # result is always the right type, but as it is 3rd party code it might not be
-                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore[arg-type]
+
+                if not isinstance(result, tuple) or len(result) != 2:
                     logger.warning(
                         "Wrong type returned by module API callback %s: %s, expected"
                         " Optional[Tuple[str, Optional[Callable]]]",
@@ -2082,8 +2092,8 @@ class PasswordAuthProvider:
 
                 # the second should be Optional[Callable]
                 if callback_result is not None:
-                    if not isinstance(callback_result, Callable):  # type: ignore[arg-type]
-                        logger.warning(
+                    if not callable(callback_result):
+                        logger.warning(  # type: ignore[unreachable]
                             "Wrong type returned by module API callback %s: %s, expected"
                             " Optional[Tuple[str, Optional[Callable]]]",
                             callback,
@@ -2100,7 +2110,7 @@ class PasswordAuthProvider:
 
     async def check_3pid_auth(
         self, medium: str, address: str, password: str
-    ) -> Optional[Tuple[str, Optional[Callable]]]:
+    ) -> Optional[Tuple[str, Optional[Callable[["LoginResponse"], Awaitable[None]]]]]:
         # This function is able to return a deferred that either
         # resolves None, meaning authentication failure, or upon
         # success, to a str (which is the user_id) or a tuple of
@@ -2116,10 +2126,10 @@ class PasswordAuthProvider:
 
             if result is not None:
                 # Check that the callback returned a Tuple[str, Optional[Callable]]
-
-                # "type: ignore" is used on the isinstance checks because mypy thinks
+                # "type: ignore[unreachable]" is used after some isinstance checks because mypy thinks
                 # result is always the right type, but as it is 3rd party code it might not be
-                if not isinstance(result, Tuple) or len(result) != 2:  # type: ignore[arg-type]
+
+                if not isinstance(result, tuple) or len(result) != 2:
                     logger.warning(
                         "Wrong type returned by module API callback %s: %s, expected"
                         " Optional[Tuple[str, Optional[Callable]]]",
@@ -2143,8 +2153,8 @@ class PasswordAuthProvider:
 
                 # the second should be Optional[Callable]
                 if callback_result is not None:
-                    if not isinstance(callback_result, Callable):  # type: ignore[arg-type]
-                        logger.warning(
+                    if not callable(callback_result):
+                        logger.warning(  # type: ignore[unreachable]
                             "Wrong type returned by module API callback %s: %s, expected"
                             " Optional[Tuple[str, Optional[Callable]]]",
                             callback,

@@ -20,7 +20,7 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 import synapse
-from synapse.handlers.auth import load_legacy_password_auth_provider
+from synapse.handlers.auth import load_legacy_password_auth_providers
 from synapse.module_api import ModuleApi
 from synapse.rest.client import devices, login
 from synapse.types import JsonDict
@@ -165,10 +165,7 @@ class PasswordAuthProviderTests(unittest.HomeserverTestCase):
         module_api = hs.get_module_api()
         for module, config in hs.config.modules.loaded_modules:
             module(config=config, api=module_api)
-        for module, config in hs.config.password_providers:
-            load_legacy_password_auth_provider(
-                module=module, config=config, api=module_api
-            )
+        load_legacy_password_auth_providers(hs)
 
         return hs
 

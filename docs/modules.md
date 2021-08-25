@@ -343,10 +343,10 @@ To register authentication checkers, the module should register:
 
 A dict mapping from tuples of a login type identifier (such as `m.login.password`) and a
 tuple of field names (such as `("password", "secret_thing")`) to authentication checking
-methods.
+callbacks.
 
-The login type and field names are the things that are provided by the user in their submission
-to the `/login` API. 
+The login type and field names are the things that should be provided by the user in their
+request to the `/login` API. 
 
 For example, if a module implements authentication checkers for two different login types: 
 -  `com.example.custom_login` 
@@ -369,20 +369,23 @@ An authentication checking method should be of the following form:
 
 ```python
 async def check_auth(
-        username: str,
-        login_type: str,
-        login_dict: JsonDict
-) -> Optional[Tuple[str, Optional[Callable]]]
+    username: str,
+    login_type: str,
+    login_dict: JsonDict
+) -> Optional[
+    Tuple[
+        str, 
+        Optional[Callable[["synapse.module_api.LoginResponse"], Awaitable[None]]]
+    ]
+]
 ```
 
 It is passed the user field provided by the client (which might not be in `@username:server` form), 
 the login type, and a dictionary of login secrets passed by the client.
 
-On a failure it should return None. On a success it should return a (user_id, callback) tuple
-where user_id is a str containing the user's matrix id (i.e. in `@username:server` form) and the 
-callback is a method to be called with the result from the `/login` call (see the 
-<a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
-for details). This callback can be None.
+If the authentication is successful, the module must return the user's Matrix ID (e.g. @alice:example.com) and optionally a callback to be called with the response to the `/login` request. If the module doesn't wish to return a callback, it must return None instead.
+
+If the authentication is unsuccessful, the module must return None.
 
 Aditionally the module can register:
 
@@ -391,32 +394,32 @@ async def check_3pid_auth(
     medium: str, 
     address: str,
     password: str,
-) -> Optional[Tuple[str, Optional[Callable]]]
+) -> Optional[
+    Tuple[
+        str, 
+        Optional[Callable[["synapse.module_api.LoginResponse"], Awaitable[None]]]
+    ]
+]
 ```
 
-This  is called when a user attempts to register or log in with a third party identifier,
+Called when a user attempts to register or log in with a third party identifier,
 such as email. It is passed the medium (eg. "email"), an address (eg. "jdoe@example.com")
 and the user's password.
 
-On a failure it should return None. On a success it should return a (user_id, callback) tuple
-where user_id is a str containing the user's matrix id (i.e. in `@username:server` form) and the 
-callback is a method to be called with the result from the `/login` call (see the 
-<a href="https://spec.matrix.org/unstable/client-server-api/#login">spec</a> 
-for details). This callback can be None.
+If the authentication is successful, the module must return the user's Matrix ID (e.g. @alice:example.com) and optionally a callback to be called with the response to the `/login` request. If the module doesn't wish to return a callback, it must return None instead.
+
+If the authentication is unsuccessful, the module must return None.
 
 ```python
 async def on_logged_out(
-        user_id: str,
-        device_id: str,
-        access_token: str,
+    user_id: str,
+    device_id: Optional[str],
+    access_token: str
 ) -> None
 ``` 
-This is called when a user logs out. It is passed the qualified user ID, the ID of the
+Called during a logout request for a user. It is passed the qualified user ID, the ID of the
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.
-
-The callback must be asynchronous but the logout request will wait for the callback
-to complete.
 
 
 ### Porting an existing module that uses the old interface
