@@ -363,7 +363,7 @@ class FederationHandler(BaseHandler):
             return
 
         logger.info("Got %d prev_events", len(missing_events))
-        await self._process_pulled_events(origin, missing_events, backfilled=False)
+        await self._federation_event_handler._process_pulled_events(origin, missing_events, backfilled=False)
 
     @log_function
     async def backfill(
@@ -404,7 +404,7 @@ class FederationHandler(BaseHandler):
                     f"room {ev.room_id}, when we were backfilling in {room_id}"
                 )
 
-        await self._process_pulled_events(dest, events, backfilled=True)
+        await self._federation_event_handler._process_pulled_events(dest, events, backfilled=True)
 
     async def maybe_backfill(
         self, room_id: str, current_depth: int, limit: int
@@ -690,33 +690,6 @@ class FederationHandler(BaseHandler):
             tried_domains.update(dom for dom, _ in likely_extremeties_domains)
 
         return False
-
-    async def _process_pulled_events(
-        self, origin: str, events: Iterable[EventBase], backfilled: bool
-    ) -> None:
-        """Process a batch of events we have pulled from a remote server
-
-        Pulls in any events required to auth the events, persists the received events,
-        and notifies clients, if appropriate.
-
-        Assumes the events have already had their signatures and hashes checked.
-
-        Params:
-            origin: The server we received these events from
-            events: The received events.
-            backfilled: True if this is part of a historical batch of events (inhibits
-                notification to clients, and validation of device keys.)
-        """
-
-        # We want to sort these by depth so we process them and
-        # tell clients about them in order.
-        sorted_events = sorted(events, key=lambda x: x.depth)
-
-        for ev in sorted_events:
-            with nested_logging_context(ev.event_id):
-                await self._federation_event_handler._process_pulled_event(
-                    origin, ev, backfilled=backfilled
-                )
 
     async def send_invite(self, target_host: str, event: EventBase) -> EventBase:
         """Sends the invite to the remote server for signing.
