@@ -483,7 +483,6 @@ def _parse_oidc_config_dict(
         idp_name=oidc_config.get("idp_name", "OIDC"),
         idp_icon=idp_icon,
         idp_brand=oidc_config.get("idp_brand"),
-        unstable_idp_brand=oidc_config.get("unstable_idp_brand"),
         discover=oidc_config.get("discover", True),
         issuer=oidc_config["issuer"],
         client_id=oidc_config["client_id"],
@@ -530,9 +529,6 @@ class OidcProviderConfig:
 
     # Optional brand identifier for this IdP.
     idp_brand = attr.ib(type=Optional[str])
-
-    # Optional brand identifier for the unstable API (see MSC2858).
-    unstable_idp_brand = attr.ib(type=Optional[str])
 
     # whether the OIDC discovery mechanism is used to discover endpoints
     discover = attr.ib(type=bool)

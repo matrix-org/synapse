@@ -422,9 +422,7 @@ class LoginRestServlet(RestServlet):
         return result
 
 
-def _get_auth_flow_dict_for_idp(
-    idp: SsoIdentityProvider, use_unstable_brands: bool = False
-) -> JsonDict:
+def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
     """Return an entry for the login flow dict
 
     Returns an entry suitable for inclusion in "identity_providers" in the
@@ -432,17 +430,12 @@ def _get_auth_flow_dict_for_idp(
 
     Args:
         idp: the identity provider to describe
-        use_unstable_brands: whether we should use brand identifiers suitable
-           for the unstable API
     """
     e: JsonDict = {"id": idp.idp_id, "name": idp.idp_name}
     if idp.idp_icon:
         e["icon"] = idp.idp_icon
     if idp.idp_brand:
         e["brand"] = idp.idp_brand
-    # use the stable brand identifier if the unstable identifier isn't defined.
-    if use_unstable_brands and idp.unstable_idp_brand:
-        e["brand"] = idp.unstable_idp_brand
     return e
 
 
