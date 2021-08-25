@@ -478,7 +478,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         """Test that choosing between thumbnails with the same quality rating succeeds.
 
         We are not particular about which thumbnail is chosen."""
-        self.assertTrue(
+        self.assertIsNotNone(
             self.thumbnail_resource._select_thumbnail(
                 desired_width=desired_size,
                 desired_height=desired_size,
