@@ -24,7 +24,7 @@ from synapse.api.urls import CLIENT_API_PREFIX
 from synapse.appservice import ApplicationService
 from synapse.handlers.sso import SsoIdentityProvider
 from synapse.http import get_request_uri
-from synapse.http.server import HttpServer, finish_request
+from synapse.http.server import finish_request
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -79,7 +79,6 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
-        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
         self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self.auth = hs.get_auth()
@@ -111,7 +110,7 @@ class LoginRestServlet(RestServlet):
         _load_sso_handlers(hs)
 
     def on_GET(self, request: SynapseRequest):
-        flows = []
+        flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
             flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
@@ -122,25 +121,15 @@ class LoginRestServlet(RestServlet):
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
-            sso_flow: JsonDict = {
-                "type": LoginRestServlet.SSO_TYPE,
-                "identity_providers": [
-                    _get_auth_flow_dict_for_idp(
-                        idp,
-                    )
-                    for idp in self._sso_handler.get_identity_providers().values()
-                ],
-            }
-
-            if self._msc2858_enabled:
-                # backwards-compatibility support for clients which don't
-                # support the stable API yet
-                sso_flow["org.matrix.msc2858.identity_providers"] = [
-                    _get_auth_flow_dict_for_idp(idp, use_unstable_brands=True)
-                    for idp in self._sso_handler.get_identity_providers().values()
-                ]
-
-            flows.append(sso_flow)
+            flows.append(
+                {
+                    "type": LoginRestServlet.SSO_TYPE,
+                    "identity_providers": [
+                        _get_auth_flow_dict_for_idp(idp)
+                        for idp in self._sso_handler.get_identity_providers().values()
+                    ],
+                }
+            )
 
             # While it's valid for us to advertise this login type generally,
             # synapse currently only gives out these tokens as part of the
@@ -507,24 +496,7 @@ class SsoRedirectServlet(RestServlet):
         # register themselves with the main SSOHandler.
         _load_sso_handlers(hs)
         self._sso_handler = hs.get_sso_handler()
-        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
         self._public_baseurl = hs.config.public_baseurl
-
-    def register(self, http_server: HttpServer) -> None:
-        super().register(http_server)
-        if self._msc2858_enabled:
-            # expose additional endpoint for MSC2858 support: backwards-compat support
-            # for clients which don't yet support the stable endpoints.
-            http_server.register_paths(
-                "GET",
-                client_patterns(
-                    "/org.matrix.msc2858/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$",
-                    releases=(),
-                    unstable=True,
-                ),
-                self.on_GET,
-                self.__class__.__name__,
-            )
 
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None
