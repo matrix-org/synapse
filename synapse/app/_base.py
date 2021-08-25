@@ -376,7 +376,10 @@ async def start(hs: "HomeServer"):
     # 'module_has_registered' is true if a module calls 'register_saml2_user_mapping_provider_callbacks'
     # Only one mapping provider can be set, so only load default (or legacy configured one) if this is
     # still false
-    if not hs.get_saml2_user_mapping_provider().module_has_registered:
+    if (
+        hs.config.saml2.saml2_enabled
+        and not hs.get_saml2_user_mapping_provider().module_has_registered
+    ):
         load_default_or_legacy_saml2_mapping_provider(hs)
 
     # If we've configured an expiry time for caches, start the background job now.
