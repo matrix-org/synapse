@@ -86,7 +86,9 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         # Send the join, it should return None (which is not an error)
         self.assertEqual(
-            self.get_success(self.handler.on_receive_pdu("test.serv", join_event)),
+            self.get_success(
+                federation_event_handler.on_receive_pdu("test.serv", join_event)
+            ),
             None,
         )
 
@@ -130,9 +132,10 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
             }
         )
 
+        federation_event_handler = self.homeserver.get_federation_event_handler()
         with LoggingContext("test-context"):
             failure = self.get_failure(
-                self.handler.on_receive_pdu("test.serv", lying_event),
+                federation_event_handler.on_receive_pdu("test.serv", lying_event),
                 FederationError,
             )
 
