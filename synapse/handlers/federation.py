@@ -70,7 +70,7 @@ from synapse.replication.http.federation import (
 from synapse.state import StateResolutionStore
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import JsonDict, StateMap, get_domain_from_id
-from synapse.util.async_helpers import Linearizer, concurrently_execute
+from synapse.util.async_helpers import Linearizer
 from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 from synapse.visibility import filter_events_for_server
@@ -438,7 +438,7 @@ class FederationHandler(BaseHandler):
 
         missing_events = missing_desired_events | missing_auth_events
         logger.debug("Fetching %i events from remote", len(missing_events))
-        await self._get_events_and_persist(
+        await self._federation_event_handler._get_events_and_persist(
             destination=destination, room_id=room_id, events=missing_events
         )
 
@@ -647,7 +647,7 @@ class FederationHandler(BaseHandler):
             "_handle_marker_event: backfilling insertion event %s", insertion_event_id
         )
 
-        await self._get_events_and_persist(
+        await self._federation_event_handler._get_events_and_persist(
             origin,
             marker_event.room_id,
             [insertion_event_id],
@@ -1022,85 +1022,6 @@ class FederationHandler(BaseHandler):
             tried_domains.update(dom for dom, _ in likely_extremeties_domains)
 
         return False
-
-    async def _get_events_and_persist(
-        self, destination: str, room_id: str, events: Iterable[str]
-    ) -> None:
-        """Fetch the given events from a server, and persist them as outliers.
-
-        This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include in the `events` argument
-        any missing events from the auth chain.
-
-        Logs a warning if we can't find the given event.
-        """
-
-        room_version = await self.store.get_room_version(room_id)
-
-        event_map: Dict[str, EventBase] = {}
-
-        async def get_event(event_id: str):
-            with nested_logging_context(event_id):
-                try:
-                    event = await self.federation_client.get_pdu(
-                        [destination],
-                        event_id,
-                        room_version,
-                        outlier=True,
-                    )
-                    if event is None:
-                        logger.warning(
-                            "Server %s didn't return event %s",
-                            destination,
-                            event_id,
-                        )
-                        return
-
-                    event_map[event.event_id] = event
-
-                except Exception as e:
-                    logger.warning(
-                        "Error fetching missing state/auth event %s: %s %s",
-                        event_id,
-                        type(e),
-                        e,
-                    )
-
-        await concurrently_execute(get_event, events, 5)
-
-        # Make a map of auth events for each event. We do this after fetching
-        # all the events as some of the events' auth events will be in the list
-        # of requested events.
-
-        auth_events = [
-            aid
-            for event in event_map.values()
-            for aid in event.auth_event_ids()
-            if aid not in event_map
-        ]
-        persisted_events = await self.store.get_events(
-            auth_events,
-            allow_rejected=True,
-        )
-
-        event_infos = []
-        for event in event_map.values():
-            auth = {}
-            for auth_event_id in event.auth_event_ids():
-                ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
-                if ae:
-                    auth[(ae.type, ae.state_key)] = ae
-                else:
-                    logger.info("Missing auth event %s", auth_event_id)
-
-            event_infos.append(_NewEventInfo(event, auth))
-
-        if event_infos:
-            await self._federation_event_handler._auth_and_persist_events(
-                destination,
-                room_id,
-                event_infos,
-            )
 
     async def _process_pulled_events(
         self, origin: str, events: Iterable[EventBase], backfilled: bool

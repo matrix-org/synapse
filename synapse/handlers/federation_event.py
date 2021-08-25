@@ -13,7 +13,16 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Sequence, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Collection,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -43,6 +52,7 @@ from synapse.types import (
     StateMap,
     UserID,
 )
+from synapse.util.async_helpers import concurrently_execute
 from synapse.util.iterutils import batch_iter
 
 if TYPE_CHECKING:
@@ -110,6 +120,85 @@ class FederationEventHandler(BaseHandler):
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
+
+    async def _get_events_and_persist(
+        self, destination: str, room_id: str, events: Iterable[str]
+    ) -> None:
+        """Fetch the given events from a server, and persist them as outliers.
+
+        This function *does not* recursively get missing auth events of the
+        newly fetched events. Callers must include in the `events` argument
+        any missing events from the auth chain.
+
+        Logs a warning if we can't find the given event.
+        """
+
+        room_version = await self.store.get_room_version(room_id)
+
+        event_map: Dict[str, EventBase] = {}
+
+        async def get_event(event_id: str):
+            with nested_logging_context(event_id):
+                try:
+                    event = await self.federation_client.get_pdu(
+                        [destination],
+                        event_id,
+                        room_version,
+                        outlier=True,
+                    )
+                    if event is None:
+                        logger.warning(
+                            "Server %s didn't return event %s",
+                            destination,
+                            event_id,
+                        )
+                        return
+
+                    event_map[event.event_id] = event
+
+                except Exception as e:
+                    logger.warning(
+                        "Error fetching missing state/auth event %s: %s %s",
+                        event_id,
+                        type(e),
+                        e,
+                    )
+
+        await concurrently_execute(get_event, events, 5)
+
+        # Make a map of auth events for each event. We do this after fetching
+        # all the events as some of the events' auth events will be in the list
+        # of requested events.
+
+        auth_events = [
+            aid
+            for event in event_map.values()
+            for aid in event.auth_event_ids()
+            if aid not in event_map
+        ]
+        persisted_events = await self.store.get_events(
+            auth_events,
+            allow_rejected=True,
+        )
+
+        event_infos = []
+        for event in event_map.values():
+            auth = {}
+            for auth_event_id in event.auth_event_ids():
+                ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
+                if ae:
+                    auth[(ae.type, ae.state_key)] = ae
+                else:
+                    logger.info("Missing auth event %s", auth_event_id)
+
+            event_infos.append(_NewEventInfo(event, auth))
+
+        if event_infos:
+            await self._auth_and_persist_events(
+                destination,
+                room_id,
+                event_infos,
+            )
 
     async def _auth_and_persist_events(
         self,
