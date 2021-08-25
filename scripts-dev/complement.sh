@@ -35,25 +35,25 @@ if [[ -z "$COMPLEMENT_DIR" ]]; then
   echo "Checkout available at 'complement-master'"
 fi
 
+# Build the base Synapse image from the local checkout
+docker build -t matrixdotorg/synapse -f "docker/Dockerfile" .
+
 # If we're using workers, modify the docker files slightly.
 if [[ -n "$WORKERS" ]]; then
-  BASE_IMAGE=matrixdotorg/synapse-workers
-  BASE_DOCKERFILE=docker/Dockerfile-workers
+  # Build the workers docker image (from the base Synapse image).
+  docker build -t matrixdotorg/synapse-workers -f "docker/Dockerfile-workers" .
+
   export COMPLEMENT_BASE_IMAGE=complement-synapse-workers
   COMPLEMENT_DOCKERFILE=SynapseWorkers.Dockerfile
   # And provide some more configuration to complement.
   export COMPLEMENT_CA=true
   export COMPLEMENT_VERSION_CHECK_ITERATIONS=500
 else
-  BASE_IMAGE=matrixdotorg/synapse
-  BASE_DOCKERFILE=docker/Dockerfile
   export COMPLEMENT_BASE_IMAGE=complement-synapse
   COMPLEMENT_DOCKERFILE=Synapse.Dockerfile
 fi
 
-# Build the base Synapse image from the local checkout
-docker build -t $BASE_IMAGE -f "$BASE_DOCKERFILE" .
-# Build the Synapse monolith image from Complement, based on the above image we just built
+# Build the Complement image from the Synapse image we just built.
 docker build -t $COMPLEMENT_BASE_IMAGE -f "$COMPLEMENT_DIR/dockerfiles/$COMPLEMENT_DOCKERFILE" "$COMPLEMENT_DIR/dockerfiles"
 
 cd "$COMPLEMENT_DIR"
