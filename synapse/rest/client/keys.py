@@ -15,8 +15,9 @@
 # limitations under the License.
 
 import logging
+from typing import Any
 
-from synapse.api.errors import SynapseError
+from synapse.api.errors import InvalidAPICallError, SynapseError
 from synapse.http.servlet import (
     RestServlet,
     parse_integer,
@@ -163,6 +164,19 @@ class KeyQueryServlet(RestServlet):
         device_id = requester.device_id
         timeout = parse_integer(request, "timeout", 10 * 1000)
         body = parse_json_object_from_request(request)
+
+        device_keys = body.get("device_keys")
+        if not isinstance(device_keys, dict):
+            raise InvalidAPICallError("'device_keys' must be a JSON object")
+
+        def is_list_of_strings(values: Any) -> bool:
+            return isinstance(values, list) and all(isinstance(v, str) for v in values)
+
+        if any(not is_list_of_strings(keys) for keys in device_keys.values()):
+            raise InvalidAPICallError(
+                "'device_keys' values must be a list of strings",
+            )
+
         result = await self.e2e_keys_handler.query_devices(
             body, timeout, user_id, device_id
         )

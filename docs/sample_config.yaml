@@ -793,6 +793,8 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #     is using
 #   - one for registration that ratelimits registration requests based on the
 #     client's IP address.
+#   - one for checking the validity of registration tokens that ratelimits
+#     requests based on the client's IP address.
 #   - one for login that ratelimits login requests based on the client's IP
 #     address.
 #   - one for login that ratelimits login requests based on the account the
@@ -820,6 +822,10 @@ log_config: "CONFDIR/SERVERNAME.log.config"
 #rc_registration:
 #  per_second: 0.17
 #  burst_count: 3
+#
+#rc_registration_token_validity:
+#  per_second: 0.1
+#  burst_count: 5
 #
 #rc_login:
 #  address:
@@ -1168,6 +1174,15 @@ url_preview_accept_language:
 # Enable 3PIDs lookup requests to identity servers from this server.
 #
 #enable_3pid_lookup: true
+
+# Require users to submit a token during registration.
+# Tokens can be managed using the admin API:
+# https://matrix-org.github.io/synapse/latest/usage/administration/admin_api/registration_tokens.html
+# Note that `enable_registration` must be set to `true`.
+# Disabling this option will not delete any tokens previously generated.
+# Defaults to false. Uncomment the following to require tokens:
+#
+#registration_requires_token: true
 
 # If set, allows registration of standard or admin accounts by anyone who
 # has the shared secret, even if registration is otherwise disabled.
