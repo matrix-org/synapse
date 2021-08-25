@@ -117,7 +117,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         Update the user directory stream position, then clean up the old tables.
         """
         position = await self.db_pool.simple_select_one_onecol(
-            TEMP_TABLE + "_position", None, "position"
+            TEMP_TABLE + "_position", {}, "position"
         )
         await self.update_user_directory_stream_pos(position)
 
@@ -443,7 +443,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 for user_id, other_user_id in user_id_tuples
             ],
             value_names=(),
-            value_values=None,
+            value_values=(),
             desc="add_users_who_share_room",
         )
 
@@ -462,7 +462,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             key_names=["user_id", "room_id"],
             key_values=[(user_id, room_id) for user_id in user_ids],
             value_names=(),
-            value_values=None,
+            value_values=(),
             desc="add_users_in_public_rooms",
         )
 
