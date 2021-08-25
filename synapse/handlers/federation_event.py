@@ -15,6 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Collection, Iterable, List, Optional, Sequence, Tuple
 
+import attr
 from prometheus_client import Counter
 
 from twisted.internet import defer
@@ -27,7 +28,6 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.handlers._base import BaseHandler
-from synapse.handlers.federation import _NewEventInfo
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -55,6 +55,30 @@ soft_failed_event_counter = Counter(
     "synapse_federation_soft_failed_events_total",
     "Events received over federation that we marked as soft_failed",
 )
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _NewEventInfo:
+    """Holds information about a received event, ready for passing to _auth_and_persist_events
+
+    Attributes:
+        event: the received event
+
+        claimed_auth_event_map: a map of (type, state_key) => event for the event's
+            claimed auth_events.
+
+            This can include events which have not yet been persisted, in the case that
+            we are backfilling a batch of events.
+
+            Note: May be incomplete: if we were unable to find all of the claimed auth
+            events. Also, treat the contents with caution: the events might also have
+            been rejected, might not yet have been authorized themselves, or they might
+            be in the wrong room.
+
+    """
+
+    event: EventBase
+    claimed_auth_event_map: StateMap[EventBase]
 
 
 class FederationEventHandler(BaseHandler):
