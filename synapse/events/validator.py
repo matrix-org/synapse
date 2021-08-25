@@ -97,7 +97,7 @@ class EventValidator:
             try:
                 jsonschema.validate(
                     instance=event.content,
-                    schema=plSchema,
+                    schema=POWER_LEVELS_SCHEMA,
                     cls=plValidator,
                 )
             except jsonschema.ValidationError as e:
@@ -216,35 +216,36 @@ class EventValidator:
             raise SynapseError(400, "'%s' must be state events" % (event.type,))
 
 
-def _create_power_level_validator():
-    powerLevelsSchema = {
-        "type": "object",
-        "properties": {
-            "ban": {"$ref": "#/definitions/int"},
-            "events": {"$ref": "#/definitions/objectOfInts"},
-            "events_default": {"$ref": "#/definitions/int"},
-            "invite": {"$ref": "#/definitions/int"},
-            "kick": {"$ref": "#/definitions/int"},
-            "notifications": {"$ref": "#/definitions/objectOfInts"},
-            "redact": {"$ref": "#/definitions/int"},
-            "state_default": {"$ref": "#/definitions/int"},
-            "users": {"$ref": "#/definitions/objectOfInts"},
-            "users_default": {"$ref": "#/definitions/int"},
+POWER_LEVELS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ban": {"$ref": "#/definitions/int"},
+        "events": {"$ref": "#/definitions/objectOfInts"},
+        "events_default": {"$ref": "#/definitions/int"},
+        "invite": {"$ref": "#/definitions/int"},
+        "kick": {"$ref": "#/definitions/int"},
+        "notifications": {"$ref": "#/definitions/objectOfInts"},
+        "redact": {"$ref": "#/definitions/int"},
+        "state_default": {"$ref": "#/definitions/int"},
+        "users": {"$ref": "#/definitions/objectOfInts"},
+        "users_default": {"$ref": "#/definitions/int"},
+    },
+    "definitions": {
+        "int": {
+            "type": "integer",
+            "minimum": CANONICALJSON_MIN_INT,
+            "maximum": CANONICALJSON_MAX_INT,
         },
-        "definitions": {
-            "int": {
-                "type": "integer",
-                "minimum": CANONICALJSON_MIN_INT,
-                "maximum": CANONICALJSON_MAX_INT,
-            },
-            "objectOfInts": {
-                "type": "object",
-                "additionalProperties": {"$ref": "#/definitions/int"},
-            },
+        "objectOfInts": {
+            "type": "object",
+            "additionalProperties": {"$ref": "#/definitions/int"},
         },
-    }
+    },
+}
 
-    validator = jsonschema.validators.validator_for(powerLevelsSchema)
+
+def _create_power_level_validator():
+    validator = jsonschema.validators.validator_for(POWER_LEVELS_SCHEMA)
 
     # by default jsonschema does not consider a frozendict to be an object so
     # we need to use a custom type checker
@@ -253,10 +254,7 @@ def _create_power_level_validator():
         "object", lambda checker, thing: isinstance(thing, collections.abc.Mapping)
     )
 
-    return (
-        powerLevelsSchema,
-        jsonschema.validators.extend(validator, type_checker=type_checker),
-    )
+    return jsonschema.validators.extend(validator, type_checker=type_checker)
 
 
-plSchema, plValidator = _create_power_level_validator()
+plValidator = _create_power_level_validator()
