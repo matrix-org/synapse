@@ -17,9 +17,17 @@
 
 import logging
 import re
+from typing import TYPE_CHECKING, Tuple
+
+from twisted.web.server import Request
 
 from synapse.api.constants import RoomCreationPreset
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +35,7 @@ logger = logging.getLogger(__name__)
 class VersionsRestServlet(RestServlet):
     PATTERNS = [re.compile("^/_matrix/client/versions$")]
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.config = hs.config
 
@@ -45,7 +53,7 @@ class VersionsRestServlet(RestServlet):
             in self.config.encryption_enabled_by_default_for_room_presets
         )
 
-    def on_GET(self, request):
+    def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         return (
             200,
             {
@@ -82,10 +90,12 @@ class VersionsRestServlet(RestServlet):
                     "io.element.e2ee_forced.trusted_private": self.e2ee_forced_trusted_private,
                     # Supports the busy presence state described in MSC3026.
                     "org.matrix.msc3026.busy_presence": self.config.experimental.msc3026_enabled,
+                    # Supports receiving hidden read receipts as per MSC2285
+                    "org.matrix.msc2285": self.config.experimental.msc2285_enabled,
                 },
             },
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     VersionsRestServlet(hs).register(http_server)

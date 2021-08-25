@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");

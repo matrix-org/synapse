@@ -74,6 +74,8 @@ class AccountDetailsResource(DirectServeHtmlResource):
         self._sso_handler = hs.get_sso_handler()
 
         def template_search_dirs():
+            if hs.config.server.custom_template_directory:
+                yield hs.config.server.custom_template_directory
             if hs.config.sso.sso_template_dir:
                 yield hs.config.sso.sso_template_dir
             yield hs.config.sso.default_template_dir
@@ -118,9 +120,9 @@ class AccountDetailsResource(DirectServeHtmlResource):
             use_display_name = parse_boolean(request, "use_display_name", default=False)
 
             try:
-                emails_to_use = [
+                emails_to_use: List[str] = [
                     val.decode("utf-8") for val in request.args.get(b"use_email", [])
-                ]  # type: List[str]
+                ]
             except ValueError:
                 raise SynapseError(400, "Query parameter use_email must be utf-8")
         except SynapseError as e:

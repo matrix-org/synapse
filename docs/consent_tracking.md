@@ -152,7 +152,7 @@ version of the policy. To do so:
 
  * ensure that the consent resource is configured, as in the previous section
 
- * ensure that server notices are configured, as in [server_notices.md](server_notices.md).
+ * ensure that server notices are configured, as in [the server notice documentation](server_notices.md).
 
  * Add `server_notice_content` under `user_consent` in `homeserver.yaml`. For
    example:

@@ -153,7 +153,7 @@ ROOM_COMPLEXITY_TOO_GREAT = (
 METRICS_PORT_WARNING = """\
 The metrics_port configuration option is deprecated in Synapse 0.31 in favour of
 a listener. Please see
-https://github.com/matrix-org/synapse/blob/master/docs/metrics-howto.md
+https://matrix-org.github.io/synapse/latest/metrics-howto.html
 on how to configure the new listener.
 --------------------------------------------------------------------------------"""
 
@@ -248,6 +248,7 @@ class ServerConfig(Config):
             self.use_presence = config.get("use_presence", True)
 
         # Custom presence router module
+        # This is the legacy way of configuring it (the config should now be put in the modules section)
         self.presence_router_module_class = None
         self.presence_router_config = None
         presence_router_config = presence_config.get("presence_router")
@@ -505,7 +506,7 @@ class ServerConfig(Config):
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs = []  # type: List[Dict[str, Optional[int]]]
+        self.retention_purge_jobs: List[Dict[str, Optional[int]]] = []
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -688,29 +689,39 @@ class ServerConfig(Config):
         # not included in the sample configuration file on purpose as it's a temporary
         # hack, so that some users can trial the new defaults without impacting every
         # user on the homeserver.
-        users_new_default_push_rules = (
+        users_new_default_push_rules: list = (
             config.get("users_new_default_push_rules") or []
-        )  # type: list
+        )
         if not isinstance(users_new_default_push_rules, list):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
         # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules = set(
-            users_new_default_push_rules
-        )  # type: set
+        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
 
         # Whitelist of domain names that given next_link parameters must have
-        next_link_domain_whitelist = config.get(
+        next_link_domain_whitelist: Optional[List[str]] = config.get(
             "next_link_domain_whitelist"
-        )  # type: Optional[List[str]]
+        )
 
-        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        self.next_link_domain_whitelist: Optional[Set[str]] = None
         if next_link_domain_whitelist is not None:
             if not isinstance(next_link_domain_whitelist, list):
                 raise ConfigError("'next_link_domain_whitelist' must be a list")
 
             # Turn the list into a set to improve lookup speed.
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
+
+        templates_config = config.get("templates") or {}
+        if not isinstance(templates_config, dict):
+            raise ConfigError("The 'templates' section must be a dictionary")
+
+        self.custom_template_directory = templates_config.get(
+            "custom_template_directory"
+        )
+        if self.custom_template_directory is not None and not isinstance(
+            self.custom_template_directory, str
+        ):
+            raise ConfigError("'custom_template_directory' must be a string")
 
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
@@ -811,7 +822,7 @@ class ServerConfig(Config):
         # In most cases you should avoid using a matrix specific subdomain such as
         # matrix.example.com or synapse.example.com as the server_name for the same
         # reasons you wouldn't use user@email.example.com as your email address.
-        # See https://github.com/matrix-org/synapse/blob/master/docs/delegate.md
+        # See https://matrix-org.github.io/synapse/latest/delegate.html
         # for information on how to host Synapse on a subdomain while preserving
         # a clean server_name.
         #
@@ -859,20 +870,6 @@ class ServerConfig(Config):
           # replaces the previous top-level 'use_presence' option.
           #
           #enabled: false
-
-          # Presence routers are third-party modules that can specify additional logic
-          # to where presence updates from users are routed.
-          #
-          presence_router:
-            # The custom module's class. Uncomment to use a custom presence router module.
-            #
-            #module: "my_custom_router.PresenceRouter"
-
-            # Configuration options of the custom module. Refer to your module's
-            # documentation for available options.
-            #
-            #config:
-            #  example_option: 'something'
 
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
@@ -962,6 +959,8 @@ class ServerConfig(Config):
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
         #
+        # Note: The value is ignored when an HTTP proxy is in use
+        #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
 
@@ -988,9 +987,9 @@ class ServerConfig(Config):
         #       'all local interfaces'.
         #
         #   type: the type of listener. Normally 'http', but other valid options are:
-        #       'manhole' (see docs/manhole.md),
-        #       'metrics' (see docs/metrics-howto.md),
-        #       'replication' (see docs/workers.md).
+        #       'manhole' (see https://matrix-org.github.io/synapse/latest/manhole.html),
+        #       'metrics' (see https://matrix-org.github.io/synapse/latest/metrics-howto.html),
+        #       'replication' (see https://matrix-org.github.io/synapse/latest/workers.html).
         #
         #   tls: set to true to enable TLS for this listener. Will use the TLS
         #       key/cert specified in tls_private_key_path / tls_certificate_path.
@@ -1015,8 +1014,8 @@ class ServerConfig(Config):
         #   client: the client-server API (/_matrix/client), and the synapse admin
         #       API (/_synapse/admin). Also implies 'media' and 'static'.
         #
-        #   consent: user consent forms (/_matrix/consent). See
-        #       docs/consent_tracking.md.
+        #   consent: user consent forms (/_matrix/consent).
+        #       See https://matrix-org.github.io/synapse/latest/consent_tracking.html.
         #
         #   federation: the server-server API (/_matrix/federation). Also implies
         #       'media', 'keys', 'openid'
@@ -1025,12 +1024,13 @@ class ServerConfig(Config):
         #
         #   media: the media API (/_matrix/media).
         #
-        #   metrics: the metrics interface. See docs/metrics-howto.md.
+        #   metrics: the metrics interface.
+        #       See https://matrix-org.github.io/synapse/latest/metrics-howto.html.
         #
         #   openid: OpenID authentication.
         #
-        #   replication: the HTTP replication API (/_synapse/replication). See
-        #       docs/workers.md.
+        #   replication: the HTTP replication API (/_synapse/replication).
+        #       See https://matrix-org.github.io/synapse/latest/workers.html.
         #
         #   static: static resources under synapse/static (/_matrix/static). (Mostly
         #       useful for 'fallback authentication'.)
@@ -1050,7 +1050,7 @@ class ServerConfig(Config):
           # that unwraps TLS.
           #
           # If you plan to use a reverse proxy, please see
-          # https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.md.
+          # https://matrix-org.github.io/synapse/latest/reverse_proxy.html.
           #
           %(unsecure_http_bindings)s
 
@@ -1283,6 +1283,19 @@ class ServerConfig(Config):
         # all domains.
         #
         #next_link_domain_whitelist: ["matrix.org"]
+
+        # Templates to use when generating email or HTML page contents.
+        #
+        templates:
+          # Directory in which Synapse will try to find template files to use to generate
+          # email or HTML page contents.
+          # If not set, or a file is not found within the template directory, a default
+          # template from within the Synapse package will be used.
+          #
+          # See https://matrix-org.github.io/synapse/latest/templates.html for more
+          # information about using custom templates.
+          #
+          #custom_template_directory: /path/to/custom/templates/
         """
             % locals()
         )

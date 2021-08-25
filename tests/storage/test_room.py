@@ -49,7 +49,7 @@ class RoomStoreTestCase(HomeserverTestCase):
         )
 
     def test_get_room_unknown_room(self):
-        self.assertIsNone((self.get_success(self.store.get_room("!uknown:test"))))
+        self.assertIsNone(self.get_success(self.store.get_room("!uknown:test")))
 
     def test_get_room_with_stats(self):
         self.assertDictContainsSubset(

@@ -21,7 +21,7 @@ import socket
 import sys
 import traceback
 import warnings
-from typing import Awaitable, Callable, Iterable
+from typing import TYPE_CHECKING, Awaitable, Callable, Iterable
 
 from cryptography.utils import CryptographyDeprecationWarning
 from typing_extensions import NoReturn
@@ -37,13 +37,19 @@ from synapse.app import check_bind_error
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
+from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
+from synapse.util.caches.lrucache import setup_expire_lru_cache_entries
 from synapse.util.daemonize import daemonize_process
 from synapse.util.rlimit import change_resource_limit
 from synapse.util.versionstring import get_version_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -312,7 +318,7 @@ def refresh_certificate(hs):
         logger.info("Context factories updated.")
 
 
-async def start(hs: "synapse.server.HomeServer"):
+async def start(hs: "HomeServer"):
     """
     Start a Synapse server or worker.
 
@@ -364,6 +370,11 @@ async def start(hs: "synapse.server.HomeServer"):
         module(config=config, api=module_api)
 
     load_legacy_spam_checkers(hs)
+    load_legacy_third_party_event_rules(hs)
+    load_legacy_presence_router(hs)
+
+    # If we've configured an expiry time for caches, start the background job now.
+    setup_expire_lru_cache_entries(hs)
 
     # It is now safe to start your Synapse.
     hs.start_listening()

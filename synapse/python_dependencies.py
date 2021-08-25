@@ -115,7 +115,7 @@ CONDITIONAL_REQUIREMENTS = {
     "cache_memory": ["pympler"],
 }
 
-ALL_OPTIONAL_REQUIREMENTS = set()  # type: Set[str]
+ALL_OPTIONAL_REQUIREMENTS: Set[str] = set()
 
 for name, optional_deps in CONDITIONAL_REQUIREMENTS.items():
     # Exclude systemd as it's a system-based requirement.
@@ -193,7 +193,7 @@ def check_requirements(for_feature=None):
     if not for_feature:
         # Check the optional dependencies are up to date. We allow them to not be
         # installed.
-        OPTS = sum(CONDITIONAL_REQUIREMENTS.values(), [])  # type: List[str]
+        OPTS: List[str] = sum(CONDITIONAL_REQUIREMENTS.values(), [])
 
         for dependency in OPTS:
             try:

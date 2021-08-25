@@ -34,8 +34,6 @@ from typing import (
 )
 
 import twisted.internet.tcp
-from twisted.internet import defer
-from twisted.mail.smtp import sendmail
 from twisted.web.iweb import IPolicyForHTTPS
 from twisted.web.resource import IResource
 
@@ -101,10 +99,10 @@ from synapse.handlers.room import (
 from synapse.handlers.room_list import RoomListHandler
 from synapse.handlers.room_member import RoomMemberHandler, RoomMemberMasterHandler
 from synapse.handlers.room_member_worker import RoomMemberWorkerHandler
+from synapse.handlers.room_summary import RoomSummaryHandler
 from synapse.handlers.search import SearchHandler
 from synapse.handlers.send_email import SendEmailHandler
 from synapse.handlers.set_password import SetPasswordHandler
-from synapse.handlers.space_summary import SpaceSummaryHandler
 from synapse.handlers.sso import SsoHandler
 from synapse.handlers.stats import StatsHandler
 from synapse.handlers.sync import SyncHandler
@@ -247,15 +245,15 @@ class HomeServer(metaclass=abc.ABCMeta):
         # the key we use to sign events and requests
         self.signing_key = config.key.signing_key[0]
         self.config = config
-        self._listening_services = []  # type: List[twisted.internet.tcp.Port]
-        self.start_time = None  # type: Optional[int]
+        self._listening_services: List[twisted.internet.tcp.Port] = []
+        self.start_time: Optional[int] = None
 
         self._instance_id = random_string(5)
         self._instance_name = config.worker.instance_name
 
         self.version_string = version_string
 
-        self.datastores = None  # type: Optional[Databases]
+        self.datastores: Optional[Databases] = None
 
         self._module_web_resources: Dict[str, IResource] = {}
         self._module_web_resources_consumed = False
@@ -441,10 +439,6 @@ class HomeServer(metaclass=abc.ABCMeta):
     @cache_in_self
     def get_room_shutdown_handler(self) -> RoomShutdownHandler:
         return RoomShutdownHandler(self)
-
-    @cache_in_self
-    def get_sendmail(self) -> Callable[..., defer.Deferred]:
-        return sendmail
 
     @cache_in_self
     def get_state_handler(self) -> StateHandler:
@@ -778,8 +772,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return AccountDataHandler(self)
 
     @cache_in_self
-    def get_space_summary_handler(self) -> SpaceSummaryHandler:
-        return SpaceSummaryHandler(self)
+    def get_room_summary_handler(self) -> RoomSummaryHandler:
+        return RoomSummaryHandler(self)
 
     @cache_in_self
     def get_event_auth_handler(self) -> EventAuthHandler:

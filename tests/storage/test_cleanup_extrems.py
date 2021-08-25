@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.storage import prepare_database
 from synapse.types import UserID, create_requester
 

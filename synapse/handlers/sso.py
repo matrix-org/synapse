@@ -37,6 +37,7 @@ from twisted.web.server import Request
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes, NotFoundError, RedirectException, SynapseError
 from synapse.config.sso import SsoAttributeRequirement
+from synapse.handlers.register import init_counters_for_auth_provider
 from synapse.handlers.ui_auth import UIAuthSessionDataConstants
 from synapse.http import get_request_user_agent
 from synapse.http.server import respond_with_html, respond_with_redirect
@@ -202,10 +203,10 @@ class SsoHandler:
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
 
         # a map from session id to session data
-        self._username_mapping_sessions = {}  # type: Dict[str, UsernameMappingSession]
+        self._username_mapping_sessions: Dict[str, UsernameMappingSession] = {}
 
         # map from idp_id to SsoIdentityProvider
-        self._identity_providers = {}  # type: Dict[str, SsoIdentityProvider]
+        self._identity_providers: Dict[str, SsoIdentityProvider] = {}
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
@@ -213,6 +214,7 @@ class SsoHandler:
         p_id = p.idp_id
         assert p_id not in self._identity_providers
         self._identity_providers[p_id] = p
+        init_counters_for_auth_provider(p_id)
 
     def get_identity_providers(self) -> Mapping[str, SsoIdentityProvider]:
         """Get the configured identity providers"""
@@ -296,7 +298,7 @@ class SsoHandler:
             )
 
         # if the client chose an IdP, use that
-        idp = None  # type: Optional[SsoIdentityProvider]
+        idp: Optional[SsoIdentityProvider] = None
         if idp_id:
             idp = self._identity_providers.get(idp_id)
             if not idp:
@@ -669,9 +671,9 @@ class SsoHandler:
             remote_user_id,
         )
 
-        user_id_to_verify = await self._auth_handler.get_session_data(
+        user_id_to_verify: str = await self._auth_handler.get_session_data(
             ui_auth_session_id, UIAuthSessionDataConstants.REQUEST_USER_ID
-        )  # type: str
+        )
 
         if not user_id:
             logger.warning(
@@ -793,7 +795,7 @@ class SsoHandler:
         session.use_display_name = use_display_name
 
         emails_from_idp = set(session.emails)
-        filtered_emails = set()  # type: Set[str]
+        filtered_emails: Set[str] = set()
 
         # we iterate through the list rather than just building a set conjunction, so
         # that we can log attempts to use unknown addresses
