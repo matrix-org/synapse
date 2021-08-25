@@ -65,7 +65,9 @@ class SamlHandler(BaseHandler):
 
         # At this point either a module will have registered user mapping provider
         # callbacks or the default will have been registered.
-        assert self._user_mapping_provider.module_has_registered
+        # however if for some reason that hasn't happened (e.g. testing) load the default
+        if not self._user_mapping_provider.module_has_registered:
+            load_default_or_legacy_saml2_mapping_provider(hs)
 
         # Merge the required and optional saml_attributes registered by the mapping
         # provider with the base sp config. NOTE: If there are conflicts then the
@@ -549,7 +551,7 @@ def load_default_or_legacy_saml2_mapping_provider(hs: "HomeServer"):
 
     # if we were loading the default provider, then it has already registered its callbacks!
     # so we can stop here
-    if module == DEFAULT_USER_MAPPING_PROVIDER:
+    if module.__module__ + "." + module.__qualname__ == DEFAULT_USER_MAPPING_PROVIDER:
         return
 
     # The required hooks. If a custom module doesn't implement all of these then raise an error
