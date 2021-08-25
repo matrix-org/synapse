@@ -14,7 +14,7 @@
 
 import logging
 from collections import namedtuple
-from typing import Any, Dict, FrozenSet, Iterable, List, Optional, Set, Tuple, Union
+from typing import Dict, FrozenSet, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 
@@ -28,16 +28,12 @@ from synapse.storage.databases.state.bg_updates import StateBackgroundUpdateStor
 from synapse.storage.state import StateFilter
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateKey, StateMap
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.dictionary_cache import DictionaryCache
 from synapse.util.caches.multi_key_response_cache import MultiKeyResponseCache
 
 logger = logging.getLogger(__name__)
-
-# XXX
-UNKNOWN = Any  # TODO
-
 
 InflightStateGroupCacheKey = Union[
     Tuple[int, StateFilter], Tuple[int, str, Optional[str]]
@@ -95,12 +91,14 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         # We size the non-members cache to be smaller than the members cache as the
         # vast majority of state in Matrix (today) is member events.
 
-        self._state_group_cache = DictionaryCache(
+        self._state_group_cache: DictionaryCache[int, StateKey] = DictionaryCache(
             "*stateGroupCache*",
             # TODO: this hasn't been tuned yet
             50000,
         )
-        self._state_group_members_cache = DictionaryCache(
+        self._state_group_members_cache: DictionaryCache[
+            int, StateKey
+        ] = DictionaryCache(
             "*stateGroupMembersCache*",
             500000,
         )
@@ -195,10 +193,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
     def _get_state_for_group_using_cache(
         self,
-        cache: DictionaryCache[int, UNKNOWN],
+        cache: DictionaryCache[int, StateKey],
         group: int,
         state_filter: StateFilter,
-    ) -> Tuple[MutableStateMap[UNKNOWN], bool]:
+    ) -> Tuple[MutableStateMap[str], bool]:
         """Checks if group is in cache. See `_get_state_for_groups`
 
         Args:
@@ -281,6 +279,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         def try_collect_satisfactory_inflight_requests(
             group: int,
+            state_filter: StateFilter,
             mut_inflight_requests: List[Tuple[int, Deferred[Dict[int, StateMap[str]]]]],
         ) -> bool:
             """
@@ -391,7 +390,9 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     inflight_requests.append((group, make_deferred_yieldable(result)))
                     continue
 
-            if try_collect_satisfactory_inflight_requests(group, inflight_requests):
+            if try_collect_satisfactory_inflight_requests(
+                group, state_filter, inflight_requests
+            ):
                 # succeeded in finding in-flight requests that could be combined
                 # together to give all the state we need for this group.
                 continue
@@ -463,7 +464,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         return state
 
     def _get_state_for_groups_using_cache(
-        self, groups: Iterable[int], cache: DictionaryCache, state_filter: StateFilter
+        self,
+        groups: Iterable[int],
+        cache: DictionaryCache[int, StateKey],
+        state_filter: StateFilter,
     ) -> Tuple[Dict[int, MutableStateMap[str]], Set[int]]:
         """Gets the state at each of a list of state groups, optionally
         filtering by type/state_key, querying from a specific cache.
