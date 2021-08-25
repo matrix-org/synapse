@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import logging
+from http import HTTPStatus
 from typing import (
     TYPE_CHECKING,
     Collection,
@@ -38,7 +39,12 @@ from synapse.api.constants import (
     RejectedReason,
     RoomEncryptionAlgorithms,
 )
-from synapse.api.errors import AuthError, FederationError, RequestSendFailed
+from synapse.api.errors import (
+    AuthError,
+    FederationError,
+    RequestSendFailed,
+    SynapseError,
+)
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
@@ -1292,3 +1298,33 @@ class FederationEventHandler(BaseHandler):
         self.notifier.on_new_room_event(
             event, event_pos, max_stream_token, extra_users=extra_users
         )
+
+    def _sanity_check_event(self, ev: EventBase) -> None:
+        """
+        Do some early sanity checks of a received event
+
+        In particular, checks it doesn't have an excessive number of
+        prev_events or auth_events, which could cause a huge state resolution
+        or cascade of event fetches.
+
+        Args:
+            ev: event to be checked
+
+        Raises:
+            SynapseError if the event does not pass muster
+        """
+        if len(ev.prev_event_ids()) > 20:
+            logger.warning(
+                "Rejecting event %s which has %i prev_events",
+                ev.event_id,
+                len(ev.prev_event_ids()),
+            )
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many prev_events")
+
+        if len(ev.auth_event_ids()) > 10:
+            logger.warning(
+                "Rejecting event %s which has %i auth_events",
+                ev.event_id,
+                len(ev.auth_event_ids()),
+            )
+            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")

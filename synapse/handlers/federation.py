@@ -158,7 +158,7 @@ class FederationHandler(BaseHandler):
         # sure it doesn't have hundreds of prev_events or auth_events, which
         # could cause a huge state resolution or cascade of event fetches.
         try:
-            self._sanity_check_event(pdu)
+            self._federation_event_handler._sanity_check_event(pdu)
         except SynapseError as err:
             logger.warning("Received event failed sanity checks")
             raise FederationError("ERROR", err.code, err.msg, affected=pdu.event_id)
@@ -758,7 +758,7 @@ class FederationHandler(BaseHandler):
             logger.info("De-outliering event %s", event_id)
 
         try:
-            self._sanity_check_event(event)
+            self._federation_event_handler._sanity_check_event(event)
         except SynapseError as err:
             logger.warning("Event %s failed sanity check: %s", event_id, err)
             return
@@ -777,36 +777,6 @@ class FederationHandler(BaseHandler):
                 logger.warning("Pulled event %s failed history check.", event_id)
             else:
                 raise
-
-    def _sanity_check_event(self, ev: EventBase) -> None:
-        """
-        Do some early sanity checks of a received event
-
-        In particular, checks it doesn't have an excessive number of
-        prev_events or auth_events, which could cause a huge state resolution
-        or cascade of event fetches.
-
-        Args:
-            ev: event to be checked
-
-        Raises:
-            SynapseError if the event does not pass muster
-        """
-        if len(ev.prev_event_ids()) > 20:
-            logger.warning(
-                "Rejecting event %s which has %i prev_events",
-                ev.event_id,
-                len(ev.prev_event_ids()),
-            )
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many prev_events")
-
-        if len(ev.auth_event_ids()) > 10:
-            logger.warning(
-                "Rejecting event %s which has %i auth_events",
-                ev.event_id,
-                len(ev.auth_event_ids()),
-            )
-            raise SynapseError(HTTPStatus.BAD_REQUEST, "Too many auth_events")
 
     async def send_invite(self, target_host: str, event: EventBase) -> EventBase:
         """Sends the invite to the remote server for signing.
