@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 import synapse.metrics
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules, Membership
-from synapse.handlers.state_deltas import StateDeltasHandler
+from synapse.handlers.state_deltas import MatchChange, StateDeltasHandler
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.roommember import ProfileInfo
 from synapse.types import JsonDict
@@ -189,14 +189,14 @@ class UserDirectoryHandler(StateDeltasHandler):
                     room_id, prev_event_id, event_id, typ
                 )
             elif typ == EventTypes.Member:
-                change = await self._get_key_change(
+                joined = await self._get_key_change(
                     prev_event_id,
                     event_id,
                     key_name="membership",
                     public_value=Membership.JOIN,
                 )
 
-                if change is False:
+                if joined is MatchChange.now_false:
                     # Need to check if the server left the room entirely, if so
                     # we might need to remove all the users in that room
                     is_in_room = await self.store.is_host_joined(
@@ -219,14 +219,14 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 is_support = await self.store.is_support_user(state_key)
                 if not is_support:
-                    if change is None:
+                    if joined is MatchChange.no_change:
                         # Handle any profile changes
                         await self._handle_profile_change(
                             state_key, room_id, prev_event_id, event_id
                         )
                         continue
 
-                    if change:  # The user joined
+                    if joined is MatchChange.now_true:  # The user joined
                         event = await self.store.get_event(event_id, allow_none=True)
                         # It isn't expected for this event to not exist, but we
                         # don't want the entire background process to break.
@@ -263,14 +263,14 @@ class UserDirectoryHandler(StateDeltasHandler):
         logger.debug("Handling change for %s: %s", typ, room_id)
 
         if typ == EventTypes.RoomHistoryVisibility:
-            change = await self._get_key_change(
+            publicity = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="history_visibility",
                 public_value=HistoryVisibility.WORLD_READABLE,
             )
         elif typ == EventTypes.JoinRules:
-            change = await self._get_key_change(
+            publicity = await self._get_key_change(
                 prev_event_id,
                 event_id,
                 key_name="join_rule",
@@ -280,7 +280,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             raise Exception("Invalid event type")
         # If change is None, no change. True => become world_readable/public,
         # False => was world_readable/public
-        if change is None:
+        if publicity is MatchChange.no_change:
             logger.debug("No change")
             return
 
@@ -290,13 +290,13 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
 
-        logger.debug("Change: %r, is_public: %r", change, is_public)
+        logger.debug("Change: %r, is_public: %r", publicity, is_public)
 
-        if change and not is_public:
+        if publicity is MatchChange.now_true and not is_public:
             # If we became world readable but room isn't currently public then
             # we ignore the change
             return
-        elif not change and is_public:
+        elif publicity is MatchChange.now_false and is_public:
             # If we stopped being world readable but are still public,
             # ignore the change
             return

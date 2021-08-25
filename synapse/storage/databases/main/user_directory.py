@@ -14,10 +14,10 @@
 
 import logging
 import re
-from typing import Any, Dict, Iterable, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, Optional, Sequence, Set, Tuple
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -146,7 +146,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         if not progress:
             await self.delete_all_from_user_dir()
 
-        def _get_next_batch(txn):
+        def _get_next_batch(
+            txn: LoggingTransaction,
+        ) -> Optional[Sequence[Tuple[str, str]]]:
             # Only fetch 250 rooms, so we don't fetch too many at once, even
             # if those 250 rooms have less than batch_size state events.
             sql = """
