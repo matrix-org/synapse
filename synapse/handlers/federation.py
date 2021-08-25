@@ -2019,7 +2019,9 @@ class FederationHandler(BaseHandler):
         event.internal_metadata.send_on_behalf_of = origin
 
         context = await self.state_handler.compute_event_context(event)
-        context = await self._check_event_auth(origin, event, context)
+        context = await self._federation_event_handler._check_event_auth(
+            origin, event, context
+        )
         if context.rejected:
             raise SynapseError(
                 403, f"{event.membership} event was rejected", Codes.FORBIDDEN
@@ -2206,7 +2208,7 @@ class FederationHandler(BaseHandler):
 
             backfilled: True if the event was backfilled.
         """
-        context = await self._check_event_auth(
+        context = await self._federation_event_handler._check_event_auth(
             origin,
             event,
             context,
@@ -2268,7 +2270,7 @@ class FederationHandler(BaseHandler):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
                 res = await self.state_handler.compute_event_context(event)
-                res = await self._check_event_auth(
+                res = await self._federation_event_handler._check_event_auth(
                     origin,
                     event,
                     res,
@@ -2431,100 +2433,6 @@ class FederationHandler(BaseHandler):
         )
 
         return missing_events
-
-    async def _check_event_auth(
-        self,
-        origin: str,
-        event: EventBase,
-        context: EventContext,
-        state: Optional[Iterable[EventBase]] = None,
-        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
-        backfilled: bool = False,
-    ) -> EventContext:
-        """
-        Checks whether an event should be rejected (for failing auth checks).
-
-        Args:
-            origin: The host the event originates from.
-            event: The event itself.
-            context:
-                The event context.
-
-            state:
-                The state events used to check the event for soft-fail. If this is
-                not provided the current state events will be used.
-
-            claimed_auth_event_map:
-                A map of (type, state_key) => event for the event's claimed auth_events.
-                Possibly incomplete, and possibly including events that are not yet
-                persisted, or authed, or in the right room.
-
-                Only populated where we may not already have persisted these events -
-                for example, when populating outliers, or the state for a backwards
-                extremity.
-
-            backfilled: True if the event was backfilled.
-
-        Returns:
-            The updated context object.
-        """
-        room_version = await self.store.get_room_version_id(event.room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
-        if claimed_auth_event_map:
-            # if we have a copy of the auth events from the event, use that as the
-            # basis for auth.
-            auth_events = claimed_auth_event_map
-        else:
-            # otherwise, we calculate what the auth events *should* be, and use that
-            prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self._event_auth_handler.compute_auth_events(
-                event, prev_state_ids, for_verification=True
-            )
-            auth_events_x = await self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
-
-        try:
-            (
-                context,
-                auth_events_for_auth,
-            ) = await self._federation_event_handler._update_auth_events_and_context_for_auth(
-                origin, event, context, auth_events
-            )
-        except Exception:
-            # We don't really mind if the above fails, so lets not fail
-            # processing if it does. However, it really shouldn't fail so
-            # let's still log as an exception since we'll still want to fix
-            # any bugs.
-            logger.exception(
-                "Failed to double check auth events for %s with remote. "
-                "Ignoring failure and continuing processing of event.",
-                event.event_id,
-            )
-            auth_events_for_auth = auth_events
-
-        try:
-            event_auth.check(room_version_obj, event, auth_events=auth_events_for_auth)
-        except AuthError as e:
-            logger.warning("Failed auth resolution for %r because %s", event, e)
-            context.rejected = RejectedReason.AUTH_ERROR
-
-        if not context.rejected:
-            await self._federation_event_handler._check_for_soft_fail(
-                event, state, backfilled, origin=origin
-            )
-
-        if event.type == EventTypes.GuestAccess and not context.rejected:
-            await self.maybe_kick_guest_users(event)
-
-        # If we are going to send this event over federation we precaclculate
-        # the joined hosts.
-        if event.internal_metadata.get_send_on_behalf_of():
-            await self.event_creation_handler.cache_joined_hosts_for_event(
-                event, context
-            )
-
-        return context
 
     async def construct_auth_difference(
         self, local_auth: Iterable[EventBase], remote_auth: Iterable[EventBase]
