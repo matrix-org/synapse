@@ -101,9 +101,16 @@ class EventValidator:
                     cls=plValidator,
                 )
             except jsonschema.ValidationError as e:
+                if e.path:
+                    # example: "users_default": '0' is not of type 'integer'
+                    message = '"' + e.path[-1] + '": ' + e.message
+                else:
+                    # example: '0' is not of type 'integer'
+                    message = e.message
+
                 raise SynapseError(
                     code=400,
-                    msg=e.message,  # noqa: B306, jsonschema.ValidationError.message is a valid attribute
+                    msg=message,  # noqa: B306, jsonschema.ValidationError.message is a valid attribute
                     errcode=Codes.BAD_JSON,
                 )
 
