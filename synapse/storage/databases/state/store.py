@@ -280,7 +280,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         def try_collect_satisfactory_inflight_requests(
             group: int,
             state_filter: StateFilter,
-            mut_inflight_requests: List[Tuple[int, Deferred[Dict[int, StateMap[str]]]]],
+            mut_inflight_requests: "List[Tuple[int, Deferred[Dict[int, StateMap[str]]]]]",
         ) -> bool:
             """
             Tries to collect existing in-flight requests that would give us all
