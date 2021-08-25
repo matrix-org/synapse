@@ -154,6 +154,12 @@ class FederationEventHandler(BaseHandler):
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
 
+        # When joining a room we need to queue any events for that room up.
+        # For each room, a list of (pdu, origin) tuples.
+        # TODO: replace this with something more elegant, probably based around the
+        # federation event staging area.
+        self.room_queues: Dict[str, List[Tuple[EventBase, str]]] = {}
+
     @log_function
     async def on_send_membership_event(
         self, origin: str, event: EventBase

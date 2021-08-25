@@ -112,9 +112,6 @@ class FederationHandler(BaseHandler):
                 self.store.maybe_store_room_on_outlier_membership
             )
 
-        # When joining a room we need to queue any events for that room up.
-        # For each room, a list of (pdu, origin) tuples.
-        self.room_queues: Dict[str, List[Tuple[EventBase, str]]] = {}
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
 
         self._room_backfill = Linearizer("room_backfill")
@@ -165,12 +162,12 @@ class FederationHandler(BaseHandler):
 
         # If we are currently in the process of joining this room, then we
         # queue up events for later processing.
-        if room_id in self.room_queues:
+        if room_id in self._federation_event_handler.room_queues:
             logger.info(
                 "Queuing PDU from %s for now: join in progress",
                 origin,
             )
-            self.room_queues[room_id].append((pdu, origin))
+            self._federation_event_handler.room_queues[room_id].append((pdu, origin))
             return
 
         # If we're not in the room just ditch the event entirely. This is
@@ -615,9 +612,9 @@ class FederationHandler(BaseHandler):
         # This shouldn't happen, because the RoomMemberHandler has a
         # linearizer lock which only allows one operation per user per room
         # at a time - so this is just paranoia.
-        assert room_id not in self.room_queues
+        assert room_id not in self._federation_event_handler.room_queues
 
-        self.room_queues[room_id] = []
+        self._federation_event_handler.room_queues[room_id] = []
 
         await self._clean_room_for_join(room_id)
 
@@ -691,8 +688,8 @@ class FederationHandler(BaseHandler):
             logger.debug("Finished joining %s to %s", joinee, room_id)
             return event.event_id, max_stream_id
         finally:
-            room_queue = self.room_queues[room_id]
-            del self.room_queues[room_id]
+            room_queue = self._federation_event_handler.room_queues[room_id]
+            del self._federation_event_handler.room_queues[room_id]
 
             # we don't need to wait for the queued events to be processed -
             # it's just a best-effort thing at this point. We do want to do
