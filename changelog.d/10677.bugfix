@@ -1,0 +1,1 @@
+Fix a bug which caused the `synapse_user_logins_total` Prometheus metric not to be correctly initialised on restart.

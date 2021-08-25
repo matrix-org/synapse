@@ -13,11 +13,18 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import SynapseError
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -25,17 +32,13 @@ logger = logging.getLogger(__name__)
 class UserDirectorySearchRestServlet(RestServlet):
     PATTERNS = client_patterns("/user_directory/search$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
         self.user_directory_handler = hs.get_user_directory_handler()
 
-    async def on_POST(self, request):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         """Searches for users in directory
 
         Returns:
@@ -75,5 +78,5 @@ class UserDirectorySearchRestServlet(RestServlet):
         return 200, results
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     UserDirectorySearchRestServlet(hs).register(http_server)
