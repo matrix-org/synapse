@@ -1,4 +1,4 @@
-Users will stop receiving message updates via email for addresses that were once, but not still, linked to their account
+Users will stop receiving message updates via email for addresses that were previously linked to their account
 
 Synapse 1.41.0rc1 (2021-08-18)
 ==============================

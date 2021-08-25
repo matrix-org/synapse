@@ -400,7 +400,8 @@ class PusherWorkerStore(SQLBaseStore):
 
         In previous versions of synapse, when users deleted their email address, it didn't
         also delete all the pushers for that email address. This background update removes
-        those to prevent unwanted emails
+        those to prevent unwanted emails. This should only need to be run once (when users
+        upgrade to v1.42.0
 
         Args:
             progress: dict used to store progress of this background update
@@ -418,7 +419,7 @@ class PusherWorkerStore(SQLBaseStore):
                 SELECT p.id, p.user_name, p.app_id, p.pushkey
                 FROM pushers AS p
                     LEFT JOIN user_threepids AS t
-                        ON t.user_id=p.user_name
+                        ON t.user_id = p.user_name
                         AND t.medium = 'email'
                         AND t.address = p.pushkey
                 WHERE t.user_id is NULL
