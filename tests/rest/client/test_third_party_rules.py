@@ -328,7 +328,6 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         """
         self.helper.create_room_as(self.user_id, tok=self.tok, expect_code=403)
 
-    @unittest.DEBUG
     def test_replacing_does_not_skip(self):
         """Tests that returning replacement content for an event in a check_event_allowed
         callback doesn't skip subsequent callbacks.
