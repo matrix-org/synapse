@@ -7,6 +7,7 @@
   - [Installation](setup/installation.md)
   - [Using Postgres](postgres.md)
   - [Configuring a Reverse Proxy](reverse_proxy.md)
+  - [Configuring a Forward/Outbound Proxy](setup/forward_proxy.md)
   - [Configuring a Turn Server](turn-howto.md)
   - [Delegation](delegate.md)
 
@@ -20,6 +21,7 @@
     - [Homeserver Sample Config File](usage/configuration/homeserver_sample_config.md)
     - [Logging Sample Config File](usage/configuration/logging_sample_config.md)
     - [Structured Logging](structured_logging.md)
+    - [Templates](templates.md)
     - [User Authentication](usage/configuration/user_authentication/README.md)
       - [Single-Sign On]()
         - [OpenID Connect](openid.md)

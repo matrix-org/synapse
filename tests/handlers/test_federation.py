@@ -22,7 +22,7 @@ from synapse.events import EventBase
 from synapse.federation.federation_base import event_from_pdu_json
 from synapse.logging.context import LoggingContext, run_in_background
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.util.stringutils import random_string
 
 from tests import unittest

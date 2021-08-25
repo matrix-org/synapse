@@ -127,9 +127,6 @@ class DataStore(
         self._clock = hs.get_clock()
         self.database_engine = database.engine
 
-        self._public_room_id_gen = StreamIdGenerator(
-            db_conn, "public_room_list_stream", "stream_id"
-        )
         self._device_list_id_gen = StreamIdGenerator(
             db_conn,
             "device_lists_stream",
@@ -170,6 +167,7 @@ class DataStore(
                 sequence_name="cache_invalidation_stream_seq",
                 writers=[],
             )
+
         else:
             self._cache_id_gen = None
 

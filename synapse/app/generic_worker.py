@@ -64,42 +64,41 @@ from synapse.replication.slave.storage.push_rule import SlavedPushRuleStore
 from synapse.replication.slave.storage.pushers import SlavedPusherStore
 from synapse.replication.slave.storage.receipts import SlavedReceiptsStore
 from synapse.replication.slave.storage.registration import SlavedRegistrationStore
-from synapse.replication.slave.storage.room import RoomStore
 from synapse.rest.admin import register_servlets_for_media_repo
-from synapse.rest.client.v1 import events, login, presence, room
-from synapse.rest.client.v1.initial_sync import InitialSyncRestServlet
-from synapse.rest.client.v1.profile import (
-    ProfileAvatarURLRestServlet,
-    ProfileDisplaynameRestServlet,
-    ProfileRestServlet,
-)
-from synapse.rest.client.v1.push_rule import PushRuleRestServlet
-from synapse.rest.client.v1.voip import VoipRestServlet
-from synapse.rest.client.v2_alpha import (
+from synapse.rest.client import (
     account_data,
+    events,
     groups,
+    login,
+    presence,
     read_marker,
     receipts,
+    room,
     room_keys,
     sync,
     tags,
     user_directory,
 )
-from synapse.rest.client.v2_alpha._base import client_patterns
-from synapse.rest.client.v2_alpha.account import ThreepidRestServlet
-from synapse.rest.client.v2_alpha.account_data import (
-    AccountDataServlet,
-    RoomAccountDataServlet,
-)
-from synapse.rest.client.v2_alpha.devices import DevicesRestServlet
-from synapse.rest.client.v2_alpha.keys import (
+from synapse.rest.client._base import client_patterns
+from synapse.rest.client.account import ThreepidRestServlet
+from synapse.rest.client.account_data import AccountDataServlet, RoomAccountDataServlet
+from synapse.rest.client.devices import DevicesRestServlet
+from synapse.rest.client.initial_sync import InitialSyncRestServlet
+from synapse.rest.client.keys import (
     KeyChangesServlet,
     KeyQueryServlet,
     OneTimeKeyServlet,
 )
-from synapse.rest.client.v2_alpha.register import RegisterRestServlet
-from synapse.rest.client.v2_alpha.sendtodevice import SendToDeviceRestServlet
+from synapse.rest.client.profile import (
+    ProfileAvatarURLRestServlet,
+    ProfileDisplaynameRestServlet,
+    ProfileRestServlet,
+)
+from synapse.rest.client.push_rule import PushRuleRestServlet
+from synapse.rest.client.register import RegisterRestServlet
+from synapse.rest.client.sendtodevice import SendToDeviceRestServlet
 from synapse.rest.client.versions import VersionsRestServlet
+from synapse.rest.client.voip import VoipRestServlet
 from synapse.rest.health import HealthResource
 from synapse.rest.key.v2 import KeyApiV2Resource
 from synapse.rest.synapse.client import build_synapse_client_resource_tree
@@ -114,6 +113,7 @@ from synapse.storage.databases.main.monthly_active_users import (
     MonthlyActiveUsersWorkerStore,
 )
 from synapse.storage.databases.main.presence import PresenceStore
+from synapse.storage.databases.main.room import RoomWorkerStore
 from synapse.storage.databases.main.search import SearchStore
 from synapse.storage.databases.main.stats import StatsStore
 from synapse.storage.databases.main.transactions import TransactionWorkerStore
@@ -237,7 +237,7 @@ class GenericWorkerSlavedStore(
     ClientIpWorkerStore,
     SlavedEventStore,
     SlavedKeyStore,
-    RoomStore,
+    RoomWorkerStore,
     DirectoryStore,
     SlavedApplicationServiceStore,
     SlavedRegistrationStore,

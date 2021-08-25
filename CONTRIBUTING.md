@@ -13,8 +13,9 @@ This document aims to get you started with contributing to this repo!
 - [7. Turn coffee and documentation into code and documentation!](#7-turn-coffee-and-documentation-into-code-and-documentation)
 - [8. Test, test, test!](#8-test-test-test)
   * [Run the linters.](#run-the-linters)
-  * [Run the unit tests.](#run-the-unit-tests)
-  * [Run the integration tests.](#run-the-integration-tests)
+  * [Run the unit tests.](#run-the-unit-tests-twisted-trial)
+  * [Run the integration tests (SyTest).](#run-the-integration-tests-sytest)
+  * [Run the integration tests (Complement).](#run-the-integration-tests-complement)
 - [9. Submit your patch.](#9-submit-your-patch)
   * [Changelog](#changelog)
     + [How do I know what to call the changelog file before I create the PR?](#how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr)
@@ -197,7 +198,7 @@ The following command will let you run the integration test with the most common
 configuration:
 
 ```sh
-$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:py37
+$ docker run --rm -it -v /path/where/you/have/cloned/the/repository\:/src:ro -v /path/to/where/you/want/logs\:/logs matrixdotorg/sytest-synapse:buster
 ```
 
 This configuration should generally cover  your needs. For more details about other configurations, see [documentation in the SyTest repo](https://github.com/matrix-org/sytest/blob/develop/docker/README.md).
@@ -252,6 +253,7 @@ To prepare a Pull Request, please:
 4. on GitHub, [create the Pull Request](https://docs.github.com/en/github/collaborating-with-issues-and-pull-requests/creating-a-pull-request);
 5. add a [changelog entry](#changelog) and push it to your Pull Request;
 6. for most contributors, that's all - however, if you are a member of the organization `matrix-org`, on GitHub, please request a review from `matrix.org / Synapse Core`.
+7. if you need to update your PR, please avoid rebasing and just add new commits to your branch.
 
 
 ## Changelog

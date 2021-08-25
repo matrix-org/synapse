@@ -710,6 +710,18 @@ class ServerConfig(Config):
             # Turn the list into a set to improve lookup speed.
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
+        templates_config = config.get("templates") or {}
+        if not isinstance(templates_config, dict):
+            raise ConfigError("The 'templates' section must be a dictionary")
+
+        self.custom_template_directory = templates_config.get(
+            "custom_template_directory"
+        )
+        if self.custom_template_directory is not None and not isinstance(
+            self.custom_template_directory, str
+        ):
+            raise ConfigError("'custom_template_directory' must be a string")
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
@@ -959,6 +971,8 @@ class ServerConfig(Config):
         # listed here, since they correspond to unroutable addresses.)
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+        #
+        # Note: The value is ignored when an HTTP proxy is in use
         #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
@@ -1282,6 +1296,19 @@ class ServerConfig(Config):
         # all domains.
         #
         #next_link_domain_whitelist: ["matrix.org"]
+
+        # Templates to use when generating email or HTML page contents.
+        #
+        templates:
+          # Directory in which Synapse will try to find template files to use to generate
+          # email or HTML page contents.
+          # If not set, or a file is not found within the template directory, a default
+          # template from within the Synapse package will be used.
+          #
+          # See https://matrix-org.github.io/synapse/latest/templates.html for more
+          # information about using custom templates.
+          #
+          #custom_template_directory: /path/to/custom/templates/
         """
             % locals()
         )

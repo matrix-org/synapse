@@ -16,8 +16,7 @@ import json
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import report_event
+from synapse.rest.client import login, report_event, room
 
 from tests import unittest
 

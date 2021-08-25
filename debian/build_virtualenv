@@ -100,3 +100,18 @@ esac
 # add a dependency on the right version of python to substvars.
 PYPKG=`basename $SNAKE`
 echo "synapse:pydepends=$PYPKG" >> debian/matrix-synapse-py3.substvars
+
+
+# add a couple of triggers.  This is needed so that dh-virtualenv can rebuild
+# the venv when the system python changes (see
+# https://dh-virtualenv.readthedocs.io/en/latest/tutorial.html#step-2-set-up-packaging-for-your-project)
+#
+# we do it here rather than the more conventional way of just adding it to
+# debian/matrix-synapse-py3.triggers, because we need to add a trigger on the
+# right version of python.
+cat >>"debian/.debhelper/generated/matrix-synapse-py3/triggers" <<EOF
+# triggers for dh-virtualenv
+interest-noawait $SNAKE
+interest dh-virtualenv-interpreter-update
+
+EOF
