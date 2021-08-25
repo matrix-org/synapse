@@ -40,7 +40,6 @@ from synapse.crypto import context_factory
 from synapse.events.presence_router import load_legacy_presence_router
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
-from synapse.handlers.saml import load_default_or_legacy_saml2_mapping_provider
 from synapse.logging.context import PreserveLoggingContext
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.metrics.jemalloc import setup_jemalloc_stats
@@ -380,6 +379,8 @@ async def start(hs: "HomeServer"):
         hs.config.saml2.saml2_enabled
         and not hs.get_saml2_user_mapping_provider().module_has_registered
     ):
+        from synapse.handlers.saml import load_default_or_legacy_saml2_mapping_provider
+
         load_default_or_legacy_saml2_mapping_provider(hs)
 
     # If we've configured an expiry time for caches, start the background job now.

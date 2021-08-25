@@ -18,7 +18,6 @@ from unittest.mock import Mock
 import attr
 
 from synapse.api.errors import RedirectException
-from synapse.handlers.saml import load_default_or_legacy_saml2_mapping_provider
 
 from tests.test_utils import simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config
@@ -27,6 +26,8 @@ from tests.unittest import HomeserverTestCase, override_config
 try:
     import saml2.config
     from saml2.sigver import SigverError
+
+    from synapse.handlers.saml import load_default_or_legacy_saml2_mapping_provider
 
     has_saml2 = True
 

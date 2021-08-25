@@ -117,7 +117,8 @@ class ModuleApi:
         self._account_validity_handler = hs.get_account_validity_handler()
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._presence_router = hs.get_presence_router()
-        self._saml2_user_mapping_provider = hs.get_saml2_user_mapping_provider()
+        if hs.config.saml2.saml2_enabled:
+            self._saml2_user_mapping_provider = hs.get_saml2_user_mapping_provider()
 
     #################################################################################
     # The following methods should only be called during the module's initialisation.
@@ -145,6 +146,10 @@ class ModuleApi:
     @property
     def register_saml2_user_mapping_provider_callbacks(self):
         """Registers callbacks for presence router capabilities."""
+        if not self._hs.config.saml2.saml2_enabled:
+            raise RuntimeError(
+                "Saml2 is not enabled, so cannot register saml2 usr mapping provider callbacks"
+            )
         return (
             self._saml2_user_mapping_provider.register_saml2_user_mapping_provider_callbacks
         )
