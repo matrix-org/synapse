@@ -23,6 +23,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Set,
     Tuple,
 )
 
@@ -42,6 +43,7 @@ from synapse.api.constants import (
 from synapse.api.errors import (
     AuthError,
     FederationError,
+    HttpResponseException,
     RequestSendFailed,
     SynapseError,
 )
@@ -71,6 +73,7 @@ from synapse.types import (
 )
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.iterutils import batch_iter
+from synapse.util.retryutils import NotRetryingDestination
 from synapse.util.stringutils import shortstr
 
 if TYPE_CHECKING:
@@ -145,6 +148,106 @@ class FederationEventHandler(BaseHandler):
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
+
+    async def _get_missing_events_for_pdu(
+        self, origin: str, pdu: EventBase, prevs: Set[str], min_depth: int
+    ) -> None:
+        """
+        Args:
+            origin: Origin of the pdu. Will be called to get the missing events
+            pdu: received pdu
+            prevs: List of event ids which we are missing
+            min_depth: Minimum depth of events to return.
+        """
+
+        room_id = pdu.room_id
+        event_id = pdu.event_id
+
+        seen = await self.store.have_events_in_timeline(prevs)
+
+        if not prevs - seen:
+            return
+
+        latest_list = await self.store.get_latest_event_ids_in_room(room_id)
+
+        # We add the prev events that we have seen to the latest
+        # list to ensure the remote server doesn't give them to us
+        latest = set(latest_list)
+        latest |= seen
+
+        logger.info(
+            "Requesting missing events between %s and %s",
+            shortstr(latest),
+            event_id,
+        )
+
+        # XXX: we set timeout to 10s to help workaround
+        # https://github.com/matrix-org/synapse/issues/1733.
+        # The reason is to avoid holding the linearizer lock
+        # whilst processing inbound /send transactions, causing
+        # FDs to stack up and block other inbound transactions
+        # which empirically can currently take up to 30 minutes.
+        #
+        # N.B. this explicitly disables retry attempts.
+        #
+        # N.B. this also increases our chances of falling back to
+        # fetching fresh state for the room if the missing event
+        # can't be found, which slightly reduces our security.
+        # it may also increase our DAG extremity count for the room,
+        # causing additional state resolution?  See #1760.
+        # However, fetching state doesn't hold the linearizer lock
+        # apparently.
+        #
+        # see https://github.com/matrix-org/synapse/pull/1744
+        #
+        # ----
+        #
+        # Update richvdh 2018/09/18: There are a number of problems with timing this
+        # request out aggressively on the client side:
+        #
+        # - it plays badly with the server-side rate-limiter, which starts tarpitting you
+        #   if you send too many requests at once, so you end up with the server carefully
+        #   working through the backlog of your requests, which you have already timed
+        #   out.
+        #
+        # - for this request in particular, we now (as of
+        #   https://github.com/matrix-org/synapse/pull/3456) reject any PDUs where the
+        #   server can't produce a plausible-looking set of prev_events - so we becone
+        #   much more likely to reject the event.
+        #
+        # - contrary to what it says above, we do *not* fall back to fetching fresh state
+        #   for the room if get_missing_events times out. Rather, we give up processing
+        #   the PDU whose prevs we are missing, which then makes it much more likely that
+        #   we'll end up back here for the *next* PDU in the list, which exacerbates the
+        #   problem.
+        #
+        # - the aggressive 10s timeout was introduced to deal with incoming federation
+        #   requests taking 8 hours to process. It's not entirely clear why that was going
+        #   on; certainly there were other issues causing traffic storms which are now
+        #   resolved, and I think in any case we may be more sensible about our locking
+        #   now. We're *certainly* more sensible about our logging.
+        #
+        # All that said: Let's try increasing the timeout to 60s and see what happens.
+
+        try:
+            missing_events = await self.federation_client.get_missing_events(
+                origin,
+                room_id,
+                earliest_events_ids=list(latest),
+                latest_events=[pdu],
+                limit=10,
+                min_depth=min_depth,
+                timeout=60000,
+            )
+        except (RequestSendFailed, HttpResponseException, NotRetryingDestination) as e:
+            # We failed to get the missing events, but since we need to handle
+            # the case of `get_missing_events` not returning the necessary
+            # events anyway, it is safe to simply log the error and continue.
+            logger.warning("Failed to get prev_events: %s", e)
+            return
+
+        logger.info("Got %d prev_events", len(missing_events))
+        await self._process_pulled_events(origin, missing_events, backfilled=False)
 
     async def _process_pulled_events(
         self, origin: str, events: Iterable[EventBase], backfilled: bool
