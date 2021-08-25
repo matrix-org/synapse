@@ -14,7 +14,6 @@
 import collections.abc
 from typing import Union
 
-import frozendict
 import jsonschema
 
 from synapse.api.constants import MAX_ALIAS_LENGTH, EventTypes, Membership
