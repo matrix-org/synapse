@@ -51,12 +51,14 @@ from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.federation.federation_client import InvalidResponseError
 from synapse.handlers._base import BaseHandler
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
     run_in_background,
 )
+from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
@@ -148,6 +150,47 @@ class FederationEventHandler(BaseHandler):
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
+
+    @log_function
+    async def backfill(
+        self, dest: str, room_id: str, limit: int, extremities: List[str]
+    ) -> None:
+        """Trigger a backfill request to `dest` for the given `room_id`
+
+        This will attempt to get more events from the remote. If the other side
+        has no new events to offer, this will return an empty list.
+
+        As the events are received, we check their signatures, and also do some
+        sanity-checking on them. If any of the backfilled events are invalid,
+        this method throws a SynapseError.
+
+        We might also raise an InvalidResponseError if the response from the remote
+        server is just bogus.
+
+        TODO: make this more useful to distinguish failures of the remote
+        server from invalid events (there is probably no point in trying to
+        re-fetch invalid events from every other HS in the room.)
+        """
+        if dest == self.server_name:
+            raise SynapseError(400, "Can't backfill from self.")
+
+        events = await self.federation_client.backfill(
+            dest, room_id, limit=limit, extremities=extremities
+        )
+
+        if not events:
+            return
+
+        # if there are any events in the wrong room, the remote server is buggy and
+        # should not be trusted.
+        for ev in events:
+            if ev.room_id != room_id:
+                raise InvalidResponseError(
+                    f"Remote server {dest} returned event {ev.event_id} which is in "
+                    f"room {ev.room_id}, when we were backfilling in {room_id}"
+                )
+
+        await self._process_pulled_events(dest, events, backfilled=True)
 
     async def _get_missing_events_for_pdu(
         self, origin: str, pdu: EventBase, prevs: Set[str], min_depth: int
