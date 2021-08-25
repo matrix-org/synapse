@@ -881,7 +881,7 @@ class FederationHandler(BaseHandler):
             raise
 
         # Ensure the user can even join the room.
-        await self._check_join_restrictions(context, event)
+        await self._federation_event_handler.check_join_restrictions(context, event)
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
@@ -1198,7 +1198,7 @@ class FederationHandler(BaseHandler):
 
         # for joins, we need to check the restrictions of restricted rooms
         if event.membership == Membership.JOIN:
-            await self._check_join_restrictions(context, event)
+            await self._federation_event_handler.check_join_restrictions(context, event)
 
         # for knock events, we run the third-party event rules. It's not entirely clear
         # why we don't do this for other sorts of membership events.
@@ -1217,32 +1217,6 @@ class FederationHandler(BaseHandler):
             event, context
         )
         return event, context
-
-    async def _check_join_restrictions(
-        self, context: EventContext, event: EventBase
-    ) -> None:
-        """Check that restrictions in restricted join rules are matched
-
-        Called when we receive a join event via send_join.
-
-        Raises an auth error if the restrictions are not matched.
-        """
-        prev_state_ids = await context.get_prev_state_ids()
-
-        # Check if the user is already in the room or invited to the room.
-        user_id = event.state_key
-        prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
-        prev_member_event = None
-        if prev_member_event_id:
-            prev_member_event = await self.store.get_event(prev_member_event_id)
-
-        # Check if the member should be allowed access via membership in a space.
-        await self._event_auth_handler.check_restricted_join_rules(
-            prev_state_ids,
-            event.room_version,
-            user_id,
-            prev_member_event,
-        )
 
     async def get_state_for_pdu(self, room_id: str, event_id: str) -> List[EventBase]:
         """Returns the state at the event. i.e. not including said event."""
