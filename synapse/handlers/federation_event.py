@@ -16,6 +16,7 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Collection,
+    Container,
     Dict,
     Iterable,
     List,
@@ -35,8 +36,9 @@ from synapse.api.constants import (
     EventTypes,
     Membership,
     RejectedReason,
+    RoomEncryptionAlgorithms,
 )
-from synapse.api.errors import AuthError, RequestSendFailed
+from synapse.api.errors import AuthError, FederationError, RequestSendFailed
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
@@ -47,6 +49,7 @@ from synapse.logging.context import (
     nested_logging_context,
     run_in_background,
 )
+from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
@@ -132,6 +135,119 @@ class FederationEventHandler(BaseHandler):
             )
         else:
             self._device_list_updater = hs.get_device_handler().device_list_updater
+
+    async def _process_received_pdu(
+        self,
+        origin: str,
+        event: EventBase,
+        state: Optional[Iterable[EventBase]],
+        backfilled: bool = False,
+    ) -> None:
+        """Called when we have a new pdu. We need to do auth checks and put it
+        through the StateHandler.
+
+        Args:
+            origin: server sending the event
+
+            event: event to be persisted
+
+            state: Normally None, but if we are handling a gap in the graph
+                (ie, we are missing one or more prev_events), the resolved state at the
+                event
+
+            backfilled: True if this is part of a historical batch of events (inhibits
+                notification to clients, and validation of device keys.)
+        """
+        logger.debug("Processing event: %s", event)
+
+        try:
+            context = await self.state_handler.compute_event_context(
+                event, old_state=state
+            )
+            await self._auth_and_persist_event(
+                origin, event, context, state=state, backfilled=backfilled
+            )
+        except AuthError as e:
+            raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
+
+        if backfilled:
+            return
+
+        # For encrypted messages we check that we know about the sending device,
+        # if we don't then we mark the device cache for that user as stale.
+        if event.type == EventTypes.Encrypted:
+            device_id = event.content.get("device_id")
+            sender_key = event.content.get("sender_key")
+
+            cached_devices = await self.store.get_cached_devices_for_user(event.sender)
+
+            resync = False  # Whether we should resync device lists.
+
+            device = None
+            if device_id is not None:
+                device = cached_devices.get(device_id)
+                if device is None:
+                    logger.info(
+                        "Received event from remote device not in our cache: %s %s",
+                        event.sender,
+                        device_id,
+                    )
+                    resync = True
+
+            # We also check if the `sender_key` matches what we expect.
+            if sender_key is not None:
+                # Figure out what sender key we're expecting. If we know the
+                # device and recognize the algorithm then we can work out the
+                # exact key to expect. Otherwise check it matches any key we
+                # have for that device.
+
+                current_keys: Container[str] = []
+
+                if device:
+                    keys = device.get("keys", {}).get("keys", {})
+
+                    if (
+                        event.content.get("algorithm")
+                        == RoomEncryptionAlgorithms.MEGOLM_V1_AES_SHA2
+                    ):
+                        # For this algorithm we expect a curve25519 key.
+                        key_name = "curve25519:%s" % (device_id,)
+                        current_keys = [keys.get(key_name)]
+                    else:
+                        # We don't know understand the algorithm, so we just
+                        # check it matches a key for the device.
+                        current_keys = keys.values()
+                elif device_id:
+                    # We don't have any keys for the device ID.
+                    pass
+                else:
+                    # The event didn't include a device ID, so we just look for
+                    # keys across all devices.
+                    current_keys = [
+                        key
+                        for device in cached_devices.values()
+                        for key in device.get("keys", {}).get("keys", {}).values()
+                    ]
+
+                # We now check that the sender key matches (one of) the expected
+                # keys.
+                if sender_key not in current_keys:
+                    logger.info(
+                        "Received event from remote device with unexpected sender key: %s %s: %s",
+                        event.sender,
+                        device_id or "<no device_id>",
+                        sender_key,
+                    )
+                    resync = True
+
+            if resync:
+                run_as_background_process(
+                    "resync_device_due_to_pdu",
+                    self._resync_device,
+                    event.sender,
+                )
+
+        await self._handle_marker_event(origin, event)
 
     async def _resync_device(self, sender: str) -> None:
         """We have detected that the device list for the given user may be out
