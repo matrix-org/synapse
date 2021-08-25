@@ -61,7 +61,6 @@ from synapse.logging.context import (
 )
 from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationCleanRoomRestServlet,
     ReplicationStoreRoomOnOutlierMembershipRestServlet,
@@ -114,14 +113,10 @@ class FederationHandler(BaseHandler):
         )
 
         if hs.config.worker_app:
-            self._user_device_resync = (
-                ReplicationUserDevicesResyncRestServlet.make_client(hs)
-            )
             self._maybe_store_room_on_outlier_membership = (
                 ReplicationStoreRoomOnOutlierMembershipRestServlet.make_client(hs)
             )
         else:
-            self._device_list_updater = hs.get_device_handler().device_list_updater
             self._maybe_store_room_on_outlier_membership = (
                 self.store.maybe_store_room_on_outlier_membership
             )
@@ -604,26 +599,12 @@ class FederationHandler(BaseHandler):
 
             if resync:
                 run_as_background_process(
-                    "resync_device_due_to_pdu", self._resync_device, event.sender
+                    "resync_device_due_to_pdu",
+                    self._federation_event_handler._resync_device,
+                    event.sender,
                 )
 
         await self._federation_event_handler._handle_marker_event(origin, event)
-
-    async def _resync_device(self, sender: str) -> None:
-        """We have detected that the device list for the given user may be out
-        of sync, so we try and resync them.
-        """
-
-        try:
-            await self.store.mark_remote_user_device_cache_as_stale(sender)
-
-            # Immediately attempt a resync in the background
-            if self.config.worker_app:
-                await self._user_device_resync(user_id=sender)
-            else:
-                await self._device_list_updater.user_device_resync(sender)
-        except Exception:
-            logger.exception("Failed to resync device for %s", sender)
 
     @log_function
     async def backfill(

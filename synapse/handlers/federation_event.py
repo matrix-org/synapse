@@ -47,6 +47,7 @@ from synapse.logging.context import (
     nested_logging_context,
     run_in_background,
 )
+from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
@@ -125,6 +126,28 @@ class FederationEventHandler(BaseHandler):
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
+        if hs.config.worker_app:
+            self._user_device_resync = (
+                ReplicationUserDevicesResyncRestServlet.make_client(hs)
+            )
+        else:
+            self._device_list_updater = hs.get_device_handler().device_list_updater
+
+    async def _resync_device(self, sender: str) -> None:
+        """We have detected that the device list for the given user may be out
+        of sync, so we try and resync them.
+        """
+
+        try:
+            await self.store.mark_remote_user_device_cache_as_stale(sender)
+
+            # Immediately attempt a resync in the background
+            if self.config.worker_app:
+                await self._user_device_resync(user_id=sender)
+            else:
+                await self._device_list_updater.user_device_resync(sender)
+        except Exception:
+            logger.exception("Failed to resync device for %s", sender)
 
     async def _handle_marker_event(self, origin: str, marker_event: EventBase):
         """Handles backfilling the insertion event when we receive a marker
