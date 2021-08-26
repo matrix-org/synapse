@@ -1,0 +1,1 @@
+Fix performance of fetching the same large set of events repeatedly at the same time, which in extreme cases could wedge the process. Introduced in v1.41.0.
