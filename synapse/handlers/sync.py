@@ -1137,7 +1137,7 @@ class SyncHandler:
                 issue4422_logger.debug(
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
-            num_events += len(joined_room.timeline)
+            num_events += len(joined_room.timeline.events)
 
         log_kv(
             {
@@ -1537,7 +1537,7 @@ class SyncHandler:
                 log_kv(
                     {
                         "room_id": room_entry.room_id,
-                        "events": len(room_entry.events),
+                        "events": len(room_entry.events or []),
                     }
                 )
                 logger.debug("Generating room entry for %s", room_entry.room_id)
