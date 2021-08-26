@@ -27,9 +27,13 @@
 # continue to work if so.
 
 import os
+import random
+import socket
+import string
 import subprocess
 import sys
-from typing import Dict, List
+from time import sleep
+from typing import Dict, List, Optional
 
 import jinja2
 import yaml
@@ -169,21 +173,6 @@ WORKERS_CONFIG = {
 }
 
 # Templates for sections that may be inserted multiple times in config files
-SUPERVISORD_PROCESS_CONFIG_BLOCK = """
-[program:synapse_{name}]
-command=/usr/local/bin/python -m {app} \
-    --config-path="{config_path}" \
-    --config-path=/conf/workers/shared.yaml \
-    --config-path=/conf/workers/{name}.yaml
-autorestart=unexpected
-priority=500
-exitcodes=0
-stdout_logfile=/dev/stdout
-stdout_logfile_maxbytes=0
-stderr_logfile=/dev/stderr
-stderr_logfile_maxbytes=0
-"""
-
 NGINX_LOCATION_CONFIG_BLOCK = """
     location ~* {endpoint} {{
         proxy_pass {upstream};
@@ -207,7 +196,7 @@ def log(txt: str):
     Args:
         txt: The text to log.
     """
-    print(txt)
+    print(txt, file=sys.stderr)
 
 
 def error(txt: str):
@@ -516,26 +505,67 @@ def generate_worker_files(
         upstream_directives=nginx_upstream_config,
     )
 
-    # Supervisord config
-    convert(
-        "/conf/supervisord.conf.j2",
-        "/etc/supervisor/conf.d/supervisord.conf",
-        main_config_path=config_path,
-        worker_config=supervisord_config,
-    )
-
     # Ensure the logging directory exists
     log_dir = data_dir + "/logs"
     if not os.path.exists(log_dir):
         os.mkdir(log_dir)
 
 
-def start_supervisord():
+def start_process(
+    args: List[str], env: Optional[Dict[str, str]] = None
+) -> subprocess.Popen:
     """Starts up supervisord which then starts and monitors all other necessary processes
 
     Raises: CalledProcessError if calling start.py return a non-zero exit code.
     """
-    subprocess.run(["/usr/bin/supervisord"], stdin=subprocess.PIPE)
+    proc_name = args[0].rsplit("/", 1)[1]
+    log(f"Starting {proc_name}")
+
+    return subprocess.Popen(
+        args, stdout=None, stderr=subprocess.STDOUT, env=env
+    )
+
+
+def start_process_and_await_notify(args: List[str]):
+    """
+    This method binds a listener to a newly created unix socket and waits for a
+    `READY=1` to be received. The socket address is added to the `env` map passed
+    in under `NOTIFY_SOCKET`.
+
+    This is basically a noddy implementation of the `sd_notify` mechanism.
+    """
+
+    # Create a random abstract socket name. Abstract sockets start with a null
+    # byte.
+    random_id = "".join(random.choice(string.ascii_uppercase) for _ in range(20))
+    path = f"\0sytest-{random_id}.sock"
+
+    # We replace null byte with '@' to allow us to pass it in via env. (This is
+    # as per the sd_notify spec).
+    path_env = path.replace("\0", "@")
+    env = {
+        "NOTIFY_SOCKET": path_env,
+    }
+
+    # We need to set this up *before* we start the process as we need to bind the
+    # socket before starting the process.
+    with socket.socket(socket.AF_UNIX, socket.SOCK_DGRAM) as sock:
+        sock.bind(path)
+
+        start_process(args, env)
+
+        # Listen until we receive a `READY=1` notification.
+        for _ in range(10):
+            # Payloads are newline separated list of variable assignments.
+            dgram = sock.recv(1024)
+
+            for line in dgram.split(b"\n"):
+                if line == b"READY=1":
+                    return
+
+            sleep(0.01)
+        else:
+            raise RuntimeError("Process died without becoming ready")
 
 
 def main(args, environ):
@@ -565,9 +595,51 @@ def main(args, environ):
         with open(mark_filepath, "w") as f:
             f.write("")
 
-    # Start supervisord, which will start Synapse, all of the configured worker
-    # processes, redis, nginx etc. according to the config we created above.
-    start_supervisord()
+    # Start the processes, this is done in tiers to ensure successful startup:
+    #
+    # 0. Caddy & Postgres (these are started by the OS already).
+    # 1. Redis
+    # 2. Synapse main
+    # 3. Synapse workers
+    # 4. nginx
+    #
+    # Once nginx starts than the image will start to respond to HTTP requests
+    # and must be started and configured.
+    # start_process()
+    start_process(
+        ["/usr/bin/redis-server", "/etc/redis/redis.conf", "--daemonize", "no"]
+    )
+
+    start_process_and_await_notify(
+        [
+            "/usr/local/bin/python",
+            "-m",
+            "synapse.app.homeserver",
+            f"--config-path={config_path}",
+            "--config-path=/conf/workers/shared.yaml",
+        ]
+    )
+
+    # TODO These could be started in parallel.
+    for worker_configs in worker_configs_by_type.values():
+        for worker_config in worker_configs:
+            name = worker_config["name"]
+            app = worker_config["app"]
+
+            start_process_and_await_notify(
+                [
+                    "/usr/local/bin/python",
+                    "-m",
+                    app,
+                    f"--config-path={config_path}",
+                    "--config-path=/conf/workers/shared.yaml",
+                    f"--config-path=/conf/workers/{name}.yaml",
+                ]
+            )
+
+    start_process(["/usr/sbin/nginx", "-g", "daemon off;"])
+
+    # TODO Should we monitor processes and restart?
 
 
 if __name__ == "__main__":
