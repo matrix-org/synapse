@@ -1,1 +1,1 @@
-Ensure that txn.fetchall has elements before accessing rows in  _purge_history_txn
+Ensure that a room has forward extremities before attempting to purging historical events.
