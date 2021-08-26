@@ -84,15 +84,15 @@ class SendServerNoticeServlet(RestServlet):
         if not self.server_notices_manager.is_enabled():
             raise SynapseError(400, "Server notices are not enabled on this server")
 
-        user_id = UserID.from_string(body["user_id"])
-        if not self.hs.is_mine(user_id):
+        target_user = UserID.from_string(body["user_id"])
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Server notices can only be sent to local users")
 
-        if not await self.admin_handler.get_user(user_id):
+        if not await self.admin_handler.get_user(target_user):
             raise NotFoundError("User not found")
 
         event = await self.server_notices_manager.send_notice(
-            user_id=body["user_id"],
+            user_id=target_user.to_string(),
             type=event_type,
             state_key=state_key,
             event_content=body["content"],
