@@ -26,6 +26,7 @@
 # in the project's README), this script may be run multiple times, and functionality should
 # continue to work if so.
 
+import json
 import os
 import random
 import socket
@@ -34,6 +35,7 @@ import subprocess
 import sys
 from time import sleep
 from typing import Dict, List, Optional
+from urllib.request import urlopen
 
 import jinja2
 import yaml
@@ -640,6 +642,9 @@ def main(args, environ):
     start_process(["/usr/sbin/nginx", "-g", "daemon off;"])
 
     # TODO Should we monitor processes and restart?
+    with urlopen('http://localhost:8080/_matrix/client/versions') as f:
+        data = json.load(f)
+    print(data)
 
 
 if __name__ == "__main__":
