@@ -277,12 +277,6 @@ OIDC_PROVIDER_CONFIG_SCHEMA = {
             "maxLength": 255,
             "pattern": "^[a-z][a-z0-9_.-]*$",
         },
-        "idp_unstable_brand": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 255,
-            "pattern": "^[a-z][a-z0-9_.-]*$",
-        },
         "discover": {"type": "boolean"},
         "issuer": {"type": "string"},
         "client_id": {"type": "string"},
