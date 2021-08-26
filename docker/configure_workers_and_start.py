@@ -29,6 +29,7 @@
 import os
 import subprocess
 import sys
+from typing import Dict, List
 
 import jinja2
 import yaml
@@ -301,7 +302,54 @@ def generate_base_homeserver_config():
     subprocess.check_output(["/usr/local/bin/python", "/start.py", "migrate_config"])
 
 
-def generate_worker_files(environ, config_path: str, data_dir: str):
+def get_worker_configs(environ, config_path: str) -> Dict[str, List[dict]]:
+    # Read the desired worker configuration from the environment
+    worker_types = environ.get("SYNAPSE_WORKER_TYPES")
+    if worker_types is None:
+        # No workers, just the main process
+        return {}
+
+    # The resulting configurations.
+    worker_configs = {}
+
+    # Start worker ports from this arbitrary port
+    worker_port = 18009
+
+    # A counter of worker_type -> int. Used for determining the name for a given
+    # worker type when generating its config file, as each worker's name is just
+    # worker_type + instance #
+    worker_type_counter = {}
+
+    for worker_type in worker_types.split(","):
+        worker_type = worker_type.strip()
+
+        worker_config = WORKERS_CONFIG.get(worker_type)
+        if worker_config:
+            worker_config = worker_config.copy()
+        else:
+            log(worker_type + " is an unknown worker type! It will be ignored")
+            continue
+
+        new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
+        worker_type_counter[worker_type] = new_worker_count
+
+        # Name workers by their type concatenated with an incrementing number
+        # e.g. federation_reader1
+        worker_name = worker_type + str(new_worker_count)
+        worker_config.update(
+            {"name": worker_name, "port": worker_port, "config_path": config_path}
+        )
+
+        worker_configs.setdefault(worker_type, []).append(worker_config)
+
+        worker_port += 1
+
+    return worker_configs
+
+
+def generate_worker_files(
+    environ, config_path: str, worker_configs: Dict[str, List[dict]], data_dir: str
+) -> None:
     """Read the desired list of workers from environment variables and generate
     shared homeserver, nginx and supervisord configs.
 
@@ -366,103 +414,69 @@ def generate_worker_files(environ, config_path: str, data_dir: str):
     # spun up. To be placed in /etc/nginx/conf.d.
     nginx_locations = {}
 
-    # Read the desired worker configuration from the environment
-    worker_types = environ.get("SYNAPSE_WORKER_TYPES")
-    if worker_types is None:
-        # No workers, just the main process
-        worker_types = []
-    else:
-        # Split type names by comma
-        worker_types = worker_types.split(",")
-
     # Create the worker configuration directory if it doesn't already exist
     os.makedirs("/conf/workers", exist_ok=True)
 
-    # Start worker ports from this arbitrary port
-    worker_port = 18009
-
-    # A counter of worker_type -> int. Used for determining the name for a given
-    # worker type when generating its config file, as each worker's name is just
-    # worker_type + instance #
-    worker_type_counter = {}
-
     # For each worker type specified by the user, create config values
-    for worker_type in worker_types:
-        worker_type = worker_type.strip()
+    for worker_type, worker_configs in worker_configs.items():
+        worker_type_total_count = len(worker_configs)
 
-        worker_config = WORKERS_CONFIG.get(worker_type)
-        if worker_config:
-            worker_config = worker_config.copy()
-        else:
-            log(worker_type + " is an unknown worker type! It will be ignored")
-            continue
+        for worker_config in worker_configs:
+            worker_name = worker_config["name"]
+            worker_port = worker_config["port"]
 
-        new_worker_count = worker_type_counter.setdefault(worker_type, 0) + 1
-        worker_type_counter[worker_type] = new_worker_count
+            # Update the shared config with any worker-type specific options
+            shared_config.update(worker_config["shared_extra_conf"])
 
-        # Name workers by their type concatenated with an incrementing number
-        # e.g. federation_reader1
-        worker_name = worker_type + str(new_worker_count)
-        worker_config.update(
-            {"name": worker_name, "port": worker_port, "config_path": config_path}
-        )
-
-        # Update the shared config with any worker-type specific options
-        shared_config.update(worker_config["shared_extra_conf"])
-
-        # Check if more than one instance of this worker type has been specified
-        worker_type_total_count = worker_types.count(worker_type)
-        if worker_type_total_count > 1:
-            # Update the shared config with sharding-related options if necessary
-            add_sharding_to_shared_config(
-                shared_config, worker_type, worker_name, worker_port
-            )
-
-        # Enable the worker in supervisord
-        supervisord_config += SUPERVISORD_PROCESS_CONFIG_BLOCK.format_map(worker_config)
-
-        # Add nginx location blocks for this worker's endpoints (if any are defined)
-        for pattern in worker_config["endpoint_patterns"]:
-            # Determine whether we need to load-balance this worker
+            # Check if more than one instance of this worker type has been specified
             if worker_type_total_count > 1:
-                # Create or add to a load-balanced upstream for this worker
-                nginx_upstreams.setdefault(worker_type, set()).add(worker_port)
+                # Update the shared config with sharding-related options if necessary
+                add_sharding_to_shared_config(
+                    shared_config, worker_type, worker_name, worker_port
+                )
 
-                # Upstreams are named after the worker_type
-                upstream = "http://" + worker_type
-            else:
-                upstream = "http://localhost:%d" % (worker_port,)
+            # Add nginx location blocks for this worker's endpoints (if any are defined)
+            for pattern in worker_config["endpoint_patterns"]:
+                # Determine whether we need to load-balance this worker
+                if worker_type_total_count > 1:
+                    # Create or add to a load-balanced upstream for this worker
+                    nginx_upstreams.setdefault(worker_type, set()).add(worker_port)
 
-            # Note that this endpoint should proxy to this upstream
-            nginx_locations[pattern] = upstream
+                    # Upstreams are named after the worker_type
+                    upstream = "http://" + worker_type
+                else:
+                    upstream = "http://localhost:%d" % (worker_port,)
 
-        # Write out the worker's logging config file
+                # Note that this endpoint should proxy to this upstream
+                nginx_locations[pattern] = upstream
 
-        # Check whether we should write worker logs to disk, in addition to the console
-        extra_log_template_args = {}
-        if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
-            extra_log_template_args["LOG_FILE_PATH"] = "{dir}/logs/{name}.log".format(
-                dir=data_dir, name=worker_name
+            # Write out the worker's logging config file
+
+            # Check whether we should write worker logs to disk, in addition to the console
+            extra_log_template_args = {}
+            if environ.get("SYNAPSE_WORKERS_WRITE_LOGS_TO_DISK"):
+                extra_log_template_args[
+                    "LOG_FILE_PATH"
+                ] = "{dir}/logs/{name}.log".format(dir=data_dir, name=worker_name)
+
+            # Render and write the file
+            log_config_filepath = "/conf/workers/{name}.log.config".format(
+                name=worker_name
+            )
+            convert(
+                "/conf/log.config",
+                log_config_filepath,
+                worker_name=worker_name,
+                **extra_log_template_args,
             )
 
-        # Render and write the file
-        log_config_filepath = "/conf/workers/{name}.log.config".format(name=worker_name)
-        convert(
-            "/conf/log.config",
-            log_config_filepath,
-            worker_name=worker_name,
-            **extra_log_template_args,
-        )
-
-        # Then a worker config file
-        convert(
-            "/conf/worker.yaml.j2",
-            "/conf/workers/{name}.yaml".format(name=worker_name),
-            **worker_config,
-            worker_log_config_filepath=log_config_filepath,
-        )
-
-        worker_port += 1
+            # Then a worker config file
+            convert(
+                "/conf/worker.yaml.j2",
+                "/conf/workers/{name}.yaml".format(name=worker_name),
+                **worker_config,
+                worker_log_config_filepath=log_config_filepath,
+            )
 
     # Build the nginx location config blocks
     nginx_location_config = ""
@@ -538,12 +552,14 @@ def main(args, environ):
         log("Generating base homeserver config")
         generate_base_homeserver_config()
 
+    worker_configs_by_type = get_worker_configs(environ, config_path)
+
     # This script may be run multiple times (mostly by Complement, see note at top of file).
     # Don't re-configure workers in this instance.
     mark_filepath = "/conf/workers_have_been_configured"
     if not os.path.exists(mark_filepath):
         # Always regenerate all other config files
-        generate_worker_files(environ, config_path, data_dir)
+        generate_worker_files(environ, config_path, worker_configs_by_type, data_dir)
 
         # Mark workers as being configured
         with open(mark_filepath, "w") as f:
