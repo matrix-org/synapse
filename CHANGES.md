@@ -1,3 +1,5 @@
+Users will stop receiving message updates via email for addresses that were previously linked to their account
+
 Synapse 1.41.0 (2021-08-24)
 ===========================
 
