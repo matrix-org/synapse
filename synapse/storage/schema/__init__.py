@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# When updating these values, please leave a short summary of the changes below.
+
 SCHEMA_VERSION = 63
 """Represents the expectations made by the codebase about the database schema
 
