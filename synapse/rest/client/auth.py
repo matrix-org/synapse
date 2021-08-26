@@ -15,11 +15,14 @@
 import logging
 from typing import TYPE_CHECKING
 
+from twisted.web.server import Request
+
 from synapse.api.constants import LoginType
 from synapse.api.errors import LoginError, SynapseError
 from synapse.api.urls import CLIENT_API_PREFIX
-from synapse.http.server import respond_with_html
+from synapse.http.server import HttpServer, respond_with_html
 from synapse.http.servlet import RestServlet, parse_string
+from synapse.http.site import SynapseRequest
 
 from ._base import client_patterns
 
@@ -49,7 +52,7 @@ class AuthRestServlet(RestServlet):
         self.registration_token_template = hs.config.registration_token_template
         self.success_template = hs.config.fallback_success_template
 
-    async def on_GET(self, request, stagetype):
+    async def on_GET(self, request: SynapseRequest, stagetype: str) -> None:
         session = parse_string(request, "session")
         if not session:
             raise SynapseError(400, "No session supplied")
@@ -88,7 +91,7 @@ class AuthRestServlet(RestServlet):
         respond_with_html(request, 200, html)
         return None
 
-    async def on_POST(self, request, stagetype):
+    async def on_POST(self, request: Request, stagetype: str) -> None:
 
         session = parse_string(request, "session")
         if not session:
@@ -172,5 +175,5 @@ class AuthRestServlet(RestServlet):
         return None
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     AuthRestServlet(hs).register(http_server)
