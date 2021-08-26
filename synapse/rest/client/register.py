@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import hmac
 import logging
 import random
 from typing import List, Union
@@ -59,18 +58,6 @@ from synapse.util.threepids import (
 )
 
 from ._base import client_patterns, interactive_auth_handler
-
-# We ought to be using hmac.compare_digest() but on older pythons it doesn't
-# exist. It's a _really minor_ security flaw to use plain string comparison
-# because the timing attack is so obscured by all the other code here it's
-# unlikely to make much difference
-if hasattr(hmac, "compare_digest"):
-    compare_digest = hmac.compare_digest
-else:
-
-    def compare_digest(a, b):
-        return a == b
-
 
 logger = logging.getLogger(__name__)
 
