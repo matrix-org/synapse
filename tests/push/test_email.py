@@ -311,9 +311,16 @@ class EmailPusherTests(HomeserverTestCase):
         # Create a simple room with two users
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.invite(
-            room=room, src=self.user_id, tok=self.access_token, targ=self.others[0].id
+            room=room,
+            src=self.user_id,
+            tok=self.access_token,
+            targ=self.others[0].id,
         )
-        self.helper.join(room=room, user=self.others[0].id, tok=self.others[0].token)
+        self.helper.join(
+            room=room,
+            user=self.others[0].id,
+            tok=self.others[0].token,
+        )
 
         # The other user sends a single message.
         self.helper.send(room, body="Hi!", tok=self.others[0].token)
