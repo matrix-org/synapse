@@ -104,7 +104,7 @@ class BackgroundUpdater:
         run_as_background_process("background_updates", self.run_background_updates)
 
     async def run_background_updates(self, sleep: bool = True) -> None:
-        logger.info("Starting background schema updates")
+        logger.debug("Starting background schema updates")
         while True:
             if sleep:
                 await self._clock.sleep(self.BACKGROUND_UPDATE_INTERVAL_MS / 1000.0)
@@ -117,7 +117,7 @@ class BackgroundUpdater:
                 logger.exception("Error doing update")
             else:
                 if result:
-                    logger.info(
+                    logger.debug(
                         "No more background updates to do."
                         " Unscheduling background update task."
                     )
@@ -207,7 +207,7 @@ class BackgroundUpdater:
                 depends_on = upd["depends_on"]
                 if not depends_on or depends_on not in pending:
                     break
-                logger.info(
+                logger.debug(
                     "Not starting on bg update %s until %s is done",
                     upd["update_name"],
                     depends_on,
@@ -227,7 +227,7 @@ class BackgroundUpdater:
     async def _do_background_update(self, desired_duration_ms: float) -> int:
         assert self._current_background_update is not None
         update_name = self._current_background_update
-        logger.info("Starting update batch on background update '%s'", update_name)
+        logger.debug("Starting update batch on background update '%s'", update_name)
 
         update_handler = self._background_update_handlers[update_name]
 
@@ -263,7 +263,7 @@ class BackgroundUpdater:
 
         duration_ms = time_stop - time_start
 
-        logger.info(
+        logger.debug(
             "Running background update %r. Processed %r items in %rms."
             " (total_rate=%r/ms, current_rate=%r/ms, total_updated=%r, batch_size=%r)",
             update_name,
@@ -417,7 +417,7 @@ class BackgroundUpdater:
 
         async def updater(progress, batch_size):
             if runner is not None:
-                logger.info("Adding index %s to %s", index_name, table)
+                logger.debug("Adding index %s to %s", index_name, table)
                 await self.db_pool.runWithConnection(runner)
             await self._end_background_update(update_name)
             return 1

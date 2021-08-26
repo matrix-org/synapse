@@ -404,7 +404,7 @@ def _upgrade_existing_database(
 
     for v in range(start_ver, SCHEMA_VERSION + 1):
         if not is_worker:
-            logger.info("Applying schema deltas for v%d", v)
+            logger.debug("Applying schema deltas for v%d", v)
 
             cur.execute("DELETE FROM schema_version")
             cur.execute(
@@ -412,7 +412,7 @@ def _upgrade_existing_database(
                 (v, True),
             )
         else:
-            logger.info("Checking schema deltas for v%d", v)
+            logger.debug("Checking schema deltas for v%d", v)
 
         # We need to search both the global and per data store schema
         # directories for schema updates.
@@ -505,7 +505,7 @@ def _upgrade_existing_database(
                     raise PrepareDatabaseException(
                         UNAPPLIED_DELTA_ON_WORKER_ERROR % relative_path
                     )
-                logger.info("Applying schema %s", relative_path)
+                logger.debug("Applying schema %s", relative_path)
                 executescript(cur, absolute_path)
             elif ext == specific_engine_extension and root_name.endswith(".sql"):
                 # A .sql file specific to our engine; just read and execute it
