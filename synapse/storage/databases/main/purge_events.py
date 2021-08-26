@@ -110,7 +110,7 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
                 # otherwise we wouldn't be able to send any events (due to not
                 # having any backwards extremities)
                 raise SynapseError(
-                    400, "topological_ordering is greater than forward extremeties"
+                    400, "topological_ordering is greater than forward extremities"
                 )
 
         logger.info("[purge] looking for events to delete")
