@@ -61,7 +61,6 @@ logger = logging.getLogger(__name__)
 # Debug logger for https://github.com/matrix-org/synapse/issues/4422
 issue4422_logger = logging.getLogger("synapse.handler.sync.4422_debug")
 
-SYNC_RESPONSE_CACHE_MS = 2 * 60 * 1000
 
 # Counts the number of times we returned a non-empty sync. `type` is one of
 # "initial_sync", "full_state_sync" or "incremental_sync", `lazy_loaded` is

@@ -84,9 +84,8 @@ class BackgroundUpdater:
 
     MINIMUM_BACKGROUND_BATCH_SIZE = 100
     DEFAULT_BACKGROUND_BATCH_SIZE = 100
-    # temporarily increased to make stream_ordering go faster: rv 2021/06/29
-    BACKGROUND_UPDATE_INTERVAL_MS = 10
-    BACKGROUND_UPDATE_DURATION_MS = 1000
+    BACKGROUND_UPDATE_INTERVAL_MS = 1000
+    BACKGROUND_UPDATE_DURATION_MS = 100
 
     def __init__(self, hs: "HomeServer", database: "DatabasePool"):
         self._clock = hs.get_clock()
