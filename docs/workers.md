@@ -223,6 +223,7 @@ expressions:
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
     ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
+    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/hierarchy$
     ^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
     ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
     ^/_matrix/client/(api/v1|r0|unstable)/devices$
@@ -261,7 +262,6 @@ ensure that the purge history admin API is not used while pagination requests
 for the room are in flight:
 
     ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/messages$
-    ^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/hierarchy$
 
 Additionally, the following endpoints should be included if Synapse is configured
 to use SSO (you only need to include the ones for whichever SSO provider you're
