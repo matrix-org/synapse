@@ -184,65 +184,6 @@
 <p>Welcome to the documentation repository for Synapse, the reference
 <a href="https://matrix.org">Matrix</a> homeserver implementation.</p>
 <div id="chapter_begin" style="break-before: page; page-break-before: always;"></div><h1 id="installation-instructions"><a class="header" href="#installation-instructions">Installation Instructions</a></h1>
-<p>There are 3 steps to follow under <strong>Installation Instructions</strong>.</p>
-<ul>
-<li><a href="setup/installation.html#installation-instructions">Installation Instructions</a>
-<ul>
-<li><a href="setup/installation.html#choosing-your-server-name">Choosing your server name</a></li>
-<li><a href="setup/installation.html#installing-synapse">Installing Synapse</a>
-<ul>
-<li><a href="setup/installation.html#installing-from-source">Installing from source</a>
-<ul>
-<li><a href="setup/installation.html#platform-specific-prerequisites">Platform-specific prerequisites</a>
-<ul>
-<li><a href="setup/installation.html#debianubunturaspbian">Debian/Ubuntu/Raspbian</a></li>
-<li><a href="setup/installation.html#archlinux">ArchLinux</a></li>
-<li><a href="setup/installation.html#centosfedora">CentOS/Fedora</a></li>
-<li><a href="setup/installation.html#macos">macOS</a></li>
-<li><a href="setup/installation.html#opensuse">OpenSUSE</a></li>
-<li><a href="setup/installation.html#openbsd">OpenBSD</a></li>
-<li><a href="setup/installation.html#windows">Windows</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a href="setup/installation.html#prebuilt-packages">Prebuilt packages</a>
-<ul>
-<li><a href="setup/installation.html#docker-images-and-ansible-playbooks">Docker images and Ansible playbooks</a></li>
-<li><a href="setup/installation.html#debianubuntu">Debian/Ubuntu</a>
-<ul>
-<li><a href="setup/installation.html#matrixorg-packages">Matrix.org packages</a></li>
-<li><a href="setup/installation.html#downstream-debian-packages">Downstream Debian packages</a></li>
-<li><a href="setup/installation.html#downstream-ubuntu-packages">Downstream Ubuntu packages</a></li>
-</ul>
-</li>
-<li><a href="setup/installation.html#fedora">Fedora</a></li>
-<li><a href="setup/installation.html#opensuse-1">OpenSUSE</a></li>
-<li><a href="setup/installation.html#suse-linux-enterprise-server">SUSE Linux Enterprise Server</a></li>
-<li><a href="setup/installation.html#archlinux-1">ArchLinux</a></li>
-<li><a href="setup/installation.html#void-linux">Void Linux</a></li>
-<li><a href="setup/installation.html#freebsd">FreeBSD</a></li>
-<li><a href="setup/installation.html#openbsd-1">OpenBSD</a></li>
-<li><a href="setup/installation.html#nixos">NixOS</a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a href="setup/installation.html#setting-up-synapse">Setting up Synapse</a>
-<ul>
-<li><a href="setup/installation.html#using-postgresql">Using PostgreSQL</a></li>
-<li><a href="setup/installation.html#tls-certificates">TLS certificates</a></li>
-<li><a href="setup/installation.html#client-well-known-uri">Client Well-Known URI</a></li>
-<li><a href="setup/installation.html#email">Email</a></li>
-<li><a href="setup/installation.html#registering-a-user">Registering a user</a></li>
-<li><a href="setup/installation.html#setting-up-a-turn-server">Setting up a TURN server</a></li>
-<li><a href="setup/installation.html#url-previews">URL previews</a></li>
-<li><a href="setup/installation.html#troubleshooting-installation">Troubleshooting Installation</a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
 <h2 id="choosing-your-server-name"><a class="header" href="#choosing-your-server-name">Choosing your server name</a></h2>
 <p>It is important to choose the name for your server before you install Synapse,
 because it cannot be changed later.</p>
@@ -11527,43 +11468,6 @@ small processing times.</p>
 <h1 id="contributing"><a class="header" href="#contributing">Contributing</a></h1>
 <p>Welcome to Synapse</p>
 <p>This document aims to get you started with contributing to this repo! </p>
-<ul>
-<li><a href="development/contributing_guide.html#1-who-can-contribute-to-synapse">1. Who can contribute to Synapse?</a></li>
-<li><a href="development/contributing_guide.html#2-what-do-i-need">2. What do I need?</a></li>
-<li><a href="development/contributing_guide.html#3-get-the-source">3. Get the source.</a></li>
-<li><a href="development/contributing_guide.html#4-install-the-dependencies">4. Install the dependencies</a>
-<ul>
-<li><a href="development/contributing_guide.html#under-unix-macos-linux-bsd-">Under Unix (macOS, Linux, BSD, ...)</a></li>
-<li><a href="development/contributing_guide.html#under-windows">Under Windows</a></li>
-</ul>
-</li>
-<li><a href="development/contributing_guide.html#5-get-in-touch">5. Get in touch.</a></li>
-<li><a href="development/contributing_guide.html#6-pick-an-issue">6. Pick an issue.</a></li>
-<li><a href="development/contributing_guide.html#7-turn-coffee-and-documentation-into-code-and-documentation">7. Turn coffee and documentation into code and documentation!</a></li>
-<li><a href="development/contributing_guide.html#8-test-test-test">8. Test, test, test!</a>
-<ul>
-<li><a href="development/contributing_guide.html#run-the-linters">Run the linters.</a></li>
-<li><a href="development/contributing_guide.html#run-the-unit-tests-twisted-trial">Run the unit tests.</a></li>
-<li><a href="development/contributing_guide.html#run-the-integration-tests-sytest">Run the integration tests (SyTest).</a></li>
-<li><a href="development/contributing_guide.html#run-the-integration-tests-complement">Run the integration tests (Complement).</a></li>
-</ul>
-</li>
-<li><a href="development/contributing_guide.html#9-submit-your-patch">9. Submit your patch.</a>
-<ul>
-<li><a href="development/contributing_guide.html#changelog">Changelog</a>
-<ul>
-<li><a href="development/contributing_guide.html#how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr">How do I know what to call the changelog file before I create the PR?</a></li>
-<li><a href="development/contributing_guide.html#debian-changelog">Debian changelog</a></li>
-</ul>
-</li>
-<li><a href="development/contributing_guide.html#sign-off">Sign off</a></li>
-</ul>
-</li>
-<li><a href="development/contributing_guide.html#10-turn-feedback-into-better-code">10. Turn feedback into better code.</a></li>
-<li><a href="development/contributing_guide.html#11-find-a-new-issue">11. Find a new issue.</a></li>
-<li><a href="development/contributing_guide.html#notes-for-maintainers-on-merging-prs-etc">Notes for maintainers on merging PRs etc</a></li>
-<li><a href="development/contributing_guide.html#conclusion">Conclusion</a></li>
-</ul>
 <h1 id="1-who-can-contribute-to-synapse"><a class="header" href="#1-who-can-contribute-to-synapse">1. Who can contribute to Synapse?</a></h1>
 <p>Everyone is welcome to contribute code to <a href="https://github.com/matrix-org">matrix.org
 projects</a>, provided that they are willing to
@@ -11572,7 +11476,7 @@ follow a simple 'inbound=outbound' model for contributions: the act of
 submitting an 'inbound' contribution means that the contributor agrees to
 license the code under the same terms as the project's overall 'outbound'
 license - in our case, this is almost always Apache Software License v2 (see
-<a href="development/LICENSE">LICENSE</a>).</p>
+<a href="https://github.com/matrix-org/synapse/blob/develop/LICENSE">LICENSE</a>).</p>
 <h1 id="2-what-do-i-need"><a class="header" href="#2-what-do-i-need">2. What do I need?</a></h1>
 <p>The code of Synapse is written in Python 3. To do pretty much anything, you'll need <a href="https://wiki.python.org/moin/BeginnersGuide/Download">a recent version of Python 3</a>.</p>
 <p>The source code of Synapse is hosted on GitHub. You will also need <a href="https://github.com/git-guides/install-git">a recent version of git</a>.</p>
@@ -11606,16 +11510,19 @@ pip install tox
 <p>Fix your favorite problem or perhaps find a <a href="https://github.com/matrix-org/synapse/issues?q=is%3Aopen+is%3Aissue+label%3A%22Good+First+Issue%22">Good First Issue</a>
 to work on.</p>
 <h1 id="7-turn-coffee-and-documentation-into-code-and-documentation"><a class="header" href="#7-turn-coffee-and-documentation-into-code-and-documentation">7. Turn coffee and documentation into code and documentation!</a></h1>
-<p>Synapse's code style is documented <a href="development/docs/code_style.html">here</a>. Please follow
-it, including the conventions for the <a href="development/docs/code_style.html#configuration-file-format">sample configuration
-file</a>.</p>
-<p>There is a growing amount of documentation located in the <a href="development/docs">docs</a>
+<p>Synapse's code style is documented
+<a href="https://matrix-org.github.io/synapse/develop/code_style.html">here</a>.
+Please follow it, including the conventions for the
+<a href="https://matrix-org.github.io/synapse/develop/code_style.html#configuration-file-format">sample configuration file</a>.</p>
+<p>There is a growing amount of documentation located in the
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs">docs</a>
 directory. This documentation is intended primarily for sysadmins running their
-own Synapse instance, as well as developers interacting externally with
-Synapse. <a href="development/docs/dev">docs/dev</a> exists primarily to house documentation for
-Synapse developers. <a href="development/docs/admin_api">docs/admin_api</a> houses documentation
-regarding Synapse's Admin API, which is used mostly by sysadmins and external
-service developers.</p>
+own Synapse instance, as well as developers interacting externally with Synapse.
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs/development">docs/development</a>
+exists primarily to house documentation for Synapse developers.
+<a href="https://github.com/matrix-org/synapse/tree/develop/docs/admin_api">docs/admin_api</a>
+houses documentation regarding Synapse's Admin API, which is used mostly by sysadmins
+and external service developers.</p>
 <p>If you add new files added to either of these folders, please use <a href="https://guides.github.com/features/mastering-markdown/">GitHub-Flavoured
 Markdown</a>.</p>
 <p>Some documentation also exists in <a href="https://github.com/matrix-org/synapse/wiki">Synapse's GitHub
@@ -11859,7 +11766,7 @@ flag to <code>git commit</code>, which uses the name and email set in your
 <p>By now, you know the drill!</p>
 <h1 id="notes-for-maintainers-on-merging-prs-etc"><a class="header" href="#notes-for-maintainers-on-merging-prs-etc">Notes for maintainers on merging PRs etc</a></h1>
 <p>There are some notes for those with commit access to the project on how we
-manage git <a href="development/docs/development/git.html">here</a>.</p>
+manage git <a href="https://matrix-org.github.io/synapse/develop/development/git.html">here</a>.</p>
 <h1 id="conclusion"><a class="header" href="#conclusion">Conclusion</a></h1>
 <p>That's it! Matrix is a very open and collaborative project as you might expect
 given our obsession with open communication. If we're going to successfully
