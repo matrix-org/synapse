@@ -811,8 +811,11 @@ class RoomCreationHandler(BaseHandler):
         with (await self.room_member_handler.member_linearizer.queue((room_id,))):
             content = {}
             is_direct = config.get("is_direct", None)
+            hide_invite = config.get("fi.mau.will_auto_accept", None)
             if is_direct:
                 content["is_direct"] = is_direct
+            if hide_invite:
+                content["fi.mau.will_auto_accept"] = True
 
             for invitee in invite_list:
                 (
