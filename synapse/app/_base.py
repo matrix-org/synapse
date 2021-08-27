@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import atexit
 import gc
 import logging
 import os
@@ -34,7 +35,6 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 import synapse
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
-from synapse.app._skip_final_gc import disable_final_gc
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -94,7 +94,6 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         run_command=run_command,
     )
 
-
 def start_reactor(
     appname,
     soft_file_limit,
@@ -127,7 +126,6 @@ def start_reactor(
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
-        disable_final_gc()
         run_command()
 
     # make sure that we run the reactor with the sentinel log context,
@@ -404,6 +402,12 @@ async def start(hs: "HomeServer"):
     if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
         gc.collect()
         gc.freeze()
+
+    # Speed up shutdowns by freezing all allocated objects. This moves everything
+    # into the permanent generation and excludes them from the final GC.
+    # Unfortunately only works on Python 3.7
+    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        atexit.register(gc.freeze)
 
 
 def setup_sentry(hs):
