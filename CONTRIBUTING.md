@@ -74,16 +74,17 @@ to work on.
 
 # 7. Turn coffee and documentation into code and documentation!
 
-Synapse's code style is documented [here](../code_style.md). Please follow
-it, including the conventions for the [sample configuration
-file](../code_style.md#configuration-file-format).
+Synapse's code style is documented
+[here](https://matrix-org.github.io/synapse/develop/code_style.html).
+Please follow it, including the conventions for the
+[sample configuration file](https://matrix-org.github.io/synapse/develop/code_style.html#configuration-file-format).
 
-There is a growing amount of documentation located in the 
+There is a growing amount of documentation located in the
 [docs](https://github.com/matrix-org/synapse/tree/develop/docs)
 directory. This documentation is intended primarily for sysadmins running their
-own Synapse instance, as well as developers interacting externally with Synapse. 
+own Synapse instance, as well as developers interacting externally with Synapse.
 [docs/development](https://github.com/matrix-org/synapse/tree/develop/docs/development)
-exists primarily to house documentation for Synapse developers. 
+exists primarily to house documentation for Synapse developers.
 [docs/admin_api](https://github.com/matrix-org/synapse/tree/develop/docs/admin_api)
 houses documentation regarding Synapse's Admin API, which is used mostly by sysadmins
 and external service developers.
@@ -409,7 +410,7 @@ By now, you know the drill!
 # Notes for maintainers on merging PRs etc
 
 There are some notes for those with commit access to the project on how we
-manage git [here](git.md).
+manage git [here](https://matrix-org.github.io/synapse/develop/development/git.html).
 
 # Conclusion
 
