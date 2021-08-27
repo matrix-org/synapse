@@ -1,0 +1,1 @@
+Fix a regression introduced in Synapse 1.41 which broke email transmission on Systems using older versions of the Twisted library.
