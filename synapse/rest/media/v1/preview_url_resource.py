@@ -99,7 +99,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
 
-        self._oembed = OEmbedProvider(self.client)
+        self._oembed = OEmbedProvider(hs, self.client)
 
         # We run the background jobs if we're the instance specified (or no
         # instance is specified, where we assume there is only one instance

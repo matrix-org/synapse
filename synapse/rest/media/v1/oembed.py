@@ -12,13 +12,14 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import logging
-import re
-from typing import Optional
-from urllib import parse as urlparse
+from typing import TYPE_CHECKING, Optional
 
 import attr
 
 from synapse.http.client import SimpleHttpClient
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -38,33 +39,6 @@ _oembed_globs = {
         "http://*.twitter.com/*/moments/*",
     ],
 }
-# Convert the globs to regular expressions.
-_oembed_patterns = {}
-for endpoint, globs in _oembed_globs.items():
-    for glob in globs:
-        # Convert the glob into a sane regular expression to match against. The
-        # rules followed will be slightly different for the domain portion vs.
-        # the rest.
-        #
-        # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
-        # 2. The domain can have globs, but we limit it to characters that can
-        #    reasonably be a domain part.
-        #    TODO: This does not attempt to handle Unicode domain names.
-        # 3. Other parts allow a glob to be any one, or more, characters.
-        results = urlparse.urlparse(glob)
-
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
-        if results.scheme not in {"http", "https"}:
-            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
-
-        pattern = urlparse.urlunparse(
-            [
-                results.scheme,
-                re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-            ]
-            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-        )
-        _oembed_patterns[re.compile(pattern)] = endpoint
 
 
 @attr.s(slots=True)
@@ -82,7 +56,11 @@ class OEmbedError(Exception):
 
 
 class OEmbedProvider:
-    def __init__(self, client: SimpleHttpClient):
+    def __init__(self, hs: "HomeServer", client: SimpleHttpClient):
+        self._oembed_patterns = {}
+        for oembed_endpoint in hs.config.oembed.oembed_patterns:
+            for pattern in oembed_endpoint.url_patterns:
+                self._oembed_patterns[pattern] = oembed_endpoint.api_endpoint
         self._client = client
 
     def get_oembed_url(self, url: str) -> Optional[str]:
@@ -95,7 +73,7 @@ class OEmbedProvider:
         Returns:
             A URL to use instead or None if the original URL should be used.
         """
-        for url_pattern, endpoint in _oembed_patterns.items():
+        for url_pattern, endpoint in self._oembed_patterns.items():
             if url_pattern.fullmatch(url):
                 return endpoint
 

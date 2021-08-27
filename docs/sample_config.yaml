@@ -1075,6 +1075,25 @@ url_preview_accept_language:
 #   - en
 
 
+oembed:
+    # By default, the providers.json from https://oembed.com/ is included
+    # with Synapse.
+    #
+    # Uncomment the following to disable using these default oEmbed URLs.
+    # Defaults to 'false'.
+    #
+    #disable_default_providers: true
+
+    # Additional files with oEmbed configuration (each should be in the
+    # form of providers.json).
+    #
+    # By default, this list is empty (so only the default providers.json
+    # is used).
+    #
+    #additional_providers:
+    #  - oembed/my_providers.json
+
+
 ## Captcha ##
 # See docs/CAPTCHA_SETUP.md for full details of configuring this.
 
