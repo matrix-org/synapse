@@ -8,6 +8,7 @@
     main {
         position: relative;
         margin-left: 100px !important;
+        margin-right: 250px !important;
     }
     .sidetoc {
         margin-left: auto;
