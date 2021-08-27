@@ -2,30 +2,6 @@ Welcome to Synapse
 
 This document aims to get you started with contributing to this repo! 
 
-- [1. Who can contribute to Synapse?](#1-who-can-contribute-to-synapse)
-- [2. What do I need?](#2-what-do-i-need)
-- [3. Get the source.](#3-get-the-source)
-- [4. Install the dependencies](#4-install-the-dependencies)
-  * [Under Unix (macOS, Linux, BSD, ...)](#under-unix-macos-linux-bsd-)
-  * [Under Windows](#under-windows)
-- [5. Get in touch.](#5-get-in-touch)
-- [6. Pick an issue.](#6-pick-an-issue)
-- [7. Turn coffee and documentation into code and documentation!](#7-turn-coffee-and-documentation-into-code-and-documentation)
-- [8. Test, test, test!](#8-test-test-test)
-  * [Run the linters.](#run-the-linters)
-  * [Run the unit tests.](#run-the-unit-tests-twisted-trial)
-  * [Run the integration tests (SyTest).](#run-the-integration-tests-sytest)
-  * [Run the integration tests (Complement).](#run-the-integration-tests-complement)
-- [9. Submit your patch.](#9-submit-your-patch)
-  * [Changelog](#changelog)
-    + [How do I know what to call the changelog file before I create the PR?](#how-do-i-know-what-to-call-the-changelog-file-before-i-create-the-pr)
-    + [Debian changelog](#debian-changelog)
-  * [Sign off](#sign-off)
-- [10. Turn feedback into better code.](#10-turn-feedback-into-better-code)
-- [11. Find a new issue.](#11-find-a-new-issue)
-- [Notes for maintainers on merging PRs etc](#notes-for-maintainers-on-merging-prs-etc)
-- [Conclusion](#conclusion)
-
 # 1. Who can contribute to Synapse?
 
 Everyone is welcome to contribute code to [matrix.org
@@ -35,7 +11,7 @@ follow a simple 'inbound=outbound' model for contributions: the act of
 submitting an 'inbound' contribution means that the contributor agrees to
 license the code under the same terms as the project's overall 'outbound'
 license - in our case, this is almost always Apache Software License v2 (see
-[LICENSE](LICENSE)).
+[LICENSE](https://github.com/matrix-org/synapse/blob/develop/LICENSE)).
 
 # 2. What do I need?
 
@@ -98,17 +74,20 @@ to work on.
 
 # 7. Turn coffee and documentation into code and documentation!
 
-Synapse's code style is documented [here](docs/code_style.md). Please follow
-it, including the conventions for the [sample configuration
-file](docs/code_style.md#configuration-file-format).
+Synapse's code style is documented
+[here](https://matrix-org.github.io/synapse/develop/code_style.html).
+Please follow it, including the conventions for the
+[sample configuration file](https://matrix-org.github.io/synapse/develop/code_style.html#configuration-file-format).
 
-There is a growing amount of documentation located in the [docs](docs)
+There is a growing amount of documentation located in the
+[docs](https://github.com/matrix-org/synapse/tree/develop/docs)
 directory. This documentation is intended primarily for sysadmins running their
-own Synapse instance, as well as developers interacting externally with
-Synapse. [docs/dev](docs/dev) exists primarily to house documentation for
-Synapse developers. [docs/admin_api](docs/admin_api) houses documentation
-regarding Synapse's Admin API, which is used mostly by sysadmins and external
-service developers.
+own Synapse instance, as well as developers interacting externally with Synapse.
+[docs/development](https://github.com/matrix-org/synapse/tree/develop/docs/development)
+exists primarily to house documentation for Synapse developers.
+[docs/admin_api](https://github.com/matrix-org/synapse/tree/develop/docs/admin_api)
+houses documentation regarding Synapse's Admin API, which is used mostly by sysadmins
+and external service developers.
 
 If you add new files added to either of these folders, please use [GitHub-Flavoured
 Markdown](https://guides.github.com/features/mastering-markdown/).
@@ -431,7 +410,7 @@ By now, you know the drill!
 # Notes for maintainers on merging PRs etc
 
 There are some notes for those with commit access to the project on how we
-manage git [here](docs/development/git.md).
+manage git [here](https://matrix-org.github.io/synapse/develop/development/git.html).
 
 # Conclusion
 
