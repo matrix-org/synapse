@@ -90,7 +90,7 @@ class SendEmailHandlerTestCase(HomeserverTestCase):
         server_protocol = smtp.ESMTP()
         server_protocol.delivery = message_delivery
         # make sure that the server uses the test reactor to set timeouts
-        server_protocol.callLater = self.reactor.callLater
+        server_protocol.callLater = self.reactor.callLater  # type: ignore[assignment]
 
         client_protocol = client_factory.buildProtocol(None)
         client_protocol.makeConnection(FakeTransport(server_protocol, self.reactor))
