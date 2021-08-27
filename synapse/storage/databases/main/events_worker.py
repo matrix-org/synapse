@@ -591,7 +591,7 @@ class EventsWorkerStore(SQLBaseStore):
 
             for result in results:
                 # We filter out events that we haven't asked for as we might get
-                # a *lot* of superfluous events back, and there is not point
+                # a *lot* of superfluous events back, and there is no point
                 # going through and inserting them all (which can take time).
                 event_entry_map.update(
                     (event_id, entry)
