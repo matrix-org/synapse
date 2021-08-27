@@ -13,13 +13,15 @@
 # limitations under the License.
 
 import email.utils
-import inspect
 import logging
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
 from typing import TYPE_CHECKING, Optional
 
+from pkg_resources import parse_version
+
+import twisted
 from twisted.internet.defer import Deferred
 from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorTCP
 from twisted.mail.smtp import ESMTPSender, ESMTPSenderFactory
@@ -31,16 +33,14 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_is_old_twisted = parse_version(twisted.__version__) < parse_version("21")
+
 
 class _NoTLSESMTPSender(ESMTPSender):
     """Extend ESMTPSender to disable TLS
 
-    Unfortunatlely ESMTPSender doesn't give an easy way to disable TLS, so we override
-    its internal method which it uses to generate a context factory.
-
-    As of Twisted 21.2, one alternative is to set the `hostname` param of
-    ESMTPSenderFactory to `None`, so if in future we drop support for earlier versions,
-    that is a possibility.
+    Unfortunately, before Twisted 21.2, ESMTPSender doesn't give an easy way to disable
+    TLS, so we override its internal method which it uses to generate a context factory.
     """
 
     def _getContextFactory(self) -> Optional[IOpenSSLContextFactory]:
@@ -77,29 +77,33 @@ async def _sendmail(
            the request will fail.
     """
     msg = BytesIO(msg_bytes)
-
     d: "Deferred[object]" = Deferred()
 
-    # Twisted 21.2 introduced a 'hostname' parameter to ESMTPSenderFactory, which we
-    # need to set to enable TLS.
-    kwargs = {}
-    sig = inspect.signature(ESMTPSenderFactory)
-    if "hostname" in sig.parameters:
-        kwargs["hostname"] = smtphost
-    factory = ESMTPSenderFactory(
-        username,
-        password,
-        from_addr,
-        to_addr,
-        msg,
-        d,
-        heloFallback=True,
-        requireAuthentication=require_auth,
-        requireTransportSecurity=require_tls,
-        **kwargs,
-    )
-    if not enable_tls:
-        factory.protocol = _NoTLSESMTPSender
+    def build_sender_factory(**kwargs) -> ESMTPSenderFactory:
+        return ESMTPSenderFactory(
+            username,
+            password,
+            from_addr,
+            to_addr,
+            msg,
+            d,
+            heloFallback=True,
+            requireAuthentication=require_auth,
+            requireTransportSecurity=require_tls,
+            **kwargs,
+        )
+
+    if _is_old_twisted:
+        # before twisted 21.2, we have to override the ESMTPSender protocol to disable
+        # TLS
+        factory = build_sender_factory()
+
+        if not enable_tls:
+            factory.protocol = _NoTLSESMTPSender
+    else:
+        # for twisted 21.2 and later, there is a 'hostname' parameter which we should
+        # set to enable TLS.
+        factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
     # the IReactorTCP interface claims host has to be a bytes, which seems to be wrong
     reactor.connectTCP(smtphost, smtpport, factory, timeout=30, bindAddress=None)  # type: ignore[arg-type]
