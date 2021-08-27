@@ -546,7 +546,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """Test an oEmbed endpoint which returns a 'photo' type which redirects the preview to a new URL."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
-            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
+            "synapse.rest.media.v1.oembed._oembed_patterns",
             {
                 re.compile(
                     r"http://twitter\.com/.+/status/.+"
@@ -619,7 +619,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
         # Route the HTTP version to an HTTP endpoint so that the tests work.
         with patch.dict(
-            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
+            "synapse.rest.media.v1.oembed._oembed_patterns",
             {
                 re.compile(
                     r"http://twitter\.com/.+/status/.+"

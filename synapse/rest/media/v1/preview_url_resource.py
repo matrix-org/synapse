@@ -25,8 +25,6 @@ import traceback
 from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Union
 from urllib import parse as urlparse
 
-import attr
-
 from twisted.internet.error import DNSLookupError
 from twisted.web.server import Request
 
@@ -43,6 +41,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
+from synapse.rest.media.v1.oembed import OEmbedError, OEmbedProvider
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -70,63 +69,6 @@ OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
-
-# A map of globs to API endpoints.
-_oembed_globs = {
-    # Twitter.
-    "https://publish.twitter.com/oembed": [
-        "https://twitter.com/*/status/*",
-        "https://*.twitter.com/*/status/*",
-        "https://twitter.com/*/moments/*",
-        "https://*.twitter.com/*/moments/*",
-        # Include the HTTP versions too.
-        "http://twitter.com/*/status/*",
-        "http://*.twitter.com/*/status/*",
-        "http://twitter.com/*/moments/*",
-        "http://*.twitter.com/*/moments/*",
-    ],
-}
-# Convert the globs to regular expressions.
-_oembed_patterns = {}
-for endpoint, globs in _oembed_globs.items():
-    for glob in globs:
-        # Convert the glob into a sane regular expression to match against. The
-        # rules followed will be slightly different for the domain portion vs.
-        # the rest.
-        #
-        # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
-        # 2. The domain can have globs, but we limit it to characters that can
-        #    reasonably be a domain part.
-        #    TODO: This does not attempt to handle Unicode domain names.
-        # 3. Other parts allow a glob to be any one, or more, characters.
-        results = urlparse.urlparse(glob)
-
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
-        if results.scheme not in {"http", "https"}:
-            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
-
-        pattern = urlparse.urlunparse(
-            [
-                results.scheme,
-                re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-            ]
-            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-        )
-        _oembed_patterns[re.compile(pattern)] = endpoint
-
-
-@attr.s(slots=True)
-class OEmbedResult:
-    # Either HTML content or URL must be provided.
-    html = attr.ib(type=Optional[str])
-    url = attr.ib(type=Optional[str])
-    title = attr.ib(type=Optional[str])
-    # Number of seconds to cache the content.
-    cache_age = attr.ib(type=int)
-
-
-class OEmbedError(Exception):
-    """An error occurred processing the oEmbed object."""
 
 
 class PreviewUrlResource(DirectServeJsonResource):
@@ -156,6 +98,8 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
+
+        self._oembed = OEmbedProvider(self.client)
 
         # We run the background jobs if we're the instance specified (or no
         # instance is specified, where we assume there is only one instance
@@ -367,87 +311,6 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         return jsonog.encode("utf8")
 
-    def _get_oembed_url(self, url: str) -> Optional[str]:
-        """
-        Check whether the URL should be downloaded as oEmbed content instead.
-
-        Args:
-            url: The URL to check.
-
-        Returns:
-            A URL to use instead or None if the original URL should be used.
-        """
-        for url_pattern, endpoint in _oembed_patterns.items():
-            if url_pattern.fullmatch(url):
-                return endpoint
-
-        # No match.
-        return None
-
-    async def _get_oembed_content(self, endpoint: str, url: str) -> OEmbedResult:
-        """
-        Request content from an oEmbed endpoint.
-
-        Args:
-            endpoint: The oEmbed API endpoint.
-            url: The URL to pass to the API.
-
-        Returns:
-            An object representing the metadata returned.
-
-        Raises:
-            OEmbedError if fetching or parsing of the oEmbed information fails.
-        """
-        try:
-            logger.debug("Trying to get oEmbed content for url '%s'", url)
-            result = await self.client.get_json(
-                endpoint,
-                # TODO Specify max height / width.
-                # Note that only the JSON format is supported.
-                args={"url": url},
-            )
-
-            # Ensure there's a version of 1.0.
-            if result.get("version") != "1.0":
-                raise OEmbedError("Invalid version: %s" % (result.get("version"),))
-
-            oembed_type = result.get("type")
-
-            # Ensure the cache age is None or an int.
-            cache_age = result.get("cache_age")
-            if cache_age:
-                cache_age = int(cache_age)
-
-            oembed_result = OEmbedResult(None, None, result.get("title"), cache_age)
-
-            # HTML content.
-            if oembed_type == "rich":
-                oembed_result.html = result.get("html")
-                return oembed_result
-
-            if oembed_type == "photo":
-                oembed_result.url = result.get("url")
-                return oembed_result
-
-            # TODO Handle link and video types.
-
-            if "thumbnail_url" in result:
-                oembed_result.url = result.get("thumbnail_url")
-                return oembed_result
-
-            raise OEmbedError("Incompatible oEmbed information.")
-
-        except OEmbedError as e:
-            # Trap OEmbedErrors first so we can directly re-raise them.
-            logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
-            raise
-
-        except Exception as e:
-            # Trap any exception and let the code follow as usual.
-            # FIXME: pass through 404s and other error messages nicely
-            logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
-            raise OEmbedError() from e
-
     async def _download_url(self, url: str, user: str) -> Dict[str, Any]:
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
@@ -459,11 +322,11 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # If this URL can be accessed via oEmbed, use that instead.
         url_to_download: Optional[str] = url
-        oembed_url = self._get_oembed_url(url)
+        oembed_url = self._oembed.get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
             try:
-                oembed_result = await self._get_oembed_content(oembed_url, url)
+                oembed_result = await self._oembed.get_oembed_content(oembed_url, url)
                 if oembed_result.url:
                     url_to_download = oembed_result.url
                 elif oembed_result.html:
