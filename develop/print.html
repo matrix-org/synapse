@@ -886,6 +886,9 @@ to proxied traffic.)</p>
     server_name matrix.example.com;
 
     location ~* ^(\/_matrix|\/_synapse\/client) {
+        # note: do not add a path (even a single /) after the port in `proxy_pass`,
+        # otherwise nginx will canonicalise the URI and cause signature verification
+        # errors.
         proxy_pass http://localhost:8008;
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -897,9 +900,7 @@ to proxied traffic.)</p>
     }
 }
 </code></pre>
-<p><strong>NOTE</strong>: Do not add a path after the port in <code>proxy_pass</code>, otherwise nginx will
-canonicalise/normalise the URI.</p>
-<h3 id="caddy-1"><a class="header" href="#caddy-1">Caddy 1</a></h3>
+<h3 id="caddy-v1"><a class="header" href="#caddy-v1">Caddy v1</a></h3>
 <pre><code>matrix.example.com {
   proxy /_matrix http://localhost:8008 {
     transparent
@@ -916,7 +917,7 @@ example.com:8448 {
   }
 }
 </code></pre>
-<h3 id="caddy-2"><a class="header" href="#caddy-2">Caddy 2</a></h3>
+<h3 id="caddy-v2"><a class="header" href="#caddy-v2">Caddy v2</a></h3>
 <pre><code>matrix.example.com {
   reverse_proxy /_matrix/* http://localhost:8008
   reverse_proxy /_synapse/client/* http://localhost:8008
