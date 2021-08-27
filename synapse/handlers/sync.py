@@ -1534,12 +1534,8 @@ class SyncHandler:
 
         async def handle_room_entries(room_entry: "RoomSyncResultBuilder"):
             with start_active_span("generate_room_entry"):
-                log_kv(
-                    {
-                        "room_id": room_entry.room_id,
-                        "events": len(room_entry.events or []),
-                    }
-                )
+                set_tag({"room_id": room_entry.room_id})
+                log_kv({"events": len(room_entry.events or [])})
                 logger.debug("Generating room entry for %s", room_entry.room_id)
                 res = await self._generate_room_entry(
                     sync_result_builder,
