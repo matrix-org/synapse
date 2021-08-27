@@ -34,6 +34,7 @@ from twisted.protocols.tls import TLSMemoryBIOFactory
 import synapse
 from synapse.api.constants import MAX_PDU_SIZE
 from synapse.app import check_bind_error
+from synapse.app._skip_final_gc import disable_final_gc
 from synapse.app.phone_stats_home import start_phone_stats_home
 from synapse.config.homeserver import HomeServerConfig
 from synapse.crypto import context_factory
@@ -126,6 +127,7 @@ def start_reactor(
         change_resource_limit(soft_file_limit)
         if gc_thresholds:
             gc.set_threshold(*gc_thresholds)
+        disable_final_gc()
         run_command()
 
     # make sure that we run the reactor with the sentinel log context,
