@@ -24,23 +24,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# A map of globs to API endpoints.
-_oembed_globs = {
-    # Twitter.
-    "https://publish.twitter.com/oembed": [
-        "https://twitter.com/*/status/*",
-        "https://*.twitter.com/*/status/*",
-        "https://twitter.com/*/moments/*",
-        "https://*.twitter.com/*/moments/*",
-        # Include the HTTP versions too.
-        "http://twitter.com/*/status/*",
-        "http://*.twitter.com/*/status/*",
-        "http://twitter.com/*/moments/*",
-        "http://*.twitter.com/*/moments/*",
-    ],
-}
-
-
 @attr.s(slots=True)
 class OEmbedResult:
     # Either HTML content or URL must be provided.
