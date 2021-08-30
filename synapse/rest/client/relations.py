@@ -87,10 +87,23 @@ class RelationSendServlet(RestServlet):
         )
 
     def on_PUT(
-        self, request: SynapseRequest, *args, **kwargs
+        self,
+        request: SynapseRequest,
+        room_id: str,
+        parent_id: str,
+        relation_type: str,
+        event_type: str,
+        txn_id: Optional[str] = None,
     ) -> Awaitable[Tuple[int, JsonDict]]:
         return self.txns.fetch_or_execute_request(
-            request, self.on_PUT_or_POST, request, *args, **kwargs
+            request,
+            self.on_PUT_or_POST,
+            request,
+            room_id,
+            parent_id,
+            relation_type,
+            event_type,
+            txn_id,
         )
 
     async def on_PUT_or_POST(
