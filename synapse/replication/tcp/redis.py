@@ -365,7 +365,9 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    endpoint = HostnameEndpoint(reactor, host.encode(), port, timeout=30, bindAddress=None)
+    endpoint = HostnameEndpoint(
+        reactor, host.encode(), port, timeout=30, bindAddress=None
+    )
     endpoint.connect(factory)
 
     return factory.handler
