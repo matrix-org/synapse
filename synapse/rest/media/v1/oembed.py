@@ -24,14 +24,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class OEmbedResult:
     # Either HTML content or URL must be provided.
-    html = attr.ib(type=Optional[str])
-    url = attr.ib(type=Optional[str])
-    title = attr.ib(type=Optional[str])
+    html: Optional[str]
+    url: Optional[str]
+    title: Optional[str]
     # Number of seconds to cache the content.
-    cache_age = attr.ib(type=int)
+    cache_age: int
 
 
 class OEmbedError(Exception):
