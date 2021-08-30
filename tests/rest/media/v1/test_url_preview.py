@@ -79,7 +79,9 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         config["media_storage_providers"] = [provider_config]
 
-        config["oembed_providers_dir"] = os.path.join(os.environ["TOP"], "oembed")
+        config["oembed_providers_dir"] = os.path.join(
+            os.environ["TOP"], "synapse", "res", "oembed"
+        )
 
         hs = self.setup_test_homeserver(config=config)
 

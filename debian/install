@@ -1,2 +1,2 @@
 debian/manage_debconf.pl /opt/venvs/matrix-synapse/lib/
-oembed/providers.json etc/matrix-synapse/oembed
+synapse/res/oembed/providers.json etc/matrix-synapse/oembed
