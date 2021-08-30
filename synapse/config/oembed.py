@@ -26,7 +26,7 @@ logger = logging.Logger(__name__)
 
 class OembedConfig(Config):
     section = "oembed"
-    oembed_providers : Dict[str, Dict[str, Any]] = {}
+    oembed_providers: Dict[str, Dict[str, Any]] = {}
 
     def read_config(self, config, **kwargs):
         oembed_dir = config.get("oembed_providers_dir")

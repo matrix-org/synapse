@@ -101,7 +101,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
         self.max_spider_size = hs.config.max_spider_size
-        self.oembed = hs.config.oembed
+        self.oembed_config = hs.config.oembed
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SimpleHttpClient(
@@ -400,7 +400,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # If this URL can be accessed via oEmbed, use that instead.
         url_to_download: Optional[str] = url
-        oembed_endpoint = self.oembed.get_oembed_endpoint(url)
+        oembed_endpoint = self.oembed_config.get_oembed_endpoint(url)
         if oembed_endpoint:
             # The result might be a new URL to download, or it might be HTML content.
             try:
