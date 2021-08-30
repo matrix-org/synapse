@@ -15,7 +15,7 @@ import json
 import logging
 import re
 from os import listdir, path
-from typing import Any, Dict
+from typing import Any, Dict, List
 from urllib.parse import urlparse, urlunparse
 
 from synapse.config._base import Config
@@ -25,8 +25,20 @@ logger = logging.Logger(__name__)
 
 
 class OembedConfig(Config):
+    """oEmbed endpoints
+
+    :property oembed_endpoints: dict {
+                                    domain: [{
+                                        "url": preview_or_discovery_url,
+                                        "discovery": bool,
+                                        "formats": [],
+                                        "patterns": [url_pattern...]
+                                    }]
+                                }
+    """
+
     section = "oembed"
-    oembed_providers: Dict[str, Dict[str, Any]] = {}
+    oembed_endpoints: Dict[str, List[Dict[str, Any]]] = {}
 
     def read_config(self, config, **kwargs):
         oembed_dir = config.get("oembed_providers_dir")
@@ -64,25 +76,39 @@ class OembedConfig(Config):
 
         for provider in oembed_providers:
             provider_url = provider["provider_url"].rstrip("/")
+            endpoints = []
             for endpoint in provider["endpoints"]:
-                if "schemes" not in endpoint:
-                    continue
+                e = {
+                    "url": endpoint["url"],
+                    "discovery": endpoint.get("discovery", False),
+                }
 
-                patterns = []
-                for s in endpoint["schemes"]:
-                    results = urlparse(s)
-                    pattern = urlunparse(
-                        [
-                            results.scheme,
-                            re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-                        ]
-                        + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-                    )
-                    patterns.append(re.compile(pattern))
-                endpoint["patterns"] = patterns
+                if "formats" in endpoint:
+                    e["formats"] = endpoint["formats"]
+
+                if "schemes" in endpoint:
+                    patterns = []
+                    for s in endpoint["schemes"]:
+                        results = urlparse(s)
+                        pattern = urlunparse(
+                            [
+                                results.scheme,
+                                re.escape(results.netloc).replace(
+                                    "\\*", "[a-zA-Z0-9_-]+"
+                                ),
+                            ]
+                            + [
+                                re.escape(part).replace("\\*", ".+")
+                                for part in results[2:]
+                            ]
+                        )
+                        patterns.append(re.compile(pattern))
+                    e["patterns"] = patterns
+
+                endpoints.append(e)
 
             parsed = urlparse(provider_url)
-            self.oembed_providers[re.sub(r"^www\.", "", parsed.netloc)] = provider
+            self.oembed_endpoints[re.sub(r"^www\.", "", parsed.netloc)] = endpoints
 
     def get_oembed_endpoint(self, url):
         """
@@ -96,12 +122,12 @@ class OembedConfig(Config):
         """
 
         parsed = urlparse(url)
-        for key, provider in self.oembed_providers.items():
+        for key, endpoints in self.oembed_endpoints.items():
             if parsed.netloc.find(key) == -1:
                 continue
 
-            for endpoint in provider["endpoints"]:
-                if "discovery" in endpoint:
+            for endpoint in endpoints:
+                if endpoint["discovery"]:
                     pass  # TODO
 
                 if "patterns" not in endpoint:
