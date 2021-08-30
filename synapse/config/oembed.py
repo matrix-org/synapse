@@ -18,8 +18,8 @@ from os import listdir, path
 from typing import Any, Dict
 from urllib.parse import urlparse, urlunparse
 
-from ._base import Config
-from ._util import validate_config
+from synapse.config._base import Config
+from synapse.config._util import validate_config
 
 logger = logging.Logger(__name__)
 
