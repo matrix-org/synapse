@@ -1334,19 +1334,19 @@ class PersistEventsStore:
 
             return im
 
-        self.db_pool.simple_insert_many_txn(
+        self.db_pool.simple_upsert_many_txn(
             txn,
             table="event_json",
-            values=[
-                {
-                    "event_id": event.event_id,
-                    "room_id": event.room_id,
-                    "internal_metadata": json_encoder.encode(
-                        get_internal_metadata(event)
-                    ),
-                    "json": json_encoder.encode(event_dict(event)),
-                    "format_version": event.format_version,
-                }
+            key_names=["event_id"],
+            key_values=[[event.event_id] for event, _ in events_and_contexts],
+            value_names=["room_id", "internal_metadata", "json", "format_version"],
+            value_values=[
+                [
+                    event.room_id,
+                    json_encoder.encode(get_internal_metadata(event)),
+                    json_encoder.encode(event_dict(event)),
+                    event.format_version,
+                ]
                 for event, _ in events_and_contexts
             ],
         )

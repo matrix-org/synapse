@@ -1,0 +1,1 @@
+Fix instert failure because of duplicate key when an incoming event id is present in the table event_json but not in events.
