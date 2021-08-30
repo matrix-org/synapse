@@ -1,0 +1,1 @@
+Use twisted HostnameEndpoint to successfully resolve domains with only AAAA DNS records. Contributed by @xfk.
