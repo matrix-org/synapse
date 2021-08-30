@@ -584,7 +584,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "GET",
-            "preview_url?url={}".format(preview_url),
+            f"preview_url?url={preview_url}",
             shorthand=False,
             await_result=False,
         )
