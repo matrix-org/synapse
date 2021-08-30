@@ -21,6 +21,7 @@ import txredisapi
 from zope.interface import implementer
 
 from twisted.internet.address import IPv4Address, IPv6Address
+from twisted.internet.endpoints import HostnameEndpoint
 from twisted.internet.interfaces import IAddress, IConnector
 from twisted.python.failure import Failure
 
@@ -364,6 +365,7 @@ def lazyConnection(
     factory.continueTrying = reconnect
 
     reactor = hs.get_reactor()
-    reactor.connectTCP(host.encode(), port, factory, timeout=30, bindAddress=None)
+    endpoint = HostnameEndpoint(reactor, host.encode(), port, timeout=30, bindAddress=None)
+    endpoint.connect(factory)
 
     return factory.handler

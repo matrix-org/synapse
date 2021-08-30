@@ -23,6 +23,7 @@ from pkg_resources import parse_version
 
 import twisted
 from twisted.internet.defer import Deferred
+from twisted.internet.endpoints import HostnameEndpoint
 from twisted.internet.interfaces import IOpenSSLContextFactory, IReactorTCP
 from twisted.mail.smtp import ESMTPSender, ESMTPSenderFactory
 
@@ -106,7 +107,8 @@ async def _sendmail(
         factory = build_sender_factory(hostname=smtphost if enable_tls else None)
 
     # the IReactorTCP interface claims host has to be a bytes, which seems to be wrong
-    reactor.connectTCP(smtphost, smtpport, factory, timeout=30, bindAddress=None)  # type: ignore[arg-type]
+    endpoint = HostnameEndpoint(reactor, smtphost, smtpport, timeout=30, bindAddress=None)
+    endpoint.connect(factory)
 
     await make_deferred_yieldable(d)
 
