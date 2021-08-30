@@ -39,6 +39,13 @@ class OEmbedError(Exception):
 
 
 class OEmbedProvider:
+    """
+    A helper for accessing oEmbed content.
+
+    It can be used to check if a URL should be accessed via oEmbed and for
+    requesting/parsing oEmbed content.
+    """
+
     def __init__(self, hs: "HomeServer", client: SimpleHttpClient):
         self._oembed_patterns = {}
         for oembed_endpoint in hs.config.oembed.oembed_patterns:
