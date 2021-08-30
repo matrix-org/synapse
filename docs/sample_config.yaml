@@ -1076,8 +1076,7 @@ url_preview_accept_language:
 
 
 oembed:
-    # By default, the providers.json from https://oembed.com/ is included
-    # with Synapse.
+    # A list of providers included with Synapse.
     #
     # Uncomment the following to disable using these default oEmbed URLs.
     # Defaults to 'false'.

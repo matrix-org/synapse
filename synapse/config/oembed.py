@@ -130,8 +130,7 @@ class OembedConfig(Config):
     def generate_config_section(self, **kwargs):
         return """\
         oembed:
-            # By default, the providers.json from https://oembed.com/ is included
-            # with Synapse.
+            # A list of providers included with Synapse.
             #
             # Uncomment the following to disable using these default oEmbed URLs.
             # Defaults to 'false'.
