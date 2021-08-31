@@ -1441,7 +1441,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
 
         room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
 
-        if room_creator is None:
+        if not isinstance(room_creator, str):
             # If the create event does not have a creator then the room is
             # invalid, and it would fail auth checks anyway.
             raise StoreError(400, "No creator defined on the create event")
