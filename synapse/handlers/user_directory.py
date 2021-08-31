@@ -229,31 +229,31 @@ class UserDirectoryHandler(StateDeltasHandler):
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                is_support = await self.store.is_support_user(state_key)
-                if not is_support:
-                    if joined is MatchChange.no_change:
-                        # Handle any profile changes for remote users
-                        if not self.is_mine_id(state_key):
-                            await self._handle_profile_change(
-                                state_key, room_id, prev_event_id, event_id
-                            )
-                        continue
+                if self.store.is_support_user(state_key):
+                    continue
 
-                    if joined is MatchChange.now_true:  # The user joined
-                        event = await self.store.get_event(event_id, allow_none=True)
-                        # It isn't expected for this event to not exist, but we
-                        # don't want the entire background process to break.
-                        if event is None:
-                            continue
-
-                        profile = ProfileInfo(
-                            avatar_url=event.content.get("avatar_url"),
-                            display_name=event.content.get("displayname"),
+                if joined is MatchChange.no_change:
+                    # Handle any profile changes for remote users
+                    if not self.is_mine_id(state_key):
+                        await self._handle_profile_change(
+                            state_key, room_id, prev_event_id, event_id
                         )
 
-                        await self._handle_new_user(room_id, state_key, profile)
-                    else:  # The user left
-                        await self._handle_remove_user(room_id, state_key)
+                elif joined is MatchChange.now_true:  # The user joined
+                    event = await self.store.get_event(event_id, allow_none=True)
+                    # It isn't expected for this event to not exist, but we
+                    # don't want the entire background process to break.
+                    if event is None:
+                        continue
+
+                    profile = ProfileInfo(
+                        avatar_url=event.content.get("avatar_url"),
+                        display_name=event.content.get("displayname"),
+                    )
+
+                    await self._handle_new_user(room_id, state_key, profile)
+                else:  # The user left
+                    await self._handle_remove_user(room_id, state_key)
             else:
                 logger.debug("Ignoring irrelevant type: %r", typ)
 
