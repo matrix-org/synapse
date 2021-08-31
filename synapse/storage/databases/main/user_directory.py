@@ -204,8 +204,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
 
-                # Update each user in the user directory.
+                # Update each remote user in the user directory.
+                # (Entries for local users are managed by the UserDirectoryHandler
+                # and do not require us to peek at room state/events.)
                 for user_id, profile in users_with_profile.items():
+                    if self.hs.is_mine_id(user_id):
+                        continue
                     await self.update_profile_in_user_dir(
                         user_id, profile.display_name, profile.avatar_url
                     )

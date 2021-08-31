@@ -232,10 +232,11 @@ class UserDirectoryHandler(StateDeltasHandler):
                 is_support = await self.store.is_support_user(state_key)
                 if not is_support:
                     if joined is MatchChange.no_change:
-                        # Handle any profile changes
-                        await self._handle_profile_change(
-                            state_key, room_id, prev_event_id, event_id
-                        )
+                        # Handle any profile changes for remote users
+                        if not self.is_mine_id(state_key):
+                            await self._handle_profile_change(
+                                state_key, room_id, prev_event_id, event_id
+                            )
                         continue
 
                     if joined is MatchChange.now_true:  # The user joined
