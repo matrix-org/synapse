@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -38,12 +37,14 @@ class AccountValidityRenewServlet(RestServlet):
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
         self.account_renewed_template = (
-            hs.config.account_validity_account_renewed_template
+            hs.config.account_validity.account_validity_account_renewed_template
         )
         self.account_previously_renewed_template = (
-            hs.config.account_validity_account_previously_renewed_template
+            hs.config.account_validity.account_validity_account_previously_renewed_template
         )
-        self.invalid_token_template = hs.config.account_validity_invalid_token_template
+        self.invalid_token_template = (
+            hs.config.account_validity.account_validity_invalid_token_template
+        )
 
     async def on_GET(self, request):
         if b"token" not in request.args:
@@ -87,7 +88,7 @@ class AccountValiditySendMailServlet(RestServlet):
         self.account_activity_handler = hs.get_account_validity_handler()
         self.auth = hs.get_auth()
         self.account_validity_renew_by_email_enabled = (
-            self.hs.config.account_validity_renew_by_email_enabled
+            hs.config.account_validity.account_validity_renew_by_email_enabled
         )
 
     async def on_POST(self, request):

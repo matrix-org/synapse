@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -637,8 +636,11 @@ class Porter(object):
                 "device_inbox_sequence", ("device_inbox", "device_federation_outbox")
             )
             await self._setup_sequence(
-                "account_data_sequence", ("room_account_data", "room_tags_revisions", "account_data"))
-            await self._setup_sequence("receipts_sequence", ("receipts_linearized", ))
+                "account_data_sequence",
+                ("room_account_data", "room_tags_revisions", "account_data"),
+            )
+            await self._setup_sequence("receipts_sequence", ("receipts_linearized",))
+            await self._setup_sequence("presence_stream_sequence", ("presence_stream",))
             await self._setup_auth_chain_sequence()
 
             # Step 3. Get tables.

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -17,13 +16,13 @@
 import logging
 import random
 from abc import ABCMeta
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Any, Collection, Iterable, Optional, Union
 
 from synapse.storage.database import LoggingTransaction  # noqa: F401
 from synapse.storage.database import make_in_list_sql_clause  # noqa: F401
 from synapse.storage.database import DatabasePool
 from synapse.storage.types import Connection
-from synapse.types import Collection, StreamToken, get_domain_from_id
+from synapse.types import StreamToken, get_domain_from_id
 from synapse.util import json_decoder
 
 if TYPE_CHECKING:
@@ -115,7 +114,7 @@ def db_to_json(db_content: Union[memoryview, bytes, bytearray, str]) -> Any:
         db_content = db_content.tobytes()
 
     # Decode it to a Unicode string before feeding it to the JSON decoder, since
-    # Python 3.5 does not support deserializing bytes.
+    # it only supports handling strings
     if isinstance(db_content, (bytes, bytearray)):
         db_content = db_content.decode("utf8")
 

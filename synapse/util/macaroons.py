@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #

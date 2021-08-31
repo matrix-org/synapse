@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -616,7 +615,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Create 3 test rooms
         total_rooms = 3
         room_ids = []
-        for x in range(total_rooms):
+        for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )
@@ -680,7 +679,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
         # Create 5 test rooms
         total_rooms = 5
         room_ids = []
-        for x in range(total_rooms):
+        for _ in range(total_rooms):
             room_id = self.helper.create_room_as(
                 self.admin_user, tok=self.admin_user_tok
             )
@@ -1578,7 +1577,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             channel.json_body["event"]["event_id"], events[midway]["event_id"]
         )
 
-        for i, found_event in enumerate(channel.json_body["events_before"]):
+        for found_event in channel.json_body["events_before"]:
             for j, posted_event in enumerate(events):
                 if found_event["event_id"] == posted_event["event_id"]:
                     self.assertTrue(j < midway)
@@ -1586,7 +1585,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
             else:
                 self.fail("Event %s from events_before not found" % j)
 
-        for i, found_event in enumerate(channel.json_body["events_after"]):
+        for found_event in channel.json_body["events_after"]:
             for j, posted_event in enumerate(events):
                 if found_event["event_id"] == posted_event["event_id"]:
                     self.assertTrue(j > midway)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -26,7 +25,10 @@ from ._util import validate_config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_USER_MAPPING_PROVIDER = (
+DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.saml.DefaultSamlMappingProvider"
+# The module that DefaultSamlMappingProvider is in was renamed, we want to
+# transparently handle both the same.
+LEGACY_USER_MAPPING_PROVIDER = (
     "synapse.handlers.saml_handler.DefaultSamlMappingProvider"
 )
 
@@ -98,6 +100,8 @@ class SAML2Config(Config):
 
         # Use the default user mapping provider if not set
         ump_dict.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
+        if ump_dict.get("module") == LEGACY_USER_MAPPING_PROVIDER:
+            ump_dict["module"] = DEFAULT_USER_MAPPING_PROVIDER
 
         # Ensure a config is present
         ump_dict["config"] = ump_dict.get("config") or {}

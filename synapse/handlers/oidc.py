@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
@@ -16,7 +15,7 @@
 import inspect
 import logging
 from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 
 import attr
 import pymacaroons
@@ -38,10 +37,7 @@ from twisted.web.client import readBody
 from twisted.web.http_headers import Headers
 
 from synapse.config import ConfigError
-from synapse.config.oidc_config import (
-    OidcProviderClientSecretJwtKey,
-    OidcProviderConfig,
-)
+from synapse.config.oidc import OidcProviderClientSecretJwtKey, OidcProviderConfig
 from synapse.handlers.sso import MappingException, UserAttributes
 from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
@@ -72,8 +68,8 @@ logger = logging.getLogger(__name__)
 #
 # Here we have the names of the cookies, and the options we use to set them.
 _SESSION_COOKIES = [
-    (b"oidc_session", b"Path=/_synapse/client/oidc; HttpOnly; Secure; SameSite=None"),
-    (b"oidc_session_no_samesite", b"Path=/_synapse/client/oidc; HttpOnly"),
+    (b"oidc_session", b"HttpOnly; Secure; SameSite=None"),
+    (b"oidc_session_no_samesite", b"HttpOnly"),
 ]
 
 #: A token exchanged from the token endpoint, as per RFC6749 sec 5.1. and
@@ -282,6 +278,13 @@ class OidcProvider:
 
         self._config = provider
         self._callback_url = hs.config.oidc_callback_url  # type: str
+
+        # Calculate the prefix for OIDC callback paths based on the public_baseurl.
+        # We'll insert this into the Path= parameter of any session cookies we set.
+        public_baseurl_path = urlparse(hs.config.server.public_baseurl).path
+        self._callback_path_prefix = (
+            public_baseurl_path.encode("utf-8") + b"_synapse/client/oidc"
+        )
 
         self._oidc_attribute_requirements = provider.attribute_requirements
         self._scopes = provider.scopes
@@ -783,8 +786,13 @@ class OidcProvider:
 
         for cookie_name, options in _SESSION_COOKIES:
             request.cookies.append(
-                b"%s=%s; Max-Age=3600; %s"
-                % (cookie_name, cookie.encode("utf-8"), options)
+                b"%s=%s; Max-Age=3600; Path=%s; %s"
+                % (
+                    cookie_name,
+                    cookie.encode("utf-8"),
+                    self._callback_path_prefix,
+                    options,
+                )
             )
 
         metadata = await self.load_metadata()
@@ -960,6 +968,11 @@ class OidcProvider:
                 # If allowing existing users we want to generate a single localpart
                 # and attempt to match it.
                 attributes = await oidc_response_to_user_attributes(failures=0)
+
+                if attributes.localpart is None:
+                    # If no localpart is returned then we will generate one, so
+                    # there is no need to search for existing users.
+                    return None
 
                 user_id = UserID(attributes.localpart, self._server_name).to_string()
                 users = await self._store.get_users_by_id_case_insensitive(user_id)

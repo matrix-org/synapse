@@ -40,7 +40,9 @@ listeners:
         compress: false
   {% endif %}
 
-  - port: 8008
+  # Allow configuring in case we want to reverse proxy 8008
+  # using another process in the same container
+  - port: {{ SYNAPSE_HTTP_PORT or 8008 }}
     tls: false
     bind_addresses: ['::']
     type: http

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -309,6 +308,57 @@ class RegisterRestServletTestCase(unittest.HomeserverTestCase):
         self.assertEquals(200, channel.code, channel.result)
 
         self.assertIsNotNone(channel.json_body.get("sid"))
+
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://test_server",
+            "email": {
+                "smtp_host": "mail_server",
+                "smtp_port": 2525,
+                "notif_from": "sender@host",
+            },
+        }
+    )
+    def test_reject_invalid_email(self):
+        """Check that bad emails are rejected"""
+
+        # Test for email with multiple @
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": "email@@email", "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        # Check error to ensure that we're not erroring due to a bug in the test.
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
+        # Test for email with no @
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": "email", "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
+
+        # Test for super long email
+        email = "a@" + "a" * 1000
+        channel = self.make_request(
+            "POST",
+            b"register/email/requestToken",
+            {"client_secret": "foobar", "email": email, "send_attempt": 1},
+        )
+        self.assertEquals(400, channel.code, channel.result)
+        self.assertEquals(
+            channel.json_body,
+            {"errcode": "M_UNKNOWN", "error": "Unable to parse email address"},
+        )
 
 
 class RegisterHideProfileTestCase(unittest.HomeserverTestCase):
@@ -740,7 +790,7 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # Check that the HTML we're getting is the one we expect on a successful renewal.
         expiration_ts = self.get_success(self.store.get_expiration_ts_for_user(user_id))
-        expected_html = self.hs.config.account_validity_account_renewed_template.render(
+        expected_html = self.hs.config.account_validity.account_validity_account_renewed_template.render(
             expiration_ts=expiration_ts
         )
         self.assertEqual(
@@ -758,10 +808,8 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # Check that the HTML we're getting is the one we expect when reusing a
         # token. The account expiration date should not have changed.
-        expected_html = (
-            self.hs.config.account_validity_account_previously_renewed_template.render(
-                expiration_ts=expiration_ts
-            )
+        expected_html = self.hs.config.account_validity.account_validity_account_previously_renewed_template.render(
+            expiration_ts=expiration_ts
         )
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result
@@ -787,7 +835,9 @@ class AccountValidityRenewalByEmailTestCase(unittest.HomeserverTestCase):
 
         # Check that the HTML we're getting is the one we expect when using an
         # invalid/unknown token.
-        expected_html = self.hs.config.account_validity_invalid_token_template.render()
+        expected_html = (
+            self.hs.config.account_validity.account_validity_invalid_token_template.render()
+        )
         self.assertEqual(
             channel.result["body"], expected_html.encode("utf8"), channel.result
         )

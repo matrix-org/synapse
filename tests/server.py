@@ -603,12 +603,6 @@ class FakeTransport:
         if self.disconnected:
             return
 
-        if not hasattr(self.other, "transport"):
-            # the other has no transport yet; reschedule
-            if self.autoflush:
-                self._reactor.callLater(0.0, self.flush)
-            return
-
         if maxbytes is not None:
             to_write = self.buffer[:maxbytes]
         else:

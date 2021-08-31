@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,6 +14,7 @@
 import hashlib
 import hmac
 import logging
+import secrets
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
@@ -376,7 +376,7 @@ class UserRegisterServlet(RestServlet):
         """
         self._clear_old_nonces()
 
-        nonce = self.hs.get_secrets().token_hex(64)
+        nonce = secrets.token_hex(64)
         self.nonces[nonce] = int(self.reactor.seconds())
         return 200, {"nonce": nonce}
 

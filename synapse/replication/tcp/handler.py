@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -56,6 +55,8 @@ from synapse.replication.tcp.streams import (
     CachesStream,
     EventsStream,
     FederationStream,
+    PresenceFederationStream,
+    PresenceStream,
     ReceiptsStream,
     Stream,
     TagAccountDataStream,
@@ -99,6 +100,10 @@ class ReplicationCommandHandler:
         self._clock = hs.get_clock()
         self._instance_id = hs.get_instance_id()
         self._instance_name = hs.get_instance_name()
+
+        self._is_presence_writer = (
+            hs.get_instance_name() in hs.config.worker.writers.presence
+        )
 
         self._streams = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
@@ -150,6 +155,14 @@ class ReplicationCommandHandler:
                 # Only add ReceiptsStream as a source on the instance in charge of
                 # receipts.
                 if hs.get_instance_name() in hs.config.worker.writers.receipts:
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
+            if isinstance(stream, (PresenceStream, PresenceFederationStream)):
+                # Only add PresenceStream as a source on the instance in charge
+                # of presence.
+                if self._is_presence_writer:
                     self._streams_to_replicate.append(stream)
 
                 continue
@@ -351,7 +364,7 @@ class ReplicationCommandHandler:
     ) -> Optional[Awaitable[None]]:
         user_sync_counter.inc()
 
-        if self._is_master:
+        if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_row(
                 cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
             )
@@ -361,7 +374,7 @@ class ReplicationCommandHandler:
     def on_CLEAR_USER_SYNC(
         self, conn: IReplicationConnection, cmd: ClearUserSyncsCommand
     ) -> Optional[Awaitable[None]]:
-        if self._is_master:
+        if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_clear(cmd.instance_id)
         else:
             return None

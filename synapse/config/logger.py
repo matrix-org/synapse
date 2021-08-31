@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +31,6 @@ from twisted.logger import (
 )
 
 import synapse
-from synapse.app import _base as appbase
 from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
@@ -319,6 +317,8 @@ def setup_logging(
     # Perform one-time logging configuration.
     _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
     # Add a SIGHUP handler to reload the logging configuration, if one is available.
+    from synapse.app import _base as appbase
+
     appbase.register_sighup(_reload_logging_config, log_config_path)
 
     # Log immediately so we can grep backwards.

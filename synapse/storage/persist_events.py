@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -18,7 +17,7 @@
 import itertools
 import logging
 from collections import deque, namedtuple
-from typing import Dict, Iterable, List, Optional, Set, Tuple
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from prometheus_client import Counter, Histogram
 
@@ -33,7 +32,6 @@ from synapse.storage.databases import Databases
 from synapse.storage.databases.main.events import DeltaState
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
-    Collection,
     PersistedEventPosition,
     RoomStreamToken,
     StateMap,

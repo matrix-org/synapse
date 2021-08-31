@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -17,6 +16,9 @@
 # limitations under the License.
 
 """Contains constants from the specification."""
+
+# the max size of a (canonical-json-encoded) event
+MAX_PDU_SIZE = 65536
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2 ** 63 - 1

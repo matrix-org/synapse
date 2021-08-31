@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyrignt 2020 Sorunome
 # Copyrignt 2020 The Matrix.org Foundation C.I.C.
@@ -454,6 +453,28 @@ class FederationClient(FederationBase):
 
         return signed_auth
 
+    def _is_unknown_endpoint(
+        self, e: HttpResponseException, synapse_error: Optional[SynapseError] = None
+    ) -> bool:
+        """
+        Returns true if the response was due to an endpoint being unimplemented.
+
+        Args:
+            e: The error response received from the remote server.
+            synapse_error: The above error converted to a SynapseError. This is
+                automatically generated if not provided.
+
+        """
+        if synapse_error is None:
+            synapse_error = e.to_synapse_error()
+        # There is no good way to detect an "unknown" endpoint.
+        #
+        # Dendrite returns a 404 (with no body); synapse returns a 400
+        # with M_UNRECOGNISED.
+        return e.code == 404 or (
+            e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
+        )
+
     async def _try_destination_list(
         self,
         description: str,
@@ -471,9 +492,9 @@ class FederationClient(FederationBase):
             callback:  Function to run for each server. Passed a single
                 argument: the server_name to try.
 
-                If the callback raises a CodeMessageException with a 300/400 code,
-                attempts to perform the operation stop immediately and the exception is
-                reraised.
+                If the callback raises a CodeMessageException with a 300/400 code or
+                an UnsupportedRoomVersionError, attempts to perform the operation
+                stop immediately and the exception is reraised.
 
                 Otherwise, if the callback raises an Exception the error is logged and the
                 next server tried. Normally the stacktrace is logged but this is
@@ -495,8 +516,7 @@ class FederationClient(FederationBase):
                 continue
 
             try:
-                res = await callback(destination)
-                return res
+                return await callback(destination)
             except InvalidResponseError as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
             except UnsupportedRoomVersionError:
@@ -505,17 +525,15 @@ class FederationClient(FederationBase):
                 synapse_error = e.to_synapse_error()
                 failover = False
 
+                # Failover on an internal server error, or if the destination
+                # doesn't implemented the endpoint for some reason.
                 if 500 <= e.code < 600:
                     failover = True
 
-                elif failover_on_unknown_endpoint:
-                    # there is no good way to detect an "unknown" endpoint. Dendrite
-                    # returns a 404 (with no body); synapse returns a 400
-                    # with M_UNRECOGNISED.
-                    if e.code == 404 or (
-                        e.code == 400 and synapse_error.errcode == Codes.UNRECOGNIZED
-                    ):
-                        failover = True
+                elif failover_on_unknown_endpoint and self._is_unknown_endpoint(
+                    e, synapse_error
+                ):
+                    failover = True
 
                 if not failover:
                     raise synapse_error from e
@@ -573,9 +591,8 @@ class FederationClient(FederationBase):
             UnsupportedRoomVersionError: if remote responds with
                 a room version we don't understand.
 
-            SynapseError: if the chosen remote server returns a 300/400 code.
-
-            RuntimeError: if no servers were reachable.
+            SynapseError: if the chosen remote server returns a 300/400 code, or
+                no servers successfully handle the request.
         """
         valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
         if membership not in valid_memberships:
@@ -645,9 +662,8 @@ class FederationClient(FederationBase):
             ``auth_chain``.
 
         Raises:
-            SynapseError: if the chosen remote server returns a 300/400 code.
-
-            RuntimeError: if no servers were reachable.
+            SynapseError: if the chosen remote server returns a 300/400 code, or
+                no servers successfully handle the request.
         """
 
         async def send_request(destination) -> Dict[str, Any]:
@@ -676,7 +692,7 @@ class FederationClient(FederationBase):
             if create_event is None:
                 # If the state doesn't have a create event then the room is
                 # invalid, and it would fail auth checks anyway.
-                raise SynapseError(400, "No create event in state")
+                raise InvalidResponseError("No create event in state")
 
             # the room version should be sane.
             create_room_version = create_event.content.get(
@@ -749,16 +765,11 @@ class FederationClient(FederationBase):
                 content=pdu.get_pdu_json(time_now),
             )
         except HttpResponseException as e:
-            if e.code in [400, 404]:
-                err = e.to_synapse_error()
-
-                # If we receive an error response that isn't a generic error, or an
-                # unrecognised endpoint error, we  assume that the remote understands
-                # the v2 invite API and this is a legitimate error.
-                if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
-                    raise err
-            else:
-                raise e.to_synapse_error()
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # and raise.
+            if not self._is_unknown_endpoint(e):
+                raise
 
         logger.debug("Couldn't send_join with the v2 API, falling back to the v1 API")
 
@@ -805,6 +816,11 @@ class FederationClient(FederationBase):
 
         Returns:
             The event as a dict as returned by the remote server
+
+        Raises:
+            SynapseError: if the remote server returns an error or if the server
+                only supports the v1 endpoint and a room version other than "1"
+                or "2" is requested.
         """
         time_now = self._clock.time_msec()
 
@@ -820,28 +836,19 @@ class FederationClient(FederationBase):
                 },
             )
         except HttpResponseException as e:
-            if e.code in [400, 404]:
-                err = e.to_synapse_error()
-
-                # If we receive an error response that isn't a generic error, we
-                # assume that the remote understands the v2 invite API and this
-                # is a legitimate error.
-                if err.errcode != Codes.UNKNOWN:
-                    raise err
-
-                # Otherwise, we assume that the remote server doesn't understand
-                # the v2 invite API. That's ok provided the room uses old-style event
-                # IDs.
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint if the room uses old-style event IDs.
+            # Otherwise consider it a legitmate error and raise.
+            err = e.to_synapse_error()
+            if self._is_unknown_endpoint(e, err):
                 if room_version.event_format != EventFormatVersions.V1:
                     raise SynapseError(
                         400,
                         "User's homeserver does not support this room version",
                         Codes.UNSUPPORTED_ROOM_VERSION,
                     )
-            elif e.code in (403, 429):
-                raise e.to_synapse_error()
             else:
-                raise
+                raise err
 
         # Didn't work, try v1 API.
         # Note the v1 API returns a tuple of `(200, content)`
@@ -868,9 +875,8 @@ class FederationClient(FederationBase):
             pdu: event to be sent
 
         Raises:
-            SynapseError if the chosen remote server returns a 300/400 code.
-
-            RuntimeError if no servers were reachable.
+            SynapseError: if the chosen remote server returns a 300/400 code, or
+                no servers successfully handle the request.
         """
 
         async def send_request(destination: str) -> None:
@@ -892,16 +898,11 @@ class FederationClient(FederationBase):
                 content=pdu.get_pdu_json(time_now),
             )
         except HttpResponseException as e:
-            if e.code in [400, 404]:
-                err = e.to_synapse_error()
-
-                # If we receive an error response that isn't a generic error, or an
-                # unrecognised endpoint error, we  assume that the remote understands
-                # the v2 invite API and this is a legitimate error.
-                if err.errcode not in [Codes.UNKNOWN, Codes.UNRECOGNIZED]:
-                    raise err
-            else:
-                raise e.to_synapse_error()
+            # If an error is received that is due to an unrecognised endpoint,
+            # fallback to the v1 endpoint. Otherwise consider it a legitmate error
+            # and raise.
+            if not self._is_unknown_endpoint(e):
+                raise
 
         logger.debug("Couldn't send_leave with the v2 API, falling back to the v1 API")
 

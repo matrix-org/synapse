@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -22,6 +21,7 @@ from synapse.api.constants import EventTypes, Membership, PresenceState
 from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events.builder import EventBuilder
+from synapse.federation.sender import FederationSender
 from synapse.handlers.presence import (
     EXTERNAL_PROCESS_EXPIRY,
     FEDERATION_PING_INTERVAL,
@@ -472,6 +472,190 @@ class PresenceHandlerTestCase(unittest.HomeserverTestCase):
         self.assertEqual(state.state, PresenceState.OFFLINE)
 
 
+class PresenceFederationQueueTestCase(unittest.HomeserverTestCase):
+    def prepare(self, reactor, clock, hs):
+        self.presence_handler = hs.get_presence_handler()
+        self.clock = hs.get_clock()
+        self.instance_name = hs.get_instance_name()
+
+        self.queue = self.presence_handler.get_federation_queue()
+
+    def test_send_and_get(self):
+        state1 = UserPresenceState.default("@user1:test")
+        state2 = UserPresenceState.default("@user2:test")
+        state3 = UserPresenceState.default("@user3:test")
+
+        prev_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+
+        now_token = self.queue.get_current_token(self.instance_name)
+
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", prev_token, now_token, 10)
+        )
+
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (1, ("dest1", "@user1:test")),
+            (1, ("dest2", "@user1:test")),
+            (1, ("dest1", "@user2:test")),
+            (1, ("dest2", "@user2:test")),
+            (2, ("dest3", "@user3:test")),
+        ]
+
+        self.assertCountEqual(rows, expected_rows)
+
+        now_token = self.queue.get_current_token(self.instance_name)
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", upto_token, now_token, 10)
+        )
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+        self.assertCountEqual(rows, [])
+
+    def test_send_and_get_split(self):
+        state1 = UserPresenceState.default("@user1:test")
+        state2 = UserPresenceState.default("@user2:test")
+        state3 = UserPresenceState.default("@user3:test")
+
+        prev_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+
+        now_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", prev_token, now_token, 10)
+        )
+
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (1, ("dest1", "@user1:test")),
+            (1, ("dest2", "@user1:test")),
+            (1, ("dest1", "@user2:test")),
+            (1, ("dest2", "@user2:test")),
+        ]
+
+        self.assertCountEqual(rows, expected_rows)
+
+        now_token = self.queue.get_current_token(self.instance_name)
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", upto_token, now_token, 10)
+        )
+
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (2, ("dest3", "@user3:test")),
+        ]
+
+        self.assertCountEqual(rows, expected_rows)
+
+    def test_clear_queue_all(self):
+        state1 = UserPresenceState.default("@user1:test")
+        state2 = UserPresenceState.default("@user2:test")
+        state3 = UserPresenceState.default("@user3:test")
+
+        prev_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+
+        self.reactor.advance(10 * 60 * 1000)
+
+        now_token = self.queue.get_current_token(self.instance_name)
+
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", prev_token, now_token, 10)
+        )
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+        self.assertCountEqual(rows, [])
+
+        prev_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+
+        now_token = self.queue.get_current_token(self.instance_name)
+
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", prev_token, now_token, 10)
+        )
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (3, ("dest1", "@user1:test")),
+            (3, ("dest2", "@user1:test")),
+            (3, ("dest1", "@user2:test")),
+            (3, ("dest2", "@user2:test")),
+            (4, ("dest3", "@user3:test")),
+        ]
+
+        self.assertCountEqual(rows, expected_rows)
+
+    def test_partially_clear_queue(self):
+        state1 = UserPresenceState.default("@user1:test")
+        state2 = UserPresenceState.default("@user2:test")
+        state3 = UserPresenceState.default("@user3:test")
+
+        prev_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+
+        self.reactor.advance(2 * 60 * 1000)
+
+        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+
+        self.reactor.advance(4 * 60 * 1000)
+
+        now_token = self.queue.get_current_token(self.instance_name)
+
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", prev_token, now_token, 10)
+        )
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (2, ("dest3", "@user3:test")),
+        ]
+        self.assertCountEqual(rows, [])
+
+        prev_token = self.queue.get_current_token(self.instance_name)
+
+        self.queue.send_presence_to_destinations((state1, state2), ("dest1", "dest2"))
+        self.queue.send_presence_to_destinations((state3,), ("dest3",))
+
+        now_token = self.queue.get_current_token(self.instance_name)
+
+        rows, upto_token, limited = self.get_success(
+            self.queue.get_replication_rows("master", prev_token, now_token, 10)
+        )
+        self.assertEqual(upto_token, now_token)
+        self.assertFalse(limited)
+
+        expected_rows = [
+            (3, ("dest1", "@user1:test")),
+            (3, ("dest2", "@user1:test")),
+            (3, ("dest1", "@user2:test")),
+            (3, ("dest2", "@user2:test")),
+            (4, ("dest3", "@user3:test")),
+        ]
+
+        self.assertCountEqual(rows, expected_rows)
+
+
 class PresenceJoinTestCase(unittest.HomeserverTestCase):
     """Tests remote servers get told about presence of users in the room when
     they join and when new local users join.
@@ -483,9 +667,16 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         hs = self.setup_test_homeserver(
-            "server", federation_http_client=None, federation_sender=Mock()
+            "server",
+            federation_http_client=None,
+            federation_sender=Mock(spec=FederationSender),
         )
         return hs
+
+    def default_config(self):
+        config = super().default_config()
+        config["send_federation"] = True
+        return config
 
     def prepare(self, reactor, clock, hs):
         self.federation_sender = hs.get_federation_sender()
@@ -530,9 +721,6 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         # Add a new remote server to the room
         self._add_new_user(room_id, "@alice:server2")
 
-        # We shouldn't have sent out any local presence *updates*
-        self.federation_sender.send_presence.assert_not_called()
-
         # When new server is joined we send it the local users presence states.
         # We expect to only see user @test2:server, as @test:server is offline
         # and has a zero last_active_ts
@@ -551,7 +739,6 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.federation_sender.reset_mock()
         self._add_new_user(room_id, "@bob:server3")
 
-        self.federation_sender.send_presence.assert_not_called()
         self.federation_sender.send_presence_to_destinations.assert_called_once_with(
             destinations=["server3"], states={expected_state}
         )
@@ -595,9 +782,6 @@ class PresenceJoinTestCase(unittest.HomeserverTestCase):
         self.helper.join(room_id, "@test2:server")
 
         self.reactor.pump([0])  # Wait for presence updates to be handled
-
-        # We shouldn't have sent out any local presence *updates*
-        self.federation_sender.send_presence.assert_not_called()
 
         # We expect to only send test2 presence to server2 and server3
         expected_state = self.get_success(

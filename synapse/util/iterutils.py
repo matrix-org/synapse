@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -16,6 +15,7 @@
 import heapq
 from itertools import islice
 from typing import (
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -26,8 +26,6 @@ from typing import (
     Tuple,
     TypeVar,
 )
-
-from synapse.types import Collection
 
 T = TypeVar("T")
 

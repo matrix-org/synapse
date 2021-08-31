@@ -13,7 +13,7 @@
 #  limitations under the License.
 from unittest.mock import Mock
 
-from synapse.handlers.cas_handler import CasResponse
+from synapse.handlers.cas import CasResponse
 
 from tests.test_utils import simple_async_mock
 from tests.unittest import HomeserverTestCase, override_config

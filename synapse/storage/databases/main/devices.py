@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -16,7 +15,7 @@
 # limitations under the License.
 import abc
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import Codes, StoreError
 from synapse.logging.opentracing import (
@@ -32,7 +31,7 @@ from synapse.storage.database import (
     LoggingTransaction,
     make_tuple_comparison_clause,
 )
-from synapse.types import Collection, JsonDict, get_verify_key_from_cross_signing_key
+from synapse.types import JsonDict, get_verify_key_from_cross_signing_key
 from synapse.util import json_decoder, json_encoder
 from synapse.util.caches.descriptors import cached, cachedList
 from synapse.util.caches.lrucache import LruCache
@@ -718,7 +717,15 @@ class DeviceWorkerStore(SQLBaseStore):
             keyvalues={"user_id": user_id},
             values={},
             insertion_values={"added_ts": self._clock.time_msec()},
-            desc="make_remote_user_device_cache_as_stale",
+            desc="mark_remote_user_device_cache_as_stale",
+        )
+
+    async def mark_remote_user_device_cache_as_valid(self, user_id: str) -> None:
+        # Remove the database entry that says we need to resync devices, after a resync
+        await self.db_pool.simple_delete(
+            table="device_lists_remote_resync",
+            keyvalues={"user_id": user_id},
+            desc="mark_remote_user_device_cache_as_valid",
         )
 
     async def mark_remote_user_device_list_as_unsubscribed(self, user_id: str) -> None:
@@ -1288,15 +1295,6 @@ class DeviceStore(DeviceWorkerStore, DeviceBackgroundUpdateStore):
             # we don't need to lock, because we can assume we are the only thread
             # updating this user's extremity.
             lock=False,
-        )
-
-        # If we're replacing the remote user's device list cache presumably
-        # we've done a full resync, so we remove the entry that says we need
-        # to resync
-        self.db_pool.simple_delete_txn(
-            txn,
-            table="device_lists_remote_resync",
-            keyvalues={"user_id": user_id},
         )
 
     async def add_device_change_to_streams(

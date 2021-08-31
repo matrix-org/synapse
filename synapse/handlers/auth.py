@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2019 - 2020 The Matrix.org Foundation C.I.C.
@@ -1249,7 +1248,7 @@ class AuthHandler(BaseHandler):
 
         # see if any of our auth providers want to know about this
         for provider in self.password_providers:
-            for token, token_id, device_id in tokens_and_devices:
+            for token, _, device_id in tokens_and_devices:
                 await provider.on_logged_out(
                     user_id=user_id, device_id=device_id, access_token=token
                 )

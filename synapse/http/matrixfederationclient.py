@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,11 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import cgi
+import codecs
 import logging
 import random
 import sys
+import typing
 import urllib.parse
-from io import BytesIO
+from io import BytesIO, StringIO
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import attr
@@ -73,6 +73,9 @@ incoming_responses_counter = Counter(
     "synapse_http_matrixfederationclient_responses", "", ["method", "code"]
 )
 
+# a federation response can be rather large (eg a big state_ids is 50M or so), so we
+# need a generous limit here.
+MAX_RESPONSE_SIZE = 100 * 1024 * 1024
 
 MAX_LONG_RETRIES = 10
 MAX_SHORT_RETRIES = 3
@@ -168,12 +171,27 @@ async def _handle_json_response(
     try:
         check_content_type_is_json(response.headers)
 
-        # Use the custom JSON decoder (partially re-implements treq.json_content).
-        d = treq.text_content(response, encoding="utf-8")
-        d.addCallback(json_decoder.decode)
+        buf = StringIO()
+        d = read_body_with_max_size(response, BinaryIOWrapper(buf), MAX_RESPONSE_SIZE)
         d = timeout_deferred(d, timeout=timeout_sec, reactor=reactor)
 
+        def parse(_len: int):
+            return json_decoder.decode(buf.getvalue())
+
+        d.addCallback(parse)
+
         body = await make_deferred_yieldable(d)
+    except BodyExceededMaxSize as e:
+        # The response was too big.
+        logger.warning(
+            "{%s} [%s] JSON response exceeded max size %i - %s %s",
+            request.txn_id,
+            request.destination,
+            MAX_RESPONSE_SIZE,
+            request.method,
+            request.uri.decode("ascii"),
+        )
+        raise RequestSendFailed(e, can_retry=False) from e
     except ValueError as e:
         # The JSON content was invalid.
         logger.warning(
@@ -217,6 +235,18 @@ async def _handle_json_response(
         request.uri.decode("ascii"),
     )
     return body
+
+
+class BinaryIOWrapper:
+    """A wrapper for a TextIO which converts from bytes on the fly."""
+
+    def __init__(self, file: typing.TextIO, encoding="utf-8", errors="strict"):
+        self.decoder = codecs.getincrementaldecoder(encoding)(errors)
+        self.file = file
+
+    def write(self, b: Union[bytes, bytearray]) -> int:
+        self.file.write(self.decoder.decode(b))
+        return len(b)
 
 
 class MatrixFederationHttpClient:

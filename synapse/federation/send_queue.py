@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -77,9 +76,6 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # Pending presence map user_id -> UserPresenceState
         self.presence_map = {}  # type: Dict[str, UserPresenceState]
 
-        # Stream position -> list[user_id]
-        self.presence_changed = SortedDict()  # type: SortedDict[int, List[str]]
-
         # Stores the destinations we need to explicitly send presence to about a
         # given user.
         # Stream position -> (user_id, destinations)
@@ -97,7 +93,7 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         self.edus = SortedDict()  # type: SortedDict[int, Edu]
 
-        # stream ID for the next entry into presence_changed/keyed_edu_changed/edus.
+        # stream ID for the next entry into keyed_edu_changed/edus.
         self.pos = 1
 
         # map from stream ID to the time that stream entry was generated, so that we
@@ -118,7 +114,6 @@ class FederationRemoteSendQueue(AbstractFederationSender):
 
         for queue_name in [
             "presence_map",
-            "presence_changed",
             "keyed_edu",
             "keyed_edu_changed",
             "edus",
@@ -156,23 +151,12 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         """Clear all the queues from before a given position"""
         with Measure(self.clock, "send_queue._clear"):
             # Delete things out of presence maps
-            keys = self.presence_changed.keys()
-            i = self.presence_changed.bisect_left(position_to_delete)
-            for key in keys[:i]:
-                del self.presence_changed[key]
-
-            user_ids = {
-                user_id for uids in self.presence_changed.values() for user_id in uids
-            }
-
             keys = self.presence_destinations.keys()
             i = self.presence_destinations.bisect_left(position_to_delete)
             for key in keys[:i]:
                 del self.presence_destinations[key]
 
-            user_ids.update(
-                user_id for user_id, _ in self.presence_destinations.values()
-            )
+            user_ids = {user_id for user_id, _ in self.presence_destinations.values()}
 
             to_del = [
                 user_id for user_id in self.presence_map if user_id not in user_ids
@@ -245,23 +229,6 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         """
         # nothing to do here: the replication listener will handle it.
 
-    def send_presence(self, states: List[UserPresenceState]) -> None:
-        """As per FederationSender
-
-        Args:
-            states
-        """
-        pos = self._next_pos()
-
-        # We only want to send presence for our own users, so lets always just
-        # filter here just in case.
-        local_states = [s for s in states if self.is_mine_id(s.user_id)]
-
-        self.presence_map.update({state.user_id: state for state in local_states})
-        self.presence_changed[pos] = [state.user_id for state in local_states]
-
-        self.notifier.on_new_replication_data()
-
     def send_presence_to_destinations(
         self, states: Iterable[UserPresenceState], destinations: Iterable[str]
     ) -> None:
@@ -325,18 +292,6 @@ class FederationRemoteSendQueue(AbstractFederationSender):
         # list of tuple(int, BaseFederationRow), where the first is the position
         # of the federation stream.
         rows = []  # type: List[Tuple[int, BaseFederationRow]]
-
-        # Fetch changed presence
-        i = self.presence_changed.bisect_right(from_token)
-        j = self.presence_changed.bisect_right(to_token) + 1
-        dest_user_ids = [
-            (pos, user_id)
-            for pos, user_id_list in self.presence_changed.items()[i:j]
-            for user_id in user_id_list
-        ]
-
-        for (key, user_id) in dest_user_ids:
-            rows.append((key, PresenceRow(state=self.presence_map[user_id])))
 
         # Fetch presence to send to destinations
         i = self.presence_destinations.bisect_right(from_token)
@@ -428,22 +383,6 @@ class BaseFederationRow:
         raise NotImplementedError()
 
 
-class PresenceRow(
-    BaseFederationRow, namedtuple("PresenceRow", ("state",))  # UserPresenceState
-):
-    TypeId = "p"
-
-    @staticmethod
-    def from_data(data):
-        return PresenceRow(state=UserPresenceState.from_dict(data))
-
-    def to_data(self):
-        return self.state.as_dict()
-
-    def add_to_buffer(self, buff):
-        buff.presence.append(self.state)
-
-
 class PresenceDestinationsRow(
     BaseFederationRow,
     namedtuple(
@@ -507,7 +446,6 @@ class EduRow(BaseFederationRow, namedtuple("EduRow", ("edu",))):  # Edu
 
 
 _rowtypes = (
-    PresenceRow,
     PresenceDestinationsRow,
     KeyedEduRow,
     EduRow,
@@ -519,7 +457,6 @@ TypeToRow = {Row.TypeId: Row for Row in _rowtypes}
 ParsedFederationStreamData = namedtuple(
     "ParsedFederationStreamData",
     (
-        "presence",  # list(UserPresenceState)
         "presence_destinations",  # list of tuples of UserPresenceState and destinations
         "keyed_edus",  # dict of destination -> { key -> Edu }
         "edus",  # dict of destination -> [Edu]
@@ -544,7 +481,6 @@ def process_rows_for_federation(
     # them into the appropriate collection and then send them off.
 
     buff = ParsedFederationStreamData(
-        presence=[],
         presence_destinations=[],
         keyed_edus={},
         edus={},
@@ -560,18 +496,15 @@ def process_rows_for_federation(
         parsed_row = RowType.from_data(row.data)
         parsed_row.add_to_buffer(buff)
 
-    if buff.presence:
-        transaction_queue.send_presence(buff.presence)
-
     for state, destinations in buff.presence_destinations:
         transaction_queue.send_presence_to_destinations(
             states=[state], destinations=destinations
         )
 
-    for destination, edu_map in buff.keyed_edus.items():
+    for edu_map in buff.keyed_edus.values():
         for key, edu in edu_map.items():
             transaction_queue.send_edu(edu, key)
 
-    for destination, edu_list in buff.edus.items():
+    for edu_list in buff.edus.values():
         for edu in edu_list:
             transaction_queue.send_edu(edu, None)

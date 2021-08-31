@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017-2018 New Vector Ltd
 # Copyright 2019-2020 The Matrix.org Foundation C.I.C.
@@ -105,7 +104,7 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True)
 class _NewEventInfo:
-    """Holds information about a received event, ready for passing to _handle_new_events
+    """Holds information about a received event, ready for passing to _auth_and_persist_events
 
     Attributes:
         event: the received event
@@ -148,6 +147,7 @@ class FederationHandler(BaseHandler):
         self.is_mine_id = hs.is_mine_id
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self.config = hs.config
@@ -810,7 +810,10 @@ class FederationHandler(BaseHandler):
         logger.debug("Processing event: %s", event)
 
         try:
-            await self._handle_new_event(origin, event, state=state)
+            context = await self.state_handler.compute_event_context(
+                event, old_state=state
+            )
+            await self._auth_and_persist_event(origin, event, context, state=state)
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
 
@@ -1013,7 +1016,9 @@ class FederationHandler(BaseHandler):
             )
 
         if ev_infos:
-            await self._handle_new_events(dest, room_id, ev_infos, backfilled=True)
+            await self._auth_and_persist_events(
+                dest, room_id, ev_infos, backfilled=True
+            )
 
         # Step 2: Persist the rest of the events in the chunk one by one
         events.sort(key=lambda e: e.depth)
@@ -1026,10 +1031,12 @@ class FederationHandler(BaseHandler):
             # non-outliers
             assert not event.internal_metadata.is_outlier()
 
+            context = await self.state_handler.compute_event_context(event)
+
             # We store these one at a time since each event depends on the
             # previous to work out the state.
             # TODO: We can probably do something more clever here.
-            await self._handle_new_event(dest, event, backfilled=True)
+            await self._auth_and_persist_event(dest, event, context, backfilled=True)
 
         return events
 
@@ -1363,7 +1370,7 @@ class FederationHandler(BaseHandler):
 
             event_infos.append(_NewEventInfo(event, None, auth))
 
-        await self._handle_new_events(
+        await self._auth_and_persist_events(
             destination,
             room_id,
             event_infos,
@@ -1740,15 +1747,46 @@ class FederationHandler(BaseHandler):
         # would introduce the danger of backwards-compatibility problems.
         event.internal_metadata.send_on_behalf_of = origin
 
-        context = await self._handle_new_event(origin, event)
+        # Calculate the event context.
+        context = await self.state_handler.compute_event_context(event)
+
+        # Get the state before the new event.
+        prev_state_ids = await context.get_prev_state_ids()
+
+        # Check if the user is already in the room or invited to the room.
+        user_id = event.state_key
+        prev_member_event_id = prev_state_ids.get((EventTypes.Member, user_id), None)
+        newly_joined = True
+        user_is_invited = False
+        if prev_member_event_id:
+            prev_member_event = await self.store.get_event(prev_member_event_id)
+            newly_joined = prev_member_event.membership != Membership.JOIN
+            user_is_invited = prev_member_event.membership == Membership.INVITE
+
+        # If the member is not already in the room, and not invited, check if
+        # they should be allowed access via membership in a space.
+        if (
+            newly_joined
+            and not user_is_invited
+            and not await self._event_auth_handler.can_join_without_invite(
+                prev_state_ids,
+                event.room_version,
+                user_id,
+            )
+        ):
+            raise AuthError(
+                403,
+                "You do not belong to any of the required spaces to join this room.",
+            )
+
+        # Persist the event.
+        await self._auth_and_persist_event(origin, event, context)
 
         logger.debug(
-            "on_send_join_request: After _handle_new_event: %s, sigs: %s",
+            "on_send_join_request: After _auth_and_persist_event: %s, sigs: %s",
             event.event_id,
             event.signatures,
         )
-
-        prev_state_ids = await context.get_prev_state_ids()
 
         state_ids = list(prev_state_ids.values())
         auth_chain = await self.store.get_auth_chain(event.room_id, state_ids)
@@ -1959,10 +1997,11 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        await self._handle_new_event(origin, event)
+        context = await self.state_handler.compute_event_context(event)
+        await self._auth_and_persist_event(origin, event, context)
 
         logger.debug(
-            "on_send_leave_request: After _handle_new_event: %s, sigs: %s",
+            "on_send_leave_request: After _auth_and_persist_event: %s, sigs: %s",
             event.event_id,
             event.signatures,
         )
@@ -2184,16 +2223,44 @@ class FederationHandler(BaseHandler):
     async def get_min_depth_for_context(self, context: str) -> int:
         return await self.store.get_min_depth(context)
 
-    async def _handle_new_event(
+    async def _auth_and_persist_event(
         self,
         origin: str,
         event: EventBase,
+        context: EventContext,
         state: Optional[Iterable[EventBase]] = None,
         auth_events: Optional[MutableStateMap[EventBase]] = None,
         backfilled: bool = False,
-    ) -> EventContext:
-        context = await self._prep_event(
-            origin, event, state=state, auth_events=auth_events, backfilled=backfilled
+    ) -> None:
+        """
+        Process an event by performing auth checks and then persisting to the database.
+
+        Args:
+            origin: The host the event originates from.
+            event: The event itself.
+            context:
+                The event context.
+
+                NB that this function potentially modifies it.
+            state:
+                The state events used to check the event for soft-fail. If this is
+                not provided the current state events will be used.
+            auth_events:
+                Map from (event_type, state_key) to event
+
+                Normally, our calculated auth_events based on the state of the room
+                at the event's position in the DAG, though occasionally (eg if the
+                event is an outlier), may be the auth events claimed by the remote
+                server.
+            backfilled: True if the event was backfilled.
+        """
+        context = await self._check_event_auth(
+            origin,
+            event,
+            context,
+            state=state,
+            auth_events=auth_events,
+            backfilled=backfilled,
         )
 
         try:
@@ -2215,9 +2282,7 @@ class FederationHandler(BaseHandler):
             )
             raise
 
-        return context
-
-    async def _handle_new_events(
+    async def _auth_and_persist_events(
         self,
         origin: str,
         room_id: str,
@@ -2235,9 +2300,13 @@ class FederationHandler(BaseHandler):
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res = await self._prep_event(
+                res = await self.state_handler.compute_event_context(
+                    event, old_state=ev_info.state
+                )
+                res = await self._check_event_auth(
                     origin,
                     event,
+                    res,
                     state=ev_info.state,
                     auth_events=ev_info.auth_events,
                     backfilled=backfilled,
@@ -2372,49 +2441,6 @@ class FederationHandler(BaseHandler):
             room_id, [(event, new_event_context)]
         )
 
-    async def _prep_event(
-        self,
-        origin: str,
-        event: EventBase,
-        state: Optional[Iterable[EventBase]],
-        auth_events: Optional[MutableStateMap[EventBase]],
-        backfilled: bool,
-    ) -> EventContext:
-        context = await self.state_handler.compute_event_context(event, old_state=state)
-
-        if not auth_events:
-            prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self.auth.compute_auth_events(
-                event, prev_state_ids, for_verification=True
-            )
-            auth_events_x = await self.store.get_events(auth_events_ids)
-            auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
-
-        # This is a hack to fix some old rooms where the initial join event
-        # didn't reference the create event in its auth events.
-        if event.type == EventTypes.Member and not event.auth_event_ids():
-            if len(event.prev_event_ids()) == 1 and event.depth < 5:
-                c = await self.store.get_event(
-                    event.prev_event_ids()[0], allow_none=True
-                )
-                if c and c.type == EventTypes.Create:
-                    auth_events[(c.type, c.state_key)] = c
-
-        context = await self.do_auth(origin, event, context, auth_events=auth_events)
-
-        if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled)
-
-        if event.type == EventTypes.GuestAccess and not context.rejected:
-            await self.maybe_kick_guest_users(event)
-
-        # If we are going to send this event over federation we precaclculate
-        # the joined hosts.
-        if event.internal_metadata.get_send_on_behalf_of():
-            await self.event_creation_handler.cache_joined_hosts_for_event(event)
-
-        return context
-
     async def _check_for_soft_fail(
         self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
     ) -> None:
@@ -2525,19 +2551,28 @@ class FederationHandler(BaseHandler):
 
         return missing_events
 
-    async def do_auth(
+    async def _check_event_auth(
         self,
         origin: str,
         event: EventBase,
         context: EventContext,
-        auth_events: MutableStateMap[EventBase],
+        state: Optional[Iterable[EventBase]],
+        auth_events: Optional[MutableStateMap[EventBase]],
+        backfilled: bool,
     ) -> EventContext:
         """
+        Checks whether an event should be rejected (for failing auth checks).
 
         Args:
-            origin:
-            event:
+            origin: The host the event originates from.
+            event: The event itself.
             context:
+                The event context.
+
+                NB that this function potentially modifies it.
+            state:
+                The state events used to check the event for soft-fail. If this is
+                not provided the current state events will be used.
             auth_events:
                 Map from (event_type, state_key) to event
 
@@ -2547,11 +2582,33 @@ class FederationHandler(BaseHandler):
                 server.
 
                 Also NB that this function adds entries to it.
+
+                If this is not provided, it is calculated from the previous state IDs.
+            backfilled: True if the event was backfilled.
+
         Returns:
-            updated context object
+            The updated context object.
         """
         room_version = await self.store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+        if not auth_events:
+            prev_state_ids = await context.get_prev_state_ids()
+            auth_events_ids = self.auth.compute_auth_events(
+                event, prev_state_ids, for_verification=True
+            )
+            auth_events_x = await self.store.get_events(auth_events_ids)
+            auth_events = {(e.type, e.state_key): e for e in auth_events_x.values()}
+
+        # This is a hack to fix some old rooms where the initial join event
+        # didn't reference the create event in its auth events.
+        if event.type == EventTypes.Member and not event.auth_event_ids():
+            if len(event.prev_event_ids()) == 1 and event.depth < 5:
+                c = await self.store.get_event(
+                    event.prev_event_ids()[0], allow_none=True
+                )
+                if c and c.type == EventTypes.Create:
+                    auth_events[(c.type, c.state_key)] = c
 
         try:
             context = await self._update_auth_events_and_context_for_auth(
@@ -2574,6 +2631,17 @@ class FederationHandler(BaseHandler):
             logger.warning("Failed auth resolution for %r because %s", event, e)
             context.rejected = RejectedReason.AUTH_ERROR
 
+        if not context.rejected:
+            await self._check_for_soft_fail(event, state, backfilled)
+
+        if event.type == EventTypes.GuestAccess and not context.rejected:
+            await self.maybe_kick_guest_users(event)
+
+        # If we are going to send this event over federation we precaclculate
+        # the joined hosts.
+        if event.internal_metadata.get_send_on_behalf_of():
+            await self.event_creation_handler.cache_joined_hosts_for_event(event)
+
         return context
 
     async def _update_auth_events_and_context_for_auth(
@@ -2583,7 +2651,7 @@ class FederationHandler(BaseHandler):
         context: EventContext,
         auth_events: MutableStateMap[EventBase],
     ) -> EventContext:
-        """Helper for do_auth. See there for docs.
+        """Helper for _check_event_auth. See there for docs.
 
         Checks whether a given event has the expected auth events. If it
         doesn't then we talk to the remote server to compare state to see if
@@ -2663,9 +2731,14 @@ class FederationHandler(BaseHandler):
                         e.internal_metadata.outlier = True
 
                         logger.debug(
-                            "do_auth %s missing_auth: %s", event.event_id, e.event_id
+                            "_check_event_auth %s missing_auth: %s",
+                            event.event_id,
+                            e.event_id,
                         )
-                        await self._handle_new_event(origin, e, auth_events=auth)
+                        context = await self.state_handler.compute_event_context(e)
+                        await self._auth_and_persist_event(
+                            origin, e, context, auth_events=auth
+                        )
 
                         if e.event_id in event_auth_events:
                             auth_events[(e.type, e.state_key)] = e
@@ -3103,7 +3176,7 @@ class FederationHandler(BaseHandler):
             try:
                 # for each sig on the third_party_invite block of the actual invite
                 for server, signature_block in signed["signatures"].items():
-                    for key_name, encoded_signature in signature_block.items():
+                    for key_name in signature_block.keys():
                         if not key_name.startswith("ed25519:"):
                             continue
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -18,7 +17,7 @@ import logging
 import os
 import re
 from collections import Counter
-from typing import Generator, Iterable, List, Optional, TextIO, Tuple
+from typing import Collection, Generator, Iterable, List, Optional, TextIO, Tuple
 
 import attr
 from typing_extensions import Counter as CounterType
@@ -28,7 +27,6 @@ from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.engines.postgres import PostgresEngine
 from synapse.storage.types import Cursor
-from synapse.types import Collection
 
 logger = logging.getLogger(__name__)
 

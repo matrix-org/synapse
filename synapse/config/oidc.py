@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 # Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
@@ -15,20 +14,23 @@
 # limitations under the License.
 
 from collections import Counter
-from typing import Iterable, List, Mapping, Optional, Tuple, Type
+from typing import Collection, Iterable, List, Mapping, Optional, Tuple, Type
 
 import attr
 
 from synapse.config._util import validate_config
 from synapse.config.sso import SsoAttributeRequirement
 from synapse.python_dependencies import DependencyException, check_requirements
-from synapse.types import Collection, JsonDict
+from synapse.types import JsonDict
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from ._base import Config, ConfigError, read_file
 
-DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingProvider"
+DEFAULT_USER_MAPPING_PROVIDER = "synapse.handlers.oidc.JinjaOidcMappingProvider"
+# The module that JinjaOidcMappingProvider is in was renamed, we want to
+# transparently handle both the same.
+LEGACY_USER_MAPPING_PROVIDER = "synapse.handlers.oidc_handler.JinjaOidcMappingProvider"
 
 
 class OIDCConfig(Config):
@@ -404,6 +406,8 @@ def _parse_oidc_config_dict(
     """
     ump_config = oidc_config.get("user_mapping_provider", {})
     ump_config.setdefault("module", DEFAULT_USER_MAPPING_PROVIDER)
+    if ump_config.get("module") == LEGACY_USER_MAPPING_PROVIDER:
+        ump_config["module"] = DEFAULT_USER_MAPPING_PROVIDER
     ump_config.setdefault("config", {})
 
     (

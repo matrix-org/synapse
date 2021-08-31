@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017, 2018 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -50,7 +49,9 @@ class DeactivateAccountHandler(BaseHandler):
         if hs.config.run_background_tasks:
             hs.get_reactor().callWhenRunning(self._start_user_parting)
 
-        self._account_validity_enabled = hs.config.account_validity_enabled
+        self._account_validity_enabled = (
+            hs.config.account_validity.account_validity_enabled
+        )
 
     async def deactivate_account(
         self,

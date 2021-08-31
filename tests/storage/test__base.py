@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 #
@@ -14,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import secrets
 
 from tests import unittest
 
@@ -22,7 +22,7 @@ class UpsertManyTests(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.storage = hs.get_datastore()
 
-        self.table_name = "table_" + hs.get_secrets().token_hex(6)
+        self.table_name = "table_" + secrets.token_hex(6)
         self.get_success(
             self.storage.db_pool.runInteraction(
                 "create",

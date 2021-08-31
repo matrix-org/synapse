@@ -85,6 +85,29 @@ for example:
      wget https://packages.matrix.org/debian/pool/main/m/matrix-synapse-py3/matrix-synapse-py3_1.3.0+stretch1_amd64.deb
      dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 
+Upgrading to v1.33.0
+====================
+
+Account Validity HTML templates can now display a user's expiration date
+------------------------------------------------------------------------
+
+This may affect you if you have enabled the account validity feature, and have made use of a
+custom HTML template specified by the ``account_validity.template_dir`` or ``account_validity.account_renewed_html_path``
+Synapse config options.
+
+The template can now accept an ``expiration_ts`` variable, which represents the unix timestamp in milliseconds for the
+future date of which their account has been renewed until. See the
+`default template <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_renewed.html>`_
+for an example of usage.
+
+ALso note that a new HTML template, ``account_previously_renewed.html``, has been added. This is is shown to users
+when they attempt to renew their account with a valid renewal token that has already been used before. The default
+template contents can been found
+`here <https://github.com/matrix-org/synapse/blob/release-v1.33.0/synapse/res/templates/account_previously_renewed.html>`_,
+and can also accept an ``expiration_ts`` variable. This template replaces the error message users would previously see
+upon attempting to use a valid renewal token more than once.
+
+
 Upgrading to v1.32.0
 ====================
 

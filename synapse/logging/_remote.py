@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -227,11 +226,11 @@ class RemoteHandler(logging.Handler):
         old_buffer = self._buffer
         self._buffer = deque()
 
-        for i in range(buffer_split):
+        for _ in range(buffer_split):
             self._buffer.append(old_buffer.popleft())
 
         end_buffer = []
-        for i in range(buffer_split):
+        for _ in range(buffer_split):
             end_buffer.append(old_buffer.pop())
 
         self._buffer.extend(reversed(end_buffer))

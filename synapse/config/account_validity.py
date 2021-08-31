@@ -83,7 +83,7 @@ class AccountValidityConfig(Config):
     def generate_config_section(self, **kwargs):
         return """\
         ## Account Validity ##
-        #
+
         # Optional account validity configuration. This allows for accounts to be denied
         # any request after a given period.
         #
@@ -134,16 +134,35 @@ class AccountValidityConfig(Config):
           # serve to the user when trying to renew an account. If not set, default
           # templates from within the Synapse package will be used.
           #
+          # The currently available templates are:
+          #
+          # * account_renewed.html: Displayed to the user after they have successfully
+          #       renewed their account.
+          #
+          # * account_previously_renewed.html: Displayed to the user if they attempt to
+          #       renew their account with a token that is valid, but that has already
+          #       been used. In this case the account is not renewed again.
+          #
+          # * invalid_token.html: Displayed to the user when they try to renew an account
+          #       with an unknown or invalid renewal token.
+          #
+          # See https://github.com/matrix-org/synapse/tree/master/synapse/res/templates for
+          # default template contents.
+          #
+          # The file name of some of these templates can be configured below for legacy
+          # reasons.
+          #
           #template_dir: "res/templates"
 
-          # File within 'template_dir' giving the HTML to be displayed to the user after
-          # they successfully renewed their account. If not set, default text is used.
+          # A custom file name for the 'account_renewed.html' template.
+          #
+          # If not set, the file is assumed to be named "account_renewed.html".
           #
           #account_renewed_html_path: "account_renewed.html"
 
-          # File within 'template_dir' giving the HTML to be displayed when the user
-          # tries to renew an account with an invalid renewal token. If not set,
-          # default text is used.
+          # A custom file name for the 'invalid_token.html' template.
+          #
+          # If not set, the file is assumed to be named "invalid_token.html".
           #
           #invalid_token_html_path: "invalid_token.html"
         """
