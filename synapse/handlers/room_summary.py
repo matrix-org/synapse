@@ -28,7 +28,14 @@ from synapse.api.constants import (
     Membership,
     RoomTypes,
 )
-from synapse.api.errors import AuthError, Codes, NotFoundError, StoreError, SynapseError
+from synapse.api.errors import (
+    AuthError,
+    Codes,
+    NotFoundError,
+    StoreError,
+    SynapseError,
+    UnsupportedRoomVersionError,
+)
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -814,7 +821,10 @@ class RoomSummaryHandler:
             logger.info("room %s is unknown, omitting from summary", room_id)
             return False
 
-        room_version = await self._store.get_room_version(room_id)
+        try:
+            room_version = await self._store.get_room_version(room_id)
+        except UnsupportedRoomVersionError:
+            return False
 
         # Include the room if it has join rules of public or knock.
         join_rules_event_id = state_ids.get((EventTypes.JoinRules, ""))

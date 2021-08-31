@@ -573,6 +573,31 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         ]
         self._assert_hierarchy(result, expected)
 
+    def test_unknown_room_version(self):
+        """
+        If an room with an unknown room version is encountered it should not cause
+        the entire summary to skip.
+        """
+        # Poke the database and update the room version to an unknown one.
+        self.get_success(
+            self.hs.get_datastores().main.db_pool.simple_update(
+                "rooms",
+                keyvalues={"room_id": self.room},
+                updatevalues={"room_version": "unknown-room-version"},
+                desc="updated-room-version",
+            )
+        )
+
+        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
+        # The result should have only the space, along with a link from space -> room.
+        expected = [(self.space, [self.room])]
+        self._assert_rooms(result, expected)
+
+        result = self.get_success(
+            self.handler.get_room_hierarchy(self.user, self.space)
+        )
+        self._assert_hierarchy(result, expected)
+
     def test_fed_complex(self):
         """
         Return data over federation and ensure that it is handled properly.
