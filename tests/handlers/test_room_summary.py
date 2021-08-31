@@ -35,10 +35,11 @@ from synapse.types import JsonDict, UserID
 from tests import unittest
 
 
-def _create_event(room_id: str, order: Optional[Any] = None):
-    result = mock.Mock()
+def _create_event(room_id: str, order: Optional[Any] = None, origin_server_ts: int = 0):
+    result = mock.Mock(name=room_id)
     result.room_id = room_id
     result.content = {}
+    result.origin_server_ts = origin_server_ts
     if order is not None:
         result.content["order"] = order
     return result
@@ -63,10 +64,17 @@ class TestSpaceSummarySort(unittest.TestCase):
 
         self.assertEqual([ev2, ev1], _order(ev1, ev2))
 
+    def test_order_origin_server_ts(self):
+        """Origin server  is a tie-breaker for ordering."""
+        ev1 = _create_event("!abc:test", origin_server_ts=10)
+        ev2 = _create_event("!xyz:test", origin_server_ts=30)
+
+        self.assertEqual([ev1, ev2], _order(ev1, ev2))
+
     def test_order_room_id(self):
-        """Room ID is a tie-breaker for ordering."""
-        ev1 = _create_event("!abc:test", "abc")
-        ev2 = _create_event("!xyz:test", "abc")
+        """Room ID is a final tie-breaker for ordering."""
+        ev1 = _create_event("!abc:test")
+        ev2 = _create_event("!xyz:test")
 
         self.assertEqual([ev1, ev2], _order(ev1, ev2))
 

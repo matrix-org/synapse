@@ -1139,17 +1139,15 @@ def _is_suggested_child_event(edge_event: EventBase) -> bool:
 _INVALID_ORDER_CHARS_RE = re.compile(r"[^\x20-\x7E]")
 
 
-def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str], str]:
+def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str], int, str]:
     """
     Generate a value for comparing two child events for ordering.
 
-    The rules for ordering are supposed to be:
+    The rules for ordering are:
 
     1. The 'order' key, if it is valid.
-    2. The 'origin_server_ts' of the 'm.room.create' event.
+    2. The 'origin_server_ts' of the 'm.space.child' event.
     3. The 'room_id'.
-
-    But we skip step 2 since we may not have any state from the room.
 
     Args:
         child: The event for generating a comparison key.
@@ -1157,7 +1155,8 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
     Returns:
         The comparison key as a tuple of:
             False if the ordering is valid.
-            The ordering field.
+            The 'order' field or None if it is not given or invalid.
+            The 'origin_server_ts' field.
             The room ID.
     """
     order = child.content.get("order")
@@ -1168,4 +1167,4 @@ def _child_events_comparison_key(child: EventBase) -> Tuple[bool, Optional[str],
         order = None
 
     # Items without an order come last.
-    return (order is None, order, child.room_id)
+    return (order is None, order, child.origin_server_ts, child.room_id)
