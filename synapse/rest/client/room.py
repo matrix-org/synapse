@@ -1035,23 +1035,27 @@ def register_txn_path(
         with_get: True to also register respective GET paths for the PUTs.
     """
     on_POST = getattr(servlet, "on_POST", None)
-    if on_POST:
-        http_server.register_paths(
-            "POST",
-            client_patterns(regex_string + "$", v1=True),
-            on_POST,
-            servlet.__class__.__name__,
-        )
     on_PUT = getattr(servlet, "on_PUT", None)
-    if on_PUT:
-        http_server.register_paths(
-            "PUT",
-            client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
-            on_PUT,
-            servlet.__class__.__name__,
-        )
+    if on_POST is None or on_PUT is None:
+        raise RuntimeError("on_POST and on_PUT must exist when using register_txn_path")
+    http_server.register_paths(
+        "POST",
+        client_patterns(regex_string + "$", v1=True),
+        on_POST,
+        servlet.__class__.__name__,
+    )
+    http_server.register_paths(
+        "PUT",
+        client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
+        on_PUT,
+        servlet.__class__.__name__,
+    )
     on_GET = getattr(servlet, "on_GET", None)
-    if with_get and on_GET:
+    if with_get:
+        if on_GET is None:
+            raise RuntimeError(
+                "register_txn_path called with with_get = True, but no on_GET method exists"
+            )
         http_server.register_paths(
             "GET",
             client_patterns(regex_string + "/(?P<txn_id>[^/]*)$", v1=True),
