@@ -398,6 +398,15 @@ class Mailer:
         self,
         room_state_ids: StateMap[str],
     ) -> Optional[str]:
+        """
+        Retrieve the avatar url for this room---if it exists.
+
+        Args:
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             room's avatar url if it's present and a string; otherwise None.
+        """
         event_id = room_state_ids.get((EventTypes.RoomAvatar, ""))
         if event_id:
             ev = await self.store.get_event(event_id)
