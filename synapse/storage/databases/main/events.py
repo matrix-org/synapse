@@ -1780,7 +1780,11 @@ class PersistEventsStore:
             retcol="creator",
             allow_none=True,
         )
-        if not room_version.msc2716_historical or event.sender != room_creator:
+        if (
+            not room_version.msc2716_historical
+            or not self.hs.config.experimental.msc2716_enabled
+            or event.sender != room_creator
+        ):
             return
 
         next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
@@ -1838,7 +1842,11 @@ class PersistEventsStore:
             retcol="creator",
             allow_none=True,
         )
-        if not room_version.msc2716_historical or event.sender != room_creator:
+        if (
+            not room_version.msc2716_historical
+            or not self.hs.config.experimental.msc2716_enabled
+            or event.sender != room_creator
+        ):
             return
 
         chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
