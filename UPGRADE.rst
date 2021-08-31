@@ -88,6 +88,18 @@ for example:
 Upgrading to v1.32.0
 ====================
 
+Regression causing connected Prometheus instances to become overwhelmed
+-----------------------------------------------------------------------
+
+This release introduces `a regression <https://github.com/matrix-org/synapse/issues/9853>`_
+that can overwhelm connected Prometheus instances. This issue is not present in
+Synapse v1.32.0rc1.
+
+If you have been affected, please downgrade to 1.31.0. You then may need to
+remove excess writeahead logs in order for Prometheus to recover. Instructions
+for doing so are provided
+`here <https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183>`_.
+
 Dropping support for old Python, Postgres and SQLite versions
 -------------------------------------------------------------
 

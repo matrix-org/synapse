@@ -1,11 +1,57 @@
+Synapse 1.32.2 (2021-04-22)
+===========================
+
+This release includes a fix for a regression introduced in 1.32.0.
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse 1.32.0 and 1.32.1 which caused `LoggingContext` errors in plugins. ([\#9857](https://github.com/matrix-org/synapse/issues/9857))
+
+
+Synapse 1.32.1 (2021-04-21)
+===========================
+
+This release fixes [a regression](https://github.com/matrix-org/synapse/issues/9853)
+in Synapse 1.32.0 that caused connected Prometheus instances to become unstable. 
+
+However, as this release is still subject to the `LoggingContext` change in 1.32.0,
+it is recommended to remain on or downgrade to 1.31.0.
+
+Bugfixes
+--------
+
+- Fix a regression in Synapse 1.32.0 which caused Synapse to report large numbers of Prometheus time series, potentially overwhelming Prometheus instances. ([\#9854](https://github.com/matrix-org/synapse/issues/9854))
+
+
 Synapse 1.32.0 (2021-04-20)
 ===========================
+
+**Note:** This release introduces [a regression](https://github.com/matrix-org/synapse/issues/9853)
+that can overwhelm connected Prometheus instances. This issue was not present in
+1.32.0rc1. If affected, it is recommended to downgrade to 1.31.0 in the meantime, and 
+follow [these instructions](https://github.com/matrix-org/synapse/pull/9854#issuecomment-823472183)
+to clean up any excess writeahead logs.
+
+**Note:** This release also mistakenly included a change that may affected Synapse 
+modules that import `synapse.logging.context.LoggingContext`, such as
+[synapse-s3-storage-provider](https://github.com/matrix-org/synapse-s3-storage-provider).
+This will be fixed in a later Synapse version.
 
 **Note:** This release requires Python 3.6+ and Postgres 9.6+ or SQLite 3.22+.
 
 This release removes the deprecated `GET /_synapse/admin/v1/users/<user_id>` admin API. Please use the [v2 API](https://github.com/matrix-org/synapse/blob/develop/docs/admin_api/user_admin_api.rst#query-user-account) instead, which has improved capabilities.
 
 This release requires Application Services to use type `m.login.application_service` when registering users via the `/_matrix/client/r0/register` endpoint to comply with the spec. Please ensure your Application Services are up to date.
+
+If you are using the `packages.matrix.org` Debian repository for Synapse packages, 
+note that we have recently updated the expiry date on the gpg signing key. If you see an 
+error similar to `The following signatures were invalid: EXPKEYSIG F473DD4473365DE1`, you
+will need to get a fresh copy of the keys. You can do so with:
+
+```sh
+sudo wget -O /usr/share/keyrings/matrix-org-archive-keyring.gpg https://packages.matrix.org/debian/matrix-org-archive-keyring.gpg
+```
 
 Bugfixes
 --------
