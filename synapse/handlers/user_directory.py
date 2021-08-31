@@ -30,14 +30,26 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryHandler(StateDeltasHandler):
-    """Handles querying of and keeping updated the user_directory.
+    """Handles queries and updates for the user_directory.
 
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
 
-    The user directory is filled with users who this server can see are joined to a
-    world_readable or publicly joinable room. We keep a database table up to date
-    by streaming changes of the current state and recalculating whether users should
-    be in the directory or not when necessary.
+    When a local user searches the user_directory, we report two kinds of users:
+
+    - users this server can see are joined to a world_readable or publicly
+      joinable room, and
+    - users belonging to a private room that contains a local user.
+
+    The two cases are tracked separately in the `users_in_public_rooms` and
+    `users_who_share_private_rooms` tables. Both kinds of users have their
+    username and avatar tracked in a `user_directory` table.
+
+    This handler has three responsibilities:
+    1. Forwarding requests to `/user_directory/search` to the UserDirectoryStore.
+    2. Providing hooks for the application to call when local users are added,
+       removed, or have their profile changed.
+    3. Listening for room state changes that indicate remote users have
+       joined or left a room, or that their profile has changed.
     """
 
     def __init__(self, hs: "HomeServer"):
@@ -94,23 +106,6 @@ class UserDirectoryHandler(StateDeltasHandler):
 
         return results
 
-    def notify_new_event(self) -> None:
-        """Called when there may be more deltas to process"""
-        if not self.update_user_directory:
-            return
-
-        if self._is_processing:
-            return
-
-        async def process():
-            try:
-                await self._unsafe_process()
-            finally:
-                self._is_processing = False
-
-        self._is_processing = True
-        run_as_background_process("user_directory.notify_new_event", process)
-
     async def handle_local_profile_change(
         self, user_id: str, profile: ProfileInfo
     ) -> None:
@@ -130,11 +125,28 @@ class UserDirectoryHandler(StateDeltasHandler):
                 user_id, profile.display_name, profile.avatar_url
             )
 
-    async def handle_user_deactivated(self, user_id: str) -> None:
+    async def handle_local_user_deactivated(self, user_id: str) -> None:
         """Called when a user ID is deactivated"""
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
         await self.store.remove_from_user_dir(user_id)
+
+    def notify_new_event(self) -> None:
+        """Called when there may be more deltas to process"""
+        if not self.update_user_directory:
+            return
+
+        if self._is_processing:
+            return
+
+        async def process():
+            try:
+                await self._unsafe_process()
+            finally:
+                self._is_processing = False
+
+        self._is_processing = True
+        run_as_background_process("user_directory.notify_new_event", process)
 
     async def _unsafe_process(self) -> None:
         # If self.pos is None then means we haven't fetched it from DB

@@ -94,7 +94,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # deactivate user
         self.get_success(self.store.set_user_deactivated_status(r_user_id, True))
-        self.get_success(self.handler.handle_user_deactivated(r_user_id))
+        self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
@@ -118,7 +118,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_user_deactivated(s_user_id))
+        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
         self.store.remove_from_user_dir.not_called()
 
     def test_handle_user_deactivated_regular_user(self):
@@ -127,7 +127,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
         self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_user_deactivated(r_user_id))
+        self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
 
     def test_private_room(self):

@@ -137,6 +137,13 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
     async def _populate_user_directory_process_rooms(self, progress, batch_size):
         """
+        Scan through the historical record of room events so we can track
+
+        - who's in a public room;
+        - which local users share a private room with other users (local
+          and remote); and
+        - who should be in the user_directory.
+
         Args:
             progress (dict)
             batch_size (int): Maximum number of state events to process

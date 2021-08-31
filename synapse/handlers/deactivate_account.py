@@ -131,7 +131,7 @@ class DeactivateAccountHandler(BaseHandler):
         await self.store.add_user_pending_deactivation(user_id)
 
         # delete from user directory
-        await self.user_directory_handler.handle_user_deactivated(user_id)
+        await self.user_directory_handler.handle_local_user_deactivated(user_id)
 
         # Mark the user as erased, if they asked for that
         if erase_data:
@@ -259,9 +259,7 @@ class DeactivateAccountHandler(BaseHandler):
         user = UserID.from_string(user_id)
         if self.hs.config.user_directory_search_all_users:
             profile = await self.store.get_profileinfo(user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                user_id, profile
-            )
+            await self.user_directory_handler.handle_local_profile_change(user_id, profile)
 
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)
