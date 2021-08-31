@@ -12,6 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Optional, Sequence
+
+import attr
+
 from synapse.api.errors import (
     NotFoundError,
     StoreError,
@@ -28,6 +32,14 @@ from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RuleSpec:
+    scope: str
+    template: str
+    rule_id: str
+    attr: Optional[str]
 
 
 class PushRuleRestServlet(RestServlet):
@@ -57,25 +69,25 @@ class PushRuleRestServlet(RestServlet):
 
         requester = await self.auth.get_user_by_req(request)
 
-        if "/" in spec["rule_id"] or "\\" in spec["rule_id"]:
+        if "/" in spec.rule_id or "\\" in spec.rule_id:
             raise SynapseError(400, "rule_id may not contain slashes")
 
         content = parse_json_value_from_request(request)
 
         user_id = requester.user.to_string()
 
-        if "attr" in spec:
+        if spec.attr:
             await self.set_rule_attr(user_id, spec, content)
             self.notify_user(user_id)
             return 200, {}
 
-        if spec["rule_id"].startswith("."):
+        if spec.rule_id.startswith("."):
             # Rule ids starting with '.' are reserved for server default rules.
             raise SynapseError(400, "cannot add new rule_ids that start with '.'")
 
         try:
             (conditions, actions) = _rule_tuple_from_request_object(
-                spec["template"], spec["rule_id"], content
+                spec.template, spec.rule_id, content
             )
         except InvalidRuleException as e:
             raise SynapseError(400, str(e))
@@ -159,19 +171,19 @@ class PushRuleRestServlet(RestServlet):
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
     async def set_rule_attr(self, user_id, spec, val):
-        if spec["attr"] not in ("enabled", "actions"):
+        if spec.attr not in ("enabled", "actions"):
             # for the sake of potential future expansion, shouldn't report
             # 404 in the case of an unknown request so check it corresponds to
             # a known attribute first.
             raise UnrecognizedRequestError()
 
         namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-        rule_id = spec["rule_id"]
+        rule_id = spec.rule_id
         is_default_rule = rule_id.startswith(".")
         if is_default_rule:
             if namespaced_rule_id not in BASE_RULE_IDS:
                 raise NotFoundError("Unknown rule %s" % (namespaced_rule_id,))
-        if spec["attr"] == "enabled":
+        if spec.attr == "enabled":
             if isinstance(val, dict) and "enabled" in val:
                 val = val["enabled"]
             if not isinstance(val, bool):
@@ -182,11 +194,11 @@ class PushRuleRestServlet(RestServlet):
             return await self.store.set_push_rule_enabled(
                 user_id, namespaced_rule_id, val, is_default_rule
             )
-        elif spec["attr"] == "actions":
+        elif spec.attr == "actions":
             actions = val.get("actions")
             _check_actions(actions)
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
-            rule_id = spec["rule_id"]
+            rule_id = spec.rule_id
             is_default_rule = rule_id.startswith(".")
             if is_default_rule:
                 if user_id in self._users_new_default_push_rules:
@@ -203,15 +215,14 @@ class PushRuleRestServlet(RestServlet):
             raise UnrecognizedRequestError()
 
 
-def _rule_spec_from_path(path):
+def _rule_spec_from_path(path: Sequence[str]) -> RuleSpec:
     """Turn a sequence of path components into a rule spec
 
     Args:
-        path (sequence[unicode]): the URL path components.
+        path: the URL path components.
 
     Returns:
-        dict: rule spec dict, containing scope/template/rule_id entries,
-            and possibly attr.
+        rule spec, containing scope/template/rule_id entries, and possibly attr.
 
     Raises:
         UnrecognizedRequestError if the path components cannot be parsed.
@@ -237,14 +248,13 @@ def _rule_spec_from_path(path):
 
     rule_id = path[0]
 
-    spec = {"scope": scope, "template": template, "rule_id": rule_id}
-
     path = path[1:]
 
+    attr = None
     if len(path) > 0 and len(path[0]) > 0:
-        spec["attr"] = path[0]
+        attr = path[0]
 
-    return spec
+    return RuleSpec(scope, template, rule_id, attr)
 
 
 def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
@@ -331,19 +341,19 @@ def _filter_ruleset_with_path(ruleset, path):
 
 
 def _priority_class_from_spec(spec):
-    if spec["template"] not in PRIORITY_CLASS_MAP.keys():
-        raise InvalidRuleException("Unknown template: %s" % (spec["template"]))
-    pc = PRIORITY_CLASS_MAP[spec["template"]]
+    if spec.template not in PRIORITY_CLASS_MAP.keys():
+        raise InvalidRuleException("Unknown template: %s" % (spec.template))
+    pc = PRIORITY_CLASS_MAP[spec.template]
 
     return pc
 
 
 def _namespaced_rule_id_from_spec(spec):
-    return _namespaced_rule_id(spec, spec["rule_id"])
+    return _namespaced_rule_id(spec, spec.rule_id)
 
 
 def _namespaced_rule_id(spec, rule_id):
-    return "global/%s/%s" % (spec["template"], rule_id)
+    return "global/%s/%s" % (spec.template, rule_id)
 
 
 class InvalidRuleException(Exception):
