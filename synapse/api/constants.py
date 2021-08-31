@@ -198,6 +198,8 @@ class EventContentFields:
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
 
+    ROOM_CREATOR = "creator"
+
     # Used on normal messages to indicate they were historically imported after the fact
     MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
     # For "insertion" events to indicate what the next chunk ID should be in

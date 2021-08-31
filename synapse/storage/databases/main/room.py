@@ -19,7 +19,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventTypes, EventContentFields, JoinRules
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.events import EventBase
@@ -1223,7 +1223,7 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             for room_id, event_json in txn:
                 event_dict = db_to_json(event_json)
 
-                creator = event_dict.get("content").get("creator")
+                creator = event_dict.get("content").get(EventContentFields.ROOM_CREATOR)
 
                 self.db_pool.simple_update_txn(
                     txn,
@@ -1439,7 +1439,7 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             # invalid, and it would fail auth checks anyway.
             raise StoreError(400, "No create event in state")
 
-        room_creator = create_event.content.get("creator", None)
+        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
 
         if room_creator is None:
             # If the create event does not have a creator then the room is
