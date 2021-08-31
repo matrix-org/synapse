@@ -43,6 +43,7 @@ from synapse.api.errors import (
     Codes,
     FederationDeniedError,
     HttpResponseException,
+    RequestSendFailed,
     SynapseError,
     UnsupportedRoomVersionError,
 )
@@ -107,6 +108,23 @@ class FederationClient(FederationBase):
             clock=self._clock,
             max_len=1000,
             expiry_ms=120 * 1000,
+            reset_expiry_on_get=False,
+        )
+
+        # A cache for fetching the room hierarchy over federation.
+        #
+        # Some stale data over federation is OK, but must be refreshed
+        # periodically since the local server is in the room.
+        #
+        # It is a map of (room ID, suggested-only) -> the response of
+        # get_room_hierarchy.
+        self._get_room_hierarchy_cache: ExpiringCache[
+            Tuple[str, bool], Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]
+        ] = ExpiringCache(
+            cache_name="get_room_hierarchy_cache",
+            clock=self._clock,
+            max_len=1000,
+            expiry_ms=5 * 60 * 1000,
             reset_expiry_on_get=False,
         )
 
@@ -558,7 +576,11 @@ class FederationClient(FederationBase):
 
             try:
                 return await callback(destination)
-            except InvalidResponseError as e:
+            except (
+                RequestSendFailed,
+                InvalidResponseError,
+                NotRetryingDestination,
+            ) as e:
                 logger.warning("Failed to %s via %s: %s", description, destination, e)
             except UnsupportedRoomVersionError:
                 raise
@@ -1319,6 +1341,10 @@ class FederationClient(FederationBase):
                remote servers
         """
 
+        cached_result = self._get_room_hierarchy_cache.get((room_id, suggested_only))
+        if cached_result:
+            return cached_result
+
         async def send_request(
             destination: str,
         ) -> Tuple[JsonDict, Sequence[JsonDict], Sequence[str]]:
@@ -1365,58 +1391,63 @@ class FederationClient(FederationBase):
             return room, children, inaccessible_children
 
         try:
-            return await self._try_destination_list(
+            result = await self._try_destination_list(
                 "fetch room hierarchy",
                 destinations,
                 send_request,
                 failover_on_unknown_endpoint=True,
             )
         except SynapseError as e:
+            # If an unexpected error occurred, re-raise it.
+            if e.code != 502:
+                raise
+
             # Fallback to the old federation API and translate the results if
             # no servers implement the new API.
             #
             # The algorithm below is a bit inefficient as it only attempts to
-            # get information for the requested room, but the legacy API may
+            # parse information for the requested room, but the legacy API may
             # return additional layers.
-            if e.code == 502:
-                legacy_result = await self.get_space_summary(
-                    destinations,
-                    room_id,
-                    suggested_only,
-                    max_rooms_per_space=None,
-                    exclude_rooms=[],
-                )
+            legacy_result = await self.get_space_summary(
+                destinations,
+                room_id,
+                suggested_only,
+                max_rooms_per_space=None,
+                exclude_rooms=[],
+            )
 
-                # Find the requested room in the response (and remove it).
-                for _i, room in enumerate(legacy_result.rooms):
-                    if room.get("room_id") == room_id:
-                        break
-                else:
-                    # The requested room was not returned, nothing we can do.
-                    raise
-                requested_room = legacy_result.rooms.pop(_i)
+            # Find the requested room in the response (and remove it).
+            for _i, room in enumerate(legacy_result.rooms):
+                if room.get("room_id") == room_id:
+                    break
+            else:
+                # The requested room was not returned, nothing we can do.
+                raise
+            requested_room = legacy_result.rooms.pop(_i)
 
-                # Find any children events of the requested room.
-                children_events = []
-                children_room_ids = set()
-                for event in legacy_result.events:
-                    if event.room_id == room_id:
-                        children_events.append(event.data)
-                        children_room_ids.add(event.state_key)
-                # And add them under the requested room.
-                requested_room["children_state"] = children_events
+            # Find any children events of the requested room.
+            children_events = []
+            children_room_ids = set()
+            for event in legacy_result.events:
+                if event.room_id == room_id:
+                    children_events.append(event.data)
+                    children_room_ids.add(event.state_key)
+            # And add them under the requested room.
+            requested_room["children_state"] = children_events
 
-                # Find the children rooms.
-                children = []
-                for room in legacy_result.rooms:
-                    if room.get("room_id") in children_room_ids:
-                        children.append(room)
+            # Find the children rooms.
+            children = []
+            for room in legacy_result.rooms:
+                if room.get("room_id") in children_room_ids:
+                    children.append(room)
 
-                # It isn't clear from the response whether some of the rooms are
-                # not accessible.
-                return requested_room, children, ()
+            # It isn't clear from the response whether some of the rooms are
+            # not accessible.
+            result = (requested_room, children, ())
 
-            raise
+        # Cache the result to avoid fetching data over federation every time.
+        self._get_room_hierarchy_cache[(room_id, suggested_only)] = result
+        return result
 
 
 @attr.s(frozen=True, slots=True, auto_attribs=True)

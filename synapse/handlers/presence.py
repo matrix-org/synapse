@@ -353,6 +353,11 @@ class BasePresenceHandler(abc.ABC):
         # otherwise would not do).
         await self.set_state(UserID.from_string(user_id), state, force_notify=True)
 
+    async def is_visible(self, observed_user: UserID, observer_user: UserID) -> bool:
+        raise NotImplementedError(
+            "Attempting to check presence on a non-presence worker."
+        )
+
 
 class _NullContextManager(ContextManager[None]):
     """A context manager which does nothing."""

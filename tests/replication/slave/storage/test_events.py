@@ -20,7 +20,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.storage.roommember import RoomsForUser
+from synapse.storage.roommember import GetRoomsForUserWithStreamOrdering, RoomsForUser
 from synapse.types import PersistedEventPosition
 
 from tests.server import FakeTransport
@@ -150,6 +150,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                     "invite",
                     event.event_id,
                     event.internal_metadata.stream_ordering,
+                    RoomVersions.V1.identifier,
                 )
             ],
         )
@@ -216,7 +217,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_rooms_for_user_with_stream_ordering",
             (USER_ID_2,),
-            {(ROOM_ID, expected_pos)},
+            {GetRoomsForUserWithStreamOrdering(ROOM_ID, expected_pos)},
         )
 
     def test_get_rooms_for_user_with_stream_ordering_with_multi_event_persist(self):
@@ -305,7 +306,10 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                 expected_pos = PersistedEventPosition(
                     "master", j2.internal_metadata.stream_ordering
                 )
-                self.assertEqual(joined_rooms, {(ROOM_ID, expected_pos)})
+                self.assertEqual(
+                    joined_rooms,
+                    {GetRoomsForUserWithStreamOrdering(ROOM_ID, expected_pos)},
+                )
 
     event_id = 0
 
