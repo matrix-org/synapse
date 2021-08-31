@@ -443,7 +443,7 @@ class RegisterRestServlet(RestServlet):
             return ret
         elif kind != "user":
             raise UnrecognizedRequestError(
-                "Do not understand membership kind: %s" % (kind,)
+                f"Do not understand membership kind: {kind}",
             )
 
         if self._msc2918_enabled:
