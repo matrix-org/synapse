@@ -1,0 +1,16 @@
+name: "Assign Reviewers"
+on:  
+  pull_request:
+    types: [opened, ready_for_review]
+     
+jobs:
+  assign-reviewers:
+    runs-on: ubuntu-latest
+    steps:
+    - name: "Assign Team and Persons"
+      uses: rowi1de/auto-assign-review-teams@v1.0.2
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+        teams: synapse-core         # only works for GitHub Organisation/Teams
+        include-draft: false            # Draft PRs will be skipped (default: false)
+        skip-with-manual-reviewers: 1   # Skip this action, if the number of reviwers was already assigned (default: 0)
