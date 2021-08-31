@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import email.message
-import json
 import os
 from typing import Dict, List, Sequence, Tuple
 
 import attr
-import html5_parser
-import lxml.etree
 import pkg_resources
 
 from twisted.internet.defer import Deferred
@@ -35,8 +32,6 @@ class _User:
     "Helper wrapper for user ID and access token"
     id = attr.ib()
     token = attr.ib()
-
-
 
 
 class EmailPusherTests(HomeserverTestCase):
@@ -266,10 +261,7 @@ class EmailPusherTests(HomeserverTestCase):
         # Create a room and set its avatar.
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
         self.helper.send_state(
-            room,
-            "m.room.avatar",
-            {"url": "mxc://DUMMY_MEDIA_ID"},
-            self.access_token
+            room, "m.room.avatar", {"url": "mxc://DUMMY_MEDIA_ID"}, self.access_token
         )
 
         # Invite two other uses.
