@@ -13,5 +13,5 @@
  * limitations under the License.
  */
 
-INSERT into background_updates (update_name, progress_json)
+INSERT INTO background_updates (update_name, progress_json)
     VALUES ('populate_rooms_creator_column', '{}');
