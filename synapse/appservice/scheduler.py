@@ -49,7 +49,7 @@ This is all tied together by the AppServiceScheduler which DIs the required
 components.
 """
 import logging
-from typing import List
+from typing import List, Optional
 
 from synapse.appservice import ApplicationService, ApplicationServiceState
 from synapse.events import EventBase
@@ -191,11 +191,11 @@ class _TransactionController:
         self,
         service: ApplicationService,
         events: List[EventBase],
-        ephemeral: List[JsonDict] = [],
+        ephemeral: Optional[List[JsonDict]] = None,
     ):
         try:
             txn = await self.store.create_appservice_txn(
-                service=service, events=events, ephemeral=ephemeral
+                service=service, events=events, ephemeral=ephemeral or []
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:

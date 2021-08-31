@@ -270,7 +270,7 @@ class TlsConfig(Config):
         tls_certificate_path,
         tls_private_key_path,
         acme_domain,
-        **kwargs
+        **kwargs,
     ):
         """If the acme_domain is specified acme will be enabled.
         If the TLS paths are not specified the default will be certs in the

@@ -427,13 +427,9 @@ class FederationSendServlet(BaseFederationServlet):
             logger.exception(e)
             return 400, {"error": "Invalid transaction"}
 
-        try:
-            code, response = await self.handler.on_incoming_transaction(
-                origin, transaction_data
-            )
-        except Exception:
-            logger.exception("on_incoming_transaction failed")
-            raise
+        code, response = await self.handler.on_incoming_transaction(
+            origin, transaction_data
+        )
 
         return code, response
 
@@ -650,8 +646,8 @@ class FederationThirdPartyInviteExchangeServlet(BaseFederationServlet):
     PATH = "/exchange_third_party_invite/(?P<room_id>[^/]*)"
 
     async def on_PUT(self, origin, content, query, room_id):
-        content = await self.handler.on_exchange_third_party_invite_request(content)
-        return 200, content
+        await self.handler.on_exchange_third_party_invite_request(content)
+        return 200, {}
 
 
 class FederationClientKeysQueryServlet(BaseFederationServlet):

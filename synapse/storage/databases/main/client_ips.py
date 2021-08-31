@@ -298,7 +298,6 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             #      times, which is fine.
 
             where_clause, where_args = make_tuple_comparison_clause(
-                self.database_engine,
                 [("user_id", last_user_id), ("device_id", last_device_id)],
             )
 

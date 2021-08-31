@@ -19,9 +19,9 @@
 """Tests REST events for /rooms paths."""
 
 import json
+from typing import Iterable
+from unittest.mock import Mock
 from urllib import parse as urlparse
-
-from mock import Mock
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
@@ -207,7 +207,9 @@ class RoomPermissionsTestCase(RoomBase):
         )
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
-    def _test_get_membership(self, room=None, members=[], expect_code=None):
+    def _test_get_membership(
+        self, room=None, members: Iterable = frozenset(), expect_code=None
+    ):
         for member in members:
             path = "/rooms/%s/state/m.room.member/%s" % (room, member)
             channel = self.make_request("GET", path)

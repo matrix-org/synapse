@@ -330,9 +330,11 @@ class FrozenEvent(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
+
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -386,9 +388,11 @@ class FrozenEventV2(EventBase):
         self,
         event_dict: JsonDict,
         room_version: RoomVersion,
-        internal_metadata_dict: JsonDict = {},
+        internal_metadata_dict: Optional[JsonDict] = None,
         rejected_reason: Optional[str] = None,
     ):
+        internal_metadata_dict = internal_metadata_dict or {}
+
         event_dict = dict(event_dict)
 
         # Signatures is a dict of dicts, and this is faster than doing a
@@ -507,9 +511,11 @@ def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
 def make_event_from_dict(
     event_dict: JsonDict,
     room_version: RoomVersion = RoomVersions.V1,
-    internal_metadata_dict: JsonDict = {},
+    internal_metadata_dict: Optional[JsonDict] = None,
     rejected_reason: Optional[str] = None,
 ) -> EventBase:
     """Construct an EventBase from the given event dict"""
     event_type = _event_type_from_format_version(room_version.event_format)
-    return event_type(event_dict, room_version, internal_metadata_dict, rejected_reason)
+    return event_type(
+        event_dict, room_version, internal_metadata_dict or {}, rejected_reason
+    )

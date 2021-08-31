@@ -82,9 +82,28 @@ pid_file: DATADIR/homeserver.pid
 #
 #soft_file_limit: 0
 
-# Set to false to disable presence tracking on this homeserver.
+# Presence tracking allows users to see the state (e.g online/offline)
+# of other local and remote users.
 #
-#use_presence: false
+presence:
+  # Uncomment to disable presence tracking on this homeserver. This option
+  # replaces the previous top-level 'use_presence' option.
+  #
+  #enabled: false
+
+  # Presence routers are third-party modules that can specify additional logic
+  # to where presence updates from users are routed.
+  #
+  presence_router:
+    # The custom module's class. Uncomment to use a custom presence router module.
+    #
+    #module: "my_custom_router.PresenceRouter"
+
+    # Configuration options of the custom module. Refer to your module's
+    # documentation for available options.
+    #
+    #config:
+    #  example_option: 'something'
 
 # Whether to require authentication to retrieve profile data (avatars,
 # display names) of other users through the client API. Defaults to
@@ -1304,9 +1323,9 @@ url_preview_accept_language:
 #
 #allowed_local_3pids:
 #  - medium: email
-#    pattern: '.*@matrix\.org'
+#    pattern: '^[^@]+@matrix\.org$'
 #  - medium: email
-#    pattern: '.*@vector\.im'
+#    pattern: '^[^@]+@vector\.im$'
 #  - medium: msisdn
 #    pattern: '\+44'
 
@@ -1629,16 +1648,31 @@ metrics_flags:
 
 ## API Configuration ##
 
-# A list of event types from a room that will be given to users when they
-# are invited to a room. This allows clients to display information about the
-# room that they've been invited to, without actually being in the room yet.
+# Controls for the state that is shared with users who receive an invite
+# to a room
 #
-#room_invite_state_types:
-#  - "m.room.join_rules"
-#  - "m.room.canonical_alias"
-#  - "m.room.avatar"
-#  - "m.room.encryption"
-#  - "m.room.name"
+room_prejoin_state:
+   # By default, the following state event types are shared with users who
+   # receive invites to the room:
+   #
+   # - m.room.join_rules
+   # - m.room.canonical_alias
+   # - m.room.avatar
+   # - m.room.encryption
+   # - m.room.name
+   #
+   # Uncomment the following to disable these defaults (so that only the event
+   # types listed in 'additional_event_types' are shared). Defaults to 'false'.
+   #
+   #disable_default_event_types: true
+
+   # Additional state event types to share with users when they are invited
+   # to a room.
+   #
+   # By default, this list is empty (so only the default event types are shared).
+   #
+   #additional_event_types:
+   #  - org.example.custom.event.type
 
 
 # A list of application service config files to use

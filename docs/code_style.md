@@ -128,6 +128,9 @@ Some guidelines follow:
     will be if no sub-options are enabled).
 -   Lines should be wrapped at 80 characters.
 -   Use two-space indents.
+-   `true` and `false` are spelt thus (as opposed to `True`, etc.)
+-   Use single quotes (`'`) rather than double-quotes (`"`) or backticks
+    (`` ` ``) to refer to configuration options.
 
 Example:
 

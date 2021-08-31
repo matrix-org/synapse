@@ -16,8 +16,7 @@
 """Tests for the password_auth_provider interface"""
 
 from typing import Any, Type, Union
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 

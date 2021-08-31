@@ -14,8 +14,7 @@
 # limitations under the License.
 
 import resource
-
-import mock
+from unittest import mock
 
 from synapse.app.phone_stats_home import phone_stats_home
 

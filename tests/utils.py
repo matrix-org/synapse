@@ -21,9 +21,8 @@ import time
 import uuid
 import warnings
 from typing import Type
+from unittest.mock import Mock, patch
 from urllib import parse as urlparse
-
-from mock import Mock, patch
 
 from twisted.internet import defer
 
@@ -122,7 +121,6 @@ def default_config(name, parse=False):
         "enable_registration_captcha": False,
         "macaroon_secret_key": "not even a little secret",
         "trusted_third_party_id_servers": [],
-        "room_invite_state_types": [],
         "password_providers": [],
         "worker_replication_url": "",
         "worker_app": None,
@@ -198,7 +196,7 @@ def setup_test_homeserver(
     config=None,
     reactor=None,
     homeserver_to_use: Type[HomeServer] = TestHomeServer,
-    **kwargs
+    **kwargs,
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments

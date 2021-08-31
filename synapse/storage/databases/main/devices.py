@@ -985,7 +985,7 @@ class DeviceBackgroundUpdateStore(SQLBaseStore):
 
         def _txn(txn):
             clause, args = make_tuple_comparison_clause(
-                self.db_pool.engine, [(x, last_row[x]) for x in KEY_COLS]
+                [(x, last_row[x]) for x in KEY_COLS]
             )
             sql = """
                 SELECT stream_id, destination, user_id, device_id, MAX(ts) AS ts

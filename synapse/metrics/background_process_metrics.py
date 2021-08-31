@@ -199,11 +199,11 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         _background_process_start_count.labels(desc).inc()
         _background_process_in_flight_count.labels(desc).inc()
 
-        with BackgroundProcessLoggingContext(desc, "%s-%i" % (desc, count)) as context:
+        with BackgroundProcessLoggingContext("%s-%s" % (desc, count)) as context:
             try:
                 ctx = noop_context_manager()
                 if bg_start_span:
-                    ctx = start_active_span(desc, tags={"request_id": context.request})
+                    ctx = start_active_span(desc, tags={"request_id": str(context)})
                 with ctx:
                     return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
@@ -244,9 +244,8 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
     __slots__ = ["_proc"]
 
-    def __init__(self, name: str, request: Optional[str] = None):
-        super().__init__(name, request=request)
-
+    def __init__(self, name: str):
+        super().__init__(name)
         self._proc = _BackgroundProcess(name, self)
 
     def start(self, rusage: "Optional[resource._RUsage]"):

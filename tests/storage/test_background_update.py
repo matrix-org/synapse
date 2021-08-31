@@ -1,4 +1,4 @@
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.storage.background_updates import BackgroundUpdater
 

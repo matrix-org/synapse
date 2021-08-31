@@ -13,8 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-
-from mock import Mock
+from typing import Optional
+from unittest.mock import Mock
 
 from twisted.internet import defer
 from twisted.internet.defer import succeed
@@ -147,9 +147,11 @@ class FilterEventsForServerTestCase(tests.unittest.TestCase):
         return event
 
     @defer.inlineCallbacks
-    def inject_room_member(self, user_id, membership="join", extra_content={}):
+    def inject_room_member(
+        self, user_id, membership="join", extra_content: Optional[dict] = None
+    ):
         content = {"membership": membership}
-        content.update(extra_content)
+        content.update(extra_content or {})
         builder = self.event_builder_factory.for_room_version(
             RoomVersions.V1,
             {

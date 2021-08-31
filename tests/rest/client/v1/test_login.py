@@ -16,9 +16,8 @@
 import time
 import urllib.parse
 from typing import Any, Dict, List, Optional, Union
+from unittest.mock import Mock
 from urllib.parse import urlencode
-
-from mock import Mock
 
 import pymacaroons
 

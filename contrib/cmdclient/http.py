@@ -16,6 +16,7 @@
 import json
 import urllib
 from pprint import pformat
+from typing import Optional
 
 from twisted.internet import defer, reactor
 from twisted.web.client import Agent, readBody
@@ -85,8 +86,9 @@ class TwistedHttpClient(HttpClient):
         body = yield readBody(response)
         defer.returnValue(json.loads(body))
 
-    def _create_put_request(self, url, json_data, headers_dict={}):
+    def _create_put_request(self, url, json_data, headers_dict: Optional[dict] = None):
         """Wrapper of _create_request to issue a PUT request"""
+        headers_dict = headers_dict or {}
 
         if "Content-Type" not in headers_dict:
             raise defer.error(RuntimeError("Must include Content-Type header for PUTs"))
@@ -95,14 +97,22 @@ class TwistedHttpClient(HttpClient):
             "PUT", url, producer=_JsonProducer(json_data), headers_dict=headers_dict
         )
 
-    def _create_get_request(self, url, headers_dict={}):
+    def _create_get_request(self, url, headers_dict: Optional[dict] = None):
         """Wrapper of _create_request to issue a GET request"""
-        return self._create_request("GET", url, headers_dict=headers_dict)
+        return self._create_request("GET", url, headers_dict=headers_dict or {})
 
     @defer.inlineCallbacks
     def do_request(
-        self, method, url, data=None, qparams=None, jsonreq=True, headers={}
+        self,
+        method,
+        url,
+        data=None,
+        qparams=None,
+        jsonreq=True,
+        headers: Optional[dict] = None,
     ):
+        headers = headers or {}
+
         if qparams:
             url = "%s?%s" % (url, urllib.urlencode(qparams, True))
 
@@ -123,8 +133,12 @@ class TwistedHttpClient(HttpClient):
         defer.returnValue(json.loads(body))
 
     @defer.inlineCallbacks
-    def _create_request(self, method, url, producer=None, headers_dict={}):
+    def _create_request(
+        self, method, url, producer=None, headers_dict: Optional[dict] = None
+    ):
         """Creates and sends a request to the given url"""
+        headers_dict = headers_dict or {}
+
         headers_dict["User-Agent"] = ["Synapse Cmd Client"]
 
         retries_left = 5

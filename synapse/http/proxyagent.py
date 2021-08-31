@@ -27,7 +27,7 @@ from twisted.python.failure import Failure
 from twisted.web.client import URI, BrowserLikePolicyForHTTPS, _AgentBase
 from twisted.web.error import SchemeNotSupported
 from twisted.web.http_headers import Headers
-from twisted.web.iweb import IAgent
+from twisted.web.iweb import IAgent, IPolicyForHTTPS
 
 from synapse.http.connectproxyclient import HTTPConnectProxyEndpoint
 
@@ -88,12 +88,14 @@ class ProxyAgent(_AgentBase):
         self,
         reactor,
         proxy_reactor=None,
-        contextFactory=BrowserLikePolicyForHTTPS(),
+        contextFactory: Optional[IPolicyForHTTPS] = None,
         connectTimeout=None,
         bindAddress=None,
         pool=None,
         use_proxy=False,
     ):
+        contextFactory = contextFactory or BrowserLikePolicyForHTTPS()
+
         _AgentBase.__init__(self, reactor, pool)
 
         if proxy_reactor is None:

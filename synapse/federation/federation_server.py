@@ -815,22 +815,20 @@ class FederationServer(FederationBase):
 
         await self.handler.on_receive_pdu(origin, pdu, sent_to_us_directly=True)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "<ReplicationLayer(%s)>" % self.server_name
 
     async def exchange_third_party_invite(
         self, sender_user_id: str, target_user_id: str, room_id: str, signed: Dict
-    ):
-        ret = await self.handler.exchange_third_party_invite(
+    ) -> None:
+        await self.handler.exchange_third_party_invite(
             sender_user_id, target_user_id, room_id, signed
         )
-        return ret
 
-    async def on_exchange_third_party_invite_request(self, event_dict: Dict):
-        ret = await self.handler.on_exchange_third_party_invite_request(event_dict)
-        return ret
+    async def on_exchange_third_party_invite_request(self, event_dict: Dict) -> None:
+        await self.handler.on_exchange_third_party_invite_request(event_dict)
 
-    async def check_server_matches_acl(self, server_name: str, room_id: str):
+    async def check_server_matches_acl(self, server_name: str, room_id: str) -> None:
         """Check if the given server is allowed by the server ACLs in the room
 
         Args:
@@ -946,6 +944,7 @@ class FederationHandlerRegistry:
 
         # A rate limiter for incoming room key requests per origin.
         self._room_key_request_rate_limiter = Ratelimiter(
+            store=hs.get_datastore(),
             clock=self.clock,
             rate_hz=self.config.rc_key_requests.per_second,
             burst_count=self.config.rc_key_requests.burst_count,
@@ -953,7 +952,7 @@ class FederationHandlerRegistry:
 
     def register_edu_handler(
         self, edu_type: str, handler: Callable[[str, JsonDict], Awaitable[None]]
-    ):
+    ) -> None:
         """Sets the handler callable that will be used to handle an incoming
         federation EDU of the given type.
 
@@ -972,7 +971,7 @@ class FederationHandlerRegistry:
 
     def register_query_handler(
         self, query_type: str, handler: Callable[[dict], Awaitable[JsonDict]]
-    ):
+    ) -> None:
         """Sets the handler callable that will be used to handle an incoming
         federation query of the given type.
 
@@ -990,15 +989,17 @@ class FederationHandlerRegistry:
 
         self.query_handlers[query_type] = handler
 
-    def register_instance_for_edu(self, edu_type: str, instance_name: str):
+    def register_instance_for_edu(self, edu_type: str, instance_name: str) -> None:
         """Register that the EDU handler is on a different instance than master."""
         self._edu_type_to_instance[edu_type] = [instance_name]
 
-    def register_instances_for_edu(self, edu_type: str, instance_names: List[str]):
+    def register_instances_for_edu(
+        self, edu_type: str, instance_names: List[str]
+    ) -> None:
         """Register that the EDU handler is on multiple instances."""
         self._edu_type_to_instance[edu_type] = instance_names
 
-    async def on_edu(self, edu_type: str, origin: str, content: dict):
+    async def on_edu(self, edu_type: str, origin: str, content: dict) -> None:
         if not self.config.use_presence and edu_type == EduTypes.Presence:
             return
 
@@ -1006,7 +1007,9 @@ class FederationHandlerRegistry:
         # the limit, drop them.
         if (
             edu_type == EduTypes.RoomKeyRequest
-            and not self._room_key_request_rate_limiter.can_do_action(origin)
+            and not await self._room_key_request_rate_limiter.can_do_action(
+                None, origin
+            )
         ):
             return
 

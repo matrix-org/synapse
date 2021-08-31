@@ -488,7 +488,7 @@ class DatabasePool:
         exception_callbacks: List[_CallbackListEntry],
         func: "Callable[..., R]",
         *args: Any,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Start a new database transaction with the given connection.
 
@@ -622,7 +622,7 @@ class DatabasePool:
         func: "Callable[..., R]",
         *args: Any,
         db_autocommit: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Starts a transaction on the database and runs a given function
 
@@ -682,7 +682,7 @@ class DatabasePool:
         func: "Callable[..., R]",
         *args: Any,
         db_autocommit: bool = False,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> R:
         """Wraps the .runWithConnection() method on the underlying db_pool.
 
@@ -775,7 +775,7 @@ class DatabasePool:
         desc: str,
         decoder: Optional[Callable[[Cursor], R]],
         query: str,
-        *args: Any
+        *args: Any,
     ) -> R:
         """Runs a single query for a result set.
 
@@ -900,7 +900,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = {},
+        insertion_values: Optional[Dict[str, Any]] = None,
         desc: str = "simple_upsert",
         lock: bool = True,
     ) -> Optional[bool]:
@@ -927,6 +927,8 @@ class DatabasePool:
             Native upserts always return None. Emulated upserts return True if a
             new entry was created, False if an existing one was updated.
         """
+        insertion_values = insertion_values or {}
+
         attempts = 0
         while True:
             try:
@@ -964,7 +966,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = {},
+        insertion_values: Optional[Dict[str, Any]] = None,
         lock: bool = True,
     ) -> Optional[bool]:
         """
@@ -982,6 +984,8 @@ class DatabasePool:
             Native upserts always return None. Emulated upserts return True if a
             new entry was created, False if an existing one was updated.
         """
+        insertion_values = insertion_values or {}
+
         if self.engine.can_native_upsert and table not in self._unsafe_to_upsert_tables:
             self.simple_upsert_txn_native_upsert(
                 txn, table, keyvalues, values, insertion_values=insertion_values
@@ -1003,7 +1007,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = {},
+        insertion_values: Optional[Dict[str, Any]] = None,
         lock: bool = True,
     ) -> bool:
         """
@@ -1017,6 +1021,8 @@ class DatabasePool:
             Returns True if a new entry was created, False if an existing
             one was updated.
         """
+        insertion_values = insertion_values or {}
+
         # We need to lock the table :(, unless we're *really* careful
         if lock:
             self.engine.lock_table(txn, table)
@@ -1077,7 +1083,7 @@ class DatabasePool:
         table: str,
         keyvalues: Dict[str, Any],
         values: Dict[str, Any],
-        insertion_values: Dict[str, Any] = {},
+        insertion_values: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
         Use the native UPSERT functionality in recent PostgreSQL versions.
@@ -1090,7 +1096,7 @@ class DatabasePool:
         """
         allvalues = {}  # type: Dict[str, Any]
         allvalues.update(keyvalues)
-        allvalues.update(insertion_values)
+        allvalues.update(insertion_values or {})
 
         if not values:
             latter = "NOTHING"
@@ -1513,7 +1519,7 @@ class DatabasePool:
         column: str,
         iterable: Iterable[Any],
         retcols: Iterable[str],
-        keyvalues: Dict[str, Any] = {},
+        keyvalues: Optional[Dict[str, Any]] = None,
         desc: str = "simple_select_many_batch",
         batch_size: int = 100,
     ) -> List[Any]:
@@ -1531,6 +1537,8 @@ class DatabasePool:
             desc: description of the transaction, for logging and metrics
             batch_size: the number of rows for each select query
         """
+        keyvalues = keyvalues or {}
+
         results = []  # type: List[Dict[str, Any]]
 
         if not iterable:
@@ -2059,69 +2067,18 @@ def make_in_list_sql_clause(
 KV = TypeVar("KV")
 
 
-def make_tuple_comparison_clause(
-    database_engine: BaseDatabaseEngine, keys: List[Tuple[str, KV]]
-) -> Tuple[str, List[KV]]:
+def make_tuple_comparison_clause(keys: List[Tuple[str, KV]]) -> Tuple[str, List[KV]]:
     """Returns a tuple comparison SQL clause
 
-    Depending what the SQL engine supports, builds a SQL clause that looks like either
-    "(a, b) > (?, ?)", or "(a > ?) OR (a == ? AND b > ?)".
+    Builds a SQL clause that looks like "(a, b) > (?, ?)"
 
     Args:
-        database_engine
         keys: A set of (column, value) pairs to be compared.
 
     Returns:
         A tuple of SQL query and the args
     """
-    if database_engine.supports_tuple_comparison:
-        return (
-            "(%s) > (%s)" % (",".join(k[0] for k in keys), ",".join("?" for _ in keys)),
-            [k[1] for k in keys],
-        )
-
-    # we want to build a clause
-    #    (a > ?) OR
-    #    (a == ? AND b > ?) OR
-    #    (a == ? AND b == ? AND c > ?)
-    #    ...
-    #    (a == ? AND b == ? AND ... AND z > ?)
-    #
-    # or, equivalently:
-    #
-    #  (a > ? OR (a == ? AND
-    #    (b > ? OR (b == ? AND
-    #      ...
-    #        (y > ? OR (y == ? AND
-    #          z > ?
-    #        ))
-    #      ...
-    #    ))
-    #  ))
-    #
-    # which itself is equivalent to (and apparently easier for the query optimiser):
-    #
-    #  (a >= ? AND (a > ? OR
-    #    (b >= ? AND (b > ? OR
-    #      ...
-    #        (y >= ? AND (y > ? OR
-    #          z > ?
-    #        ))
-    #      ...
-    #    ))
-    #  ))
-    #
-    #
-
-    clause = ""
-    args = []  # type: List[KV]
-    for k, v in keys[:-1]:
-        clause = clause + "(%s >= ? AND (%s > ? OR " % (k, k)
-        args.extend([v, v])
-
-    (k, v) = keys[-1]
-    clause += "%s > ?" % (k,)
-    args.append(v)
-
-    clause += "))" * (len(keys) - 1)
-    return clause, args
+    return (
+        "(%s) > (%s)" % (",".join(k[0] for k in keys), ",".join("?" for _ in keys)),
+        [k[1] for k in keys],
+    )

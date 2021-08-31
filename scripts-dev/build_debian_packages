@@ -18,11 +18,9 @@ import threading
 from concurrent.futures import ThreadPoolExecutor
 
 DISTS = (
-    "debian:stretch",
     "debian:buster",
     "debian:bullseye",
     "debian:sid",
-    "ubuntu:xenial",
     "ubuntu:bionic",
     "ubuntu:focal",
     "ubuntu:groovy",
@@ -43,7 +41,7 @@ class Builder(object):
         self._lock = threading.Lock()
         self._failed = False
 
-    def run_build(self, dist):
+    def run_build(self, dist, skip_tests=False):
         """Build deb for a single distribution"""
 
         if self._failed:
@@ -51,13 +49,13 @@ class Builder(object):
             raise Exception("failed")
 
         try:
-            self._inner_build(dist)
+            self._inner_build(dist, skip_tests)
         except Exception as e:
             print("build of %s failed: %s" % (dist, e), file=sys.stderr)
             self._failed = True
             raise
 
-    def _inner_build(self, dist):
+    def _inner_build(self, dist, skip_tests=False):
         projdir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
         os.chdir(projdir)
 
@@ -101,6 +99,7 @@ class Builder(object):
             "--volume=" + debsdir + ":/debs",
             "-e", "TARGET_USERID=%i" % (os.getuid(), ),
             "-e", "TARGET_GROUPID=%i" % (os.getgid(), ),
+            "-e", "DEB_BUILD_OPTIONS=%s" % ("nocheck" if skip_tests else ""),
             "dh-venv-builder:" + tag,
         ], stdout=stdout, stderr=subprocess.STDOUT)
 
@@ -124,7 +123,7 @@ class Builder(object):
                 self.active_containers.remove(c)
 
 
-def run_builds(dists, jobs=1):
+def run_builds(dists, jobs=1, skip_tests=False):
     builder = Builder(redirect_stdout=(jobs > 1))
 
     def sig(signum, _frame):
@@ -133,7 +132,7 @@ def run_builds(dists, jobs=1):
     signal.signal(signal.SIGINT, sig)
 
     with ThreadPoolExecutor(max_workers=jobs) as e:
-        res = e.map(builder.run_build, dists)
+        res = e.map(lambda dist: builder.run_build(dist, skip_tests), dists)
 
     # make sure we consume the iterable so that exceptions are raised.
     for r in res:
@@ -149,8 +148,12 @@ if __name__ == '__main__':
         help='specify the number of builds to run in parallel',
     )
     parser.add_argument(
+        '--no-check', action='store_true',
+        help='skip running tests after building',
+    )
+    parser.add_argument(
         'dist', nargs='*', default=DISTS,
         help='a list of distributions to build for. Default: %(default)s',
     )
     args = parser.parse_args()
-    run_builds(dists=args.dist, jobs=args.jobs)
+    run_builds(dists=args.dist, jobs=args.jobs, skip_tests=args.no_check)

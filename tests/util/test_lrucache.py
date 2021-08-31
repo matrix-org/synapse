@@ -14,7 +14,7 @@
 # limitations under the License.
 
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.util.caches.lrucache import LruCache
 from synapse.util.caches.treecache import TreeCache
