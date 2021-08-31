@@ -26,7 +26,6 @@ from synapse.api.constants import (
     HistoryVisibility,
     Membership,
 )
-from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
@@ -456,16 +455,16 @@ class SpaceSummaryHandler:
                     return True
 
             # Otherwise, check if they should be allowed access via membership in a space.
-            try:
-                await self._event_auth_handler.check_restricted_join_rules(
-                    state_ids, room_version, requester, member_event
+            if self._event_auth_handler.has_restricted_join_rules(
+                state_ids, room_version
+            ):
+                allowed_spaces = (
+                    await self._event_auth_handler.get_spaces_that_allow_join(state_ids)
                 )
-            except AuthError:
-                # The user doesn't have access due to spaces, but might have access
-                # another way. Keep trying.
-                pass
-            else:
-                return True
+                if await self._event_auth_handler.is_user_in_rooms(
+                    allowed_spaces, requester
+                ):
+                    return True
 
         # If this is a request over federation, check if the host is in the room or
         # is in one of the spaces specified via the join rules.
