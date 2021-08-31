@@ -94,7 +94,7 @@ file](../code_style.md#configuration-file-format).
 We welcome improvements and additions to our documentation itself! When
 writing new pages, please
 [build `docs` to a book](https://github.com/matrix-org/synapse/tree/develop/docs#adding-to-the-documentation)
-to check that your contributions render correctly. The `docs` are written in 
+to check that your contributions render correctly. The docs are written in
 [GitHub-Flavoured Markdown](https://guides.github.com/features/mastering-markdown/).
 
 Some documentation also exists in [Synapse's GitHub
