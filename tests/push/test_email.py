@@ -37,7 +37,6 @@ class _User:
     token = attr.ib()
 
 
-SendMailCall = Tuple[Sequence, Dict]
 
 
 class EmailPusherTests(HomeserverTestCase):
@@ -349,8 +348,13 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
-    def _check_for_mail(self) -> SendMailCall:
-        """Check that synapse sends off exactly one email notification. Return it."""
+    def _check_for_mail(self) -> Tuple[Sequence, Dict]:
+        """Assert that synapse sent off exactly one email notification.
+
+        Returns:
+            args and kwargs passed to synapse.reactor.send_email._sendmail for
+            that notification.
+        """
 
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
