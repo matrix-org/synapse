@@ -51,7 +51,6 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
 # How long we allow callers to wait for replication updates before timing out.
 _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS = 30
 

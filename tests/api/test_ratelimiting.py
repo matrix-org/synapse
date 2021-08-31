@@ -230,3 +230,60 @@ class TestRatelimiter(unittest.HomeserverTestCase):
         # Shouldn't raise
         for _ in range(20):
             self.get_success_or_raise(limiter.ratelimit(requester, _time_now_s=0))
+
+    def test_multiple_actions(self):
+        limiter = Ratelimiter(
+            store=self.hs.get_datastore(), clock=None, rate_hz=0.1, burst_count=3
+        )
+        # Test that 4 actions aren't allowed with a maximum burst of 3.
+        allowed, time_allowed = self.get_success_or_raise(
+            limiter.can_do_action(None, key="test_id", n_actions=4, _time_now_s=0)
+        )
+        self.assertFalse(allowed)
+
+        # Test that 3 actions are allowed with a maximum burst of 3.
+        allowed, time_allowed = self.get_success_or_raise(
+            limiter.can_do_action(None, key="test_id", n_actions=3, _time_now_s=0)
+        )
+        self.assertTrue(allowed)
+        self.assertEquals(10.0, time_allowed)
+
+        # Test that, after doing these 3 actions, we can't do any more action without
+        # waiting.
+        allowed, time_allowed = self.get_success_or_raise(
+            limiter.can_do_action(None, key="test_id", n_actions=1, _time_now_s=0)
+        )
+        self.assertFalse(allowed)
+        self.assertEquals(10.0, time_allowed)
+
+        # Test that after waiting we can do only 1 action.
+        allowed, time_allowed = self.get_success_or_raise(
+            limiter.can_do_action(
+                None,
+                key="test_id",
+                update=False,
+                n_actions=1,
+                _time_now_s=10,
+            )
+        )
+        self.assertTrue(allowed)
+        # The time allowed is the current time because we could still repeat the action
+        # once.
+        self.assertEquals(10.0, time_allowed)
+
+        allowed, time_allowed = self.get_success_or_raise(
+            limiter.can_do_action(None, key="test_id", n_actions=2, _time_now_s=10)
+        )
+        self.assertFalse(allowed)
+        # The time allowed doesn't change despite allowed being False because, while we
+        # don't allow 2 actions, we could still do 1.
+        self.assertEquals(10.0, time_allowed)
+
+        # Test that after waiting a bit more we can do 2 actions.
+        allowed, time_allowed = self.get_success_or_raise(
+            limiter.can_do_action(None, key="test_id", n_actions=2, _time_now_s=20)
+        )
+        self.assertTrue(allowed)
+        # The time allowed is the current time because we could still repeat the action
+        # once.
+        self.assertEquals(20.0, time_allowed)

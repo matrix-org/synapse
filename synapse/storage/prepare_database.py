@@ -26,16 +26,13 @@ from synapse.config.homeserver import HomeServerConfig
 from synapse.storage.database import LoggingDatabaseConnection
 from synapse.storage.engines import BaseDatabaseEngine
 from synapse.storage.engines.postgres import PostgresEngine
+from synapse.storage.schema import SCHEMA_VERSION
 from synapse.storage.types import Cursor
 
 logger = logging.getLogger(__name__)
 
 
-# Remember to update this number every time a change is made to database
-# schema files, so the users will be informed on server restarts.
-SCHEMA_VERSION = 59
-
-dir_path = os.path.abspath(os.path.dirname(__file__))
+schema_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "schema")
 
 
 class PrepareDatabaseException(Exception):
@@ -167,7 +164,14 @@ def _setup_new_database(
 
     Example directory structure:
 
-        schema/
+    schema/
+        common/
+            delta/
+                ...
+            full_schemas/
+                11/
+                    foo.sql
+        main/
             delta/
                 ...
             full_schemas/
@@ -175,15 +179,14 @@ def _setup_new_database(
                     test.sql
                     ...
                 11/
-                    foo.sql
                     bar.sql
                 ...
 
     In the example foo.sql and bar.sql would be run, and then any delta files
     for versions strictly greater than 11.
 
-    Note: we apply the full schemas and deltas from the top level `schema/`
-    folder as well those in the data stores specified.
+    Note: we apply the full schemas and deltas from the `schema/common`
+    folder as well those in the databases specified.
 
     Args:
         cur: a database cursor
@@ -195,12 +198,12 @@ def _setup_new_database(
     # configured to our liking.
     database_engine.check_new_database(cur)
 
-    current_dir = os.path.join(dir_path, "schema", "full_schemas")
+    full_schemas_dir = os.path.join(schema_path, "common", "full_schemas")
 
     # First we find the highest full schema version we have
     valid_versions = []
 
-    for filename in os.listdir(current_dir):
+    for filename in os.listdir(full_schemas_dir):
         try:
             ver = int(filename)
         except ValueError:
@@ -218,15 +221,13 @@ def _setup_new_database(
 
     logger.debug("Initialising schema v%d", max_current_ver)
 
-    # Now lets find all the full schema files, both in the global schema and
-    # in data store schemas.
-    directories = [os.path.join(current_dir, str(max_current_ver))]
+    # Now let's find all the full schema files, both in the common schema and
+    # in database schemas.
+    directories = [os.path.join(full_schemas_dir, str(max_current_ver))]
     directories.extend(
         os.path.join(
-            dir_path,
-            "databases",
+            schema_path,
             database,
-            "schema",
             "full_schemas",
             str(max_current_ver),
         )
@@ -357,6 +358,9 @@ def _upgrade_existing_database(
         check_database_before_upgrade(cur, database_engine, config)
 
     start_ver = current_version
+
+    # if we got to this schema version by running a full_schema rather than a series
+    # of deltas, we should not run the deltas for this version.
     if not upgraded:
         start_ver += 1
 
@@ -385,12 +389,10 @@ def _upgrade_existing_database(
         # directories for schema updates.
 
         # First we find the directories to search in
-        delta_dir = os.path.join(dir_path, "schema", "delta", str(v))
+        delta_dir = os.path.join(schema_path, "common", "delta", str(v))
         directories = [delta_dir]
         for database in databases:
-            directories.append(
-                os.path.join(dir_path, "databases", database, "schema", "delta", str(v))
-            )
+            directories.append(os.path.join(schema_path, database, "delta", str(v)))
 
         # Used to check if we have any duplicate file names
         file_name_counter = Counter()  # type: CounterType[str]
@@ -621,8 +623,8 @@ def _get_or_create_schema_state(
     txn: Cursor, database_engine: BaseDatabaseEngine
 ) -> Optional[Tuple[int, List[str], bool]]:
     # Bluntly try creating the schema_version tables.
-    schema_path = os.path.join(dir_path, "schema", "schema_version.sql")
-    executescript(txn, schema_path)
+    sql_path = os.path.join(schema_path, "common", "schema_version.sql")
+    executescript(txn, sql_path)
 
     txn.execute("SELECT version, upgraded FROM schema_version")
     row = txn.fetchone()

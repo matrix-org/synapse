@@ -220,3 +220,23 @@ def strtobool(val: str) -> bool:
         return False
     else:
         raise ValueError("invalid truth value %r" % (val,))
+
+
+_BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+
+def base62_encode(num: int, minwidth: int = 1) -> str:
+    """Encode a number using base62
+
+    Args:
+        num: number to be encoded
+        minwidth: width to pad to, if the number is small
+    """
+    res = ""
+    while num:
+        num, rem = divmod(num, 62)
+        res = _BASE62[rem] + res
+
+    # pad to minimum width
+    pad = "0" * (minwidth - len(res))
+    return pad + res

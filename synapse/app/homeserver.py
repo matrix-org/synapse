@@ -341,6 +341,10 @@ def setup(config_options):
         sys.exit(0)
 
     events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
+
+    if config.server.gc_seconds:
+        synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = SynapseHomeServer(
         config.server_name,

@@ -535,6 +535,13 @@ class ReactorLastSeenMetric:
 
 REGISTRY.register(ReactorLastSeenMetric())
 
+# The minimum time in seconds between GCs for each generation, regardless of the current GC
+# thresholds and counts.
+MIN_TIME_BETWEEN_GCS = (1.0, 10.0, 30.0)
+
+# The time (in seconds since the epoch) of the last time we did a GC for each generation.
+_last_gc = [0.0, 0.0, 0.0]
+
 
 def runUntilCurrentTimer(reactor, func):
     @functools.wraps(func)
@@ -575,11 +582,16 @@ def runUntilCurrentTimer(reactor, func):
             return ret
 
         # Check if we need to do a manual GC (since its been disabled), and do
-        # one if necessary.
+        # one if necessary. Note we go in reverse order as e.g. a gen 1 GC may
+        # promote an object into gen 2, and we don't want to handle the same
+        # object multiple times.
         threshold = gc.get_threshold()
         counts = gc.get_count()
         for i in (2, 1, 0):
-            if threshold[i] < counts[i]:
+            # We check if we need to do one based on a straightforward
+            # comparison between the threshold and count. We also do an extra
+            # check to make sure that we don't a GC too often.
+            if threshold[i] < counts[i] and MIN_TIME_BETWEEN_GCS[i] < end - _last_gc[i]:
                 if i == 0:
                     logger.debug("Collecting gc %d", i)
                 else:
@@ -588,6 +600,8 @@ def runUntilCurrentTimer(reactor, func):
                 start = time.time()
                 unreachable = gc.collect(i)
                 end = time.time()
+
+                _last_gc[i] = end
 
                 gc_time.labels(i).observe(end - start)
                 gc_unreachable.labels(i).set(unreachable)
@@ -614,6 +628,7 @@ try:
         gc.disable()
 except AttributeError:
     pass
+
 
 __all__ = [
     "MetricsResource",

@@ -17,6 +17,7 @@ import logging
 import time
 import unicodedata
 import urllib.parse
+from binascii import crc32
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -34,6 +35,7 @@ from typing import (
 import attr
 import bcrypt
 import pymacaroons
+import unpaddedbase64
 
 from twisted.web.server import Request
 
@@ -66,6 +68,7 @@ from synapse.util import stringutils as stringutils
 from synapse.util.async_helpers import maybe_awaitable
 from synapse.util.macaroons import get_value_from_macaroon, satisfy_expiry
 from synapse.util.msisdn import phone_number_to_msisdn
+from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
@@ -808,10 +811,12 @@ class AuthHandler(BaseHandler):
             logger.info(
                 "Logging in user %s as %s%s", user_id, puppets_user_id, fmt_expiry
             )
+            target_user_id_obj = UserID.from_string(puppets_user_id)
         else:
             logger.info(
                 "Logging in user %s on device %s%s", user_id, device_id, fmt_expiry
             )
+            target_user_id_obj = UserID.from_string(user_id)
 
         if (
             not is_appservice_ghost
@@ -819,7 +824,7 @@ class AuthHandler(BaseHandler):
         ):
             await self.auth.check_auth_blocking(user_id)
 
-        access_token = self.macaroon_gen.generate_access_token(user_id)
+        access_token = self.generate_access_token(target_user_id_obj)
         await self.store.add_access_token_to_user(
             user_id=user_id,
             token=access_token,
@@ -1191,6 +1196,19 @@ class AuthHandler(BaseHandler):
             logger.warning("Failed password login for user %s", user_id)
             return None
         return user_id
+
+    def generate_access_token(self, for_user: UserID) -> str:
+        """Generates an opaque string, for use as an access token"""
+
+        # we use the following format for access tokens:
+        #    syt_<base64 local part>_<random string>_<base62 crc check>
+
+        b64local = unpaddedbase64.encode_base64(for_user.localpart.encode("utf-8"))
+        random_string = stringutils.random_string(20)
+        base = f"syt_{b64local}_{random_string}"
+
+        crc = base62_encode(crc32(base.encode("ascii")), minwidth=6)
+        return f"{base}_{crc}"
 
     async def validate_short_term_login_token(
         self, login_token: str
@@ -1585,10 +1603,7 @@ class MacaroonGenerator:
 
     hs = attr.ib()
 
-    def generate_access_token(
-        self, user_id: str, extra_caveats: Optional[List[str]] = None
-    ) -> str:
-        extra_caveats = extra_caveats or []
+    def generate_guest_access_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
         macaroon.add_first_party_caveat("type = access")
         # Include a nonce, to make sure that each login gets a different
@@ -1596,8 +1611,7 @@ class MacaroonGenerator:
         macaroon.add_first_party_caveat(
             "nonce = %s" % (stringutils.random_string_with_symbols(16),)
         )
-        for caveat in extra_caveats:
-            macaroon.add_first_party_caveat(caveat)
+        macaroon.add_first_party_caveat("guest = true")
         return macaroon.serialize()
 
     def generate_short_term_login_token(

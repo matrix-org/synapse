@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Any, Collection, Dict, List, Optional, Tuple, 
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.media_storage import ReadableFileWrapper
 from synapse.spam_checker_api import RegistrationBehaviour
+from synapse.types import RoomAlias
 from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
@@ -150,7 +151,9 @@ class SpamChecker:
 
         return True
 
-    async def user_may_create_room_alias(self, userid: str, room_alias: str) -> bool:
+    async def user_may_create_room_alias(
+        self, userid: str, room_alias: RoomAlias
+    ) -> bool:
         """Checks if a given user may create a room alias
 
         If this method returns false, the association request will be rejected.

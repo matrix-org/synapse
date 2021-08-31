@@ -213,10 +213,15 @@ class StateHandler:
         return ret.state
 
     async def get_current_users_in_room(
-        self, room_id: str, latest_event_ids: Optional[List[str]] = None
+        self, room_id: str, latest_event_ids: List[str]
     ) -> Dict[str, ProfileInfo]:
         """
         Get the users who are currently in a room.
+
+        Note: This is much slower than using the equivalent method
+        `DataStore.get_users_in_room` or `DataStore.get_users_in_room_with_profiles`,
+        so this should only be used when wanting the users at a particular point
+        in the room.
 
         Args:
             room_id: The ID of the room.
@@ -224,8 +229,7 @@ class StateHandler:
         Returns:
             Dictionary of user IDs to their profileinfo.
         """
-        if not latest_event_ids:
-            latest_event_ids = await self.store.get_latest_event_ids_in_room(room_id)
+
         assert latest_event_ids is not None
 
         logger.debug("calling resolve_state_groups from get_current_users_in_room")

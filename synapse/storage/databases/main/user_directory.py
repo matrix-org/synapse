@@ -142,8 +142,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             batch_size (int): Maximum number of state events to process
                 per cycle.
         """
-        state = self.hs.get_state_handler()
-
         # If we don't have progress filed, delete everything.
         if not progress:
             await self.delete_all_from_user_dir()
@@ -197,7 +195,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     room_id
                 )
 
-                users_with_profile = await state.get_current_users_in_room(room_id)
+                users_with_profile = await self.get_users_in_room_with_profiles(room_id)
                 user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.
