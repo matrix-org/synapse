@@ -229,7 +229,8 @@ class UserDirectoryHandler(StateDeltasHandler):
                     else:
                         logger.debug("Server is still in room: %r", room_id)
 
-                if self.store.is_support_user(state_key):
+                is_support_user = await self.store.is_support_user(state_key)
+                if is_support_user:
                     continue
 
                 if joined is MatchChange.no_change:
