@@ -32,13 +32,19 @@ from synapse.handlers.presence import (
     handle_timeout,
     handle_update,
 )
+from synapse.rest import admin
 from synapse.rest.client.v1 import room
 from synapse.types import UserID, get_domain_from_id
 
 from tests import unittest
 
 
-class PresenceUpdateTestCase(unittest.TestCase):
+class PresenceUpdateTestCase(unittest.HomeserverTestCase):
+    servlets = [admin.register_servlets]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.store = homeserver.get_datastore()
+
     def test_offline_to_online(self):
         wheel_timer = Mock()
         user_id = "@foo:bar"
@@ -291,6 +297,45 @@ class PresenceUpdateTestCase(unittest.TestCase):
             ],
             any_order=True,
         )
+
+    def test_persisting_presence_updates(self):
+        """Tests that the latest presence state for each user is persisted correctly"""
+        # Create some test users and presence states for them
+        presence_states = []
+        for i in range(5):
+            user_id = self.register_user(f"user_{i}", "password")
+
+            presence_state = UserPresenceState(
+                user_id=user_id,
+                state="online",
+                last_active_ts=1,
+                last_federation_update_ts=1,
+                last_user_sync_ts=1,
+                status_msg="I'm online!",
+                currently_active=True,
+            )
+            presence_states.append(presence_state)
+
+        # Persist these presence updates to the database
+        self.get_success(self.store.update_presence(presence_states))
+
+        # Check that each update is present in the database
+        db_presence_states = self.get_success(
+            self.store.get_all_presence_updates(
+                instance_name="master",
+                last_id=0,
+                current_id=len(presence_states) + 1,
+                limit=len(presence_states),
+            )
+        )
+
+        # Extract presence update user ID and state information into lists of tuples
+        db_presence_states = [(ps[0], ps[1]) for _, ps in db_presence_states[0]]
+        presence_states = [(ps.user_id, ps.state) for ps in presence_states]
+
+        # Compare what we put into the storage with what we got out.
+        # They should be identical.
+        self.assertEqual(presence_states, db_presence_states)
 
 
 class PresenceTimeoutTestCase(unittest.TestCase):

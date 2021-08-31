@@ -24,7 +24,7 @@ class SlavedClientIpStore(BaseSlavedStore):
         super().__init__(database, db_conn, hs)
 
         self.client_ip_last_seen = LruCache(
-            cache_name="client_ip_last_seen", keylen=4, max_size=50000
+            cache_name="client_ip_last_seen", max_size=50000
         )  # type: LruCache[tuple, int]
 
     async def insert_client_ip(self, user_id, access_token, ip, user_agent, device_id):

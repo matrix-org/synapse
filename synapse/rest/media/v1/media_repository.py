@@ -76,6 +76,8 @@ class MediaRepository:
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
 
+        Thumbnailer.set_limits(self.max_image_pixels)
+
         self.primary_base_path = hs.config.media_store_path  # type: str
         self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
 

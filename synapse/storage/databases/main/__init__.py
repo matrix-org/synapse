@@ -67,7 +67,7 @@ from .state import StateStore
 from .stats import StatsStore
 from .stream import StreamStore
 from .tags import TagsStore
-from .transactions import TransactionStore
+from .transactions import TransactionWorkerStore
 from .ui_auth import UIAuthStore
 from .user_directory import UserDirectoryStore
 from .user_erasure_store import UserErasureStore
@@ -83,7 +83,7 @@ class DataStore(
     StreamStore,
     ProfileStore,
     PresenceStore,
-    TransactionStore,
+    TransactionWorkerStore,
     DirectoryStore,
     KeyStore,
     StateStore,

@@ -162,7 +162,7 @@ class Authenticator:
         # If we get a valid signed request from the other side, its probably
         # alive
         retry_timings = await self.store.get_destination_retry_timings(origin)
-        if retry_timings and retry_timings["retry_last_ts"]:
+        if retry_timings and retry_timings.retry_last_ts:
             run_in_background(self._reset_retry_timings, origin)
 
         return origin
@@ -1479,7 +1479,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
                 )
 
         return 200, await self.handler.federation_space_summary(
-            room_id, suggested_only, max_rooms_per_space, exclude_rooms
+            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
         )
 
     # TODO When switching to the stable endpoint, remove the POST handler.
@@ -1509,7 +1509,7 @@ class FederationSpaceSummaryServlet(BaseFederationServlet):
             )
 
         return 200, await self.handler.federation_space_summary(
-            room_id, suggested_only, max_rooms_per_space, exclude_rooms
+            origin, room_id, suggested_only, max_rooms_per_space, exclude_rooms
         )
 
 

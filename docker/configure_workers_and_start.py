@@ -184,18 +184,18 @@ stderr_logfile_maxbytes=0
 """
 
 NGINX_LOCATION_CONFIG_BLOCK = """
-    location ~* {endpoint} {
+    location ~* {endpoint} {{
         proxy_pass {upstream};
         proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Host $host;
-    }
+    }}
 """
 
 NGINX_UPSTREAM_CONFIG_BLOCK = """
-upstream {upstream_worker_type} {
+upstream {upstream_worker_type} {{
 {body}
-}
+}}
 """
 
 

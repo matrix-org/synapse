@@ -33,6 +33,10 @@ scripts-dev/update_database --database-config .buildkite/sqlite-config.yaml
 echo "+++ Run synapse_port_db against test database"
 coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
 
+# We should be able to run twice against the same database.
+echo "+++ Run synapse_port_db a second time"
+coverage run scripts/synapse_port_db --sqlite-database .buildkite/test_db.db --postgres-config .buildkite/postgres-config.yaml
+
 #####
 
 # Now do the same again, on an empty database.

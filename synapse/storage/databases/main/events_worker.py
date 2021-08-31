@@ -157,7 +157,6 @@ class EventsWorkerStore(SQLBaseStore):
 
         self._get_event_cache = LruCache(
             cache_name="*getEvent*",
-            keylen=3,
             max_size=hs.config.caches.event_cache_size,
         )
 

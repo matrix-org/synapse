@@ -751,33 +751,6 @@ acme:
     #
     account_key_file: DATADIR/acme_account.key
 
-# List of allowed TLS fingerprints for this server to publish along
-# with the signing keys for this server. Other matrix servers that
-# make HTTPS requests to this server will check that the TLS
-# certificates returned by this server match one of the fingerprints.
-#
-# Synapse automatically adds the fingerprint of its own certificate
-# to the list. So if federation traffic is handled directly by synapse
-# then no modification to the list is required.
-#
-# If synapse is run behind a load balancer that handles the TLS then it
-# will be necessary to add the fingerprints of the certificates used by
-# the loadbalancers to this list if they are different to the one
-# synapse is using.
-#
-# Homeservers are permitted to cache the list of TLS fingerprints
-# returned in the key responses up to the "valid_until_ts" returned in
-# key. It may be necessary to publish the fingerprints of a new
-# certificate and wait until the "valid_until_ts" of the previous key
-# responses have passed before deploying it.
-#
-# You can calculate a fingerprint from a given TLS listener via:
-# openssl s_client -connect $host:$port < /dev/null 2> /dev/null |
-#   openssl x509 -outform DER | openssl sha256 -binary | base64 | tr -d '='
-# or by checking matrix.org/federationtester/api/report?server_name=$host
-#
-#tls_fingerprints: [{"sha256": "<base64_encoded_sha256_fingerprint>"}]
-
 
 ## Federation ##
 
@@ -3092,7 +3065,8 @@ opentracing:
     #enabled: true
 
     # The list of homeservers we wish to send and receive span contexts and span baggage.
-    # See docs/opentracing.rst
+    # See docs/opentracing.rst.
+    #
     # This is a list of regexes which are matched against the server_name of the
     # homeserver.
     #
@@ -3101,19 +3075,26 @@ opentracing:
     #homeserver_whitelist:
     #  - ".*"
 
+    # A list of the matrix IDs of users whose requests will always be traced,
+    # even if the tracing system would otherwise drop the traces due to
+    # probabilistic sampling.
+    #
+    # By default, the list is empty.
+    #
+    #force_tracing_for_users:
+    #  - "@user1:server_name"
+    #  - "@user2:server_name"
+
     # Jaeger can be configured to sample traces at different rates.
     # All configuration options provided by Jaeger can be set here.
-    # Jaeger's configuration mostly related to trace sampling which
+    # Jaeger's configuration is mostly related to trace sampling which
     # is documented here:
-    # https://www.jaegertracing.io/docs/1.13/sampling/.
+    # https://www.jaegertracing.io/docs/latest/sampling/.
     #
     #jaeger_config:
     #  sampler:
     #    type: const
     #    param: 1
-
-    #  Logging whether spans were started and reported
-    #
     #  logging:
     #    false
 
@@ -3182,3 +3163,18 @@ redis:
   # Optional password if configured on the Redis instance
   #
   #password: <secret_password>
+
+
+# Enable experimental features in Synapse.
+#
+# Experimental features might break or be removed without a deprecation
+# period.
+#
+experimental_features:
+  # Support for Spaces (MSC1772), it enables the following:
+  #
+  # * The Spaces Summary API (MSC2946).
+  # * Restricting room membership based on space membership (MSC3083).
+  #
+  # Uncomment to disable support for Spaces.
+  #spaces_enabled: false

@@ -73,9 +73,6 @@ class RemoteKey(DirectServeJsonResource):
                         "expired_ts": 0, # when the key stop being used.
                     }
                 }
-                "tls_fingerprints": [
-                    { "sha256": # fingerprint }
-                ]
                 "signatures": {
                     "remote.server.example.com": {...}
                     "this.server.example.com": {...}

@@ -14,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import random
 from abc import ABCMeta
 from typing import TYPE_CHECKING, Any, Collection, Iterable, Optional, Union
 
@@ -44,7 +43,6 @@ class SQLBaseStore(metaclass=ABCMeta):
         self._clock = hs.get_clock()
         self.database_engine = database.engine
         self.db_pool = database
-        self.rand = random.SystemRandom()
 
     def process_replication_rows(
         self,

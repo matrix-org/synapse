@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import Set
+
 from synapse.python_dependencies import DependencyException, check_requirements
 
 from ._base import Config, ConfigError
@@ -32,6 +34,8 @@ class TracerConfig(Config):
             {"sampler": {"type": "const", "param": 1}, "logging": False},
         )
 
+        self.force_tracing_for_users: Set[str] = set()
+
         if not self.opentracer_enabled:
             return
 
@@ -47,6 +51,19 @@ class TracerConfig(Config):
         self.opentracer_whitelist = opentracing_config.get("homeserver_whitelist", [])
         if not isinstance(self.opentracer_whitelist, list):
             raise ConfigError("Tracer homeserver_whitelist config is malformed")
+
+        force_tracing_for_users = opentracing_config.get("force_tracing_for_users", [])
+        if not isinstance(force_tracing_for_users, list):
+            raise ConfigError(
+                "Expected a list", ("opentracing", "force_tracing_for_users")
+            )
+        for i, u in enumerate(force_tracing_for_users):
+            if not isinstance(u, str):
+                raise ConfigError(
+                    "Expected a string",
+                    ("opentracing", "force_tracing_for_users", f"index {i}"),
+                )
+            self.force_tracing_for_users.add(u)
 
     def generate_config_section(cls, **kwargs):
         return """\
@@ -64,7 +81,8 @@ class TracerConfig(Config):
             #enabled: true
 
             # The list of homeservers we wish to send and receive span contexts and span baggage.
-            # See docs/opentracing.rst
+            # See docs/opentracing.rst.
+            #
             # This is a list of regexes which are matched against the server_name of the
             # homeserver.
             #
@@ -73,19 +91,26 @@ class TracerConfig(Config):
             #homeserver_whitelist:
             #  - ".*"
 
+            # A list of the matrix IDs of users whose requests will always be traced,
+            # even if the tracing system would otherwise drop the traces due to
+            # probabilistic sampling.
+            #
+            # By default, the list is empty.
+            #
+            #force_tracing_for_users:
+            #  - "@user1:server_name"
+            #  - "@user2:server_name"
+
             # Jaeger can be configured to sample traces at different rates.
             # All configuration options provided by Jaeger can be set here.
-            # Jaeger's configuration mostly related to trace sampling which
+            # Jaeger's configuration is mostly related to trace sampling which
             # is documented here:
-            # https://www.jaegertracing.io/docs/1.13/sampling/.
+            # https://www.jaegertracing.io/docs/latest/sampling/.
             #
             #jaeger_config:
             #  sampler:
             #    type: const
             #    param: 1
-
-            #  Logging whether spans were started and reported
-            #
             #  logging:
             #    false
         """

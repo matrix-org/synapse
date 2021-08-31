@@ -473,7 +473,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
         num_args=1,
     )
     async def _get_bare_e2e_cross_signing_keys_bulk(
-        self, user_ids: List[str]
+        self, user_ids: Iterable[str]
     ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if
@@ -497,7 +497,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
     def _get_bare_e2e_cross_signing_keys_bulk_txn(
         self,
         txn: Connection,
-        user_ids: List[str],
+        user_ids: Iterable[str],
     ) -> Dict[str, Dict[str, dict]]:
         """Returns the cross-signing keys for a set of users.  The output of this
         function should be passed to _get_e2e_cross_signing_signatures_txn if

@@ -30,7 +30,7 @@ class EventPersisterShardTestCase(BaseMultiWorkerStreamTestCase):
     """Checks event persisting sharding works"""
 
     # Event persister sharding requires postgres (due to needing
-    # `MutliWriterIdGenerator`).
+    # `MultiWriterIdGenerator`).
     if not USE_POSTGRES_FOR_TESTS:
         skip = "Requires Postgres"
 

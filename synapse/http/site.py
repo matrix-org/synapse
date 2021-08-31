@@ -105,8 +105,10 @@ class SynapseRequest(Request):
         assert self.content, "handleContentChunk() called before gotLength()"
         if self.content.tell() + len(data) > self._max_request_body_size:
             logger.warning(
-                "Aborting connection from %s because the request exceeds maximum size",
+                "Aborting connection from %s because the request exceeds maximum size: %s %s",
                 self.client,
+                self.get_method(),
+                self.get_redacted_uri(),
             )
             self.transport.abortConnection()
             return

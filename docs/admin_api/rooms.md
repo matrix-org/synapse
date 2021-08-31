@@ -4,6 +4,7 @@
   * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
+- [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
   * [Parameters](#parameters-1)
   * [Response](#response)

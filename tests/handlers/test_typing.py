@@ -89,14 +89,8 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
         self.event_source = hs.get_event_sources().sources["typing"]
 
         self.datastore = hs.get_datastore()
-        retry_timings_res = {
-            "destination": "",
-            "retry_last_ts": 0,
-            "retry_interval": 0,
-            "failure_ts": None,
-        }
         self.datastore.get_destination_retry_timings = Mock(
-            return_value=defer.succeed(retry_timings_res)
+            return_value=defer.succeed(None)
         )
 
         self.datastore.get_device_updates_by_remote = Mock(

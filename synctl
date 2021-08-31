@@ -24,12 +24,13 @@ import signal
 import subprocess
 import sys
 import time
+from typing import Iterable
 
 import yaml
 
 from synapse.config import find_config_files
 
-SYNAPSE = [sys.executable, "-m", "synapse.app.homeserver"]
+MAIN_PROCESS = "synapse.app.homeserver"
 
 GREEN = "\x1b[1;32m"
 YELLOW = "\x1b[1;33m"
@@ -68,71 +69,37 @@ def abort(message, colour=RED, stream=sys.stderr):
     sys.exit(1)
 
 
-def start(configfile: str, daemonize: bool = True) -> bool:
-    """Attempts to start synapse.
+def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) -> bool:
+    """Attempts to start a synapse main or worker process.
     Args:
-        configfile: path to a yaml synapse config file
-        daemonize: whether to daemonize synapse or keep it attached to the current
-            session
+        pidfile: the pidfile we expect the process to create
+        app: the python module to run
+        config_files: config files to pass to synapse
+        daemonize: if True, will include a --daemonize argument to synapse
 
     Returns:
-        True if the process started successfully
+        True if the process started successfully or was already running
         False if there was an error starting the process
-
-        If deamonize is False it will only return once synapse exits.
     """
 
-    write("Starting ...")
-    args = SYNAPSE
+    if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
+        print(app + " already running")
+        return True
 
+    args = [sys.executable, "-m", app]
+    for c in config_files:
+        args += ["-c", c]
     if daemonize:
-        args.extend(["--daemonize", "-c", configfile])
-    else:
-        args.extend(["-c", configfile])
+        args.append("--daemonize")
 
     try:
         subprocess.check_call(args)
-        write("started synapse.app.homeserver(%r)" % (configfile,), colour=GREEN)
+        write("started %s(%s)" % (app, ",".join(config_files)), colour=GREEN)
         return True
     except subprocess.CalledProcessError as e:
         write(
-            "error starting (exit code: %d); see above for logs" % e.returncode,
-            colour=RED,
-        )
-        return False
-
-
-def start_worker(app: str, configfile: str, worker_configfile: str) -> bool:
-    """Attempts to start a synapse worker.
-    Args:
-        app: name of the worker's appservice
-        configfile: path to a yaml synapse config file
-        worker_configfile: path to worker specific yaml synapse file
-
-    Returns:
-        True if the process started successfully
-        False if there was an error starting the process
-    """
-
-    args = [
-        sys.executable,
-        "-m",
-        app,
-        "-c",
-        configfile,
-        "-c",
-        worker_configfile,
-        "--daemonize",
-    ]
-
-    try:
-        subprocess.check_call(args)
-        write("started %s(%r)" % (app, worker_configfile), colour=GREEN)
-        return True
-    except subprocess.CalledProcessError as e:
-        write(
-            "error starting %s(%r) (exit code: %d); see above for logs"
-            % (app, worker_configfile, e.returncode),
+            "error starting %s(%s) (exit code: %d); see above for logs"
+            % (app, ",".join(config_files), e.returncode),
             colour=RED,
         )
         return False
@@ -224,10 +191,11 @@ def main():
 
     if not os.path.exists(configfile):
         write(
-            "No config file found\n"
-            "To generate a config file, run '%s -c %s --generate-config"
-            " --server-name=<server name> --report-stats=<yes/no>'\n"
-            % (" ".join(SYNAPSE), options.configfile),
+            f"Config file {configfile} does not exist.\n"
+            f"To generate a config file, run:\n"
+            f"    {sys.executable} -m {MAIN_PROCESS}"
+            f" -c {configfile} --generate-config"
+            f" --server-name=<server name> --report-stats=<yes/no>\n",
             stream=sys.stderr,
         )
         sys.exit(1)
@@ -323,7 +291,7 @@ def main():
                 has_stopped = False
 
         if start_stop_synapse:
-            if not stop(pidfile, "synapse.app.homeserver"):
+            if not stop(pidfile, MAIN_PROCESS):
                 has_stopped = False
         if not has_stopped and action == "stop":
             sys.exit(1)
@@ -346,22 +314,11 @@ def main():
     if action == "start" or action == "restart":
         error = False
         if start_stop_synapse:
-            # Check if synapse is already running
-            if os.path.exists(pidfile) and pid_running(int(open(pidfile).read())):
-                abort("synapse.app.homeserver already running")
-
-            if not start(configfile, bool(options.daemonize)):
+            if not start(pidfile, MAIN_PROCESS, (configfile,), options.daemonize):
                 error = True
 
         for worker in workers:
             env = os.environ.copy()
-
-            # Skip starting a worker if its already running
-            if os.path.exists(worker.pidfile) and pid_running(
-                int(open(worker.pidfile).read())
-            ):
-                print(worker.app + " already running")
-                continue
 
             if worker.cache_factor:
                 os.environ["SYNAPSE_CACHE_FACTOR"] = str(worker.cache_factor)
@@ -369,7 +326,12 @@ def main():
             for cache_name, factor in worker.cache_factors.items():
                 os.environ["SYNAPSE_CACHE_FACTOR_" + cache_name.upper()] = str(factor)
 
-            if not start_worker(worker.app, configfile, worker.configfile):
+            if not start(
+                worker.pidfile,
+                worker.app,
+                (configfile, worker.configfile),
+                options.daemonize,
+            ):
                 error = True
 
             # Reset env back to the original

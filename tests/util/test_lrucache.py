@@ -59,7 +59,7 @@ class LruCacheTestCase(unittest.HomeserverTestCase):
         self.assertEquals(cache.pop("key"), None)
 
     def test_del_multi(self):
-        cache = LruCache(4, keylen=2, cache_type=TreeCache)
+        cache = LruCache(4, cache_type=TreeCache)
         cache[("animal", "cat")] = "mew"
         cache[("animal", "dog")] = "woof"
         cache[("vehicles", "car")] = "vroom"
@@ -165,7 +165,7 @@ class LruCacheCallbacksTestCase(unittest.HomeserverTestCase):
         m2 = Mock()
         m3 = Mock()
         m4 = Mock()
-        cache = LruCache(4, keylen=2, cache_type=TreeCache)
+        cache = LruCache(4, cache_type=TreeCache)
 
         cache.set(("a", "1"), "value", callbacks=[m1])
         cache.set(("a", "2"), "value", callbacks=[m2])
