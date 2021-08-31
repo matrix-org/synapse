@@ -264,13 +264,12 @@ class EmailPusherTests(HomeserverTestCase):
     def test_room_notifications_include_avatar(self):
         # Create a room and set its avatar.
         room = self.helper.create_room_as(self.user_id, tok=self.access_token)
-        channel = self.make_request(
-            "PUT",
-            f"/rooms/{room}/state/m.room.avatar",
-            content=json.dumps({"url": "mxc://DUMMY_MEDIA_ID"}).encode(),
-            access_token=self.access_token,
+        self.helper.send_state(
+            room,
+            "m.room.avatar",
+            {"url": "mxc://DUMMY_MEDIA_ID"},
+            self.access_token
         )
-        self.assertEqual(200, channel.code, msg=channel.json_body)
 
         # Invite two other uses.
         for other in self.others:
@@ -296,11 +295,7 @@ class EmailPusherTests(HomeserverTestCase):
             .get_payload(decode=True)
             .decode()
         )
-        root: lxml.etree.Element = html5_parser.parse(html)
-        images = root.xpath('.//td[@class="room_avatar"]//img')
-        self.assertEqual(len(images), 1)
-        source = images[0].attrib["src"]
-        self.assertIn("_matrix/media/v1/thumbnail/DUMMY_MEDIA_ID", source)
+        self.assertIn("_matrix/media/v1/thumbnail/DUMMY_MEDIA_ID", html)
 
     def test_empty_room(self):
         """All users leaving a room shouldn't cause the pusher to break."""
