@@ -10,9 +10,10 @@ from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
-from twisted.internet.defer import Deferred, fail, succeed
+from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import (
+    IAddress,
     IHostnameResolver,
     IProtocol,
     IPullProducer,
@@ -511,6 +512,9 @@ class FakeTransport:
     will get called back for connectionLost() notifications etc.
     """
 
+    _peer_address: Optional[IAddress] = attr.ib(default=None)
+    """The value to be returend by getPeer"""
+
     disconnecting = False
     disconnected = False
     connected = True
@@ -519,7 +523,7 @@ class FakeTransport:
     autoflush = attr.ib(default=True)
 
     def getPeer(self):
-        return None
+        return self._peer_address
 
     def getHost(self):
         return None
@@ -572,7 +576,12 @@ class FakeTransport:
         self.producerStreaming = streaming
 
         def _produce():
-            d = self.producer.resumeProducing()
+            if not self.producer:
+                # we've been unregistered
+                return
+            # some implementations of IProducer (for example, FileSender)
+            # don't return a deferred.
+            d = maybeDeferred(self.producer.resumeProducing)
             d.addCallback(lambda x: self._reactor.callLater(0.1, _produce))
 
         if not streaming:
