@@ -1,1 +1,1 @@
-Allow configuration the oEmbed URLs used for URL previews.
+Allow configuration of the oEmbed URLs used for URL previews.
