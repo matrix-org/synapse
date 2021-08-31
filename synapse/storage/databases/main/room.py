@@ -1209,9 +1209,10 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
         def _background_populate_rooms_creator_column_txn(txn: LoggingTransaction):
             sql = """
-                SELECT room_id, json FROM current_state_events
-                INNER JOIN event_json USING (room_id, event_id)
-                WHERE room_id > ? AND type = 'm.room.create' AND state_key = ''
+                SELECT room_id, json FROM event_json
+                INNER JOIN rooms AS room USING (room_id)
+                INNER JOIN current_state_events AS state_event USING (room_id, event_id)
+                WHERE room_id > ? AND (room.creator IS NULL OR room.creator = '') AND state_event.type = 'm.room.create' AND state_event.state_key = ''
                 ORDER BY room_id
                 LIMIT ?
             """
