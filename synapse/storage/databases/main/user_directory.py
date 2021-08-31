@@ -85,19 +85,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
             del rooms
 
-            # If search all users is on, get all the users we want to add.
-            if self.hs.config.user_directory_search_all_users:
-                sql = (
-                    "CREATE TABLE IF NOT EXISTS "
-                    + TEMP_TABLE
-                    + "_users(user_id TEXT NOT NULL)"
-                )
-                txn.execute(sql)
+            sql = (
+                "CREATE TABLE IF NOT EXISTS "
+                + TEMP_TABLE
+                + "_users(user_id TEXT NOT NULL)"
+            )
+            txn.execute(sql)
 
-                txn.execute("SELECT name FROM users")
-                users = [{"user_id": x[0]} for x in txn.fetchall()]
+            txn.execute("SELECT name FROM users")
+            users = [{"user_id": x[0]} for x in txn.fetchall()]
 
-                self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
+            self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
 
         new_pos = await self.get_max_stream_id_in_current_state_deltas()
         await self.db_pool.runInteraction(
@@ -265,13 +263,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
     async def _populate_user_directory_process_users(self, progress, batch_size):
         """
-        If search_all_users is enabled, add all of the users to the user directory.
+        Add all local users to the user directory.
         """
-        if not self.hs.config.user_directory_search_all_users:
-            await self.db_pool.updates._end_background_update(
-                "populate_user_directory_process_users"
-            )
-            return 1
 
         def _get_next_batch(txn):
             sql = "SELECT user_id FROM %s LIMIT %s" % (

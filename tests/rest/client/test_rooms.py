@@ -784,6 +784,12 @@ class RoomJoinRatelimitTestCase(RoomBase):
         room.register_servlets,
     ]
 
+    def prepare(self, reactor, clock, homeserver):
+        super().prepare(reactor, clock, homeserver)
+        # profile changes expect that the user is actually registered
+        user = UserID.from_string(self.user_id)
+        self.get_success(self.register_user(user.localpart, "supersecretpassword"))
+
     @unittest.override_config(
         {"rc_joins": {"local": {"per_second": 0.5, "burst_count": 3}}}
     )
@@ -812,12 +818,6 @@ class RoomJoinRatelimitTestCase(RoomBase):
         # Add one to make sure we're joined to more rooms than the config allows us to
         # join in a second.
         room_ids.append(self.helper.create_room_as(self.user_id))
-
-        # Create a profile for the user, since it hasn't been done on registration.
-        store = self.hs.get_datastore()
-        self.get_success(
-            store.create_profile(UserID.from_string(self.user_id).localpart)
-        )
 
         # Update the display name for the user.
         path = "/_matrix/client/r0/profile/%s/displayname" % self.user_id
