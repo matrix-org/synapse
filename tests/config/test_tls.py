@@ -74,12 +74,11 @@ s4niecZKPBizL6aucT59CsunNmmb5Glq8rlAcU+1ZTZZzGYqVYhF6axB9Qg=
 
         config = {
             "tls_certificate_path": os.path.join(config_dir, "cert.pem"),
-            "tls_fingerprints": [],
         }
 
         t = TestConfig()
         t.read_config(config, config_dir_path="", data_dir_path="")
-        t.read_certificate_from_disk(require_cert_and_key=False)
+        t.read_tls_certificate()
 
         warnings = self.flushWarnings()
         self.assertEqual(len(warnings), 1)

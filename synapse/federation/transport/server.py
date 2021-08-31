@@ -39,6 +39,7 @@ from synapse.http.servlet import (
 )
 from synapse.logging.context import run_in_background
 from synapse.logging.opentracing import (
+    SynapseTags,
     start_active_span,
     start_active_span_from_request,
     tags,
@@ -153,7 +154,9 @@ class Authenticator:
             )
 
         await self.keyring.verify_json_for_server(
-            origin, json_request, now, "Incoming request"
+            origin,
+            json_request,
+            now,
         )
 
         logger.debug("Request from %s", origin)
@@ -316,7 +319,7 @@ class BaseFederationServlet:
                 raise
 
             request_tags = {
-                "request_id": request.get_request_id(),
+                SynapseTags.REQUEST_ID: request.get_request_id(),
                 tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
                 tags.HTTP_METHOD: request.get_method(),
                 tags.HTTP_URL: request.get_redacted_uri(),
@@ -1646,13 +1649,12 @@ def register_servlets(
                 server_name=hs.hostname,
             ).register(resource)
 
-        if hs.config.experimental.spaces_enabled:
-            FederationSpaceSummaryServlet(
-                handler=hs.get_space_summary_handler(),
-                authenticator=authenticator,
-                ratelimiter=ratelimiter,
-                server_name=hs.hostname,
-            ).register(resource)
+        FederationSpaceSummaryServlet(
+            handler=hs.get_space_summary_handler(),
+            authenticator=authenticator,
+            ratelimiter=ratelimiter,
+            server_name=hs.hostname,
+        ).register(resource)
 
     if "openid" in servlet_groups:
         for servletclass in OPENID_SERVLET_CLASSES:

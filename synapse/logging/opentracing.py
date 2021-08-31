@@ -265,6 +265,18 @@ class SynapseTags:
     # Whether the sync response has new data to be returned to the client.
     SYNC_RESULT = "sync.new_data"
 
+    # incoming HTTP request ID  (as written in the logs)
+    REQUEST_ID = "request_id"
+
+    # HTTP request tag (used to distinguish full vs incremental syncs, etc)
+    REQUEST_TAG = "request_tag"
+
+    # Text description of a database transaction
+    DB_TXN_DESC = "db.txn_desc"
+
+    # Uniqueish ID of a database transaction
+    DB_TXN_ID = "db.txn_id"
+
 
 # Block everything by default
 # A regex which matches the server_names to expose traces for.
@@ -325,6 +337,7 @@ def ensure_active_span(message, ret=None):
 @contextlib.contextmanager
 def noop_context_manager(*args, **kwargs):
     """Does exactly what it says on the tin"""
+    # TODO: replace with contextlib.nullcontext once we drop support for Python 3.6
     yield
 
 
@@ -350,10 +363,13 @@ def init_tracer(hs: "HomeServer"):
 
     set_homeserver_whitelist(hs.config.opentracer_whitelist)
 
+    from jaeger_client.metrics.prometheus import PrometheusMetricsFactory
+
     config = JaegerConfig(
         config=hs.config.jaeger_config,
         service_name="{} {}".format(hs.config.server_name, hs.get_instance_name()),
         scope_manager=LogContextScopeManager(hs.config),
+        metrics_factory=PrometheusMetricsFactory(),
     )
 
     # If we have the rust jaeger reporter available let's use that.
@@ -588,7 +604,7 @@ def inject_active_span_twisted_headers(headers, destination, check_destination=T
 
     span = opentracing.tracer.active_span
     carrier = {}  # type: Dict[str, str]
-    opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
+    opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers.addRawHeaders(key, value)
@@ -625,7 +641,7 @@ def inject_active_span_byte_dict(headers, destination, check_destination=True):
     span = opentracing.tracer.active_span
 
     carrier = {}  # type: Dict[str, str]
-    opentracing.tracer.inject(span, opentracing.Format.HTTP_HEADERS, carrier)
+    opentracing.tracer.inject(span.context, opentracing.Format.HTTP_HEADERS, carrier)
 
     for key, value in carrier.items():
         headers[key.encode()] = [value.encode()]
@@ -659,7 +675,7 @@ def inject_active_span_text_map(carrier, destination, check_destination=True):
         return
 
     opentracing.tracer.inject(
-        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+        opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
 
 
@@ -681,7 +697,7 @@ def get_active_span_text_map(destination=None):
 
     carrier = {}  # type: Dict[str, str]
     opentracing.tracer.inject(
-        opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+        opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
     )
 
     return carrier
@@ -696,7 +712,7 @@ def active_span_context_as_string():
     carrier = {}  # type: Dict[str, str]
     if opentracing:
         opentracing.tracer.inject(
-            opentracing.tracer.active_span, opentracing.Format.TEXT_MAP, carrier
+            opentracing.tracer.active_span.context, opentracing.Format.TEXT_MAP, carrier
         )
     return json_encoder.encode(carrier)
 
@@ -824,7 +840,7 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
         return
 
     request_tags = {
-        "request_id": request.get_request_id(),
+        SynapseTags.REQUEST_ID: request.get_request_id(),
         tags.SPAN_KIND: tags.SPAN_KIND_RPC_SERVER,
         tags.HTTP_METHOD: request.get_method(),
         tags.HTTP_URL: request.get_redacted_uri(),
@@ -833,9 +849,9 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
 
     request_name = request.request_metrics.name
     if extract_context:
-        scope = start_active_span_from_request(request, request_name, tags=request_tags)
+        scope = start_active_span_from_request(request, request_name)
     else:
-        scope = start_active_span(request_name, tags=request_tags)
+        scope = start_active_span(request_name)
 
     with scope:
         try:
@@ -845,4 +861,11 @@ def trace_servlet(request: "SynapseRequest", extract_context: bool = False):
             # with JsonResource).
             scope.span.set_operation_name(request.request_metrics.name)
 
-            scope.span.set_tag("request_tag", request.request_metrics.start_context.tag)
+            # set the tags *after* the servlet completes, in case it decided to
+            # prioritise the span (tags will get dropped on unprioritised spans)
+            request_tags[
+                SynapseTags.REQUEST_TAG
+            ] = request.request_metrics.start_context.tag
+
+            for k, v in request_tags.items():
+                scope.span.set_tag(k, v)

@@ -40,6 +40,7 @@ from twisted.enterprise import adbapi
 
 from synapse.api.errors import StoreError
 from synapse.config.database import DatabaseConnectionConfig
+from synapse.logging import opentracing
 from synapse.logging.context import (
     LoggingContext,
     current_context,
@@ -90,12 +91,18 @@ def make_pool(
     db_args = dict(db_config.config.get("args", {}))
     db_args.setdefault("cp_reconnect", True)
 
+    def _on_new_connection(conn):
+        # Ensure we have a logging context so we can correctly track queries,
+        # etc.
+        with LoggingContext("db.on_new_connection"):
+            engine.on_new_connection(
+                LoggingDatabaseConnection(conn, engine, "on_new_connection")
+            )
+
     return adbapi.ConnectionPool(
         db_config.config["name"],
         cp_reactor=reactor,
-        cp_openfun=lambda conn: engine.on_new_connection(
-            LoggingDatabaseConnection(conn, engine, "on_new_connection")
-        ),
+        cp_openfun=_on_new_connection,
         **db_args,
     )
 
@@ -313,7 +320,14 @@ class LoggingTransaction:
         start = time.time()
 
         try:
-            return func(sql, *args)
+            with opentracing.start_active_span(
+                "db.query",
+                tags={
+                    opentracing.tags.DATABASE_TYPE: "sql",
+                    opentracing.tags.DATABASE_STATEMENT: sql,
+                },
+            ):
+                return func(sql, *args)
         except Exception as e:
             sql_logger.debug("[SQL FAIL] {%s} %s", self.name, e)
             raise
@@ -525,9 +539,17 @@ class DatabasePool:
                     exception_callbacks=exception_callbacks,
                 )
                 try:
-                    r = func(cursor, *args, **kwargs)
-                    conn.commit()
-                    return r
+                    with opentracing.start_active_span(
+                        "db.txn",
+                        tags={
+                            opentracing.SynapseTags.DB_TXN_DESC: desc,
+                            opentracing.SynapseTags.DB_TXN_ID: name,
+                        },
+                    ):
+                        r = func(cursor, *args, **kwargs)
+                        opentracing.log_kv({"message": "commit"})
+                        conn.commit()
+                        return r
                 except self.engine.module.OperationalError as e:
                     # This can happen if the database disappears mid
                     # transaction.
@@ -541,7 +563,8 @@ class DatabasePool:
                     if i < N:
                         i += 1
                         try:
-                            conn.rollback()
+                            with opentracing.start_active_span("db.rollback"):
+                                conn.rollback()
                         except self.engine.module.Error as e1:
                             transaction_logger.warning("[TXN EROLL] {%s} %s", name, e1)
                         continue
@@ -554,7 +577,8 @@ class DatabasePool:
                         if i < N:
                             i += 1
                             try:
-                                conn.rollback()
+                                with opentracing.start_active_span("db.rollback"):
+                                    conn.rollback()
                             except self.engine.module.Error as e1:
                                 transaction_logger.warning(
                                     "[TXN EROLL] {%s} %s",
@@ -653,16 +677,17 @@ class DatabasePool:
             logger.warning("Starting db txn '%s' from sentinel context", desc)
 
         try:
-            result = await self.runWithConnection(
-                self.new_transaction,
-                desc,
-                after_callbacks,
-                exception_callbacks,
-                func,
-                *args,
-                db_autocommit=db_autocommit,
-                **kwargs,
-            )
+            with opentracing.start_active_span(f"db.{desc}"):
+                result = await self.runWithConnection(
+                    self.new_transaction,
+                    desc,
+                    after_callbacks,
+                    exception_callbacks,
+                    func,
+                    *args,
+                    db_autocommit=db_autocommit,
+                    **kwargs,
+                )
 
             for after_callback, after_args, after_kwargs in after_callbacks:
                 after_callback(*after_args, **after_kwargs)
@@ -718,25 +743,29 @@ class DatabasePool:
             with LoggingContext(
                 str(curr_context), parent_context=parent_context
             ) as context:
-                sched_duration_sec = monotonic_time() - start_time
-                sql_scheduling_timer.observe(sched_duration_sec)
-                context.add_database_scheduled(sched_duration_sec)
+                with opentracing.start_active_span(
+                    operation_name="db.connection",
+                ):
+                    sched_duration_sec = monotonic_time() - start_time
+                    sql_scheduling_timer.observe(sched_duration_sec)
+                    context.add_database_scheduled(sched_duration_sec)
 
-                if self.engine.is_connection_closed(conn):
-                    logger.debug("Reconnecting closed database connection")
-                    conn.reconnect()
+                    if self.engine.is_connection_closed(conn):
+                        logger.debug("Reconnecting closed database connection")
+                        conn.reconnect()
+                        opentracing.log_kv({"message": "reconnected"})
 
-                try:
-                    if db_autocommit:
-                        self.engine.attempt_to_set_autocommit(conn, True)
+                    try:
+                        if db_autocommit:
+                            self.engine.attempt_to_set_autocommit(conn, True)
 
-                    db_conn = LoggingDatabaseConnection(
-                        conn, self.engine, "runWithConnection"
-                    )
-                    return func(db_conn, *args, **kwargs)
-                finally:
-                    if db_autocommit:
-                        self.engine.attempt_to_set_autocommit(conn, False)
+                        db_conn = LoggingDatabaseConnection(
+                            conn, self.engine, "runWithConnection"
+                        )
+                        return func(db_conn, *args, **kwargs)
+                    finally:
+                        if db_autocommit:
+                            self.engine.attempt_to_set_autocommit(conn, False)
 
         return await make_deferred_yieldable(
             self._db_pool.runWithConnection(inner_func, *args, **kwargs)

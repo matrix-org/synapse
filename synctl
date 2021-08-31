@@ -97,11 +97,15 @@ def start(pidfile: str, app: str, config_files: Iterable[str], daemonize: bool) 
         write("started %s(%s)" % (app, ",".join(config_files)), colour=GREEN)
         return True
     except subprocess.CalledProcessError as e:
-        write(
-            "error starting %s(%s) (exit code: %d); see above for logs"
-            % (app, ",".join(config_files), e.returncode),
-            colour=RED,
+        err = "%s(%s) failed to start (exit code: %d). Check the Synapse logfile" % (
+            app,
+            ",".join(config_files),
+            e.returncode,
         )
+        if daemonize:
+            err += ", or run synctl with --no-daemonize"
+        err += "."
+        write(err, colour=RED, stream=sys.stderr)
         return False
 
 

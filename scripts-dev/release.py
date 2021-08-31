@@ -139,7 +139,7 @@ def run():
         click.get_current_context().abort()
 
     # Switch to the release branch.
-    release_branch_name = f"release-v{base_version}"
+    release_branch_name = f"release-v{current_version.major}.{current_version.minor}"
     release_branch = find_ref(repo, release_branch_name)
     if release_branch:
         if release_branch.is_remote():

@@ -226,4 +226,4 @@ healthcheck:
 ## Using jemalloc
 
 Jemalloc is embedded in the image and will be used instead of the default allocator.
-You can read about jemalloc by reading the Synapse [README](../README.md).
+You can read about jemalloc by reading the Synapse [README](../README.rst).

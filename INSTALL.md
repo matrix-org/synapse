@@ -399,11 +399,9 @@ Once you have installed synapse as above, you will need to configure it.
 
 ### Using PostgreSQL
 
-By default Synapse uses [SQLite](https://sqlite.org/) and in doing so trades performance for convenience.
-SQLite is only recommended in Synapse for testing purposes or for servers with
-very light workloads.
-
-Almost all installations should opt to use [PostgreSQL](https://www.postgresql.org). Advantages include:
+By default Synapse uses an [SQLite](https://sqlite.org/) database and in doing so trades
+performance for convenience. Almost all installations should opt to use [PostgreSQL](https://www.postgresql.org)
+instead. Advantages include:
 
 - significant performance improvements due to the superior threading and
   caching model, smarter query optimiser
@@ -411,6 +409,10 @@ Almost all installations should opt to use [PostgreSQL](https://www.postgresql.o
 
 For information on how to install and use PostgreSQL in Synapse, please see
 [docs/postgres.md](docs/postgres.md)
+
+SQLite is only acceptable for testing purposes. SQLite should not be used in
+a production server. Synapse will perform poorly when using
+SQLite, especially when participating in large rooms.
 
 ### TLS certificates
 

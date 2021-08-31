@@ -22,7 +22,11 @@ from prometheus_client.core import REGISTRY, Counter, Gauge
 from twisted.internet import defer
 
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
-from synapse.logging.opentracing import noop_context_manager, start_active_span
+from synapse.logging.opentracing import (
+    SynapseTags,
+    noop_context_manager,
+    start_active_span,
+)
 from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
@@ -200,9 +204,12 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
 
         with BackgroundProcessLoggingContext(desc, count) as context:
             try:
-                ctx = noop_context_manager()
                 if bg_start_span:
-                    ctx = start_active_span(desc, tags={"request_id": str(context)})
+                    ctx = start_active_span(
+                        f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
+                    )
+                else:
+                    ctx = noop_context_manager()
                 with ctx:
                     return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
