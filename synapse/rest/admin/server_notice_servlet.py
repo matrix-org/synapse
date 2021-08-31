@@ -14,7 +14,7 @@
 from typing import TYPE_CHECKING, Optional, Tuple
 
 from synapse.api.constants import EventTypes
-from synapse.api.errors import SynapseError
+from synapse.api.errors import NotFoundError, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
@@ -53,6 +53,8 @@ class SendServerNoticeServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
+        self.server_notices_manager = hs.get_server_notices_manager()
+        self.admin_handler = hs.get_admin_handler()
         self.txns = HttpTransactionCache(hs)
 
     def register(self, json_resource: HttpServer):
@@ -79,19 +81,22 @@ class SendServerNoticeServlet(RestServlet):
         # We grab the server notices manager here as its initialisation has a check for worker processes,
         # but worker processes still need to initialise SendServerNoticeServlet (as it is part of the
         # admin api).
-        if not self.hs.get_server_notices_manager().is_enabled():
+        if not self.server_notices_manager.is_enabled():
             raise SynapseError(400, "Server notices are not enabled on this server")
 
-        user_id = body["user_id"]
-        UserID.from_string(user_id)
-        if not self.hs.is_mine_id(user_id):
+        target_user = UserID.from_string(body["user_id"])
+        if not self.hs.is_mine(target_user):
             raise SynapseError(400, "Server notices can only be sent to local users")
 
-        event = await self.hs.get_server_notices_manager().send_notice(
-            user_id=body["user_id"],
+        if not await self.admin_handler.get_user(target_user):
+            raise NotFoundError("User not found")
+
+        event = await self.server_notices_manager.send_notice(
+            user_id=target_user.to_string(),
             type=event_type,
             state_key=state_key,
             event_content=body["content"],
+            txn_id=txn_id,
         )
 
         return 200, {"event_id": event.event_id}

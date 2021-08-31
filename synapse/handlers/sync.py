@@ -30,6 +30,7 @@ from prometheus_client import Counter
 
 from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.filtering import FilterCollection
+from synapse.api.presence import UserPresenceState
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.logging.context import current_context
@@ -231,7 +232,7 @@ class SyncResult:
     """
 
     next_batch: StreamToken
-    presence: List[JsonDict]
+    presence: List[UserPresenceState]
     account_data: List[JsonDict]
     joined: List[JoinedSyncResult]
     invited: List[InvitedSyncResult]
@@ -2177,14 +2178,14 @@ class SyncResultBuilder:
         joined_room_ids: List of rooms the user is joined to
 
         # The following mirror the fields in a sync response
-        presence (list)
-        account_data (list)
-        joined (list[JoinedSyncResult])
-        invited (list[InvitedSyncResult])
-        knocked (list[KnockedSyncResult])
-        archived (list[ArchivedSyncResult])
-        groups (GroupsSyncResult|None)
-        to_device (list)
+        presence
+        account_data
+        joined
+        invited
+        knocked
+        archived
+        groups
+        to_device
     """
 
     sync_config: SyncConfig
@@ -2193,7 +2194,7 @@ class SyncResultBuilder:
     now_token: StreamToken
     joined_room_ids: FrozenSet[str]
 
-    presence: List[JsonDict] = attr.Factory(list)
+    presence: List[UserPresenceState] = attr.Factory(list)
     account_data: List[JsonDict] = attr.Factory(list)
     joined: List[JoinedSyncResult] = attr.Factory(list)
     invited: List[InvitedSyncResult] = attr.Factory(list)

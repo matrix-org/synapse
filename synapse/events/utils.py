@@ -32,6 +32,9 @@ from . import EventBase
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
+CANONICALJSON_MAX_INT = (2 ** 53) - 1
+CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
+
 
 def prune_event(event: EventBase) -> EventBase:
     """Returns a pruned version of the given event, which removes all keys we
@@ -505,7 +508,7 @@ def validate_canonicaljson(value: Any):
     * NaN, Infinity, -Infinity
     """
     if isinstance(value, int):
-        if value <= -(2 ** 53) or 2 ** 53 <= value:
+        if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 
     elif isinstance(value, float):

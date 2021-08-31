@@ -15,6 +15,7 @@ import logging
 from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, MSC3244_CAPABILITIES
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
 from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
@@ -75,5 +76,5 @@ class CapabilitiesRestServlet(RestServlet):
         return 200, response
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     CapabilitiesRestServlet(hs).register(http_server)

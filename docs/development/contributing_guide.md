@@ -11,7 +11,7 @@ follow a simple 'inbound=outbound' model for contributions: the act of
 submitting an 'inbound' contribution means that the contributor agrees to
 license the code under the same terms as the project's overall 'outbound'
 license - in our case, this is almost always Apache Software License v2 (see
-[LICENSE](LICENSE)).
+[LICENSE](https://github.com/matrix-org/synapse/blob/develop/LICENSE)).
 
 # 2. What do I need?
 

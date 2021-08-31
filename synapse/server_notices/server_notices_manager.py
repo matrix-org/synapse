@@ -12,12 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from synapse.api.constants import EventTypes, Membership, RoomCreationPreset
 from synapse.events import EventBase
 from synapse.types import UserID, create_requester
 from synapse.util.caches.descriptors import cached
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +28,7 @@ SERVER_NOTICE_ROOM_TAG = "m.server_notice"
 
 
 class ServerNoticesManager:
-    def __init__(self, hs):
-        """
-
-        Args:
-            hs (synapse.server.HomeServer):
-        """
-
+    def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
         self._config = hs.config
         self._account_data_handler = hs.get_account_data_handler()
@@ -58,6 +55,7 @@ class ServerNoticesManager:
         event_content: dict,
         type: str = EventTypes.Message,
         state_key: Optional[str] = None,
+        txn_id: Optional[str] = None,
     ) -> EventBase:
         """Send a notice to the given user
 
@@ -68,6 +66,7 @@ class ServerNoticesManager:
             event_content: content of event to send
             type: type of event
             is_state_event: Is the event a state event
+            txn_id: The transaction ID.
         """
         room_id = await self.get_or_create_notice_room_for_user(user_id)
         await self.maybe_invite_user_to_room(user_id, room_id)
@@ -90,7 +89,7 @@ class ServerNoticesManager:
             event_dict["state_key"] = state_key
 
         event, _ = await self._event_creation_handler.create_and_send_nonmember_event(
-            requester, event_dict, ratelimit=False
+            requester, event_dict, ratelimit=False, txn_id=txn_id
         )
         return event
 
