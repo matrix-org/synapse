@@ -79,6 +79,7 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+    REGISTRATION_TOKEN = "org.matrix.msc3231.login.registration_token"
 
 
 # This is used in the `type` parameter for /register when called by

@@ -150,6 +150,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                     "invite",
                     event.event_id,
                     event.internal_metadata.stream_ordering,
+                    RoomVersions.V1.identifier,
                 )
             ],
         )

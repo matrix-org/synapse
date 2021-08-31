@@ -132,6 +132,8 @@ class EmailPusherTests(HomeserverTestCase):
             )
         )
 
+        self.auth_handler = hs.get_auth_handler()
+
     def test_need_validated_email(self):
         """Test that we can only add an email pusher if the user has validated
         their email.
@@ -348,14 +350,51 @@ class EmailPusherTests(HomeserverTestCase):
         # We should get emailed about that message
         self._check_for_mail()
 
+    def test_no_email_sent_after_removed(self):
+        # Create a simple room with two users
+        room = self.helper.create_room_as(self.user_id, tok=self.access_token)
+        self.helper.invite(
+            room=room,
+            src=self.user_id,
+            tok=self.access_token,
+            targ=self.others[0].id,
+        )
+        self.helper.join(
+            room=room,
+            user=self.others[0].id,
+            tok=self.others[0].token,
+        )
+
+        # The other user sends a single message.
+        self.helper.send(room, body="Hi!", tok=self.others[0].token)
+
+        # We should get emailed about that message
+        self._check_for_mail()
+
+        # disassociate the user's email address
+        self.get_success(
+            self.auth_handler.delete_threepid(
+                user_id=self.user_id,
+                medium="email",
+                address="a@example.com",
+            )
+        )
+
+        # check that the pusher for that email address has been deleted
+        pushers = self.get_success(
+            self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
+        )
+        pushers = list(pushers)
+        self.assertEqual(len(pushers), 0)
+
     def _check_for_mail(self) -> Tuple[Sequence, Dict]:
-        """Assert that synapse sent off exactly one email notification.
+        """
+        Assert that synapse sent off exactly one email notification.
 
         Returns:
             args and kwargs passed to synapse.reactor.send_email._sendmail for
             that notification.
         """
-
         # Get the stream ordering before it gets sent
         pushers = self.get_success(
             self.hs.get_datastore().get_pushers_by({"user_name": self.user_id})
