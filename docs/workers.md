@@ -16,7 +16,7 @@ workers only work with PostgreSQL-based Synapse deployments. SQLite should only
 be used for demo purposes and any admin considering workers should already be
 running PostgreSQL.
 
-See also https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability
+See also [Matrix.org blog post](https://matrix.org/blog/2020/11/03/how-we-fixed-synapses-scalability)
 for a higher level overview.
 
 ## Main process/worker communication

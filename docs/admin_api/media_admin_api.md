@@ -28,7 +28,7 @@ The API is:
 GET /_synapse/admin/v1/room/<room_id>/media
 ```
 To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../../usage/administration/admin_api).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 The API returns a JSON body like the following:
 ```json
@@ -311,7 +311,7 @@ The following fields are returned in the JSON response body:
 * `deleted`: integer - The number of media items successfully deleted
 
 To use it, you will need to authenticate by providing an `access_token` for a
-server admin: see [Admin API](../../usage/administration/admin_api).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 If the user re-requests purged remote media, synapse will re-request the media
 from the originating server.

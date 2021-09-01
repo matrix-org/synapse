@@ -258,7 +258,11 @@ def _is_membership_change_allowed(
 
     caller_in_room = caller and caller.membership == Membership.JOIN
     caller_invited = caller and caller.membership == Membership.INVITE
-    caller_knocked = caller and caller.membership == Membership.KNOCK
+    caller_knocked = (
+        caller
+        and room_version.msc2403_knocking
+        and caller.membership == Membership.KNOCK
+    )
 
     # get info about the target
     key = (EventTypes.Member, target_user_id)
@@ -285,6 +289,7 @@ def _is_membership_change_allowed(
         {
             "caller_in_room": caller_in_room,
             "caller_invited": caller_invited,
+            "caller_knocked": caller_knocked,
             "target_banned": target_banned,
             "target_in_room": target_in_room,
             "membership": membership,
@@ -302,7 +307,9 @@ def _is_membership_change_allowed(
         return
 
     # Require the user to be in the room for membership changes other than join/knock.
-    if Membership.JOIN != membership and Membership.KNOCK != membership:
+    if Membership.JOIN != membership and (
+        RoomVersion.msc2403_knocking and Membership.KNOCK != membership
+    ):
         # If the user has been invited or has knocked, they are allowed to change their
         # membership event to leave
         if (
@@ -344,7 +351,9 @@ def _is_membership_change_allowed(
             and join_rule == JoinRules.MSC3083_RESTRICTED
         ):
             pass
-        elif join_rule in (JoinRules.INVITE, JoinRules.KNOCK):
+        elif join_rule == JoinRules.INVITE or (
+            room_version.msc2403_knocking and join_rule == JoinRules.KNOCK
+        ):
             if not caller_in_room and not caller_invited:
                 raise AuthError(403, "You are not invited to this room.")
         else:
@@ -363,7 +372,7 @@ def _is_membership_change_allowed(
     elif Membership.BAN == membership:
         if user_level < ban_level or user_level <= target_level:
             raise AuthError(403, "You don't have permission to ban")
-    elif Membership.KNOCK == membership:
+    elif room_version.msc2403_knocking and Membership.KNOCK == membership:
         if join_rule != JoinRules.KNOCK:
             raise AuthError(403, "You don't have permission to knock")
         elif target_user_id != event.user_id:

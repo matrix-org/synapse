@@ -443,7 +443,7 @@ with a body of:
 ```
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [Admin API](../../usage/administration/admin_api).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 A response body like the following is returned:
 

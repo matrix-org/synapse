@@ -1,6 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2017-2018 New Vector Ltd
-# Copyright 2019-2020 The Matrix.org Foundation C.I.C.
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 # Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,6 +33,7 @@ from typing import (
 )
 
 import attr
+from prometheus_client import Counter
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
 from unpaddedbase64 import decode_base64
@@ -102,6 +101,11 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
+
+soft_failed_event_counter = Counter(
+    "synapse_federation_soft_failed_events_total",
+    "Events received over federation that we marked as soft_failed",
+)
 
 
 @attr.s(slots=True)
@@ -1965,7 +1969,7 @@ class FederationHandler(BaseHandler):
         return event
 
     async def on_send_leave_request(self, origin: str, pdu: EventBase) -> None:
-        """ We have received a leave event for a room. Fully process it."""
+        """We have received a leave event for a room. Fully process it."""
         event = pdu
 
         logger.debug(
@@ -2013,8 +2017,7 @@ class FederationHandler(BaseHandler):
         """
         if get_domain_from_id(user_id) != origin:
             logger.info(
-                "Get /xyz.amorgan.knock/make_knock request for user %r"
-                "from different origin %s, ignoring",
+                "Get /make_knock request for user %r from different origin %s, ignoring",
                 user_id,
                 origin,
             )
@@ -2081,8 +2084,7 @@ class FederationHandler(BaseHandler):
 
         if get_domain_from_id(event.sender) != origin:
             logger.info(
-                "Got /xyz.amorgan.knock/send_knock request for user %r "
-                "from different origin %s",
+                "Got /send_knock request for user %r from different origin %s",
                 event.sender,
                 origin,
             )
@@ -2090,7 +2092,7 @@ class FederationHandler(BaseHandler):
 
         event.internal_metadata.outlier = False
 
-        context = await self._handle_new_event(origin, event)
+        context = await self.state_handler.compute_event_context(event)
 
         event_allowed = await self.third_party_event_rules.check_event_allowed(
             event, context
@@ -2101,11 +2103,7 @@ class FederationHandler(BaseHandler):
                 403, "This event is not allowed in this context", Codes.FORBIDDEN
             )
 
-        logger.debug(
-            "on_send_knock_request: After _handle_new_event: %s, sigs: %s",
-            event.event_id,
-            event.signatures,
-        )
+        await self._auth_and_persist_event(origin, event, context)
 
         return context
 
@@ -2433,7 +2431,11 @@ class FederationHandler(BaseHandler):
         )
 
     async def _check_for_soft_fail(
-        self, event: EventBase, state: Optional[Iterable[EventBase]], backfilled: bool
+        self,
+        event: EventBase,
+        state: Optional[Iterable[EventBase]],
+        backfilled: bool,
+        origin: str,
     ) -> None:
         """Checks if we should soft fail the event; if so, marks the event as
         such.
@@ -2442,6 +2444,7 @@ class FederationHandler(BaseHandler):
             event
             state: The state at the event if we don't have all the event's prev events
             backfilled: Whether the event is from backfill
+            origin: The host the event originates from.
         """
         # For new (non-backfilled and non-outlier) events we check if the event
         # passes auth based on the current state. If it doesn't then we
@@ -2511,7 +2514,18 @@ class FederationHandler(BaseHandler):
         try:
             event_auth.check(room_version_obj, event, auth_events=current_auth_events)
         except AuthError as e:
-            logger.warning("Soft-failing %r because %s", event, e)
+            logger.warning(
+                "Soft-failing %r (from %s) because %s",
+                event,
+                e,
+                origin,
+                extra={
+                    "room_id": event.room_id,
+                    "mxid": event.sender,
+                    "hs": origin,
+                },
+            )
+            soft_failed_event_counter.inc()
             event.internal_metadata.soft_failed = True
 
     async def on_get_missing_events(
@@ -2623,7 +2637,7 @@ class FederationHandler(BaseHandler):
             context.rejected = RejectedReason.AUTH_ERROR
 
         if not context.rejected:
-            await self._check_for_soft_fail(event, state, backfilled)
+            await self._check_for_soft_fail(event, state, backfilled, origin=origin)
 
         if event.type == EventTypes.GuestAccess and not context.rejected:
             await self.maybe_kick_guest_users(event)

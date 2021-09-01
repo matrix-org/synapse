@@ -24,7 +24,7 @@ from tests import unittest
 
 
 class PresenceTestCase(unittest.HomeserverTestCase):
-    """ Tests presence REST API. """
+    """Tests presence REST API."""
 
     user_id = "@sid:red"
 

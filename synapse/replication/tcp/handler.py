@@ -571,7 +571,7 @@ class ReplicationCommandHandler:
     def on_REMOTE_SERVER_UP(
         self, conn: IReplicationConnection, cmd: RemoteServerUpCommand
     ):
-        """"Called when get a new REMOTE_SERVER_UP command."""
+        """Called when get a new REMOTE_SERVER_UP command."""
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
         self._notifier.notify_remote_server_up(cmd.data)

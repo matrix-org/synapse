@@ -210,7 +210,7 @@ class RegistrationHandler(BaseHandler):
             bind_emails: list of emails to bind to this account.
             by_admin: True if this registration is being made via the
               admin api, otherwise False.
-            user_agent_ips: Tuples of IP addresses and user-agents used
+            user_agent_ips: Tuples of user-agents and IP addresses used
                 during the registration process.
             auth_provider_id: The SSO IdP the user used, if any.
         Returns:

@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Any, Generator, Iterable, List, Optional, Tuple
 
 from twisted.internet import defer
+from twisted.web.resource import IResource
 
 from synapse.events import EventBase
 from synapse.http.client import SimpleHttpClient
@@ -55,6 +56,33 @@ class ModuleApi:
         # We expose these as properties below in order to attach a helpful docstring.
         self._http_client = hs.get_simple_http_client()  # type: SimpleHttpClient
         self._public_room_list_manager = PublicRoomListManager(hs)
+
+        self._spam_checker = hs.get_spam_checker()
+
+    #################################################################################
+    # The following methods should only be called during the module's initialisation.
+
+    @property
+    def register_spam_checker_callbacks(self):
+        """Registers callbacks for spam checking capabilities."""
+        return self._spam_checker.register_callbacks
+
+    def register_web_resource(self, path: str, resource: IResource):
+        """Registers a web resource to be served at the given path.
+
+        This function should be called during initialisation of the module.
+
+        If multiple modules register a resource for the same path, the module that
+        appears the highest in the configuration file takes priority.
+
+        Args:
+            path: The path to register the resource for.
+            resource: The resource to attach to this path.
+        """
+        self._hs.register_module_web_resource(path, resource)
+
+    #########################################################################
+    # The following methods can be called by the module at any point in time.
 
     @property
     def http_client(self):

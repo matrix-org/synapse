@@ -90,7 +90,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
                 60 * 1000,
             )
             self.hs.get_clock().call_later(
-                1000,
+                1,
                 self._count_known_servers,
             )
             LaterGauge(

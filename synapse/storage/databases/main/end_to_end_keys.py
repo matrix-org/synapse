@@ -62,6 +62,13 @@ class EndToEndKeyBackgroundStore(SQLBaseStore):
 
 
 class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
+    def __init__(self, database: DatabasePool, db_conn: Connection, hs: "HomeServer"):
+        super().__init__(database, db_conn, hs)
+
+        self._allow_device_name_lookup_over_federation = (
+            self.hs.config.federation.allow_device_name_lookup_over_federation
+        )
+
     async def get_e2e_device_keys_for_federation_query(
         self, user_id: str
     ) -> Tuple[int, List[JsonDict]]:
@@ -85,7 +92,7 @@ class EndToEndKeyWorkerStore(EndToEndKeyBackgroundStore):
                     result["keys"] = keys
 
                 device_display_name = None
-                if self.hs.config.allow_device_name_lookup_over_federation:
+                if self._allow_device_name_lookup_over_federation:
                     device_display_name = device.display_name
                 if device_display_name:
                     result["device_display_name"] = device_display_name

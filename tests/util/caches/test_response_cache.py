@@ -11,14 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from parameterized import parameterized
 
-from synapse.util.caches.response_cache import ResponseCache
+from twisted.internet import defer
+
+from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
 
 from tests.server import get_clock
 from tests.unittest import TestCase
 
 
-class DeferredCacheTestCase(TestCase):
+class ResponseCacheTestCase(TestCase):
     """
     A TestCase class for ResponseCache.
 
@@ -48,7 +51,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.instant_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.instant_return, expected_result)
+        )
 
         self.assertEqual(
             expected_result,
@@ -66,7 +71,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.instant_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.instant_return, expected_result)
+        )
 
         self.assertEqual(
             expected_result,
@@ -80,7 +87,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.instant_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.instant_return, expected_result)
+        )
 
         self.assertEqual(expected_result, self.successResultOf(wrap_d))
         self.assertEqual(
@@ -99,7 +108,10 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.delayed_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.delayed_return, expected_result)
+        )
+
         self.assertNoResult(wrap_d)
 
         # function wakes up, returns result
@@ -112,7 +124,9 @@ class DeferredCacheTestCase(TestCase):
 
         expected_result = "howdy"
 
-        wrap_d = cache.wrap(0, self.delayed_return, expected_result)
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, self.delayed_return, expected_result)
+        )
         self.assertNoResult(wrap_d)
 
         # stop at 1 second to callback cache eviction callLater at that time, then another to set time at 2
@@ -129,3 +143,50 @@ class DeferredCacheTestCase(TestCase):
         self.reactor.pump((2,))
 
         self.assertIsNone(cache.get(0), "cache should not have the result now")
+
+    @parameterized.expand([(True,), (False,)])
+    def test_cache_context_nocache(self, should_cache: bool):
+        """If the callback clears the should_cache bit, the result should not be cached"""
+        cache = self.with_cache("medium_cache", ms=3000)
+
+        expected_result = "howdy"
+
+        call_count = 0
+
+        async def non_caching(o: str, cache_context: ResponseCacheContext[int]):
+            nonlocal call_count
+            call_count += 1
+            await self.clock.sleep(1)
+            cache_context.should_cache = should_cache
+            return o
+
+        wrap_d = defer.ensureDeferred(
+            cache.wrap(0, non_caching, expected_result, cache_context=True)
+        )
+        # there should be no result to start with
+        self.assertNoResult(wrap_d)
+
+        # a second call should also return a pending deferred
+        wrap2_d = defer.ensureDeferred(
+            cache.wrap(0, non_caching, expected_result, cache_context=True)
+        )
+        self.assertNoResult(wrap2_d)
+
+        # and there should have been exactly one call
+        self.assertEqual(call_count, 1)
+
+        # let the call complete
+        self.reactor.advance(1)
+
+        # both results should have completed
+        self.assertEqual(expected_result, self.successResultOf(wrap_d))
+        self.assertEqual(expected_result, self.successResultOf(wrap2_d))
+
+        if should_cache:
+            self.assertEqual(
+                expected_result,
+                self.successResultOf(cache.get(0)),
+                "cache should still have the result",
+            )
+        else:
+            self.assertIsNone(cache.get(0), "cache should not have the result")

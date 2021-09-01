@@ -130,7 +130,7 @@ class FederationServer(FederationBase):
         # come in waves.
         self._state_resp_cache = ResponseCache(
             hs.get_clock(), "state_resp", timeout_ms=30000
-        )  # type: ResponseCache[Tuple[str, str]]
+        )  # type: ResponseCache[Tuple[str, Optional[str]]]
         self._state_ids_resp_cache = ResponseCache(
             hs.get_clock(), "state_ids_resp", timeout_ms=30000
         )  # type: ResponseCache[Tuple[str, str]]
@@ -138,6 +138,8 @@ class FederationServer(FederationBase):
         self._federation_metrics_domains = (
             hs.config.federation.federation_metrics_domains
         )
+
+        self._room_prejoin_state_types = hs.config.api.room_prejoin_state
 
     async def on_backfill_request(
         self, origin: str, room_id: str, versions: List[str], limit: int
@@ -407,7 +409,7 @@ class FederationServer(FederationBase):
         )
 
     async def on_room_state_request(
-        self, origin: str, room_id: str, event_id: str
+        self, origin: str, room_id: str, event_id: Optional[str]
     ) -> Tuple[int, Dict[str, Any]]:
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
@@ -464,7 +466,7 @@ class FederationServer(FederationBase):
         return {"pdu_ids": state_ids, "auth_chain_ids": auth_chain_ids}
 
     async def _on_context_state_request_compute(
-        self, room_id: str, event_id: str
+        self, room_id: str, event_id: Optional[str]
     ) -> Dict[str, list]:
         if event_id:
             pdus = await self.handler.get_state_for_pdu(
@@ -607,16 +609,29 @@ class FederationServer(FederationBase):
         origin_host, _ = parse_server_name(origin)
         await self.check_server_matches_acl(origin_host, room_id)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        if room_version not in supported_versions:
+        room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room version is supported by the remote homeserver
+        if room_version.identifier not in supported_versions:
             logger.warning(
-                "Room version %s not in %s", room_version, supported_versions
+                "Room version %s not in %s", room_version.identifier, supported_versions
             )
-            raise IncompatibleRoomVersionError(room_version=room_version)
+            raise IncompatibleRoomVersionError(room_version=room_version.identifier)
+
+        # Check that this room supports knocking as defined by its room version
+        if not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
 
         pdu = await self.handler.on_make_knock_request(origin, room_id, user_id)
         time_now = self._clock.time_msec()
-        return {"event": pdu.get_pdu_json(time_now), "room_version": room_version}
+        return {
+            "event": pdu.get_pdu_json(time_now),
+            "room_version": room_version.identifier,
+        }
 
     async def on_send_knock_request(
         self,
@@ -640,6 +655,15 @@ class FederationServer(FederationBase):
         logger.debug("on_send_knock_request: content: %s", content)
 
         room_version = await self.store.get_room_version(room_id)
+
+        # Check that this room supports knocking as defined by its room version
+        if not room_version.msc2403_knocking:
+            raise SynapseError(
+                403,
+                "This room version does not support knocking",
+                errcode=Codes.FORBIDDEN,
+            )
+
         pdu = event_from_pdu_json(content, room_version)
 
         origin_host, _ = parse_server_name(origin)
@@ -657,7 +681,7 @@ class FederationServer(FederationBase):
         # related to the room while the knock request is pending.
         stripped_room_state = (
             await self.store.get_stripped_room_state_from_event_context(
-                event_context, DEFAULT_ROOM_STATE_TYPES
+                event_context, self._room_prejoin_state_types
             )
         )
         return {"knock_state_events": stripped_room_state}

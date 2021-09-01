@@ -1,6 +1,5 @@
-# Copyright 2015, 2016 OpenMarket Ltd
-# Copyrignt 2020 Sorunome
-# Copyrignt 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2015-2021 The Matrix.org Foundation C.I.C.
+# Copyright 2020 Sorunome
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -622,6 +621,7 @@ class FederationClient(FederationBase):
                 no servers successfully handle the request.
         """
         valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
+
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -639,6 +639,13 @@ class FederationClient(FederationBase):
             room_version = KNOWN_ROOM_VERSIONS.get(room_version_id)
             if not room_version:
                 raise UnsupportedRoomVersionError()
+
+            if not room_version.msc2403_knocking and membership == Membership.KNOCK:
+                raise SynapseError(
+                    400,
+                    "This room version does not support knocking",
+                    errcode=Codes.FORBIDDEN,
+                )
 
             pdu_dict = ret.get("event", None)
             if not isinstance(pdu_dict, dict):
@@ -977,7 +984,7 @@ class FederationClient(FederationBase):
             return await self._do_send_knock(destination, pdu)
 
         return await self._try_destination_list(
-            "xyz.amorgan.knock/send_knock", destinations, send_request
+            "send_knock", destinations, send_request
         )
 
     async def _do_send_knock(self, destination: str, pdu: EventBase) -> JsonDict:
@@ -997,7 +1004,7 @@ class FederationClient(FederationBase):
         """
         time_now = self._clock.time_msec()
 
-        return await self.transport_layer.send_knock_v2(
+        return await self.transport_layer.send_knock_v1(
             destination=destination,
             room_id=pdu.room_id,
             event_id=pdu.event_id,

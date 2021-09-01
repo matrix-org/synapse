@@ -1,5 +1,3 @@
-# Copyright 2014-2016 OpenMarket Ltd
-# Copyright 2018 New Vector Ltd
 # Copyright 2020 Sorunome
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -223,6 +221,7 @@ class TransportLayerClient:
             is not in our federation whitelist
         """
         valid_memberships = {Membership.JOIN, Membership.LEAVE, Membership.KNOCK}
+
         if membership not in valid_memberships:
             raise RuntimeError(
                 "make_membership_event called with membership='%s', must be one of %s"
@@ -335,7 +334,7 @@ class TransportLayerClient:
         return response
 
     @log_function
-    async def send_knock_v2(
+    async def send_knock_v1(
         self,
         destination: str,
         room_id: str,
@@ -362,12 +361,7 @@ class TransportLayerClient:
 
             The list of state events may be empty.
         """
-        path = _create_path(
-            FEDERATION_UNSTABLE_PREFIX + "/xyz.amorgan.knock",
-            "/send_knock/%s/%s",
-            room_id,
-            event_id,
-        )
+        path = _create_v1_path("/send_knock/%s/%s", room_id, event_id)
 
         return await self.client.put_json(
             destination=destination, path=path, data=content

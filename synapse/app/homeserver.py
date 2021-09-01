@@ -37,10 +37,11 @@ from synapse.api.urls import (
 )
 from synapse.app import _base
 from synapse.app._base import (
+    handle_startup_exception,
     listen_ssl,
     listen_tcp,
     max_request_body_size,
-    quit_with_error,
+    redirect_stdio_to_logs,
     register_start,
 )
 from synapse.config._base import ConfigError
@@ -69,8 +70,6 @@ from synapse.rest.synapse.client import build_synapse_client_resource_tree
 from synapse.rest.well_known import WellKnownResource
 from synapse.server import HomeServer
 from synapse.storage import DataStore
-from synapse.storage.engines import IncorrectDatabaseSetup
-from synapse.storage.prepare_database import UpgradeDatabaseException
 from synapse.util.httpresourcetree import create_resource_tree
 from synapse.util.module_loader import load_module
 from synapse.util.versionstring import get_version_string
@@ -123,6 +122,10 @@ class SynapseHomeServer(HomeServer):
                     % (resmodule["module"],)
                 )
             resources[path] = resource
+
+        # Attach additional resources registered by modules.
+        resources.update(self._module_web_resources)
+        self._module_web_resources_consumed = True
 
         # try to find something useful to redirect '/' to
         if WEB_CLIENT_PREFIX in resources:
@@ -358,60 +361,10 @@ def setup(config_options):
 
     try:
         hs.setup()
-    except IncorrectDatabaseSetup as e:
-        quit_with_error(str(e))
-    except UpgradeDatabaseException as e:
-        quit_with_error("Failed to upgrade database: %s" % (e,))
-
-    async def do_acme() -> bool:
-        """
-        Reprovision an ACME certificate, if it's required.
-
-        Returns:
-            Whether the cert has been updated.
-        """
-        acme = hs.get_acme_handler()
-
-        # Check how long the certificate is active for.
-        cert_days_remaining = hs.config.is_disk_cert_valid(allow_self_signed=False)
-
-        # We want to reprovision if cert_days_remaining is None (meaning no
-        # certificate exists), or the days remaining number it returns
-        # is less than our re-registration threshold.
-        provision = False
-
-        if (
-            cert_days_remaining is None
-            or cert_days_remaining < hs.config.acme_reprovision_threshold
-        ):
-            provision = True
-
-        if provision:
-            await acme.provision_certificate()
-
-        return provision
-
-    async def reprovision_acme():
-        """
-        Provision a certificate from ACME, if required, and reload the TLS
-        certificate if it's renewed.
-        """
-        reprovisioned = await do_acme()
-        if reprovisioned:
-            _base.refresh_certificate(hs)
+    except Exception as e:
+        handle_startup_exception(e)
 
     async def start():
-        # Run the ACME provisioning code, if it's enabled.
-        if hs.config.acme_enabled:
-            acme = hs.get_acme_handler()
-            # Start up the webservices which we will respond to ACME
-            # challenges with, and then provision.
-            await acme.start_listening()
-            await do_acme()
-
-            # Check if it needs to be reprovisioned every day.
-            hs.get_clock().looping_call(reprovision_acme, 24 * 60 * 60 * 1000)
-
         # Load the OIDC provider metadatas, if OIDC is enabled.
         if hs.config.oidc_enabled:
             oidc = hs.get_oidc_handler()
@@ -500,6 +453,11 @@ def main():
         # check base requirements
         check_requirements()
         hs = setup(sys.argv[1:])
+
+        # redirect stdio to the logs, if configured.
+        if not hs.config.no_redirect_stdio:
+            redirect_stdio_to_logs()
+
         run(hs)
 
 

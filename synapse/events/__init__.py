@@ -119,6 +119,7 @@ class _EventInternalMetadata:
     redacted = DictProperty("redacted")  # type: bool
     txn_id = DictProperty("txn_id")  # type: str
     token_id = DictProperty("token_id")  # type: str
+    historical = DictProperty("historical")  # type: bool
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
@@ -203,6 +204,14 @@ class _EventInternalMetadata:
             bool
         """
         return self._dict.get("redacted", False)
+
+    def is_historical(self) -> bool:
+        """Whether this is a historical message.
+        This is used by the batchsend historical message endpoint and
+        is needed to and mark the event as backfilled and skip some checks
+        like push notifications.
+        """
+        return self._dict.get("historical", False)
 
 
 class EventBase(metaclass=abc.ABCMeta):

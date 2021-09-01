@@ -450,7 +450,7 @@ class IncompatibleRoomVersionError(SynapseError):
         super().__init__(
             code=400,
             msg="Your homeserver does not support the features required to "
-            "join this room",
+            "interact with this room",
             errcode=Codes.INCOMPATIBLE_ROOM_VERSION,
         )
 

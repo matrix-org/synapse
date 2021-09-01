@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Sorunome
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -14,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -23,7 +22,7 @@ from synapse.api.errors import SynapseError
 from synapse.http.servlet import (
     RestServlet,
     parse_json_object_from_request,
-    parse_list_from_args,
+    parse_strings_from_args,
 )
 from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag
@@ -40,12 +39,10 @@ logger = logging.getLogger(__name__)
 
 class KnockRoomAliasServlet(RestServlet):
     """
-    POST /xyz.amorgan.knock/{roomIdOrAlias}
+    POST /knock/{roomIdOrAlias}
     """
 
-    PATTERNS = client_patterns(
-        "/xyz.amorgan.knock/(?P<room_identifier>[^/]*)", releases=()
-    )
+    PATTERNS = client_patterns("/knock/(?P<room_identifier>[^/]*)")
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
@@ -68,10 +65,13 @@ class KnockRoomAliasServlet(RestServlet):
 
         if RoomID.is_valid(room_identifier):
             room_id = room_identifier
-            try:
-                remote_room_hosts = parse_list_from_args(request.args, "server_name")  # type: ignore
-            except KeyError:
-                remote_room_hosts = None
+
+            # twisted.web.server.Request.args is incorrectly defined as Optional[Any]
+            args: Dict[bytes, List[bytes]] = request.args  # type: ignore
+
+            remote_room_hosts = parse_strings_from_args(
+                args, "server_name", required=False
+            )
         elif RoomAlias.is_valid(room_identifier):
             handler = self.room_member_handler
             room_alias = RoomAlias.from_string(room_identifier)

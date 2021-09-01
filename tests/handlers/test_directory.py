@@ -27,7 +27,7 @@ from tests.test_utils import make_awaitable
 
 
 class DirectoryTestCase(unittest.HomeserverTestCase):
-    """ Tests the directory service. """
+    """Tests the directory service."""
 
     def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()

@@ -14,7 +14,7 @@ you set the `server_name` to match your machine's public DNS hostname.
 
 For this default configuration to work, you will need to listen for TLS
 connections on port 8448. The preferred way to do that is by using a
-reverse proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions
+reverse proxy: see [reverse_proxy.md](reverse_proxy.md) for instructions
 on how to correctly set one up.
 
 In some cases you might not want to run Synapse on the machine that has
@@ -44,7 +44,7 @@ a complicated dance which requires connections in both directions).
 
 Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to correctly
+proxy: see [reverse_proxy.md](reverse_proxy.md) for instructions on how to correctly
 configure a reverse proxy.
 
 ### Known issues
@@ -63,4 +63,4 @@ release of Synapse.
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation, there is a script in the `demo` directory. This is mainly
-useful just for development purposes. See [demo/README](<../demo/README>).
+useful just for development purposes. See [demo/README](https://github.com/matrix-org/synapse/tree/develop/demo/).

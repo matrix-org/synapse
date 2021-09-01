@@ -23,7 +23,7 @@ from tests.test_utils import make_awaitable
 
 
 class ProfileTestCase(unittest.HomeserverTestCase):
-    """ Tests profile management. """
+    """Tests profile management."""
 
     def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
