@@ -326,7 +326,8 @@ class ProfileHandler(BaseHandler):
                 target_user.to_string(), profile
             )
 
-        await self._update_join_states(requester, target_user)
+        # Don't ratelimit when the admin makes the change.
+        await self._update_join_states(requester, target_user, ratelimit=not by_admin)
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)
@@ -551,12 +552,13 @@ class ProfileHandler(BaseHandler):
         return response
 
     async def _update_join_states(
-        self, requester: Requester, target_user: UserID
+        self, requester: Requester, target_user: UserID, ratelimit: bool = True,
     ) -> None:
         if not self.hs.is_mine(target_user):
             return
 
-        await self.ratelimit(requester)
+        if ratelimit:
+            await self.ratelimit(requester)
 
         # Do not actually update the room state for shadow-banned users.
         if requester.shadow_banned:
