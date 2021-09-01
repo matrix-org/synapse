@@ -288,9 +288,10 @@ class RegistrationHandler(BaseHandler):
 
             if default_display_name:
                 requester = create_requester(user)
-                # FIXME: this is DINUM-specific code to update DINUM's custom
-                #  Sydent-powered userdir, and needed some custom changes to ignore
-                #  the ratelimiter.
+                # FIXME: this function call is DINUM-specific code to update DINUM's
+                #  custom Sydent-powered userdir, and needed some custom changes to
+                #  ignore the ratelimiter. On mainline, we don't need to call this
+                #  function.
                 await self.profile_handler.set_displayname(
                     user, requester, default_display_name, by_admin=True
                 )

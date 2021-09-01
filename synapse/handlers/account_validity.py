@@ -450,4 +450,6 @@ class AccountValidityHandler:
         # Mark each as non-active
         # We get the profile handler here so that we don't cause a cyclic dependency at
         # startup.
-        await self.hs.get_profile_handler().set_active(active_expired_users, False, True)
+        await self.hs.get_profile_handler().set_active(
+            active_expired_users, False, True
+        )

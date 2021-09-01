@@ -327,6 +327,8 @@ class ProfileHandler(BaseHandler):
             )
 
         # Don't ratelimit when the admin makes the change.
+        # FIXME: this is because we call this function on registration to update DINUM's
+        #  custom userdir.
         await self._update_join_states(requester, target_user, ratelimit=not by_admin)
 
         # start a profile replication push
@@ -552,7 +554,10 @@ class ProfileHandler(BaseHandler):
         return response
 
     async def _update_join_states(
-        self, requester: Requester, target_user: UserID, ratelimit: bool = True,
+        self,
+        requester: Requester,
+        target_user: UserID,
+        ratelimit: bool = True,
     ) -> None:
         if not self.hs.is_mine(target_user):
             return
