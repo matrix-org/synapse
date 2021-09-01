@@ -421,8 +421,8 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
                 return groups_to_state_dict
 
-            # make a list of keys for us to store in the in-flight cache
-            # this should list all the keys that the request will pick up from
+            # Make a list of keys for us to store in the in-flight cache.
+            # This should list all the keys that the request will pick up from
             # the database.
             keys: List[InflightStateGroupCacheKey] = []
             for group in inflight_cache_misses:
