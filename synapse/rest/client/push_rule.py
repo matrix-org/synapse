@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
 import attr
 
@@ -22,16 +22,22 @@ from synapse.api.errors import (
     SynapseError,
     UnrecognizedRequestError,
 )
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     parse_json_value_from_request,
     parse_string,
 )
+from synapse.http.site import SynapseRequest
 from synapse.push.baserules import BASE_RULE_IDS, NEW_RULE_IDS
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.push.rulekinds import PRIORITY_CLASS_MAP
 from synapse.rest.client._base import client_patterns
 from synapse.storage.push_rule import InconsistentRuleException, RuleNotFoundException
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -48,7 +54,7 @@ class PushRuleRestServlet(RestServlet):
         "Unrecognised request: You probably wanted a trailing slash"
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
@@ -57,7 +63,7 @@ class PushRuleRestServlet(RestServlet):
 
         self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
-    async def on_PUT(self, request, path):
+    async def on_PUT(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         if self._is_worker:
             raise Exception("Cannot handle PUT /push_rules on worker")
 
@@ -118,7 +124,9 @@ class PushRuleRestServlet(RestServlet):
 
         return 200, {}
 
-    async def on_DELETE(self, request, path):
+    async def on_DELETE(
+        self, request: SynapseRequest, path: str
+    ) -> Tuple[int, JsonDict]:
         if self._is_worker:
             raise Exception("Cannot handle DELETE /push_rules on worker")
 
@@ -139,7 +147,7 @@ class PushRuleRestServlet(RestServlet):
             else:
                 raise
 
-    async def on_GET(self, request, path):
+    async def on_GET(self, request: SynapseRequest, path: str) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         user_id = requester.user.to_string()
 
@@ -150,27 +158,29 @@ class PushRuleRestServlet(RestServlet):
 
         rules = format_push_rules_for_user(requester.user, rules)
 
-        path = path.split("/")[1:]
+        path_parts = path.split("/")[1:]
 
-        if path == []:
+        if path_parts == []:
             # we're a reference impl: pedantry is our job.
             raise UnrecognizedRequestError(
                 PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
             )
 
-        if path[0] == "":
+        if path_parts[0] == "":
             return 200, rules
-        elif path[0] == "global":
-            result = _filter_ruleset_with_path(rules["global"], path[1:])
+        elif path_parts[0] == "global":
+            result = _filter_ruleset_with_path(rules["global"], path_parts[1:])
             return 200, result
         else:
             raise UnrecognizedRequestError()
 
-    def notify_user(self, user_id):
+    def notify_user(self, user_id: str) -> None:
         stream_id = self.store.get_max_push_rules_stream_id()
         self.notifier.on_new_event("push_rules_key", stream_id, users=[user_id])
 
-    async def set_rule_attr(self, user_id, spec, val):
+    async def set_rule_attr(
+        self, user_id: str, spec: RuleSpec, val: Union[bool, JsonDict]
+    ) -> None:
         if spec.attr not in ("enabled", "actions"):
             # for the sake of potential future expansion, shouldn't report
             # 404 in the case of an unknown request so check it corresponds to
@@ -191,11 +201,15 @@ class PushRuleRestServlet(RestServlet):
                 # This should *actually* take a dict, but many clients pass
                 # bools directly, so let's not break them.
                 raise SynapseError(400, "Value for 'enabled' must be boolean")
-            return await self.store.set_push_rule_enabled(
+            await self.store.set_push_rule_enabled(
                 user_id, namespaced_rule_id, val, is_default_rule
             )
         elif spec.attr == "actions":
+            if not isinstance(val, dict):
+                raise SynapseError(400, "Value must be a dict")
             actions = val.get("actions")
+            if not isinstance(actions, list):
+                raise SynapseError(400, "Value for 'actions' must be dict")
             _check_actions(actions)
             namespaced_rule_id = _namespaced_rule_id_from_spec(spec)
             rule_id = spec.rule_id
@@ -208,7 +222,7 @@ class PushRuleRestServlet(RestServlet):
 
                 if namespaced_rule_id not in rule_ids:
                     raise SynapseError(404, "Unknown rule %r" % (namespaced_rule_id,))
-            return await self.store.set_push_rule_actions(
+            await self.store.set_push_rule_actions(
                 user_id, namespaced_rule_id, actions, is_default_rule
             )
         else:
@@ -257,7 +271,9 @@ def _rule_spec_from_path(path: Sequence[str]) -> RuleSpec:
     return RuleSpec(scope, template, rule_id, attr)
 
 
-def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
+def _rule_tuple_from_request_object(
+    rule_template: str, rule_id: str, req_obj: JsonDict
+) -> Tuple[List[JsonDict], List[Union[str, JsonDict]]]:
     if rule_template in ["override", "underride"]:
         if "conditions" not in req_obj:
             raise InvalidRuleException("Missing 'conditions'")
@@ -287,7 +303,7 @@ def _rule_tuple_from_request_object(rule_template, rule_id, req_obj):
     return conditions, actions
 
 
-def _check_actions(actions):
+def _check_actions(actions: List[Union[str, JsonDict]]) -> None:
     if not isinstance(actions, list):
         raise InvalidRuleException("No actions found")
 
@@ -300,7 +316,7 @@ def _check_actions(actions):
             raise InvalidRuleException("Unrecognised action")
 
 
-def _filter_ruleset_with_path(ruleset, path):
+def _filter_ruleset_with_path(ruleset: JsonDict, path: List[str]) -> JsonDict:
     if path == []:
         raise UnrecognizedRequestError(
             PushRuleRestServlet.SLIGHTLY_PEDANTIC_TRAILING_SLASH_ERROR
@@ -325,7 +341,7 @@ def _filter_ruleset_with_path(ruleset, path):
         if r["rule_id"] == rule_id:
             the_rule = r
     if the_rule is None:
-        raise NotFoundError
+        raise NotFoundError()
 
     path = path[1:]
     if len(path) == 0:
@@ -340,7 +356,7 @@ def _filter_ruleset_with_path(ruleset, path):
         raise UnrecognizedRequestError()
 
 
-def _priority_class_from_spec(spec):
+def _priority_class_from_spec(spec: RuleSpec) -> int:
     if spec.template not in PRIORITY_CLASS_MAP.keys():
         raise InvalidRuleException("Unknown template: %s" % (spec.template))
     pc = PRIORITY_CLASS_MAP[spec.template]
@@ -348,11 +364,11 @@ def _priority_class_from_spec(spec):
     return pc
 
 
-def _namespaced_rule_id_from_spec(spec):
+def _namespaced_rule_id_from_spec(spec: RuleSpec) -> str:
     return _namespaced_rule_id(spec, spec.rule_id)
 
 
-def _namespaced_rule_id(spec, rule_id):
+def _namespaced_rule_id(spec: RuleSpec, rule_id: str) -> str:
     return "global/%s/%s" % (spec.template, rule_id)
 
 
@@ -360,5 +376,5 @@ class InvalidRuleException(Exception):
     pass
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     PushRuleRestServlet(hs).register(http_server)
