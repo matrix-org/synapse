@@ -445,10 +445,6 @@ class RegisterRestServlet(RestServlet):
 
         desired_display_name = body.get("display_name")
 
-        appservice = None
-        if self.auth.has_access_token(request):
-            appservice = self.auth.get_appservice_by_req(request)
-
         # We need to retrieve the password early in order to pass it to
         # application service registration
         # This is specific to shadow server registration of users via an AS
