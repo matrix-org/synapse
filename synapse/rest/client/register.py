@@ -354,11 +354,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
                 # Artificially delay requests if rate > sleep_limit/window_size
                 sleep_limit=1,
                 # Amount of artificial delay to apply
-                sleep_msec=1000,
+                sleep_delay=1000,
                 # Error with 429 if more than reject_limit requests are queued
                 reject_limit=1,
                 # Allow 1 request at a time
-                concurrent_requests=1,
+                concurrent=1,
             ),
         )
 
