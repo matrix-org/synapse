@@ -1,15 +1,15 @@
 Synapse 1.42.0rc1 (2021-09-01)
 ==============================
 
-As of this release, users will stop receiving message updates via email for addresses that were previously linked to their account (but are not linked anymore).
+This release fixes a bug where users who once added and then removed an e-mail address from their account would continue to receive e-mail notifications.
 
 
 Features
 --------
 
 - Add support for [MSC3231](https://github.com/matrix-org/matrix-doc/pull/3231): Token authenticated registration. Users can be required to submit a token during registration to authenticate themselves. Contributed by Callum Brown. ([\#10142](https://github.com/matrix-org/synapse/issues/10142))
-- Add support for [MSC3283](https://github.com/matrix-org/matrix-doc/pull/3283): Expose enable_set_displayname in capabilities. ([\#10452](https://github.com/matrix-org/synapse/issues/10452))
-- Port the PresenceRouter module interface to the new generic interface. ([\#10524](https://github.com/matrix-org/synapse/issues/10524))
+- Add support for [MSC3283](https://github.com/matrix-org/matrix-doc/pull/3283): Expose `enable_set_displayname` in capabilities. ([\#10452](https://github.com/matrix-org/synapse/issues/10452))
+- Port the `PresenceRouter` module interface to the new generic interface. ([\#10524](https://github.com/matrix-org/synapse/issues/10524))
 - Add pagination to the spaces summary based on updates to [MSC2946](https://github.com/matrix-org/matrix-doc/pull/2946). ([\#10613](https://github.com/matrix-org/synapse/issues/10613), [\#10725](https://github.com/matrix-org/synapse/issues/10725))
 
 
@@ -23,21 +23,20 @@ Bugfixes
 - Rooms with unsupported room versions are no longer returned via `/sync`. ([\#10644](https://github.com/matrix-org/synapse/issues/10644))
 - Enforce the maximum length for per-room display names and avatar URLs. ([\#10654](https://github.com/matrix-org/synapse/issues/10654))
 - Fix a bug which caused the `synapse_user_logins_total` Prometheus metric not to be correctly initialised on restart. ([\#10677](https://github.com/matrix-org/synapse/issues/10677))
-- Improve ServerNoticeServlet to avoid duplicate requests and add unit tests. ([\#10679](https://github.com/matrix-org/synapse/issues/10679))
+- Improve `ServerNoticeServlet` to avoid duplicate requests and add unit tests. ([\#10679](https://github.com/matrix-org/synapse/issues/10679))
 - Fix long-standing issue which caused an error when a thumbnail is requested and there are multiple thumbnails with the same quality rating. ([\#10684](https://github.com/matrix-org/synapse/issues/10684))
 - Fix a regression introduced in v1.41.0 which affected the performance of concurrent fetches of large sets of events, in extreme cases causing the process to hang. ([\#10703](https://github.com/matrix-org/synapse/issues/10703))
 - Fix a regression introduced in Synapse 1.41 which broke email transmission on Systems using older versions of the Twisted library. ([\#10713](https://github.com/matrix-org/synapse/issues/10713))
-- Fix unauthorised exposure of room metadata to communities. ([\#10723](https://github.com/matrix-org/synapse/issues/10723))
 
 
 Improved Documentation
 ----------------------
 
-- Add documentation on how to connect Django with synapse using oidc and django-oauth-toolkit. Contributed by @HugoDelval. ([\#10192](https://github.com/matrix-org/synapse/issues/10192))
+- Add documentation on how to connect Django with synapse using OIDC and django-oauth-toolkit. Contributed by @HugoDelval. ([\#10192](https://github.com/matrix-org/synapse/issues/10192))
 - Advertise https://matrix-org.github.io/synapse docs in README and CONTRIBUTING files. ([\#10595](https://github.com/matrix-org/synapse/issues/10595))
 - Fix some of the titles not rendering in the OIDC documentation. ([\#10639](https://github.com/matrix-org/synapse/issues/10639))
 - Minor clarifications to the documentation for reverse proxies. ([\#10708](https://github.com/matrix-org/synapse/issues/10708))
-- Removed table of contents from the top of installation and contributing documentation pages. ([\#10711](https://github.com/matrix-org/synapse/issues/10711))
+- Remove table of contents from the top of installation and contributing documentation pages. ([\#10711](https://github.com/matrix-org/synapse/issues/10711))
 
 
 Deprecations and Removals
