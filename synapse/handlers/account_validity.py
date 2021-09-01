@@ -60,7 +60,6 @@ class AccountValidityHandler:
         )
 
         self._show_users_in_user_directory = self.hs.config.show_users_in_user_directory
-        self.profile_handler = self.hs.get_profile_handler()
 
         self._account_validity_period = None
         if self._account_validity_enabled:
@@ -429,7 +428,10 @@ class AccountValidityHandler:
         # Check if renewed users should be reintroduced to the user directory
         if self._show_users_in_user_directory:
             # Show the user in the directory again by setting them to active
-            await self.profile_handler.set_active(
+            # We get the profile handler here so that we don't cause a cyclic dependency
+            # at startup.
+            # FIXME: this doesn't work with the new account validity module stuff
+            await self.hs.get_profile_handler().set_active(
                 [UserID.from_string(user_id)], True, True
             )
 
@@ -446,4 +448,6 @@ class AccountValidityHandler:
         active_expired_users = await self.store.get_expired_users()
 
         # Mark each as non-active
-        await self.profile_handler.set_active(active_expired_users, False, True)
+        # We get the profile handler here so that we don't cause a cyclic dependency at
+        # startup.
+        await self.hs.get_profile_handler().set_active(active_expired_users, False, True)
