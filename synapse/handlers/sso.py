@@ -459,6 +459,14 @@ class SsoHandler:
                         client_redirect_url,
                         extra_login_attributes,
                     )
+                elif self._consent_at_registration:
+                    await self._redirect_to_new_user_consent(
+                        auth_provider_id,
+                        remote_user_id,
+                        attributes,
+                        client_redirect_url,
+                        extra_login_attributes,
+                    )
 
                 user_id = await self._register_mapped_user(
                     attributes,
@@ -582,6 +590,65 @@ class SsoHandler:
 
         # Set the cookie and redirect to the username picker
         e = RedirectException(b"/_synapse/client/pick_username/account_details")
+        e.cookies.append(
+            b"%s=%s; path=/"
+            % (USERNAME_MAPPING_SESSION_COOKIE_NAME, session_id.encode("ascii"))
+        )
+        raise e
+
+    async def _redirect_to_new_user_consent(
+        self,
+        auth_provider_id: str,
+        remote_user_id: str,
+        attributes: UserAttributes,
+        client_redirect_url: str,
+        extra_login_attributes: Optional[JsonDict],
+    ) -> NoReturn:
+        """Creates a ConsentMappingSession and redirects the browser
+
+        Called if an otherwise successful new user registration requires consent.
+        Raises a RedirectException which redirects the browser to the consent form.
+
+        Args:
+            auth_provider_id: A unique identifier for this SSO provider, e.g.
+                "oidc" or "saml".
+
+            remote_user_id: The unique identifier from the SSO provider.
+
+            attributes: the user attributes returned by the user mapping provider.
+
+            client_redirect_url: The redirect URL passed in by the client, which we
+                will eventually redirect back to.
+
+            extra_login_attributes: An optional dictionary of extra
+                attributes to be provided to the client in the login response.
+
+        Raises:
+            RedirectException
+        """
+        session_id = random_string(16)
+        now = self._clock.time_msec()
+        # Shortcut: pretend that the localpart set by the mapping provider was chosen by the user.
+        # TODO Maybe worth renaming UsernameMappingSession since it also handles the consent flow.
+        session = UsernameMappingSession(
+            auth_provider_id=auth_provider_id,
+            remote_user_id=remote_user_id,
+            display_name=attributes.display_name,
+            emails=attributes.emails,
+            client_redirect_url=client_redirect_url,
+            expiry_time_ms=now + self._MAPPING_SESSION_VALIDITY_PERIOD_MS,
+            extra_login_attributes=extra_login_attributes,
+            # Overridden settings
+            chosen_localpart=attributes.localpart,
+            use_display_name=True,
+            emails_to_use=[],
+        )
+
+        self._username_mapping_sessions[session_id] = session
+        logger.info("Recorded registration session id %s", session_id)
+
+        # Set the cookie and redirect to the username picker
+        e = RedirectException(b"/_synapse/client/new_user_consent")
         e.cookies.append(
             b"%s=%s; path=/"
             % (USERNAME_MAPPING_SESSION_COOKIE_NAME, session_id.encode("ascii"))
