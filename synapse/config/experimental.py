@@ -24,12 +24,6 @@ class ExperimentalConfig(Config):
     def read_config(self, config: JsonDict, **kwargs):
         experimental = config.get("experimental_features") or {}
 
-        # MSC2403 (room knocking)
-        self.msc2403_enabled = experimental.get("msc2403_enabled", False)  # type: bool
-        if self.msc2403_enabled:
-            # Enable the MSC2403 unstable room version
-            KNOWN_ROOM_VERSIONS.update({RoomVersions.V7.identifier: RoomVersions.V7})
-
         # MSC2858 (multiple SSO identity providers)
         self.msc2858_enabled: bool = experimental.get("msc2858_enabled", False)
 

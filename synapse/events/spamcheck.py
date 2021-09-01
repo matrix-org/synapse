@@ -48,8 +48,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str, str, bool, bool], Awaitable[bool]]
 # FIXME: Callback signature differs from mainline
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[
-    [str, List[str], List[dict], bool],
-    Awaitable[bool]
+    [str, List[str], List[dict], bool], Awaitable[bool]
 ]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
@@ -290,14 +289,17 @@ class SpamChecker:
             True if the user may send an invite, otherwise False
         """
         for callback in self._user_may_invite_callbacks:
-            if await callback(
-                inviter_userid,
-                invitee_userid,
-                third_party_invite,
-                room_id,
-                new_room,
-                published_room,
-            ) is False:
+            if (
+                await callback(
+                    inviter_userid,
+                    invitee_userid,
+                    third_party_invite,
+                    room_id,
+                    new_room,
+                    published_room,
+                )
+                is False
+            ):
                 return False
 
         return True
@@ -326,9 +328,10 @@ class SpamChecker:
             True if the user may create a room, otherwise False
         """
         for callback in self._user_may_create_room_callbacks:
-            if await callback(
-                userid, invite_list, third_party_invite_list, cloning
-            ) is False:
+            if (
+                await callback(userid, invite_list, third_party_invite_list, cloning)
+                is False
+            ):
                 return False
 
         return True
@@ -371,7 +374,7 @@ class SpamChecker:
 
         return True
 
-    def user_may_join_room(self, userid: str, room_id: str, is_invited: bool):
+    async def user_may_join_room(self, userid: str, room_id: str, is_invited: bool):
         """Checks if a given users is allowed to join a room.
 
         Not called when a user creates a room.

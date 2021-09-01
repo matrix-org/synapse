@@ -19,9 +19,8 @@ import os
 import os.path
 import tempfile
 
-from mock import Mock
-
 import pkg_resources
+from mock import Mock
 
 from twisted.internet import defer
 
