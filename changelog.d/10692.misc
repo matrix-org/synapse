@@ -1,0 +1,1 @@
+Split the event-processing methods in `FederationHandler` into a separate `FederationEventHandler`.

@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import atexit
 import gc
 import logging
 import os
@@ -402,6 +403,12 @@ async def start(hs: "HomeServer"):
     if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
         gc.collect()
         gc.freeze()
+
+    # Speed up shutdowns by freezing all allocated objects. This moves everything
+    # into the permanent generation and excludes them from the final GC.
+    # Unfortunately only works on Python 3.7
+    if platform.python_implementation() == "CPython" and sys.version_info >= (3, 7):
+        atexit.register(gc.freeze)
 
 
 def setup_sentry(hs):
