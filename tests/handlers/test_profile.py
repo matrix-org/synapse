@@ -49,7 +49,7 @@ class ProfileTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
 
-        self.frank = UserID.from_string("@1234ABCD:test")
+        self.frank = UserID.from_string("@1234abcd:test")
         self.bob = UserID.from_string("@4567:test")
         self.alice = UserID.from_string("@alice:remote")
 
