@@ -89,6 +89,13 @@ class MediaInfo:
 
 
 class PreviewUrlResource(DirectServeJsonResource):
+    """
+    Generating URL previews is a complicated task which many potential pitfalls.
+
+    See docs/development/url_previews.md for discussion of the design and
+    algorithm followed in this module.
+    """
+
     isLeaf = True
 
     def __init__(
