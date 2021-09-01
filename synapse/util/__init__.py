@@ -15,16 +15,21 @@
 import json
 import logging
 import re
-from typing import Any, Dict, Pattern
+import typing
+from typing import Any, Dict, Pattern, Callable
 
 import attr
 from frozendict import frozendict
 
+
 from twisted.internet import defer, task
 from twisted.internet.interfaces import IDelayedCall
 from twisted.internet.task import LoopingCall
+from twisted.python.failure import Failure
 
 from synapse.logging import context
+if typing.TYPE_CHECKING:
+    from twisted.application.reactors import Reactor
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +37,7 @@ logger = logging.getLogger(__name__)
 _WILDCARD_RUN = re.compile(r"([\?\*]+)")
 
 
-def _reject_invalid_json(val) -> None:
+def _reject_invalid_json(val: Any) -> None:
     """Do not allow Infinity, -Infinity, or NaN values in JSON."""
     raise ValueError("Invalid JSON value: '%s'" % val)
 
@@ -62,7 +67,7 @@ json_encoder = json.JSONEncoder(
 json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
-def unwrapFirstError(failure):
+def unwrapFirstError(failure: Failure) -> Failure:
     # defer.gatherResults and DeferredLists wrap failures.
     failure.trap(defer.FirstError)
     return failure.value.subFailure
@@ -77,10 +82,10 @@ class Clock:
         reactor: The Twisted reactor to use.
     """
 
-    _reactor = attr.ib()
+    _reactor: Reactor = attr.ib()
 
     @defer.inlineCallbacks
-    def sleep(self, seconds: float):
+    def sleep(self, seconds: float) -> float:
         d: defer.Deferred[float] = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
@@ -95,7 +100,7 @@ class Clock:
         """Returns the current system time in milliseconds since epoch."""
         return int(self.time() * 1000)
 
-    def looping_call(self, f, msec, *args, **kwargs) -> LoopingCall:
+    def looping_call(self, f: Callable, msec: float, *args, **kwargs) -> LoopingCall:
         """Call a function repeatedly.
 
         Waits `msec` initially before calling `f` for the first time.
@@ -104,8 +109,8 @@ class Clock:
         other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
-            f(function): The function to call repeatedly.
-            msec(float): How long to wait between calls in milliseconds.
+            f: The function to call repeatedly.
+            msec: How long to wait between calls in milliseconds.
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
@@ -135,7 +140,7 @@ class Clock:
         with context.PreserveLoggingContext():
             return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
-    def cancel_call_later(self, timer: IDelayedCall, ignore_errs=False) -> None:
+    def cancel_call_later(self, timer: IDelayedCall, ignore_errs: bool=False) -> None:
         try:
             timer.cancel()
         except Exception:

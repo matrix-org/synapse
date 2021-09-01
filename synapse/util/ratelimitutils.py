@@ -63,11 +63,11 @@ class FederationRateLimiter:
 
 
 class _PerHostRatelimiter:
-    def __init__(self, clock, config):
+    def __init__(self, clock: Clock, config: FederationRateLimitConfig):
         """
         Args:
-            clock (Clock)
-            config (FederationRateLimitConfig)
+            clock
+            config
         """
         self.clock = clock
 
@@ -107,7 +107,7 @@ class _PerHostRatelimiter:
         finally:
             self._on_exit(request_id)
 
-    def _on_enter(self, request_id) -> "defer.Deferred[None]":
+    def _on_enter(self, request_id: object) -> "defer.Deferred[None]":
         time_now = self.clock.time_msec()
 
         # remove any entries from request_times which aren't within the window
@@ -182,7 +182,7 @@ class _PerHostRatelimiter:
         ret_defer.addBoth(on_both)
         return make_deferred_yieldable(ret_defer)
 
-    def _on_exit(self, request_id) -> None:
+    def _on_exit(self, request_id: object) -> None:
         logger.debug("Ratelimit [%s]: Processed req", id(request_id))
         self.current_processing.discard(request_id)
         try:
