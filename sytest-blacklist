@@ -42,6 +42,12 @@ We can't peek into rooms with joined history_visibility
 Local users can peek by room alias
 Peeked rooms only turn up in the sync for the device who peeked them
 
+
+# Blacklisted due to changes made in #10272
+Outbound federation will ignore a missing event with bad JSON for room version 6
+Backfilled events whose prev_events are in a different room do not allow cross-room back-pagination
+Federation rejects inbound events where the prev_events cannot be found
+
 # Blacklisted due to https://github.com/matrix-org/synapse-dinsic/issues/43
 Inviting an AS-hosted user asks the AS server
 Accesing an AS-hosted room alias asks the AS server
