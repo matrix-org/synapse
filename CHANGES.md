@@ -1,7 +1,7 @@
 Synapse 1.42.0rc1 (2021-09-01)
 ==============================
 
-This release fixes a bug where users who once added and then removed an e-mail address from their account would continue to receive e-mail notifications.
+Server administrators are reminded to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
 
 
 Features
@@ -18,7 +18,7 @@ Bugfixes
 
 - Validate new `m.room.power_levels` events. Contributed by @aaronraimist. ([\#10232](https://github.com/matrix-org/synapse/issues/10232))
 - Display an error on User-Interactive Authentication fallback pages when authentication fails. Contributed by Callum Brown. ([\#10561](https://github.com/matrix-org/synapse/issues/10561))
-- Remove pushers when deleting a 3pid from an account. Pushers for old unlinked emails will also be deleted. ([\#10581](https://github.com/matrix-org/synapse/issues/10581), [\#10734](https://github.com/matrix-org/synapse/issues/10734))
+- Remove pushers when deleting an e-mail address from an account. Pushers for old unlinked emails will also be deleted. ([\#10581](https://github.com/matrix-org/synapse/issues/10581), [\#10734](https://github.com/matrix-org/synapse/issues/10734))
 - Reject Client-Server `/keys/query` requests which provide `device_ids` incorrectly. ([\#10593](https://github.com/matrix-org/synapse/issues/10593))
 - Rooms with unsupported room versions are no longer returned via `/sync`. ([\#10644](https://github.com/matrix-org/synapse/issues/10644))
 - Enforce the maximum length for per-room display names and avatar URLs. ([\#10654](https://github.com/matrix-org/synapse/issues/10654))
