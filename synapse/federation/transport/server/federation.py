@@ -548,11 +548,11 @@ class FederationUserInfoServlet(BaseFederationServlet):
     PATH = "/users/info"
     PREFIX = FEDERATION_UNSTABLE_PREFIX
 
-    def __init__(self, handler, authenticator, ratelimiter, server_name):
+    def __init__(self, hs, authenticator, ratelimiter, server_name):
         super(FederationUserInfoServlet, self).__init__(
-            handler, authenticator, ratelimiter, server_name
+            hs, authenticator, ratelimiter, server_name
         )
-        self.handler = handler
+        self._store = hs.get_datastore()
 
     async def on_POST(self, origin, content, query):
         assert_params_in_dict(content, required=["user_ids"])
@@ -566,7 +566,7 @@ class FederationUserInfoServlet(BaseFederationServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        data = await self.handler.store.get_info_for_users(user_ids)
+        data = await self._store.get_info_for_users(user_ids)
         return 200, data
 
 

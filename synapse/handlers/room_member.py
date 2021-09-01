@@ -725,7 +725,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             if not is_requester_admin:
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
-                if not new_room and not self.spam_checker.user_may_join_room(
+                if not new_room and not await self.spam_checker.user_may_join_room(
                     target.to_string(), room_id, is_invited=inviter is not None
                 ):
                     raise SynapseError(403, "Not allowed to join this room")

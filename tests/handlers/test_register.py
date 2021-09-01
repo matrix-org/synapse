@@ -18,10 +18,7 @@ from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
 from synapse.api.errors import Codes, ResourceLimitError, SynapseError
 from synapse.events.spamcheck import load_legacy_spam_checkers
-from synapse.rest.client.v2_alpha.register import (
-    _map_email_to_displayname,
-    register_servlets,
-)
+from synapse.rest.client.register import _map_email_to_displayname, register_servlets
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
