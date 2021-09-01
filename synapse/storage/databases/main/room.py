@@ -19,7 +19,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
-from synapse.api.constants import EventTypes, JoinRules
+from synapse.api.constants import EventContentFields, EventTypes, JoinRules
 from synapse.api.errors import StoreError
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.events import EventBase
@@ -1012,9 +1012,9 @@ class RoomWorkerStore(SQLBaseStore):
 class _BackgroundUpdates:
     REMOVE_TOMESTONED_ROOMS_BG_UPDATE = "remove_tombstoned_rooms_from_directory"
     ADD_ROOMS_ROOM_VERSION_COLUMN = "add_rooms_room_version_column"
-    POPULATE_ROOMS_CREATOR_COLUMN = "populate_rooms_creator_column"
     POPULATE_ROOM_DEPTH_MIN_DEPTH2 = "populate_room_depth_min_depth2"
     REPLACE_ROOM_DEPTH_MIN_DEPTH = "replace_room_depth_min_depth"
+    POPULATE_ROOMS_CREATOR_COLUMN = "populate_rooms_creator_column"
 
 
 _REPLACE_ROOM_DEPTH_SQL_COMMANDS = (
@@ -1046,11 +1046,6 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
             self._background_add_rooms_room_version_column,
         )
 
-        self.db_pool.updates.register_background_update_handler(
-            _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
-            self._background_populate_rooms_creator_column,
-        )
-
         # BG updates to change the type of room_depth.min_depth
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.POPULATE_ROOM_DEPTH_MIN_DEPTH2,
@@ -1059,6 +1054,11 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         self.db_pool.updates.register_background_update_handler(
             _BackgroundUpdates.REPLACE_ROOM_DEPTH_MIN_DEPTH,
             self._background_replace_room_depth_min_depth,
+        )
+
+        self.db_pool.updates.register_background_update_handler(
+            _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
+            self._background_populate_rooms_creator_column,
         )
 
     async def _background_insert_retention(self, progress, batch_size):
@@ -1194,63 +1194,6 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
         if end:
             await self.db_pool.updates._end_background_update(
                 _BackgroundUpdates.ADD_ROOMS_ROOM_VERSION_COLUMN
-            )
-
-        return batch_size
-
-    async def _background_populate_rooms_creator_column(
-        self, progress: dict, batch_size: int
-    ):
-        """Background update to go and add creator information to `rooms`
-        table from `current_state_events` table.
-        """
-
-        last_room_id = progress.get("room_id", "")
-
-        def _background_populate_rooms_creator_column_txn(txn: LoggingTransaction):
-            sql = """
-                SELECT room_id, json FROM current_state_events
-                INNER JOIN event_json USING (room_id, event_id)
-                WHERE room_id > ? AND type = 'm.room.create' AND state_key = ''
-                ORDER BY room_id
-                LIMIT ?
-            """
-
-            txn.execute(sql, (last_room_id, batch_size))
-
-            new_last_room_id = ""
-            for room_id, event_json in txn:
-                event_dict = db_to_json(event_json)
-
-                creator = event_dict.get("content").get("creator")
-
-                self.db_pool.simple_update_txn(
-                    txn,
-                    table="rooms",
-                    keyvalues={"room_id": room_id},
-                    updatevalues={"creator": creator},
-                )
-                new_last_room_id = room_id
-
-            if new_last_room_id == "":
-                return True
-
-            self.db_pool.updates._background_update_progress_txn(
-                txn,
-                _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
-                {"room_id": new_last_room_id},
-            )
-
-            return False
-
-        end = await self.db_pool.runInteraction(
-            "_background_populate_rooms_creator_column",
-            _background_populate_rooms_creator_column_txn,
-        )
-
-        if end:
-            await self.db_pool.updates._end_background_update(
-                _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN
             )
 
         return batch_size
@@ -1407,6 +1350,65 @@ class RoomBackgroundUpdateStore(SQLBaseStore):
 
         return 0
 
+    async def _background_populate_rooms_creator_column(
+        self, progress: dict, batch_size: int
+    ):
+        """Background update to go and add creator information to `rooms`
+        table from `current_state_events` table.
+        """
+
+        last_room_id = progress.get("room_id", "")
+
+        def _background_populate_rooms_creator_column_txn(txn: LoggingTransaction):
+            sql = """
+                SELECT room_id, json FROM event_json
+                INNER JOIN rooms AS room USING (room_id)
+                INNER JOIN current_state_events AS state_event USING (room_id, event_id)
+                WHERE room_id > ? AND (room.creator IS NULL OR room.creator = '') AND state_event.type = 'm.room.create' AND state_event.state_key = ''
+                ORDER BY room_id
+                LIMIT ?
+            """
+
+            txn.execute(sql, (last_room_id, batch_size))
+            room_id_to_create_event_results = txn.fetchall()
+
+            new_last_room_id = ""
+            for room_id, event_json in room_id_to_create_event_results:
+                event_dict = db_to_json(event_json)
+
+                creator = event_dict.get("content").get(EventContentFields.ROOM_CREATOR)
+
+                self.db_pool.simple_update_txn(
+                    txn,
+                    table="rooms",
+                    keyvalues={"room_id": room_id},
+                    updatevalues={"creator": creator},
+                )
+                new_last_room_id = room_id
+
+            if new_last_room_id == "":
+                return True
+
+            self.db_pool.updates._background_update_progress_txn(
+                txn,
+                _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN,
+                {"room_id": new_last_room_id},
+            )
+
+            return False
+
+        end = await self.db_pool.runInteraction(
+            "_background_populate_rooms_creator_column",
+            _background_populate_rooms_creator_column_txn,
+        )
+
+        if end:
+            await self.db_pool.updates._end_background_update(
+                _BackgroundUpdates.POPULATE_ROOMS_CREATOR_COLUMN
+            )
+
+        return batch_size
+
 
 class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
@@ -1438,7 +1440,12 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             # invalid, and it would fail auth checks anyway.
             raise StoreError(400, "No create event in state")
 
-        room_creator = create_event.content.get("creator", None)
+        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+
+        if not isinstance(room_creator, str):
+            # If the create event does not have a creator then the room is
+            # invalid, and it would fail auth checks anyway.
+            raise StoreError(400, "No creator defined on the create event")
 
         await self.db_pool.simple_upsert(
             desc="upsert_room_on_join",
@@ -1467,9 +1474,6 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
         # mark the room as having an auth chain cover index.
         has_auth_chain_index = await self.has_auth_chain_index(room_id)
 
-        create_event = await self.get_create_event_for_room(room_id)
-        room_creator = create_event.content.get("creator", None)
-
         await self.db_pool.simple_upsert(
             desc="maybe_store_room_on_outlier_membership",
             table="rooms",
@@ -1478,7 +1482,10 @@ class RoomStore(RoomBackgroundUpdateStore, RoomWorkerStore, SearchStore):
             insertion_values={
                 "room_version": room_version.identifier,
                 "is_public": False,
-                "creator": room_creator,
+                # We don't worry about setting the `creator` here because
+                # we don't process any messages in a room while a user is
+                # invited (only after the join).
+                "creator": "",
                 "has_auth_chain_index": has_auth_chain_index,
             },
             # rooms has a unique constraint on room_id, so no need to lock when doing an
