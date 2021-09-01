@@ -112,7 +112,7 @@ class ConsentResource(DirectServeHtmlResource):
             request (twisted.web.http.Request):
         """
         version = parse_string(request, "v", default=self._default_consent_version)
-        username = parse_string(request, "u", required=False, default="")
+        username = parse_string(request, "u", default="")
         userhmac = None
         has_consented = False
         public_version = username == ""

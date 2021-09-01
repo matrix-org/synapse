@@ -379,7 +379,7 @@ class RoomWorkerStore(SQLBaseStore):
         self,
         start: int,
         limit: int,
-        order_by: RoomSortOrder,
+        order_by: str,
         reverse_order: bool,
         search_term: Optional[str],
     ) -> Tuple[List[Dict[str, Any]], int]:

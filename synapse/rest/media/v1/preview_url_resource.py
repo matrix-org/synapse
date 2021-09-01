@@ -58,9 +58,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_charset_match = re.compile(br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9-]+)"?', flags=re.I)
+_charset_match = re.compile(
+    br'<\s*meta[^>]*charset\s*=\s*"?([a-z0-9_-]+)"?', flags=re.I
+)
 _xml_encoding_match = re.compile(
-    br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9-]+)"', flags=re.I
+    br'\s*<\s*\?\s*xml[^>]*encoding="([a-z0-9_-]+)"', flags=re.I
 )
 _content_type_match = re.compile(r'.*; *charset="?(.*?)"?(;|$)', flags=re.I)
 
@@ -186,15 +188,11 @@ class PreviewUrlResource(DirectServeJsonResource):
         respond_with_json(request, 200, {}, send_cors=True)
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:
-        # This will always be set by the time Twisted calls us.
-        assert request.args is not None
-
         # XXX: if get_user_by_req fails, what should we do in an async render?
         requester = await self.auth.get_user_by_req(request)
-        url = parse_string(request, "url")
-        if b"ts" in request.args:
-            ts = parse_integer(request, "ts")
-        else:
+        url = parse_string(request, "url", required=True)
+        ts = parse_integer(request, "ts")
+        if ts is None:
             ts = self.clock.time_msec()
 
         # XXX: we could move this into _do_preview if we wanted.
