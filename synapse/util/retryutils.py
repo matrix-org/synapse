@@ -14,7 +14,7 @@
 import logging
 import random
 from types import TracebackType
-from typing import Any, Optional, Type, TypeVar
+from typing import Any, Optional
 
 import synapse.logging.context
 from synapse.api.errors import CodeMessageException
@@ -56,7 +56,11 @@ class NotRetryingDestination(Exception):
 
 
 async def get_retry_limiter(
-    destination: str, clock: Clock, store: DataStore, ignore_backoff: bool = False, **kwargs: Any
+    destination: str,
+    clock: Clock,
+    store: DataStore,
+    ignore_backoff: bool = False,
+    **kwargs: Any,
 ) -> "RetryDestinationLimiter":
     """For a given destination check if we have previously failed to
     send a request there and are waiting before retrying the destination.

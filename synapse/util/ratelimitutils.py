@@ -16,7 +16,7 @@ import collections
 import contextlib
 import logging
 import typing
-from typing import DefaultDict, Iterator
+from typing import DefaultDict, Iterator, List, Set
 
 from twisted.internet import defer
 
@@ -78,7 +78,7 @@ class _PerHostRatelimiter:
         self.concurrent_requests = config.concurrent
 
         # request_id objects for requests which have been slept
-        self.sleeping_requests = set()
+        self.sleeping_requests: Set[object] = set()
 
         # map from request_id object to Deferred for requests which are ready
         # for processing but have been queued
@@ -87,11 +87,11 @@ class _PerHostRatelimiter:
         ] = collections.OrderedDict()
 
         # request id objects for requests which are in progress
-        self.current_processing = set()
+        self.current_processing: Set[object] = set()
 
         # times at which we have recently (within the last window_size ms)
         # received requests.
-        self.request_times = []
+        self.request_times: List[int] = []
 
     @contextlib.contextmanager
     def ratelimit(self) -> "Iterator[defer.Deferred[None]]":

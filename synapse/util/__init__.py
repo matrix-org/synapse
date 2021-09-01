@@ -16,20 +16,21 @@ import json
 import logging
 import re
 import typing
-from typing import Any, Dict, Pattern, Callable
+from typing import Any, Callable, Dict, Pattern
 
 import attr
 from frozendict import frozendict
 
-
 from twisted.internet import defer, task
-from twisted.internet.interfaces import IDelayedCall
+from twisted.internet.defer import Deferred
+from twisted.internet.interfaces import IDelayedCall, IReactorTime
 from twisted.internet.task import LoopingCall
 from twisted.python.failure import Failure
 
 from synapse.logging import context
+
 if typing.TYPE_CHECKING:
-    from twisted.application.reactors import Reactor
+    pass
 
 logger = logging.getLogger(__name__)
 
@@ -82,10 +83,10 @@ class Clock:
         reactor: The Twisted reactor to use.
     """
 
-    _reactor: Reactor = attr.ib()
+    _reactor: IReactorTime = attr.ib()
 
     @defer.inlineCallbacks
-    def sleep(self, seconds: float) -> float:
+    def sleep(self, seconds: float) -> typing.Iterable[Deferred[float]]:
         d: defer.Deferred[float] = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
@@ -140,7 +141,7 @@ class Clock:
         with context.PreserveLoggingContext():
             return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
-    def cancel_call_later(self, timer: IDelayedCall, ignore_errs: bool=False) -> None:
+    def cancel_call_later(self, timer: IDelayedCall, ignore_errs: bool = False) -> None:
         try:
             timer.cancel()
         except Exception:
