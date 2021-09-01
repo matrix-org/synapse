@@ -375,11 +375,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
         unstable=True,
     )
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastore()
@@ -390,7 +386,7 @@ class RegistrationTokenValidityRestServlet(RestServlet):
             burst_count=hs.config.ratelimiting.rc_registration_token_validity.burst_count,
         )
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         await self.ratelimiter.ratelimit(None, (request.getClientIP(),))
 
         if not self.hs.config.enable_registration:
@@ -730,7 +726,11 @@ class RegisterRestServlet(RestServlet):
         return 200, return_dict
 
     async def _do_appservice_registration(
-        self, username, as_token, body, should_issue_refresh_token: bool = False
+        self,
+        username: str,
+        as_token: str,
+        body: JsonDict,
+        should_issue_refresh_token: bool = False,
     ) -> JsonDict:
         user_id = await self.registration_handler.appservice_register(
             username, as_token
