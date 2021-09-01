@@ -22,8 +22,10 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Union
 from urllib import parse as urlparse
+
+import attr
 
 from twisted.internet.error import DNSLookupError
 from twisted.web.server import Request
@@ -42,6 +44,7 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
 from synapse.rest.media.v1.oembed import OEmbedError, OEmbedProvider
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -69,6 +72,20 @@ OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class MediaInfo:
+    media_type: str
+    media_length: int
+    download_name: Optional[str]
+    created_ts_ms: int
+    filesystem_id: str
+    filename: str
+    uri: str
+    response_code: int
+    expires: int
+    etag: Optional[str]
 
 
 class PreviewUrlResource(DirectServeJsonResource):
@@ -219,18 +236,17 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("got media_info of '%s'", media_info)
 
-        if _is_media(media_info["media_type"]):
-            file_id = media_info["filesystem_id"]
+        if _is_media(media_info.media_type):
+            file_id = media_info.filesystem_id
             dims = await self.media_repo._generate_thumbnails(
-                None, file_id, file_id, media_info["media_type"], url_cache=True
+                None, file_id, file_id, media_info.media_type, url_cache=True
             )
 
             og = {
-                "og:description": media_info["download_name"],
-                "og:image": "mxc://%s/%s"
-                % (self.server_name, media_info["filesystem_id"]),
-                "og:image:type": media_info["media_type"],
-                "matrix:image:size": media_info["media_length"],
+                "og:description": media_info.download_name,
+                "og:image": f"mxc://{self.server_name}/{media_info.filesystem_id}",
+                "og:image:type": media_info.media_type,
+                "matrix:image:size": media_info.media_length,
             }
 
             if dims:
@@ -240,14 +256,14 @@ class PreviewUrlResource(DirectServeJsonResource):
                 logger.warning("Couldn't get dims for %s" % url)
 
             # define our OG response for this media
-        elif _is_html(media_info["media_type"]):
+        elif _is_html(media_info.media_type):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-            with open(media_info["filename"], "rb") as file:
+            with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            encoding = get_html_media_encoding(body, media_info["media_type"])
-            og = decode_and_calc_og(body, media_info["uri"], encoding)
+            encoding = get_html_media_encoding(body, media_info.media_type)
+            og = decode_and_calc_og(body, media_info.uri, encoding)
 
             # pre-cache the image for posterity
             # FIXME: it might be cleaner to use the same flow as the main /preview_url
@@ -255,14 +271,14 @@ class PreviewUrlResource(DirectServeJsonResource):
             # just rely on the caching on the master request to speed things up.
             if "og:image" in og and og["og:image"]:
                 image_info = await self._download_url(
-                    _rebase_url(og["og:image"], media_info["uri"]), user
+                    _rebase_url(og["og:image"], media_info.uri), user
                 )
 
-                if _is_media(image_info["media_type"]):
+                if _is_media(image_info.media_type):
                     # TODO: make sure we don't choke on white-on-transparent images
-                    file_id = image_info["filesystem_id"]
+                    file_id = image_info.filesystem_id
                     dims = await self.media_repo._generate_thumbnails(
-                        None, file_id, file_id, image_info["media_type"], url_cache=True
+                        None, file_id, file_id, image_info.media_type, url_cache=True
                     )
                     if dims:
                         og["og:image:width"] = dims["width"]
@@ -270,12 +286,11 @@ class PreviewUrlResource(DirectServeJsonResource):
                     else:
                         logger.warning("Couldn't get dims for %s", og["og:image"])
 
-                    og["og:image"] = "mxc://%s/%s" % (
-                        self.server_name,
-                        image_info["filesystem_id"],
-                    )
-                    og["og:image:type"] = image_info["media_type"]
-                    og["matrix:image:size"] = image_info["media_length"]
+                    og[
+                        "og:image"
+                    ] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
+                    og["og:image:type"] = image_info.media_type
+                    og["matrix:image:size"] = image_info.media_length
                 else:
                     del og["og:image"]
         else:
@@ -301,17 +316,17 @@ class PreviewUrlResource(DirectServeJsonResource):
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
             url,
-            media_info["response_code"],
-            media_info["etag"],
-            media_info["expires"] + media_info["created_ts"],
+            media_info.response_code,
+            media_info.etag,
+            media_info.expires + media_info.created_ts_ms,
             jsonog,
-            media_info["filesystem_id"],
-            media_info["created_ts"],
+            media_info.filesystem_id,
+            media_info.created_ts_ms,
         )
 
         return jsonog.encode("utf8")
 
-    async def _download_url(self, url: str, user: str) -> Dict[str, Any]:
+    async def _download_url(self, url: str, user: str) -> MediaInfo:
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -423,18 +438,18 @@ class PreviewUrlResource(DirectServeJsonResource):
             # therefore not expire it.
             raise
 
-        return {
-            "media_type": media_type,
-            "media_length": length,
-            "download_name": download_name,
-            "created_ts": time_now_ms,
-            "filesystem_id": file_id,
-            "filename": fname,
-            "uri": uri,
-            "response_code": code,
-            "expires": expires,
-            "etag": etag,
-        }
+        return MediaInfo(
+            media_type=media_type,
+            media_length=length,
+            download_name=download_name,
+            created_ts_ms=time_now_ms,
+            filesystem_id=file_id,
+            filename=fname,
+            uri=uri,
+            response_code=code,
+            expires=expires,
+            etag=etag,
+        )
 
     def _start_expire_url_cache_data(self):
         return run_as_background_process(
@@ -580,7 +595,7 @@ def get_html_media_encoding(body: bytes, content_type: str) -> str:
 
 def decode_and_calc_og(
     body: bytes, media_uri: str, request_encoding: Optional[str] = None
-) -> Dict[str, Optional[str]]:
+) -> JsonDict:
     """
     Calculate metadata for an HTML document.
 
