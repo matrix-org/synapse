@@ -67,7 +67,7 @@ class EmailPusherTests(HomeserverTestCase):
         config["public_baseurl"] = "aaa"
         config["start_pushers"] = True
 
-        self.hs = self.setup_test_homeserver(config=config)
+        hs = self.setup_test_homeserver(config=config)
 
         # List[Tuple[Deferred, args, kwargs]]
         self.email_attempts = []
@@ -77,9 +77,9 @@ class EmailPusherTests(HomeserverTestCase):
             self.email_attempts.append((d, args, kwargs))
             return d
 
-        self.hs.get_send_email_handler()._sendmail = sendmail
+        hs.get_send_email_handler()._sendmail = sendmail
 
-        return self.hs
+        return hs
 
     def prepare(self, reactor, clock, hs):
         # Register the user who gets notified
