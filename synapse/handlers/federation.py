@@ -799,7 +799,7 @@ class FederationHandler(BaseHandler):
         # support it or the event is not from the room creator.
         room_version = await self.store.get_room_version(marker_event.room_id)
         create_event = await self.store.get_create_event_for_room(marker_event.room_id)
-        room_creator = create_event.content.get("creator", None)
+        room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
         if (
             not room_version.msc2716_historical
             or not self.hs.config.experimental.msc2716_enabled
