@@ -32,9 +32,9 @@ Bugfixes
 Improved Documentation
 ----------------------
 
-- Add documentation on how to connect Django with synapse using OIDC and django-oauth-toolkit. Contributed by @HugoDelval. ([\#10192](https://github.com/matrix-org/synapse/issues/10192))
-- Advertise https://matrix-org.github.io/synapse docs in README and CONTRIBUTING files. ([\#10595](https://github.com/matrix-org/synapse/issues/10595))
-- Fix some of the titles not rendering in the OIDC documentation. ([\#10639](https://github.com/matrix-org/synapse/issues/10639))
+- Add documentation on how to connect Django with Synapse using OpenID Connect and django-oauth-toolkit. Contributed by @HugoDelval. ([\#10192](https://github.com/matrix-org/synapse/issues/10192))
+- Advertise https://matrix-org.github.io/synapse documentation in the `README` and `CONTRIBUTING` files. ([\#10595](https://github.com/matrix-org/synapse/issues/10595))
+- Fix some of the titles not rendering in the OpenID Connect documentation. ([\#10639](https://github.com/matrix-org/synapse/issues/10639))
 - Minor clarifications to the documentation for reverse proxies. ([\#10708](https://github.com/matrix-org/synapse/issues/10708))
 - Remove table of contents from the top of installation and contributing documentation pages. ([\#10711](https://github.com/matrix-org/synapse/issues/10711))
 
