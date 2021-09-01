@@ -85,7 +85,7 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
-# Upgrading to v1.xx.0
+# Upgrading to v1.42.0
 
 ## Removal of old Room Admin API
 
@@ -106,6 +106,11 @@ This may affect you if you make use of custom HTML templates for the
 
 The template is now provided an `error` variable if the authentication
 process failed. See the default templates linked above for an example.
+
+## Removal of out-of-date email pushers
+
+Users will stop receiving message updates via email for addresses that were
+once, but not still, linked to their account.
 
 
 # Upgrading to v1.41.0

@@ -183,20 +183,37 @@ class MessageHandler:
 
             if not last_events:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
+            last_event = last_events[0]
+
+            # check whether the user is in the room at that time to determine
+            # whether they should be treated as peeking.
+            state_map = await self.state_store.get_state_for_event(
+                last_event.event_id,
+                StateFilter.from_types([(EventTypes.Member, user_id)]),
+            )
+
+            joined = False
+            membership_event = state_map.get((EventTypes.Member, user_id))
+            if membership_event:
+                joined = membership_event.membership == Membership.JOIN
+
+            is_peeking = not joined
 
             visible_events = await filter_events_for_client(
                 self.storage,
                 user_id,
                 last_events,
                 filter_send_to_client=False,
+                is_peeking=is_peeking,
             )
 
-            event = last_events[0]
             if visible_events:
                 room_state_events = await self.state_store.get_state_for_events(
-                    [event.event_id], state_filter=state_filter
+                    [last_event.event_id], state_filter=state_filter
                 )
-                room_state: Mapping[Any, EventBase] = room_state_events[event.event_id]
+                room_state: Mapping[Any, EventBase] = room_state_events[
+                    last_event.event_id
+                ]
             else:
                 raise AuthError(
                     403,

@@ -1,1 +1,0 @@
-Add support for [MSC3283](https://github.com/matrix-org/matrix-doc/pull/3283): Expose enable_set_displayname in capabilities.
