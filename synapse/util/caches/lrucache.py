@@ -341,7 +341,7 @@ class LruCache(Generic[KT, VT]):
         # Default `clock` to something sensible. Note that we rename it to
         # `real_clock` so that mypy doesn't think its still `Optional`.
         if clock is None:
-            real_clock = Clock(reactor)
+            real_clock = Clock(reactor)  # type: ignore[arg-type]
         else:
             real_clock = clock
 

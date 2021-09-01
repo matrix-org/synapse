@@ -268,7 +268,7 @@ class Linearizer:
         if not clock:
             from twisted.internet import reactor
 
-            clock = Clock(reactor)
+            clock = Clock(reactor)  # type: ignore[arg-type]
         self._clock = clock
         self.max_count = max_count
 
