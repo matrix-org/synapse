@@ -16,6 +16,7 @@ from unittest.mock import Mock
 
 import synapse.types
 from synapse.api.errors import AuthError, SynapseError
+from synapse.rest import admin
 from synapse.types import UserID
 
 from tests import unittest
@@ -24,6 +25,8 @@ from tests.test_utils import make_awaitable
 
 class ProfileTestCase(unittest.HomeserverTestCase):
     """Tests profile management."""
+
+    servlets = [admin.register_servlets]
 
     def make_homeserver(self, reactor, clock):
         self.mock_federation = Mock()
