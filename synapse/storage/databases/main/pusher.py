@@ -430,10 +430,11 @@ class PusherWorkerStore(SQLBaseStore):
             """
 
             txn.execute(sql, (last_pusher, batch_size))
+            rows = txn.fetchall()
 
             last = None
             num_deleted = 0
-            for row in txn:
+            for row in rows:
                 last = row[0]
                 num_deleted += 1
                 self.db_pool.simple_delete_txn(
