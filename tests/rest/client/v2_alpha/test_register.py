@@ -28,7 +28,17 @@ import synapse.rest.admin
 from synapse.api.constants import APP_SERVICE_REGISTRATION_TYPE, LoginType
 from synapse.api.errors import Codes
 from synapse.appservice import ApplicationService
-from synapse.rest.client import account, account_validity, login, logout, register, sync
+from synapse.rest.client import (
+    account,
+    account_validity,
+    login,
+    logout,
+    profile,
+    register,
+    room,
+    sync,
+    user_directory,
+)
 
 from tests import unittest
 from tests.unittest import override_config
@@ -572,9 +582,9 @@ class AccountValidityTestCase(unittest.HomeserverTestCase):
 class AccountValidityUserDirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
-        synapse.rest.client.v1.profile.register_servlets,
-        synapse.rest.client.v1.room.register_servlets,
-        synapse.rest.client.v2_alpha.user_directory.register_servlets,
+        profile.register_servlets,
+        room.register_servlets,
+        user_directory.register_servlets,
         login.register_servlets,
         register.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,

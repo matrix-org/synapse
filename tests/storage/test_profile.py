@@ -27,7 +27,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.create_profile(self.u_frank.localpart))
 
         self.get_success(
-            self.store.set_profile_displayname(self.u_frank.localpart, "Frank")
+            self.store.set_profile_displayname(self.u_frank.localpart, "Frank", 1)
         )
 
         self.assertEquals(
@@ -68,7 +68,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         # test set to None
         self.get_success(
-            self.store.set_profile_avatar_url(self.u_frank.localpart, None)
+            self.store.set_profile_avatar_url(self.u_frank.localpart, None, 1)
         )
 
         self.assertIsNone(

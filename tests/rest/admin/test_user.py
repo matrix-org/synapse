@@ -796,9 +796,9 @@ class UsersListTestCase(unittest.HomeserverTestCase):
 
         # Set avatar URL to all users, that no user has a NULL value to avoid
         # different sort order between SQlite and PostreSQL
-        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url3"))
-        self.get_success(self.store.set_profile_avatar_url("user2", "mxc://url2"))
-        self.get_success(self.store.set_profile_avatar_url("admin", "mxc://url1"))
+        self.get_success(self.store.set_profile_avatar_url("user1", "mxc://url3", 1))
+        self.get_success(self.store.set_profile_avatar_url("user2", "mxc://url2", 1))
+        self.get_success(self.store.set_profile_avatar_url("admin", "mxc://url1", 1))
 
         # order by default (name)
         self._order_test([self.admin_user, user1, user2], None)

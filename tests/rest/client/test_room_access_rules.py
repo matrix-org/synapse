@@ -23,7 +23,7 @@ from twisted.internet import defer
 from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
 from synapse.rest import admin
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client import directory, login, room
 from synapse.third_party_rules.access_rules import (
     ACCESS_RULES_TYPE,
     FROZEN_STATE_TYPE,
