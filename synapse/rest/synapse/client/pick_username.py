@@ -74,6 +74,8 @@ class AccountDetailsResource(DirectServeHtmlResource):
         self._sso_handler = hs.get_sso_handler()
 
         def template_search_dirs():
+            if hs.config.server.custom_template_directory:
+                yield hs.config.server.custom_template_directory
             if hs.config.sso.sso_template_dir:
                 yield hs.config.sso.sso_template_dir
             yield hs.config.sso.default_template_dir

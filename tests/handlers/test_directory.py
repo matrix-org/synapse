@@ -19,7 +19,7 @@ import synapse
 import synapse.api.errors
 from synapse.api.constants import EventTypes
 from synapse.config.room_directory import RoomDirectoryConfig
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client import directory, login, room
 from synapse.types import RoomAlias, create_requester
 
 from tests import unittest

@@ -18,8 +18,7 @@ from twisted.internet import defer
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import account, account_validity, user_directory
+from synapse.rest.client import account, account_validity, login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
@@ -691,7 +690,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         account_validity.register_servlets,
-        synapse.rest.client.v2_alpha.user_directory.register_servlets,
+        user_directory.register_servlets,
         account.register_servlets,
     ]
 

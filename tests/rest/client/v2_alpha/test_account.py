@@ -25,8 +25,7 @@ import synapse.rest.admin
 from synapse.api.constants import LoginType, Membership
 from synapse.api.errors import Codes, HttpResponseException
 from synapse.appservice import ApplicationService
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import account, register
+from synapse.rest.client import account, login, register, room
 from synapse.rest.synapse.client.password_reset import PasswordResetSubmitTokenResource
 
 from tests import unittest
@@ -47,12 +46,6 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
-            self.email_attempts.append(msg)
-            return
-
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
@@ -67,7 +60,16 @@ class PasswordResetTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "https://example.com"
 
-        hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(
+            reactor, smtphost, smtpport, from_addr, to_addrs, msg, **kwargs
+        ):
+            self.email_attempts.append(msg)
+
+        self.email_attempts = []
+        hs.get_send_email_handler()._sendmail = sendmail
+
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -511,11 +513,6 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         config = self.default_config()
 
         # Email config.
-        self.email_attempts = []
-
-        async def sendmail(smtphost, from_addr, to_addrs, msg, **kwargs):
-            self.email_attempts.append(msg)
-
         config["email"] = {
             "enable_notifs": False,
             "template_dir": os.path.abspath(
@@ -530,7 +527,16 @@ class ThreepidEmailRestTestCase(unittest.HomeserverTestCase):
         }
         config["public_baseurl"] = "https://example.com"
 
-        self.hs = self.setup_test_homeserver(config=config, sendmail=sendmail)
+        self.hs = self.setup_test_homeserver(config=config)
+
+        async def sendmail(
+            reactor, smtphost, smtpport, from_addr, to_addrs, msg, **kwargs
+        ):
+            self.email_attempts.append(msg)
+
+        self.email_attempts = []
+        self.hs.get_send_email_handler()._sendmail = sendmail
+
         return self.hs
 
     def prepare(self, reactor, clock, hs):

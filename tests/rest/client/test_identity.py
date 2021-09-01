@@ -17,8 +17,7 @@ from mock import Mock
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import account
+from synapse.rest.client import account, login, room
 
 from tests import unittest
 

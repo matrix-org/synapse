@@ -143,7 +143,7 @@ class TransportLayerClient:
         """Sends the given Transaction to its destination
 
         Args:
-            transaction (Transaction)
+            transaction
 
         Returns:
             Succeeds when we get a 2xx HTTP response. The result
@@ -1186,6 +1186,28 @@ class TransportLayerClient:
 
         return await self.client.post_json(
             destination=destination, path=path, data=params
+        )
+
+    async def get_room_hierarchy(
+        self,
+        destination: str,
+        room_id: str,
+        suggested_only: bool,
+    ) -> JsonDict:
+        """
+        Args:
+            destination: The remote server
+            room_id: The room ID to ask about.
+            suggested_only: if True, only suggested rooms will be returned
+        """
+        path = _create_path(
+            FEDERATION_UNSTABLE_PREFIX, "/org.matrix.msc2946/hierarchy/%s", room_id
+        )
+
+        return await self.client.get_json(
+            destination=destination,
+            path=path,
+            args={"suggested_only": "true" if suggested_only else "false"},
         )
 
     def get_info_of_users(self, destination: str, user_ids: List[str]):

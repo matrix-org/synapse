@@ -51,6 +51,7 @@ from synapse.rest.admin.rooms import (
 )
 from synapse.rest.admin.server_notice_servlet import SendServerNoticeServlet
 from synapse.rest.admin.statistics import UserMediaStatisticsRestServlet
+from synapse.rest.admin.username_available import UsernameAvailableRestServlet
 from synapse.rest.admin.users import (
     AccountValidityRenewServlet,
     DeactivateAccountRestServlet,
@@ -60,7 +61,6 @@ from synapse.rest.admin.users import (
     SearchUsersRestServlet,
     ShadowBanRestServlet,
     UserAdminServlet,
-    UserMediaRestServlet,
     UserMembershipRestServlet,
     UserRegisterServlet,
     UserRestServletV2,
@@ -224,7 +224,6 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     SendServerNoticeServlet(hs).register(http_server)
     VersionServlet(hs).register(http_server)
     UserAdminServlet(hs).register(http_server)
-    UserMediaRestServlet(hs).register(http_server)
     UserMembershipRestServlet(hs).register(http_server)
     UserTokenRestServlet(hs).register(http_server)
     UserRestServletV2(hs).register(http_server)
@@ -241,6 +240,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ForwardExtremitiesRestServlet(hs).register(http_server)
     RoomEventContextServlet(hs).register(http_server)
     RateLimitRestServlet(hs).register(http_server)
+    UsernameAvailableRestServlet(hs).register(http_server)
 
 
 def register_servlets_for_client_rest_resource(
