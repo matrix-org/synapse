@@ -1,1 +1,0 @@
-Remove pushers when deleting a 3pid from an account. Pushers for old unlinked emails will also be deleted.

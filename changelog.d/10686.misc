@@ -1,1 +1,0 @@
-Update `complement.sh` to rebuild the base Docker image when run with workers.
