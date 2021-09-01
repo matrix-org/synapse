@@ -317,7 +317,7 @@ class IdentityHandler(BaseHandler):
             )
 
         url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
-        url_bytes = "/_matrix/identity/api/v1/3pid/unbind".encode("ascii")
+        url_bytes = b"/_matrix/identity/api/v1/3pid/unbind"
 
         content = {
             "mxid": mxid,
@@ -836,7 +836,7 @@ class IdentityHandler(BaseHandler):
                 return data["mxid"]
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        except IOError as e:
+        except OSError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
         return None

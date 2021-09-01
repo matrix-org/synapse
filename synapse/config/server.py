@@ -511,7 +511,7 @@ class ServerConfig(Config):
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs = []  # type: List[Dict[str, Optional[int]]]
+        self.retention_purge_jobs: List[Dict[str, Optional[int]]] = []
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -694,23 +694,21 @@ class ServerConfig(Config):
         # not included in the sample configuration file on purpose as it's a temporary
         # hack, so that some users can trial the new defaults without impacting every
         # user on the homeserver.
-        users_new_default_push_rules = (
+        users_new_default_push_rules: list = (
             config.get("users_new_default_push_rules") or []
-        )  # type: list
+        )
         if not isinstance(users_new_default_push_rules, list):
             raise ConfigError("'users_new_default_push_rules' must be a list")
 
         # Turn the list into a set to improve lookup speed.
-        self.users_new_default_push_rules = set(
-            users_new_default_push_rules
-        )  # type: set
+        self.users_new_default_push_rules: set = set(users_new_default_push_rules)
 
         # Whitelist of domain names that given next_link parameters must have
-        next_link_domain_whitelist = config.get(
+        next_link_domain_whitelist: Optional[List[str]] = config.get(
             "next_link_domain_whitelist"
-        )  # type: Optional[List[str]]
+        )
 
-        self.next_link_domain_whitelist = None  # type: Optional[Set[str]]
+        self.next_link_domain_whitelist: Optional[Set[str]] = None
         if next_link_domain_whitelist is not None:
             if not isinstance(next_link_domain_whitelist, list):
                 raise ConfigError("'next_link_domain_whitelist' must be a list")

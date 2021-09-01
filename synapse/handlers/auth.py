@@ -191,7 +191,7 @@ class AuthHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
-        self.checkers = {}  # type: Dict[str, UserInteractiveAuthChecker]
+        self.checkers: Dict[str, UserInteractiveAuthChecker] = {}
         for auth_checker_class in INTERACTIVE_AUTH_CHECKERS:
             inst = auth_checker_class(hs)
             if inst.is_enabled():
@@ -296,7 +296,7 @@ class AuthHandler(BaseHandler):
 
         # A mapping of user ID to extra attributes to include in the login
         # response.
-        self._extra_attributes = {}  # type: Dict[str, SsoLoginExtraAttributes]
+        self._extra_attributes: Dict[str, SsoLoginExtraAttributes] = {}
 
     async def validate_user_via_ui_auth(
         self,
@@ -500,7 +500,7 @@ class AuthHandler(BaseHandler):
                 all the stages in any of the permitted flows.
         """
 
-        sid = None  # type: Optional[str]
+        sid: Optional[str] = None
         authdict = clientdict.pop("auth", {})
         if "session" in authdict:
             sid = authdict["session"]
@@ -588,9 +588,9 @@ class AuthHandler(BaseHandler):
             )
 
         # check auth type currently being presented
-        errordict = {}  # type: Dict[str, Any]
+        errordict: Dict[str, Any] = {}
         if "type" in authdict:
-            login_type = authdict["type"]  # type: str
+            login_type: str = authdict["type"]
             try:
                 result = await self._check_auth_dict(authdict, clientip)
                 if result:
@@ -766,7 +766,7 @@ class AuthHandler(BaseHandler):
             LoginType.TERMS: self._get_params_terms,
         }
 
-        params = {}  # type: Dict[str, Any]
+        params: Dict[str, Any] = {}
 
         for f in public_flows:
             for stage in f:
@@ -1530,9 +1530,9 @@ class AuthHandler(BaseHandler):
         except StoreError:
             raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-        user_id_to_verify = await self.get_session_data(
+        user_id_to_verify: str = await self.get_session_data(
             session_id, UIAuthSessionDataConstants.REQUEST_USER_ID
-        )  # type: str
+        )
 
         idps = await self.hs.get_sso_handler().get_identity_providers_for_user(
             user_id_to_verify

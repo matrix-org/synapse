@@ -75,7 +75,7 @@ class PurgeTests(HomeserverTestCase):
         token = self.get_success(
             self.store.get_topological_token_for_event(last["event_id"])
         )
-        event = "t{}-{}".format(token.topological + 1, token.stream + 1)
+        event = f"t{token.topological + 1}-{token.stream + 1}"
 
         # Purge everything before this topological token
         f = self.get_failure(

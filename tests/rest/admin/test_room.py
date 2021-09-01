@@ -535,7 +535,7 @@ class DeleteRoomTestCase(unittest.HomeserverTestCase):
                 )
             )
 
-            self.assertEqual(count, 0, msg="Rows not purged in {}".format(table))
+            self.assertEqual(count, 0, msg=f"Rows not purged in {table}")
 
     def _assert_peek(self, room_id, expect_code):
         """Assert that the admin user can (or cannot) peek into the room."""
@@ -599,7 +599,7 @@ class PurgeRoomTestCase(unittest.HomeserverTestCase):
                 )
             )
 
-            self.assertEqual(count, 0, msg="Rows not purged in {}".format(table))
+            self.assertEqual(count, 0, msg=f"Rows not purged in {table}")
 
 
 class RoomTestCase(unittest.HomeserverTestCase):
@@ -1280,7 +1280,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         self.public_room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=True
         )
-        self.url = "/_synapse/admin/v1/join/{}".format(self.public_room_id)
+        self.url = f"/_synapse/admin/v1/join/{self.public_room_id}"
 
     def test_requester_is_no_admin(self):
         """
@@ -1420,7 +1420,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         private_room_id = self.helper.create_room_as(
             self.creator, tok=self.creator_tok, is_public=False
         )
-        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        url = f"/_synapse/admin/v1/join/{private_room_id}"
         body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
@@ -1463,7 +1463,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
 
         # Join user to room.
 
-        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        url = f"/_synapse/admin/v1/join/{private_room_id}"
         body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
@@ -1493,7 +1493,7 @@ class JoinAliasRoomTestCase(unittest.HomeserverTestCase):
         private_room_id = self.helper.create_room_as(
             self.admin_user, tok=self.admin_user_tok, is_public=False
         )
-        url = "/_synapse/admin/v1/join/{}".format(private_room_id)
+        url = f"/_synapse/admin/v1/join/{private_room_id}"
         body = json.dumps({"user_id": self.second_user_id})
 
         channel = self.make_request(
@@ -1633,7 +1633,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1660,7 +1660,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1686,7 +1686,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={"user_id": self.second_user_id},
             access_token=self.admin_user_tok,
         )
@@ -1720,7 +1720,7 @@ class MakeRoomAdminTestCase(unittest.HomeserverTestCase):
 
         channel = self.make_request(
             "POST",
-            "/_synapse/admin/v1/rooms/{}/make_room_admin".format(room_id),
+            f"/_synapse/admin/v1/rooms/{room_id}/make_room_admin",
             content={},
             access_token=self.admin_user_tok,
         )
@@ -1753,7 +1753,6 @@ PURGE_TABLES = [
     "room_memberships",
     "room_stats_state",
     "room_stats_current",
-    "room_stats_historical",
     "room_stats_earliest_token",
     "rooms",
     "stream_ordering_to_exterm",

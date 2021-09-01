@@ -406,9 +406,9 @@ class TransportLayerClient:
             # this uses MSC2197 (Search Filtering over Federation)
             path = _create_v1_path("/publicRooms")
 
-            data = {
+            data: Dict[str, Any] = {
                 "include_all_networks": "true" if include_all_networks else "false"
-            }  # type: Dict[str, Any]
+            }
             if third_party_instance_id:
                 data["third_party_instance_id"] = third_party_instance_id
             if limit:
@@ -434,9 +434,9 @@ class TransportLayerClient:
         else:
             path = _create_v1_path("/publicRooms")
 
-            args = {
+            args: Dict[str, Any] = {
                 "include_all_networks": "true" if include_all_networks else "false"
-            }  # type: Dict[str, Any]
+            }
             if third_party_instance_id:
                 args["third_party_instance_id"] = (third_party_instance_id,)
             if limit:
