@@ -824,6 +824,8 @@ class RoomSummaryHandler:
         try:
             room_version = await self._store.get_room_version(room_id)
         except UnsupportedRoomVersionError:
+            # If a room with an unsupported room version is encountered, ignore
+            # it to avoid breaking the entire summary response.
             return False
 
         # Include the room if it has join rules of public or knock.
