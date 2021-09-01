@@ -201,6 +201,12 @@ class EventContentFields:
     )
 
 
+class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
+    SPACE = "m.space"
+
+
 class RoomEncryptionAlgorithms:
     MEGOLM_V1_AES_SHA2 = "m.megolm.v1.aes-sha2"
     DEFAULT = MEGOLM_V1_AES_SHA2

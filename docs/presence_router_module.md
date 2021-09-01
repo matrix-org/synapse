@@ -222,7 +222,9 @@ Synapse, amend your homeserver config file with the following.
 
 ```yaml
 presence:
-  routing_module:
+  enabled: true
+
+  presence_router:
     module: my_module.ExamplePresenceRouter
     config:
       # Any configuration options for your module. The below is an example.

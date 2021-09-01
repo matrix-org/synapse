@@ -168,7 +168,7 @@ class ModuleApi:
             "Using deprecated ModuleApi.register which creates a dummy user device."
         )
         user_id = yield self.register_user(localpart, displayname, emails or [])
-        _, access_token = yield self.register_device(user_id)
+        _, access_token, _, _ = yield self.register_device(user_id)
         return user_id, access_token
 
     def register_user(

@@ -310,13 +310,24 @@ class Lock:
         _excinst: Optional[BaseException],
         _exctb: Optional[TracebackType],
     ) -> bool:
+        await self.release()
+
+        return False
+
+    async def release(self) -> None:
+        """Release the lock.
+
+        This is automatically called when using the lock as a context manager.
+        """
+
+        if self._dropped:
+            return
+
         if self._looping_call.running:
             self._looping_call.stop()
 
         await self._store._drop_lock(self._lock_name, self._lock_key, self._token)
         self._dropped = True
-
-        return False
 
     def __del__(self) -> None:
         if not self._dropped:

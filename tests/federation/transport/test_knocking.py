@@ -205,9 +205,7 @@ class FederationKnockingTestCase(
 
         # Have this homeserver skip event auth checks. This is necessary due to
         # event auth checks ensuring that events were signed by the sender's homeserver.
-        async def _check_event_auth(
-            origin, event, context, state, auth_events, backfilled
-        ):
+        async def _check_event_auth(origin, event, context, *args, **kwargs):
             return context
 
         homeserver.get_federation_handler()._check_event_auth = _check_event_auth

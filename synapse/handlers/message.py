@@ -386,6 +386,7 @@ class EventCreationHandler:
     def __init__(self, hs: "HomeServer"):
         self.hs = hs
         self.auth = hs.get_auth()
+        self._event_auth_handler = hs.get_event_auth_handler()
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state = hs.get_state_handler()
@@ -510,6 +511,8 @@ class EventCreationHandler:
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
 
+                If non-None, prev_event_ids must also be provided.
+
             require_consent: Whether to check if the requester has
                 consented to the privacy policy.
 
@@ -582,6 +585,9 @@ class EventCreationHandler:
         # Strip down the auth_event_ids to only what we need to auth the event.
         # For example, we don't need extra m.room.member that don't match event.sender
         if auth_event_ids is not None:
+            # If auth events are provided, prev events must be also.
+            assert prev_event_ids is not None
+
             temp_event = await builder.build(
                 prev_event_ids=prev_event_ids,
                 auth_event_ids=auth_event_ids,
@@ -593,7 +599,7 @@ class EventCreationHandler:
                 (e.type, e.state_key): e.event_id for e in auth_events
             }
             # Actually strip down and use the necessary auth events
-            auth_event_ids = self.auth.compute_auth_events(
+            auth_event_ids = self._event_auth_handler.compute_auth_events(
                 event=temp_event,
                 current_state_ids=auth_event_state_map,
                 for_verification=False,
@@ -785,6 +791,8 @@ class EventCreationHandler:
                 The event ids to use as the auth_events for the new event.
                 Should normally be left as None, which will cause them to be calculated
                 based on the room state at the prev_events.
+
+                If non-None, prev_event_ids must also be provided.
             ratelimit: Whether to rate limit this send.
             txn_id: The transaction ID.
             ignore_shadow_ban: True if shadow-banned users should be allowed to
@@ -1050,7 +1058,9 @@ class EventCreationHandler:
             assert event.content["membership"] == Membership.LEAVE
         else:
             try:
-                await self.auth.check_from_context(room_version, event, context)
+                await self._event_auth_handler.check_from_context(
+                    room_version, event, context
+                )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
                 raise err
@@ -1375,7 +1385,7 @@ class EventCreationHandler:
                     raise AuthError(403, "Redacting server ACL events is not permitted")
 
             prev_state_ids = await context.get_prev_state_ids()
-            auth_events_ids = self.auth.compute_auth_events(
+            auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events_map = await self.store.get_events(auth_events_ids)

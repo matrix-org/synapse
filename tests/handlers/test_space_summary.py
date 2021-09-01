@@ -14,6 +14,7 @@
 from typing import Any, Iterable, Optional, Tuple
 from unittest import mock
 
+from synapse.api.constants import EventContentFields, RoomTypes
 from synapse.api.errors import AuthError
 from synapse.handlers.space_summary import _child_events_comparison_key
 from synapse.rest import admin
@@ -97,8 +98,20 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         self.hs = hs
         self.handler = self.hs.get_space_summary_handler()
 
+        # Create a user.
         self.user = self.register_user("user", "pass")
         self.token = self.login("user", "pass")
+
+        # Create a space and a child room.
+        self.space = self.helper.create_room_as(
+            self.user,
+            tok=self.token,
+            extra_content={
+                "creation_content": {EventContentFields.ROOM_TYPE: RoomTypes.SPACE}
+            },
+        )
+        self.room = self.helper.create_room_as(self.user, tok=self.token)
+        self._add_child(self.space, self.room, self.token)
 
     def _add_child(self, space_id: str, room_id: str, token: str) -> None:
         """Add a child room to a space."""
@@ -128,43 +141,32 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
 
     def test_simple_space(self):
         """Test a simple space with a single room."""
-        space = self.helper.create_room_as(self.user, tok=self.token)
-        room = self.helper.create_room_as(self.user, tok=self.token)
-        self._add_child(space, room, self.token)
-
-        result = self.get_success(self.handler.get_space_summary(self.user, space))
+        result = self.get_success(self.handler.get_space_summary(self.user, self.space))
         # The result should have the space and the room in it, along with a link
         # from space -> room.
-        self._assert_rooms(result, [space, room])
-        self._assert_events(result, [(space, room)])
+        self._assert_rooms(result, [self.space, self.room])
+        self._assert_events(result, [(self.space, self.room)])
 
     def test_visibility(self):
         """A user not in a space cannot inspect it."""
-        space = self.helper.create_room_as(self.user, tok=self.token)
-        room = self.helper.create_room_as(self.user, tok=self.token)
-        self._add_child(space, room, self.token)
-
         user2 = self.register_user("user2", "pass")
         token2 = self.login("user2", "pass")
 
         # The user cannot see the space.
-        self.get_failure(self.handler.get_space_summary(user2, space), AuthError)
+        self.get_failure(self.handler.get_space_summary(user2, self.space), AuthError)
 
         # Joining the room causes it to be visible.
-        self.helper.join(space, user2, tok=token2)
-        result = self.get_success(self.handler.get_space_summary(user2, space))
+        self.helper.join(self.space, user2, tok=token2)
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
 
         # The result should only have the space, but includes the link to the room.
-        self._assert_rooms(result, [space])
-        self._assert_events(result, [(space, room)])
+        self._assert_rooms(result, [self.space])
+        self._assert_events(result, [(self.space, self.room)])
 
     def test_world_readable(self):
         """A world-readable room is visible to everyone."""
-        space = self.helper.create_room_as(self.user, tok=self.token)
-        room = self.helper.create_room_as(self.user, tok=self.token)
-        self._add_child(space, room, self.token)
         self.helper.send_state(
-            space,
+            self.space,
             event_type="m.room.history_visibility",
             body={"history_visibility": "world_readable"},
             tok=self.token,
@@ -173,6 +175,6 @@ class SpaceSummaryTestCase(unittest.HomeserverTestCase):
         user2 = self.register_user("user2", "pass")
 
         # The space should be visible, as well as the link to the room.
-        result = self.get_success(self.handler.get_space_summary(user2, space))
-        self._assert_rooms(result, [space])
-        self._assert_events(result, [(space, room)])
+        result = self.get_success(self.handler.get_space_summary(user2, self.space))
+        self._assert_rooms(result, [self.space])
+        self._assert_events(result, [(self.space, self.room)])

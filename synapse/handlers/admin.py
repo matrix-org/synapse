@@ -62,9 +62,16 @@ class AdminHandler(BaseHandler):
         if ret:
             profile = await self.store.get_profileinfo(user.localpart)
             threepids = await self.store.user_get_threepids(user.to_string())
+            external_ids = [
+                ({"auth_provider": auth_provider, "external_id": external_id})
+                for auth_provider, external_id in await self.store.get_external_ids_by_user(
+                    user.to_string()
+                )
+            ]
             ret["displayname"] = profile.display_name
             ret["avatar_url"] = profile.avatar_url
             ret["threepids"] = threepids
+            ret["external_ids"] = external_ids
         return ret
 
     async def export_user_data(self, user_id: str, writer: "ExfiltrationWriter") -> Any:

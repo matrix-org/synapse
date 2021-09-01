@@ -23,7 +23,7 @@ from synapse.rest.client.v2_alpha.register import (
     register_servlets,
 )
 from synapse.spam_checker_api import RegistrationBehaviour
-from synapse.types import RoomAlias, UserID, create_requester
+from synapse.types import RoomAlias, RoomID, UserID, create_requester
 
 from tests.server import FakeChannel
 from tests.test_utils import make_awaitable
@@ -825,3 +825,50 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
             )
 
         return user_id, token
+
+
+class RemoteAutoJoinTestCase(unittest.HomeserverTestCase):
+    """Tests auto-join on remote rooms."""
+
+    def make_homeserver(self, reactor, clock):
+        self.room_id = "!roomid:remotetest"
+
+        async def update_membership(*args, **kwargs):
+            pass
+
+        async def lookup_room_alias(*args, **kwargs):
+            return RoomID.from_string(self.room_id), ["remotetest"]
+
+        self.room_member_handler = Mock(spec=["update_membership", "lookup_room_alias"])
+        self.room_member_handler.update_membership.side_effect = update_membership
+        self.room_member_handler.lookup_room_alias.side_effect = lookup_room_alias
+
+        hs = self.setup_test_homeserver(room_member_handler=self.room_member_handler)
+        return hs
+
+    def prepare(self, reactor, clock, hs):
+        self.handler = self.hs.get_registration_handler()
+        self.store = self.hs.get_datastore()
+
+    @override_config({"auto_join_rooms": ["#room:remotetest"]})
+    def test_auto_create_auto_join_remote_room(self):
+        """Tests that we don't attempt to create remote rooms, and that we don't attempt
+        to invite ourselves to rooms we're not in."""
+
+        # Register a first user; this should call _create_and_join_rooms
+        self.get_success(self.handler.register_user(localpart="jeff"))
+
+        _, kwargs = self.room_member_handler.update_membership.call_args
+
+        self.assertEqual(kwargs["room_id"], self.room_id)
+        self.assertEqual(kwargs["action"], "join")
+        self.assertEqual(kwargs["remote_room_hosts"], ["remotetest"])
+
+        # Register a second user; this should call _join_rooms
+        self.get_success(self.handler.register_user(localpart="jeff2"))
+
+        _, kwargs = self.room_member_handler.update_membership.call_args
+
+        self.assertEqual(kwargs["room_id"], self.room_id)
+        self.assertEqual(kwargs["action"], "join")
+        self.assertEqual(kwargs["remote_room_hosts"], ["remotetest"])

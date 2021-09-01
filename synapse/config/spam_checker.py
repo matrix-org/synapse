@@ -26,7 +26,7 @@ LEGACY_SPAM_CHECKER_WARNING = """
 This server is using a spam checker module that is implementing the deprecated spam
 checker interface. Please check with the module's maintainer to see if a new version
 supporting Synapse's generic modules system is available.
-For more information, please see https://matrix-org.github.io/synapse/develop/modules.html
+For more information, please see https://matrix-org.github.io/synapse/latest/modules.html
 ---------------------------------------------------------------------------------------"""
 
 

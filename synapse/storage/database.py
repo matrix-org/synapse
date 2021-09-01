@@ -111,7 +111,7 @@ def make_conn(
     db_config: DatabaseConnectionConfig,
     engine: BaseDatabaseEngine,
     default_txn_name: str,
-) -> Connection:
+) -> "LoggingDatabaseConnection":
     """Make a new connection to the database and return it.
 
     Returns:

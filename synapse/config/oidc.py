@@ -166,7 +166,7 @@ class OIDCConfig(Config):
         #
         #       module: The class name of a custom mapping module. Default is
         #           {mapping_provider!r}.
-        #           See https://github.com/matrix-org/synapse/blob/master/docs/sso_mapping_providers.md#openid-mapping-providers
+        #           See https://matrix-org.github.io/synapse/latest/sso_mapping_providers.html#openid-mapping-providers
         #           for information on implementing a custom mapping provider.
         #
         #       config: Configuration for the mapping provider module. This section will
@@ -217,7 +217,7 @@ class OIDCConfig(Config):
         #     - attribute: groups
         #       value: "admin"
         #
-        # See https://github.com/matrix-org/synapse/blob/master/docs/openid.md
+        # See https://matrix-org.github.io/synapse/latest/openid.html
         # for information on how to configure these options.
         #
         # For backwards compatibility, it is also possible to configure a single OIDC
