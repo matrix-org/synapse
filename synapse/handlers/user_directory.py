@@ -341,11 +341,13 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id: The room ID that user joined or started being public
             user_id
         """
-        logger.debug("Adding new user to dir, %r", user_id)
-
-        await self.store.update_profile_in_user_dir(
-            user_id, profile.display_name, profile.avatar_url
-        )
+        # Local users' directory entries are created and updated in tandem with
+        # their global profile, not in response to room events.
+        if not self.is_mine_id(user_id):
+            logger.debug("Adding new user to dir, %r", user_id)
+            await self.store.update_profile_in_user_dir(
+                user_id, profile.display_name, profile.avatar_url
+            )
 
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
