@@ -129,7 +129,7 @@ class FederationEventHandler:
         self._state_store = self._storage.state
 
         self._state_handler = hs.get_state_handler()
-        self.event_creation_handler = hs.get_event_creation_handler()
+        self._event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
         self.action_generator = hs.get_action_generator()
@@ -1334,7 +1334,7 @@ class FederationEventHandler:
         # If we are going to send this event over federation we precaclculate
         # the joined hosts.
         if event.internal_metadata.get_send_on_behalf_of():
-            await self.event_creation_handler.cache_joined_hosts_for_event(
+            await self._event_creation_handler.cache_joined_hosts_for_event(
                 event, context
             )
 
