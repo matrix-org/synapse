@@ -15,7 +15,6 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-from synapse.api.constants import EventTypes
 from synapse.api.ratelimiting import Ratelimiter
 
 if TYPE_CHECKING:
@@ -113,24 +112,3 @@ class BaseHandler:
                 burst_count=burst_count,
                 update=update,
             )
-
-    async def maybe_kick_guest_users(self, event, context=None):
-        # Technically this function invalidates current_state by changing it.
-        # Hopefully this isn't that important to the caller.
-        if event.type == EventTypes.GuestAccess:
-            guest_access = event.content.get("guest_access", "forbidden")
-            if guest_access != "can_join":
-                if context:
-                    current_state_ids = await context.get_current_state_ids()
-                    current_state_dict = await self.store.get_events(
-                        list(current_state_ids.values())
-                    )
-                    current_state = list(current_state_dict.values())
-                else:
-                    current_state_map = await self.state_handler.get_current_state(
-                        event.room_id
-                    )
-                    current_state = list(current_state_map.values())
-
-                logger.info("maybe_kick_guest_users %r", current_state)
-                await self.hs.get_room_member_handler().kick_guest_users(current_state)
