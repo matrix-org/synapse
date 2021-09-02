@@ -15,10 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-import synapse.types
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.types import UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -135,48 +133,4 @@ class BaseHandler:
                     current_state = list(current_state_map.values())
 
                 logger.info("maybe_kick_guest_users %r", current_state)
-                await self.kick_guest_users(current_state)
-
-    async def kick_guest_users(self, current_state):
-        for member_event in current_state:
-            try:
-                if member_event.type != EventTypes.Member:
-                    continue
-
-                target_user = UserID.from_string(member_event.state_key)
-                if not self.hs.is_mine(target_user):
-                    continue
-
-                if member_event.content["membership"] not in {
-                    Membership.JOIN,
-                    Membership.INVITE,
-                }:
-                    continue
-
-                if (
-                    "kind" not in member_event.content
-                    or member_event.content["kind"] != "guest"
-                ):
-                    continue
-
-                # We make the user choose to leave, rather than have the
-                # event-sender kick them. This is partially because we don't
-                # need to worry about power levels, and partially because guest
-                # users are a concept which doesn't hugely work over federation,
-                # and having homeservers have their own users leave keeps more
-                # of that decision-making and control local to the guest-having
-                # homeserver.
-                requester = synapse.types.create_requester(
-                    target_user, is_guest=True, authenticated_entity=self.server_name
-                )
-                handler = self.hs.get_room_member_handler()
-                await handler.update_membership(
-                    requester,
-                    target_user,
-                    member_event.room_id,
-                    "leave",
-                    ratelimit=False,
-                    require_consent=False,
-                )
-            except Exception as e:
-                logger.exception("Error kicking guest user: %s" % (e,))
+                await self.hs.get_room_member_handler().kick_guest_users(current_state)
