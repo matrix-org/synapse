@@ -16,7 +16,7 @@ import json
 import logging
 import re
 import typing
-from typing import Any, Callable, Dict, Pattern
+from typing import Any, Callable, Dict, Generator, Pattern
 
 import attr
 from frozendict import frozendict
@@ -71,7 +71,7 @@ json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 def unwrapFirstError(failure: Failure) -> Failure:
     # defer.gatherResults and DeferredLists wrap failures.
     failure.trap(defer.FirstError)
-    return failure.value.subFailure
+    return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
 
 
 @attr.s(slots=True)
@@ -85,8 +85,8 @@ class Clock:
 
     _reactor: IReactorTime = attr.ib()
 
-    @defer.inlineCallbacks
-    def sleep(self, seconds: float) -> typing.Iterable[Deferred[float]]:
+    @defer.inlineCallbacks  # type: ignore[arg-type]  # Issue in Twisted's type annotations
+    def sleep(self, seconds: float) -> Generator[Deferred[float], Any, Any]:
         d: defer.Deferred[float] = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
