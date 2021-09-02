@@ -228,11 +228,11 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                     for user_id in user_ids:
                         await self._handle_remove_user(room_id, user_id)
-                    return
                 else:
                     logger.debug("Server is still in room: %r", room_id)
+                    await self._handle_remove_user(room_id, state_key)
 
-            if joined is MatchChange.no_change:
+            elif joined is MatchChange.no_change:
                 # Handle any profile changes for remote users
                 if not self.is_mine_id(state_key):
                     await self._handle_remote_possible_profile_change(
@@ -252,8 +252,6 @@ class UserDirectoryHandler(StateDeltasHandler):
                 )
 
                 await self._handle_new_user(room_id, state_key, profile)
-            else:  # The user left
-                await self._handle_remove_user(room_id, state_key)
         else:
             logger.debug("Ignoring irrelevant type: %r", typ)
 
