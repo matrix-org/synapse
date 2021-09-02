@@ -18,6 +18,7 @@ import json
 
 import synapse.rest.admin
 from synapse.config._base import ConfigError
+from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.rest.client import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
@@ -179,6 +180,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         }
 
         hs = self.setup_test_homeserver(config=config)
+        load_legacy_spam_checkers(hs)
         return hs
 
     def prepare(self, reactor, clock, hs):

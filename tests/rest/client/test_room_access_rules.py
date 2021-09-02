@@ -22,6 +22,7 @@ from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
 from synapse.rest.client import directory, login, room
 from synapse.third_party_rules.access_rules import (
@@ -107,6 +108,8 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.hs.get_identity_handler().blacklisting_http_client = mock_http_client
 
         self.third_party_event_rules = self.hs.get_third_party_event_rules()
+
+        load_legacy_third_party_event_rules(self.hs)
 
         return self.hs
 
