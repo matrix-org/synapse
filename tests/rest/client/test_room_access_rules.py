@@ -15,7 +15,6 @@
 import json
 import random
 import string
-
 from unittest.mock import Mock
 
 from twisted.internet import defer

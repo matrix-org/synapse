@@ -18,9 +18,9 @@ import json
 import os
 import os.path
 import tempfile
+from unittest.mock import Mock
 
 import pkg_resources
-from unittest.mock import Mock
 
 from twisted.internet import defer
 
