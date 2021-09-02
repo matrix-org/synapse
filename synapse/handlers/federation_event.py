@@ -141,7 +141,7 @@ class FederationEventHandler:
         self._third_party_event_rules = hs.get_third_party_event_rules()
         self._notifier = hs.get_notifier()
 
-        self.is_mine_id = hs.is_mine_id
+        self._is_mine_id = hs.is_mine_id
         self._server_name = hs.hostname
         self._instance_name = hs.get_instance_name()
 
@@ -1793,7 +1793,7 @@ class FederationEventHandler:
             # users
             if event.internal_metadata.is_outlier():
                 if event.membership != Membership.INVITE:
-                    if not self.is_mine_id(target_user_id):
+                    if not self._is_mine_id(target_user_id):
                         return
 
             target_user = UserID.from_string(target_user_id)
