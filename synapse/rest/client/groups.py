@@ -26,6 +26,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -155,7 +156,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         group_id: str,
         category_id: Optional[str],
         room_id: str,
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -187,7 +188,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
     @_validate_group_id
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, category_id: str, room_id: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -450,7 +451,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
     @_validate_group_id
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, role_id: str, user_id: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -673,7 +674,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
     @_validate_group_id
     async def on_PUT(
         self, request: SynapseRequest, group_id: str, room_id: str, config_key: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -705,7 +706,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: SynapseRequest, group_id, user_id
+        self, request: SynapseRequest, group_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
@@ -737,7 +738,7 @@ class GroupAdminUsersKickServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: SynapseRequest, group_id, user_id
+        self, request: SynapseRequest, group_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
@@ -930,7 +931,7 @@ class GroupsForUserServlet(RestServlet):
         return 200, result
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     GroupServlet(hs).register(http_server)
     GroupSummaryServlet(hs).register(http_server)
     GroupInvitedUsersServlet(hs).register(http_server)

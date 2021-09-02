@@ -1,5 +1,4 @@
-# Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2018, 2019 New Vector Ltd
+# Copyright 2015-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +30,8 @@ from prometheus_client import Counter
 
 from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.filtering import FilterCollection
+from synapse.api.presence import UserPresenceState
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
@@ -231,7 +232,7 @@ class SyncResult:
     """
 
     next_batch: StreamToken
-    presence: List[JsonDict]
+    presence: List[UserPresenceState]
     account_data: List[JsonDict]
     joined: List[JoinedSyncResult]
     invited: List[InvitedSyncResult]
@@ -1843,6 +1844,9 @@ class SyncHandler:
         knocked = []
 
         for event in room_list:
+            if event.room_version_id not in KNOWN_ROOM_VERSIONS:
+                continue
+
             if event.membership == Membership.JOIN:
                 room_entries.append(
                     RoomSyncResultBuilder(
@@ -2174,14 +2178,14 @@ class SyncResultBuilder:
         joined_room_ids: List of rooms the user is joined to
 
         # The following mirror the fields in a sync response
-        presence (list)
-        account_data (list)
-        joined (list[JoinedSyncResult])
-        invited (list[InvitedSyncResult])
-        knocked (list[KnockedSyncResult])
-        archived (list[ArchivedSyncResult])
-        groups (GroupsSyncResult|None)
-        to_device (list)
+        presence
+        account_data
+        joined
+        invited
+        knocked
+        archived
+        groups
+        to_device
     """
 
     sync_config: SyncConfig
@@ -2190,7 +2194,7 @@ class SyncResultBuilder:
     now_token: StreamToken
     joined_room_ids: FrozenSet[str]
 
-    presence: List[JsonDict] = attr.Factory(list)
+    presence: List[UserPresenceState] = attr.Factory(list)
     account_data: List[JsonDict] = attr.Factory(list)
     joined: List[JoinedSyncResult] = attr.Factory(list)
     invited: List[InvitedSyncResult] = attr.Factory(list)

@@ -12,7 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-SCHEMA_VERSION = 62
+# When updating these values, please leave a short summary of the changes below.
+
+SCHEMA_VERSION = 63
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -25,6 +27,11 @@ for more information on how this works.
 Changes in SCHEMA_VERSION = 61:
     - The `user_stats_historical` and `room_stats_historical` tables are not written and
       are not read (previously, they were written but not read).
+
+Changes in SCHEMA_VERSION = 63:
+    - The `public_room_list_stream` table is not written nor read to
+      (previously, it was written and read to, but not for any significant purpose).
+      https://github.com/matrix-org/synapse/pull/10565
 """
 
 

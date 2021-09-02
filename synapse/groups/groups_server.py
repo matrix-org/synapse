@@ -332,6 +332,13 @@ class GroupsServerWorkerHandler:
             requester_user_id, group_id
         )
 
+        # Note! room_results["is_public"] is about whether the room is considered
+        # public from the group's point of view. (i.e. whether non-group members
+        # should be able to see the room is in the group).
+        # This is not the same as whether the room itself is public (in the sense
+        # of being visible in the room directory).
+        # As such, room_results["is_public"] itself is not sufficient to determine
+        # whether any given user is permitted to see the room's metadata.
         room_results = await self.store.get_rooms_in_group(
             group_id, include_private=is_user_in_group
         )
@@ -341,8 +348,15 @@ class GroupsServerWorkerHandler:
             room_id = room_result["room_id"]
 
             joined_users = await self.store.get_users_in_room(room_id)
+
+            # check the user is actually allowed to see the room before showing it to them
+            allow_private = requester_user_id in joined_users
+
             entry = await self.room_list_handler.generate_room_entry(
-                room_id, len(joined_users), with_alias=False, allow_private=True
+                room_id,
+                len(joined_users),
+                with_alias=False,
+                allow_private=allow_private,
             )
 
             if not entry:
@@ -354,7 +368,7 @@ class GroupsServerWorkerHandler:
 
         chunk.sort(key=lambda e: -e["num_joined_members"])
 
-        return {"chunk": chunk, "total_room_count_estimate": len(room_results)}
+        return {"chunk": chunk, "total_room_count_estimate": len(chunk)}
 
 
 class GroupsServerHandler(GroupsServerWorkerHandler):

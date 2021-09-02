@@ -1,1 +1,0 @@
-Re-organize the `synapse.federation.transport.server` module to create smaller files.

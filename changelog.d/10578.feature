@@ -1,1 +1,0 @@
-Add an admin API (`GET /_synapse/admin/username_available`) to check if a username is available (regardless of registration settings).

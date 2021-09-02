@@ -13,10 +13,18 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING, Tuple
 
+from twisted.web.server import Request
+
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
+from synapse.types import JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -24,17 +32,13 @@ logger = logging.getLogger(__name__)
 class PasswordPolicyServlet(RestServlet):
     PATTERNS = client_patterns("/password_policy$")
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.policy = hs.config.password_policy
         self.enabled = hs.config.password_policy_enabled
 
-    def on_GET(self, request):
+    def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.enabled or not self.policy:
             return (200, {})
 
@@ -53,5 +57,5 @@ class PasswordPolicyServlet(RestServlet):
         return (200, policy)
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     PasswordPolicyServlet(hs).register(http_server)

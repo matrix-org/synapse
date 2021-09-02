@@ -12,13 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
 import logging
+from typing import TYPE_CHECKING, Dict, List, Tuple
 
 from synapse.api.constants import ThirdPartyEntityKind
+from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -26,13 +32,13 @@ logger = logging.getLogger(__name__)
 class ThirdPartyProtocolsServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/protocols")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    async def on_GET(self, request):
+    async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         await self.auth.get_user_by_req(request, allow_guest=True)
 
         protocols = await self.appservice_handler.get_3pe_protocols()
@@ -42,13 +48,15 @@ class ThirdPartyProtocolsServlet(RestServlet):
 class ThirdPartyProtocolServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/protocol/(?P<protocol>[^/]+)$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    async def on_GET(self, request, protocol):
+    async def on_GET(
+        self, request: SynapseRequest, protocol: str
+    ) -> Tuple[int, JsonDict]:
         await self.auth.get_user_by_req(request, allow_guest=True)
 
         protocols = await self.appservice_handler.get_3pe_protocols(
@@ -63,16 +71,18 @@ class ThirdPartyProtocolServlet(RestServlet):
 class ThirdPartyUserServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/user(/(?P<protocol>[^/]+))?$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    async def on_GET(self, request, protocol):
+    async def on_GET(
+        self, request: SynapseRequest, protocol: str
+    ) -> Tuple[int, List[JsonDict]]:
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        fields = request.args
+        fields: Dict[bytes, List[bytes]] = request.args  # type: ignore[assignment]
         fields.pop(b"access_token", None)
 
         results = await self.appservice_handler.query_3pe(
@@ -85,16 +95,18 @@ class ThirdPartyUserServlet(RestServlet):
 class ThirdPartyLocationServlet(RestServlet):
     PATTERNS = client_patterns("/thirdparty/location(/(?P<protocol>[^/]+))?$")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.auth = hs.get_auth()
         self.appservice_handler = hs.get_application_service_handler()
 
-    async def on_GET(self, request, protocol):
+    async def on_GET(
+        self, request: SynapseRequest, protocol: str
+    ) -> Tuple[int, List[JsonDict]]:
         await self.auth.get_user_by_req(request, allow_guest=True)
 
-        fields = request.args
+        fields: Dict[bytes, List[bytes]] = request.args  # type: ignore[assignment]
         fields.pop(b"access_token", None)
 
         results = await self.appservice_handler.query_3pe(
@@ -104,7 +116,7 @@ class ThirdPartyLocationServlet(RestServlet):
         return 200, results
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     ThirdPartyProtocolsServlet(hs).register(http_server)
     ThirdPartyProtocolServlet(hs).register(http_server)
     ThirdPartyUserServlet(hs).register(http_server)
