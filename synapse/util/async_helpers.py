@@ -551,18 +551,18 @@ def timeout_deferred(
 
 
 @attr.s(slots=True, frozen=True)
-class DoneAwaitable:
+class DoneAwaitable(Generic[R]):
     """Simple awaitable that returns the provided value."""
 
-    value = attr.ib()
+    value = attr.ib(type="R")
 
     def __await__(self):
         return self
 
-    def __iter__(self):
+    def __iter__(self) -> "DoneAwaitable[R]":
         return self
 
-    def __next__(self):
+    def __next__(self) -> None:
         raise StopIteration(self.value)
 
 
