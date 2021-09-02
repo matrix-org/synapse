@@ -27,6 +27,7 @@ from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
     RelationTypes,
     UserTypes,
@@ -1477,8 +1478,8 @@ class EventCreationHandler:
         if event.type != EventTypes.GuestAccess:
             return
 
-        guest_access = event.content.get("guest_access")
-        if guest_access == "can_join":
+        guest_access = event.content.get(EventContentFields.GUEST_ACCESS)
+        if guest_access == GuestAccess.CAN_JOIN:
             return
 
         current_state_ids = await context.get_current_state_ids()

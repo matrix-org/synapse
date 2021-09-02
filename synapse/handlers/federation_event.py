@@ -36,6 +36,7 @@ from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
     RejectedReason,
     RoomEncryptionAlgorithms,
@@ -1336,8 +1337,8 @@ class FederationEventHandler(BaseHandler):
         if event.type != EventTypes.GuestAccess:
             return
 
-        guest_access = event.content.get("guest_access")
-        if guest_access == "can_join":
+        guest_access = event.content.get(EventContentFields.GUEST_ACCESS)
+        if guest_access == GuestAccess.CAN_JOIN:
             return
 
         current_state_map = await self.state_handler.get_current_state(event.room_id)
