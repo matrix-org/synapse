@@ -214,7 +214,7 @@ class RoomVersions:
     )
     V8 = RoomVersion(
         "8",
-        RoomDisposition.UNSTABLE,
+        RoomDisposition.STABLE,
         EventFormatVersions.V3,
         StateResolutionVersions.V2,
         enforce_key_validity=True,
