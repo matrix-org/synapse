@@ -388,22 +388,25 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self.store.add_users_who_share_private_room(room_id, to_insert)
 
     async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
-        """Called when we might need to remove user from directory
+        """Called in two cases:
+        - when the given user has left the room
+        - we can no longer see that the given user is in this room.
 
         Args:
-            room_id: The room ID that user left or stopped being public that
-            user_id
+            room_id: The room ID which the given user was in
         """
         logger.debug("Removing user %r", user_id)
 
         # Remove user from sharing tables
         await self.store.remove_user_who_share_room(user_id, room_id)
 
-        # Are they still in any rooms? If not, remove them entirely.
-        rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
+        # If this is a remote user, we can remove them from the user_directory
+        # if they're no longer in any rooms.
+        if not self.is_mine_id(user_id):
+            rooms_user_is_in = await self.store.get_user_dir_rooms_user_is_in(user_id)
 
-        if len(rooms_user_is_in) == 0:
-            await self.store.remove_from_user_dir(user_id)
+            if len(rooms_user_is_in) == 0:
+                await self.store.remove_from_user_dir(user_id)
 
     async def _handle_remote_possible_profile_change(
         self,
