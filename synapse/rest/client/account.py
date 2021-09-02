@@ -17,7 +17,7 @@ import logging
 import random
 import re
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 from urllib.parse import urlparse
 
 from synapse.api.constants import LoginType
@@ -692,7 +692,10 @@ class ThreepidRestServlet(RestServlet):
             # This makes the API entirely change shape when we have an AS token;
             # it really should be an entirely separate API - perhaps
             # /account/3pid/replicate or something.
-            threepid = body.get("threepid")
+            threepid: Optional[dict] = body.get("threepid")
+
+            if not threepid:
+                raise SynapseError(400, "Missing param 'threepid'")
 
             await self.auth_handler.add_threepid(
                 user_id,

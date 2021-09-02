@@ -45,7 +45,10 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     Awaitable[Union[bool, str]],
 ]
 # FIXME: Callback signature differs from mainline
-USER_MAY_INVITE_CALLBACK = Callable[[str, str, str, str, bool, bool], Awaitable[bool]]
+USER_MAY_INVITE_CALLBACK = Callable[
+    [str, Optional[str], Optional[dict], str, bool, bool],
+    Awaitable[bool]
+]
 # FIXME: Callback signature differs from mainline
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[
     [str, List[str], List[dict], bool], Awaitable[bool]

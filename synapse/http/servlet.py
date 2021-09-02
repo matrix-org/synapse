@@ -22,7 +22,7 @@ from typing import (
     Optional,
     Sequence,
     Tuple,
-    overload,
+    overload, Union,
 )
 
 from typing_extensions import Literal
@@ -630,7 +630,7 @@ def parse_json_object_from_request(
     return content
 
 
-def assert_params_in_dict(body: JsonDict, required: Iterable[str]) -> None:
+def assert_params_in_dict(body: JsonDict, required: Iterable[Union[str, bytes]]) -> None:
     absent = []
     for k in required:
         if k not in body:

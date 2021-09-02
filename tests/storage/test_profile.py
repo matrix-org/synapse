@@ -41,7 +41,7 @@ class ProfileStoreTestCase(unittest.HomeserverTestCase):
 
         # test set to None
         self.get_success(
-            self.store.set_profile_displayname(self.u_frank.localpart, None)
+            self.store.set_profile_displayname(self.u_frank.localpart, None, 1)
         )
 
         self.assertIsNone(
