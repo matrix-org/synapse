@@ -1,1 +1,1 @@
-Fix joining room when the server has received multiple invites for different users in the room.
+Fix edge case when persisting events into a room where there are multiple events we previously hadn't calculated auth chains for (and hadn't marked as needing to be calculated).
