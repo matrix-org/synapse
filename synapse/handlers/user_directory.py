@@ -201,8 +201,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 room_id, prev_event_id, event_id, typ
             )
         elif typ == EventTypes.Member:
-            is_support_user = await self.store.is_support_user(state_key)
-            if is_support_user:
+            if await self._user_omitted_from_directory(state_key):
                 return
 
             joined = await self._get_key_change(
@@ -257,6 +256,16 @@ class UserDirectoryHandler(StateDeltasHandler):
                 await self._handle_remove_user(room_id, state_key)
         else:
             logger.debug("Ignoring irrelevant type: %r", typ)
+
+    async def _user_omitted_from_directory(self, user_id: str) -> bool:
+        """We want to ignore events from "hidden" users who shouldn't be exposed
+        to real users."""
+        if await self.store.is_support_user(user_id):
+            return True
+        if self.store.get_if_app_services_interested_in_user(user_id):
+            return True
+
+        return False
 
     async def _handle_room_publicity_change(
         self,
@@ -352,38 +361,31 @@ class UserDirectoryHandler(StateDeltasHandler):
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
-        # Now we update users who share rooms with users.
-        other_users_in_room = await self.store.get_users_in_room(room_id)
-
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
+            other_users_in_room = await self.store.get_users_in_room(room_id)
+            other_users_in_room = [
+                other_user
+                for other_user in other_users_in_room
+                if not await self._user_omitted_from_directory(other_user)
+            ]
+
             to_insert = set()
 
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
+                for other_user_id in other_users_in_room:
+                    if user_id == other_user_id:
+                        continue
 
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    user_id
-                )
-
-                # We don't care about appservice users.
-                if not is_appservice:
-                    for other_user_id in other_users_in_room:
-                        if user_id == other_user_id:
-                            continue
-
-                        to_insert.add((user_id, other_user_id))
+                    to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
                 if user_id == other_user_id:
                     continue
-
-                is_appservice = self.store.get_if_app_services_interested_in_user(
-                    other_user_id
-                )
-                if self.is_mine_id(other_user_id) and not is_appservice:
+                if self.is_mine_id(other_user_id):
                     to_insert.add((other_user_id, user_id))
 
             if to_insert:
