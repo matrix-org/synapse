@@ -15,7 +15,7 @@
 import hmac
 import logging
 import random
-from typing import List, Union
+from typing import Dict, List, Union
 
 import synapse
 import synapse.api.auth
@@ -777,7 +777,7 @@ class RegisterRestServlet(RestServlet):
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        result = {
+        result: Dict[str, Union[int, str]] = {
             "user_id": user_id,
             "device_id": device_id,
             "access_token": access_token,

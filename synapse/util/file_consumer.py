@@ -58,7 +58,7 @@ class BackgroundFileConsumer:
         self._bytes_queue: queue.Queue[Optional[bytes]] = queue.Queue()
 
         # Deferred that is resolved when finished writing
-        self._finished_deferred: Optional[Deferred[int]] = None  # TODO
+        self._finished_deferred: Optional[Deferred[None]] = None
 
         # If the _writer thread throws an exception it gets stored here.
         self._write_exception: Optional[Exception] = None
@@ -141,7 +141,7 @@ class BackgroundFileConsumer:
         finally:
             self._file_obj.close()
 
-    def wait(self):
+    def wait(self) -> "Deferred[None]":
         """Returns a deferred that resolves when finished writing to file"""
         return make_deferred_yieldable(self._finished_deferred)
 
