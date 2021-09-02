@@ -54,7 +54,6 @@ from synapse.event_auth import auth_types_for_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
 from synapse.federation.federation_client import InvalidResponseError
-from synapse.handlers._base import BaseHandler
 from synapse.logging.context import (
     make_deferred_yieldable,
     nested_logging_context,
@@ -117,7 +116,7 @@ class _NewEventInfo:
     claimed_auth_event_map: StateMap[EventBase]
 
 
-class FederationEventHandler(BaseHandler):
+class FederationEventHandler:
     """Handles events that originated from federation.
 
     Responsible for handing incoming events and passing them on to the rest
@@ -125,8 +124,6 @@ class FederationEventHandler(BaseHandler):
     """
 
     def __init__(self, hs: "HomeServer"):
-        super().__init__(hs)
-
         self.store = hs.get_datastore()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
@@ -137,11 +134,15 @@ class FederationEventHandler(BaseHandler):
         self._message_handler = hs.get_message_handler()
         self.action_generator = hs.get_action_generator()
         self._state_resolution_handler = hs.get_state_resolution_handler()
+        # avoid a circular dependency by deferring execution here
+        self._get_room_member_handler = hs.get_room_member_handler
 
         self.federation_client = hs.get_federation_client()
         self.third_party_event_rules = hs.get_third_party_event_rules()
+        self._notifier = hs.get_notifier()
 
         self.is_mine_id = hs.is_mine_id
+        self._server_name = hs.hostname
         self._instance_name = hs.get_instance_name()
 
         self.config = hs.config
@@ -222,7 +223,7 @@ class FederationEventHandler(BaseHandler):
         # Note that if we were never in the room then we would have already
         # dropped the event, since we wouldn't know the room version.
         is_in_room = await self._event_auth_handler.check_host_in_room(
-            room_id, self.server_name
+            room_id, self._server_name
         )
         if not is_in_room:
             logger.info(
@@ -435,7 +436,7 @@ class FederationEventHandler(BaseHandler):
         server from invalid events (there is probably no point in trying to
         re-fetch invalid events from every other HS in the room.)
         """
-        if dest == self.server_name:
+        if dest == self._server_name:
             raise SynapseError(400, "Can't backfill from self.")
 
         events = await self.federation_client.backfill(
@@ -1349,7 +1350,7 @@ class FederationEventHandler(BaseHandler):
 
         current_state_map = await self.state_handler.get_current_state(event.room_id)
         current_state = list(current_state_map.values())
-        await self.hs.get_room_member_handler().kick_guest_users(current_state)
+        await self._get_room_member_handler().kick_guest_users(current_state)
 
     async def _check_for_soft_fail(
         self,
@@ -1804,7 +1805,7 @@ class FederationEventHandler(BaseHandler):
         event_pos = PersistedEventPosition(
             self._instance_name, event.internal_metadata.stream_ordering
         )
-        self.notifier.on_new_room_event(
+        self._notifier.on_new_room_event(
             event, event_pos, max_stream_token, extra_users=extra_users
         )
 
