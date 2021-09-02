@@ -125,8 +125,8 @@ class FederationEventHandler:
 
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
-        self.storage = hs.get_storage()
-        self.state_store = self.storage.state
+        self._storage = hs.get_storage()
+        self.state_store = self._storage.state
 
         self.state_handler = hs.get_state_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -1755,11 +1755,11 @@ class FederationEventHandler:
                 )
             return result["max_stream_id"]
         else:
-            assert self.storage.persistence
+            assert self._storage.persistence
 
             # Note that this returns the events that were persisted, which may not be
             # the same as were passed in if some were deduplicated due to transaction IDs.
-            events, max_stream_token = await self.storage.persistence.persist_events(
+            events, max_stream_token = await self._storage.persistence.persist_events(
                 event_and_contexts, backfilled=backfilled
             )
 
