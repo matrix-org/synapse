@@ -137,7 +137,7 @@ class FederationEventHandler:
         # avoid a circular dependency by deferring execution here
         self._get_room_member_handler = hs.get_room_member_handler
 
-        self.federation_client = hs.get_federation_client()
+        self._federation_client = hs.get_federation_client()
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._notifier = hs.get_notifier()
 
@@ -439,7 +439,7 @@ class FederationEventHandler:
         if dest == self._server_name:
             raise SynapseError(400, "Can't backfill from self.")
 
-        events = await self.federation_client.backfill(
+        events = await self._federation_client.backfill(
             dest, room_id, limit=limit, extremities=extremities
         )
 
@@ -538,7 +538,7 @@ class FederationEventHandler:
         # All that said: Let's try increasing the timeout to 60s and see what happens.
 
         try:
-            missing_events = await self.federation_client.get_missing_events(
+            missing_events = await self._federation_client.get_missing_events(
                 origin,
                 room_id,
                 earliest_events_ids=list(latest),
@@ -776,7 +776,7 @@ class FederationEventHandler:
         (
             state_event_ids,
             auth_event_ids,
-        ) = await self.federation_client.get_room_state_ids(
+        ) = await self._federation_client.get_room_state_ids(
             destination, room_id, event_id=event_id
         )
 
@@ -1103,7 +1103,7 @@ class FederationEventHandler:
         async def get_event(event_id: str):
             with nested_logging_context(event_id):
                 try:
-                    event = await self.federation_client.get_pdu(
+                    event = await self._federation_client.get_pdu(
                         [destination],
                         event_id,
                         room_version,
@@ -1510,7 +1510,7 @@ class FederationEventHandler:
             logger.info("auth_events contains unknown events: %s", missing_auth)
             try:
                 try:
-                    remote_auth_chain = await self.federation_client.get_event_auth(
+                    remote_auth_chain = await self._federation_client.get_event_auth(
                         origin, event.room_id, event.event_id
                     )
                 except RequestSendFailed as e1:
