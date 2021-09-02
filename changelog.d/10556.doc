@@ -1,1 +1,1 @@
-Change the directory name for remote thumbnails from `remote_thumbnails` to `remote_thumbnail` in  media_repository.md file to match the code.
+Minor fix to the `media_repository` developer documentation. Contributed by @cuttingedge1109.
