@@ -14,7 +14,7 @@
 import enum
 import logging
 import threading
-from typing import Dict, Generic, Iterable, Optional, Set, TypeVar
+from typing import Any, Dict, Generic, Iterable, Optional, Set, TypeVar
 
 import attr
 
@@ -31,8 +31,10 @@ DKT = TypeVar("DKT")
 DV = TypeVar("DV")
 
 
+# This class can't be generic because it uses slots with attrs.
+# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True)
-class DictionaryEntry(Generic[DKT, DV]):
+class DictionaryEntry:  # should be: Generic[DKT, DV].
     """Returned when getting an entry from the cache
 
     Attributes:
@@ -45,8 +47,8 @@ class DictionaryEntry(Generic[DKT, DV]):
     """
 
     full = attr.ib(type=bool)
-    known_absent = attr.ib(type=Set[DKT])
-    value = attr.ib(type=Dict[DKT, DV])
+    known_absent = attr.ib(type=Set[Any])  # should be: Set[DKT]
+    value = attr.ib(type=Dict[Any, Any])  # should be: Dict[DKT, DV]
 
     def __len__(self) -> int:
         return len(self.value)
@@ -64,7 +66,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
     """
 
     def __init__(self, name: str, max_entries: int = 1000):
-        self.cache: LruCache[KT, DictionaryEntry[DKT, DV]] = LruCache(
+        self.cache: LruCache[KT, DictionaryEntry] = LruCache(
             max_size=max_entries, cache_name=name, size_callback=len
         )
 
@@ -84,7 +86,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
 
     def get(
         self, key: KT, dict_keys: Optional[Iterable[DKT]] = None
-    ) -> DictionaryEntry[DKT, DV]:
+    ) -> DictionaryEntry:
         """Fetch an entry out of the cache
 
         Args:
@@ -158,9 +160,7 @@ class DictionaryCache(Generic[KT, DKT, DV]):
         # We pop and reinsert as we need to tell the cache the size may have
         # changed
 
-        entry: DictionaryEntry[DKT, DV] = self.cache.pop(
-            key, DictionaryEntry(False, set(), {})
-        )
+        entry: DictionaryEntry = self.cache.pop(key, DictionaryEntry(False, set(), {}))
         entry.value.update(value)
         entry.known_absent.update(known_absent)
         self.cache[key] = entry

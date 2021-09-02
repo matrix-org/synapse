@@ -550,16 +550,18 @@ def timeout_deferred(
     return new_d
 
 
+# This class can't be generic because it uses slots with attrs.
+# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True, frozen=True)
-class DoneAwaitable(Generic[R]):
+class DoneAwaitable:  # should be: Generic[R]
     """Simple awaitable that returns the provided value."""
 
-    value = attr.ib(type="R")
+    value = attr.ib(type=Any)  # should be: R
 
     def __await__(self):
         return self
 
-    def __iter__(self) -> "DoneAwaitable[R]":
+    def __iter__(self) -> "DoneAwaitable":
         return self
 
     def __next__(self) -> None:
