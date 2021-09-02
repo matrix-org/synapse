@@ -23,7 +23,6 @@ from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
-from tests.server import make_request
 from tests.unittest import override_config
 
 
@@ -666,7 +665,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         # One of them makes the room public.
-        res = self.helper.send_state(
+        self.helper.send_state(
             room,
             "m.room.join_rules",
             {"join_rule": "public"},
