@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import Tuple, List
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -22,6 +23,7 @@ from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
+from tests.server import make_request
 from tests.unittest import override_config
 
 
@@ -379,7 +381,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
 
-    def get_users_in_public_rooms(self):
+    def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
         r = self.get_success(
             self.store.db_pool.simple_select_list(
                 "users_in_public_rooms", None, ("user_id", "room_id")
@@ -390,7 +392,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             retval.append((i["user_id"], i["room_id"]))
         return retval
 
-    def get_users_who_share_private_rooms(self):
+    def get_users_who_share_private_rooms(self) -> List[Tuple[str, str, str]]:
         return self.get_success(
             self.store.db_pool.simple_select_list(
                 "users_who_share_private_rooms",
@@ -638,6 +640,45 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(
             self.hs.get_storage().persistence.persist_event(event, context)
         )
+
+    def test_making_room_public_doesnt_alter_directory_entry(self):
+        # TODO the same should apply when Alice is a remote user.
+        alice = self.register_user("alice", "pass")
+        alice_token = self.login(alice, "pass")
+        bob = self.register_user("bob", "pass")
+        bob_token = self.login(bob, "pass")
+
+        # Alice and Bob are in a private room.
+        room = self.helper.create_room_as(alice, is_public=False, tok=alice_token)
+        self.helper.invite(room, src=alice, targ=bob, tok=alice_token)
+        self.helper.join(room, user=bob, tok=bob_token)
+
+        # Alice has a nickname unique to that room.
+        self.helper.send_state(
+            room,
+            "m.room.member",
+            {
+                "displayname": "Freddy Mercury",
+                "membership": "join",
+            },
+            alice_token,
+            state_key=alice,
+        )
+
+        # One of them makes the room public.
+        res = self.helper.send_state(
+            room,
+            "m.room.join_rules",
+            {"join_rule": "public"},
+            alice_token,
+        )
+        # Wait for the handler to process the event
+        self.assertIn((alice, room), self.get_users_in_public_rooms())
+
+        # Alice's nickname is now publicly visible, but this shouldn't change
+        # her entry in the user directory.
+        search_result = self.get_success(self.handler.search_users(bob, alice, 10))
+        self.assertEqual(search_result["results"], [{"display_name": "alice", "avatar_url": None, "user_id": alice}], 0)
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
