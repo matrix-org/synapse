@@ -38,7 +38,7 @@ class Distributor:
       model will do for today.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.signals: Dict[str, Signal] = {}
         self.pre_registration: Dict[str, List[Callable]] = {}
 

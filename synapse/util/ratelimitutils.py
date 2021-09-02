@@ -150,7 +150,7 @@ class _PerHostRatelimiter:
 
             self.sleeping_requests.add(request_id)
 
-            def on_wait_finished(_):
+            def on_wait_finished(_) -> "defer.Deferred[None]":
                 logger.debug("Ratelimit [%s]: Finished sleeping", id(request_id))
                 self.sleeping_requests.discard(request_id)
                 queue_defer = queue_request()
@@ -160,19 +160,19 @@ class _PerHostRatelimiter:
         else:
             ret_defer = queue_request()
 
-        def on_start(r):
+        def on_start(r: object) -> object:
             logger.debug("Ratelimit [%s]: Processing req", id(request_id))
             self.current_processing.add(request_id)
             return r
 
-        def on_err(r):
+        def on_err(r: object) -> object:
             # XXX: why is this necessary? this is called before we start
             # processing the request so why would the request be in
             # current_processing?
             self.current_processing.discard(request_id)
             return r
 
-        def on_both(r):
+        def on_both(r: object) -> object:
             # Ensure that we've properly cleaned up.
             self.sleeping_requests.discard(request_id)
             self.ready_request_queue.pop(request_id, None)

@@ -98,7 +98,7 @@ def manhole(username, password, globals):
 class SynapseManhole(ColoredManhole):
     """Overrides connectionMade to create our own ManholeInterpreter"""
 
-    def connectionMade(self):
+    def connectionMade(self) -> None:
         super().connectionMade()
 
         # replace the manhole interpreter with our own impl
@@ -133,7 +133,7 @@ class SynapseManholeInterpreter(ManholeInterpreter):
         lines = traceback.format_exception_only(type, value)
         self.write("".join(lines))
 
-    def showtraceback(self):
+    def showtraceback(self) -> None:
         """Display the exception that just occurred.
 
         Overrides the base implementation, ignoring sys.excepthook. We always want

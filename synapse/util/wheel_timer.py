@@ -13,16 +13,15 @@
 # limitations under the License.
 from typing import Generic, List, TypeVar
 
+T = TypeVar("T")
 
-class _Entry:
+
+class _Entry(Generic[T]):
     __slots__ = ["end_key", "queue"]
 
-    def __init__(self, end_key):
+    def __init__(self, end_key) -> None:
         self.end_key = end_key
-        self.queue = []
-
-
-T = TypeVar("T")
+        self.queue: List[T] = []
 
 
 class WheelTimer(Generic[T]):
@@ -37,7 +36,7 @@ class WheelTimer(Generic[T]):
                 accuracy of the timer.
         """
         self.bucket_size = bucket_size
-        self.entries = []
+        self.entries: List[_Entry[T]] = []
         self.current_tick = 0
 
     def insert(self, now: int, obj: T, then: int) -> None:

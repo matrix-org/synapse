@@ -384,7 +384,7 @@ class LruCache(Generic[KT, VT]):
 
         lock = threading.Lock()
 
-        def evict():
+        def evict() -> None:
             while cache_len() > self.max_size:
                 # Get the last node in the list (i.e. the oldest node).
                 todelete = list_root.prev_node

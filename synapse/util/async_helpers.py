@@ -411,7 +411,7 @@ class ReadWriteLock:
     # writers and readers have been resolved. The new writer replaces the latest
     # writer.
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Latest readers queued
         self.key_to_current_readers: Dict[str, Set[defer.Deferred]] = {}
 
@@ -503,7 +503,7 @@ def timeout_deferred(
 
     timed_out = [False]
 
-    def time_it_out():
+    def time_it_out() -> None:
         timed_out[0] = True
 
         try:

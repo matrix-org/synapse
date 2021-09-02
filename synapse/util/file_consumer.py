@@ -13,11 +13,14 @@
 # limitations under the License.
 
 import queue
-from typing import Optional
+from typing import BinaryIO, Optional, Union
 
 from twisted.internet import threads
+from twisted.internet.defer import Deferred
+from twisted.internet.interfaces import IPullProducer, IPushProducer
 
 from synapse.logging.context import make_deferred_yieldable, run_in_background
+from synapse.types import ISynapseReactor
 
 
 class BackgroundFileConsumer:
@@ -25,9 +28,9 @@ class BackgroundFileConsumer:
     and pull producers
 
     Args:
-        file_obj (file): The file like object to write to. Closed when
+        file_obj: The file like object to write to. Closed when
             finished.
-        reactor (twisted.internet.reactor): the Twisted reactor to use
+        reactor: the Twisted reactor to use
     """
 
     # For PushProducers pause if we have this many unwritten slices
@@ -35,13 +38,13 @@ class BackgroundFileConsumer:
     # And resume once the size of the queue is less than this
     _RESUME_ON_QUEUE_SIZE = 2
 
-    def __init__(self, file_obj, reactor):
-        self._file_obj = file_obj
+    def __init__(self, file_obj: BinaryIO, reactor: ISynapseReactor) -> None:
+        self._file_obj: BinaryIO = file_obj
 
-        self._reactor = reactor
+        self._reactor: ISynapseReactor = reactor
 
         # Producer we're registered with
-        self._producer = None
+        self._producer: Optional[Union[IPushProducer, IPullProducer]] = None
 
         # True if PushProducer, false if PullProducer
         self.streaming = False
@@ -55,17 +58,19 @@ class BackgroundFileConsumer:
         self._bytes_queue: queue.Queue[Optional[bytes]] = queue.Queue()
 
         # Deferred that is resolved when finished writing
-        self._finished_deferred = None
+        self._finished_deferred: Optional[Deferred[int]] = None  # TODO
 
         # If the _writer thread throws an exception it gets stored here.
-        self._write_exception = None
+        self._write_exception: Optional[Exception] = None
 
-    def registerProducer(self, producer, streaming) -> None:
+    def registerProducer(
+        self, producer: Union[IPushProducer, IPullProducer], streaming: bool
+    ) -> None:
         """Part of IConsumer interface
 
         Args:
-            producer (IProducer)
-            streaming (bool): True if push based producer, False if pull
+            producer
+            streaming: True if push based producer, False if pull
                 based.
         """
         if self._producer:
@@ -80,6 +85,7 @@ class BackgroundFileConsumer:
             self._writer,
         )
         if not streaming:
+            assert isinstance(self._producer, IPullProducer)
             self._producer.resumeProducing()
 
     def unregisterProducer(self) -> None:
@@ -89,7 +95,7 @@ class BackgroundFileConsumer:
         if not self._finished_deferred.called:
             self._bytes_queue.put_nowait(None)
 
-    def write(self, bytes) -> None:
+    def write(self, write_bytes: bytes) -> None:
         """Part of IProducer interface"""
         if self._write_exception:
             raise self._write_exception
@@ -98,11 +104,12 @@ class BackgroundFileConsumer:
         if self._finished_deferred.called:
             raise Exception("consumer has closed")
 
-        self._bytes_queue.put_nowait(bytes)
+        self._bytes_queue.put_nowait(write_bytes)
 
         # If this is a PushProducer and the queue is getting behind
         # then we pause the producer.
         if self.streaming and self._bytes_queue.qsize() >= self._PAUSE_ON_QUEUE_SIZE:
+            assert isinstance(self._producer, IPushProducer)
             self._paused_producer = True
             assert self._producer is not None
             self._producer.pauseProducing()
