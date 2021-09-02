@@ -299,8 +299,6 @@ class UserDirectoryHandler(StateDeltasHandler):
             )
         else:
             raise Exception("Invalid event type")
-        # If change is None, no change. True => become world_readable/public,
-        # False => was world_readable/public
         if publicity is MatchChange.no_change:
             logger.debug("No change")
             return
