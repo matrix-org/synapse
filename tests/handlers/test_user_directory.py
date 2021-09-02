@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Tuple, List
+from typing import List, Tuple
 from unittest.mock import Mock
 
 from twisted.internet import defer
@@ -678,7 +678,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Alice's nickname is now publicly visible, but this shouldn't change
         # her entry in the user directory.
         search_result = self.get_success(self.handler.search_users(bob, alice, 10))
-        self.assertEqual(search_result["results"], [{"display_name": "alice", "avatar_url": None, "user_id": alice}], 0)
+        self.assertEqual(
+            search_result["results"],
+            [{"display_name": "alice", "avatar_url": None, "user_id": alice}],
+            0,
+        )
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):

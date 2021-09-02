@@ -214,17 +214,13 @@ class UserDirectoryHandler(StateDeltasHandler):
             if joined is MatchChange.now_false:
                 # Need to check if the server left the room entirely, if so
                 # we might need to remove all the users in that room
-                is_in_room = await self.store.is_host_joined(
-                    room_id, self.server_name
-                )
+                is_in_room = await self.store.is_host_joined(room_id, self.server_name)
                 if not is_in_room:
                     logger.debug("Server left room: %r", room_id)
                     # Fetch all the users that we marked as being in user
                     # directory due to being in the room and then check if
                     # need to remove those users or not
-                    user_ids = await self.store.get_users_in_dir_due_to_room(
-                        room_id
-                    )
+                    user_ids = await self.store.get_users_in_dir_due_to_room(room_id)
 
                     for user_id in user_ids:
                         await self._handle_remove_user(room_id, user_id)
@@ -335,7 +331,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id  in other_users_in_room:
+        for user_id in other_users_in_room:
             await self._track_user_joined_room(room_id, user_id)
 
     async def _handle_remote_user_joining_room(
