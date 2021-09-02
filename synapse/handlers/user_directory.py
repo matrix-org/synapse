@@ -201,6 +201,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 room_id, prev_event_id, event_id, typ
             )
         elif typ == EventTypes.Member:
+            is_support_user = await self.store.is_support_user(state_key)
+            if is_support_user:
+                return
+
             joined = await self._get_key_change(
                 prev_event_id,
                 event_id,
@@ -228,10 +232,6 @@ class UserDirectoryHandler(StateDeltasHandler):
                     return
                 else:
                     logger.debug("Server is still in room: %r", room_id)
-
-            is_support_user = await self.store.is_support_user(state_key)
-            if is_support_user:
-                return
 
             if joined is MatchChange.no_change:
                 # Handle any profile changes for remote users
