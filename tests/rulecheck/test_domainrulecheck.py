@@ -317,13 +317,13 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 403, channel.result["body"])
 
-    def _create_room(self, token, content={}):
+    def _create_room(self, token, content=None):
         path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
         channel = self.make_request(
             "POST",
             path,
-            content=json.dumps(content).encode("utf8"),
+            content=json.dumps(content or {}).encode("utf8"),
         )
 
         return channel
