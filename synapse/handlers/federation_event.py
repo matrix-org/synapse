@@ -126,7 +126,7 @@ class FederationEventHandler:
     def __init__(self, hs: "HomeServer"):
         self._store = hs.get_datastore()
         self._storage = hs.get_storage()
-        self.state_store = self._storage.state
+        self._state_store = self._storage.state
 
         self.state_handler = hs.get_state_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
@@ -693,7 +693,7 @@ class FederationEventHandler:
         event_map = {event_id: event}
         try:
             # Get the state of the events we know about
-            ours = await self.state_store.get_state_groups_ids(room_id, seen)
+            ours = await self._state_store.get_state_groups_ids(room_id, seen)
 
             # state_maps is a list of mappings from (type, state_key) to event_id
             state_maps: List[StateMap[str]] = list(ours.values())
@@ -1400,7 +1400,7 @@ class FederationEventHandler:
             # given state at the event. This should correctly handle cases
             # like bans, especially with state res v2.
 
-            state_sets_d = await self.state_store.get_state_groups(
+            state_sets_d = await self._state_store.get_state_groups(
                 event.room_id, extrem_ids
             )
             state_sets: List[Iterable[EventBase]] = list(state_sets_d.values())
@@ -1671,7 +1671,7 @@ class FederationEventHandler:
 
         # create a new state group as a delta from the existing one.
         prev_group = context.state_group
-        state_group = await self.state_store.store_state_group(
+        state_group = await self._state_store.store_state_group(
             event.event_id,
             event.room_id,
             prev_group=prev_group,
