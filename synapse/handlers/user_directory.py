@@ -172,7 +172,8 @@ class UserDirectoryHandler(StateDeltasHandler):
                 )
 
                 logger.debug("Handling %d state deltas", len(deltas))
-                await self._handle_deltas(deltas)
+                for delta in deltas:
+                    await self._handle_delta(delta)
 
                 self.pos = max_pos
 
@@ -183,80 +184,79 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 await self.store.update_user_directory_stream_pos(max_pos)
 
-    async def _handle_deltas(self, deltas: List[Dict[str, Any]]) -> None:
-        """Called with the state deltas to process"""
-        for delta in deltas:
-            typ = delta["type"]
-            state_key = delta["state_key"]
-            room_id = delta["room_id"]
-            event_id = delta["event_id"]
-            prev_event_id = delta["prev_event_id"]
+    async def _handle_delta(self, delta: Dict[str, Any]) -> None:
+        """Called with an individual state delta to process"""
+        typ = delta["type"]
+        state_key = delta["state_key"]
+        room_id = delta["room_id"]
+        event_id = delta["event_id"]
+        prev_event_id = delta["prev_event_id"]
 
-            logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
+        logger.debug("Handling: %r %r, %s", typ, state_key, event_id)
 
-            # For join rule and visibility changes we need to check if the room
-            # may have become public or not and add/remove the users in said room
-            if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
-                await self._handle_room_publicity_change(
-                    room_id, prev_event_id, event_id, typ
+        # For join rule and visibility changes we need to check if the room
+        # may have become public or not and add/remove the users in said room
+        if typ in (EventTypes.RoomHistoryVisibility, EventTypes.JoinRules):
+            await self._handle_room_publicity_change(
+                room_id, prev_event_id, event_id, typ
+            )
+        elif typ == EventTypes.Member:
+            joined = await self._get_key_change(
+                prev_event_id,
+                event_id,
+                key_name="membership",
+                public_value=Membership.JOIN,
+            )
+
+            if joined is MatchChange.now_false:
+                # Need to check if the server left the room entirely, if so
+                # we might need to remove all the users in that room
+                is_in_room = await self.store.is_host_joined(
+                    room_id, self.server_name
                 )
-            elif typ == EventTypes.Member:
-                joined = await self._get_key_change(
-                    prev_event_id,
-                    event_id,
-                    key_name="membership",
-                    public_value=Membership.JOIN,
-                )
-
-                if joined is MatchChange.now_false:
-                    # Need to check if the server left the room entirely, if so
-                    # we might need to remove all the users in that room
-                    is_in_room = await self.store.is_host_joined(
-                        room_id, self.server_name
-                    )
-                    if not is_in_room:
-                        logger.debug("Server left room: %r", room_id)
-                        # Fetch all the users that we marked as being in user
-                        # directory due to being in the room and then check if
-                        # need to remove those users or not
-                        user_ids = await self.store.get_users_in_dir_due_to_room(
-                            room_id
-                        )
-
-                        for user_id in user_ids:
-                            await self._handle_remove_user(room_id, user_id)
-                        return
-                    else:
-                        logger.debug("Server is still in room: %r", room_id)
-
-                is_support_user = await self.store.is_support_user(state_key)
-                if is_support_user:
-                    continue
-
-                if joined is MatchChange.no_change:
-                    # Handle any profile changes for remote users
-                    if not self.is_mine_id(state_key):
-                        await self._handle_remote_possible_profile_change(
-                            state_key, room_id, prev_event_id, event_id
-                        )
-
-                elif joined is MatchChange.now_true:  # The user joined
-                    event = await self.store.get_event(event_id, allow_none=True)
-                    # It isn't expected for this event to not exist, but we
-                    # don't want the entire background process to break.
-                    if event is None:
-                        continue
-
-                    profile = ProfileInfo(
-                        avatar_url=event.content.get("avatar_url"),
-                        display_name=event.content.get("displayname"),
+                if not is_in_room:
+                    logger.debug("Server left room: %r", room_id)
+                    # Fetch all the users that we marked as being in user
+                    # directory due to being in the room and then check if
+                    # need to remove those users or not
+                    user_ids = await self.store.get_users_in_dir_due_to_room(
+                        room_id
                     )
 
-                    await self._handle_new_user(room_id, state_key, profile)
-                else:  # The user left
-                    await self._handle_remove_user(room_id, state_key)
-            else:
-                logger.debug("Ignoring irrelevant type: %r", typ)
+                    for user_id in user_ids:
+                        await self._handle_remove_user(room_id, user_id)
+                    return
+                else:
+                    logger.debug("Server is still in room: %r", room_id)
+
+            is_support_user = await self.store.is_support_user(state_key)
+            if is_support_user:
+                return
+
+            if joined is MatchChange.no_change:
+                # Handle any profile changes for remote users
+                if not self.is_mine_id(state_key):
+                    await self._handle_remote_possible_profile_change(
+                        state_key, room_id, prev_event_id, event_id
+                    )
+
+            elif joined is MatchChange.now_true:  # The user joined
+                event = await self.store.get_event(event_id, allow_none=True)
+                # It isn't expected for this event to not exist, but we
+                # don't want the entire background process to break.
+                if event is None:
+                    return
+
+                profile = ProfileInfo(
+                    avatar_url=event.content.get("avatar_url"),
+                    display_name=event.content.get("displayname"),
+                )
+
+                await self._handle_new_user(room_id, state_key, profile)
+            else:  # The user left
+                await self._handle_remove_user(room_id, state_key)
+        else:
+            logger.debug("Ignoring irrelevant type: %r", typ)
 
     async def _handle_room_publicity_change(
         self,
