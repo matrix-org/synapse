@@ -240,6 +240,8 @@ class UserDirectoryHandler(StateDeltasHandler):
                     )
 
             elif joined is MatchChange.now_true:  # The user joined
+                await self._track_user_joined_room(room_id, state_key)
+
                 event = await self.store.get_event(event_id, allow_none=True)
                 # It isn't expected for this event to not exist, but we
                 # don't want the entire background process to break.
@@ -251,7 +253,8 @@ class UserDirectoryHandler(StateDeltasHandler):
                     display_name=event.content.get("displayname"),
                 )
 
-                await self._handle_new_user(room_id, state_key, profile)
+                if not self.is_mine_id(state_key):
+                    await self._handle_remote_user_joining_room(state_key, profile)
         else:
             logger.debug("Ignoring irrelevant type: %r", typ)
 
@@ -320,25 +323,23 @@ class UserDirectoryHandler(StateDeltasHandler):
             # ignore the change
             return
 
-        other_users_in_room_with_profiles = (
-            await self.store.get_users_in_room_with_profiles(room_id)
-        )
+        other_users_in_room = await self.store.get_users_in_room(room_id)
 
         # Remove every user from the sharing tables for that room.
-        for user_id in other_users_in_room_with_profiles.keys():
+        for user_id in other_users_in_room:
             await self.store.remove_user_who_share_room(user_id, room_id)
 
         # Then, re-add them to the tables.
-        # NOTE: this is not the most efficient method, as handle_new_user sets
+        # NOTE: this is not the most efficient, as _track_user_joined_room sets
         # up local_user -> other_user and other_user_whos_local -> local_user,
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id, profile in other_users_in_room_with_profiles.items():
-            await self._handle_new_user(room_id, user_id, profile)
+        for user_id  in other_users_in_room:
+            await self._track_user_joined_room(room_id, user_id)
 
-    async def _handle_new_user(
-        self, room_id: str, user_id: str, profile: ProfileInfo
+    async def _handle_remote_user_joining_room(
+        self, user_id: str, profile: ProfileInfo
     ) -> None:
         """Called when we might need to add user to directory
 
@@ -354,6 +355,9 @@ class UserDirectoryHandler(StateDeltasHandler):
                 user_id, profile.display_name, profile.avatar_url
             )
 
+    async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
+        """Someone's just joined a room. Add to `users_in_public_rooms` and
+        `users sharing private room` if necessary."""
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
