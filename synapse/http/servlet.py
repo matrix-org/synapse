@@ -579,14 +579,14 @@ def parse_json_value_from_request(request: Request) -> JsonDict:
 
 @overload
 def parse_json_value_from_request(
-    request: Request, *, allow_empty_body: Literal[True]
-) -> Optional[JsonDict]:
+    request: Request, allow_empty_body: Literal[False]
+) -> JsonDict:
     ...
 
 
 @overload
 def parse_json_value_from_request(
-    request: Request, *, allow_empty_body: bool = False
+    request: Request, allow_empty_body: bool = False
 ) -> Optional[JsonDict]:
     ...
 
