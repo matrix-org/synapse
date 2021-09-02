@@ -38,7 +38,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     - users this server can see are joined to a world_readable or publicly
       joinable room, and
-    - users belonging to a private room that contains a local user.
+    - users belonging to a private room shared by that local user.
 
     The two cases are tracked separately in the `users_in_public_rooms` and
     `users_who_share_private_rooms` tables. Both kinds of users have their
