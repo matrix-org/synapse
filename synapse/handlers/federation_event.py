@@ -128,7 +128,7 @@ class FederationEventHandler:
         self._storage = hs.get_storage()
         self._state_store = self._storage.state
 
-        self.state_handler = hs.get_state_handler()
+        self._state_handler = hs.get_state_handler()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._message_handler = hs.get_message_handler()
@@ -363,7 +363,7 @@ class FederationEventHandler:
         # the room, so we send it on their behalf.
         event.internal_metadata.send_on_behalf_of = origin
 
-        context = await self.state_handler.compute_event_context(event)
+        context = await self._state_handler.compute_event_context(event)
         context = await self._check_event_auth(origin, event, context)
         if context.rejected:
             raise SynapseError(
@@ -903,7 +903,7 @@ class FederationEventHandler:
         logger.debug("Processing event: %s", event)
 
         try:
-            context = await self.state_handler.compute_event_context(
+            context = await self._state_handler.compute_event_context(
                 event, old_state=state
             )
             await self._auth_and_persist_event(
@@ -1183,7 +1183,7 @@ class FederationEventHandler:
         async def prep(ev_info: _NewEventInfo):
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res = await self.state_handler.compute_event_context(event)
+                res = await self._state_handler.compute_event_context(event)
                 res = await self._check_event_auth(
                     origin,
                     event,
@@ -1348,7 +1348,7 @@ class FederationEventHandler:
         if guest_access == GuestAccess.CAN_JOIN:
             return
 
-        current_state_map = await self.state_handler.get_current_state(event.room_id)
+        current_state_map = await self._state_handler.get_current_state(event.room_id)
         current_state = list(current_state_map.values())
         await self._get_room_member_handler().kick_guest_users(current_state)
 
@@ -1405,14 +1405,14 @@ class FederationEventHandler:
             )
             state_sets: List[Iterable[EventBase]] = list(state_sets_d.values())
             state_sets.append(state)
-            current_states = await self.state_handler.resolve_events(
+            current_states = await self._state_handler.resolve_events(
                 room_version, state_sets, event
             )
             current_state_ids: StateMap[str] = {
                 k: e.event_id for k, e in current_states.items()
             }
         else:
-            current_state_ids = await self.state_handler.get_current_state_ids(
+            current_state_ids = await self._state_handler.get_current_state_ids(
                 event.room_id, latest_event_ids=extrem_ids
             )
 
@@ -1545,7 +1545,7 @@ class FederationEventHandler:
                             e.event_id,
                         )
                         missing_auth_event_context = (
-                            await self.state_handler.compute_event_context(e)
+                            await self._state_handler.compute_event_context(e)
                         )
                         await self._auth_and_persist_event(
                             origin,
@@ -1613,7 +1613,7 @@ class FederationEventHandler:
         remote_state = remote_auth_events.values()
 
         room_version = await self._store.get_room_version_id(event.room_id)
-        new_state = await self.state_handler.resolve_events(
+        new_state = await self._state_handler.resolve_events(
             room_version, (local_state, remote_state), event
         )
 
