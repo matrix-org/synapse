@@ -236,7 +236,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 if joined is MatchChange.no_change:
                     # Handle any profile changes for remote users
                     if not self.is_mine_id(state_key):
-                        await self._handle_possible_remote_profile_change(
+                        await self._handle_remote_possible_profile_change(
                             state_key, room_id, prev_event_id, event_id
                         )
 
@@ -407,7 +407,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if len(rooms_user_is_in) == 0:
             await self.store.remove_from_user_dir(user_id)
 
-    async def _handle_possible_remote_profile_change(
+    async def _handle_remote_possible_profile_change(
         self,
         user_id: str,
         room_id: str,
