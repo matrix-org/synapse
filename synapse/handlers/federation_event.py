@@ -145,7 +145,7 @@ class FederationEventHandler:
         self._server_name = hs.hostname
         self._instance_name = hs.get_instance_name()
 
-        self.config = hs.config
+        self._config = hs.config
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
@@ -1000,7 +1000,7 @@ class FederationEventHandler:
             await self._store.mark_remote_user_device_cache_as_stale(sender)
 
             # Immediately attempt a resync in the background
-            if self.config.worker_app:
+            if self._config.worker_app:
                 await self._user_device_resync(user_id=sender)
             else:
                 await self._device_list_updater.user_device_resync(sender)
@@ -1741,7 +1741,7 @@ class FederationEventHandler:
         if not event_and_contexts:
             return self._store.get_current_events_token()
 
-        instance = self.config.worker.events_shard_config.get_instance(room_id)
+        instance = self._config.worker.events_shard_config.get_instance(room_id)
         if instance != self._instance_name:
             # Limit the number of events sent over replication. We choose 200
             # here as that is what we default to in `max_request_body_size(..)`
