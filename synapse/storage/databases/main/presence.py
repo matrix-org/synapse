@@ -73,6 +73,15 @@ class PresenceStore(SQLBaseStore):
             prefilled_cache=presence_cache_prefill,
         )
 
+        # Used by `_get_active_presence()`
+        self.db_pool.updates.register_background_index_update(
+            "presence_stream_not_offline_index",
+            index_name="presence_stream_state_not_offline_idx",
+            table="presence_stream",
+            columns=["state"],
+            where_clause="state != 'offline'",
+        )
+
     async def update_presence(self, presence_states):
         assert self._can_persist_presence
 
@@ -332,6 +341,8 @@ class PresenceStore(SQLBaseStore):
         the appropriate time outs.
         """
 
+        # The `presence_stream_state_not_offline_idx` index should be used for this
+        # query.
         sql = (
             "SELECT user_id, state, last_active_ts, last_federation_update_ts,"
             " last_user_sync_ts, status_msg, currently_active FROM presence_stream"
