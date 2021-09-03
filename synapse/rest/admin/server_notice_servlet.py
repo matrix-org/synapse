@@ -57,7 +57,7 @@ class SendServerNoticeServlet(RestServlet):
         self.admin_handler = hs.get_admin_handler()
         self.txns = HttpTransactionCache(hs)
 
-    def register(self, json_resource: HttpServer):
+    def register(self, json_resource: HttpServer) -> None:
         PATTERN = "/send_server_notice"
         json_resource.register_paths(
             "POST", admin_patterns(PATTERN + "$"), self.on_POST, self.__class__.__name__

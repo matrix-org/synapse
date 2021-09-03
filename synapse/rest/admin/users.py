@@ -419,7 +419,7 @@ class UserRegisterServlet(RestServlet):
         self.nonces: Dict[str, int] = {}
         self.hs = hs
 
-    def _clear_old_nonces(self):
+    def _clear_old_nonces(self) -> None:
         """
         Clear out old nonces that are older than NONCE_TIMEOUT.
         """
