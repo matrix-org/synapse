@@ -196,6 +196,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     ) -> Dict[str, ProfileInfo]:
         """Get a mapping from user ID to profile information for all users in a given room.
 
+        The profile information comes directly from this room's `m.room.member`
+        events, and so may be specific to this room rather than part of a user's
+        global profile. To avoid privacy leaks, the profile data should only be
+        revealed to users who are already in this room.
+
         Args:
             room_id: The ID of the room to retrieve the users of.
 

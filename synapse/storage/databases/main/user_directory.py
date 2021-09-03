@@ -211,6 +211,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     room_id
                 )
 
+                # TODO: this will leak per-room profiles to the user directory.
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
 
                 # Update each remote user in the user directory.
