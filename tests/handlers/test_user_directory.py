@@ -679,6 +679,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             state_key=alice,
         )
 
+        # Check Alice isn't recorded as being in a public room.
+        self.assertNotIn((alice, room), self.get_users_in_public_rooms())
+
         # One of them makes the room public.
         self.helper.send_state(
             room,
@@ -686,7 +689,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             {"join_rule": "public"},
             alice_token,
         )
-        # Wait for the handler to process the event
+        # Check that Alice is now recorded as being in a public room
         self.assertIn((alice, room), self.get_users_in_public_rooms())
 
         # Alice's display name remains the same in the user directory.
