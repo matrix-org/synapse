@@ -1,4 +1,4 @@
-# stub for SortedDict. This is a lightly edited copy of
+# stub for SortedSet. This is a lightly edited copy of
 # https://github.com/grantjenks/python-sortedcontainers/blob/d0a225d7fd0fb4c54532b8798af3cbeebf97e2d5/sortedcontainers/sortedset.pyi
 # (from https://github.com/grantjenks/python-sortedcontainers/pull/107)
 
