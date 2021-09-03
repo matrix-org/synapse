@@ -17,8 +17,7 @@ Data model
 There are five relevant tables:
 
 * `user_directory`. This contains the user_id, display name and avatar we'll
-  return when you search the directory. For some reason the `user_directory`
-  also tracks a room_id.
+  return when you search the directory.
   - Because there's only one directory entry per user, it's important that we only
     ever put publicly visible names here. Otherwise we might leak a private
     nickname or avatar used in a private room.
@@ -37,6 +36,6 @@ There are five relevant tables:
 * `users_in_public_rooms`. Contains associations between users and the public rooms they're in.
   Used to determine which users are in public rooms and should be publicly visible in the directory.
 
-* `users_who_share_private_rooms`. Rows are triples `(L, U, room id)` where `L`
-   is a local user and `R` is a local or remote user. `L` and `R` should be
+* `users_who_share_private_rooms`. Rows are triples `(L, M, room id)` where `L`
+   is a local user and `M` is a local or remote user. `L` and `M` should be
    different, but this isn't enforced by a constraint.
