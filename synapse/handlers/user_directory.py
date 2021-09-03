@@ -232,7 +232,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 # Handle any profile changes for remote users
                 if not self.is_mine_id(state_key):
                     await self._handle_remote_possible_profile_change(
-                        state_key, room_id, prev_event_id, event_id
+                        state_key, prev_event_id, event_id
                     )
 
             elif joined is MatchChange.now_true:  # The user joined
@@ -411,7 +411,6 @@ class UserDirectoryHandler(StateDeltasHandler):
     async def _handle_remote_possible_profile_change(
         self,
         user_id: str,
-        room_id: str,
         prev_event_id: Optional[str],
         event_id: Optional[str],
     ) -> None:
