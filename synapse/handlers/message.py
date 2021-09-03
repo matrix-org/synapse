@@ -1483,6 +1483,10 @@ class EventCreationHandler:
             return
 
         current_state_ids = await context.get_current_state_ids()
+
+        # since this is a client-generated event, it cannot be an outlier and we must
+        # therefore have the state ids.
+        assert current_state_ids is not None
         current_state_dict = await self.store.get_events(
             list(current_state_ids.values())
         )
