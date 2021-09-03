@@ -250,7 +250,10 @@ class UserDirectoryHandler(StateDeltasHandler):
                 )
 
                 if not self.is_mine_id(state_key):
-                    await self._handle_remote_user_joining_room(state_key, profile)
+                    logger.debug("Adding new user to dir, %r", state_key)
+                    await self.store.update_profile_in_user_dir(
+                        state_key, profile.display_name, profile.avatar_url
+                    )
         else:
             logger.debug("Ignoring irrelevant type: %r", typ)
 
@@ -333,23 +336,6 @@ class UserDirectoryHandler(StateDeltasHandler):
         # too bad, though.
         for user_id in other_users_in_room:
             await self._track_user_joined_room(room_id, user_id)
-
-    async def _handle_remote_user_joining_room(
-        self, user_id: str, profile: ProfileInfo
-    ) -> None:
-        """Called when we might need to add user to directory
-
-        Args:
-            room_id: The room ID that user joined or started being public
-            user_id
-        """
-        # Local users' directory entries are created and updated in tandem with
-        # their global profile, not in response to room events.
-        if not self.is_mine_id(user_id):
-            logger.debug("Adding new user to dir, %r", user_id)
-            await self.store.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
 
     async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
         """Someone's just joined a room. Add to `users_in_public_rooms` and
