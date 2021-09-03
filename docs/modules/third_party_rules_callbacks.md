@@ -56,3 +56,26 @@ the request is a server admin.
 
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
+
+```python
+async def check_threepid_can_be_invited(
+    medium: str,
+    address: str,
+    state_events: "synapse.types.StateMap",
+) -> bool:
+```
+
+Called when processing an invite via a third-party identifier (i.e. email or phone number).
+The module must return a boolean indicating whether the invite can go through.
+
+```python
+async def check_visibility_can_be_modified(
+    room_id: str,
+    state_events: "synapse.types.StateMap",
+    new_visibility: str,
+) -> bool:
+```
+
+Called when changing the visibility of a room in the local public room directory. The
+visibility is a string that's either "public" or "private". The module must return a
+boolean indicating whether the change can go through.
