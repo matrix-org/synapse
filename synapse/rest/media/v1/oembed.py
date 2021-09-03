@@ -86,11 +86,15 @@ class OEmbedProvider:
         """
         try:
             logger.debug("Trying to get oEmbed content for url '%s'", url)
+
+            # Note that only the JSON format is supported, some endpoints want
+            # this in the URL, others want it as an argument.
+            endpoint = endpoint.replace("{format}", "json")
+
             result = await self._client.get_json(
                 endpoint,
                 # TODO Specify max height / width.
-                # Note that only the JSON format is supported.
-                args={"url": url},
+                args={"url": url, "format": "json"},
             )
 
             # Ensure there's a version of 1.0.
