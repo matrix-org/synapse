@@ -575,7 +575,13 @@ class PersistEventsStore:
 
             missing_auth_chains.clear()
 
-            for auth_id, event_type, state_key, chain_id, sequence_number in txn:
+            for (
+                auth_id,
+                event_type,
+                state_key,
+                chain_id,
+                sequence_number,
+            ) in txn.fetchall():
                 event_to_types[auth_id] = (event_type, state_key)
 
                 if chain_id is None:
