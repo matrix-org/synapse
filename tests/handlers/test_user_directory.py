@@ -641,6 +641,21 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
     def test_making_room_public_doesnt_alter_directory_entry(self):
+        """Per-room names shouldn't go to the directory when the room becomes public.
+
+        I made this a synapse test case rather than a complement one because
+        I think this is (strictly speaking) an implementation choice. Synapse
+        has chosen to only ever use the public profile when responding to a user
+        directory search. There's no privacy leak here, because making the room
+        public discloses the per-room name.
+
+        The spec doesn't mandate anything about _how_ a user
+        should appear in a /user_directory/search result. Hypothetical example:
+        suppose Bob searches for Alice. When representing Alice in a search
+        result, it's reasonable to use any of Alice's nicknames that Bob is
+        aware of. Heck, maybe we even want to use lots of them in a combined
+        displayname like `Alice (aka "ali", "ally", "41iC3")`.
+        """
         # TODO the same should apply when Alice is a remote user.
         alice = self.register_user("alice", "pass")
         alice_token = self.login(alice, "pass")
