@@ -16,6 +16,8 @@ import logging
 import re
 from typing import Any, Dict, Iterable, Optional, Sequence, Set, Tuple
 
+from typing_extensions import TypedDict
+
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.state import StateFilter
@@ -28,6 +30,10 @@ logger = logging.getLogger(__name__)
 
 
 TEMP_TABLE = "_temp_populate_user_directory"
+
+
+class ProgressDict(TypedDict):
+    remaining: int
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
@@ -57,7 +63,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
         )
 
-    async def _populate_user_directory_createtables(self, progress, batch_size):
+    async def _populate_user_directory_createtables(self, progress: Dict, batch_size: str) -> int:
 
         # Get all the rooms that we want to process.
         def _make_staging_area(txn):
@@ -110,7 +116,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
         return 1
 
-    async def _populate_user_directory_cleanup(self, progress, batch_size):
+    async def _populate_user_directory_cleanup(self, progress: Dict, batch_size: str) -> int:
         """
         Update the user directory stream position, then clean up the old tables.
         """
@@ -133,7 +139,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
         return 1
 
-    async def _populate_user_directory_process_rooms(self, progress, batch_size):
+    async def _populate_user_directory_process_rooms(self, progress: ProgressDict, batch_size: int) -> int:
         """
         Scan through the historical record of room events so we can track
 
@@ -146,6 +152,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             progress (dict)
             batch_size (int): Maximum number of state events to process
                 per cycle.
+
+        Returns:
+            number of events processed.
         """
         # If we don't have progress filed, delete everything.
         if not progress:
@@ -274,7 +283,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return processed_event_count
 
-    async def _populate_user_directory_process_users(self, progress, batch_size):
+    async def _populate_user_directory_process_users(self, progress: ProgressDict, batch_size: int) -> int:
         def _get_next_batch(txn):
             sql = "SELECT user_id FROM %s LIMIT %s" % (
                 TEMP_TABLE + "_users",
