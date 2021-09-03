@@ -1,1 +1,1 @@
-Stop leaking per-room nicknames and avatars for users on this homeserver. NB: synapse can still leak nicknames and avatars of users from *other* homeservers.
+Fixed one case of leaking per-room nicknames and avatar to the user directory, pending further work to tackle other cases.
