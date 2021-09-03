@@ -244,6 +244,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 if event is None:
                     return
 
+                # TODO this leaks per-room profiles to the directory.
                 profile = ProfileInfo(
                     avatar_url=event.content.get("avatar_url"),
                     display_name=event.content.get("displayname"),
@@ -421,6 +422,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if not isinstance(new_name, str):
             new_name = prev_name
 
+        # TODO this leaks per-room profiles to the directory.
         prev_avatar = prev_event.content.get("avatar_url")
         new_avatar = event.content.get("avatar_url")
         # If the new avatar is an unexpected form, do not update the directory.
