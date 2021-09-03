@@ -93,6 +93,15 @@ class OembedConfig(Config):
             # might have multiple patterns to match.
             for endpoint in provider["endpoints"]:
                 api_endpoint = endpoint["url"]
+
+                # The API endpoint must be an HTTP(S) URL.
+                results = urlparse.urlparse(api_endpoint)
+                if results.scheme not in {"http", "https"}:
+                    raise ConfigError(
+                        f"Insecure oEmbed scheme ({results.scheme}) for endpoint {api_endpoint}",
+                        config_path,
+                    )
+
                 patterns = [
                     self._glob_to_pattern(glob, config_path)
                     for glob in endpoint["schemes"]
@@ -114,9 +123,12 @@ class OembedConfig(Config):
         """
         results = urlparse.urlparse(glob)
 
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
+        # The scheme must be HTTP(S) (and cannot contain wildcards).
         if results.scheme not in {"http", "https"}:
-            raise ConfigError(f"Insecure oEmbed scheme: {results.scheme}", config_path)
+            raise ConfigError(
+                f"Insecure oEmbed scheme ({results.scheme}) for pattern: {glob}",
+                config_path,
+            )
 
         pattern = urlparse.urlunparse(
             [
