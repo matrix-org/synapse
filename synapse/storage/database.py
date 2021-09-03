@@ -921,8 +921,8 @@ class DatabasePool:
                 raise RuntimeError("All items must have the same keys")
 
         if isinstance(txn.database_engine, PostgresEngine):
-            # We use `execute_values` for postgres as it can be a lot faster
-            # than `execute_batch`, but it's only available on postgres.
+            # We use `execute_values` as it can be a lot faster than `execute_batch`,
+            # but it's only available on postgres.
             sql = "INSERT INTO %s (%s) VALUES ?" % (
                 table,
                 ", ".join(k for k in keys[0]),
