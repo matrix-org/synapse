@@ -63,7 +63,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             "populate_user_directory_cleanup", self._populate_user_directory_cleanup
         )
 
-    async def _populate_user_directory_createtables(self, progress: Dict, batch_size: str) -> int:
+    async def _populate_user_directory_createtables(
+        self, progress: Dict, batch_size: str
+    ) -> int:
 
         # Get all the rooms that we want to process.
         def _make_staging_area(txn):
@@ -116,7 +118,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
         return 1
 
-    async def _populate_user_directory_cleanup(self, progress: Dict, batch_size: str) -> int:
+    async def _populate_user_directory_cleanup(
+        self, progress: Dict, batch_size: str
+    ) -> int:
         """
         Update the user directory stream position, then clean up the old tables.
         """
@@ -139,7 +143,9 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
         return 1
 
-    async def _populate_user_directory_process_rooms(self, progress: ProgressDict, batch_size: int) -> int:
+    async def _populate_user_directory_process_rooms(
+        self, progress: ProgressDict, batch_size: int
+    ) -> int:
         """
         Rescan the state of all rooms so we can track
 
@@ -242,10 +248,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         is_in_room = await self.is_host_joined(room_id, self.server_name)
         if not is_in_room:
             return
-        
-        is_public = await self.is_room_world_readable_or_publicly_joinable(
-            room_id
-        )
+
+        is_public = await self.is_room_world_readable_or_publicly_joinable(room_id)
         # TODO: this will leak per-room profiles to the user directory.
         users_with_profile = await self.get_users_in_room_with_profiles(room_id)
 
@@ -289,17 +293,18 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                     # If it gets too big, stop and write to the database
                     # to prevent storing too much in RAM.
                     if len(to_insert) >= self.SHARE_PRIVATE_WORKING_SET:
-                        await self.add_users_who_share_private_room(
-                            room_id, to_insert
-                        )
+                        await self.add_users_who_share_private_room(room_id, to_insert)
                         to_insert.clear()
 
             if to_insert:
                 await self.add_users_who_share_private_room(room_id, to_insert)
                 to_insert.clear()
 
-    async def _populate_user_directory_process_users(self, progress: ProgressDict, batch_size: int) -> int:
+    async def _populate_user_directory_process_users(
+        self, progress: ProgressDict, batch_size: int
+    ) -> int:
         """Upsert a user_directory entry for each local user."""
+
         def _get_next_batch(txn):
             sql = "SELECT user_id FROM %s LIMIT %s" % (
                 TEMP_TABLE + "_users",
