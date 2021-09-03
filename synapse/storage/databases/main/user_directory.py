@@ -228,6 +228,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return processed_event_count
 
     async def _populate_user_directory_process_single_room(self, room_id: str) -> None:
+        """Update the user_directory and room-sharing tables to account for this room.
+
+        There's a lot of overlap with _track_user_joined_room here. But that has
+        some more guarantees. It's only ever called when a user X of interest has
+        joined the room, so only needs to add rows containing user X (linear in
+        the size of the room). It also is only concerned with the room-sharing
+        tables.
+
+        We need to add rows for all pairs of users (quadratic in the size of the
+        room) and to update the user_directory entries too.
+        """
         is_in_room = await self.is_host_joined(room_id, self.server_name)
         if not is_in_room:
             return
@@ -288,6 +299,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 to_insert.clear()
 
     async def _populate_user_directory_process_users(self, progress: ProgressDict, batch_size: int) -> int:
+        """Upsert a user_directory entry for each local user."""
         def _get_next_batch(txn):
             sql = "SELECT user_id FROM %s LIMIT %s" % (
                 TEMP_TABLE + "_users",
