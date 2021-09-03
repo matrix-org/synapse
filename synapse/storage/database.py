@@ -1297,8 +1297,8 @@ class DatabasePool:
             args.append(tuple(x) + tuple(y))
 
         if isinstance(txn.database_engine, PostgresEngine):
-            # We use `execute_values` for postgres as it can be a lot faster
-            # than `execute_batch`, but it's only available on postgres.
+            # We use `execute_values` as it can be a lot faster than `execute_batch`,
+            # but it's only available on postgres.
             sql = "INSERT INTO %s (%s) VALUES ? ON CONFLICT (%s) DO %s" % (
                 table,
                 ", ".join(k for k in allnames),
