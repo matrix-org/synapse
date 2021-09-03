@@ -227,63 +227,65 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return processed_event_count
 
-    async def _populate_user_directory_process_single_room(self, room_id: str):
+    async def _populate_user_directory_process_single_room(self, room_id: str) -> None:
         is_in_room = await self.is_host_joined(room_id, self.server_name)
-        if is_in_room:
-            is_public = await self.is_room_world_readable_or_publicly_joinable(
-                room_id
+        if not is_in_room:
+            return
+        
+        is_public = await self.is_room_world_readable_or_publicly_joinable(
+            room_id
+        )
+        # TODO: this will leak per-room profiles to the user directory.
+        users_with_profile = await self.get_users_in_room_with_profiles(room_id)
+
+        # Update each remote user in the user directory.
+        # (Entries for local users are managed by the UserDirectoryHandler
+        # and do not require us to peek at room state/events.)
+        for user_id, profile in users_with_profile.items():
+            if self.hs.is_mine_id(user_id):
+                continue
+            await self.update_profile_in_user_dir(
+                user_id, profile.display_name, profile.avatar_url
             )
-            # TODO: this will leak per-room profiles to the user directory.
-            users_with_profile = await self.get_users_in_room_with_profiles(room_id)
 
-            # Update each remote user in the user directory.
-            # (Entries for local users are managed by the UserDirectoryHandler
-            # and do not require us to peek at room state/events.)
-            for user_id, profile in users_with_profile.items():
-                if self.hs.is_mine_id(user_id):
+        to_insert = set()
+
+        if is_public:
+            for user_id in users_with_profile:
+                if self.get_if_app_services_interested_in_user(user_id):
                     continue
-                await self.update_profile_in_user_dir(
-                    user_id, profile.display_name, profile.avatar_url
-                )
 
-            to_insert = set()
+                to_insert.add(user_id)
 
-            if is_public:
-                for user_id in users_with_profile:
-                    if self.get_if_app_services_interested_in_user(user_id):
+            if to_insert:
+                await self.add_users_in_public_rooms(room_id, to_insert)
+                to_insert.clear()
+        else:
+            for user_id in users_with_profile:
+                if not self.hs.is_mine_id(user_id):
+                    continue
+
+                if self.get_if_app_services_interested_in_user(user_id):
+                    continue
+
+                for other_user_id in users_with_profile:
+                    if user_id == other_user_id:
                         continue
 
-                    to_insert.add(user_id)
+                    user_set = (user_id, other_user_id)
+                    to_insert.add(user_set)
 
-                if to_insert:
-                    await self.add_users_in_public_rooms(room_id, to_insert)
-                    to_insert.clear()
-            else:
-                for user_id in users_with_profile:
-                    if not self.hs.is_mine_id(user_id):
-                        continue
+                    # If it gets too big, stop and write to the database
+                    # to prevent storing too much in RAM.
+                    if len(to_insert) >= self.SHARE_PRIVATE_WORKING_SET:
+                        await self.add_users_who_share_private_room(
+                            room_id, to_insert
+                        )
+                        to_insert.clear()
 
-                    if self.get_if_app_services_interested_in_user(user_id):
-                        continue
-
-                    for other_user_id in users_with_profile:
-                        if user_id == other_user_id:
-                            continue
-
-                        user_set = (user_id, other_user_id)
-                        to_insert.add(user_set)
-
-                        # If it gets too big, stop and write to the database
-                        # to prevent storing too much in RAM.
-                        if len(to_insert) >= self.SHARE_PRIVATE_WORKING_SET:
-                            await self.add_users_who_share_private_room(
-                                room_id, to_insert
-                            )
-                            to_insert.clear()
-
-                if to_insert:
-                    await self.add_users_who_share_private_room(room_id, to_insert)
-                    to_insert.clear()
+            if to_insert:
+                await self.add_users_who_share_private_room(room_id, to_insert)
+                to_insert.clear()
 
     async def _populate_user_directory_process_users(self, progress: ProgressDict, batch_size: int) -> int:
         def _get_next_batch(txn):
