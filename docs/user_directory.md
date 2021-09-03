@@ -14,7 +14,15 @@ flush the current tables and regenerate the directory.
 Data model
 ----------
 
-There are five relevant tables:
+There are five relevant tables that collectively form the "user directory".
+Three of them track a master list of all the users we could search for.
+The last two (collectively called the "search tables") track who can
+see who.
+
+From all of these tables we exclude three types of local user:
+  - "support users"
+  - appservice users
+  - deactivated users
 
 * `user_directory`. This contains the user_id, display name and avatar we'll
   return when you search the directory.
