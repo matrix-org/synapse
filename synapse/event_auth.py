@@ -217,17 +217,17 @@ def check(
 
 def _check_size_limits(event: EventBase) -> None:
     if len(event.user_id) > 255:
-        EventSizeError("'user_id' too large")
+        raise EventSizeError("'user_id' too large")
     if len(event.room_id) > 255:
-        EventSizeError("'room_id' too large")
+        raise EventSizeError("'room_id' too large")
     if event.is_state() and len(event.state_key) > 255:
-        EventSizeError("'state_key' too large")
+        raise EventSizeError("'state_key' too large")
     if len(event.type) > 255:
-        EventSizeError("'type' too large")
+        raise EventSizeError("'type' too large")
     if len(event.event_id) > 255:
-        EventSizeError("'event_id' too large")
+        raise EventSizeError("'event_id' too large")
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
-        EventSizeError("event too large")
+        raise EventSizeError("event too large")
 
 
 def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
