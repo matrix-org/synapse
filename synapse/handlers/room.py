@@ -909,7 +909,12 @@ class RoomCreationHandler(BaseHandler):
             )
             return last_stream_id
 
-        config = self._presets_dict[preset_config]
+        try:
+            config = self._presets_dict[preset_config]
+        except KeyError:
+            raise SynapseError(
+                400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
+            )
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
