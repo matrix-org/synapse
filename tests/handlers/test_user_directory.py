@@ -594,8 +594,6 @@ class UserDirectoryTestCase(GetUserDirectoryTables, HomeserverTestCase):
 
 
 class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
-    user_id = "@test:test"
-
     servlets = [
         user_directory.register_servlets,
         room.register_servlets,
@@ -614,17 +612,22 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
 
     def test_disabling_room_list(self):
         self.config.user_directory_search_enabled = True
-
-        # First we create a room with another user so that user dir is non-empty
-        # for our user
-        self.helper.create_room_as(self.user_id)
+        u1 = self.register_user("user1", "pass")
+        u1_token = self.login(u1, "pass")
         u2 = self.register_user("user2", "pass")
-        room = self.helper.create_room_as(self.user_id)
-        self.helper.join(room, user=u2)
+        u2_token = self.login(u2, "pass")
+
+        # First we create a room with another user u2, so that user dir is
+        # non-empty for our user u1
+        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
+        self.helper.join(room, user=u2, tok=u2_token)
 
         # Assert user directory is not empty
         channel = self.make_request(
-            "POST", b"user_directory/search", b'{"search_term":"user2"}'
+            "POST",
+            b"user_directory/search",
+            b'{"search_term":"user2"}',
+            access_token=u1_token,
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) > 0)
@@ -632,7 +635,10 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         # Disable user directory and check search returns nothing
         self.config.user_directory_search_enabled = False
         channel = self.make_request(
-            "POST", b"user_directory/search", b'{"search_term":"user2"}'
+            "POST",
+            b"user_directory/search",
+            b'{"search_term":"user2"}',
+            access_token=u1_token,
         )
         self.assertEquals(200, channel.code, channel.result)
         self.assertTrue(len(channel.json_body["results"]) == 0)
