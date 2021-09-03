@@ -86,7 +86,7 @@ class Clock:
     _reactor: IReactorTime = attr.ib()
 
     @defer.inlineCallbacks  # type: ignore[arg-type]  # Issue in Twisted's type annotations
-    def sleep(self, seconds: float) -> Generator[Deferred[float], Any, Any]:
+    def sleep(self, seconds: float) -> "Generator[Deferred[float], Any, Any]":
         d: defer.Deferred[float] = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
