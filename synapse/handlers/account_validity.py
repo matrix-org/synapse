@@ -430,7 +430,9 @@ class AccountValidityHandler:
             # Show the user in the directory again by setting them to active
             # We get the profile handler here so that we don't cause a cyclic dependency
             # at startup.
-            # FIXME: this doesn't work with the new account validity module stuff
+            # FIXME: this doesn't work with the new account validity module stuff, in
+            #  that this code is only run when no account validity module implements the
+            #  on_legacy_renew callback - which synapse-email-account-validity does.
             await self.hs.get_profile_handler().set_active(
                 [UserID.from_string(user_id)], True, True
             )

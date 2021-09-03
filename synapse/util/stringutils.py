@@ -147,12 +147,6 @@ def valid_id_server_location(id_server: str) -> bool:
     Returns:
         True if valid, False otherwise.
     """
-
-    # A previous call to rewrite_id_server_url might have added a protocol scheme to the
-    # server's address - we don't care about that so remove it just for these checks.
-    if id_server.startswith("https://"):
-        id_server = id_server[8:]
-
     components = id_server.split("/", 1)
 
     host = components[0]

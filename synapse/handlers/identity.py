@@ -202,16 +202,16 @@ class IdentityHandler(BaseHandler):
         if id_access_token is None:
             use_v2 = False
 
-        # if we have a rewrite rule set for the identity server,
-        # apply it now, but only for sending the request (not
-        # storing in the database).
-        id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
-
-        if not valid_id_server_location(id_server_url):
+        if not valid_id_server_location(id_server):
             raise SynapseError(
                 400,
                 "id_server must be a valid hostname with optional port and path components",
             )
+
+        # if we have a rewrite rule set for the identity server,
+        # apply it now, but only for sending the request (not
+        # storing in the database).
+        id_server_url = self.rewrite_id_server_url(id_server, add_https=True)
 
         # Decide which API endpoint URLs to use
         headers = {}
