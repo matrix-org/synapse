@@ -340,7 +340,7 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
         """Someone's just joined a room. Add to `users_in_public_rooms` and
-        `users sharing private room` if necessary."""
+        `users_who_share_private_rooms` if necessary."""
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )

@@ -643,7 +643,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
     def test_making_room_public_doesnt_alter_directory_entry(self):
         """Per-room names shouldn't go to the directory when the room becomes public.
 
-        I made this a synapse test case rather than a complement one because
+        I made this a Synapse test case rather than a Complement one because
         I think this is (strictly speaking) an implementation choice. Synapse
         has chosen to only ever use the public profile when responding to a user
         directory search. There's no privacy leak here, because making the room
@@ -689,8 +689,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Wait for the handler to process the event
         self.assertIn((alice, room), self.get_users_in_public_rooms())
 
-        # Alice's nickname is now publicly visible, but this shouldn't change
-        # her entry in the user directory.
+        # Alice's display name remains the same in the user directory.
         search_result = self.get_success(self.handler.search_users(bob, alice, 10))
         self.assertEqual(
             search_result["results"],

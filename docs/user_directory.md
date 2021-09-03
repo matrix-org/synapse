@@ -26,7 +26,7 @@ There are five relevant tables:
 
 * `user_directory_search`. To be joined to `user_directory`. It contains an extra
   column that enables full text search based on user ids and display names.
-  Different schemas for sqlite and postgres with different code paths to match.
+  Different schemas for SQLite and Postgres with different code paths to match.
   - Indexed on the full text search data. Indexed on users.
 
 * `user_directory_stream_pos`. When the initial background update to populate
@@ -34,7 +34,8 @@ There are five relevant tables:
   that synapse should now listen for room changes and incrementally update
   the directory where necessary.
 
-* `users_in_public_rooms`. Tracks both users and which rooms they're in.
+* `users_in_public_rooms`. Contains associations between users and the public rooms they're in.
+  Used to determine which users are in public rooms and should be publicly visible in the directory.
 
 * `users_who_share_private_rooms`. Rows are triples `(L, U, room id)` where `L`
    is a local user and `R` is a local or remote user. `L` and `R` should be
