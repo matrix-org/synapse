@@ -49,8 +49,23 @@ class OEmbedProvider:
     def __init__(self, hs: "HomeServer", client: SimpleHttpClient):
         self._oembed_patterns = {}
         for oembed_endpoint in hs.config.oembed.oembed_patterns:
+            api_endpoint = oembed_endpoint.api_endpoint
+
+            # Only JSON is supported at the moment. This could be declared in
+            # the formats field. Otherwise, if the endpoint ends in .xml assume
+            # it doesn't support JSON.
+            if (
+                oembed_endpoint.formats is not None
+                and "json" not in oembed_endpoint.formats
+            ) or api_endpoint.endswith(".xml"):
+                logger.info(
+                    f"Ignoring oEmbed endpoint due to not supporting JSON: {api_endpoint}"
+                )
+                continue
+
+            # Iterate through each URL pattern and point it to the endpoint.
             for pattern in oembed_endpoint.url_patterns:
-                self._oembed_patterns[pattern] = oembed_endpoint.api_endpoint
+                self._oembed_patterns[pattern] = api_endpoint
         self._client = client
 
     def get_oembed_url(self, url: str) -> Optional[str]:

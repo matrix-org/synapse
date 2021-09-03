@@ -13,7 +13,7 @@
 # limitations under the License.
 import json
 import re
-from typing import Any, Dict, Iterable, List, Pattern
+from typing import Any, Dict, Iterable, List, Optional, Pattern
 from urllib import parse as urlparse
 
 import attr
@@ -31,6 +31,8 @@ class OEmbedEndpointConfig:
     api_endpoint: str
     # The patterns to match.
     url_patterns: List[Pattern]
+    # The supported formats.
+    formats: Optional[List[str]]
 
 
 class OembedConfig(Config):
@@ -106,7 +108,9 @@ class OembedConfig(Config):
                     self._glob_to_pattern(glob, config_path)
                     for glob in endpoint["schemes"]
                 ]
-                yield OEmbedEndpointConfig(api_endpoint, patterns)
+                yield OEmbedEndpointConfig(
+                    api_endpoint, patterns, endpoint.get("formats")
+                )
 
     def _glob_to_pattern(self, glob: str, config_path: Iterable[str]) -> Pattern:
         """

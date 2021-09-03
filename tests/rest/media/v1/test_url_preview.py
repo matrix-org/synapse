@@ -92,12 +92,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 url_patterns=[
                     re.compile(r"http://twitter\.com/.+/status/.+"),
                 ],
+                formats=None,
             ),
             OEmbedEndpointConfig(
                 api_endpoint="http://www.hulu.com/api/oembed.{format}",
                 url_patterns=[
                     re.compile(r"http://www\.hulu\.com/watch/.+"),
                 ],
+                formats=["json"],
             ),
         ]
 
