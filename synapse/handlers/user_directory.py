@@ -376,11 +376,14 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     async def _handle_remove_user(self, room_id: str, user_id: str) -> None:
         """Called in two cases:
-        - when the given user has left the room
-        - we can no longer see that the given user is in this room.
+        1. The given user has left the given room.
+        2. The last local user (someone else) just left the given room. So
+           so everyone else in the room is remote. We may no longer need to
+           include the given user (`user_id`) in the directory.
 
         Args:
-            room_id: The room ID which the given user was in
+            user_id: The user we may need to remove from the directory
+            room_id: The room which someone just left
         """
         logger.debug("Removing user %r", user_id)
 
