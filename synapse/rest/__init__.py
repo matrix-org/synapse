@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import TYPE_CHECKING
+
 from synapse.http.server import JsonResource
 from synapse.rest import admin
 from synapse.rest.client import (
@@ -57,6 +59,9 @@ from synapse.rest.client import (
     voip,
 )
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 class ClientRestResource(JsonResource):
     """Matrix Client API REST resource.
@@ -68,12 +73,12 @@ class ClientRestResource(JsonResource):
        * etc
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         JsonResource.__init__(self, hs, canonical_json=False)
         self.register_servlets(self, hs)
 
     @staticmethod
-    def register_servlets(client_resource, hs):
+    def register_servlets(client_resource, hs: "HomeServer") -> None:
         versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
