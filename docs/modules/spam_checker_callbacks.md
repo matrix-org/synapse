@@ -4,6 +4,8 @@ Spam checker callbacks allow module developers to implement spam mitigation acti
 Synapse instances. Spam checker callbacks can be registered using the module API's
 `register_spam_checker_callbacks` method.
 
+## Callbacks
+
 The available spam checker callbacks are:
 
 ```python
@@ -93,3 +95,50 @@ async def check_media_file_for_spam(
 
 Called when storing a local or remote file. The module must return a boolean indicating
 whether the given file can be stored in the homeserver's media store.
+
+## Example
+
+The example below is a module that implements the spam checker callback
+`check_event_for_spam` to deny any message sent by users whose Matrix user IDs are
+mentioned in a configured list, and registers a web resource to the path
+`/_synapse/client/list_spam_checker/is_evil` that returns a JSON object indicating
+whether the provided user appears in that list.
+
+```python
+import json
+from typing import Union
+
+from twisted.web.resource import Resource
+from twisted.web.server import Request
+
+from synapse.module_api import ModuleApi
+
+
+class IsUserEvilResource(Resource):
+    def __init__(self, config):
+        super(IsUserEvilResource, self).__init__()
+        self.evil_users = config.get("evil_users") or []
+
+    def render_GET(self, request: Request):
+        user = request.args.get(b"user")[0]
+        request.setHeader(b"Content-Type", b"application/json")
+        return json.dumps({"evil": user in self.evil_users})
+
+
+class ListSpamChecker:
+    def __init__(self, config: dict, api: ModuleApi):
+        self.api = api
+        self.evil_users = config.get("evil_users") or []
+
+        self.api.register_spam_checker_callbacks(
+            check_event_for_spam=self.check_event_for_spam,
+        )
+
+        self.api.register_web_resource(
+            path="/_synapse/client/list_spam_checker/is_evil",
+            resource=IsUserEvilResource(config),
+        )
+
+    async def check_event_for_spam(self, event: "synapse.events.EventBase") -> Union[bool, str]:
+      return event.sender not in self.evil_users
+```

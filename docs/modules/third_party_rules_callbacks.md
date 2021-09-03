@@ -4,6 +4,8 @@ Third party rules callbacks allow module developers to add extra checks to verif
 validity of incoming events. Third party event rules callbacks can be registered using
 the module API's `register_third_party_rules_callbacks` method.
 
+## Callbacks
+
 The available third party rules callbacks are:
 
 ```python
@@ -79,3 +81,37 @@ async def check_visibility_can_be_modified(
 Called when changing the visibility of a room in the local public room directory. The
 visibility is a string that's either "public" or "private". The module must return a
 boolean indicating whether the change can go through.
+
+## Example
+
+The example below is a module that implements the third-party rules callback
+`check_event_allowed` to censor incoming messages as dictated by a third-party service.
+
+```python
+from typing import Optional, Tuple
+
+from synapse.module_api import ModuleApi
+
+_DEFAULT_CENSOR_ENDPOINT = "https://my-internal-service.local/censor-event"
+
+class EventCensorer:
+    def __init__(self, config: dict, api: ModuleApi):
+        self.api = api
+        self._endpoint = config.get("endpoint", _DEFAULT_CENSOR_ENDPOINT)
+
+        self.api.register_third_party_rules_callbacks(
+            check_event_allowed=self.check_event_allowed,
+        )
+
+    async def check_event_allowed(
+        self,
+        event: "synapse.events.EventBase",
+        state_events: "synapse.types.StateMap",
+    ) -> Tuple[bool, Optional[dict]]:
+        event_dict = event.get_dict()
+        new_event_content = await self.api.http_client.post_json_get_json(
+            uri=self._endpoint, post_json=event_dict,
+        )
+        event_dict["content"] = new_event_content
+        return event_dict
+```
