@@ -324,7 +324,7 @@ MSC3244_CAPABILITIES = {
         ),
         RoomVersionCapability(
             "restricted",
-            RoomVersions.V9,
+            RoomVersions.V8,
             lambda room_version: room_version.msc3083_join_rules,
         ),
     )
