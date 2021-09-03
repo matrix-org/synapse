@@ -11,24 +11,36 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Tuple
 from unittest.mock import Mock
 
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
+from synapse.api.constants import (
+    EventTypes,
+    Membership,
+    RoomEncryptionAlgorithms,
+    UserTypes,
+)
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
+from synapse.types import create_requester
 
 from tests import unittest
-from tests.unittest import override_config
+from tests.storage.test_user_directory import GetUserDirectoryTables
+from tests.unittest import HomeserverTestCase, override_config
 
 
-class UserDirectoryTestCase(unittest.HomeserverTestCase):
+class UserDirectoryTestCase(GetUserDirectoryTables, HomeserverTestCase):
     """
     Tests the UserDirectoryHandler.
+
+    We're broadly testing two kinds of things here.
+
+    1. Check that we correctly update the user directory in response
+       to events (e.g. join a room, leave a room, change name, make public)
+    2. Check that the search logic behaves as expected.
     """
 
     servlets = [
@@ -130,6 +142,36 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
+
+    def test_reactivation_makes_regular_user_searchable(self):
+        user = self.register_user("regular", "pass")
+        user_token = self.login(user, "pass")
+        admin_user = self.register_user("admin", "pass", admin=True)
+
+        # Ensure the regular user is publicly visible and searchable.
+        public_room = self.helper.create_room_as(user, is_public=True, tok=user_token)
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
+
+        # Deactivate the user and check they're not searchable.
+        deactivate_handler = self.hs._deactivate_account_handler
+        self.get_success(
+            deactivate_handler.deactivate_account(
+                user, erase_data=False, requester=create_requester(admin_user)
+            )
+        )
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(s["results"], [])
+
+        # Reactivate the user and make them publicly visible again.
+        self.get_success(deactivate_handler.activate_account(user))
+        self.inject_room_member(public_room, user, Membership.JOIN)
+
+        # Check they're searchable.
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
 
     def test_private_room(self):
         """
@@ -371,134 +413,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
-    def _compress_shared(self, shared):
-        """
-        Compress a list of users who share rooms dicts to a list of tuples.
-        """
-        r = set()
-        for i in shared:
-            r.add((i["user_id"], i["other_user_id"], i["room_id"]))
-        return r
-
-    def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
-        r = self.get_success(
-            self.store.db_pool.simple_select_list(
-                "users_in_public_rooms", None, ("user_id", "room_id")
-            )
-        )
-        retval = []
-        for i in r:
-            retval.append((i["user_id"], i["room_id"]))
-        return retval
-
-    def get_users_who_share_private_rooms(self) -> List[Tuple[str, str, str]]:
-        return self.get_success(
-            self.store.db_pool.simple_select_list(
-                "users_who_share_private_rooms",
-                None,
-                ["user_id", "other_user_id", "room_id"],
-            )
-        )
-
-    def _add_background_updates(self):
-        """
-        Add the background updates we need to run.
-        """
-        # Ugh, have to reset this flag
-        self.store.db_pool.updates._all_done = False
-
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_createtables",
-                    "progress_json": "{}",
-                },
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_process_rooms",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_createtables",
-                },
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_process_users",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_process_rooms",
-                },
-            )
-        )
-        self.get_success(
-            self.store.db_pool.simple_insert(
-                "background_updates",
-                {
-                    "update_name": "populate_user_directory_cleanup",
-                    "progress_json": "{}",
-                    "depends_on": "populate_user_directory_process_users",
-                },
-            )
-        )
-
-    def test_initial(self):
-        """
-        The user directory's initial handler correctly updates the search tables.
-        """
-        u1 = self.register_user("user1", "pass")
-        u1_token = self.login(u1, "pass")
-        u2 = self.register_user("user2", "pass")
-        u2_token = self.login(u2, "pass")
-        u3 = self.register_user("user3", "pass")
-        u3_token = self.login(u3, "pass")
-
-        room = self.helper.create_room_as(u1, is_public=True, tok=u1_token)
-        self.helper.invite(room, src=u1, targ=u2, tok=u1_token)
-        self.helper.join(room, user=u2, tok=u2_token)
-
-        private_room = self.helper.create_room_as(u1, is_public=False, tok=u1_token)
-        self.helper.invite(private_room, src=u1, targ=u3, tok=u1_token)
-        self.helper.join(private_room, user=u3, tok=u3_token)
-
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
-
-        # Nothing updated yet
-        self.assertEqual(shares_private, [])
-        self.assertEqual(public_users, [])
-
-        # Do the initial population of the user directory via the background update
-        self._add_background_updates()
-
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
-
-        # User 1 and User 2 are in the same public room
-        self.assertEqual(set(public_users), {(u1, room), (u2, room)})
-
-        # User 1 and User 3 share private rooms
-        self.assertEqual(
-            self._compress_shared(shares_private),
-            {(u1, u3, private_room), (u3, u1, private_room)},
-        )
-
-    def test_initial_share_all_users(self):
+    def test_search_all_users(self):
         """
         Search all users = True means that a user does not have to share a
         private room with the searching user or be in a public room to be search
@@ -510,20 +425,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         u1 = self.register_user("user1", "pass")
         self.register_user("user2", "pass")
         u3 = self.register_user("user3", "pass")
-
-        # Wipe the user dir
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        # Do the initial population of the user directory via the background update
-        self._add_background_updates()
-
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
 
         shares_private = self.get_users_who_share_private_rooms()
         public_users = self.get_users_in_public_rooms()
@@ -588,15 +489,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         local_users = [local_user_1, local_user_2, local_user_3]
         remote_users = [remote_user_1, remote_user_2, remote_user_3]
-
-        # Populate the user directory via background update
-        self._add_background_updates()
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
 
         # The local searching user searches for the term "user", which other users have
         # in their user id
