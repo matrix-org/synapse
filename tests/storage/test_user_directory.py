@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List, Set, Tuple
+from unittest.mock import patch, Mock
 
 import synapse
 from synapse.api.constants import UserTypes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, room
 from synapse.storage import DataStore
+from synapse.storage.databases.main.appservice import _make_exclusive_regex
 
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
@@ -216,11 +218,16 @@ class UserDirectoryInitialPopulationTestcase(
             namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
             sender="@as:test",
         )
+        self.store.services_cache.append(appservice)
+
         as_user = "@as_user_potato:test"
-        self.hs.get_datastore().services_cache.append(appservice)
         self.get_success(self.store.register_user(user_id=as_user, password_hash=None))
 
-        self._purge_and_rebuild_user_dir()
+        # TODO can we configure the app service up front somehow? This is a hack.
+        mock_regex = Mock()
+        mock_regex.match = lambda user_id: user_id == as_user
+        with patch.object(self.store, "exclusive_user_regex", mock_regex):
+            self._purge_and_rebuild_user_dir()
 
         # TODO add AS user to a public and private room. Check that
         # users_in_public_rooms and users_who_share_private_rooms is empty.
