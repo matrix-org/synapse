@@ -1,0 +1,1 @@
+Fix leaking per-room nicknames and avatars to the user directory for local users when the user directory is rebuilt.
