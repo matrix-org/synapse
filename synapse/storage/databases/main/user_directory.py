@@ -249,13 +249,16 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         if not is_in_room:
             return
 
-        is_public = await self.is_room_world_readable_or_publicly_joinable(room_id)
-        # TODO: this will leak per-room profiles to the user directory.
+        # TODO: get_users_in_room_with_profiles returns per-room profiles. Leak!
         users_with_profile = await self.get_users_in_room_with_profiles(room_id)
+        users_with_profile = {
+            user_id: profile
+            for user_id, profile in users_with_profile.items()
+            if not await self.exclude_from_user_dir(user_id)
+        }
 
-        # Update each remote user in the user directory.
-        # (Entries for local users are managed by the UserDirectoryHandler
-        # and do not require us to peek at room state/events.)
+        # Upsert a user_directory record for each remote user we see.
+        # (Local users are processed in `_populate_user_directory_users`.)
         for user_id, profile in users_with_profile.items():
             if self.hs.is_mine_id(user_id):
                 continue
@@ -263,24 +266,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 user_id, profile.display_name, profile.avatar_url
             )
 
-        to_insert = set()
-
+        is_public = await self.is_room_world_readable_or_publicly_joinable(room_id)
         if is_public:
-            for user_id in users_with_profile:
-                if self.get_if_app_services_interested_in_user(user_id):
-                    continue
-
-                to_insert.add(user_id)
-
-            if to_insert:
-                await self.add_users_in_public_rooms(room_id, to_insert)
-                to_insert.clear()
+            if users_with_profile:
+                await self.add_users_in_public_rooms(room_id, users_with_profile.keys())
         else:
+            to_insert = set()
             for user_id in users_with_profile:
                 if not self.hs.is_mine_id(user_id):
-                    continue
-
-                if self.get_if_app_services_interested_in_user(user_id):
                     continue
 
                 for other_user_id in users_with_profile:
@@ -298,7 +291,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
             if to_insert:
                 await self.add_users_who_share_private_room(room_id, to_insert)
-                to_insert.clear()
 
     async def _populate_user_directory_process_users(
         self, progress: ProgressDict, batch_size: int
@@ -343,10 +335,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         for user_id in users_to_work_on:
-            profile = await self.get_profileinfo(get_localpart_from_id(user_id))
-            await self.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
+            if not await self.exclude_from_user_dir(user_id):
+                profile = await self.get_profileinfo(get_localpart_from_id(user_id))
+                await self.update_profile_in_user_dir(
+                    user_id, profile.display_name, profile.avatar_url
+                )
 
             # We've finished processing a user. Delete it from the table.
             await self.db_pool.simple_delete_one(
@@ -529,6 +522,24 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             desc="update_user_directory_stream_pos",
         )
 
+    async def exclude_from_user_dir(self, user_id: str) -> bool:
+        """Certain classes of local user are omitted from the user directory.
+        Is this user one of them?
+        """
+        if self.hs.is_mine_id(user_id):
+            # Support users are for diagnostics and should not appear in the user directory.
+            if await self.is_support_user(user_id):
+                return True
+
+            # Deactivated users aren't contactable, so should not appear in the user directory.
+            if await self.get_user_deactivated_status(user_id):
+                return True
+
+            # App service users aren't usually contactable, so exclude them.
+            if self.get_if_app_services_interested_in_user(user_id):
+                return True
+
+        return False
 
 class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 

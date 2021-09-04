@@ -114,13 +114,8 @@ class UserDirectoryHandler(StateDeltasHandler):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-
-        # Support users are for diagnostics and should not appear in the user directory.
-        is_support = await self.store.is_support_user(user_id)
-        # When change profile information of deactivated user it should not appear in the user directory.
-        is_deactivated = await self.store.get_user_deactivated_status(user_id)
-
-        if not (is_support or is_deactivated):
+        excluded = await self.store.exclude_from_user_dir(user_id)
+        if not excluded:
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
             )
@@ -201,7 +196,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 room_id, prev_event_id, event_id, typ
             )
         elif typ == EventTypes.Member:
-            if await self._user_omitted_from_directory(state_key):
+            if await self.store.exclude_from_user_dir(state_key):
                 return
 
             joined = await self._get_key_change(
@@ -257,16 +252,6 @@ class UserDirectoryHandler(StateDeltasHandler):
                     )
         else:
             logger.debug("Ignoring irrelevant type: %r", typ)
-
-    async def _user_omitted_from_directory(self, user_id: str) -> bool:
-        """We want to ignore events from "hidden" users who shouldn't be exposed
-        to real users."""
-        if await self.store.is_support_user(user_id):
-            return True
-        if self.store.get_if_app_services_interested_in_user(user_id):
-            return True
-
-        return False
 
     async def _handle_room_publicity_change(
         self,
@@ -340,18 +325,24 @@ class UserDirectoryHandler(StateDeltasHandler):
 
     async def _track_user_joined_room(self, room_id: str, user_id: str) -> None:
         """Someone's just joined a room. Add to `users_in_public_rooms` and
-        `users_who_share_private_rooms` if necessary."""
+        `users_who_share_private_rooms` if necessary.
+
+        The caller is responsible for ensuring that the given user may be
+        included in the user directory.
+        (See UserDirectoryStore.exclude_from_user_dir)
+        """
         is_public = await self.store.is_room_world_readable_or_publicly_joinable(
             room_id
         )
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
         else:
-            other_users_in_room = await self.store.get_users_in_room(room_id)
+            users_in_room = await self.store.get_users_in_room(room_id)
             other_users_in_room = [
-                other_user
-                for other_user in other_users_in_room
-                if not await self._user_omitted_from_directory(other_user)
+                user
+                for user in users_in_room
+                if user != user_id
+                   and not await self.store.exclude_from_user_dir(user)
             ]
 
             to_insert = set()
@@ -359,15 +350,10 @@ class UserDirectoryHandler(StateDeltasHandler):
             # First, if they're our user then we need to update for every user
             if self.is_mine_id(user_id):
                 for other_user_id in other_users_in_room:
-                    if user_id == other_user_id:
-                        continue
-
                     to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
             for other_user_id in other_users_in_room:
-                if user_id == other_user_id:
-                    continue
                 if self.is_mine_id(other_user_id):
                     to_insert.add((other_user_id, user_id))
 
