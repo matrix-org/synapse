@@ -12,14 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List, Set, Tuple
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
 
 import synapse
 from synapse.api.constants import UserTypes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, room
 from synapse.storage import DataStore
-from synapse.storage.databases.main.appservice import _make_exclusive_regex
 
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config

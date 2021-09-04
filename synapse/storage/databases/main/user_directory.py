@@ -20,6 +20,8 @@ from typing_extensions import TypedDict
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool, LoggingTransaction
+from synapse.storage.databases.main.appservice import ApplicationServiceWorkerStore
+from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
@@ -27,7 +29,6 @@ from synapse.types import get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
-
 
 TEMP_TABLE = "_temp_populate_user_directory"
 
@@ -37,7 +38,6 @@ class ProgressDict(TypedDict):
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
-
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
@@ -514,7 +514,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             desc="get_user_in_directory",
         )
 
-    async def update_user_directory_stream_pos(self, stream_id: int) -> None:
+    async def update_user_directory_stream_pos(self, stream_id: Optional[int]) -> None:
         await self.db_pool.simple_update_one(
             table="user_directory_stream_pos",
             keyvalues={},
@@ -541,8 +541,12 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         return False
 
-class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
 
+class UserDirectoryStore(
+    UserDirectoryBackgroundUpdateStore,
+    ApplicationServiceWorkerStore,
+    RegistrationWorkerStore,
+):
     # How many records do we calculate before sending it to
     # add_users_who_share_private_rooms?
     SHARE_PRIVATE_WORKING_SET = 500
