@@ -20,6 +20,7 @@ from synapse.api.constants import UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
+from synapse.types import create_requester
 
 from tests import unittest
 from tests.unittest import override_config
@@ -132,11 +133,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_reactivation_makes_regular_user_searchable(self):
         user = self.register_user("regular", "pass")
-        password_hash = self.get_success(self.store.db_pool.simple_select_one_onecol(
-            "users",
-            {"name": user},
-            "password_hash",
-        ))
+        password_hash = self.get_success(
+            self.store.db_pool.simple_select_one_onecol(
+                "users",
+                {"name": user},
+                "password_hash",
+            )
+        )
         user_token = self.login(user, "pass")
         admin_user = self.register_user("admin", "pass", admin=True)
 
@@ -159,11 +162,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # Reactivate the user
         self.get_success(deactivate_handler.activate_account(user))
         # Hackily reset password by restoring the old pw hash.
-        self.get_success(self.store.db_pool.simple_update_one(
-            "users",
-            {"name": user},
-            {"password_hash": password_hash},
-        ))
+        self.get_success(
+            self.store.db_pool.simple_update_one(
+                "users",
+                {"name": user},
+                {"password_hash": password_hash},
+            )
+        )
         user_token = self.login(user, "pass")
         self.helper.create_room_as(user, is_public=True, tok=user_token)
 
