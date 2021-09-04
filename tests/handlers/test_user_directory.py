@@ -131,6 +131,48 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
 
+    def test_reactivation_makes_regular_user_searchable(self):
+        user = self.register_user("regular", "pass")
+        password_hash = self.get_success(self.store.db_pool.simple_select_one_onecol(
+            "users",
+            {"name": user},
+            "password_hash",
+        ))
+        user_token = self.login(user, "pass")
+        admin_user = self.register_user("admin", "pass", admin=True)
+
+        # Ensure the regular user is publicly visible and searchable.
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
+
+        # Deactivate the user and check they're not searchable.
+        deactivate_handler = self.hs._deactivate_account_handler
+        self.get_success(
+            deactivate_handler.deactivate_account(
+                user, erase_data=False, requester=create_requester(admin_user)
+            )
+        )
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(s["results"], [])
+
+        # Reactivate the user
+        self.get_success(deactivate_handler.activate_account(user))
+        # Hackily reset password by restoring the old pw hash.
+        self.get_success(self.store.db_pool.simple_update_one(
+            "users",
+            {"name": user},
+            {"password_hash": password_hash},
+        ))
+        user_token = self.login(user, "pass")
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+
+        # Check they're searchable.
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
+
     def test_private_room(self):
         """
         A user can be searched for only by people that are either in a public
