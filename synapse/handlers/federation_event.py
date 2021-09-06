@@ -36,6 +36,7 @@ from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
     RejectedReason,
     RoomEncryptionAlgorithms,
@@ -1327,9 +1328,7 @@ class FederationEventHandler(BaseHandler):
 
         if not context.rejected:
             await self._check_for_soft_fail(event, state, backfilled, origin=origin)
-
-        if event.type == EventTypes.GuestAccess and not context.rejected:
-            await self.maybe_kick_guest_users(event)
+            await self._maybe_kick_guest_users(event)
 
         # If we are going to send this event over federation we precaclculate
         # the joined hosts.
@@ -1339,6 +1338,18 @@ class FederationEventHandler(BaseHandler):
             )
 
         return context
+
+    async def _maybe_kick_guest_users(self, event: EventBase) -> None:
+        if event.type != EventTypes.GuestAccess:
+            return
+
+        guest_access = event.content.get(EventContentFields.GUEST_ACCESS)
+        if guest_access == GuestAccess.CAN_JOIN:
+            return
+
+        current_state_map = await self.state_handler.get_current_state(event.room_id)
+        current_state = list(current_state_map.values())
+        await self.hs.get_room_member_handler().kick_guest_users(current_state)
 
     async def _check_for_soft_fail(
         self,
