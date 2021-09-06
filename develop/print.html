@@ -9929,34 +9929,51 @@ clients in a confused state.</li>
 the old room to the new.</li>
 <li><code>new_room_id</code> - A string representing the room ID of the new room.</li>
 </ul>
-<h2 id="undoing-room-shutdowns"><a class="header" href="#undoing-room-shutdowns">Undoing room shutdowns</a></h2>
-<p><em>Note</em>: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+<h2 id="undoing-room-deletions"><a class="header" href="#undoing-room-deletions">Undoing room deletions</a></h2>
+<p><em>Note</em>: This guide may be outdated by the time you read it. By nature of room deletions being performed at the database level,
 the structure can and does change without notice.</p>
-<p>First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+<p>First, it's important to understand that a room deletion is very destructive. Undoing a deletion is not as simple as pretending it
 never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
 to recover at all:</p>
 <ul>
 <li>If the room was invite-only, your users will need to be re-invited.</li>
 <li>If the room no longer has any members at all, it'll be impossible to rejoin.</li>
-<li>The first user to rejoin will have to do so via an alias on a different server.</li>
+<li>The first user to rejoin will have to do so via an alias on a different
+server (or receive an invite from a user on a different server).</li>
 </ul>
 <p>With all that being said, if you still want to try and recover the room:</p>
+<ol>
+<li>
+<p>If the room was <code>block</code>ed, you must unblock it on your server. This can be
+accomplished as follows:</p>
 <ol>
 <li>For safety reasons, shut down Synapse.</li>
 <li>In the database, run <code>DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';</code>
 <ul>
 <li>For caution: it's recommended to run this in a transaction: <code>BEGIN; DELETE ...;</code>, verify you got 1 result, then <code>COMMIT;</code>.</li>
-<li>The room ID is the same one supplied to the shutdown room API, not the Content Violation room.</li>
+<li>The room ID is the same one supplied to the delete room API, not the Content Violation room.</li>
 </ul>
 </li>
 <li>Restart Synapse.</li>
 </ol>
-<p>You will have to manually handle, if you so choose, the following:</p>
-<ul>
-<li>Aliases that would have been redirected to the Content Violation room.</li>
-<li>Users that would have been booted from the room (and will have been force-joined to the Content Violation room).</li>
-<li>Removal of the Content Violation room if desired.</li>
-</ul>
+<p>This step is unnecessary if <code>block</code> was not set.</p>
+</li>
+<li>
+<p>Any room aliases on your server that pointed to the deleted room may have
+been deleted, or redirected to the Content Violation room. These will need
+to be restored manually.</p>
+</li>
+<li>
+<p>Users on your server that were in the deleted room will have been kicked
+from the room. Consider whether you want to update their membership
+(possibly via the <a href="admin_api/room_membership.html">Edit Room Membership API</a>) or let
+them handle rejoining themselves.</p>
+</li>
+<li>
+<p>If <code>new_room_user_id</code> was given, a 'Content Violation' will have been
+created. Consider whether you want to delete that roomm.</p>
+</li>
+</ol>
 <h2 id="deprecated-endpoint"><a class="header" href="#deprecated-endpoint">Deprecated endpoint</a></h2>
 <p>The previous deprecated API will be removed in a future release, it was:</p>
 <pre><code>POST /_synapse/admin/v1/rooms/&lt;room_id&gt;/delete
@@ -9974,7 +9991,7 @@ optionally be specified, e.g.:</p>
 </code></pre>
 <h1 id="forward-extremities-admin-api"><a class="header" href="#forward-extremities-admin-api">Forward Extremities Admin API</a></h1>
 <p>Enables querying and deleting forward extremities from rooms. When a lot of forward
-extremities accumulate in a room, performance can become degraded. For details, see 
+extremities accumulate in a room, performance can become degraded. For details, see
 <a href="https://github.com/matrix-org/synapse/issues/1760">#1760</a>.</p>
 <h2 id="check-for-forward-extremities"><a class="header" href="#check-for-forward-extremities">Check for forward extremities</a></h2>
 <p>To check the status of forward extremities for a room:</p>
@@ -9994,7 +10011,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
 }
 </code></pre>
 <h2 id="deleting-forward-extremities"><a class="header" href="#deleting-forward-extremities">Deleting forward extremities</a></h2>
-<p><strong>WARNING</strong>: Please ensure you know what you're doing and have read 
+<p><strong>WARNING</strong>: Please ensure you know what you're doing and have read
 the related issue <a href="https://github.com/matrix-org/synapse/issues/1760">#1760</a>.
 Under no situations should this API be executed as an automated maintenance task!</p>
 <p>If a room has lots of forward extremities, the extra can be
