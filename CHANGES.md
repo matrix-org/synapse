@@ -1,6 +1,8 @@
 Synapse 1.42.0rc2 (2021-09-06)
 ==============================
 
+Server administrators are reminded to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
+
 Features
 --------
 
@@ -15,9 +17,6 @@ Internal Changes
 
 Synapse 1.42.0rc1 (2021-09-01)
 ==============================
-
-Server administrators are reminded to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
-
 
 Features
 --------
