@@ -66,11 +66,15 @@ class RatelimitConfig(Config):
         else:
             self.rc_federation = FederationRateLimitConfig(
                 **{
-                    "window_size": config.get("federation_rc_window_size"),
-                    "sleep_limit": config.get("federation_rc_sleep_limit"),
-                    "sleep_delay": config.get("federation_rc_sleep_delay"),
-                    "reject_limit": config.get("federation_rc_reject_limit"),
-                    "concurrent": config.get("federation_rc_concurrent"),
+                    k: v
+                    for k, v in {
+                        "window_size": config.get("federation_rc_window_size"),
+                        "sleep_limit": config.get("federation_rc_sleep_limit"),
+                        "sleep_delay": config.get("federation_rc_sleep_delay"),
+                        "reject_limit": config.get("federation_rc_reject_limit"),
+                        "concurrent": config.get("federation_rc_concurrent"),
+                    }.items()
+                    if v is not None
                 }
             )
 
