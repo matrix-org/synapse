@@ -266,6 +266,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 user_id, profile.display_name, profile.avatar_url
             )
 
+        # Now update the room sharing tables to include this room.
         is_public = await self.is_room_world_readable_or_publicly_joinable(room_id)
         if is_public:
             if users_with_profile:

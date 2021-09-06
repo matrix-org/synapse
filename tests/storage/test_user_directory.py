@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Set, Tuple
+from typing import Dict, List, Tuple
 from unittest.mock import Mock, patch
 
 import synapse
@@ -19,6 +19,7 @@ from synapse.api.constants import UserTypes
 from synapse.appservice import ApplicationService
 from synapse.rest.client import login, room
 from synapse.storage import DataStore
+from synapse.types import UserID, create_requester
 
 from tests.test_utils.event_injection import inject_member_event
 from tests.unittest import HomeserverTestCase, override_config
@@ -51,14 +52,14 @@ class GetUserDirectoryTables(HomeserverTestCase):
             )
         )
 
-    def get_users_in_user_directory(self) -> Set[str]:
+    def get_users_in_user_directory(self) -> Dict[str, str]:
         # Just the set of usernames for now
         r = self.get_success(
             self.store.db_pool.simple_select_list(
                 "user_directory", None, ("user_id", "display_name")
             )
         )
-        return {entry["user_id"] for entry in r}
+        return {entry["user_id"]: entry["display_name"] for entry in r}
 
     def _compress_shared(self, shared):
         """
@@ -186,12 +187,12 @@ class UserDirectoryInitialPopulationTestcase(
         )
 
         # All three should have entries in the directory
-        self.assertEqual(self.get_users_in_user_directory(), {u1, u2, u3})
+        self.assertEqual(set(self.get_users_in_user_directory().keys()), {u1, u2, u3})
 
     def test_populates_users_in_zero_rooms(self):
         billy_no_mates = self.register_user("user2", "pass")
         self._purge_and_rebuild_user_dir()
-        self.assertEqual(self.get_users_in_user_directory(), {billy_no_mates})
+        self.assertEqual(self.get_users_in_user_directory().keys(), {billy_no_mates})
         self.assertEqual(self.get_users_in_public_rooms(), [])
         self.assertEqual(self.get_users_who_share_private_rooms(), [])
 
@@ -206,7 +207,7 @@ class UserDirectoryInitialPopulationTestcase(
         self._purge_and_rebuild_user_dir()
         # TODO add support user to a public and private room. Check that
         # users_in_public_rooms and users_who_share_private_rooms is empty.
-        self.assertEqual(self.get_users_in_user_directory(), set())
+        self.assertEqual(self.get_users_in_user_directory(), {})
 
     def test_population_excludes_appservice_user(self):
         as_token = "i_am_an_app_service"
@@ -230,7 +231,7 @@ class UserDirectoryInitialPopulationTestcase(
 
         # TODO add AS user to a public and private room. Check that
         # users_in_public_rooms and users_who_share_private_rooms is empty.
-        self.assertEqual(self.get_users_in_user_directory(), set())
+        self.assertEqual(self.get_users_in_user_directory(), {})
 
     def test_population_excludes_deactivated_user(self):
         user = self.register_user("rip", "pass")
@@ -243,7 +244,7 @@ class UserDirectoryInitialPopulationTestcase(
 
         self.assertEqual(self.get_users_in_public_rooms(), [])
         self.assertEqual(self.get_users_who_share_private_rooms(), [])
-        self.assertEqual(self.get_users_in_user_directory(), set())
+        self.assertEqual(self.get_users_in_user_directory(), {})
 
     def test_populates_remote_and_local_users(self):
         """All local users and remote users have entries in the user_directory table.
@@ -284,9 +285,43 @@ class UserDirectoryInitialPopulationTestcase(
 
         self._purge_and_rebuild_user_dir()
 
-        users_in_directory = self.get_users_in_user_directory()
+        users_in_directory = set(self.get_users_in_user_directory().keys())
         # No assertions about displaynames or avatars here.
         self.assertEqual(users_in_directory, {u1, u2, remote1, remote2})
+
+    def test_population_of_local_users_ignores_per_room_nicknames(self):
+        user = self.register_user("user", "pass")
+        token = self.login(user, "pass")
+
+        # Explictly set a profile name for our userAlice
+        self.get_success(
+            self.hs.get_profile_handler().set_displayname(
+                UserID.from_string(user),
+                create_requester(user, token),
+                "Alice Cooper",
+            )
+        )
+
+        # Alice makes a private room and sets a nickname there
+        private_room = self.helper.create_room_as(user, is_public=False, tok=token)
+        self.helper.send_state(
+            private_room,
+            "m.room.member",
+            {
+                "displayname": "Freddie Mercury",
+                "membership": "join",
+            },
+            token,
+            state_key=user,
+        )
+
+        # Rebuild the directory
+        self._purge_and_rebuild_user_dir()
+
+        # Check we only see Alice's profile name in the directory
+        self.assertEqual(
+            self.get_users_in_user_directory(), {"@user:test": "Alice Cooper"}
+        )
 
 
 ALICE = "@alice:a"
