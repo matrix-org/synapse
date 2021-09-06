@@ -1385,18 +1385,18 @@ class PersistEventsStore:
         # If we're persisting an unredacted event we go and ensure
         # that we mark any redactions that reference this event as
         # requiring censoring.
-        sql = "UPDATE redactions SET have_censored = ? WHERE redacts = ?"
-        txn.execute_batch(
-            sql,
-            (
-                (
-                    False,
-                    event.event_id,
-                )
-                for event, _ in events_and_contexts
-                if not event.internal_metadata.is_redacted()
-            ),
+        unredacted_events = [
+            event.event_id
+            for event, _ in events_and_contexts
+            if not event.internal_metadata.is_redacted()
+        ]
+        sql = "UPDATE redactions SET have_censored = ? WHERE "
+        clause, args = make_in_list_sql_clause(
+            self.database_engine,
+            "redacts",
+            unredacted_events,
         )
+        txn.execute(sql + clause, [False] + args)
 
         state_events_and_contexts = [
             ec for ec in events_and_contexts if ec[0].is_state()
