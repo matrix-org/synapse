@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import queue
-from typing import BinaryIO, Optional, Union
+from typing import BinaryIO, Optional, Union, cast
 
 from twisted.internet import threads
 from twisted.internet.defer import Deferred
@@ -85,7 +85,6 @@ class BackgroundFileConsumer:
             self._writer,
         )
         if not streaming:
-            assert isinstance(self._producer, IPullProducer)
             self._producer.resumeProducing()
 
     def unregisterProducer(self) -> None:
@@ -109,10 +108,10 @@ class BackgroundFileConsumer:
         # If this is a PushProducer and the queue is getting behind
         # then we pause the producer.
         if self.streaming and self._bytes_queue.qsize() >= self._PAUSE_ON_QUEUE_SIZE:
-            assert isinstance(self._producer, IPushProducer)
             self._paused_producer = True
             assert self._producer is not None
-            self._producer.pauseProducing()
+            # cast safe because `streaming` means this is an IPushProducer
+            cast(IPushProducer, self._producer).pauseProducing()
 
     def _writer(self) -> None:
         """This is run in a background thread to write to the file."""
