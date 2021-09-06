@@ -104,6 +104,8 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
 
     if event_type == EventTypes.Member:
         add_fields("membership")
+        if room_version.msc3375_redaction_rules:
+            add_fields("join_authorised_via_users_server")
     elif event_type == EventTypes.Create:
         # MSC2176 rules state that create events cannot be redacted.
         if room_version.msc2176_redaction_rules:
