@@ -11,11 +11,22 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
 from typing import Any, Dict, Optional
 
 import attr
 
 from ._base import Config
+
+logger = logging.getLogger(__name__)
+
+LEGACY_TEMPLATE_DIR_WARNING = """
+This server's configuration file is using the deprecated 'template_dir' setting in the
+'sso' section. Support for this setting has been deprecated and will be removed in a
+future version of Synapse. Server admins should instead use the new
+'custom_templates_directory' setting documented here:
+https://matrix-org.github.io/synapse/latest/templates.html
+---------------------------------------------------------------------------------------"""
 
 
 @attr.s(frozen=True)
@@ -43,6 +54,8 @@ class SSOConfig(Config):
 
         # The sso-specific template_dir
         self.sso_template_dir = sso_config.get("template_dir")
+        if self.sso_template_dir is not None:
+            logger.warning(LEGACY_TEMPLATE_DIR_WARNING)
 
         # Read templates from disk
         custom_template_directories = (
