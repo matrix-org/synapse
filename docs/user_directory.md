@@ -20,7 +20,7 @@ The last two (collectively called the "search tables") track who can
 see who.
 
 From all of these tables we exclude three types of local user:
-  - "support users"
+  - support users
   - appservice users
   - deactivated users
 
