@@ -114,7 +114,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         """
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
-        excluded = await self.store.exclude_from_user_dir(user_id)
+        excluded = await self.store.is_excluded_from_user_dir(user_id)
         if not excluded:
             await self.store.update_profile_in_user_dir(
                 user_id, profile.display_name, profile.avatar_url
@@ -196,7 +196,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 room_id, prev_event_id, event_id, typ
             )
         elif typ == EventTypes.Member:
-            if await self.store.exclude_from_user_dir(state_key):
+            if await self.store.is_excluded_from_user_dir(state_key):
                 return
 
             joined = await self._get_key_change(
@@ -341,7 +341,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             other_users_in_room = [
                 user
                 for user in users_in_room
-                if user != user_id and not await self.store.exclude_from_user_dir(user)
+                if user != user_id and not await self.store.is_excluded_from_user_dir(user)
             ]
 
             to_insert = set()

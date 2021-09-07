@@ -254,7 +254,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         users_with_profile = {
             user_id: profile
             for user_id, profile in users_with_profile.items()
-            if not await self.exclude_from_user_dir(user_id)
+            if not await self.is_excluded_from_user_dir(user_id)
         }
 
         # Upsert a user_directory record for each remote user we see.
@@ -336,7 +336,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         for user_id in users_to_work_on:
-            if not await self.exclude_from_user_dir(user_id):
+            if not await self.is_excluded_from_user_dir(user_id):
                 profile = await self.get_profileinfo(get_localpart_from_id(user_id))
                 await self.update_profile_in_user_dir(
                     user_id, profile.display_name, profile.avatar_url
@@ -523,7 +523,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             desc="update_user_directory_stream_pos",
         )
 
-    async def exclude_from_user_dir(self, user_id: str) -> bool:
+    async def is_excluded_from_user_dir(self, user_id: str) -> bool:
         """Certain classes of local user are omitted from the user directory.
         Is this user one of them?
         """
