@@ -61,6 +61,7 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
+from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .session import SessionStore
@@ -81,6 +82,7 @@ class DataStore(
     EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,
+    RoomBatchStore,
     RegistrationStore,
     StreamStore,
     ProfileStore,

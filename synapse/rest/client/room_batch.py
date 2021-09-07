@@ -299,7 +299,18 @@ class RoomBatchSendEventRestServlet(RestServlet):
             #  event, which causes the HS to ask for the state at the start of
             #  the chunk later.
             prev_event_ids = [fake_prev_event_id]
-            # TODO: Verify the chunk_id_from_query corresponds to an insertion event
+
+            # Verify the chunk_id_from_query corresponds to an actual insertion event
+            # and have the chunk connected.
+            corresponding_insertion_event_id = (
+                await self.store.get_insertion_event_by_chunk_id(chunk_id_from_query)
+            )
+            if corresponding_insertion_event_id is None:
+                raise SynapseError(
+                    400,
+                    "No insertion event corresponds to the given ?chunk_id",
+                    errcode=Codes.INVALID_PARAM,
+                )
             pass
         # Otherwise, create an insertion event to act as a starting point.
         #
