@@ -818,7 +818,7 @@ class FederationEventHandler:
         missing_events = missing_desired_events | missing_auth_events
         logger.debug("Fetching %i events from remote", len(missing_events))
         await self._get_events_and_persist(
-            destination=destination, room_id=room_id, events=missing_events
+            destination=destination, room_id=room_id, event_ids=missing_events
         )
 
         # we need to make sure we re-load from the database to get the rejected
@@ -1085,12 +1085,12 @@ class FederationEventHandler:
         )
 
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, events: Iterable[str]
+        self, destination: str, room_id: str, event_ids: Iterable[str]
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
         This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include in the `events` argument
+        newly fetched events. Callers must include in the `event_ids` argument
         any missing events from the auth chain.
 
         Logs a warning if we can't find the given event.
@@ -1127,7 +1127,7 @@ class FederationEventHandler:
                         e,
                     )
 
-        await concurrently_execute(get_event, events, 5)
+        await concurrently_execute(get_event, event_ids, 5)
 
         # Make a map of auth events for each event. We do this after fetching
         # all the events as some of the events' auth events will be in the list
