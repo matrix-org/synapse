@@ -550,10 +550,6 @@ class UserDirectoryStore(
     ApplicationServiceWorkerStore,
     RegistrationWorkerStore,
 ):
-    # How many records do we calculate before sending it to
-    # add_users_who_share_private_rooms?
-    SHARE_PRIVATE_WORKING_SET = 500
-
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
