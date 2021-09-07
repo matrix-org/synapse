@@ -37,7 +37,6 @@ from synapse.api.errors import (
     UnsupportedRoomVersionError,
 )
 from synapse.events import EventBase
-from synapse.events.utils import format_event_for_client_v2
 from synapse.types import JsonDict
 from synapse.util.caches.response_cache import ResponseCache
 
@@ -89,7 +88,6 @@ class RoomSummaryHandler:
     _PAGINATION_SESSION_VALIDITY_PERIOD_MS = 5 * 60 * 1000
 
     def __init__(self, hs: "HomeServer"):
-        self._clock = hs.get_clock()
         self._event_auth_handler = hs.get_event_auth_handler()
         self._store = hs.get_datastore()
         self._event_serializer = hs.get_event_client_serializer()
@@ -648,18 +646,18 @@ class RoomSummaryHandler:
         if max_children is None or max_children > MAX_ROOMS_PER_SPACE:
             max_children = MAX_ROOMS_PER_SPACE
 
-        now = self._clock.time_msec()
-        events_result: List[JsonDict] = []
-        for edge_event in itertools.islice(child_events, max_children):
-            events_result.append(
-                await self._event_serializer.serialize_event(
-                    edge_event,
-                    time_now=now,
-                    event_format=format_event_for_client_v2,
-                )
-            )
-
-        return _RoomEntry(room_id, room_entry, events_result)
+        stripped_events: List[JsonDict] = [
+            {
+                "type": e.type,
+                "state_key": e.state_key,
+                "content": e.content,
+                "room_id": e.room_id,
+                "sender": e.sender,
+                "origin_server_ts": e.origin_server_ts,
+            }
+            for e in itertools.islice(child_events, max_children)
+        ]
+        return _RoomEntry(room_id, room_entry, stripped_events)
 
     async def _summarize_remote_room(
         self,
