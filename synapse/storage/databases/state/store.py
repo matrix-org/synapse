@@ -249,6 +249,32 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 from the database.
         Returns:
             Dict of state group to state map.
+
+
+        The flow for this function looks as follows:
+
+                * Query the immediate caches (self._state_group_cache,
+                |                             self._state_group_members_cache).
+        NONSTOP |
+                |
+                * Query the in-flight cache (self._state_group_inflight_cache)
+                | for immediate-cache misses.
+        NONSTOP |
+                |
+                * Service cache misses:
+                |   - Expand the state filter (to help cache hit ratio).
+                |   - Start a new transaction to fetch outstanding groups.
+                |   - Register entries in the in-flight cache for this transaction.
+                |   - (When the transaction is finished) Register entries in
+                |     the immediate caches.
+                |
+                * Wait for in-flight requests to finish...
+                |
+                * Assemble everything together and filter out anything we didn't
+                  ask for.
+
+        The sections marked NONSTOP must not contain any `await`s, otherwise
+        race conditions could occur and the cache could be made less effective.
         """
 
         def try_combine_inflight_requests(
