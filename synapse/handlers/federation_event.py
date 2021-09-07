@@ -1167,7 +1167,16 @@ class FederationEventHandler:
     async def _auth_and_persist_fetched_events(
         self, origin: str, room_id: str, fetched_events: Collection[EventBase]
     ) -> None:
-        """Persist the events fetched by _get_events_and_persist
+        """Persist the events fetched by _get_events_and_persist.
+
+        The events should not depend on one another, e.g. this should be used to persist
+        a bunch of outliers, but not a chunk of individual events that depend
+        on each other for state calculations.
+
+        We also assume that all of the auth events for all of the events have already
+        been persisted.
+
+        Notifies about the events where appropriate.
 
         Params:
             origin: where the events came from
@@ -1196,27 +1205,6 @@ class FederationEventHandler:
                     logger.info("Missing auth event %s", auth_event_id)
 
             event_infos.append(_NewEventInfo(event, auth))
-
-        if event_infos:
-            await self._auth_and_persist_events(
-                origin,
-                room_id,
-                event_infos,
-            )
-
-    async def _auth_and_persist_events(
-        self,
-        origin: str,
-        room_id: str,
-        event_infos: Collection[_NewEventInfo],
-    ) -> None:
-        """Creates the appropriate contexts and persists events. The events
-        should not depend on one another, e.g. this should be used to persist
-        a bunch of outliers, but not a chunk of individual events that depend
-        on each other for state calculations.
-
-        Notifies about the events where appropriate.
-        """
 
         if not event_infos:
             return
