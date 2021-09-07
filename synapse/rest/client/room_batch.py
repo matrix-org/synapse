@@ -15,6 +15,7 @@
 import logging
 import re
 from typing import TYPE_CHECKING, Awaitable, List, Tuple
+from http import HTTPStatus
 
 from twisted.web.server import Request
 
@@ -179,7 +180,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
         if not requester.app_service:
             raise AuthError(
-                403,
+                HTTPStatus.FORBIDDEN,
                 "Only application services can use the /batchsend endpoint",
             )
 
@@ -192,7 +193,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
         if prev_events_from_query is None:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "prev_event query parameter is required when inserting historical messages back in time",
                 errcode=Codes.MISSING_PARAM,
             )
@@ -213,7 +214,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
-        state_events_at_start = []
+        state_event_ids_at_start = []
         for state_event in body["state_events_at_start"]:
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
@@ -279,7 +280,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 )
                 event_id = event.event_id
 
-            state_events_at_start.append(event_id)
+            state_event_ids_at_start.append(event_id)
             auth_event_ids.append(event_id)
 
         events_to_create = body["events"]
@@ -424,20 +425,26 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 context=context,
             )
 
-        # Add the base_insertion_event to the bottom of the list we return
-        if base_insertion_event is not None:
-            event_ids.append(base_insertion_event.event_id)
+        insertion_event_id = event_ids.pop(0)
+        chunk_event_id = event_ids.pop(len(event_ids) - 1)
+        historical_event_ids = event_ids
 
-        return 200, {
-            "state_events": state_events_at_start,
-            "events": event_ids,
+        response_dict = {
+            "state_event_ids": state_event_ids_at_start,
+            "event_ids": historical_event_ids,
             "next_chunk_id": insertion_event["content"][
                 EventContentFields.MSC2716_NEXT_CHUNK_ID
             ],
+            "insertion_event_id": insertion_event_id,
+            "chunk_event_id": chunk_event_id,
         }
+        if base_insertion_event is not None:
+            response_dict["base_insertion_event_id"] = base_insertion_event.event_id
+
+        return HTTPStatus.OK, response_dict
 
     def on_GET(self, request: Request, room_id: str) -> Tuple[int, str]:
-        return 501, "Not implemented"
+        return HTTPStatus.NOT_IMPLEMENTED, "Not implemented"
 
     def on_PUT(
         self, request: SynapseRequest, room_id: str
