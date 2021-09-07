@@ -1,3 +1,7 @@
+:root {
+    --pagetoc-width: 250px;
+}
+
 @media only screen and (max-width:1439px) {
     .sidetoc {
         display: none;
@@ -8,6 +12,7 @@
     main {
         position: relative;
         margin-left: 100px !important;
+        margin-right: var(--pagetoc-width) !important;
     }
     .sidetoc {
         margin-left: auto;
@@ -18,7 +23,7 @@
     }
     .pagetoc {
         position: fixed;
-        width: 250px;
+        width: var(--pagetoc-width);
         overflow: auto;
         right: 20px;
         height: calc(100% - var(--menu-bar-height));
