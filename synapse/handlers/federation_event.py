@@ -1085,7 +1085,7 @@ class FederationEventHandler:
         )
 
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, event_ids: Iterable[str]
+        self, destination: str, room_id: str, event_ids: Collection[str]
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
@@ -1128,6 +1128,7 @@ class FederationEventHandler:
                     )
 
         await concurrently_execute(get_event, event_ids, 5)
+        logger.info("Fetched %i events of %i requested", len(event_map), len(event_ids))
 
         # Make a map of auth events for each event. We do this after fetching
         # all the events as some of the events' auth events will be in the list
