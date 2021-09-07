@@ -1282,15 +1282,16 @@ class FederationEventHandler:
                 Possibly incomplete, and possibly including events that are not yet
                 persisted, or authed, or in the right room.
 
-                Only populated where we may not already have persisted these events -
-                for example, when populating outliers, or the state for a backwards
-                extremity.
+                Only populated when populating outliers.
 
             backfilled: True if the event was backfilled.
 
         Returns:
             The updated context object.
         """
+        # claimed_auth_event_map should be given iff the event is an outlier
+        assert bool(claimed_auth_event_map) == event.internal_metadata.outlier
+
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
