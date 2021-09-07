@@ -1129,7 +1129,19 @@ class FederationEventHandler:
 
         await concurrently_execute(get_event, event_ids, 5)
         logger.info("Fetched %i events of %i requested", len(event_map), len(event_ids))
+        await self._auth_and_persist_fetched_events(destination, room_id, event_map)
 
+    async def _auth_and_persist_fetched_events(
+        self, origin: str, room_id: str, event_map: Dict[str, EventBase]
+    ) -> None:
+        """Persist the events fetched by _get_events_and_persist
+
+        Params:
+            origin: where the events came from
+            room_id: the room that the events are meant to be in (though this has
+               not yet been checked)
+            event_id: map from event_id -> event for the fetched events
+        """
         # Make a map of auth events for each event. We do this after fetching
         # all the events as some of the events' auth events will be in the list
         # of requested events.
@@ -1159,7 +1171,7 @@ class FederationEventHandler:
 
         if event_infos:
             await self._auth_and_persist_events(
-                destination,
+                origin,
                 room_id,
                 event_infos,
             )
