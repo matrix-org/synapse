@@ -1136,12 +1136,12 @@ class FederationEventHandler:
         # XXX: it might be possible to kick this process off in parallel with fetching
         # the events.
         while event_map:
-            # build a dict of events whose auth events are not in the queue.
-            roots = {
-                eid: ev
-                for eid, ev in event_map.items()
+            # build a list of events whose auth events are not in the queue.
+            roots = tuple(
+                ev
+                for ev in event_map.values()
                 if not any(aid in event_map for aid in ev.auth_event_ids())
-            }
+            )
 
             if not roots:
                 # if *none* of the remaining events are ready, that means
@@ -1161,11 +1161,11 @@ class FederationEventHandler:
 
             await self._auth_and_persist_fetched_events(destination, room_id, roots)
 
-            for eid in roots.keys():
-                del event_map[eid]
+            for ev in roots:
+                del event_map[ev.event_id]
 
     async def _auth_and_persist_fetched_events(
-        self, origin: str, room_id: str, event_map: Dict[str, EventBase]
+        self, origin: str, room_id: str, fetched_events: Collection[EventBase]
     ) -> None:
         """Persist the events fetched by _get_events_and_persist
 
@@ -1178,7 +1178,7 @@ class FederationEventHandler:
         # get all the auth events for all the events in this batch. By now, they should
         # have been persisted.
         auth_events = {
-            aid for event in event_map.values() for aid in event.auth_event_ids()
+            aid for event in fetched_events for aid in event.auth_event_ids()
         }
         persisted_events = await self._store.get_events(
             auth_events,
@@ -1186,7 +1186,7 @@ class FederationEventHandler:
         )
 
         event_infos = []
-        for event in event_map.values():
+        for event in fetched_events:
             auth = {}
             for auth_event_id in event.auth_event_ids():
                 ae = persisted_events.get(auth_event_id)
