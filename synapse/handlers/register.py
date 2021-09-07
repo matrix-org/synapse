@@ -21,7 +21,13 @@ from prometheus_client import Counter
 from typing_extensions import TypedDict
 
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
+from synapse.api.constants import (
+    MAX_USERID_LENGTH,
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    LoginType,
+)
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
@@ -405,7 +411,7 @@ class RegistrationHandler(BaseHandler):
 
         # Choose whether to federate the new room.
         if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
-            stub_config["creation_content"] = {"m.federate": False}
+            stub_config["creation_content"] = {EventContentFields.FEDERATE: False}
 
         for r in self.hs.config.registration.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)

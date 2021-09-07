@@ -254,7 +254,7 @@ class StatsHandler:
 
             elif typ == EventTypes.Create:
                 room_state["is_federatable"] = (
-                    event_content.get("m.federate", True) is True
+                    event_content.get(EventContentFields.FEDERATE, True) is True
                 )
             elif typ == EventTypes.JoinRules:
                 room_state["join_rules"] = event_content.get("join_rule")
