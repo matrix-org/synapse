@@ -16,16 +16,10 @@ from unittest.mock import Mock
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import (
-    EventTypes,
-    Membership,
-    RoomEncryptionAlgorithms,
-    UserTypes,
-)
+from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
-from synapse.types import create_requester
 
 from tests import unittest
 from tests.storage.test_user_directory import GetUserDirectoryTables

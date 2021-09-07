@@ -341,7 +341,8 @@ class UserDirectoryHandler(StateDeltasHandler):
             other_users_in_room = [
                 user
                 for user in users_in_room
-                if user != user_id and not await self.store.is_excluded_from_user_dir(user)
+                if user != user_id
+                and not await self.store.is_excluded_from_user_dir(user)
             ]
 
             to_insert = set()
