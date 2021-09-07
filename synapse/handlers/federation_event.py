@@ -882,8 +882,13 @@ class FederationEventHandler:
         state: Optional[Iterable[EventBase]],
         backfilled: bool = False,
     ) -> None:
-        """Called when we have a new pdu. We need to do auth checks and put it
-        through the StateHandler.
+        """Called when we have a new non-outlier event.
+
+        This is called when we have a new event to add to the room DAG - either directly
+        via a /send request, retrieved via get_missing_events after a /send request, or
+        backfilled after a client request.
+
+        We need to do auth checks and put it through the StateHandler.
 
         Args:
             origin: server sending the event
@@ -898,6 +903,7 @@ class FederationEventHandler:
                 notification to clients, and validation of device keys.)
         """
         logger.debug("Processing event: %s", event)
+        assert not event.internal_metadata.outlier
 
         try:
             context = await self._state_handler.compute_event_context(
