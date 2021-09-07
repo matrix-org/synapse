@@ -337,6 +337,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         for user_id in users_to_work_on:
             if not await self.is_excluded_from_user_dir(user_id):
+                # Populate this local user's user directory entry with their
+                # profile information
                 profile = await self.get_profileinfo(get_localpart_from_id(user_id))
                 await self.update_profile_in_user_dir(
                     user_id, profile.display_name, profile.avatar_url

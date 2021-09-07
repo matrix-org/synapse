@@ -287,6 +287,7 @@ class UserDirectoryInitialPopulationTestcase(
 
         users_in_directory = set(self.get_users_in_user_directory().keys())
         # No assertions about displaynames or avatars here.
+        # TODO extend this case to do so, or add a new test case to cover it
         self.assertEqual(users_in_directory, {u1, u2, remote1, remote2})
 
     def test_population_of_local_users_ignores_per_room_nicknames(self):
