@@ -1,8 +1,25 @@
-Synapse 1.42.0rc1 (2021-09-01)
+Synapse 1.42.0rc2 (2021-09-06)
 ==============================
 
-Server administrators are reminded to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
+This version of Synapse removes deprecated room-management admin APIs, removes out-of-date
+email pushers, and improves error handling for fallback templates for user-interactive
+authentication. For more information on these points, server administrators are
+encouraged to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
 
+Features
+--------
+
+- Support room version 9 from [MSC3375](https://github.com/matrix-org/matrix-doc/pull/3375). ([\#10747](https://github.com/matrix-org/synapse/issues/10747))
+
+
+Internal Changes
+----------------
+
+- Print a warning when using one of the deprecated `template_dir` settings. ([\#10768](https://github.com/matrix-org/synapse/issues/10768))
+
+
+Synapse 1.42.0rc1 (2021-09-01)
+==============================
 
 Features
 --------
