@@ -1175,16 +1175,11 @@ class FederationEventHandler:
                not yet been checked)
             event_id: map from event_id -> event for the fetched events
         """
-        # Make a map of auth events for each event. We do this after fetching
-        # all the events as some of the events' auth events will be in the list
-        # of requested events.
-
-        auth_events = [
-            aid
-            for event in event_map.values()
-            for aid in event.auth_event_ids()
-            if aid not in event_map
-        ]
+        # get all the auth events for all the events in this batch. By now, they should
+        # have been persisted.
+        auth_events = {
+            aid for event in event_map.values() for aid in event.auth_event_ids()
+        }
         persisted_events = await self._store.get_events(
             auth_events,
             allow_rejected=True,
@@ -1194,7 +1189,7 @@ class FederationEventHandler:
         for event in event_map.values():
             auth = {}
             for auth_event_id in event.auth_event_ids():
-                ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
+                ae = persisted_events.get(auth_event_id)
                 if ae:
                     auth[(ae.type, ae.state_key)] = ae
                 else:
