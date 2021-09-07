@@ -14,8 +14,8 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Awaitable, List, Tuple
 from http import HTTPStatus
+from typing import TYPE_CHECKING, Awaitable, List, Tuple
 
 from twisted.web.server import Request
 
