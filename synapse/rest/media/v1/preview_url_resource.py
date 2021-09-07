@@ -79,6 +79,7 @@ class MediaInfo:
     """
     Information parsed from downloading media being previewed.
     """
+
     # The Content-Type header of the response.
     media_type: str
     # The length (in bytes) of the downloaded media.
