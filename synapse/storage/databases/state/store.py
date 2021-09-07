@@ -395,7 +395,27 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
                 return groups_to_state_dict
 
-            keys = ()  # TODO populate with keys
+            # Make a list of keys for us to store in the in-flight cache.
+            # This should list all the keys that the request will pick up from
+            # the database.
+            keys: List[InflightStateGroupCacheKey] = []
+            for group in inflight_cache_misses:
+                if db_state_filter.include_others:
+                    # We can't properly add cache keys for all the 'other'
+                    # state keys that `include_others` specifies (since there are
+                    # an unlimited number of 'other' state keys), but we can
+                    # add a cache key with the exact state filter in use
+                    # (in addition to cache keys specifying the definite state
+                    # keys we are requesting).
+                    keys.append((group, db_state_filter))
+
+                for event_type, state_keys in db_state_filter.types.items():
+                    if state_keys is None:
+                        keys.append((group, event_type, None))
+                    else:
+                        for state_key in state_keys:
+                            keys.append((group, event_type, state_key))
+
             spawned_request = self._state_group_inflight_cache.set_and_compute(
                 tuple(keys), get_state_groups_from_groups_then_add_to_cache
             )
