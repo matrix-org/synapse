@@ -1237,11 +1237,13 @@ class FederationEventHandler:
                 Possibly incomplete, and possibly including events that are not yet
                 persisted, or authed, or in the right room.
 
-                Only populated where we may not already have persisted these events -
-                for example, when populating outliers.
+                Only populated when populating outliers.
 
             backfilled: True if the event was backfilled.
         """
+        # claimed_auth_event_map should be given iff the event is an outlier
+        assert bool(claimed_auth_event_map) == event.internal_metadata.outlier
+
         context = await self._check_event_auth(
             origin,
             event,
