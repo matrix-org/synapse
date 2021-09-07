@@ -365,7 +365,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return False
 
     async def update_profile_in_user_dir(
-        self, user_id: str, display_name: str, avatar_url: str
+        self, user_id: str, display_name: Optional[str], avatar_url: Optional[str]
     ) -> None:
         """
         Update or add a user's profile in the user directory.

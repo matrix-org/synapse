@@ -16,6 +16,7 @@
 
 # This file can't be called email.py because if it is, we cannot:
 import email.utils
+import logging
 import os
 from enum import Enum
 from typing import Optional
@@ -23,6 +24,8 @@ from typing import Optional
 import attr
 
 from ._base import Config, ConfigError
+
+logger = logging.getLogger(__name__)
 
 MISSING_PASSWORD_RESET_CONFIG_ERROR = """\
 Password reset emails are enabled on this homeserver due to a partial
@@ -43,6 +46,14 @@ DEFAULT_SUBJECTS = {
     "password_reset": "[%(server_name)s] Password reset",
     "email_validation": "[%(server_name)s] Validate your email",
 }
+
+LEGACY_TEMPLATE_DIR_WARNING = """
+This server's configuration file is using the deprecated 'template_dir' setting in the
+'email' section. Support for this setting has been deprecated and will be removed in a
+future version of Synapse. Server admins should instead use the new
+'custom_templates_directory' setting documented here:
+https://matrix-org.github.io/synapse/latest/templates.html
+---------------------------------------------------------------------------------------"""
 
 
 @attr.s(slots=True, frozen=True)
@@ -105,6 +116,9 @@ class EmailConfig(Config):
 
         # A user-configurable template directory
         template_dir = email_config.get("template_dir")
+        if template_dir is not None:
+            logger.warning(LEGACY_TEMPLATE_DIR_WARNING)
+
         if isinstance(template_dir, str):
             # We need an absolute path, because we change directory after starting (and
             # we don't yet know what auxiliary templates like mail.css we will need).

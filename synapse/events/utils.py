@@ -32,6 +32,9 @@ from . import EventBase
 #       the literal fields "foo\" and "bar" but will instead be treated as "foo\\.bar"
 SPLIT_FIELD_REGEX = re.compile(r"(?<!\\)\.")
 
+CANONICALJSON_MAX_INT = (2 ** 53) - 1
+CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
+
 
 def prune_event(event: EventBase) -> EventBase:
     """Returns a pruned version of the given event, which removes all keys we
@@ -101,6 +104,8 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
 
     if event_type == EventTypes.Member:
         add_fields("membership")
+        if room_version.msc3375_redaction_rules:
+            add_fields("join_authorised_via_users_server")
     elif event_type == EventTypes.Create:
         # MSC2176 rules state that create events cannot be redacted.
         if room_version.msc2176_redaction_rules:
@@ -505,7 +510,7 @@ def validate_canonicaljson(value: Any):
     * NaN, Infinity, -Infinity
     """
     if isinstance(value, int):
-        if value <= -(2 ** 53) or 2 ** 53 <= value:
+        if value < CANONICALJSON_MIN_INT or CANONICALJSON_MAX_INT < value:
             raise SynapseError(400, "JSON integer out of range", Codes.BAD_JSON)
 
     elif isinstance(value, float):
