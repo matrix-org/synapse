@@ -76,15 +76,29 @@ ONE_HOUR = 60 * 60 * 1000
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class MediaInfo:
+    """
+    Information parsed from downloading media being previewed.
+    """
+    # The Content-Type header of the response.
     media_type: str
+    # The length (in bytes) of the downloaded media.
     media_length: int
+    # The media filename, according to the server. This is parsed from the
+    # returned headers, if possible.
     download_name: Optional[str]
+    # The time of the preview.
     created_ts_ms: int
+    # Information from the media storage provider about where the file is stored
+    # on disk.
     filesystem_id: str
     filename: str
+    # The URI being previewed.
     uri: str
+    # The HTTP response code.
     response_code: int
+    # The timestamp (in milliseconds) of when this preview expires.
     expires: int
+    # The ETag header of the response.
     etag: Optional[str]
 
 
