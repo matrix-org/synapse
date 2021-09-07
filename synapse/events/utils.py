@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@ from typing import Any, Mapping, Union
 
 from frozendict import frozendict
 
-from synapse.api.constants import EventTypes, RelationTypes
+from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
 from synapse.api.errors import Codes, SynapseError
 from synapse.api.room_versions import RoomVersion
 from synapse.util.async_helpers import yieldable_gather_results
@@ -110,6 +109,8 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
         add_fields("creator")
     elif event_type == EventTypes.JoinRules:
         add_fields("join_rule")
+        if room_version.msc3083_join_rules:
+            add_fields("allow")
     elif event_type == EventTypes.PowerLevels:
         add_fields(
             "users",
@@ -125,12 +126,21 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
         if room_version.msc2176_redaction_rules:
             add_fields("invite")
 
+        if room_version.msc2716_historical:
+            add_fields("historical")
+
     elif event_type == EventTypes.Aliases and room_version.special_case_aliases_auth:
         add_fields("aliases")
     elif event_type == EventTypes.RoomHistoryVisibility:
         add_fields("history_visibility")
     elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
         add_fields("redacts")
+    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_INSERTION:
+        add_fields(EventContentFields.MSC2716_NEXT_CHUNK_ID)
+    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_CHUNK:
+        add_fields(EventContentFields.MSC2716_CHUNK_ID)
+    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
+        add_fields(EventContentFields.MSC2716_MARKER_INSERTION)
 
     allowed_fields = {k: v for k, v in event_dict.items() if k in allowed_keys}
 

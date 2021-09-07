@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,7 +15,7 @@
 import json
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client import directory, login, room
 from synapse.types import RoomAlias
 from synapse.util.stringutils import random_string
 

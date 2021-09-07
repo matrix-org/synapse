@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
@@ -14,7 +13,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import mock
+from unittest import mock
 
 from signedjson import key as key, sign as sign
 
@@ -48,12 +47,16 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             "alg2:k3": {"key": "key3"},
         }
 
+        # Note that "signed_curve25519" is always returned in key count responses. This is necessary until
+        # https://github.com/matrix-org/matrix-doc/issues/3298 is fixed.
         res = self.get_success(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
+        )
 
         # we should be able to change the signature without a problem
         keys["alg2:k2"]["signatures"]["k1"] = "sig2"
@@ -62,7 +65,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
+        )
 
     def test_change_one_time_keys(self):
         """attempts to change one-time-keys should be rejected"""
@@ -80,7 +85,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1, "alg2": 2}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "alg2": 2, "signed_curve25519": 0}}
+        )
 
         # Error when changing string key
         self.get_failure(
@@ -90,7 +97,7 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
             SynapseError,
         )
 
-        # Error when replacing dict key with strin
+        # Error when replacing dict key with string
         self.get_failure(
             self.handler.upload_keys_for_user(
                 local_user, device_id, {"one_time_keys": {"alg2:k3": "key2"}}
@@ -132,7 +139,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
                 local_user, device_id, {"one_time_keys": keys}
             )
         )
-        self.assertDictEqual(res, {"one_time_key_counts": {"alg1": 1}})
+        self.assertDictEqual(
+            res, {"one_time_key_counts": {"alg1": 1, "signed_curve25519": 0}}
+        )
 
         res2 = self.get_success(
             self.handler.claim_one_time_keys(
@@ -258,7 +267,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         self.get_success(self.handler.upload_signing_keys_for_user(local_user, keys2))
 
         devices = self.get_success(
-            self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
+            self.handler.query_devices(
+                {"device_keys": {local_user: []}}, 0, local_user, "device123"
+            )
         )
         self.assertDictEqual(devices["master_keys"], {local_user: keys2["master_key"]})
 
@@ -358,7 +369,9 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         device_key_1["signatures"][local_user]["ed25519:abc"] = "base64+signature"
         device_key_2["signatures"][local_user]["ed25519:def"] = "base64+signature"
         devices = self.get_success(
-            self.handler.query_devices({"device_keys": {local_user: []}}, 0, local_user)
+            self.handler.query_devices(
+                {"device_keys": {local_user: []}}, 0, local_user, "device123"
+            )
         )
         del devices["device_keys"][local_user]["abc"]["unsigned"]
         del devices["device_keys"][local_user]["def"]["unsigned"]
@@ -592,7 +605,10 @@ class E2eKeysHandlerTestCase(unittest.HomeserverTestCase):
         # fetch the signed keys/devices and make sure that the signatures are there
         ret = self.get_success(
             self.handler.query_devices(
-                {"device_keys": {local_user: [], other_user: []}}, 0, local_user
+                {"device_keys": {local_user: [], other_user: []}},
+                0,
+                local_user,
+                "device123",
             )
         )
 

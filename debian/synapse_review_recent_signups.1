@@ -1,0 +1,26 @@
+.\" generated with Ronn-NG/v0.8.0
+.\" http://github.com/apjanke/ronn-ng/tree/0.8.0
+.TH "SYNAPSE_REVIEW_RECENT_SIGNUPS" "1" "July 2021" "" ""
+.SH "NAME"
+\fBsynapse_review_recent_signups\fR \- Print users that have recently registered on Synapse
+.SH "SYNOPSIS"
+\fBsynapse_review_recent_signups\fR \fB\-c\fR|\fB\-\-config\fR \fIfile\fR [\fB\-s\fR|\fB\-\-since\fR \fIperiod\fR] [\fB\-e\fR|\fB\-\-exclude\-emails\fR] [\fB\-u\fR|\fB\-\-only\-users\fR]
+.SH "DESCRIPTION"
+\fBsynapse_review_recent_signups\fR prints out recently registered users on a Synapse server, as well as some basic information about the user\.
+.P
+\fBsynapse_review_recent_signups\fR must be supplied with the config of the Synapse server, so that it can fetch the database config and connect to the database\.
+.SH "OPTIONS"
+.TP
+\fB\-c\fR, \fB\-\-config\fR
+The config file(s) used by the Synapse server\.
+.TP
+\fB\-s\fR, \fB\-\-since\fR
+How far back to search for newly registered users\. Defaults to 7d, i\.e\. up to seven days in the past\. Valid units are \'s\', \'m\', \'h\', \'d\', \'w\', or \'y\'\.
+.TP
+\fB\-e\fR, \fB\-\-exclude\-emails\fR
+Do not print out users that have validated emails associated with their account\.
+.TP
+\fB\-u\fR, \fB\-\-only\-users\fR
+Only print out the user IDs of recently registered users, without any additional information
+.SH "SEE ALSO"
+synctl(1), synapse_port_db(1), register_new_matrix_user(1), hash_password(1)

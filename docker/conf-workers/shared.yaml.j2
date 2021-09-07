@@ -1,0 +1,9 @@
+# This file contains the base for the shared homeserver config file between Synapse workers,
+# as part of ./Dockerfile-workers.
+# configure_workers_and_start.py uses and amends to this file depending on the workers
+# that have been selected.
+
+redis:
+    enabled: true
+
+{{ shared_worker_config }}

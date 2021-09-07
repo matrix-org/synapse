@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2018, 2019 New Vector Ltd
 #
@@ -15,7 +14,17 @@
 # limitations under the License.
 import itertools
 import logging
-from typing import TYPE_CHECKING, Any, Dict, FrozenSet, List, Optional, Set, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Collection,
+    Dict,
+    FrozenSet,
+    List,
+    Optional,
+    Set,
+    Tuple,
+)
 
 import attr
 from prometheus_client import Counter
@@ -24,11 +33,11 @@ from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.filtering import FilterCollection
 from synapse.events import EventBase
 from synapse.logging.context import current_context
+from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
 from synapse.push.clientformat import format_push_rules_for_user
 from synapse.storage.roommember import MemberSummary
 from synapse.storage.state import StateFilter
 from synapse.types import (
-    Collection,
     JsonDict,
     MutableStateMap,
     Requester,
@@ -40,7 +49,7 @@ from synapse.types import (
 from synapse.util.async_helpers import concurrently_execute
 from synapse.util.caches.expiringcache import ExpiringCache
 from synapse.util.caches.lrucache import LruCache
-from synapse.util.caches.response_cache import ResponseCache
+from synapse.util.caches.response_cache import ResponseCache, ResponseCacheContext
 from synapse.util.metrics import Measure, measure_func
 from synapse.visibility import filter_events_for_client
 
@@ -74,12 +83,15 @@ LAZY_LOADED_MEMBERS_CACHE_MAX_AGE = 30 * 60 * 1000
 LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE = 100
 
 
+SyncRequestKey = Tuple[Any, ...]
+
+
 @attr.s(slots=True, frozen=True)
 class SyncConfig:
     user = attr.ib(type=UserID)
     filter_collection = attr.ib(type=FilterCollection)
     is_guest = attr.ib(type=bool)
-    request_key = attr.ib(type=Tuple[Any, ...])
+    request_key = attr.ib(type=SyncRequestKey)
     device_id = attr.ib(type=Optional[str])
 
 
@@ -257,16 +269,26 @@ class SyncHandler:
         self.presence_handler = hs.get_presence_handler()
         self.event_sources = hs.get_event_sources()
         self.clock = hs.get_clock()
-        self.response_cache = ResponseCache(
-            hs.get_clock(), "sync"
-        )  # type: ResponseCache[Tuple[Any, ...]]
         self.state = hs.get_state_handler()
         self.auth = hs.get_auth()
         self.storage = hs.get_storage()
         self.state_store = self.storage.state
 
-        # ExpiringCache((User, Device)) -> LruCache(state_key => event_id)
-        self.lazy_loaded_members_cache = ExpiringCache(
+        # TODO: flush cache entries on subsequent sync request.
+        #    Once we get the next /sync request (ie, one with the same access token
+        #    that sets 'since' to 'next_batch'), we know that device won't need a
+        #    cached result any more, and we could flush the entry from the cache to save
+        #    memory.
+        self.response_cache: ResponseCache[SyncRequestKey] = ResponseCache(
+            hs.get_clock(),
+            "sync",
+            timeout_ms=hs.config.caches.sync_response_cache_duration,
+        )
+
+        # ExpiringCache((User, Device)) -> LruCache(user_id => event_id)
+        self.lazy_loaded_members_cache: ExpiringCache[
+            Tuple[str, Optional[str]], LruCache[str, str]
+        ] = ExpiringCache(
             "lazy_loaded_members_cache",
             self.clock,
             max_len=0,
@@ -298,6 +320,7 @@ class SyncHandler:
             since_token,
             timeout,
             full_state,
+            cache_context=True,
         )
         logger.debug("Returning sync response for %s", user_id)
         return res
@@ -305,9 +328,10 @@ class SyncHandler:
     async def _wait_for_sync_for_user(
         self,
         sync_config: SyncConfig,
-        since_token: Optional[StreamToken] = None,
-        timeout: int = 0,
-        full_state: bool = False,
+        since_token: Optional[StreamToken],
+        timeout: int,
+        full_state: bool,
+        cache_context: ResponseCacheContext[SyncRequestKey],
     ) -> SyncResult:
         if since_token is None:
             sync_type = "initial_sync"
@@ -320,16 +344,27 @@ class SyncHandler:
         if context:
             context.tag = sync_type
 
+        # if we have a since token, delete any to-device messages before that token
+        # (since we now know that the device has received them)
+        if since_token is not None:
+            since_stream_id = since_token.to_device_key
+            deleted = await self.store.delete_messages_for_device(
+                sync_config.user.to_string(), sync_config.device_id, since_stream_id
+            )
+            logger.debug(
+                "Deleted %d to-device messages up to %d", deleted, since_stream_id
+            )
+
         if timeout == 0 or since_token is None or full_state:
             # we are going to return immediately, so don't bother calling
             # notifier.wait_for_events.
-            result = await self.current_sync_for_user(
+            result: SyncResult = await self.current_sync_for_user(
                 sync_config, since_token, full_state=full_state
             )
         else:
 
-            def current_sync_callback(before_token, after_token):
-                return self.current_sync_for_user(sync_config, since_token)
+            async def current_sync_callback(before_token, after_token) -> SyncResult:
+                return await self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(
                 sync_config.user.to_string(),
@@ -337,6 +372,17 @@ class SyncHandler:
                 current_sync_callback,
                 from_token=since_token,
             )
+
+            # if nothing has happened in any of the users' rooms since /sync was called,
+            # the resultant next_batch will be the same as since_token (since the result
+            # is generated when wait_for_events is first called, and not regenerated
+            # when wait_for_events times out).
+            #
+            # If that happens, we mustn't cache it, so that when the client comes back
+            # with the same cache token, we don't immediately return the same empty
+            # result, causing a tightloop. (#8518)
+            if result.next_batch == since_token:
+                cache_context.should_cache = False
 
         if result:
             if sync_config.filter_collection.lazy_load_members():
@@ -354,7 +400,14 @@ class SyncHandler:
         full_state: bool = False,
     ) -> SyncResult:
         """Get the sync for client needed to match what the server has now."""
-        return await self.generate_sync_result(sync_config, since_token, full_state)
+        with start_active_span("current_sync_for_user"):
+            log_kv({"since_token": since_token})
+            sync_result = await self.generate_sync_result(
+                sync_config, since_token, full_state
+            )
+
+            set_tag(SynapseTags.SYNC_RESULT, bool(sync_result))
+            return sync_result
 
     async def push_rules_for_user(self, user: UserID) -> JsonDict:
         user_id = user.to_string()
@@ -397,7 +450,7 @@ class SyncHandler:
             )
             now_token = now_token.copy_and_replace("typing_key", typing_key)
 
-            ephemeral_by_room = {}  # type: JsonDict
+            ephemeral_by_room: JsonDict = {}
 
             for event in typing:
                 # we want to exclude the room_id from the event, but modifying the
@@ -459,9 +512,9 @@ class SyncHandler:
                 # We check if there are any state events, if there are then we pass
                 # all current state events to the filter_events function. This is to
                 # ensure that we always include current state in the timeline
-                current_state_ids = frozenset()  # type: FrozenSet[str]
+                current_state_ids: FrozenSet[str] = frozenset()
                 if any(e.is_state() for e in recents):
-                    current_state_ids_map = await self.state.get_current_state_ids(
+                    current_state_ids_map = await self.store.get_current_state_ids(
                         room_id
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
@@ -521,7 +574,7 @@ class SyncHandler:
                 # ensure that we always include current state in the timeline
                 current_state_ids = frozenset()
                 if any(e.is_state() for e in loaded_recents):
-                    current_state_ids_map = await self.state.get_current_state_ids(
+                    current_state_ids_map = await self.store.get_current_state_ids(
                         room_id
                     )
                     current_state_ids = frozenset(current_state_ids_map.values())
@@ -554,7 +607,7 @@ class SyncHandler:
         )
 
     async def get_state_after_event(
-        self, event: EventBase, state_filter: StateFilter = StateFilter.all()
+        self, event: EventBase, state_filter: Optional[StateFilter] = None
     ) -> StateMap[str]:
         """
         Get the room state after the given event
@@ -564,7 +617,7 @@ class SyncHandler:
             state_filter: The state filter used to fetch state from the database.
         """
         state_ids = await self.state_store.get_state_ids_for_event(
-            event.event_id, state_filter=state_filter
+            event.event_id, state_filter=state_filter or StateFilter.all()
         )
         if event.is_state():
             state_ids = dict(state_ids)
@@ -575,7 +628,7 @@ class SyncHandler:
         self,
         room_id: str,
         stream_position: StreamToken,
-        state_filter: StateFilter = StateFilter.all(),
+        state_filter: Optional[StateFilter] = None,
     ) -> StateMap[str]:
         """Get the room state at a particular stream position
 
@@ -595,7 +648,7 @@ class SyncHandler:
         if last_events:
             last_event = last_events[-1]
             state = await self.get_state_after_event(
-                last_event, state_filter=state_filter
+                last_event, state_filter=state_filter or StateFilter.all()
             )
 
         else:
@@ -739,8 +792,10 @@ class SyncHandler:
 
     def get_lazy_loaded_members_cache(
         self, cache_key: Tuple[str, Optional[str]]
-    ) -> LruCache:
-        cache = self.lazy_loaded_members_cache.get(cache_key)
+    ) -> LruCache[str, str]:
+        cache: Optional[LruCache[str, str]] = self.lazy_loaded_members_cache.get(
+            cache_key
+        )
         if cache is None:
             logger.debug("creating LruCache for %r", cache_key)
             cache = LruCache(LAZY_LOADED_MEMBERS_CACHE_MAX_SIZE)
@@ -939,7 +994,7 @@ class SyncHandler:
                     if t[0] == EventTypes.Member:
                         cache.set(t[1], event_id)
 
-        state = {}  # type: Dict[str, EventBase]
+        state: Dict[str, EventBase] = {}
         if state_ids:
             state = await self.store.get_events(list(state_ids.values()))
 
@@ -978,6 +1033,7 @@ class SyncHandler:
         # to query up to a given point.
         # Always use the `now_token` in `SyncResultBuilder`
         now_token = self.event_sources.get_current_token()
+        log_kv({"now_token": now_token})
 
         logger.debug(
             "Calculating sync response for %r between %s and %s",
@@ -1042,9 +1098,13 @@ class SyncHandler:
 
         logger.debug("Fetching OTK data")
         device_id = sync_config.device_id
-        one_time_key_counts = {}  # type: JsonDict
-        unused_fallback_key_types = []  # type: List[str]
+        one_time_key_counts: JsonDict = {}
+        unused_fallback_key_types: List[str] = []
         if device_id:
+            # TODO: We should have a way to let clients differentiate between the states of:
+            #   * no change in OTK count since the provided since token
+            #   * the server has zero OTKs left for this device
+            #  Spec issue: https://github.com/matrix-org/matrix-doc/issues/3298
             one_time_key_counts = await self.store.count_e2e_one_time_keys(
                 user_id, device_id
             )
@@ -1191,7 +1251,7 @@ class SyncHandler:
 
             # Step 1b, check for newly joined rooms
             for room_id in newly_joined_rooms:
-                joined_users = await self.state.get_current_users_in_room(room_id)
+                joined_users = await self.store.get_users_in_room(room_id)
                 newly_joined_or_invited_or_knocked_users.update(joined_users)
 
             # TODO: Check that these users are actually new, i.e. either they
@@ -1207,7 +1267,7 @@ class SyncHandler:
 
             # Now find users that we no longer track
             for room_id in newly_left_rooms:
-                left_users = await self.state.get_current_users_in_room(room_id)
+                left_users = await self.store.get_users_in_room(room_id)
                 newly_left_users.update(left_users)
 
             # Remove any users that we still share a room with.
@@ -1231,19 +1291,16 @@ class SyncHandler:
             since_stream_id = int(sync_result_builder.since_token.to_device_key)
 
         if since_stream_id != int(now_token.to_device_key):
-            # We only delete messages when a new message comes in, but that's
-            # fine so long as we delete them at some point.
-
-            deleted = await self.store.delete_messages_for_device(
-                user_id, device_id, since_stream_id
-            )
-            logger.debug(
-                "Deleted %d to-device messages up to %d", deleted, since_stream_id
-            )
-
             messages, stream_id = await self.store.get_new_messages_for_device(
                 user_id, device_id, since_stream_id, now_token.to_device_key
             )
+
+            for message in messages:
+                # We pop here as we shouldn't be sending the message ID down
+                # `/sync`
+                message_id = message.pop("message_id", None)
+                if message_id:
+                    set_tag(SynapseTags.TO_DEVICE_MESSAGE_ID, message_id)
 
             logger.debug(
                 "Returning %d to-device messages between %d and %d (current token: %d)",
@@ -1355,7 +1412,7 @@ class SyncHandler:
 
         extra_users_ids = set(newly_joined_or_invited_users)
         for room_id in newly_joined_rooms:
-            users = await self.state.get_current_users_in_room(room_id)
+            users = await self.store.get_users_in_room(room_id)
             extra_users_ids.update(users)
         extra_users_ids.discard(user.to_string())
 
@@ -1394,7 +1451,7 @@ class SyncHandler:
         )
 
         if block_all_room_ephemeral:
-            ephemeral_by_room = {}  # type: Dict[str, List[JsonDict]]
+            ephemeral_by_room: Dict[str, List[JsonDict]] = {}
         else:
             now_token, ephemeral_by_room = await self.ephemeral_by_room(
                 sync_result_builder,
@@ -1425,7 +1482,7 @@ class SyncHandler:
 
         # If there is ignored users account data and it matches the proper type,
         # then use it.
-        ignored_users = frozenset()  # type: FrozenSet[str]
+        ignored_users: FrozenSet[str] = frozenset()
         if ignored_account_data:
             ignored_users_data = ignored_account_data.get("ignored_users", {})
             if isinstance(ignored_users_data, dict):
@@ -1543,7 +1600,7 @@ class SyncHandler:
             user_id, since_token.room_key, now_token.room_key
         )
 
-        mem_change_events_by_room_id = {}  # type: Dict[str, List[EventBase]]
+        mem_change_events_by_room_id: Dict[str, List[EventBase]] = {}
         for event in rooms_changed:
             mem_change_events_by_room_id.setdefault(event.room_id, []).append(event)
 
@@ -1556,7 +1613,7 @@ class SyncHandler:
             logger.debug(
                 "Membership changes in %s: [%s]",
                 room_id,
-                ", ".join(("%s (%s)" % (e.event_id, e.membership) for e in events)),
+                ", ".join("%s (%s)" % (e.event_id, e.membership) for e in events),
             )
 
             non_joins = [e for e in events if e.membership != Membership.JOIN]
@@ -1679,7 +1736,7 @@ class SyncHandler:
                 # This is all screaming out for a refactor, as the logic here is
                 # subtle and the moving parts numerous.
                 if leave_event.internal_metadata.is_out_of_band_membership():
-                    batch_events = [leave_event]  # type: Optional[List[EventBase]]
+                    batch_events: Optional[List[EventBase]] = [leave_event]
                 else:
                     batch_events = None
 
@@ -1928,7 +1985,7 @@ class SyncHandler:
             room_id, batch, sync_config, since_token, now_token, full_state=full_state
         )
 
-        summary = {}  # type: Optional[JsonDict]
+        summary: Optional[JsonDict] = {}
 
         # we include a summary in room responses when we're lazy loading
         # members (as the client otherwise doesn't have enough info to form
@@ -1952,7 +2009,7 @@ class SyncHandler:
             )
 
         if room_builder.rtype == "joined":
-            unread_notifications = {}  # type: Dict[str, int]
+            unread_notifications: Dict[str, int] = {}
             room_sync = JoinedSyncResult(
                 room_id=room_id,
                 timeline=batch,

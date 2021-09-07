@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 """Tests REST events for /profile paths."""
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, profile, room
+from synapse.rest.client import login, profile, room
 
 from tests import unittest
 

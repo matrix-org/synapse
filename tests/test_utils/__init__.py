@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C
 #
@@ -21,8 +20,7 @@ import sys
 import warnings
 from asyncio import Future
 from typing import Any, Awaitable, Callable, TypeVar
-
-from mock import Mock
+from unittest.mock import Mock
 
 import attr
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -325,6 +324,19 @@ class MediaEncodingTestCase(unittest.TestCase):
             "text/html",
         )
         self.assertEqual(encoding, "ascii")
+
+    def test_meta_charset_underscores(self):
+        """A character encoding contains underscore."""
+        encoding = get_html_media_encoding(
+            b"""
+        <html>
+        <head><meta charset="Shift_JIS">
+        </head>
+        </html>
+        """,
+            "text/html",
+        )
+        self.assertEqual(encoding, "Shift_JIS")
 
     def test_xml_encoding(self):
         """A character encoding is found via the meta tag."""

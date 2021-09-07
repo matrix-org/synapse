@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +15,7 @@ from typing import Optional
 
 from synapse.config.server import DEFAULT_ROOM_VERSION
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import room_upgrade_rest_servlet
+from synapse.rest.client import login, room, room_upgrade_rest_servlet
 
 from tests import unittest
 from tests.server import FakeChannel

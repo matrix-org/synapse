@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2019 Matrix.org Federation C.I.C
 #
@@ -20,7 +19,7 @@ from parameterized import parameterized
 from synapse.events import make_event_from_dict
 from synapse.federation.federation_server import server_matches_acl_event
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests import unittest
 
@@ -74,6 +73,25 @@ class ServerACLsTestCase(unittest.TestCase):
         self.assertTrue(server_matches_acl_event("1a.2.3.4", e))
         self.assertFalse(server_matches_acl_event("[1:2::]", e))
         self.assertTrue(server_matches_acl_event("1:2:3:4", e))
+
+    def test_wildcard_matching(self):
+        e = _create_acl_event({"allow": ["good*.com"]})
+        self.assertTrue(
+            server_matches_acl_event("good.com", e),
+            "* matches 0 characters",
+        )
+        self.assertTrue(
+            server_matches_acl_event("GOOD.COM", e),
+            "pattern is case-insensitive",
+        )
+        self.assertTrue(
+            server_matches_acl_event("good.aa.com", e),
+            "* matches several characters, including '.'",
+        )
+        self.assertFalse(
+            server_matches_acl_event("ishgood.com", e),
+            "pattern does not allow prefixes",
+        )
 
 
 class StateQueryTests(unittest.FederatingHomeserverTestCase):

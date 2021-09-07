@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -58,9 +57,9 @@ class ConstantProperty(Generic[T, V]):
     it.
     """
 
-    constant = attr.ib()  # type: V
+    constant: V = attr.ib()
 
-    def __get__(self, obj: Optional[T], objtype: Type[T] = None) -> V:
+    def __get__(self, obj: Optional[T], objtype: Optional[Type[T]] = None) -> V:
         return self.constant
 
     def __set__(self, obj: Optional[T], value: V):
@@ -92,9 +91,9 @@ class RedisSubscriber(txredisapi.SubscriberProtocol):
             commands.
     """
 
-    synapse_handler = None  # type: ReplicationCommandHandler
-    synapse_stream_name = None  # type: str
-    synapse_outbound_redis_connection = None  # type: txredisapi.RedisProtocol
+    synapse_handler: "ReplicationCommandHandler"
+    synapse_stream_name: str
+    synapse_outbound_redis_connection: txredisapi.RedisProtocol
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

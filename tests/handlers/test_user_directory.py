@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,15 +11,14 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import account, account_validity, user_directory
+from synapse.rest.client import account, account_validity, login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
 
 from tests import unittest
@@ -313,15 +311,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
+        async def allow_all(user_profile):
+            # Allow all users.
+            return False
+
         # Configure a spam checker that does not filter any users.
         spam_checker = self.hs.get_spam_checker()
-
-        class AllowAll:
-            async def check_username_for_spam(self, user_profile):
-                # Allow all users.
-                return False
-
-        spam_checker.spam_checkers = [AllowAll()]
+        spam_checker._check_username_for_spam_callbacks = [allow_all]
 
         # The results do not change:
         # We get one search result when searching for user2 by user1.
@@ -329,12 +325,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        class BlockAll:
-            async def check_username_for_spam(self, user_profile):
-                # All users are spammy.
-                return True
+        async def block_all(user_profile):
+            # All users are spammy.
+            return True
 
-        spam_checker.spam_checkers = [BlockAll()]
+        spam_checker._check_username_for_spam_callbacks = [block_all]
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -695,7 +690,7 @@ class UserInfoTestCase(unittest.FederatingHomeserverTestCase):
         login.register_servlets,
         synapse.rest.admin.register_servlets_for_client_rest_resource,
         account_validity.register_servlets,
-        synapse.rest.client.v2_alpha.user_directory.register_servlets,
+        user_directory.register_servlets,
         account.register_servlets,
     ]
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.config._base import Config
 from synapse.types import JsonDict
 
@@ -26,15 +24,20 @@ class ExperimentalConfig(Config):
     def read_config(self, config: JsonDict, **kwargs):
         experimental = config.get("experimental_features") or {}
 
-        # MSC2403 (room knocking)
-        self.msc2403_enabled = experimental.get("msc2403_enabled", False)  # type: bool
-        if self.msc2403_enabled:
-            # Enable the MSC2403 unstable room version
-            KNOWN_ROOM_VERSIONS.update({RoomVersions.V7.identifier: RoomVersions.V7})
-
         # MSC2858 (multiple SSO identity providers)
-        self.msc2858_enabled = experimental.get("msc2858_enabled", False)  # type: bool
-        # Spaces (MSC1772, MSC2946, etc)
-        self.spaces_enabled = experimental.get("spaces_enabled", False)  # type: bool
+        self.msc2858_enabled: bool = experimental.get("msc2858_enabled", False)
+
         # MSC3026 (busy presence state)
-        self.msc3026_enabled = experimental.get("msc3026_enabled", False)  # type: bool
+        self.msc3026_enabled: bool = experimental.get("msc3026_enabled", False)
+
+        # MSC2716 (backfill existing history)
+        self.msc2716_enabled: bool = experimental.get("msc2716_enabled", False)
+
+        # MSC2285 (hidden read receipts)
+        self.msc2285_enabled: bool = experimental.get("msc2285_enabled", False)
+
+        # MSC3244 (room version capabilities)
+        self.msc3244_enabled: bool = experimental.get("msc3244_enabled", True)
+
+        # MSC3266 (room summary api)
+        self.msc3266_enabled: bool = experimental.get("msc3266_enabled", False)

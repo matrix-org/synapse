@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +15,10 @@
 """Contains functions for registering clients."""
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 
 from prometheus_client import Counter
+from typing_extensions import TypedDict
 
 from synapse import types
 from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
@@ -56,6 +56,13 @@ login_counter = Counter(
 )
 
 
+class LoginDict(TypedDict):
+    device_id: str
+    access_token: str
+    valid_until_ms: Optional[int]
+    refresh_token: Optional[str]
+
+
 class RegistrationHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
@@ -68,6 +75,7 @@ class RegistrationHandler(BaseHandler):
         self.identity_handler = self.hs.get_identity_handler()
         self.ratelimiter = hs.get_registration_ratelimiter()
         self.macaroon_gen = hs.get_macaroon_generator()
+        self._account_validity_handler = hs.get_account_validity_handler()
         self._server_notices_mxid = hs.config.server_notices_mxid
         self._server_name = hs.hostname
 
@@ -89,6 +97,7 @@ class RegistrationHandler(BaseHandler):
             self.pusher_pool = hs.get_pusherpool()
 
         self.session_lifetime = hs.config.session_lifetime
+        self.access_token_lifetime = hs.config.access_token_lifetime
 
     async def check_username(
         self,
@@ -184,7 +193,7 @@ class RegistrationHandler(BaseHandler):
         user_type: Optional[str] = None,
         default_display_name: Optional[str] = None,
         address: Optional[str] = None,
-        bind_emails: Iterable[str] = [],
+        bind_emails: Optional[Iterable[str]] = None,
         by_admin: bool = False,
         user_agent_ips: Optional[List[Tuple[str, str]]] = None,
         auth_provider_id: Optional[str] = None,
@@ -211,7 +220,7 @@ class RegistrationHandler(BaseHandler):
             bind_emails: list of emails to bind to this account.
             by_admin: True if this registration is being made via the
               admin api, otherwise False.
-            user_agent_ips: Tuples of IP addresses and user-agents used
+            user_agent_ips: Tuples of user-agents and IP addresses used
                 during the registration process.
             auth_provider_id: The SSO IdP the user used, if any.
         Returns:
@@ -219,7 +228,9 @@ class RegistrationHandler(BaseHandler):
         Raises:
             SynapseError if there was a problem registering.
         """
-        self.check_registration_ratelimit(address)
+        bind_emails = bind_emails or []
+
+        await self.check_registration_ratelimit(address)
 
         result = await self.spam_checker.check_registration_for_spam(
             threepid,
@@ -277,6 +288,10 @@ class RegistrationHandler(BaseHandler):
 
             if default_display_name:
                 requester = create_requester(user)
+                # FIXME: this function call is DINUM-specific code to update DINUM's
+                #  custom Sydent-powered userdir, and needed some custom changes to
+                #  ignore the ratelimiter. On mainline, we don't need to call this
+                #  function.
                 await self.profile_handler.set_displayname(
                     user, requester, default_display_name, by_admin=True
                 )
@@ -417,10 +432,31 @@ class RegistrationHandler(BaseHandler):
                 room_alias = RoomAlias.from_string(r)
 
                 if self.hs.hostname != room_alias.domain:
-                    logger.warning(
-                        "Cannot create room alias %s, "
-                        "it does not match server domain",
+                    # If the alias is remote, try to join the room. This might fail
+                    # because the room might be invite only, but we don't have any local
+                    # user in the room to invite this one with, so at this point that's
+                    # the best we can do.
+                    logger.info(
+                        "Cannot automatically create room with alias %s as it isn't"
+                        " local, trying to join the room instead",
                         r,
+                    )
+
+                    (
+                        room,
+                        remote_room_hosts,
+                    ) = await room_member_handler.lookup_room_alias(room_alias)
+                    room_id = room.to_string()
+
+                    await room_member_handler.update_membership(
+                        requester=create_requester(
+                            user_id, authenticated_entity=self._server_name
+                        ),
+                        target=UserID.from_string(user_id),
+                        room_id=room_id,
+                        remote_room_hosts=remote_room_hosts,
+                        action="join",
+                        ratelimit=False,
                     )
                 else:
                     # A shallow copy is OK here since the only key that is
@@ -479,22 +515,32 @@ class RegistrationHandler(BaseHandler):
                     )
 
                 # Calculate whether the room requires an invite or can be
-                # joined directly. Note that unless a join rule of public exists,
-                # it is treated as requiring an invite.
-                requires_invite = True
-
-                state = await self.store.get_filtered_current_state_ids(
-                    room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
+                # joined directly. By default, we consider the room as requiring an
+                # invite if the homeserver is in the room (unless told otherwise by the
+                # join rules). Otherwise we consider it as being joinable, at the risk of
+                # failing to join, but in this case there's little more we can do since
+                # we don't have a local user in the room to craft up an invite with.
+                requires_invite = await self.store.is_host_joined(
+                    room_id,
+                    self.server_name,
                 )
 
-                event_id = state.get((EventTypes.JoinRules, ""))
-                if event_id:
-                    join_rules_event = await self.store.get_event(
-                        event_id, allow_none=True
+                if requires_invite:
+                    # If the server is in the room, check if the room is public.
+                    state = await self.store.get_filtered_current_state_ids(
+                        room_id, StateFilter.from_types([(EventTypes.JoinRules, "")])
                     )
-                    if join_rules_event:
-                        join_rule = join_rules_event.content.get("join_rule", None)
-                        requires_invite = join_rule and join_rule != JoinRules.PUBLIC
+
+                    event_id = state.get((EventTypes.JoinRules, ""))
+                    if event_id:
+                        join_rules_event = await self.store.get_event(
+                            event_id, allow_none=True
+                        )
+                        if join_rules_event:
+                            join_rule = join_rules_event.content.get("join_rule", None)
+                            requires_invite = (
+                                join_rule and join_rule != JoinRules.PUBLIC
+                            )
 
                 # Send the invite, if necessary.
                 if requires_invite:
@@ -663,7 +709,7 @@ class RegistrationHandler(BaseHandler):
             },
         )
 
-    def check_registration_ratelimit(self, address: Optional[str]) -> None:
+    async def check_registration_ratelimit(self, address: Optional[str]) -> None:
         """A simple helper method to check whether the registration rate limit has been hit
         for a given IP address
 
@@ -677,7 +723,7 @@ class RegistrationHandler(BaseHandler):
         if not address:
             return
 
-        self.ratelimiter.ratelimit(address)
+        await self.ratelimiter.ratelimit(None, address)
 
     async def register_with_store(
         self,
@@ -736,6 +782,10 @@ class RegistrationHandler(BaseHandler):
                 shadow_banned=shadow_banned,
             )
 
+            # Only call the account validity module(s) on the main process, to avoid
+            # repeating e.g. database writes on all of the workers.
+            await self._account_validity_handler.on_user_registration(user_id)
+
     async def register_device(
         self,
         user_id: str,
@@ -744,7 +794,8 @@ class RegistrationHandler(BaseHandler):
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
         auth_provider_id: Optional[str] = None,
-    ) -> Tuple[str, str]:
+        should_issue_refresh_token: bool = False,
+    ) -> Tuple[str, str, Optional[int], Optional[str]]:
         """Register a device for a user and generate an access token.
 
         The access token will be limited by the homeserver's session_lifetime config.
@@ -756,8 +807,9 @@ class RegistrationHandler(BaseHandler):
             is_guest: Whether this is a guest account
             auth_provider_id: The SSO IdP the user used, if any (just used for the
                 prometheus metrics).
+            should_issue_refresh_token: Whether it should also issue a refresh token
         Returns:
-            Tuple of device ID and access token
+            Tuple of device ID, access token, access token expiration time and refresh token
         """
         res = await self._register_device_client(
             user_id=user_id,
@@ -765,6 +817,7 @@ class RegistrationHandler(BaseHandler):
             initial_display_name=initial_display_name,
             is_guest=is_guest,
             is_appservice_ghost=is_appservice_ghost,
+            should_issue_refresh_token=should_issue_refresh_token,
         )
 
         login_counter.labels(
@@ -772,7 +825,12 @@ class RegistrationHandler(BaseHandler):
             auth_provider=(auth_provider_id or ""),
         ).inc()
 
-        return res["device_id"], res["access_token"]
+        return (
+            res["device_id"],
+            res["access_token"],
+            res["valid_until_ms"],
+            res["refresh_token"],
+        )
 
     async def register_device_inner(
         self,
@@ -781,7 +839,8 @@ class RegistrationHandler(BaseHandler):
         initial_display_name: Optional[str],
         is_guest: bool = False,
         is_appservice_ghost: bool = False,
-    ) -> Dict[str, str]:
+        should_issue_refresh_token: bool = False,
+    ) -> LoginDict:
         """Helper for register_device
 
         Does the bits that need doing on the main process. Not for use outside this
@@ -796,23 +855,40 @@ class RegistrationHandler(BaseHandler):
                 )
             valid_until_ms = self.clock.time_msec() + self.session_lifetime
 
+        refresh_token = None
+        refresh_token_id = None
+
         registered_device_id = await self.device_handler.check_device_registered(
             user_id, device_id, initial_display_name
         )
         if is_guest:
             assert valid_until_ms is None
-            access_token = self.macaroon_gen.generate_access_token(
-                user_id, ["guest = true"]
-            )
+            access_token = self.macaroon_gen.generate_guest_access_token(user_id)
         else:
+            if should_issue_refresh_token:
+                (
+                    refresh_token,
+                    refresh_token_id,
+                ) = await self._auth_handler.get_refresh_token_for_user_id(
+                    user_id,
+                    device_id=registered_device_id,
+                )
+                valid_until_ms = self.clock.time_msec() + self.access_token_lifetime
+
             access_token = await self._auth_handler.get_access_token_for_user_id(
                 user_id,
                 device_id=registered_device_id,
                 valid_until_ms=valid_until_ms,
                 is_appservice_ghost=is_appservice_ghost,
+                refresh_token_id=refresh_token_id,
             )
 
-        return {"device_id": registered_device_id, "access_token": access_token}
+        return {
+            "device_id": registered_device_id,
+            "access_token": access_token,
+            "valid_until_ms": valid_until_ms,
+            "refresh_token": refresh_token,
+        }
 
     async def post_registration_actions(
         self, user_id: str, auth_result: dict, access_token: Optional[str]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -36,17 +35,6 @@ def _stub_db_engine(**kwargs) -> BaseDatabaseEngine:
 
 class TupleComparisonClauseTestCase(unittest.TestCase):
     def test_native_tuple_comparison(self):
-        db_engine = _stub_db_engine(supports_tuple_comparison=True)
-        clause, args = make_tuple_comparison_clause(db_engine, [("a", 1), ("b", 2)])
+        clause, args = make_tuple_comparison_clause([("a", 1), ("b", 2)])
         self.assertEqual(clause, "(a,b) > (?,?)")
         self.assertEqual(args, [1, 2])
-
-    def test_emulated_tuple_comparison(self):
-        db_engine = _stub_db_engine(supports_tuple_comparison=False)
-        clause, args = make_tuple_comparison_clause(
-            db_engine, [("a", 1), ("b", 2), ("c", 3)]
-        )
-        self.assertEqual(
-            clause, "(a >= ? AND (a > ? OR (b >= ? AND (b > ? OR c > ?))))"
-        )
-        self.assertEqual(args, [1, 1, 2, 2, 3])

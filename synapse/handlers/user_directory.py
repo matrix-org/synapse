@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -45,7 +44,6 @@ class UserDirectoryHandler(StateDeltasHandler):
         super().__init__(hs)
 
         self.store = hs.get_datastore()
-        self.state = hs.get_state_handler()
         self.server_name = hs.hostname
         self.clock = hs.get_clock()
         self.notifier = hs.get_notifier()
@@ -54,7 +52,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         self.search_all_users = hs.config.user_directory_search_all_users
         self.spam_checker = hs.get_spam_checker()
         # The current position in the current_state_delta stream
-        self.pos = None  # type: Optional[int]
+        self.pos: Optional[int] = None
 
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
@@ -303,10 +301,12 @@ class UserDirectoryHandler(StateDeltasHandler):
             # ignore the change
             return
 
-        users_with_profile = await self.state.get_current_users_in_room(room_id)
+        other_users_in_room_with_profiles = (
+            await self.store.get_users_in_room_with_profiles(room_id)
+        )
 
         # Remove every user from the sharing tables for that room.
-        for user_id in users_with_profile.keys():
+        for user_id in other_users_in_room_with_profiles.keys():
             await self.store.remove_user_who_share_room(user_id, room_id)
 
         # Then, re-add them to the tables.
@@ -315,7 +315,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         # which when ran over an entire room, will result in the same values
         # being added multiple times. The batching upserts shouldn't make this
         # too bad, though.
-        for user_id, profile in users_with_profile.items():
+        for user_id, profile in other_users_in_room_with_profiles.items():
             await self._handle_new_user(room_id, user_id, profile)
 
     async def _handle_new_user(
@@ -337,7 +337,7 @@ class UserDirectoryHandler(StateDeltasHandler):
             room_id
         )
         # Now we update users who share rooms with users.
-        users_with_profile = await self.state.get_current_users_in_room(room_id)
+        other_users_in_room = await self.store.get_users_in_room(room_id)
 
         if is_public:
             await self.store.add_users_in_public_rooms(room_id, (user_id,))
@@ -353,14 +353,14 @@ class UserDirectoryHandler(StateDeltasHandler):
 
                 # We don't care about appservice users.
                 if not is_appservice:
-                    for other_user_id in users_with_profile:
+                    for other_user_id in other_users_in_room:
                         if user_id == other_user_id:
                             continue
 
                         to_insert.add((user_id, other_user_id))
 
             # Next we need to update for every local user in the room
-            for other_user_id in users_with_profile:
+            for other_user_id in other_users_in_room:
                 if user_id == other_user_id:
                     continue
 

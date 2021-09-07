@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,7 +14,7 @@
 
 # type: ignore
 
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.replication.tcp.streams._base import ReceiptsStream
 
@@ -44,7 +43,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         stream_name, _, token, rdata_rows = self.test_handler.on_rdata.call_args[0]
         self.assertEqual(stream_name, "receipts")
         self.assertEqual(1, len(rdata_rows))
-        row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
+        row: ReceiptsStream.ReceiptsStreamRow = rdata_rows[0]
         self.assertEqual("!room:blue", row.room_id)
         self.assertEqual("m.read", row.receipt_type)
         self.assertEqual(USER_ID, row.user_id)
@@ -76,7 +75,7 @@ class ReceiptsStreamTestCase(BaseStreamTestCase):
         self.assertEqual(token, 3)
         self.assertEqual(1, len(rdata_rows))
 
-        row = rdata_rows[0]  # type: ReceiptsStream.ReceiptsStreamRow
+        row: ReceiptsStream.ReceiptsStreamRow = rdata_rows[0]
         self.assertEqual("!room2:blue", row.room_id)
         self.assertEqual("m.read", row.receipt_type)
         self.assertEqual(USER_ID, row.user_id)

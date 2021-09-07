@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,14 +15,18 @@
 import logging
 import threading
 from functools import wraps
-from typing import TYPE_CHECKING, Dict, Optional, Set
+from typing import TYPE_CHECKING, Dict, Optional, Set, Union
 
 from prometheus_client.core import REGISTRY, Counter, Gauge
 
 from twisted.internet import defer
 
 from synapse.logging.context import LoggingContext, PreserveLoggingContext
-from synapse.logging.opentracing import noop_context_manager, start_active_span
+from synapse.logging.opentracing import (
+    SynapseTags,
+    noop_context_manager,
+    start_active_span,
+)
 from synapse.util.async_helpers import maybe_awaitable
 
 if TYPE_CHECKING:
@@ -90,7 +93,7 @@ _background_process_db_sched_duration = Counter(
 # map from description to a counter, so that we can name our logcontexts
 # incrementally. (It actually duplicates _background_process_start_count, but
 # it's much simpler to do so than to try to combine them.)
-_background_process_counts = {}  # type: Dict[str, int]
+_background_process_counts: Dict[str, int] = {}
 
 # Set of all running background processes that became active active since the
 # last time metrics were scraped (i.e. background processes that performed some
@@ -100,7 +103,7 @@ _background_process_counts = {}  # type: Dict[str, int]
 # background processes stacking up behind a lock or linearizer, where we then
 # only need to iterate over and update metrics for the process that have
 # actually been active and can ignore the idle ones.
-_background_processes_active_since_last_scrape = set()  # type: Set[_BackgroundProcess]
+_background_processes_active_since_last_scrape: "Set[_BackgroundProcess]" = set()
 
 # A lock that covers the above set and dict
 _bg_metrics_lock = threading.Lock()
@@ -134,8 +137,7 @@ class _Collector:
             _background_process_db_txn_duration,
             _background_process_db_sched_duration,
         ):
-            for r in m.collect():
-                yield r
+            yield from m.collect()
 
 
 REGISTRY.register(_Collector())
@@ -199,11 +201,14 @@ def run_as_background_process(desc: str, func, *args, bg_start_span=True, **kwar
         _background_process_start_count.labels(desc).inc()
         _background_process_in_flight_count.labels(desc).inc()
 
-        with BackgroundProcessLoggingContext(desc, "%s-%i" % (desc, count)) as context:
+        with BackgroundProcessLoggingContext(desc, count) as context:
             try:
-                ctx = noop_context_manager()
                 if bg_start_span:
-                    ctx = start_active_span(desc, tags={"request_id": context.request})
+                    ctx = start_active_span(
+                        f"bgproc.{desc}", tags={SynapseTags.REQUEST_ID: str(context)}
+                    )
+                else:
+                    ctx = noop_context_manager()
                 with ctx:
                     return await maybe_awaitable(func(*args, **kwargs))
             except Exception:
@@ -244,9 +249,20 @@ class BackgroundProcessLoggingContext(LoggingContext):
 
     __slots__ = ["_proc"]
 
-    def __init__(self, name: str, request: Optional[str] = None):
-        super().__init__(name, request=request)
+    def __init__(self, name: str, instance_id: Optional[Union[int, str]] = None):
+        """
 
+        Args:
+            name: The name of the background process. Each distinct `name` gets a
+                separate prometheus time series.
+
+            instance_id: an identifer to add to `name` to distinguish this instance of
+                the named background process in the logs. If this is `None`, one is
+                made up based on id(self).
+        """
+        if instance_id is None:
+            instance_id = id(self)
+        super().__init__("%s-%s" % (name, instance_id))
         self._proc = _BackgroundProcess(name, self)
 
     def start(self, rusage: "Optional[resource._RUsage]"):

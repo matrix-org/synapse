@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +14,16 @@
 
 """ Tests REST events for /events paths."""
 
-from mock import Mock
+from unittest.mock import Mock
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import events, login, room
+from synapse.rest.client import events, login, room
 
 from tests import unittest
 
 
 class EventStreamPermissionsTestCase(unittest.HomeserverTestCase):
-    """ Tests event streaming (GET /events). """
+    """Tests event streaming (GET /events)."""
 
     servlets = [
         events.register_servlets,

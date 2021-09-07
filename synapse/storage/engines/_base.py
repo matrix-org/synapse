@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -44,18 +43,16 @@ class BaseDatabaseEngine(Generic[ConnectionType], metaclass=abc.ABCMeta):
 
     @property
     @abc.abstractmethod
-    def supports_tuple_comparison(self) -> bool:
+    def supports_using_any_list(self) -> bool:
         """
-        Do we support comparing tuples, i.e. `(a, b) > (c, d)`?
+        Do we support using `a = ANY(?)` and passing a list
         """
         ...
 
     @property
     @abc.abstractmethod
-    def supports_using_any_list(self) -> bool:
-        """
-        Do we support using `a = ANY(?)` and passing a list
-        """
+    def supports_returning(self) -> bool:
+        """Do we support the `RETURNING` clause in insert/update/delete?"""
         ...
 
     @abc.abstractmethod

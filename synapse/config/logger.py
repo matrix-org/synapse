@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,7 +31,6 @@ from twisted.logger import (
 )
 
 import synapse
-from synapse.app import _base as appbase
 from synapse.logging._structured import setup_structured_logging
 from synapse.logging.context import LoggingContextFilter
 from synapse.logging.filter import MetadataFilter
@@ -51,7 +49,7 @@ DEFAULT_LOG_CONFIG = Template(
 # be ingested by ELK stacks. See [2] for details.
 #
 # [1]: https://docs.python.org/3.7/library/logging.config.html#configuration-dictionary-schema
-# [2]: https://github.com/matrix-org/synapse/blob/master/docs/structured_logging.md
+# [2]: https://matrix-org.github.io/synapse/latest/structured_logging.html
 
 version: 1
 
@@ -69,18 +67,31 @@ handlers:
         backupCount: 3  # Does not include the current log file.
         encoding: utf8
 
-    # Default to buffering writes to log file for efficiency. This means that
-    # will be a delay for INFO/DEBUG logs to get written, but WARNING/ERROR
-    # logs will still be flushed immediately.
+    # Default to buffering writes to log file for efficiency.
+    # WARNING/ERROR logs will still be flushed immediately, but there will be a
+    # delay (of up to `period` seconds, or until the buffer is full with
+    # `capacity` messages) before INFO/DEBUG logs get written.
     buffer:
-        class: logging.handlers.MemoryHandler
+        class: synapse.logging.handlers.PeriodicallyFlushingMemoryHandler
         target: file
-        # The capacity is the number of log lines that are buffered before
-        # being written to disk. Increasing this will lead to better
+
+        # The capacity is the maximum number of log lines that are buffered
+        # before being written to disk. Increasing this will lead to better
         # performance, at the expensive of it taking longer for log lines to
         # be written to disk.
+        # This parameter is required.
         capacity: 10
-        flushLevel: 30  # Flush for WARNING logs as well
+
+        # Logs with a level at or above the flush level will cause the buffer to
+        # be flushed immediately.
+        # Default value: 40 (ERROR)
+        # Other values: 50 (CRITICAL), 30 (WARNING), 20 (INFO), 10 (DEBUG)
+        flushLevel: 30  # Flush immediately for WARNING logs and higher
+
+        # The period of time, in seconds, between forced flushes.
+        # Messages will not be delayed for longer than this time.
+        # Default value: 5 seconds
+        period: 5
 
     # A handler that writes logs to stderr. Unused by default, but can be used
     # instead of "buffer" and "file" in the logger handlers.
@@ -261,9 +272,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
         finally:
             threadlocal.active = False
 
-    logBeginner.beginLoggingTo([_log], redirectStandardIO=not config.no_redirect_stdio)
-    if not config.no_redirect_stdio:
-        print("Redirected stdout/stderr to logs")
+    logBeginner.beginLoggingTo([_log], redirectStandardIO=False)
 
 
 def _load_logging_config(log_config_path: str) -> None:
@@ -319,6 +328,8 @@ def setup_logging(
     # Perform one-time logging configuration.
     _setup_stdlib_logging(config, log_config_path, logBeginner=logBeginner)
     # Add a SIGHUP handler to reload the logging configuration, if one is available.
+    from synapse.app import _base as appbase
+
     appbase.register_sighup(_reload_logging_config, log_config_path)
 
     # Log immediately so we can grep backwards.

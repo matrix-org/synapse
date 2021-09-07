@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.rest import admin
-from synapse.rest.client.v1 import room
+from synapse.rest.client import room
 
 from tests import unittest
 

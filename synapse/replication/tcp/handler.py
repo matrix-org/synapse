@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -56,6 +55,8 @@ from synapse.replication.tcp.streams import (
     CachesStream,
     EventsStream,
     FederationStream,
+    PresenceFederationStream,
+    PresenceStream,
     ReceiptsStream,
     Stream,
     TagAccountDataStream,
@@ -100,12 +101,16 @@ class ReplicationCommandHandler:
         self._instance_id = hs.get_instance_id()
         self._instance_name = hs.get_instance_name()
 
-        self._streams = {
+        self._is_presence_writer = (
+            hs.get_instance_name() in hs.config.worker.writers.presence
+        )
+
+        self._streams: Dict[str, Stream] = {
             stream.NAME: stream(hs) for stream in STREAMS_MAP.values()
-        }  # type: Dict[str, Stream]
+        }
 
         # List of streams that this instance is the source of
-        self._streams_to_replicate = []  # type: List[Stream]
+        self._streams_to_replicate: List[Stream] = []
 
         for stream in self._streams.values():
             if hs.config.redis.redis_enabled and stream.NAME == CachesStream.NAME:
@@ -154,6 +159,14 @@ class ReplicationCommandHandler:
 
                 continue
 
+            if isinstance(stream, (PresenceStream, PresenceFederationStream)):
+                # Only add PresenceStream as a source on the instance in charge
+                # of presence.
+                if self._is_presence_writer:
+                    self._streams_to_replicate.append(stream)
+
+                continue
+
             # Only add any other streams if we're on master.
             if hs.config.worker_app is not None:
                 continue
@@ -167,14 +180,14 @@ class ReplicationCommandHandler:
 
         # Map of stream name to batched updates. See RdataCommand for info on
         # how batching works.
-        self._pending_batches = {}  # type: Dict[str, List[Any]]
+        self._pending_batches: Dict[str, List[Any]] = {}
 
         # The factory used to create connections.
-        self._factory = None  # type: Optional[ReconnectingClientFactory]
+        self._factory: Optional[ReconnectingClientFactory] = None
 
         # The currently connected connections. (The list of places we need to send
         # outgoing replication commands to.)
-        self._connections = []  # type: List[IReplicationConnection]
+        self._connections: List[IReplicationConnection] = []
 
         LaterGauge(
             "synapse_replication_tcp_resource_total_connections",
@@ -187,7 +200,7 @@ class ReplicationCommandHandler:
         # them in order in a separate background process.
 
         # the streams which are currently being processed by _unsafe_process_queue
-        self._processing_streams = set()  # type: Set[str]
+        self._processing_streams: Set[str] = set()
 
         # for each stream, a queue of commands that are awaiting processing, and the
         # connection that they arrived on.
@@ -197,7 +210,7 @@ class ReplicationCommandHandler:
 
         # For each connection, the incoming stream names that have received a POSITION
         # from that connection.
-        self._streams_by_connection = {}  # type: Dict[IReplicationConnection, Set[str]]
+        self._streams_by_connection: Dict[IReplicationConnection, Set[str]] = {}
 
         LaterGauge(
             "synapse_replication_tcp_command_queue",
@@ -351,7 +364,7 @@ class ReplicationCommandHandler:
     ) -> Optional[Awaitable[None]]:
         user_sync_counter.inc()
 
-        if self._is_master:
+        if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_row(
                 cmd.instance_id, cmd.user_id, cmd.is_syncing, cmd.last_sync_ms
             )
@@ -361,7 +374,7 @@ class ReplicationCommandHandler:
     def on_CLEAR_USER_SYNC(
         self, conn: IReplicationConnection, cmd: ClearUserSyncsCommand
     ) -> Optional[Awaitable[None]]:
-        if self._is_master:
+        if self._is_presence_writer:
             return self._presence_handler.update_external_syncs_clear(cmd.instance_id)
         else:
             return None
@@ -558,7 +571,7 @@ class ReplicationCommandHandler:
     def on_REMOTE_SERVER_UP(
         self, conn: IReplicationConnection, cmd: RemoteServerUpCommand
     ):
-        """"Called when get a new REMOTE_SERVER_UP command."""
+        """Called when get a new REMOTE_SERVER_UP command."""
         self._replication_data_handler.on_remote_server_up(cmd.data)
 
         self._notifier.notify_remote_server_up(cmd.data)

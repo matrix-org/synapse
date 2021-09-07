@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
@@ -50,7 +49,7 @@ TEXT_CONTENT_TYPES = [
 def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
     try:
         # The type on postpath seems incorrect in Twisted 21.2.0.
-        postpath = request.postpath  # type: List[bytes]  # type: ignore
+        postpath: List[bytes] = request.postpath  # type: ignore
         assert postpath
 
         # This allows users to append e.g. /test.png to the URL. Useful for

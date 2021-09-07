@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Half-Shot
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import synapse.rest.admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import shared_rooms
+from synapse.rest.client import login, room, shared_rooms
 
 from tests import unittest
 from tests.server import FakeChannel

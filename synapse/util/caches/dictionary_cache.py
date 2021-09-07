@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,13 +62,13 @@ class DictionaryCache(Generic[KT, DKT]):
     """
 
     def __init__(self, name: str, max_entries: int = 1000):
-        self.cache = LruCache(
+        self.cache: LruCache[KT, DictionaryEntry] = LruCache(
             max_size=max_entries, cache_name=name, size_callback=len
-        )  # type: LruCache[KT, DictionaryEntry]
+        )
 
         self.name = name
         self.sequence = 0
-        self.thread = None  # type: Optional[threading.Thread]
+        self.thread: Optional[threading.Thread] = None
 
     def check_thread(self) -> None:
         expected_thread = self.thread

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018, 2019 New Vector Ltd
@@ -16,10 +15,9 @@
 # limitations under the License.
 
 """Utilities for interacting with Identity Servers"""
-
 import logging
 import urllib.parse
-from typing import Awaitable, Callable, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from synapse.api.errors import (
     AuthError,
@@ -37,15 +35,22 @@ from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict, Requester
 from synapse.util import json_decoder
 from synapse.util.hash import sha256_and_url_safe_base64
-from synapse.util.stringutils import assert_valid_client_secret, random_string
+from synapse.util.stringutils import (
+    assert_valid_client_secret,
+    random_string,
+    valid_id_server_location,
+)
 
 from ._base import BaseHandler
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
 
 class IdentityHandler(BaseHandler):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
 
         # An HTTP client for contacting trusted URLs.
@@ -64,22 +69,24 @@ class IdentityHandler(BaseHandler):
 
         # Ratelimiters for `/requestToken` endpoints.
         self._3pid_validation_ratelimiter_ip = Ratelimiter(
+            store=self.store,
             clock=hs.get_clock(),
             rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
             burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
         )
         self._3pid_validation_ratelimiter_address = Ratelimiter(
+            store=self.store,
             clock=hs.get_clock(),
             rate_hz=hs.config.ratelimiting.rc_3pid_validation.per_second,
             burst_count=hs.config.ratelimiting.rc_3pid_validation.burst_count,
         )
 
-    def ratelimit_request_token_requests(
+    async def ratelimit_request_token_requests(
         self,
         request: SynapseRequest,
         medium: str,
         address: str,
-    ):
+    ) -> None:
         """Used to ratelimit requests to `/requestToken` by IP and address.
 
         Args:
@@ -88,8 +95,12 @@ class IdentityHandler(BaseHandler):
             address: The actual threepid ID, e.g. the phone number or email address
         """
 
-        self._3pid_validation_ratelimiter_ip.ratelimit((medium, request.getClientIP()))
-        self._3pid_validation_ratelimiter_address.ratelimit((medium, address))
+        await self._3pid_validation_ratelimiter_ip.ratelimit(
+            None, (medium, request.getClientIP())
+        )
+        await self._3pid_validation_ratelimiter_address.ratelimit(
+            None, (medium, address)
+        )
 
     async def threepid_from_creds(
         self, id_server_url: str, creds: Dict[str, str]
@@ -177,6 +188,11 @@ class IdentityHandler(BaseHandler):
                 server with, if necessary. Required if use_v2 is true
             use_v2: Whether to use v2 Identity Service API endpoints. Defaults to True
 
+        Raises:
+            SynapseError: On any of the following conditions
+                - the supplied id_server is not a valid identity server name
+                - we failed to contact the supplied identity server
+
         Returns:
             The response from the identity server
         """
@@ -185,6 +201,12 @@ class IdentityHandler(BaseHandler):
         # If an id_access_token is not supplied, force usage of v1
         if id_access_token is None:
             use_v2 = False
+
+        if not valid_id_server_location(id_server):
+            raise SynapseError(
+                400,
+                "id_server must be a valid hostname with optional port and path components",
+            )
 
         # if we have a rewrite rule set for the identity server,
         # apply it now, but only for sending the request (not
@@ -279,12 +301,24 @@ class IdentityHandler(BaseHandler):
             id_server: Identity server to unbind from
 
         Raises:
-            SynapseError: If we failed to contact the identity server
+            SynapseError: On any of the following conditions
+                - the supplied id_server is not a valid identity server name
+                - we failed to contact the supplied identity server
 
         Returns:
             True on success, otherwise False if the identity
             server doesn't support unbinding
         """
+
+        if not valid_id_server_location(id_server):
+            raise SynapseError(
+                400,
+                "id_server must be a valid hostname with optional port and path components",
+            )
+
+        url = "https://%s/_matrix/identity/api/v1/3pid/unbind" % (id_server,)
+        url_bytes = b"/_matrix/identity/api/v1/3pid/unbind"
+
         content = {
             "mxid": mxid,
             "threepid": {"medium": threepid["medium"], "address": threepid["address"]},
@@ -802,7 +836,7 @@ class IdentityHandler(BaseHandler):
                 return data["mxid"]
         except RequestTimedOutError:
             raise SynapseError(500, "Timed out contacting identity server")
-        except IOError as e:
+        except OSError as e:
             logger.warning("Error from v1 identity server lookup: %s" % (e,))
 
         return None
@@ -929,6 +963,7 @@ class IdentityHandler(BaseHandler):
         room_avatar_url: str,
         room_join_rules: str,
         room_name: str,
+        room_type: Optional[str],
         inviter_display_name: str,
         inviter_avatar_url: str,
         id_access_token: Optional[str] = None,
@@ -948,6 +983,7 @@ class IdentityHandler(BaseHandler):
                 notifications.
             room_join_rules: The join rules of the email (e.g. "public").
             room_name: The m.room.name of the room.
+            room_type: The type of the room from its m.room.create event (e.g "m.space").
             inviter_display_name: The current display name of the
                 inviter.
             inviter_avatar_url: The URL of the inviter's avatar.
@@ -974,6 +1010,10 @@ class IdentityHandler(BaseHandler):
             "sender_display_name": inviter_display_name,
             "sender_avatar_url": inviter_avatar_url,
         }
+
+        if room_type is not None:
+            invite_config["org.matrix.msc3288.room_type"] = room_type
+
         # If a custom web client location is available, include it in the request.
         if self._web_client_location:
             invite_config["org.matrix.web_client_location"] = self._web_client_location

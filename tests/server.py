@@ -10,9 +10,10 @@ from zope.interface import implementer
 
 from twisted.internet import address, threads, udp
 from twisted.internet._resolver import SimpleResolverComplexifier
-from twisted.internet.defer import Deferred, fail, succeed
+from twisted.internet.defer import Deferred, fail, maybeDeferred, succeed
 from twisted.internet.error import DNSLookupError
 from twisted.internet.interfaces import (
+    IAddress,
     IHostnameResolver,
     IProtocol,
     IPullProducer,
@@ -52,7 +53,7 @@ class FakeChannel:
     _reactor = attr.ib()
     result = attr.ib(type=dict, default=attr.Factory(dict))
     _ip = attr.ib(type=str, default="127.0.0.1")
-    _producer = None  # type: Optional[Union[IPullProducer, IPushProducer]]
+    _producer: Optional[Union[IPullProducer, IPushProducer]] = None
 
     @property
     def json_body(self):
@@ -138,21 +139,19 @@ class FakeChannel:
     def transport(self):
         return self
 
-    def await_result(self, timeout: int = 100) -> None:
+    def await_result(self, timeout_ms: int = 1000) -> None:
         """
         Wait until the request is finished.
         """
+        end_time = self._reactor.seconds() + timeout_ms / 1000.0
         self._reactor.run()
-        x = 0
 
         while not self.is_finished():
             # If there's a producer, tell it to resume producing so we get content
             if self._producer:
                 self._producer.resumeProducing()
 
-            x += 1
-
-            if x > timeout:
+            if self._reactor.seconds() > end_time:
                 raise TimedOutException("Timed out waiting for request to finish.")
 
             self._reactor.advance(0.1)
@@ -318,8 +317,10 @@ class ThreadedMemoryReactorClock(MemoryReactorClock):
 
         self._tcp_callbacks = {}
         self._udp = []
-        lookups = self.lookups = {}  # type: Dict[str, str]
-        self._thread_callbacks = deque()  # type: Deque[Callable[[], None]]
+        self.lookups: Dict[str, str] = {}
+        self._thread_callbacks: Deque[Callable[[], None]] = deque()
+
+        lookups = self.lookups
 
         @implementer(IResolverSimple)
         class FakeResolver:
@@ -511,6 +512,9 @@ class FakeTransport:
     will get called back for connectionLost() notifications etc.
     """
 
+    _peer_address: Optional[IAddress] = attr.ib(default=None)
+    """The value to be returend by getPeer"""
+
     disconnecting = False
     disconnected = False
     connected = True
@@ -519,7 +523,7 @@ class FakeTransport:
     autoflush = attr.ib(default=True)
 
     def getPeer(self):
-        return None
+        return self._peer_address
 
     def getHost(self):
         return None
@@ -572,7 +576,12 @@ class FakeTransport:
         self.producerStreaming = streaming
 
         def _produce():
-            d = self.producer.resumeProducing()
+            if not self.producer:
+                # we've been unregistered
+                return
+            # some implementations of IProducer (for example, FileSender)
+            # don't return a deferred.
+            d = maybeDeferred(self.producer.resumeProducing)
             d.addCallback(lambda x: self._reactor.callLater(0.1, _produce))
 
         if not streaming:
@@ -601,12 +610,6 @@ class FakeTransport:
             return
 
         if self.disconnected:
-            return
-
-        if not hasattr(self.other, "transport"):
-            # the other has no transport yet; reschedule
-            if self.autoflush:
-                self._reactor.callLater(0.0, self.flush)
             return
 
         if maxbytes is not None:

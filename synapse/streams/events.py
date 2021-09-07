@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,9 +32,9 @@ class EventSources:
     }
 
     def __init__(self, hs):
-        self.sources = {
+        self.sources: Dict[str, Any] = {
             name: cls(hs) for name, cls in EventSources.SOURCE_TYPES.items()
-        }  # type: Dict[str, Any]
+        }
         self.store = hs.get_datastore()
 
     def get_current_token(self) -> StreamToken:

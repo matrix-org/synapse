@@ -1,12 +1,9 @@
 # Contents
 - [List Room API](#list-room-api)
-  * [Parameters](#parameters)
-  * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
+- [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
-  * [Parameters](#parameters-1)
-  * [Response](#response)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
 - [Make Room Admin API](#make-room-admin-api)
 - [Forward Extremities Admin API](#forward-extremities-admin-api)
@@ -18,7 +15,7 @@ The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.
 
-## Parameters
+**Parameters**
 
 The following query parameters are available:
 
@@ -44,6 +41,8 @@ The following query parameters are available:
           this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name. Search term can be contained in any
                   part of the room name. Defaults to no filtering.
+
+**Response**
 
 The following fields are possible in the JSON response body:
 
@@ -78,17 +77,15 @@ The following fields are possible in the JSON response body:
                  Use `prev_batch` for the `from` value in the next request to
                  get the "previous page" of results.
 
-## Usage
+The API is:
 
 A standard request with no filtering:
 
 ```
 GET /_synapse/admin/v1/rooms
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```jsonc
 {
@@ -136,11 +133,9 @@ Filtering by room name:
 
 ```
 GET /_synapse/admin/v1/rooms?search_term=TWIM
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -171,11 +166,9 @@ Paginating through a list of rooms:
 
 ```
 GET /_synapse/admin/v1/rooms?order_by=size
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```jsonc
 {
@@ -227,11 +220,9 @@ parameter to the value of `next_token`.
 
 ```
 GET /_synapse/admin/v1/rooms?order_by=size&from=100
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```jsonc
 {
@@ -303,17 +294,13 @@ The following fields are possible in the JSON response body:
 * `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
 * `state_events` - Total number of state_events of a room. Complexity of the room.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```
 GET /_synapse/admin/v1/rooms/<room_id>
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -346,17 +333,13 @@ The response includes the following fields:
 * `members` - A list of all the members that are present in the room, represented by their ids.
 * `total` - Total number of members in the room.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```
 GET /_synapse/admin/v1/rooms/<room_id>/members
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -377,17 +360,13 @@ The response includes the following fields:
 
 * `state` - The current state of the room at the time of request.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```
 GET /_synapse/admin/v1/rooms/<room_id>/state
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -427,10 +406,11 @@ the new room. Users on other servers will be unaffected.
 The API is:
 
 ```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
+DELETE /_synapse/admin/v1/rooms/<room_id>
 ```
 
 with a body of:
+
 ```json
 {
     "new_room_user_id": "@someuser:example.com",
@@ -442,7 +422,7 @@ with a body of:
 ```
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [README.rst](README.rst).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 A response body like the following is returned:
 
@@ -460,7 +440,7 @@ A response body like the following is returned:
 }
 ```
 
-## Parameters
+**Parameters**
 
 The following parameters should be set in the URL:
 
@@ -490,7 +470,7 @@ The following JSON body parameters are available:
 
 The JSON body must not be empty. The body must be at least `{}`.
 
-## Response
+**Response**
 
 The following fields are returned in the JSON response body:
 
@@ -528,6 +508,15 @@ You will have to manually handle, if you so choose, the following:
 * Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
 * Removal of the Content Violation room if desired.
 
+## Deprecated endpoint
+
+The previous deprecated API will be removed in a future release, it was:
+
+```
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+It behaves the same way than the current endpoint except the path and the method.
 
 # Make Room Admin API
 
@@ -538,10 +527,10 @@ By default the server admin (the caller) is granted power, but another user can
 optionally be specified, e.g.:
 
 ```
-    POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
-    {
-        "user_id": "@foo:example.com"
-    }
+POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
+{
+    "user_id": "@foo:example.com"
+}
 ```
 
 # Forward Extremities Admin API
@@ -555,7 +544,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
 To check the status of forward extremities for a room:
 
 ```
-    GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
 ```
 
 A response as follows will be returned:
@@ -571,7 +560,7 @@ A response as follows will be returned:
       "received_ts": 1611263016761
     }
   ]
-}    
+}
 ```
 
 ## Deleting forward extremities
@@ -584,7 +573,7 @@ If a room has lots of forward extremities, the extra can be
 deleted as follows:
 
 ```
-    DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
 ```
 
 A response as follows will be returned, indicating the amount of forward extremities

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -33,10 +32,12 @@ class ServerNoticesSender(WorkerServerNoticesSender):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self._server_notices = (
+        self._server_notices: Iterable[
+            Union[ConsentServerNotices, ResourceLimitsServerNotices]
+        ] = (
             ConsentServerNotices(hs),
             ResourceLimitsServerNotices(hs),
-        )  # type: Iterable[Union[ConsentServerNotices, ResourceLimitsServerNotices]]
+        )
 
     async def on_user_syncing(self, user_id: str) -> None:
         """Called when the user performs a sync operation.

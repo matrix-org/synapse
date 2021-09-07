@@ -18,7 +18,8 @@ import json
 
 import synapse.rest.admin
 from synapse.config._base import ConfigError
-from synapse.rest.client.v1 import login, room
+from synapse.events.spamcheck import load_legacy_spam_checkers
+from synapse.rest.client import login, room
 from synapse.rulecheck.domain_rule_checker import DomainRuleChecker
 
 from tests import unittest
@@ -179,6 +180,7 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         }
 
         hs = self.setup_test_homeserver(config=config)
+        load_legacy_spam_checkers(hs)
         return hs
 
     def prepare(self, reactor, clock, hs):
@@ -317,13 +319,13 @@ class DomainRuleCheckerRoomTestCase(unittest.HomeserverTestCase):
         )
         self.assertEqual(channel.code, 403, channel.result["body"])
 
-    def _create_room(self, token, content={}):
+    def _create_room(self, token, content=None):
         path = "/_matrix/client/r0/createRoom?access_token=%s" % (token,)
 
         channel = self.make_request(
             "POST",
             path,
-            content=json.dumps(content).encode("utf8"),
+            content=json.dumps(content or {}).encode("utf8"),
         )
 
         return channel

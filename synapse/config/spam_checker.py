@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 from typing import Any, Dict, List, Tuple
 
 from synapse.config import ConfigError
@@ -20,12 +20,21 @@ from synapse.util.module_loader import load_module
 
 from ._base import Config
 
+logger = logging.getLogger(__name__)
+
+LEGACY_SPAM_CHECKER_WARNING = """
+This server is using a spam checker module that is implementing the deprecated spam
+checker interface. Please check with the module's maintainer to see if a new version
+supporting Synapse's generic modules system is available.
+For more information, please see https://matrix-org.github.io/synapse/latest/modules.html
+---------------------------------------------------------------------------------------"""
+
 
 class SpamCheckerConfig(Config):
     section = "spamchecker"
 
     def read_config(self, config, **kwargs):
-        self.spam_checkers = []  # type: List[Tuple[Any, Dict]]
+        self.spam_checkers: List[Tuple[Any, Dict]] = []
 
         spam_checkers = config.get("spam_checker") or []
         if isinstance(spam_checkers, dict):
@@ -44,17 +53,7 @@ class SpamCheckerConfig(Config):
         else:
             raise ConfigError("spam_checker syntax is incorrect")
 
-    def generate_config_section(self, **kwargs):
-        return """\
-        # Spam checkers are third-party modules that can block specific actions
-        # of local users, such as creating rooms and registering undesirable
-        # usernames, as well as remote users by redacting incoming events.
-        #
-        spam_checker:
-           #- module: "my_custom_project.SuperSpamChecker"
-           #  config:
-           #    example_option: 'things'
-           #- module: "some_other_project.BadEventStopper"
-           #  config:
-           #    example_stop_events_from: ['@bad:example.com']
-        """
+        # If this configuration is being used in any way, warn the admin that it is going
+        # away soon.
+        if self.spam_checkers:
+            logger.warning(LEGACY_SPAM_CHECKER_WARNING)

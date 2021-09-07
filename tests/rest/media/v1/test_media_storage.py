@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,9 +17,8 @@ import tempfile
 from binascii import unhexlify
 from io import BytesIO
 from typing import Optional
+from unittest.mock import Mock
 from urllib import parse
-
-from mock import Mock
 
 import attr
 from parameterized import parameterized_class
@@ -29,9 +27,10 @@ from PIL import Image as Image
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
 
+from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.rest.media.v1._base import FileInfo
 from synapse.rest.media.v1.filepath import MediaFilePaths
 from synapse.rest.media.v1.media_storage import MediaStorage
@@ -311,7 +310,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         correctly decode it as the UTF-8 string, and use filename* in the
         response.
         """
-        filename = parse.quote("\u2603".encode("utf8")).encode("ascii")
+        filename = parse.quote("\u2603".encode()).encode("ascii")
         channel = self._req(
             b"inline; filename*=utf-8''" + filename + self.test_image.extension
         )
@@ -536,6 +535,8 @@ class SpamCheckerTestCase(unittest.HomeserverTestCase):
         self.media_repo = hs.get_media_repository_resource()
         self.download_resource = self.media_repo.children[b"download"]
         self.upload_resource = self.media_repo.children[b"upload"]
+
+        load_legacy_spam_checkers(hs)
 
     def default_config(self):
         config = default_config("test")

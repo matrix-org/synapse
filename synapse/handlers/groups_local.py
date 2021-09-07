@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -215,7 +214,7 @@ class GroupsLocalWorkerHandler:
     async def bulk_get_publicised_groups(
         self, user_ids: Iterable[str], proxy: bool = True
     ) -> JsonDict:
-        destinations = {}  # type: Dict[str, Set[str]]
+        destinations: Dict[str, Set[str]] = {}
         local_users = set()
 
         for user_id in user_ids:
@@ -228,7 +227,7 @@ class GroupsLocalWorkerHandler:
             raise SynapseError(400, "Some user_ids are not local")
 
         results = {}
-        failed_results = []  # type: List[str]
+        failed_results: List[str] = []
         for destination, dest_user_ids in destinations.items():
             try:
                 r = await self.transport_client.bulk_get_publicised_groups(

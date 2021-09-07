@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +17,7 @@ import urllib.parse
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 
 from tests import unittest
 
@@ -431,7 +430,7 @@ class DevicesRestTestCase(unittest.HomeserverTestCase):
         """
         # Create devices
         number_devices = 5
-        for n in range(number_devices):
+        for _ in range(number_devices):
             self.login("user", "pass")
 
         # Get devices
@@ -548,7 +547,7 @@ class DeleteDevicesRestTestCase(unittest.HomeserverTestCase):
 
         # Create devices
         number_devices = 5
-        for n in range(number_devices):
+        for _ in range(number_devices):
             self.login("user", "pass")
 
         # Get devices

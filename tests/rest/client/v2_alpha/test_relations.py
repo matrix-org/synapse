@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,11 +15,11 @@
 import itertools
 import json
 import urllib
+from typing import Optional
 
 from synapse.api.constants import EventTypes, RelationTypes
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import register, relations
+from synapse.rest.client import login, register, relations, room
 
 from tests import unittest
 
@@ -273,7 +272,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
 
         prev_token = None
         found_event_ids = []
-        encoded_key = urllib.parse.quote_plus("👍".encode("utf-8"))
+        encoded_key = urllib.parse.quote_plus("👍".encode())
         for _ in range(20):
             from_token = ""
             if prev_token:
@@ -681,7 +680,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
         relation_type,
         event_type,
         key=None,
-        content={},
+        content: Optional[dict] = None,
         access_token=None,
         parent_id=None,
     ):
@@ -713,7 +712,7 @@ class RelationsTestCase(unittest.HomeserverTestCase):
             "POST",
             "/_matrix/client/unstable/rooms/%s/send_relation/%s/%s/%s%s"
             % (self.room, original_id, relation_type, event_type, query),
-            json.dumps(content).encode("utf-8"),
+            json.dumps(content or {}).encode("utf-8"),
             access_token=access_token,
         )
         return channel

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,6 +18,21 @@ class AccountValidityConfig(Config):
     section = "account_validity"
 
     def read_config(self, config, **kwargs):
+        """Parses the old account validity config. The config format looks like this:
+
+        account_validity:
+            enabled: true
+            period: 6w
+            renew_at: 1w
+            renew_email_subject: "Renew your %(app)s account"
+            template_dir: "res/templates"
+            account_renewed_html_path: "account_renewed.html"
+            invalid_token_html_path: "invalid_token.html"
+
+        We expect admins to use modules for this feature (which is why it doesn't appear
+        in the sample config file), but we want to keep support for it around for a bit
+        for backwards compatibility.
+        """
         account_validity_config = config.get("account_validity") or {}
         self.account_validity_enabled = account_validity_config.get("enabled", False)
         self.account_validity_renew_by_email_enabled = (
@@ -54,18 +68,19 @@ class AccountValidityConfig(Config):
                 raise ConfigError("Can't send renewal emails without 'public_baseurl'")
 
         # Load account validity templates.
-        # We do this here instead of in AccountValidityConfig as read_templates
-        # relies on state that hasn't been initialised in AccountValidityConfig
+        account_validity_template_dir = account_validity_config.get("template_dir")
         account_renewed_template_filename = account_validity_config.get(
             "account_renewed_html_path", "account_renewed.html"
-        )
-        account_previously_renewed_template_filename = account_validity_config.get(
-            "account_previously_renewed_html_path", "account_previously_renewed.html"
         )
         invalid_token_template_filename = account_validity_config.get(
             "invalid_token_html_path", "invalid_token.html"
         )
-        custom_template_directory = account_validity_config.get("template_dir")
+
+        # Read and store template content
+        custom_template_directories = (
+            self.root.server.custom_template_directory,
+            account_validity_template_dir,
+        )
 
         (
             self.account_validity_account_renewed_template,
@@ -74,76 +89,8 @@ class AccountValidityConfig(Config):
         ) = self.read_templates(
             [
                 account_renewed_template_filename,
-                account_previously_renewed_template_filename,
+                "account_previously_renewed.html",
                 invalid_token_template_filename,
             ],
-            custom_template_directory=custom_template_directory,
+            (td for td in custom_template_directories if td),
         )
-
-    def generate_config_section(self, **kwargs):
-        return """\
-        ## Account Validity ##
-        #
-        # Optional account validity configuration. This allows for accounts to be denied
-        # any request after a given period.
-        #
-        # Once this feature is enabled, Synapse will look for registered users without an
-        # expiration date at startup and will add one to every account it found using the
-        # current settings at that time.
-        # This means that, if a validity period is set, and Synapse is restarted (it will
-        # then derive an expiration date from the current validity period), and some time
-        # after that the validity period changes and Synapse is restarted, the users'
-        # expiration dates won't be updated unless their account is manually renewed. This
-        # date will be randomly selected within a range [now + period - d ; now + period],
-        # where d is equal to 10% of the validity period.
-        #
-        account_validity:
-          # The account validity feature is disabled by default. Uncomment the
-          # following line to enable it.
-          #
-          #enabled: true
-
-          # The period after which an account is valid after its registration. When
-          # renewing the account, its validity period will be extended by this amount
-          # of time. This parameter is required when using the account validity
-          # feature.
-          #
-          #period: 6w
-
-          # The amount of time before an account's expiry date at which Synapse will
-          # send an email to the account's email address with a renewal link. By
-          # default, no such emails are sent.
-          #
-          # If you enable this setting, you will also need to fill out the 'email' and
-          # 'public_baseurl' configuration sections.
-          #
-          #renew_at: 1w
-
-          # The subject of the email sent out with the renewal link. '%(app)s' can be
-          # used as a placeholder for the 'app_name' parameter from the 'email'
-          # section.
-          #
-          # Note that the placeholder must be written '%(app)s', including the
-          # trailing 's'.
-          #
-          # If this is not set, a default value is used.
-          #
-          #renew_email_subject: "Renew your %(app)s account"
-
-          # Directory in which Synapse will try to find templates for the HTML files to
-          # serve to the user when trying to renew an account. If not set, default
-          # templates from within the Synapse package will be used.
-          #
-          #template_dir: "res/templates"
-
-          # File within 'template_dir' giving the HTML to be displayed to the user after
-          # they successfully renewed their account. If not set, default text is used.
-          #
-          #account_renewed_html_path: "account_renewed.html"
-
-          # File within 'template_dir' giving the HTML to be displayed when the user
-          # tries to renew an account with an invalid renewal token. If not set,
-          # default text is used.
-          #
-          #invalid_token_html_path: "invalid_token.html"
-        """

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,8 +17,7 @@ import json
 from synapse.api.constants import LoginType
 from synapse.api.errors import Codes
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import account, password_policy, register
+from synapse.rest.client import account, login, password_policy, register
 
 from tests import unittest
 

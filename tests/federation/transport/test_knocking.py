@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Matrix.org Federation C.I.C
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,21 +14,16 @@
 from collections import OrderedDict
 from typing import Dict, List
 
-from twisted.internet.defer import succeed
-
 from synapse.api.constants import EventTypes, JoinRules, Membership
 from synapse.api.room_versions import RoomVersions
 from synapse.events import builder
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.server import HomeServer
 from synapse.types import RoomAlias
 
 from tests.test_utils import event_injection
 from tests.unittest import FederatingHomeserverTestCase, TestCase, override_config
-
-# An identifier to use while MSC2304 is not in a stable release of the spec
-KNOCK_UNSTABLE_IDENTIFIER = "xyz.amorgan.knock"
 
 
 class KnockingStrippedStateEventHelperMixin(TestCase):
@@ -133,6 +127,16 @@ class KnockingStrippedStateEventHelperMixin(TestCase):
                 )
             )
 
+        # Finally, we expect to see the m.room.create event of the room as part of the
+        # stripped state. We don't need to inject this event though.
+        room_state[EventTypes.Create] = {
+            "content": {
+                "creator": sender,
+                "room_version": RoomVersions.V7.identifier,
+            },
+            "state_key": "",
+        }
+
         return room_state
 
     def check_knock_room_state_against_room_state(
@@ -192,19 +196,19 @@ class FederationKnockingTestCase(
         # Note that these checks are not relevant to this test case.
 
         # Have this homeserver auto-approve all event signature checking.
-        def approve_all_signature_checking(_, ev):
-            return [succeed(ev[0])]
+        async def approve_all_signature_checking(_, pdu):
+            return pdu
 
-        homeserver.get_federation_server()._check_sigs_and_hashes = (
+        homeserver.get_federation_server()._check_sigs_and_hash = (
             approve_all_signature_checking
         )
 
         # Have this homeserver skip event auth checks. This is necessary due to
-        # event auth checks ensuring that events were signed the sender's homeserver.
-        async def do_auth(origin, event, context, auth_events):
+        # event auth checks ensuring that events were signed by the sender's homeserver.
+        async def _check_event_auth(origin, event, context, *args, **kwargs):
             return context
 
-        homeserver.get_federation_handler().do_auth = do_auth
+        homeserver.get_federation_handler()._check_event_auth = _check_event_auth
 
         return super().prepare(reactor, clock, homeserver)
 
@@ -234,9 +238,8 @@ class FederationKnockingTestCase(
 
         channel = self.make_request(
             "GET",
-            "/_matrix/federation/unstable/%s/make_knock/%s/%s?ver=%s"
+            "/_matrix/federation/v1/make_knock/%s/%s?ver=%s"
             % (
-                KNOCK_UNSTABLE_IDENTIFIER,
                 room_id,
                 fake_knocking_user_id,
                 # Inform the remote that we support the room version of the room we're
@@ -278,8 +281,8 @@ class FederationKnockingTestCase(
         # Send the signed knock event into the room
         channel = self.make_request(
             "PUT",
-            "/_matrix/federation/unstable/%s/send_knock/%s/%s"
-            % (KNOCK_UNSTABLE_IDENTIFIER, room_id, signed_knock_event.event_id),
+            "/_matrix/federation/v1/send_knock/%s/%s"
+            % (room_id, signed_knock_event.event_id),
             signed_knock_event_json,
         )
         self.assertEquals(200, channel.code, channel.result)

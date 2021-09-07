@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C
 #
@@ -33,7 +32,7 @@ async def inject_member_event(
     membership: str,
     target: Optional[str] = None,
     extra_content: Optional[dict] = None,
-    **kwargs
+    **kwargs,
 ) -> EventBase:
     """Inject a membership event into a room."""
     if target is None:
@@ -58,7 +57,7 @@ async def inject_event(
     hs: synapse.server.HomeServer,
     room_version: Optional[str] = None,
     prev_event_ids: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ) -> EventBase:
     """Inject a generic event into a room
 
@@ -83,7 +82,7 @@ async def create_event(
     hs: synapse.server.HomeServer,
     room_version: Optional[str] = None,
     prev_event_ids: Optional[List[str]] = None,
-    **kwargs
+    **kwargs,
 ) -> Tuple[EventBase, EventContext]:
     if room_version is None:
         room_version = await hs.get_datastore().get_room_version_id(kwargs["room_id"])

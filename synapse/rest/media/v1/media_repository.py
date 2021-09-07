@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
@@ -77,16 +76,18 @@ class MediaRepository:
         self.max_upload_size = hs.config.max_upload_size
         self.max_image_pixels = hs.config.max_image_pixels
 
-        self.primary_base_path = hs.config.media_store_path  # type: str
-        self.filepaths = MediaFilePaths(self.primary_base_path)  # type: MediaFilePaths
+        Thumbnailer.set_limits(self.max_image_pixels)
+
+        self.primary_base_path: str = hs.config.media_store_path
+        self.filepaths: MediaFilePaths = MediaFilePaths(self.primary_base_path)
 
         self.dynamic_thumbnails = hs.config.dynamic_thumbnails
         self.thumbnail_requirements = hs.config.thumbnail_requirements
 
         self.remote_media_linearizer = Linearizer(name="media_remote")
 
-        self.recently_accessed_remotes = set()  # type: Set[Tuple[str, str]]
-        self.recently_accessed_locals = set()  # type: Set[str]
+        self.recently_accessed_remotes: Set[Tuple[str, str]] = set()
+        self.recently_accessed_locals: Set[str] = set()
 
         self.federation_domain_whitelist = hs.config.federation_domain_whitelist
 
@@ -468,6 +469,9 @@ class MediaRepository:
         return media_info
 
     def _get_thumbnail_requirements(self, media_type):
+        scpos = media_type.find(";")
+        if scpos > 0:
+            media_type = media_type[:scpos]
         return self.thumbnail_requirements.get(media_type, ())
 
     def _generate_thumbnail(
@@ -707,7 +711,7 @@ class MediaRepository:
 
         # We deduplicate the thumbnail sizes by ignoring the cropped versions if
         # they have the same dimensions of a scaled one.
-        thumbnails = {}  # type: Dict[Tuple[int, int, str], str]
+        thumbnails: Dict[Tuple[int, int, str], str] = {}
         for r_width, r_height, r_method, r_type in requirements:
             if r_method == "crop":
                 thumbnails.setdefault((r_width, r_height, r_type), r_method)
@@ -832,7 +836,9 @@ class MediaRepository:
 
         return {"deleted": deleted}
 
-    async def delete_local_media(self, media_id: str) -> Tuple[List[str], int]:
+    async def delete_local_media_ids(
+        self, media_ids: List[str]
+    ) -> Tuple[List[str], int]:
         """
         Delete the given local or remote media ID from this server
 
@@ -841,7 +847,7 @@ class MediaRepository:
         Returns:
             A tuple of (list of deleted media IDs, total deleted media IDs).
         """
-        return await self._remove_local_media_from_disk([media_id])
+        return await self._remove_local_media_from_disk(media_ids)
 
     async def delete_old_local_media(
         self,

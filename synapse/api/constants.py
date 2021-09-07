@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2017 Vector Creations Ltd
 # Copyright 2018-2019 New Vector Ltd
@@ -17,6 +16,9 @@
 # limitations under the License.
 
 """Contains constants from the specification."""
+
+# the max size of a (canonical-json-encoded) event
+MAX_PDU_SIZE = 65536
 
 # the "depth" field on events is limited to 2**63 - 1
 MAX_DEPTH = 2 ** 63 - 1
@@ -59,6 +61,14 @@ class JoinRules:
     KNOCK = "knock"
     INVITE = "invite"
     PRIVATE = "private"
+    # As defined for MSC3083.
+    RESTRICTED = "restricted"
+
+
+class RestrictedJoinRuleTypes:
+    """Understood types for the allow rules in restricted join rules."""
+
+    ROOM_MEMBERSHIP = "m.room_membership"
 
 
 class LoginType:
@@ -69,6 +79,11 @@ class LoginType:
     TERMS = "m.login.terms"
     SSO = "m.login.sso"
     DUMMY = "m.login.dummy"
+
+
+# This is used in the `type` parameter for /register when called by
+# an appservice to register a new user.
+APP_SERVICE_REGISTRATION_TYPE = "m.login.application_service"
 
 
 class EventTypes:
@@ -101,13 +116,28 @@ class EventTypes:
 
     Dummy = "org.matrix.dummy_event"
 
-    MSC1772_SPACE_CHILD = "org.matrix.msc1772.space.child"
-    MSC1772_SPACE_PARENT = "org.matrix.msc1772.space.parent"
+    SpaceChild = "m.space.child"
+    SpaceParent = "m.space.parent"
+
+    MSC2716_INSERTION = "org.matrix.msc2716.insertion"
+    MSC2716_CHUNK = "org.matrix.msc2716.chunk"
+    MSC2716_MARKER = "org.matrix.msc2716.marker"
+
+
+class ToDeviceEventTypes:
+    RoomKeyRequest = "m.room_key_request"
+
+
+class DeviceKeyAlgorithms:
+    """Spec'd algorithms for the generation of per-device keys"""
+
+    ED25519 = "ed25519"
+    CURVE25519 = "curve25519"
+    SIGNED_CURVE25519 = "signed_curve25519"
 
 
 class EduTypes:
     Presence = "m.presence"
-    RoomKeyRequest = "m.room_key_request"
 
 
 class RejectedReason:
@@ -165,7 +195,23 @@ class EventContentFields:
     SELF_DESTRUCT_AFTER = "org.matrix.self_destruct_after"
 
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
-    MSC1772_ROOM_TYPE = "org.matrix.msc1772.type"
+    ROOM_TYPE = "type"
+
+    # Used on normal messages to indicate they were historically imported after the fact
+    MSC2716_HISTORICAL = "org.matrix.msc2716.historical"
+    # For "insertion" events to indicate what the next chunk ID should be in
+    # order to connect to it
+    MSC2716_NEXT_CHUNK_ID = "org.matrix.msc2716.next_chunk_id"
+    # Used on "chunk" events to indicate which insertion event it connects to
+    MSC2716_CHUNK_ID = "org.matrix.msc2716.chunk_id"
+    # For "marker" events
+    MSC2716_MARKER_INSERTION = "org.matrix.msc2716.marker.insertion"
+
+
+class RoomTypes:
+    """Understood values of the room_type field of m.room.create events."""
+
+    SPACE = "m.space"
 
 
 class RoomEncryptionAlgorithms:
@@ -183,3 +229,7 @@ class HistoryVisibility:
     JOINED = "joined"
     SHARED = "shared"
     WORLD_READABLE = "world_readable"
+
+
+class ReadReceiptEventFields:
+    MSC2285_HIDDEN = "org.matrix.msc2285.hidden"

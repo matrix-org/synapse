@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -296,7 +295,7 @@ class ProfileHandler(BaseHandler):
                 400, "Displayname is too long (max %i)" % (MAX_DISPLAYNAME_LEN,)
             )
 
-        displayname_to_set = new_displayname  # type: Optional[str]
+        displayname_to_set: Optional[str] = new_displayname
         if new_displayname == "":
             displayname_to_set = None
 
@@ -327,7 +326,10 @@ class ProfileHandler(BaseHandler):
                 target_user.to_string(), profile
             )
 
-        await self._update_join_states(requester, target_user)
+        # Don't ratelimit when the admin makes the change.
+        # FIXME: this is because we call this function on registration to update DINUM's
+        #  custom userdir.
+        await self._update_join_states(requester, target_user, ratelimit=not by_admin)
 
         # start a profile replication push
         run_in_background(self._replicate_profiles)
@@ -436,7 +438,7 @@ class ProfileHandler(BaseHandler):
                 400, "Avatar URL is too long (max %i)" % (MAX_AVATAR_URL_LEN,)
             )
 
-        avatar_url_to_set = new_avatar_url  # type: Optional[str]
+        avatar_url_to_set: Optional[str] = new_avatar_url
         if new_avatar_url == "":
             avatar_url_to_set = None
 
@@ -552,12 +554,16 @@ class ProfileHandler(BaseHandler):
         return response
 
     async def _update_join_states(
-        self, requester: Requester, target_user: UserID
+        self,
+        requester: Requester,
+        target_user: UserID,
+        ratelimit: bool = True,
     ) -> None:
         if not self.hs.is_mine(target_user):
             return
 
-        await self.ratelimit(requester)
+        if ratelimit:
+            await self.ratelimit(requester)
 
         # Do not actually update the room state for shadow-banned users.
         if requester.shadow_banned:

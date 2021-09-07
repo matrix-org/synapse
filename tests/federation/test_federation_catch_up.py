@@ -1,13 +1,12 @@
 from typing import List, Tuple
-
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.federation.sender import PerDestinationQueue, TransactionManager
 from synapse.federation.units import Edu
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.util.retryutils import NotRetryingDestination
 
 from tests.test_utils import event_injection, make_awaitable

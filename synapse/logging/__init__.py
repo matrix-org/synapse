@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,8 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# These are imported to allow for nicer logging configuration files.
+import logging
+
 from synapse.logging._remote import RemoteHandler
 from synapse.logging._terse_json import JsonFormatter, TerseJsonFormatter
 
+# These are imported to allow for nicer logging configuration files.
 __all__ = ["RemoteHandler", "JsonFormatter", "TerseJsonFormatter"]
+
+# Debug logger for https://github.com/matrix-org/synapse/issues/9533 etc
+issue9533_logger = logging.getLogger("synapse.9533_debug")

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Quentin Gliech
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
@@ -40,7 +39,7 @@ def get_value_from_macaroon(macaroon: pymacaroons.Macaroon, key: str) -> str:
              caveat in the macaroon, or if the caveat was not found in the macaroon.
     """
     prefix = key + " = "
-    result = None  # type: Optional[str]
+    result: Optional[str] = None
     for caveat in macaroon.caveats:
         if not caveat.caveat_id.startswith(prefix):
             continue

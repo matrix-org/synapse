@@ -12,12 +12,17 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 import synapse.rest.admin
 from synapse.api.constants import EventTypes
-from synapse.rest.client.v1 import directory, login, profile, room
-from synapse.rest.client.v2_alpha import room_upgrade_rest_servlet
+from synapse.rest.client import (
+    directory,
+    login,
+    profile,
+    room,
+    room_upgrade_rest_servlet,
+)
 from synapse.types import UserID
 
 from tests import unittest

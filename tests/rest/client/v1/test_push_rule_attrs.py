@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 import synapse
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login, push_rule, room
+from synapse.rest.client import login, push_rule, room
 
 from tests.unittest import HomeserverTestCase
 

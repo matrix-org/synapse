@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the 'License');
@@ -300,6 +299,49 @@ class PruneEventTestCase(unittest.TestCase):
                 "unsigned": {},
             },
             room_version=RoomVersions.MSC2176,
+        )
+
+    def test_join_rules(self):
+        """Join rules events have changed behavior starting with MSC3083."""
+        self.run_test(
+            {
+                "type": "m.room.join_rules",
+                "event_id": "$test:domain",
+                "content": {
+                    "join_rule": "invite",
+                    "allow": [],
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.join_rules",
+                "event_id": "$test:domain",
+                "content": {"join_rule": "invite"},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+        # After MSC3083, alias events have no special behavior.
+        self.run_test(
+            {
+                "type": "m.room.join_rules",
+                "content": {
+                    "join_rule": "invite",
+                    "allow": [],
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.join_rules",
+                "content": {
+                    "join_rule": "invite",
+                    "allow": [],
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V8,
         )
 
 

@@ -14,7 +14,7 @@ you set the `server_name` to match your machine's public DNS hostname.
 
 For this default configuration to work, you will need to listen for TLS
 connections on port 8448. The preferred way to do that is by using a
-reverse proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions
+reverse proxy: see [the reverse proxy documentation](reverse_proxy.md) for instructions
 on how to correctly set one up.
 
 In some cases you might not want to run Synapse on the machine that has
@@ -23,7 +23,7 @@ traffic to use a different port than 8448. For example, you might want to
 have your user names look like `@user:example.com`, but you want to run
 Synapse on `synapse.example.com` on port 443. This can be done using
 delegation, which allows an admin to control where federation traffic should
-be sent. See [delegate.md](delegate.md) for instructions on how to set this up.
+be sent. See [the delegation documentation](delegate.md) for instructions on how to set this up.
 
 Once federation has been configured, you should be able to join a room over
 federation. A good place to start is `#synapse:matrix.org` - a room for
@@ -44,8 +44,8 @@ a complicated dance which requires connections in both directions).
 
 Another common problem is that people on other servers can't join rooms that
 you invite them to. This can be caused by an incorrectly-configured reverse
-proxy: see [reverse_proxy.md](<reverse_proxy.md>) for instructions on how to correctly
-configure a reverse proxy.
+proxy: see [the reverse proxy documentation](reverse_proxy.md) for instructions on how
+to correctly configure a reverse proxy.
 
 ### Known issues
 
@@ -63,4 +63,4 @@ release of Synapse.
 
 If you want to get up and running quickly with a trio of homeservers in a
 private federation, there is a script in the `demo` directory. This is mainly
-useful just for development purposes. See [demo/README](<../demo/README>).
+useful just for development purposes. See [demo/README](https://github.com/matrix-org/synapse/tree/develop/demo/).

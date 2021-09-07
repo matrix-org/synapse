@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,14 +15,12 @@
 """Tests for the password_auth_provider interface"""
 
 from typing import Any, Type, Union
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
 import synapse
-from synapse.rest.client.v1 import login
-from synapse.rest.client.v2_alpha import devices
+from synapse.rest.client import devices, login
 from synapse.types import JsonDict
 
 from tests import unittest

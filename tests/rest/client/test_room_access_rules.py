@@ -15,15 +15,15 @@
 import json
 import random
 import string
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
 from synapse.api.constants import EventTypes, JoinRules, Membership, RoomCreationPreset
 from synapse.api.errors import SynapseError
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.rest import admin
-from synapse.rest.client.v1 import directory, login, room
+from synapse.rest.client import directory, login, room
 from synapse.third_party_rules.access_rules import (
     ACCESS_RULES_TYPE,
     FROZEN_STATE_TYPE,
@@ -60,11 +60,13 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         def send_invite(destination, room_id, event_id, pdu):
             return defer.succeed(pdu)
 
-        def get_json(uri, args={}, headers=None):
+        def get_json(uri, args=None, headers=None):
+            if args is None:
+                args = {}
             address_domain = args["address"].split("@")[1]
             return defer.succeed({"hs": address_domain})
 
-        def post_json_get_json(uri, post_json, args={}, headers=None):
+        def post_json_get_json(uri, post_json, args=None, headers=None):
             token = "".join(random.choice(string.ascii_letters) for _ in range(10))
             return defer.succeed(
                 {
@@ -105,6 +107,8 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         self.hs.get_identity_handler().blacklisting_http_client = mock_http_client
 
         self.third_party_event_rules = self.hs.get_third_party_event_rules()
+
+        load_legacy_third_party_event_rules(self.hs)
 
         return self.hs
 
@@ -1022,7 +1026,7 @@ class RoomAccessTestCase(unittest.HomeserverTestCase):
         preset=RoomCreationPreset.TRUSTED_PRIVATE_CHAT,
         initial_state=None,
         power_levels_content_override=None,
-        invite=[],
+        invite=None,
         expected_code=200,
     ):
         content = {"is_direct": direct, "preset": preset}

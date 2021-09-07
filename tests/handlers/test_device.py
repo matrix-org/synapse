@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
@@ -258,7 +257,7 @@ class DehydrationTestCase(unittest.HomeserverTestCase):
         self.assertEqual(device_data, {"device_data": {"foo": "bar"}})
 
         # Create a new login for the user and dehydrated the device
-        device_id, access_token = self.get_success(
+        device_id, access_token, _expiration_time, _refresh_token = self.get_success(
             self.registration.register_device(
                 user_id=user_id,
                 device_id=None,

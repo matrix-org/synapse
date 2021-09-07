@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -34,7 +33,7 @@ from synapse.metrics.background_process_metrics import (
     wrap_as_background_process,
 )
 from synapse.storage.databases.main.directory import RoomAliasMapping
-from synapse.types import Collection, JsonDict, RoomAlias, RoomStreamToken, UserID
+from synapse.types import JsonDict, RoomAlias, RoomStreamToken, UserID
 from synapse.util.metrics import Measure
 
 if TYPE_CHECKING:
@@ -88,7 +87,8 @@ class ApplicationServicesHandler:
             self.is_processing = True
             try:
                 limit = 100
-                while True:
+                upper_bound = -1
+                while upper_bound < self.current_max:
                     (
                         upper_bound,
                         events,
@@ -96,10 +96,7 @@ class ApplicationServicesHandler:
                         self.current_max, limit
                     )
 
-                    if not events:
-                        break
-
-                    events_by_room = {}  # type: Dict[str, List[EventBase]]
+                    events_by_room: Dict[str, List[EventBase]] = {}
                     for event in events:
                         events_by_room.setdefault(event.room_id, []).append(event)
 
@@ -154,9 +151,6 @@ class ApplicationServicesHandler:
 
                     await self.store.set_appservice_last_pos(upper_bound)
 
-                    now = self.clock.time_msec()
-                    ts = await self.store.get_received_ts(events[-1].event_id)
-
                     synapse.metrics.event_processing_positions.labels(
                         "appservice_sender"
                     ).set(upper_bound)
@@ -169,12 +163,16 @@ class ApplicationServicesHandler:
 
                     event_processing_loop_counter.labels("appservice_sender").inc()
 
-                    synapse.metrics.event_processing_lag.labels(
-                        "appservice_sender"
-                    ).set(now - ts)
-                    synapse.metrics.event_processing_last_ts.labels(
-                        "appservice_sender"
-                    ).set(ts)
+                    if events:
+                        now = self.clock.time_msec()
+                        ts = await self.store.get_received_ts(events[-1].event_id)
+
+                        synapse.metrics.event_processing_lag.labels(
+                            "appservice_sender"
+                        ).set(now - ts)
+                        synapse.metrics.event_processing_last_ts.labels(
+                            "appservice_sender"
+                        ).set(ts)
             finally:
                 self.is_processing = False
 
@@ -182,7 +180,7 @@ class ApplicationServicesHandler:
         self,
         stream_key: str,
         new_token: Optional[int],
-        users: Collection[Union[str, UserID]] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.
@@ -215,7 +213,7 @@ class ApplicationServicesHandler:
         # We only start a new background process if necessary rather than
         # optimistically (to cut down on overhead).
         self._notify_interested_services_ephemeral(
-            services, stream_key, new_token, users
+            services, stream_key, new_token, users or []
         )
 
     @wrap_as_background_process("notify_interested_services_ephemeral")
@@ -277,7 +275,7 @@ class ApplicationServicesHandler:
     async def _handle_presence(
         self, service: ApplicationService, users: Collection[Union[str, UserID]]
     ) -> List[JsonDict]:
-        events = []  # type: List[JsonDict]
+        events: List[JsonDict] = []
         presence_source = self.event_sources.sources["presence"]
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
@@ -377,7 +375,7 @@ class ApplicationServicesHandler:
         self, only_protocol: Optional[str] = None
     ) -> Dict[str, JsonDict]:
         services = self.store.get_app_services()
-        protocols = {}  # type: Dict[str, List[JsonDict]]
+        protocols: Dict[str, List[JsonDict]] = {}
 
         # Collect up all the individual protocol responses out of the ASes
         for s in services:
@@ -394,9 +392,6 @@ class ApplicationServicesHandler:
                     protocols[p].append(info)
 
         def _merge_instances(infos: List[JsonDict]) -> JsonDict:
-            if not infos:
-                return {}
-
             # Merge the 'instances' lists of multiple results, but just take
             # the other fields from the first as they ought to be identical
             # copy the result so as not to corrupt the cached one
@@ -408,7 +403,9 @@ class ApplicationServicesHandler:
 
             return combined
 
-        return {p: _merge_instances(protocols[p]) for p in protocols.keys()}
+        return {
+            p: _merge_instances(protocols[p]) for p in protocols.keys() if protocols[p]
+        }
 
     async def _get_services_for_event(
         self, event: EventBase

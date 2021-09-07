@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import account
+from synapse.rest.client import account, login, room
 
 from tests import unittest
 
