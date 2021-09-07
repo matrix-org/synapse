@@ -100,7 +100,7 @@ class OembedConfig(Config):
                 results = urlparse.urlparse(api_endpoint)
                 if results.scheme not in {"http", "https"}:
                     raise ConfigError(
-                        f"Insecure oEmbed scheme ({results.scheme}) for endpoint {api_endpoint}",
+                        f"Unsupported oEmbed scheme ({results.scheme}) for endpoint {api_endpoint}",
                         config_path,
                     )
 
@@ -130,7 +130,7 @@ class OembedConfig(Config):
         # The scheme must be HTTP(S) (and cannot contain wildcards).
         if results.scheme not in {"http", "https"}:
             raise ConfigError(
-                f"Insecure oEmbed scheme ({results.scheme}) for pattern: {glob}",
+                f"Unsupported oEmbed scheme ({results.scheme}) for pattern: {glob}",
                 config_path,
             )
 

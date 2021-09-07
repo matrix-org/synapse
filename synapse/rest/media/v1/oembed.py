@@ -59,7 +59,8 @@ class OEmbedProvider:
                 and "json" not in oembed_endpoint.formats
             ) or api_endpoint.endswith(".xml"):
                 logger.info(
-                    f"Ignoring oEmbed endpoint due to not supporting JSON: {api_endpoint}"
+                    "Ignoring oEmbed endpoint due to not supporting JSON: %s",
+                    api_endpoint,
                 )
                 continue
 
