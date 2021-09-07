@@ -390,9 +390,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                     inflight_requests.append((group, make_deferred_yieldable(result)))
                     continue
 
-            if try_combine_inflight_requests(
-                group, state_filter, inflight_requests
-            ):
+            if try_combine_inflight_requests(group, state_filter, inflight_requests):
                 # succeeded in finding in-flight requests that could be combined
                 # together to give all the state we need for this group.
                 continue
