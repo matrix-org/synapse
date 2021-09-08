@@ -122,7 +122,17 @@ class OEmbedProvider:
                 cache_age = int(cache_age)
 
             # The results.
-            open_graph_response = {"og:title": oembed.get("title")}
+            open_graph_response = {}
+
+            # Use either title or author's name as the title.
+            title = oembed.get("title") or oembed.get("author_name")
+            if title:
+                open_graph_response["og:title"] = title
+
+            # Use the provider name and as the site.
+            provider_name = oembed.get("provider_name")
+            if provider_name:
+                open_graph_response["og:site_name"] = provider_name
 
             # If a thumbnail exists, use it. Note that dimensions will be calculated later.
             if "thumbnail_url" in oembed:

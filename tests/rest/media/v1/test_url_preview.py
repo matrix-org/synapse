@@ -620,7 +620,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertIn(b"/matrixdotorg", server.data)
 
         self.assertEqual(channel.code, 200)
-        self.assertIsNone(channel.json_body["og:title"])
         self.assertTrue(channel.json_body["og:image"].startswith("mxc://"))
         self.assertEqual(channel.json_body["og:image:height"], 1)
         self.assertEqual(channel.json_body["og:image:width"], 1)
@@ -633,6 +632,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         result = {
             "version": "1.0",
             "type": "rich",
+            # Note that this provides the author, not the title.
+            "author_name": "Alice",
             "html": "<div>Content Preview</div>",
         }
         end_content = json.dumps(result).encode("utf-8")
@@ -662,7 +663,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
-            {"og:title": None, "og:description": "Content Preview"},
+            {"og:title": "Alice", "og:description": "Content Preview"},
         )
 
     def test_oembed_format(self):
@@ -707,5 +708,5 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
-            {"og:title": None, "og:description": "Content Preview"},
+            {"og:description": "Content Preview"},
         )
