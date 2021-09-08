@@ -258,6 +258,9 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("got media_info of '%s'", media_info)
 
+        # The timestamp of when this media expires.
+        expiration_ts_ms = media_info.expires + media_info.created_ts_ms
+
         if _is_media(media_info.media_type):
             file_id = media_info.filesystem_id
             dims = await self.media_repo._generate_thumbnails(
@@ -340,7 +343,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             url,
             media_info.response_code,
             media_info.etag,
-            media_info.expires + media_info.created_ts_ms,
+            expiration_ts_ms,
             jsonog,
             media_info.filesystem_id,
             media_info.created_ts_ms,
