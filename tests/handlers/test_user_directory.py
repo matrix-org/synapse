@@ -164,10 +164,8 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(deactivate_handler.activate_account(user))
         # Hackily reset password by restoring the old pw hash.
         self.get_success(
-            self.store.db_pool.simple_update_one(
-                "users",
-                {"name": user},
-                {"password_hash": password_hash},
+            self.hs.get_set_password_handler().set_password(
+                user, password_hash, logout_devices=False
             )
         )
         user_token = self.login(user, "pass")
