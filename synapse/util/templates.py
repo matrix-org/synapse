@@ -16,7 +16,7 @@
 
 import time
 import urllib.parse
-from typing import TYPE_CHECKING, Callable, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Optional, Sequence, Union
 
 import jinja2
 
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 
 def build_jinja_env(
-    template_search_directories: Iterable[str],
+    template_search_directories: Sequence[str],
     config: "HomeServerConfig",
     autoescape: Union[bool, Callable[[Optional[str]], bool], None] = None,
 ) -> jinja2.Environment:
@@ -56,8 +56,7 @@ def build_jinja_env(
     if autoescape is None:
         autoescape = jinja2.select_autoescape()
 
-    # the type signature of this is wrong
-    loader = jinja2.FileSystemLoader(template_search_directories)  # type: ignore[arg-type]
+    loader = jinja2.FileSystemLoader(template_search_directories)
     env = jinja2.Environment(loader=loader, autoescape=autoescape)
 
     # Update the environment with our custom filters
