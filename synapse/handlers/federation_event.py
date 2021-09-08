@@ -1700,10 +1700,13 @@ class FederationEventHandler:
             context: The event context.
             backfilled: True if the event was backfilled.
         """
+        # this method should not be called on outliers (those code paths call
+        # persist_events_and_notify directly.)
+        assert not event.internal_metadata.outlier
+
         try:
             if (
-                not event.internal_metadata.is_outlier()
-                and not backfilled
+                not backfilled
                 and not context.rejected
                 and (await self._store.get_min_depth(event.room_id)) <= event.depth
             ):
