@@ -298,7 +298,7 @@ class FileInfo:
     # The local ID of the file. For local files this is the same as the media_id
     file_id: str
     # If the file is for the url preview cache
-    url_cache: bool = False
+    url_cache: Optional[str] = None
     # Whether the file is a thumbnail or not.
     thumbnail: bool = False
     thumbnail_width: Optional[int] = None

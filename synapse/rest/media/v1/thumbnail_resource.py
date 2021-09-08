@@ -318,6 +318,13 @@ class ThumbnailResource(DirectServeJsonResource):
                 respond_404(request)
                 return
 
+            # These must exist if it is a thumbnail.
+            assert file_info.thumbnail_width is not None
+            assert file_info.thumbnail_height is not None
+            assert file_info.thumbnail_type is not None
+            assert file_info.thumbnail_method is not None
+            assert file_info.thumbnail_length is not None
+
             responder = await self.media_storage.fetch_media(file_info)
             if responder:
                 await respond_with_responder(

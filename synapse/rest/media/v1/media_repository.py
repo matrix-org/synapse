@@ -585,7 +585,7 @@ class MediaRepository:
         t_type: str,
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
-            FileInfo(server_name, file_id, url_cache=False)
+            FileInfo(server_name, file_id)
         )
 
         try:
@@ -655,7 +655,7 @@ class MediaRepository:
         media_id: str,
         file_id: str,
         media_type: str,
-        url_cache: bool = False,
+        url_cache: Optional[str] = None,
     ) -> Optional[dict]:
         """Generate and store thumbnails for an image.
 
