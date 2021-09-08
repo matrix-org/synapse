@@ -1487,6 +1487,12 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1430"><a class="header" href="#upgrading-to-v1430">Upgrading to v1.43.0</a></h1>
+<h2 id="the-spaces-summary-apis-can-now-be-handled-by-workers"><a class="header" href="#the-spaces-summary-apis-can-now-be-handled-by-workers">The spaces summary APIs can now be handled by workers</a></h2>
+<p>The <a href="https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications">available worker applications documentation</a>
+has been updated to reflect that calls to the <code>/spaces</code>, <code>/hierarchy</code>, and
+<code>/summary</code> endpoints can now be routed to workers for both client API and
+federation requests.</p>
 <h1 id="upgrading-to-v1420"><a class="header" href="#upgrading-to-v1420">Upgrading to v1.42.0</a></h1>
 <h2 id="removal-of-old-room-admin-api"><a class="header" href="#removal-of-old-room-admin-api">Removal of old Room Admin API</a></h2>
 <p>The following admin APIs were deprecated in <a href="https://github.com/matrix-org/synapse/blob/v1.25.0/CHANGES.md#removal-warning">Synapse 1.25</a>
@@ -8268,6 +8274,8 @@ expressions:</p>
 ^/_matrix/federation/v1/user/devices/
 ^/_matrix/federation/v1/get_groups_publicised$
 ^/_matrix/key/v2/query
+^/_matrix/federation/unstable/org.matrix.msc2946/spaces/
+^/_matrix/federation/unstable/org.matrix.msc2946/hierarchy/
 
 # Inbound federation transaction request
 ^/_matrix/federation/v1/send/
@@ -8279,6 +8287,9 @@ expressions:</p>
 ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/context/.*$
 ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/members$
 ^/_matrix/client/(api/v1|r0|unstable)/rooms/.*/state$
+^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/spaces$
+^/_matrix/client/unstable/org.matrix.msc2946/rooms/.*/hierarchy$
+^/_matrix/client/unstable/im.nheko.summary/rooms/.*/summary$
 ^/_matrix/client/(api/v1|r0|unstable)/account/3pid$
 ^/_matrix/client/(api/v1|r0|unstable)/devices$
 ^/_matrix/client/(api/v1|r0|unstable)/keys/query$
