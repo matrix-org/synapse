@@ -15,7 +15,7 @@
 import inspect
 import sys
 import traceback
-from typing import Any, Dict, Optional, Union
+from typing import Any, Dict, Optional
 
 from twisted.conch import manhole_ssh
 from twisted.conch.insults import insults
@@ -24,6 +24,8 @@ from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
 from twisted.internet import defer
 from twisted.internet.protocol import Factory
+
+from synapse.config.server import ManholeConfig
 
 PUBLIC_KEY = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHhGATaW4KhE23+7nrH4jFx3yLq9OjaEs5"
@@ -63,7 +65,7 @@ EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
-def manhole(settings, globals):
+def manhole(settings: ManholeConfig, globals: Dict[str, Any]) -> Factory:
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
@@ -78,16 +80,13 @@ def manhole(settings, globals):
         A factory to pass to ``listenTCP``
     """
     username = settings.username
-    password = settings.password
+    password = settings.password.encode("ascii")
     priv_key = settings.priv_key
     if priv_key is None:
         priv_key = Key.fromString(PRIVATE_KEY)
     pub_key = settings.pub_key
     if pub_key is None:
         pub_key = Key.fromString(PUBLIC_KEY)
-
-    if not isinstance(password, bytes):
-        password = password.encode("ascii")
 
     checker = checkers.InMemoryUsernamePasswordDatabaseDontUse(**{username: password})
 
@@ -100,8 +99,11 @@ def manhole(settings, globals):
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.privateKeys[b"ssh-rsa"] = priv_key
-    factory.publicKeys[b"ssh-rsa"] = pub_key
+
+    # conch has the wrong type on these dicts (says bytes to bytes,
+    # should be bytes to Keys judging by how it's used).
+    factory.privateKeys[b"ssh-rsa"] = priv_key  # type: ignore[assignment]
+    factory.publicKeys[b"ssh-rsa"] = pub_key  # type: ignore[assignment]
 
     return factory
 
