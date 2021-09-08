@@ -14,7 +14,7 @@
 import logging
 import random
 from types import TracebackType
-from typing import Any, Optional
+from typing import Any, Optional, Type, TypeVar, cast
 
 import synapse.logging.context
 from synapse.api.errors import CodeMessageException
@@ -31,6 +31,9 @@ RETRY_MULTIPLIER = 5
 
 # a cap on the backoff. (Essentially none)
 MAX_RETRY_INTERVAL = 2 ** 62
+
+
+T = TypeVar("T")
 
 
 class NotRetryingDestination(Exception):
@@ -163,7 +166,9 @@ class RetryDestinationLimiter:
     def __enter__(self) -> None:
         pass
 
-    def __exit__(self, exc_type, exc_val, exc_tb: TracebackType) -> None:
+    def __exit__(
+        self, exc_type: Optional[Type[T]], exc_val: T, exc_tb: TracebackType
+    ) -> None:
         valid_err_code = False
         if exc_type is None:
             valid_err_code = True
@@ -172,6 +177,7 @@ class RetryDestinationLimiter:
             # failures; this is mostly so as not to catch defer._DefGen.
             valid_err_code = True
         elif issubclass(exc_type, CodeMessageException):
+            exc_val_cme = cast(CodeMessageException, exc_val)
             # Some error codes are perfectly fine for some APIs, whereas other
             # APIs may expect to never received e.g. a 404. It's important to
             # handle 404 as some remote servers will return a 404 when the HS
@@ -180,11 +186,11 @@ class RetryDestinationLimiter:
             # won't accept our requests for at least a while.
             # 429 is us being aggressively rate limited, so lets rate limit
             # ourselves.
-            if exc_val.code == 404 and self.backoff_on_404:
+            if exc_val_cme.code == 404 and self.backoff_on_404:
                 valid_err_code = False
-            elif exc_val.code in (401, 429):
+            elif exc_val_cme.code in (401, 429):
                 valid_err_code = False
-            elif exc_val.code < 500:
+            elif exc_val_cme.code < 500:
                 valid_err_code = True
             else:
                 valid_err_code = False
