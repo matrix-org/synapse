@@ -18,6 +18,8 @@ import os
 import urllib
 from typing import Awaitable, Dict, Generator, List, Optional, Tuple
 
+import attr
+
 from twisted.internet.interfaces import IConsumer
 from twisted.protocols.basic import FileSender
 from twisted.web.server import Request
@@ -287,44 +289,25 @@ class Responder:
         pass
 
 
+@attr.s(slots=True, auto_attribs=True)
 class FileInfo:
-    """Details about a requested/uploaded file.
+    """Details about a requested/uploaded file."""
 
-    Attributes:
-        server_name (str): The server name where the media originated from,
-            or None if local.
-        file_id (str): The local ID of the file. For local files this is the
-            same as the media_id
-        url_cache (bool): If the file is for the url preview cache
-        thumbnail (bool): Whether the file is a thumbnail or not.
-        thumbnail_width (int)
-        thumbnail_height (int)
-        thumbnail_method (str)
-        thumbnail_type (str): Content type of thumbnail, e.g. image/png
-        thumbnail_length (int): The size of the media file, in bytes.
-    """
-
-    def __init__(
-        self,
-        server_name,
-        file_id,
-        url_cache=False,
-        thumbnail=False,
-        thumbnail_width=None,
-        thumbnail_height=None,
-        thumbnail_method=None,
-        thumbnail_type=None,
-        thumbnail_length=None,
-    ):
-        self.server_name = server_name
-        self.file_id = file_id
-        self.url_cache = url_cache
-        self.thumbnail = thumbnail
-        self.thumbnail_width = thumbnail_width
-        self.thumbnail_height = thumbnail_height
-        self.thumbnail_method = thumbnail_method
-        self.thumbnail_type = thumbnail_type
-        self.thumbnail_length = thumbnail_length
+    # The server name where the media originated from, or None if local.
+    server_name: Optional[str]
+    # The local ID of the file. For local files this is the same as the media_id
+    file_id: str
+    # If the file is for the url preview cache
+    url_cache: bool = False
+    # Whether the file is a thumbnail or not.
+    thumbnail: bool = False
+    thumbnail_width: Optional[int] = None
+    thumbnail_height: Optional[int] = None
+    thumbnail_method: Optional[str] = None
+    # Content type of thumbnail, e.g. image/png
+    thumbnail_type: Optional[str] = None
+    # The size of the media file, in bytes.
+    thumbnail_length: Optional[int] = None
 
 
 def get_filename_from_headers(headers: Dict[bytes, List[bytes]]) -> Optional[str]:
