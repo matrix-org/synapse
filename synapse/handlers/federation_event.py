@@ -1589,8 +1589,8 @@ class FederationEventHandler:
                             missing_auth_event_context,
                             claimed_auth_event_map=auth,
                         )
-                        await self._run_push_actions_and_persist_event(
-                            auth_event, missing_auth_event_context, backfilled=False
+                        await self.persist_events_and_notify(
+                            event.room_id, [(auth_event, missing_auth_event_context)]
                         )
 
                         if auth_event.event_id in event_auth_events:
