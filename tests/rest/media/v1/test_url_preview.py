@@ -620,6 +620,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertIn(b"/matrixdotorg", server.data)
 
         self.assertEqual(channel.code, 200)
+        self.assertIn("og:url", channel.json_body)
         self.assertTrue(channel.json_body["og:image"].startswith("mxc://"))
         self.assertEqual(channel.json_body["og:image:height"], 1)
         self.assertEqual(channel.json_body["og:image:width"], 1)
@@ -661,9 +662,11 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
+        # The JSON body should have a URL, but we don't really care what it is.
+        body = channel.json_body
+        body.pop("og:url")
         self.assertEqual(
-            channel.json_body,
-            {"og:title": "Alice", "og:description": "Content Preview"},
+            body, {"og:title": "Alice", "og:description": "Content Preview"}
         )
 
     def test_oembed_format(self):
@@ -706,7 +709,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertIn(b"format=json", server.data)
 
         self.assertEqual(channel.code, 200)
-        self.assertEqual(
-            channel.json_body,
-            {"og:description": "Content Preview"},
-        )
+        # The JSON body should have a URL, but we don't really care what it is.
+        body = channel.json_body
+        body.pop("og:url")
+        self.assertEqual(body, {"og:description": "Content Preview"})

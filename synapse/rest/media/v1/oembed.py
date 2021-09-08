@@ -124,7 +124,9 @@ class OEmbedProvider:
                 cache_age = int(cache_age)
 
             # The results.
-            open_graph_response = {}
+            open_graph_response = {
+                "og:url": url,
+            }
 
             # Use either title or author's name as the title.
             title = oembed.get("title") or oembed.get("author_name")
