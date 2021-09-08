@@ -541,7 +541,7 @@ class SsoHandler:
         self,
         attributes: Optional[UserAttributes] = None,
         session: Optional[UsernameMappingSession] = None,
-    ) -> Optional[bytes]:
+    ) -> bytes:
         """Returns the URL to redirect to for the next step of new user registration
 
         Given attributes from the user mapping provider or a UsernameMappingSession,
@@ -555,7 +555,7 @@ class SsoHandler:
                 attributes chosen by the user.
 
         Returns:
-            The URL to redirect to, or None if no redirect is necessary
+            The URL to redirect to, or an empty value if no redirect is necessary
         """
         # Must provide either attributes or session, not both
         assert (attributes is not None) != (session is not None)
@@ -569,7 +569,7 @@ class SsoHandler:
         ):
             return b"/_synapse/client/new_user_consent"
         else:
-            return b"/_synapse/client/sso_register" if session else None
+            return b"/_synapse/client/sso_register" if session else b""
 
     async def _redirect_to_next_new_user_step(
         self,
@@ -577,7 +577,7 @@ class SsoHandler:
         remote_user_id: str,
         attributes: UserAttributes,
         client_redirect_url: str,
-        next_step_url: str,
+        next_step_url: bytes,
         extra_login_attributes: Optional[JsonDict],
     ) -> NoReturn:
         """Creates a UsernameMappingSession and redirects the browser
