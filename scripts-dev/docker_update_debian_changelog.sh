@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash
 # Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -47,7 +47,9 @@ fi
 
 # We set -x here rather than in the shebang so that if we need to exit early because no
 # version was provided, the message doesn't get drowned in useless output.
-set -x
+# We also set -e here rather than in the shebang, because we don't want the script to exit
+# without any error message if one of the checks before (which and grep) returned 1.
+set -xe
 
 # Make the root of the Synapse checkout the current working directory.
 cd /synapse
