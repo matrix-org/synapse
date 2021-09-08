@@ -13,7 +13,7 @@
 # limitations under the License.
 import json
 import re
-from typing import Any, Dict, Iterable, List, Pattern
+from typing import Any, Dict, Iterable, List, Optional, Pattern
 from urllib import parse as urlparse
 
 import attr
@@ -31,6 +31,8 @@ class OEmbedEndpointConfig:
     api_endpoint: str
     # The patterns to match.
     url_patterns: List[Pattern]
+    # The supported formats.
+    formats: Optional[List[str]]
 
 
 class OembedConfig(Config):
@@ -93,11 +95,22 @@ class OembedConfig(Config):
             # might have multiple patterns to match.
             for endpoint in provider["endpoints"]:
                 api_endpoint = endpoint["url"]
+
+                # The API endpoint must be an HTTP(S) URL.
+                results = urlparse.urlparse(api_endpoint)
+                if results.scheme not in {"http", "https"}:
+                    raise ConfigError(
+                        f"Unsupported oEmbed scheme ({results.scheme}) for endpoint {api_endpoint}",
+                        config_path,
+                    )
+
                 patterns = [
                     self._glob_to_pattern(glob, config_path)
                     for glob in endpoint["schemes"]
                 ]
-                yield OEmbedEndpointConfig(api_endpoint, patterns)
+                yield OEmbedEndpointConfig(
+                    api_endpoint, patterns, endpoint.get("formats")
+                )
 
     def _glob_to_pattern(self, glob: str, config_path: Iterable[str]) -> Pattern:
         """
@@ -114,9 +127,12 @@ class OembedConfig(Config):
         """
         results = urlparse.urlparse(glob)
 
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
+        # The scheme must be HTTP(S) (and cannot contain wildcards).
         if results.scheme not in {"http", "https"}:
-            raise ConfigError(f"Insecure oEmbed scheme: {results.scheme}", config_path)
+            raise ConfigError(
+                f"Unsupported oEmbed scheme ({results.scheme}) for pattern: {glob}",
+                config_path,
+            )
 
         pattern = urlparse.urlunparse(
             [

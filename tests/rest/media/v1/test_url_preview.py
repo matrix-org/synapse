@@ -92,7 +92,15 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 url_patterns=[
                     re.compile(r"http://twitter\.com/.+/status/.+"),
                 ],
-            )
+                formats=None,
+            ),
+            OEmbedEndpointConfig(
+                api_endpoint="http://www.hulu.com/api/oembed.{format}",
+                url_patterns=[
+                    re.compile(r"http://www\.hulu\.com/watch/.+"),
+                ],
+                formats=["json"],
+            ),
         ]
 
         return hs
@@ -651,6 +659,51 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         )
 
         self.pump()
+        self.assertEqual(channel.code, 200)
+        self.assertEqual(
+            channel.json_body,
+            {"og:title": None, "og:description": "Content Preview"},
+        )
+
+    def test_oembed_format(self):
+        """Test an oEmbed endpoint which requires the format in the URL."""
+        self.lookups["www.hulu.com"] = [(IPv4Address, "10.1.2.3")]
+
+        result = {
+            "version": "1.0",
+            "type": "rich",
+            "html": "<div>Content Preview</div>",
+        }
+        end_content = json.dumps(result).encode("utf-8")
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://www.hulu.com/watch/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+
+        # The {format} should have been turned into json.
+        self.assertIn(b"/api/oembed.json", server.data)
+        # A URL parameter of format=json should be provided.
+        self.assertIn(b"format=json", server.data)
+
         self.assertEqual(channel.code, 200)
         self.assertEqual(
             channel.json_body,
