@@ -152,6 +152,8 @@ class SynapseManholeInterpreter(ManholeInterpreter):
             # It's unclear whether there is a reason behind this line.
             # It conceivably could be because an exception raised in this block
             # will keep the local frame (containing these local variables) around.
+            # This was adapted taken from CPython's Lib/code.py; see here:
+            # https://github.com/python/cpython/blob/4dc4300c686f543d504ab6fa9fe600eaf11bb695/Lib/code.py#L131-L150
             last_tb = ei = None  # type: ignore
 
     def displayhook(self, obj):
