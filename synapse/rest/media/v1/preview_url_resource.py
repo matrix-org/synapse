@@ -43,7 +43,7 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
-from synapse.rest.media.v1.oembed import OEmbedError, OEmbedProvider
+from synapse.rest.media.v1.oembed import OEmbedProvider
 from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
@@ -254,7 +254,13 @@ class PreviewUrlResource(DirectServeJsonResource):
                 og = og.encode("utf8")
             return og
 
-        media_info = await self._download_url(url, user)
+        # If this URL can be accessed via oEmbed, use that instead.
+        url_to_download = url
+        oembed_url = self._oembed.get_oembed_url(url)
+        if oembed_url:
+            url_to_download = oembed_url
+
+        media_info = await self._download_url(url_to_download, user)
 
         logger.debug("got media_info of '%s'", media_info)
 
@@ -289,6 +295,22 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             encoding = get_html_media_encoding(body, media_info.media_type)
             og = decode_and_calc_og(body, media_info.uri, encoding)
+
+            await self._precache_image_url(user, media_info, og)
+
+        elif oembed_url and _is_json(media_info.media_type):
+            # Handle an oEmbed response.
+            with open(media_info.filename, "r") as utf8_file:
+                oembed_body = utf8_file.read()
+
+            oembed_response = self._oembed.parse_oembed_response(
+                media_info.uri, oembed_body
+            )
+            og = oembed_response.og
+
+            # Use the cache age from the oEmbed result, instead of the HTTP response.
+            if oembed_response.cache_age is not None:
+                expiration_ts_ms = oembed_response.cache_age + media_info.created_ts_ms
 
             await self._precache_image_url(user, media_info, og)
 
@@ -334,88 +356,52 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
-        # If this URL can be accessed via oEmbed, use that instead.
-        url_to_download: Optional[str] = url
-        oembed_url = self._oembed.get_oembed_url(url)
-        if oembed_url:
-            # The result might be a new URL to download, or it might be HTML content.
+        with self.media_storage.store_into_file(file_info) as (f, fname, finish):
             try:
-                oembed_result = await self._oembed.get_oembed_content(oembed_url, url)
-                if oembed_result.url:
-                    url_to_download = oembed_result.url
-                elif oembed_result.html:
-                    url_to_download = None
-            except OEmbedError:
-                # If an error occurs, try doing a normal preview.
-                pass
-
-        if url_to_download:
-            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-                try:
-                    logger.debug("Trying to get preview for url '%s'", url_to_download)
-                    length, headers, uri, code = await self.client.get_file(
-                        url_to_download,
-                        output_stream=f,
-                        max_size=self.max_spider_size,
-                        headers={"Accept-Language": self.url_preview_accept_language},
-                    )
-                except SynapseError:
-                    # Pass SynapseErrors through directly, so that the servlet
-                    # handler will return a SynapseError to the client instead of
-                    # blank data or a 500.
-                    raise
-                except DNSLookupError:
-                    # DNS lookup returned no results
-                    # Note: This will also be the case if one of the resolved IP
-                    # addresses is blacklisted
-                    raise SynapseError(
-                        502,
-                        "DNS resolution failure during URL preview generation",
-                        Codes.UNKNOWN,
-                    )
-                except Exception as e:
-                    # FIXME: pass through 404s and other error messages nicely
-                    logger.warning("Error downloading %s: %r", url_to_download, e)
-
-                    raise SynapseError(
-                        500,
-                        "Failed to download content: %s"
-                        % (traceback.format_exception_only(sys.exc_info()[0], e),),
-                        Codes.UNKNOWN,
-                    )
-                await finish()
-
-                if b"Content-Type" in headers:
-                    media_type = headers[b"Content-Type"][0].decode("ascii")
-                else:
-                    media_type = "application/octet-stream"
-
-                download_name = get_filename_from_headers(headers)
-
-                # FIXME: we should calculate a proper expiration based on the
-                # Cache-Control and Expire headers.  But for now, assume 1 hour.
-                expires = ONE_HOUR
-                etag = (
-                    headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
+                logger.debug("Trying to get preview for url '%s'", url)
+                length, headers, uri, code = await self.client.get_file(
+                    url,
+                    output_stream=f,
+                    max_size=self.max_spider_size,
+                    headers={"Accept-Language": self.url_preview_accept_language},
                 )
-        else:
-            # we can only get here if we did an oembed request and have an oembed_result.html
-            assert oembed_result.html is not None
-            assert oembed_url is not None
+            except SynapseError:
+                # Pass SynapseErrors through directly, so that the servlet
+                # handler will return a SynapseError to the client instead of
+                # blank data or a 500.
+                raise
+            except DNSLookupError:
+                # DNS lookup returned no results
+                # Note: This will also be the case if one of the resolved IP
+                # addresses is blacklisted
+                raise SynapseError(
+                    502,
+                    "DNS resolution failure during URL preview generation",
+                    Codes.UNKNOWN,
+                )
+            except Exception as e:
+                # FIXME: pass through 404s and other error messages nicely
+                logger.warning("Error downloading %s: %r", url, e)
 
-            html_bytes = oembed_result.html.encode("utf-8")
-            with self.media_storage.store_into_file(file_info) as (f, fname, finish):
-                f.write(html_bytes)
-                await finish()
+                raise SynapseError(
+                    500,
+                    "Failed to download content: %s"
+                    % (traceback.format_exception_only(sys.exc_info()[0], e),),
+                    Codes.UNKNOWN,
+                )
+            await finish()
 
-            media_type = "text/html"
-            download_name = oembed_result.title
-            length = len(html_bytes)
-            # If a specific cache age was not given, assume 1 hour.
-            expires = oembed_result.cache_age or ONE_HOUR
-            uri = oembed_url
-            code = 200
-            etag = None
+            if b"Content-Type" in headers:
+                media_type = headers[b"Content-Type"][0].decode("ascii")
+            else:
+                media_type = "application/octet-stream"
+
+            download_name = get_filename_from_headers(headers)
+
+            # FIXME: we should calculate a proper expiration based on the
+            # Cache-Control and Expire headers.  But for now, assume 1 hour.
+            expires = ONE_HOUR
+            etag = headers[b"ETag"][0].decode("ascii") if b"ETag" in headers else None
 
         try:
             time_now_ms = self.clock.time_msec()
@@ -876,6 +862,10 @@ def _is_html(content_type: str) -> bool:
     return content_type.startswith("text/html") or content_type.startswith(
         "application/xhtml"
     )
+
+
+def _is_json(content_type: str) -> bool:
+    return content_type.lower().startswith("application/json")
 
 
 def summarize_paragraphs(

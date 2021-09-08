@@ -626,6 +626,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertIn(b"/matrixdotorg", server.data)
 
         self.assertEqual(channel.code, 200)
+        self.assertIsNone(channel.json_body["og:title"])
         self.assertTrue(channel.json_body["og:image"].startswith("mxc://"))
         self.assertEqual(channel.json_body["og:image:height"], 1)
         self.assertEqual(channel.json_body["og:image:width"], 1)
