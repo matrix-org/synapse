@@ -107,10 +107,9 @@ class OEmbedProvider:
             result = json_decoder.decode(body)
 
             # Ensure there's a version of 1.0.
-            if result.get("version") != "1.0":
-                raise RuntimeError("Invalid version: %s" % (result.get("version"),))
-
-            oembed_type = result.get("type")
+            oembed_version = result["version"]
+            if oembed_version != "1.0":
+                raise RuntimeError(f"Invalid version: {oembed_version}")
 
             # Ensure the cache age is None or an int.
             cache_age = result.get("cache_age")
@@ -125,12 +124,13 @@ class OEmbedProvider:
                 og["og:image"] = result["thumbnail_url"]
 
             # Process each type separately.
+            oembed_type = result["type"]
             if oembed_type == "rich":
-                calc_description_and_urls(og, result.get("html"))
+                calc_description_and_urls(og, result["html"])
 
             elif oembed_type == "photo":
                 # If this is a photo, use the full image, not the thumbnail.
-                og["og:image"] = result.get("url")
+                og["og:image"] = result["url"]
 
             else:
                 raise RuntimeError(f"Unknown oEmbed type: {oembed_type}")
