@@ -1990,6 +1990,15 @@ class PersistEventsStore:
                 events_and_context.
         """
 
+        # Only non outlier events will have push actions associated with them,
+        # so let's filter them out. (This makes joining large rooms faster, as
+        # these queries took seconds to process all the state events).
+        non_outlier_events = [
+            event
+            for event, _ in events_and_contexts
+            if not event.internal_metadata.is_outlier()
+        ]
+
         sql = """
             INSERT INTO event_push_actions (
                 room_id, event_id, user_id, actions, stream_ordering,
@@ -2000,7 +2009,7 @@ class PersistEventsStore:
             WHERE event_id = ?
         """
 
-        if events_and_contexts:
+        if non_outlier_events:
             txn.execute_batch(
                 sql,
                 (
@@ -2010,12 +2019,12 @@ class PersistEventsStore:
                         event.depth,
                         event.event_id,
                     )
-                    for event, _ in events_and_contexts
+                    for event in non_outlier_events
                 ),
             )
 
             room_to_event_ids: Dict[str, List[str]] = {}
-            for e, _ in events_and_contexts:
+            for e in non_outlier_events:
                 room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
 
             for room_id, event_ids in room_to_event_ids.items():
@@ -2040,7 +2049,11 @@ class PersistEventsStore:
         # persisted.
         txn.execute_batch(
             "DELETE FROM event_push_actions_staging WHERE event_id = ?",
-            ((event.event_id,) for event, _ in all_events_and_contexts),
+            (
+                (event.event_id,)
+                for event, _ in all_events_and_contexts
+                if not event.internal_metadata.is_outlier()
+            ),
         )
 
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
