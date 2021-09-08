@@ -290,34 +290,8 @@ class PreviewUrlResource(DirectServeJsonResource):
             encoding = get_html_media_encoding(body, media_info.media_type)
             og = decode_and_calc_og(body, media_info.uri, encoding)
 
-            # pre-cache the image for posterity
-            # FIXME: it might be cleaner to use the same flow as the main /preview_url
-            # request itself and benefit from the same caching etc.  But for now we
-            # just rely on the caching on the master request to speed things up.
-            if "og:image" in og and og["og:image"]:
-                image_info = await self._download_url(
-                    _rebase_url(og["og:image"], media_info.uri), user
-                )
+            await self._precache_image_url(user, media_info, og)
 
-                if _is_media(image_info.media_type):
-                    # TODO: make sure we don't choke on white-on-transparent images
-                    file_id = image_info.filesystem_id
-                    dims = await self.media_repo._generate_thumbnails(
-                        None, file_id, file_id, image_info.media_type, url_cache=True
-                    )
-                    if dims:
-                        og["og:image:width"] = dims["width"]
-                        og["og:image:height"] = dims["height"]
-                    else:
-                        logger.warning("Couldn't get dims for %s", og["og:image"])
-
-                    og[
-                        "og:image"
-                    ] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
-                    og["og:image:type"] = image_info.media_type
-                    og["matrix:image:size"] = image_info.media_length
-                else:
-                    del og["og:image"]
         else:
             logger.warning("Failed to find any OG data in %s", url)
             og = {}
@@ -475,6 +449,44 @@ class PreviewUrlResource(DirectServeJsonResource):
             expires=expires,
             etag=etag,
         )
+
+    async def _precache_image_url(
+        self, user: str, media_info: MediaInfo, og: JsonDict
+    ) -> None:
+        """
+        Pre-cache the image (if one exists) for posterity
+
+        Args:
+            user: The user requesting the preview.
+            media_info: The media being previewed.
+            og: The Open Graph dictionary. This is modified with image information.
+        """
+        #
+        # FIXME: it might be cleaner to use the same flow as the main /preview_url
+        # request itself and benefit from the same caching etc.  But for now we
+        # just rely on the caching on the master request to speed things up.
+        if "og:image" in og and og["og:image"]:
+            image_info = await self._download_url(
+                _rebase_url(og["og:image"], media_info.uri), user
+            )
+
+            if _is_media(image_info.media_type):
+                # TODO: make sure we don't choke on white-on-transparent images
+                file_id = image_info.filesystem_id
+                dims = await self.media_repo._generate_thumbnails(
+                    None, file_id, file_id, image_info.media_type, url_cache=True
+                )
+                if dims:
+                    og["og:image:width"] = dims["width"]
+                    og["og:image:height"] = dims["height"]
+                else:
+                    logger.warning("Couldn't get dims for %s", og["og:image"])
+
+                og["og:image"] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
+                og["og:image:type"] = image_info.media_type
+                og["matrix:image:size"] = image_info.media_length
+            else:
+                del og["og:image"]
 
     def _start_expire_url_cache_data(self):
         return run_as_background_process(
