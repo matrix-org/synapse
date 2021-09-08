@@ -412,8 +412,8 @@ class EventsPersistenceStorage:
                 return replaced_events
 
         chunks = [
-            events_and_contexts[x : x + 100]
-            for x in range(0, len(events_and_contexts), 100)
+            events_and_contexts[x : x + 100000000]
+            for x in range(0, len(events_and_contexts), 10000000)
         ]
 
         for chunk in chunks:

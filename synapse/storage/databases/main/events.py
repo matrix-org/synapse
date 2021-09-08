@@ -242,7 +242,7 @@ class PersistEventsStore:
             txn.execute(sql + clause, args)
             results.extend(r[0] for r in txn if not db_to_json(r[1]).get("soft_failed"))
 
-        for chunk in batch_iter(event_ids, 100):
+        for chunk in batch_iter(event_ids, 1000000000000000):
             await self.db_pool.runInteraction(
                 "_get_events_which_are_prevs", _get_events_which_are_prevs_txn, chunk
             )
@@ -305,7 +305,7 @@ class PersistEventsStore:
                         to_recursively_check.append(prev_event_id)
                         existing_prevs.add(prev_event_id)
 
-        for chunk in batch_iter(event_ids, 100):
+        for chunk in batch_iter(event_ids, 100000000000000000):
             await self.db_pool.runInteraction(
                 "_get_prevs_before_rejected", _get_prevs_before_rejected_txn, chunk
             )
@@ -1550,7 +1550,7 @@ class PersistEventsStore:
         to_prefill = []
 
         rows = []
-        N = 200
+        N = 200000000000000000000
         for i in range(0, len(events_and_contexts), N):
             ev_map = {e[0].event_id: e[0] for e in events_and_contexts[i : i + N]}
             if not ev_map:
