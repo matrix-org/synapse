@@ -31,6 +31,7 @@ from typing import (
     Set,
     TypeVar,
     Union,
+    cast,
 )
 
 import attr
@@ -268,7 +269,7 @@ class Linearizer:
         if not clock:
             from twisted.internet import reactor
 
-            clock = Clock(reactor)  # type: ignore[arg-type]
+            clock = Clock(cast(IReactorTime, reactor))
         self._clock = clock
         self.max_count = max_count
 

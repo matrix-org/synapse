@@ -35,6 +35,7 @@ from typing import (
 from typing_extensions import Literal
 
 from twisted.internet import reactor
+from twisted.internet.interfaces import IReactorTime
 
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import wrap_as_background_process
@@ -341,7 +342,7 @@ class LruCache(Generic[KT, VT]):
         # Default `clock` to something sensible. Note that we rename it to
         # `real_clock` so that mypy doesn't think its still `Optional`.
         if clock is None:
-            real_clock = Clock(reactor)  # type: ignore[arg-type]
+            real_clock = Clock(cast(IReactorTime, reactor))
         else:
             real_clock = clock
 
