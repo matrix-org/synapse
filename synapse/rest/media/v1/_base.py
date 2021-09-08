@@ -289,7 +289,7 @@ class Responder:
         pass
 
 
-@attr.s(slots=True, auto_attribs=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class FileInfo:
     """Details about a requested/uploaded file."""
 
