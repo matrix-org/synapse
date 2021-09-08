@@ -1142,7 +1142,7 @@ class FederationEventHandler:
     async def _auth_and_persist_fetched_events(
         self, origin: str, room_id: str, events: Iterable[EventBase]
     ) -> None:
-        """Persist the events fetched by _get_events_and_persist.
+        """Persist the events fetched by _get_events_and_persist or _get_remote_auth_chain_for_event
 
         The events should not depend on one another, e.g. this should be used to persist
         a bunch of outliers, but not a chunk of individual events that depend
@@ -1643,33 +1643,9 @@ class FederationEventHandler:
             x for x in remote_auth_chain if x.event_id not in seen_remotes
         ]
 
-        for auth_event in remote_auth_chain:
-            try:
-                auth_ids = auth_event.auth_event_ids()
-                auth = {
-                    (e.type, e.state_key): e
-                    for e in remote_auth_chain
-                    if e.event_id in auth_ids or e.type == EventTypes.Create
-                }
-
-                logger.debug(
-                    "_check_event_auth %s missing_auth: %s",
-                    event_id,
-                    auth_event.event_id,
-                )
-                missing_auth_event_context = EventContext.for_outlier()
-                missing_auth_event_context = await self._check_event_auth(
-                    destination,
-                    auth_event,
-                    missing_auth_event_context,
-                    claimed_auth_event_map=auth,
-                )
-                await self.persist_events_and_notify(
-                    room_id,
-                    [(auth_event, missing_auth_event_context)],
-                )
-            except AuthError:
-                pass
+        await self._auth_and_persist_fetched_events(
+            destination, room_id, remote_auth_chain
+        )
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
