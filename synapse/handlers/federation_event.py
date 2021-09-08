@@ -1582,11 +1582,15 @@ class FederationEventHandler:
                         missing_auth_event_context = (
                             await self._state_handler.compute_event_context(auth_event)
                         )
-                        await self._auth_and_persist_event(
+
+                        missing_auth_event_context = await self._check_event_auth(
                             origin,
                             auth_event,
                             missing_auth_event_context,
                             claimed_auth_event_map=auth,
+                        )
+                        await self._run_push_actions_and_persist_event(
+                            auth_event, missing_auth_event_context, backfilled=False
                         )
 
                         if auth_event.event_id in event_auth_events:
