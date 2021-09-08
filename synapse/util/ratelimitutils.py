@@ -16,7 +16,7 @@ import collections
 import contextlib
 import logging
 import typing
-from typing import DefaultDict, Iterator, List, Set
+from typing import Any, DefaultDict, Iterator, List, Set
 
 from twisted.internet import defer
 
@@ -150,7 +150,7 @@ class _PerHostRatelimiter:
 
             self.sleeping_requests.add(request_id)
 
-            def on_wait_finished(_) -> "defer.Deferred[None]":
+            def on_wait_finished(_: Any) -> "defer.Deferred[None]":
                 logger.debug("Ratelimit [%s]: Finished sleeping", id(request_id))
                 self.sleeping_requests.discard(request_id)
                 queue_defer = queue_request()

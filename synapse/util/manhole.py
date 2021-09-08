@@ -15,6 +15,7 @@
 import inspect
 import sys
 import traceback
+from typing import Any, Dict, Optional, Union
 
 from twisted.conch import manhole_ssh
 from twisted.conch.insults import insults
@@ -22,6 +23,7 @@ from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
 from twisted.internet import defer
+from twisted.internet.protocol import Factory
 
 PUBLIC_KEY = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHhGATaW4KhE23+7nrH4jFx3yLq9OjaEs5"
@@ -61,19 +63,19 @@ EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
-def manhole(username, password, globals):
+def manhole(username: str, password: Union[str, bytes], globals: Dict) -> Factory:
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
     the supplied globals.
 
     Args:
-        username(str): The username ssh clients should auth with.
-        password(str): The password ssh clients should auth with.
-        globals(dict): The variables to expose in the shell.
+        username: The username ssh clients should auth with.
+        password: The password ssh clients should auth with.
+        globals: The variables to expose in the shell.
 
     Returns:
-        twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
+        A factory to pass to ``listenTCP``
     """
     if not isinstance(password, bytes):
         password = password.encode("ascii")
@@ -108,7 +110,7 @@ class SynapseManhole(ColoredManhole):
 
 
 class SynapseManholeInterpreter(ManholeInterpreter):
-    def showsyntaxerror(self, filename=None):
+    def showsyntaxerror(self, filename: Optional[str] = None) -> None:
         """Display the syntax error that just occurred.
 
         Overrides the base implementation, ignoring sys.excepthook. We always want
@@ -156,7 +158,7 @@ class SynapseManholeInterpreter(ManholeInterpreter):
             # https://github.com/python/cpython/blob/4dc4300c686f543d504ab6fa9fe600eaf11bb695/Lib/code.py#L131-L150
             last_tb = ei = None  # type: ignore
 
-    def displayhook(self, obj):
+    def displayhook(self, obj: Any) -> None:
         """
         We override the displayhook so that we automatically convert coroutines
         into Deferreds. (Our superclass' displayhook will take care of the rest,
