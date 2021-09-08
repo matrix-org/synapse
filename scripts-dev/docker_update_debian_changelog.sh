@@ -32,15 +32,17 @@ if [ "$#" -ne 1 ]; then
 fi
 
 # Check that apt-get is available on the system.
-which apt-get > /dev/null 2>&1
-if [ "$?" -ne 0 ]; then
+if ! which apt-get > /dev/null 2>&1; then
   echo "\"apt-get\" isn't available on this system. This script needs to be run in a Docker container using a Debian-based image."
   exit 1
 fi
 
 # Check if devscripts is available in the default repos for this distro.
-apt-cache search devscripts | grep -E "^devscripts \-" > /dev/null
-if [ "$?" -ne 0 ]; then
+# Update the apt package list cache.
+# We need to do this before we can search the apt cache or install devscripts.
+apt-get update || exit 1
+
+if ! apt-cache search devscripts | grep -E "^devscripts \-" > /dev/null; then
   echo "The package \"devscripts\" needs to exist in the default repositories for this distribution."
   exit 1
 fi
@@ -54,10 +56,8 @@ set -xe
 # Make the root of the Synapse checkout the current working directory.
 cd /synapse
 
-# Update the packages list and install devscripts (which provides dch). We need to make
-# the Debian frontent noninteractive because installing devscripts otherwise asks for the
-# machine's location.
-apt-get update
+# Install devscripts (which provides dch). We need to make the Debian frontent noninteractive
+# because installing devscripts otherwise asks for the machine's location.
 DEBIAN_FRONTEND=noninteractive apt-get install -y devscripts
 
 # Update the Debian changelog.
