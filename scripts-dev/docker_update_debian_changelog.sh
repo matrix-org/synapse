@@ -54,8 +54,8 @@ set -x
 # Make the root of the Synapse checkout the current working directory.
 cd /synapse
 
-# Install devscripts (which provides dch). We need to make the Debian frontent noninteractive
-# because installing devscripts otherwise asks for the machine's location.
+# Install devscripts (which provides dch). We need to make the Debian frontend
+# noninteractive because installing devscripts otherwise asks for the machine's location.
 DEBIAN_FRONTEND=noninteractive apt-get install -y devscripts
 
 # Update the Debian changelog.
