@@ -66,5 +66,5 @@ methods. The callback functions are passed to these methods as keyword arguments
 the callback name as the argument name and the function as its value. This is demonstrated
 in the example below. A `register_[...]_callbacks` method exists for each category.
 
-Callbacks for each category can be found by clicking the relevant links in the navigation
-panel on the left-hand side of this documentation.
+Callbacks for each category can be found on their respective page of the
+[Synapse documentation website](https://matrix-org.github.io/synapse).
