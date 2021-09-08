@@ -14,7 +14,7 @@
 import logging
 import random
 from types import TracebackType
-from typing import Any, Optional, Type, TypeVar, cast
+from typing import Any, Optional, Type, cast
 
 import synapse.logging.context
 from synapse.api.errors import CodeMessageException
@@ -31,9 +31,6 @@ RETRY_MULTIPLIER = 5
 
 # a cap on the backoff. (Essentially none)
 MAX_RETRY_INTERVAL = 2 ** 62
-
-
-T = TypeVar("T")
 
 
 class NotRetryingDestination(Exception):
@@ -167,7 +164,10 @@ class RetryDestinationLimiter:
         pass
 
     def __exit__(
-        self, exc_type: Optional[Type[T]], exc_val: T, exc_tb: TracebackType
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
     ) -> None:
         valid_err_code = False
         if exc_type is None:
