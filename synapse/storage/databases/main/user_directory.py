@@ -14,9 +14,7 @@
 
 import logging
 import re
-from typing import Any, Dict, Iterable, Optional, Sequence, Set, Tuple
-
-from typing_extensions import TypedDict
+from typing import Any, Dict, Iterable, Optional, Sequence, Set, Tuple, cast
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
 from synapse.storage.database import DatabasePool, LoggingTransaction
@@ -25,16 +23,12 @@ from synapse.storage.databases.main.registration import RegistrationWorkerStore
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
-from synapse.types import get_domain_from_id, get_localpart_from_id
+from synapse.types import JsonDict, get_domain_from_id, get_localpart_from_id
 from synapse.util.caches.descriptors import cached
 
 logger = logging.getLogger(__name__)
 
 TEMP_TABLE = "_temp_populate_user_directory"
-
-
-class ProgressDict(TypedDict):
-    remaining: int
 
 
 class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
@@ -64,7 +58,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
     async def _populate_user_directory_createtables(
-        self, progress: Dict, batch_size: str
+        self, progress: JsonDict, batch_size: str
     ) -> int:
 
         # Get all the rooms that we want to process.
@@ -119,7 +113,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return 1
 
     async def _populate_user_directory_cleanup(
-        self, progress: Dict, batch_size: str
+        self, progress: JsonDict, batch_size: str
     ) -> int:
         """
         Update the user directory stream position, then clean up the old tables.
@@ -144,7 +138,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         return 1
 
     async def _populate_user_directory_process_rooms(
-        self, progress: ProgressDict, batch_size: int
+        self, progress: JsonDict, batch_size: int
     ) -> int:
         """
         Rescan the state of all rooms so we can track
@@ -168,7 +162,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
         def _get_next_batch(
             txn: LoggingTransaction,
-        ) -> Optional[Sequence[Tuple[str, str]]]:
+        ) -> Optional[Sequence[Tuple[str, int]]]:
             # Only fetch 250 rooms, so we don't fetch too many at once, even
             # if those 250 rooms have less than batch_size state events.
             sql = """
@@ -179,7 +173,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 TEMP_TABLE + "_rooms",
             )
             txn.execute(sql)
-            rooms_to_work_on = txn.fetchall()
+            rooms_to_work_on = cast(Sequence[Tuple[str, int]], txn.fetchall())
 
             if not rooms_to_work_on:
                 return None
@@ -187,7 +181,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             # Get how many are left to process, so we can give status on how
             # far we are in processing
             txn.execute("SELECT COUNT(*) FROM " + TEMP_TABLE + "_rooms")
-            progress["remaining"] = txn.fetchone()[0]
+            result = cast(Tuple[int], txn.fetchone())
+            progress["remaining"] = result[0]
 
             return rooms_to_work_on
 
@@ -294,7 +289,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 await self.add_users_who_share_private_room(room_id, to_insert)
 
     async def _populate_user_directory_process_users(
-        self, progress: ProgressDict, batch_size: int
+        self, progress: JsonDict, batch_size: int
     ) -> int:
         """Upsert a user_directory entry for each local user."""
 
@@ -758,7 +753,7 @@ class UserDirectoryStore(
         # We allow manipulating the ranking algorithm by injecting statements
         # based on config options.
         additional_ordering_statements = []
-        ordering_arguments = ()
+        ordering_arguments: Tuple[str, ...] = ()
 
         if isinstance(self.database_engine, PostgresEngine):
             full_query, exact_query, prefix_query = _parse_query_postgres(search_term)
