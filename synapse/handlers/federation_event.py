@@ -1550,16 +1550,21 @@ class FederationEventHandler:
                         await self.persist_events_and_notify(
                             event.room_id, [(auth_event, missing_auth_event_context)]
                         )
-
-                        if auth_event.event_id in event_auth_events:
-                            auth_events[
-                                (auth_event.type, auth_event.state_key)
-                            ] = auth_event
                     except AuthError:
                         pass
-
             except Exception:
                 logger.exception("Failed to get auth chain")
+            else:
+                # load any auth events we might have persisted from the database. This
+                # has the side-effect of correctly setting the rejected_reason on them.
+                auth_events.update(
+                    {
+                        (ae.type, ae.state_key): ae
+                        for ae in await self._store.get_events_as_list(
+                            missing_auth, allow_rejected=True
+                        )
+                    }
+                )
 
         if event.internal_metadata.is_outlier():
             # XXX: given that, for an outlier, we'll be working with the
