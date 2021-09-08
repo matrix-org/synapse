@@ -17,8 +17,8 @@
 # needed to release Synapse. This is useful on systems like macOS where such scripts are
 # not easily accessible.
 #
-# Running it (when if the current working directory is the root of the Synapse checkout):
-#   docker run -v $PWD:/synapse ubuntu:latest /synapse/scripts-dev/update_debian_changelog.sh VERSION
+# Running it (when the current working directory is the root of the Synapse checkout):
+#   docker run --rm -v $PWD:/synapse ubuntu:latest /synapse/scripts-dev/update_debian_changelog.sh VERSION
 #
 # The image can be replaced by any other Debian-based image (as long as the `devscripts`
 # package exists in the default repository).
