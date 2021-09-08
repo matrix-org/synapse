@@ -140,5 +140,5 @@ class ListSpamChecker:
         )
 
     async def check_event_for_spam(self, event: "synapse.events.EventBase") -> Union[bool, str]:
-      return event.sender not in self.evil_users
+        return event.sender not in self.evil_users
 ```

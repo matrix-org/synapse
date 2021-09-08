@@ -10,9 +10,8 @@ The available presence router callbacks are:
 
 ```python 
 async def get_users_for_states(
-    self,
     state_updates: Iterable["synapse.api.UserPresenceState"],
-) -> Dict[str, Set["synapse.api.UserPresenceState"]]:
+) -> Dict[str, Set["synapse.api.UserPresenceState"]]
 ```
 **Requires** `get_interested_users` to also be registered
 
@@ -25,7 +24,6 @@ Synapse will then attempt to send the specified presence updates to each user wh
 
 ```python
 async def get_interested_users(
-    self,
     user_id: str
 ) -> Union[Set[str], "synapse.module_api.PRESENCE_ALL_USERS"]
 ```
