@@ -1558,39 +1558,41 @@ class FederationEventHandler:
                     event.room_id, [e.event_id for e in remote_auth_chain]
                 )
 
-                for e in remote_auth_chain:
-                    if e.event_id in seen_remotes:
+                for auth_event in remote_auth_chain:
+                    if auth_event.event_id in seen_remotes:
                         continue
 
-                    if e.event_id == event.event_id:
+                    if auth_event.event_id == event.event_id:
                         continue
 
                     try:
-                        auth_ids = e.auth_event_ids()
+                        auth_ids = auth_event.auth_event_ids()
                         auth = {
                             (e.type, e.state_key): e
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
                         }
-                        e.internal_metadata.outlier = True
+                        auth_event.internal_metadata.outlier = True
 
                         logger.debug(
                             "_check_event_auth %s missing_auth: %s",
                             event.event_id,
-                            e.event_id,
+                            auth_event.event_id,
                         )
                         missing_auth_event_context = (
-                            await self._state_handler.compute_event_context(e)
+                            await self._state_handler.compute_event_context(auth_event)
                         )
                         await self._auth_and_persist_event(
                             origin,
-                            e,
+                            auth_event,
                             missing_auth_event_context,
                             claimed_auth_event_map=auth,
                         )
 
-                        if e.event_id in event_auth_events:
-                            auth_events[(e.type, e.state_key)] = e
+                        if auth_event.event_id in event_auth_events:
+                            auth_events[
+                                (auth_event.type, auth_event.state_key)
+                            ] = auth_event
                     except AuthError:
                         pass
 
