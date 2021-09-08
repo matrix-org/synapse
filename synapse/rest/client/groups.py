@@ -15,7 +15,7 @@
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -43,14 +43,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _validate_group_id(f):
+def _validate_group_id(
+    f: Callable[..., Awaitable[Tuple[int, JsonDict]]]
+) -> Callable[..., Awaitable[Tuple[int, JsonDict]]]:
     """Wrapper to validate the form of the group ID.
 
     Can be applied to any on_FOO methods that accepts a group ID as a URL parameter.
     """
 
     @wraps(f)
-    def wrapper(self, request: Request, group_id: str, *args, **kwargs):
+    def wrapper(
+        self: RestServlet, request: Request, group_id: str, *args: Any, **kwargs: Any
+    ) -> Awaitable[Tuple[int, JsonDict]]:
         if not GroupID.is_valid(group_id):
             raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
 
