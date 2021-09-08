@@ -18,7 +18,7 @@
 # not easily accessible.
 #
 # Running it (when if the current working directory is the root of the Synapse checkout):
-#   docker run -v $PWD:/synapse ubuntu:latest /synapse/scripts-dev/update_debian_changelog.sh VERSION
+#   docker run -v $PWD:/synapse ubuntu:latest /synapse/scripts-dev/docker_update_debian_changelog.sh VERSION
 #
 # The image can be replaced by any other Debian-based image (as long as the `devscripts`
 # package exists in the default repository).
@@ -28,6 +28,20 @@
 if [ "$#" -ne 1 ]; then
   echo "Usage: update_debian_changelog.sh VERSION"
   echo "VERSION is the version of Synapse being released in the form 1.42.0 (without the leading \"v\")"
+  exit 1
+fi
+
+# Check that apt-get is available on the system.
+which apt-get > /dev/null 2>&1
+if [ "$?" -ne 0 ]; then
+  echo "\"apt-get\" isn't available on this system. This script needs to be run in a Docker container using a Debian-based image."
+  exit 1
+fi
+
+# Check if devscripts is available in the default repos for this distro.
+apt-cache search devscripts | grep -E "^devscripts \-" > /dev/null
+if [ "$?" -ne 0 ]; then
+  echo "The package \"devscripts\" needs to exist in the default repositories for this distribution."
   exit 1
 fi
 
