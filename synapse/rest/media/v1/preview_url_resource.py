@@ -668,7 +668,18 @@ def decode_and_calc_og(
 
 
 def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
-    # suck our tree into lxml and define our OG response.
+    """
+    Calculate metadata for an HTML document.
+
+    This uses lxml to search the HTML document for Open Graph data.
+
+    Args:
+        tree: The parsed HTML document.
+        media_url: The URI used to download the body.
+
+    Returns:
+        The Open Graph response as a dictionary.
+    """
 
     # if we see any image URLs in the OG response, then spider them
     # (although the client could choose to do this by asking for previews of those
@@ -742,35 +753,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
         if meta_description:
             og["og:description"] = meta_description[0]
         else:
-            # grab any text nodes which are inside the <body/> tag...
-            # unless they are within an HTML5 semantic markup tag...
-            # <header/>, <nav/>, <aside/>, <footer/>
-            # ...or if they are within a <script/> or <style/> tag.
-            # This is a very very very coarse approximation to a plain text
-            # render of the page.
-
-            # We don't just use XPATH here as that is slow on some machines.
-
-            from lxml import etree
-
-            TAGS_TO_REMOVE = (
-                "header",
-                "nav",
-                "aside",
-                "footer",
-                "script",
-                "noscript",
-                "style",
-                etree.Comment,
-            )
-
-            # Split all the text nodes into paragraphs (by splitting on new
-            # lines)
-            text_nodes = (
-                re.sub(r"\s+", "\n", el).strip()
-                for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
-            )
-            og["og:description"] = summarize_paragraphs(text_nodes)
+            og["og:description"] = _calc_description(tree)
     elif og["og:description"]:
         # This must be a non-empty string at this point.
         assert isinstance(og["og:description"], str)
@@ -779,6 +762,46 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
     # TODO: delete the url downloads to stop diskfilling,
     # as we only ever cared about its OG
     return og
+
+
+def _calc_description(tree: "etree.Element") -> Optional[str]:
+    """
+    Calculate a text description based on an HTML document.
+
+    Grabs any text nodes which are inside the <body/> tag, unless they are within
+    an HTML5 semantic markup tag (<header/>, <nav/>, <aside/>, <footer/>), or
+    if they are within a <script/> or <style/> tag.
+
+    This is a very very very coarse approximation to a plain text render of the page.
+
+    Args:
+        tree: The parsed HTML document.
+
+    Returns:
+        The plain text description, or None if one cannot be generated.
+    """
+    # We don't just use XPATH here as that is slow on some machines.
+
+    from lxml import etree
+
+    TAGS_TO_REMOVE = (
+        "header",
+        "nav",
+        "aside",
+        "footer",
+        "script",
+        "noscript",
+        "style",
+        etree.Comment,
+    )
+
+    # Split all the text nodes into paragraphs (by splitting on new
+    # lines)
+    text_nodes = (
+        re.sub(r"\s+", "\n", el).strip()
+        for el in _iterate_over_text(tree.find("body"), *TAGS_TO_REMOVE)
+    )
+    return summarize_paragraphs(text_nodes)
 
 
 def _iterate_over_text(
@@ -843,8 +866,18 @@ def _is_html(content_type: str) -> bool:
 def summarize_paragraphs(
     text_nodes: Iterable[str], min_size: int = 200, max_size: int = 500
 ) -> Optional[str]:
-    # Try to get a summary of between 200 and 500 words, respecting
-    # first paragraph and then word boundaries.
+    """
+    Try to get a summary respecting first paragraph and then word boundaries.
+
+    Args:
+        text_nodes: The paragraphs to summarize.
+        min_size: The minimum number of words to include.
+        max_size: The maximum number of words to include.
+
+    Returns:
+        A summary of the text nodes, or None if that was not possible.
+    """
+
     # TODO: Respect sentences?
 
     description = ""
@@ -867,7 +900,7 @@ def summarize_paragraphs(
         new_desc = ""
 
         # This splits the paragraph into words, but keeping the
-        # (preceeding) whitespace intact so we can easily concat
+        # (preceding) whitespace intact so we can easily concat
         # words back together.
         for match in re.finditer(r"\s*\S+", description):
             word = match.group()
