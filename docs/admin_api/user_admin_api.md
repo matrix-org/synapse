@@ -21,11 +21,15 @@ It returns a JSON body like the following:
     "threepids": [
         {
             "medium": "email",
-            "address": "<user_mail_1>"
+            "address": "<user_mail_1>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         },
         {
             "medium": "email",
-            "address": "<user_mail_2>"
+            "address": "<user_mail_2>",
+            "added_at": 1586458409743,
+            "validated_at": 1586458409743
         }
     ],
     "avatar_url": "<avatar_url>",
@@ -81,6 +85,16 @@ with a body of:
             "address": "<user_mail_2>"
         }
     ],
+    "external_ids": [
+        {
+            "auth_provider": "<provider1>",
+            "external_id": "<user_id_provider_1>"
+        },
+        {
+            "auth_provider": "<provider2>",
+            "external_id": "<user_id_provider_2>"
+        }
+    ],
     "avatar_url": "<avatar_url>",
     "admin": false,
     "deactivated": false
@@ -90,26 +104,34 @@ with a body of:
 To use it, you will need to authenticate by providing an `access_token` for a
 server admin: [Admin API](../usage/administration/admin_api)
 
+Returns HTTP status code:
+- `201` - When a new user object was created.
+- `200` - When a user was modified.
+
 URL parameters:
 
 - `user_id`: fully-qualified user id: for example, `@user:server.com`.
 
 Body parameters:
 
-- `password`, optional. If provided, the user's password is updated and all
+- `password` - string, optional. If provided, the user's password is updated and all
   devices are logged out.
-
-- `displayname`, optional, defaults to the value of `user_id`.
-
-- `threepids`, optional, allows setting the third-party IDs (email, msisdn)
+- `displayname` - string, optional, defaults to the value of `user_id`.
+- `threepids` - array, optional, allows setting the third-party IDs (email, msisdn)
+  - `medium` - string. Kind of third-party ID, either `email` or `msisdn`.
+  - `address` - string. Value of third-party ID.
   belonging to a user.
-
-- `avatar_url`, optional, must be a
+- `external_ids` - array, optional. Allow setting the identifier of the external identity
+  provider for SSO (Single sign-on). Details in
+  [Sample Configuration File](../usage/configuration/homeserver_sample_config.html)
+  section `sso` and `oidc_providers`.
+  - `auth_provider` - string. ID of the external identity provider. Value of `idp_id`
+    in homeserver configuration.
+  - `external_id` - string, user ID in the external identity provider.
+- `avatar_url` - string, optional, must be a
   [MXC URI](https://matrix.org/docs/spec/client_server/r0.6.0#matrix-content-mxc-uris).
-
-- `admin`, optional, defaults to `false`.
-
-- `deactivated`, optional. If unspecified, deactivation state will be left
+- `admin` - bool, optional, defaults to `false`.
+- `deactivated` - bool, optional. If unspecified, deactivation state will be left
   unchanged on existing accounts and set to `false` for new accounts.
   A user cannot be erased by deactivating with this API. For details on
   deactivating users see [Deactivate Account](#deactivate-account).
@@ -443,8 +465,9 @@ The following fields are returned in the JSON response body:
 - `joined_rooms` - An array of `room_id`.
 - `total` - Number of rooms.
 
+## User media
 
-## List media of a user
+### List media uploaded by a user
 Gets a list of all local media that a specific `user_id` has created.
 By default, the response is ordered by descending creation date and ascending media ID.
 The newest media is on top. You can change the order with parameters
@@ -543,7 +566,6 @@ The following fields are returned in the JSON response body:
 
 - `media` - An array of objects, each containing information about a media.
   Media objects contain the following fields:
-
   - `created_ts` - integer - Timestamp when the content was uploaded in ms.
   - `last_access_ts` - integer - Timestamp when the content was last accessed in ms.
   - `media_id` - string - The id used to refer to the media.
@@ -551,12 +573,57 @@ The following fields are returned in the JSON response body:
   - `media_type` - string - The MIME-type of the media.
   - `quarantined_by` - string - The user ID that initiated the quarantine request
     for this media.
-
   - `safe_from_quarantine` - bool - Status if this media is safe from quarantining.
   - `upload_name` - string - The name the media was uploaded with.
-
 - `next_token`: integer - Indication for pagination. See above.
 - `total` - integer - Total number of media.
+
+### Delete media uploaded by a user
+
+This API deletes the *local* media from the disk of your own server
+that a specific `user_id` has created. This includes any local thumbnails.
+
+This API will not affect media that has been uploaded to external
+media repositories (e.g https://github.com/turt2live/matrix-media-repo/).
+
+By default, the API deletes media ordered by descending creation date and ascending media ID.
+The newest media is deleted first. You can change the order with parameters
+`order_by` and `dir`. If no `limit` is set the API deletes `100` files per request.
+
+The API is:
+
+```
+DELETE /_synapse/admin/v1/users/<user_id>/media
+```
+
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: [Admin API](../usage/administration/admin_api)
+
+A response body like the following is returned:
+
+```json
+{
+  "deleted_media": [
+    "abcdefghijklmnopqrstuvwx"
+  ],
+  "total": 1
+}
+```
+
+The following fields are returned in the JSON response body:
+
+* `deleted_media`: an array of strings - List of deleted `media_id`
+* `total`: integer - Total number of deleted `media_id`
+
+**Note**: There is no `next_token`. This is not useful for deleting media, because
+after deleting media the remaining media have a new order.
+
+**Parameters**
+
+This API has the same parameters as
+[List media uploaded by a user](#list-media-uploaded-by-a-user).
+With the parameters you can for example limit the number of files to delete at once or
+delete largest/smallest or newest/oldest files first.
 
 ## Login as a user
 
@@ -1013,3 +1080,22 @@ The following parameters should be set in the URL:
 - `user_id` - The fully qualified MXID: for example, `@user:server.com`. The user must
   be local.
 
+### Check username availability
+
+Checks to see if a username is available, and valid, for the server. See [the client-server 
+API](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available)
+for more information.
+
+This endpoint will work even if registration is disabled on the server, unlike 
+`/_matrix/client/r0/register/available`.
+
+The API is:
+
+```
+POST /_synapse/admin/v1/username_availabile?username=$localpart
+```
+
+The request and response format is the same as the [/_matrix/client/r0/register/available](https://matrix.org/docs/spec/client_server/r0.6.0#get-matrix-client-r0-register-available) API.
+
+To use it, you will need to authenticate by providing an `access_token` for a
+server admin: [Admin API](../usage/administration/admin_api)

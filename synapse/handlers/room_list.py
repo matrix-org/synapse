@@ -19,7 +19,13 @@ from typing import TYPE_CHECKING, Optional, Tuple
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
-from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    GuestAccess,
+    HistoryVisibility,
+    JoinRules,
+)
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
@@ -336,8 +342,8 @@ class RoomListHandler(BaseHandler):
         guest_event = current_state.get((EventTypes.GuestAccess, ""))
         guest = None
         if guest_event:
-            guest = guest_event.content.get("guest_access", None)
-        result["guest_can_join"] = guest == "can_join"
+            guest = guest_event.content.get(EventContentFields.GUEST_ACCESS)
+        result["guest_can_join"] = guest == GuestAccess.CAN_JOIN
 
         avatar_event = current_state.get(("m.room.avatar", ""))
         if avatar_event:
@@ -356,6 +362,12 @@ class RoomListHandler(BaseHandler):
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
     ) -> JsonDict:
+        """Get the public room list from remote server
+
+        Raises:
+            SynapseError
+        """
+
         if not self.enable_room_list_search:
             return {"chunk": [], "total_room_count_estimate": 0}
 
@@ -395,13 +407,16 @@ class RoomListHandler(BaseHandler):
             limit = None
             since_token = None
 
-        res = await self._get_remote_list_cached(
-            server_name,
-            limit=limit,
-            since_token=since_token,
-            include_all_networks=include_all_networks,
-            third_party_instance_id=third_party_instance_id,
-        )
+        try:
+            res = await self._get_remote_list_cached(
+                server_name,
+                limit=limit,
+                since_token=since_token,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
+        except (RequestSendFailed, HttpResponseException):
+            raise SynapseError(502, "Failed to fetch room list")
 
         if search_filter:
             res = {
@@ -423,20 +438,21 @@ class RoomListHandler(BaseHandler):
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
     ) -> JsonDict:
+        """Wrapper around FederationClient.get_public_rooms that caches the
+        result.
+        """
+
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            try:
-                return await repl_layer.get_public_rooms(
-                    server_name,
-                    limit=limit,
-                    since_token=since_token,
-                    search_filter=search_filter,
-                    include_all_networks=include_all_networks,
-                    third_party_instance_id=third_party_instance_id,
-                )
-            except (RequestSendFailed, HttpResponseException):
-                raise SynapseError(502, "Failed to fetch room list")
+            return await repl_layer.get_public_rooms(
+                server_name,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
 
         key = (
             server_name,

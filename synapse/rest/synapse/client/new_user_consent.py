@@ -46,6 +46,8 @@ class NewUserConsentResource(DirectServeHtmlResource):
         self._consent_version = hs.config.consent.user_consent_version
 
         def template_search_dirs():
+            if hs.config.server.custom_template_directory:
+                yield hs.config.server.custom_template_directory
             if hs.config.sso.sso_template_dir:
                 yield hs.config.sso.sso_template_dir
             yield hs.config.sso.default_template_dir

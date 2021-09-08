@@ -1,1 +1,0 @@
-Initial support for MSC3244, Room version capabilities over the /capabilities API.

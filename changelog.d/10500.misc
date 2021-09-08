@@ -1,1 +1,0 @@
-Fix a bug which caused production debian packages to be incorrectly marked as 'prerelease'.

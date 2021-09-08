@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import inspect
 import sys
 import traceback
 
@@ -20,6 +21,7 @@ from twisted.conch.insults import insults
 from twisted.conch.manhole import ColoredManhole, ManholeInterpreter
 from twisted.conch.ssh.keys import Key
 from twisted.cred import checkers, portal
+from twisted.internet import defer
 
 PUBLIC_KEY = (
     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDHhGATaW4KhE23+7nrH4jFx3yLq9OjaEs5"
@@ -59,7 +61,7 @@ EddTrx3TNpr1D5m/f+6mnXWrc8u9y1+GNx9yz889xMjIBTBI9KqaaOs=
 -----END RSA PRIVATE KEY-----"""
 
 
-def manhole(username, password, globals):
+def manhole(settings, globals):
     """Starts a ssh listener with password authentication using
     the given username and password. Clients connecting to the ssh
     listener will find themselves in a colored python shell with
@@ -73,6 +75,15 @@ def manhole(username, password, globals):
     Returns:
         twisted.internet.protocol.Factory: A factory to pass to ``listenTCP``
     """
+    username = settings.username
+    password = settings.password
+    priv_key = settings.priv_key
+    if priv_key is None:
+        priv_key = Key.fromString(PRIVATE_KEY)
+    pub_key = settings.pub_key
+    if pub_key is None:
+        pub_key = Key.fromString(PUBLIC_KEY)
+
     if not isinstance(password, bytes):
         password = password.encode("ascii")
 
@@ -84,8 +95,8 @@ def manhole(username, password, globals):
     )
 
     factory = manhole_ssh.ConchFactory(portal.Portal(rlm, [checker]))
-    factory.publicKeys[b"ssh-rsa"] = Key.fromString(PUBLIC_KEY)
-    factory.privateKeys[b"ssh-rsa"] = Key.fromString(PRIVATE_KEY)
+    factory.privateKeys[b"ssh-rsa"] = priv_key
+    factory.publicKeys[b"ssh-rsa"] = pub_key
 
     return factory
 
@@ -141,3 +152,15 @@ class SynapseManholeInterpreter(ManholeInterpreter):
             self.write("".join(lines))
         finally:
             last_tb = ei = None
+
+    def displayhook(self, obj):
+        """
+        We override the displayhook so that we automatically convert coroutines
+        into Deferreds. (Our superclass' displayhook will take care of the rest,
+        by displaying the Deferred if it's ready, or registering a callback
+        if it's not).
+        """
+        if inspect.iscoroutine(obj):
+            super().displayhook(defer.ensureDeferred(obj))
+        else:
+            super().displayhook(obj)

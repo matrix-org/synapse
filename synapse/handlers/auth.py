@@ -73,7 +73,7 @@ from synapse.util.stringutils import base62_encode
 from synapse.util.threepids import canonicalise_email
 
 if TYPE_CHECKING:
-    from synapse.rest.client.v1.login import LoginResponse
+    from synapse.rest.client.login import LoginResponse
     from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
@@ -461,7 +461,7 @@ class AuthHandler(BaseHandler):
 
         If no auth flows have been completed successfully, raises an
         InteractiveAuthIncompleteError. To handle this, you can use
-        synapse.rest.client.v2_alpha._base.interactive_auth_handler as a
+        synapse.rest.client._base.interactive_auth_handler as a
         decorator.
 
         Args:
@@ -543,7 +543,7 @@ class AuthHandler(BaseHandler):
             # Note that the registration endpoint explicitly removes the
             # "initial_device_display_name" parameter if it is provided
             # without a "password" parameter. See the changes to
-            # synapse.rest.client.v2_alpha.register.RegisterRestServlet.on_POST
+            # synapse.rest.client.register.RegisterRestServlet.on_POST
             # in commit 544722bad23fc31056b9240189c3cbbbf0ffd3f9.
             if not clientdict:
                 clientdict = session.clientdict
@@ -627,23 +627,28 @@ class AuthHandler(BaseHandler):
 
     async def add_oob_auth(
         self, stagetype: str, authdict: Dict[str, Any], clientip: str
-    ) -> bool:
+    ) -> None:
         """
         Adds the result of out-of-band authentication into an existing auth
         session. Currently used for adding the result of fallback auth.
+
+        Raises:
+            LoginError if the stagetype is unknown or the session is missing.
+            LoginError is raised by check_auth if authentication fails.
         """
         if stagetype not in self.checkers:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-        if "session" not in authdict:
-            raise LoginError(400, "", Codes.MISSING_PARAM)
-
-        result = await self.checkers[stagetype].check_auth(authdict, clientip)
-        if result:
-            await self.store.mark_ui_auth_stage_complete(
-                authdict["session"], stagetype, result
+            raise LoginError(
+                400, f"Unknown UIA stage type: {stagetype}", Codes.INVALID_PARAM
             )
-            return True
-        return False
+        if "session" not in authdict:
+            raise LoginError(400, "Missing session ID", Codes.MISSING_PARAM)
+
+        # If authentication fails a LoginError is raised. Otherwise, store
+        # the successful result.
+        result = await self.checkers[stagetype].check_auth(authdict, clientip)
+        await self.store.mark_ui_auth_stage_complete(
+            authdict["session"], stagetype, result
+        )
 
     def get_session_id(self, clientdict: Dict[str, Any]) -> Optional[str]:
         """
@@ -1459,6 +1464,10 @@ class AuthHandler(BaseHandler):
         )
 
         await self.store.user_delete_threepid(user_id, medium, address)
+        if medium == "email":
+            await self.store.delete_pusher_by_app_id_pushkey_user_id(
+                app_id="m.email", pushkey=address, user_id=user_id
+            )
         return result
 
     async def hash(self, password: str) -> str:
@@ -1727,7 +1736,6 @@ class AuthHandler(BaseHandler):
 
 @attr.s(slots=True)
 class MacaroonGenerator:
-
     hs = attr.ib()
 
     def generate_guest_access_token(self, user_id: str) -> str:

@@ -151,6 +151,15 @@ class CacheConfig(Config):
           # entries are never evicted based on time.
           #
           #expiry_time: 30m
+
+          # Controls how long the results of a /sync request are cached for after
+          # a successful response is returned. A higher duration can help clients with
+          # intermittent connections, at the cost of higher memory usage.
+          #
+          # By default, this is zero, which means that sync responses are not cached
+          # at all.
+          #
+          #sync_response_cache_duration: 2m
         """
 
     def read_config(self, config, **kwargs):
@@ -211,6 +220,10 @@ class CacheConfig(Config):
             self.expiry_time_msec = self.parse_duration(expiry_time)
         else:
             self.expiry_time_msec = None
+
+        self.sync_response_cache_duration = self.parse_duration(
+            cache_config.get("sync_response_cache_duration", 0)
+        )
 
         # Resize all caches (if necessary) with the new factors we've loaded
         self.resize_all_caches()

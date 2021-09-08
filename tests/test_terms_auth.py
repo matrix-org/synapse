@@ -17,7 +17,7 @@ from unittest.mock import Mock
 
 from twisted.test.proto_helpers import MemoryReactorClock
 
-from synapse.rest.client.v2_alpha.register import register_servlets
+from synapse.rest.client.register import register_servlets
 from synapse.util import Clock
 
 from tests import unittest

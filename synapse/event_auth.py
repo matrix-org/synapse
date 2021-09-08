@@ -216,21 +216,18 @@ def check(
 
 
 def _check_size_limits(event: EventBase) -> None:
-    def too_big(field):
-        raise EventSizeError("%s too large" % (field,))
-
     if len(event.user_id) > 255:
-        too_big("user_id")
+        raise EventSizeError("'user_id' too large")
     if len(event.room_id) > 255:
-        too_big("room_id")
+        raise EventSizeError("'room_id' too large")
     if event.is_state() and len(event.state_key) > 255:
-        too_big("state_key")
+        raise EventSizeError("'state_key' too large")
     if len(event.type) > 255:
-        too_big("type")
+        raise EventSizeError("'type' too large")
     if len(event.event_id) > 255:
-        too_big("event_id")
+        raise EventSizeError("'event_id' too large")
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
-        too_big("event")
+        raise EventSizeError("event too large")
 
 
 def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
@@ -370,10 +367,7 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif (
-            room_version.msc3083_join_rules
-            and join_rule == JoinRules.MSC3083_RESTRICTED
-        ):
+        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.
