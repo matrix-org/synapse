@@ -8,6 +8,8 @@ the module API's `register_third_party_rules_callbacks` method.
 
 The available third party rules callbacks are:
 
+### `check_event_allowed`
+
 ```python
 async def check_event_allowed(
     event: "synapse.events.EventBase",
@@ -42,6 +44,8 @@ dictionary, and modify the returned dictionary accordingly.
 Note that replacing the event only works for events sent by local users, not for events
 received over federation.
 
+### `on_create_room`
+
 ```python
 async def on_create_room(
     requester: "synapse.types.Requester",
@@ -59,6 +63,8 @@ the request is a server admin.
 Modules can modify the `request_content` (by e.g. adding events to its `initial_state`),
 or deny the room's creation by raising a `module_api.errors.SynapseError`.
 
+### `check_threepid_can_be_invited`
+
 ```python
 async def check_threepid_can_be_invited(
     medium: str,
@@ -69,6 +75,8 @@ async def check_threepid_can_be_invited(
 
 Called when processing an invite via a third-party identifier (i.e. email or phone number).
 The module must return a boolean indicating whether the invite can go through.
+
+### `check_visibility_can_be_modified`
 
 ```python
 async def check_visibility_can_be_modified(

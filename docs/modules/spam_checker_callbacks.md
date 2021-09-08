@@ -8,6 +8,8 @@ Synapse instances. Spam checker callbacks can be registered using the module API
 
 The available spam checker callbacks are:
 
+### `check_event_for_spam`
+
 ```python
 async def check_event_for_spam(event: "synapse.events.EventBase") -> Union[bool, str]
 ```
@@ -17,6 +19,8 @@ either a `bool` to indicate whether the event must be rejected because of spam, 
 to indicate the event must be rejected because of spam and to give a rejection reason to
 forward to clients.
 
+### `user_may_invite`
+
 ```python
 async def user_may_invite(inviter: str, invitee: str, room_id: str) -> bool
 ```
@@ -25,12 +29,16 @@ Called when processing an invitation. The module must return a `bool` indicating
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. `@alice:example.com`).
 
+### `user_may_create_room`
+
 ```python
 async def user_may_create_room(user: str) -> bool
 ```
 
 Called when processing a room creation request. The module must return a `bool` indicating
 whether the given user (represented by their Matrix user ID) is allowed to create a room.
+
+### `user_may_create_room_alias`
 
 ```python
 async def user_may_create_room_alias(user: str, room_alias: "synapse.types.RoomAlias") -> bool
@@ -40,6 +48,8 @@ Called when trying to associate an alias with an existing room. The module must 
 `bool` indicating whether the given user (represented by their Matrix user ID) is allowed
 to set the given alias.
 
+### `user_may_publish_room`
+
 ```python
 async def user_may_publish_room(user: str, room_id: str) -> bool
 ```
@@ -47,6 +57,8 @@ async def user_may_publish_room(user: str, room_id: str) -> bool
 Called when trying to publish a room to the homeserver's public rooms directory. The
 module must return a `bool` indicating whether the given user (represented by their
 Matrix user ID) is allowed to publish the given room.
+
+### `check_username_for_spam`
 
 ```python
 async def check_username_for_spam(user_profile: Dict[str, str]) -> bool
@@ -62,6 +74,8 @@ is represented as a dictionary with the following keys:
 
 The module is given a copy of the original dictionary, so modifying it from within the
 module cannot modify a user's profile when included in user directory search results.
+
+### `check_registration_for_spam`
 
 ```python
 async def check_registration_for_spam(
@@ -85,6 +99,8 @@ The arguments passed to this callback are:
   second item is an IP address. These user agents and IP addresses are the ones that were
   used during the registration process.
 * `auth_provider_id`: The identifier of the SSO authentication provider, if any.
+
+### `check_media_file_for_spam`
 
 ```python
 async def check_media_file_for_spam(

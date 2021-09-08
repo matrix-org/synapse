@@ -7,6 +7,8 @@ Synapse instance. Account validity callbacks can be registered using the module 
 
 The available account validity callbacks are:
 
+### `is_user_expired`
+
 ```python
 async def is_user_expired(user: str) -> Optional[bool]
 ```
@@ -19,6 +21,8 @@ represented by their Matrix user ID (e.g. `@alice:example.com`).
 If the module returns `True`, the current request will be denied with the error code
 `ORG_MATRIX_EXPIRED_ACCOUNT` and the HTTP status code 403. Note that this doesn't
 invalidate the user's access token.
+
+### `on_user_registration`
 
 ```python
 async def on_user_registration(user: str) -> None

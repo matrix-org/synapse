@@ -8,6 +8,8 @@ registered using the module API's `register_presence_router_callbacks` method.
 
 The available presence router callbacks are:
 
+### `get_users_for_states`
+
 ```python 
 async def get_users_for_states(
     state_updates: Iterable["synapse.api.UserPresenceState"],
@@ -21,6 +23,8 @@ must return a dictionary that maps from Matrix user IDs (which can be local or r
 `UserPresenceState` changes that they should be forwarded.
 
 Synapse will then attempt to send the specified presence updates to each user when possible.
+
+### `get_interested_users`
 
 ```python
 async def get_interested_users(
