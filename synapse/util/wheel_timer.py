@@ -19,8 +19,8 @@ T = TypeVar("T")
 class _Entry(Generic[T]):
     __slots__ = ["end_key", "queue"]
 
-    def __init__(self, end_key) -> None:
-        self.end_key = end_key
+    def __init__(self, end_key: int) -> None:
+        self.end_key: int = end_key
         self.queue: List[T] = []
 
 
@@ -29,15 +29,15 @@ class WheelTimer(Generic[T]):
     expired.
     """
 
-    def __init__(self, bucket_size=5000):
+    def __init__(self, bucket_size: int = 5000) -> None:
         """
         Args:
-            bucket_size (int): Size of buckets in ms. Corresponds roughly to the
+            bucket_size: Size of buckets in ms. Corresponds roughly to the
                 accuracy of the timer.
         """
-        self.bucket_size = bucket_size
+        self.bucket_size: int = bucket_size
         self.entries: List[_Entry[T]] = []
-        self.current_tick = 0
+        self.current_tick: int = 0
 
     def insert(self, now: int, obj: T, then: int) -> None:
         """Inserts object into timer.
@@ -90,5 +90,5 @@ class WheelTimer(Generic[T]):
 
         return ret
 
-    def __len__(self):
+    def __len__(self) -> int:
         return sum(len(entry.queue) for entry in self.entries)
