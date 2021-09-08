@@ -14,7 +14,7 @@
 # limitations under the License.
 import logging
 import random
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -763,7 +763,7 @@ class RegisterRestServlet(RestServlet):
         Returns:
              dictionary for response from /register
         """
-        result: Dict[str, Union[str, int]] = {
+        result: JsonDict = {
             "user_id": user_id,
             "home_server": self.hs.hostname,
         }
@@ -817,7 +817,7 @@ class RegisterRestServlet(RestServlet):
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        result: Dict[str, Union[int, str]] = {
+        result: JsonDict = {
             "user_id": user_id,
             "device_id": device_id,
             "access_token": access_token,

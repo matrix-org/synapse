@@ -70,7 +70,7 @@ class CacheMetric:
     def inc_misses(self) -> None:
         self.misses += 1
 
-    def inc_evictions(self, size=1) -> None:
+    def inc_evictions(self, size: int = 1) -> None:
         self.evicted_size += size
 
     def inc_memory_usage(self, memory: int) -> None:
