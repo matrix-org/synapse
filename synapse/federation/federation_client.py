@@ -806,6 +806,34 @@ class FederationClient(FederationBase):
                     % (create_room_version,)
                 )
 
+            logger.info("Got from send_join %d events", len(state) + len(auth_chain))
+
+            with start_active_span("filter_auth_chain"):
+                event_map = {e.event_id: e for e in auth_chain}
+
+                state = [
+                    e
+                    for e in state
+                    if e.type != EventTypes.Member or e.membership != Membership.LEAVE
+                ]
+
+                roots = list(state)
+                new_auth_chain_ids = set()
+
+                while roots:
+                    e = roots.pop()
+
+                    for aid in e.auth_event_ids():
+                        if aid in new_auth_chain_ids:
+                            continue
+
+                        a = event_map.get(aid)
+                        if a:
+                            roots.append(a)
+                            new_auth_chain_ids.add(aid)
+
+                auth_chain = [event_map[aid] for aid in new_auth_chain_ids]
+
             logger.info(
                 "Processing from send_join %d events", len(state) + len(auth_chain)
             )
