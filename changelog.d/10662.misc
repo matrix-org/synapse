@@ -1,1 +1,0 @@
-Do not print out stack traces for network errors when fetching data over federation.
