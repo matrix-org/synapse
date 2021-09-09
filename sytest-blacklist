@@ -24,9 +24,6 @@ Newly created users see their own presence in /initialSync (SYT-34)
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1396
 Should reject keys claiming to belong to a different user
 
-# Blacklisted due to https://github.com/matrix-org/synapse/issues/1531
-# Enabling an unknown default rule fails with 404
-
 # Blacklisted due to https://github.com/matrix-org/synapse/issues/1663
 # New federated private chats get full presence information (SYN-115)
 
