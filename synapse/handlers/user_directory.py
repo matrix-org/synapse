@@ -142,7 +142,7 @@ class UserDirectoryHandler(StateDeltasHandler):
                 user_id, profile.display_name, profile.avatar_url
             )
 
-    async def handle_user_deactivated(self, user_id: str) -> None:
+    async def handle_local_user_deactivated(self, user_id: str) -> None:
         """Called when a user ID is deactivated"""
         # FIXME(#3714): We should probably do this in the same worker as all
         # the other changes.
