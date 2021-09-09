@@ -1,1 +1,1 @@
-Remove blacklisted tests whose underlying issues have been fixed.
+Remove fixed and flakey tests from the sytest-blacklist.
