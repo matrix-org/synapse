@@ -560,8 +560,8 @@ class SsoHandler:
         # Must provide either attributes or session, not both
         assert (attributes is not None) != (session is not None)
 
-        if (attributes and not attributes.localpart) or (
-            session and not session.chosen_localpart
+        if (attributes and attributes.localpart is None) or (
+            session and session.chosen_localpart is None
         ):
             return b"/_synapse/client/pick_username/account_details"
         elif self._consent_at_registration and not (
