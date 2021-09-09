@@ -1,10 +1,12 @@
-#### Password auth provider callbacks
+# Password auth provider callbacks
 
 Password auth providers offer a way for server administrators to integrate
 their Synapse installation with an external authentication system. The callbacks can be
 registered by using the Module API's `register_password_auth_provider_callbacks` method.
 
-To register authentication checkers, the module should register:
+## Callbacks
+
+### `auth_checkers`
 
 ```
  auth_checkers: Dict[Tuple[str,Tuple], CHECK_AUTH_CALLBACK]
@@ -40,7 +42,7 @@ An authentication checking method should be of the following form:
 async def check_auth(
     username: str,
     login_type: str,
-    login_dict: JsonDict
+    login_dict: "synapse.module_api.JsonDict",
 ) -> Optional[
     Tuple[
         str, 
@@ -56,7 +58,7 @@ If the authentication is successful, the module must return the user's Matrix ID
 
 If the authentication is unsuccessful, the module must return None.
 
-Aditionally the module can register:
+### `check_3pid_auth`
 
 ```python
 async def check_3pid_auth(
@@ -79,6 +81,8 @@ If the authentication is successful, the module must return the user's Matrix ID
 
 If the authentication is unsuccessful, the module must return None.
 
+### `on_logged_out`
+
 ```python
 async def on_logged_out(
     user_id: str,
@@ -90,18 +94,62 @@ Called during a logout request for a user. It is passed the qualified user ID, t
 deactivated device (if any: access tokens are occasionally created without an associated
 device ID), and the (now deactivated) access token.
 
-#### Porting password auth provider modules
+## Example
+```python
+from typing import Awaitable, Callable, Optional, Tuple
 
-There is no longer a `get_db_schema_files` callback provided, any changes to the database
-should now be made by the module using the module API class.
+import synapse
+from synapse import module_api
 
-To port a module that has a `check_password` method: 
-- Register `("m.login.password", ("password",): self.check_password` as an auth checker
-- Set `self.module_api` to point to the `ModuleApi` object given in `__init__`
-- Change the arguments of `check_password` to
-  `(username: str, login_type: str, login_dict: JsonDict)`
-- Add the following lines to the top of the `check_password` method:
-  - `user_id = self.module_api.get_qualified_user_id(username)`
-  - `password = login_dict["password"]`
-- Alter `check_password` so that it returns `None` on an authentication failure, and `user_id`
-  on a success
+
+class MyAuthProvider:
+    def __init__(self, config: dict, api: module_api):
+
+        self.api = api
+
+        self.credentials = {
+            "bob": "building",
+            "@scoop:matrix.org": "digging",
+        }
+
+        api.register_password_auth_provider_callbacks(
+            auth_checkers={
+                ("my.login_type", ("my_field",)): self.check_my_login,
+                ("m.login.password", ("password",)): self.check_pass,
+            },
+        )
+
+    async def check_my_login(
+        self,
+        username: str,
+        login_type: str,
+        login_dict: "synapse.module_api.JsonDict",
+    ) -> Optional[
+        Tuple[
+            str,
+            Optional[Callable[["synapse.module_api.LoginResponse"], Awaitable[None]]],
+        ]
+    ]:
+        if login_type != "my.login_type":
+            return None
+
+        if self.credentials.get(username) == login_dict.get("my_field"):
+            return self.api.get_qualified_user_id(username)
+
+    async def check_pass(
+        self,
+        username: str,
+        login_type: str,
+        login_dict: "synapse.module_api.JsonDict",
+    ) -> Optional[
+        Tuple[
+            str,
+            Optional[Callable[["synapse.module_api.LoginResponse"], Awaitable[None]]],
+        ]
+    ]:
+        if login_type != "m.login.password":
+            return None
+
+        if self.credentials.get(username) == login_dict.get("password"):
+            return self.api.get_qualified_user_id(username)
+```

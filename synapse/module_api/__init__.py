@@ -76,6 +76,7 @@ __all__ = [
     "ModuleApi",
     "PRESENCE_ALL_USERS",
     "LoginResponse",
+    "JsonDict"
 ]
 
 logger = logging.getLogger(__name__)
