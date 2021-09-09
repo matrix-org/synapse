@@ -30,14 +30,26 @@ logger = logging.getLogger(__name__)
 
 
 class UserDirectoryHandler(StateDeltasHandler):
-    """Handles querying of and keeping updated the user_directory.
+    """Handles queries and updates for the user_directory.
 
     N.B.: ASSUMES IT IS THE ONLY THING THAT MODIFIES THE USER DIRECTORY
 
-    The user directory is filled with users who this server can see are joined to a
-    world_readable or publicly joinable room. We keep a database table up to date
-    by streaming changes of the current state and recalculating whether users should
-    be in the directory or not when necessary.
+    When a local user searches the user_directory, we report two kinds of users:
+
+    - users this server can see are joined to a world_readable or publicly
+      joinable room, and
+    - users belonging to a private room shared by that local user.
+
+    The two cases are tracked separately in the `users_in_public_rooms` and
+    `users_who_share_private_rooms` tables. Both kinds of users have their
+    username and avatar tracked in a `user_directory` table.
+
+    This handler has three responsibilities:
+    1. Forwarding requests to `/user_directory/search` to the UserDirectoryStore.
+    2. Providing hooks for the application to call when local users are added,
+       removed, or have their profile changed.
+    3. Listening for room state changes that indicate remote users have
+       joined or left a room, or that their profile has changed.
     """
 
     def __init__(self, hs: "HomeServer"):
