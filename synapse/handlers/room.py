@@ -429,6 +429,11 @@ class RoomCreationHandler(BaseHandler):
         for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
+                # If the event is an space child event with empty content, it was
+                # removed from the space and should be ignored.
+                if k[0] == EventTypes.SpaceChild and not old_event.content:
+                    continue
+
                 initial_state[k] = old_event.content
 
         # deep-copy the power-levels event before we start modifying it

@@ -185,6 +185,16 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
             state_key=self.room_id,
         )
 
+        # Also add a room that was removed.
+        old_room_id = "!notaroom:" + self.hs.hostname
+        self.helper.send_state(
+            space_id,
+            event_type=EventTypes.SpaceChild,
+            body={},
+            tok=self.creator_token,
+            state_key=old_room_id,
+        )
+
         # Upgrade the room!
         channel = self._upgrade_room(room_id=space_id)
         self.assertEquals(200, channel.code, channel.result)
@@ -204,3 +214,5 @@ class UpgradeRoomTest(unittest.HomeserverTestCase):
 
         # The child link should have been copied over.
         self.assertIn((EventTypes.SpaceChild, self.room_id), state_ids)
+        # The child that was removed should not be copied over.
+        self.assertNotIn((EventTypes.SpaceChild, old_room_id), state_ids)
