@@ -1462,6 +1462,10 @@ class AuthHandler(BaseHandler):
         )
 
         await self.store.user_delete_threepid(user_id, medium, address)
+        if medium == "email":
+            await self.store.delete_pusher_by_app_id_pushkey_user_id(
+                app_id="m.email", pushkey=address, user_id=user_id
+            )
         return result
 
     async def hash(self, password: str) -> str:

@@ -110,6 +110,7 @@ class FederationServer(FederationBase):
         super().__init__(hs)
 
         self.handler = hs.get_federation_handler()
+        self._federation_event_handler = hs.get_federation_event_handler()
         self.state = hs.get_state_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
 
@@ -787,7 +788,9 @@ class FederationServer(FederationBase):
 
         event = await self._check_sigs_and_hash(room_version, event)
 
-        return await self.handler.on_send_membership_event(origin, event)
+        return await self._federation_event_handler.on_send_membership_event(
+            origin, event
+        )
 
     async def on_event_auth(
         self, origin: str, room_id: str, event_id: str
@@ -1005,9 +1008,7 @@ class FederationServer(FederationBase):
             async with lock:
                 logger.info("handling received PDU: %s", event)
                 try:
-                    await self.handler.on_receive_pdu(
-                        origin, event, sent_to_us_directly=True
-                    )
+                    await self._federation_event_handler.on_receive_pdu(origin, event)
                 except FederationError as e:
                     # XXX: Ideally we'd inform the remote we failed to process
                     # the event, but we can't return an error in the transaction

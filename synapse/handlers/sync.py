@@ -1,5 +1,4 @@
-# Copyright 2015, 2016 OpenMarket Ltd
-# Copyright 2018, 2019 New Vector Ltd
+# Copyright 2015-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,6 +30,8 @@ from prometheus_client import Counter
 
 from synapse.api.constants import AccountDataTypes, EventTypes, Membership
 from synapse.api.filtering import FilterCollection
+from synapse.api.presence import UserPresenceState
+from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.events import EventBase
 from synapse.logging.context import current_context
 from synapse.logging.opentracing import SynapseTags, log_kv, set_tag, start_active_span
@@ -231,7 +232,7 @@ class SyncResult:
     """
 
     next_batch: StreamToken
-    presence: List[JsonDict]
+    presence: List[UserPresenceState]
     account_data: List[JsonDict]
     joined: List[JoinedSyncResult]
     invited: List[InvitedSyncResult]
@@ -504,10 +505,13 @@ class SyncHandler:
             else:
                 limited = False
 
+            log_kv({"limited": limited})
+
             if potential_recents:
                 recents = sync_config.filter_collection.filter_room_timeline(
                     potential_recents
                 )
+                log_kv({"recents_after_sync_filtering": len(recents)})
 
                 # We check if there are any state events, if there are then we pass
                 # all current state events to the filter_events function. This is to
@@ -525,6 +529,7 @@ class SyncHandler:
                     recents,
                     always_include_ids=current_state_ids,
                 )
+                log_kv({"recents_after_visibility_filtering": len(recents)})
             else:
                 recents = []
 
@@ -565,9 +570,14 @@ class SyncHandler:
                     events, end_key = await self.store.get_recent_events_for_room(
                         room_id, limit=load_limit + 1, end_token=end_key
                     )
+
+                log_kv({"loaded_recents": len(events)})
+
                 loaded_recents = sync_config.filter_collection.filter_room_timeline(
                     events
                 )
+
+                log_kv({"loaded_recents_after_sync_filtering": len(loaded_recents)})
 
                 # We check if there are any state events, if there are then we pass
                 # all current state events to the filter_events function. This is to
@@ -585,6 +595,9 @@ class SyncHandler:
                     loaded_recents,
                     always_include_ids=current_state_ids,
                 )
+
+                log_kv({"loaded_recents_after_client_filtering": len(loaded_recents)})
+
                 loaded_recents.extend(recents)
                 recents = loaded_recents
 
@@ -1115,6 +1128,8 @@ class SyncHandler:
         logger.debug("Fetching group data")
         await self._generate_sync_entry_for_groups(sync_result_builder)
 
+        num_events = 0
+
         # debug for https://github.com/matrix-org/synapse/issues/4422
         for joined_room in sync_result_builder.joined:
             room_id = joined_room.room_id
@@ -1122,6 +1137,14 @@ class SyncHandler:
                 issue4422_logger.debug(
                     "Sync result for newly joined room %s: %r", room_id, joined_room
                 )
+            num_events += len(joined_room.timeline.events)
+
+        log_kv(
+            {
+                "joined_rooms_in_result": len(sync_result_builder.joined),
+                "events_in_result": num_events,
+            }
+        )
 
         logger.debug("Sync response calculation complete")
         return SyncResult(
@@ -1466,6 +1489,7 @@ class SyncHandler:
         if not sync_result_builder.full_state:
             if since_token and not ephemeral_by_room and not account_data_by_room:
                 have_changed = await self._have_rooms_changed(sync_result_builder)
+                log_kv({"rooms_have_changed": have_changed})
                 if not have_changed:
                     tags_by_room = await self.store.get_updated_tags(
                         user_id, since_token.account_data_key
@@ -1500,25 +1524,30 @@ class SyncHandler:
 
             tags_by_room = await self.store.get_tags_for_user(user_id)
 
+        log_kv({"rooms_changed": len(room_changes.room_entries)})
+
         room_entries = room_changes.room_entries
         invited = room_changes.invited
         knocked = room_changes.knocked
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
-        async def handle_room_entries(room_entry):
-            logger.debug("Generating room entry for %s", room_entry.room_id)
-            res = await self._generate_room_entry(
-                sync_result_builder,
-                ignored_users,
-                room_entry,
-                ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
-                tags=tags_by_room.get(room_entry.room_id),
-                account_data=account_data_by_room.get(room_entry.room_id, {}),
-                always_include=sync_result_builder.full_state,
-            )
-            logger.debug("Generated room entry for %s", room_entry.room_id)
-            return res
+        async def handle_room_entries(room_entry: "RoomSyncResultBuilder"):
+            with start_active_span("generate_room_entry"):
+                set_tag("room_id", room_entry.room_id)
+                log_kv({"events": len(room_entry.events or [])})
+                logger.debug("Generating room entry for %s", room_entry.room_id)
+                res = await self._generate_room_entry(
+                    sync_result_builder,
+                    ignored_users,
+                    room_entry,
+                    ephemeral=ephemeral_by_room.get(room_entry.room_id, []),
+                    tags=tags_by_room.get(room_entry.room_id),
+                    account_data=account_data_by_room.get(room_entry.room_id, {}),
+                    always_include=sync_result_builder.full_state,
+                )
+                logger.debug("Generated room entry for %s", room_entry.room_id)
+                return res
 
         await concurrently_execute(handle_room_entries, room_entries, 10)
 
@@ -1843,6 +1872,9 @@ class SyncHandler:
         knocked = []
 
         for event in room_list:
+            if event.room_version_id not in KNOWN_ROOM_VERSIONS:
+                continue
+
             if event.membership == Membership.JOIN:
                 room_entries.append(
                     RoomSyncResultBuilder(
@@ -1928,6 +1960,12 @@ class SyncHandler:
         room_id = room_builder.room_id
         since_token = room_builder.since_token
         upto_token = room_builder.upto_token
+        log_kv(
+            {
+                "since_token": since_token,
+                "upto_token": upto_token,
+            }
+        )
 
         batch = await self._load_filtered_recents(
             room_id,
@@ -1936,6 +1974,13 @@ class SyncHandler:
             since_token=since_token,
             potential_recents=events,
             newly_joined_room=newly_joined,
+        )
+        log_kv(
+            {
+                "batch_events": len(batch.events),
+                "prev_batch": batch.prev_batch,
+                "batch_limited": batch.limited,
+            }
         )
 
         # Note: `batch` can be both empty and limited here in the case where
@@ -2174,14 +2219,14 @@ class SyncResultBuilder:
         joined_room_ids: List of rooms the user is joined to
 
         # The following mirror the fields in a sync response
-        presence (list)
-        account_data (list)
-        joined (list[JoinedSyncResult])
-        invited (list[InvitedSyncResult])
-        knocked (list[KnockedSyncResult])
-        archived (list[ArchivedSyncResult])
-        groups (GroupsSyncResult|None)
-        to_device (list)
+        presence
+        account_data
+        joined
+        invited
+        knocked
+        archived
+        groups
+        to_device
     """
 
     sync_config: SyncConfig
@@ -2190,7 +2235,7 @@ class SyncResultBuilder:
     now_token: StreamToken
     joined_room_ids: FrozenSet[str]
 
-    presence: List[JsonDict] = attr.Factory(list)
+    presence: List[UserPresenceState] = attr.Factory(list)
     account_data: List[JsonDict] = attr.Factory(list)
     joined: List[JoinedSyncResult] = attr.Factory(list)
     invited: List[InvitedSyncResult] = attr.Factory(list)

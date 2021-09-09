@@ -63,6 +63,7 @@ from .relations import RelationsStore
 from .room import RoomStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
+from .session import SessionStore
 from .signatures import SignatureStore
 from .state import StateStore
 from .stats import StatsStore
@@ -121,6 +122,7 @@ class DataStore(
     ServerMetricsStore,
     EventForwardExtremitiesStore,
     LockStore,
+    SessionStore,
 ):
     def __init__(self, database: DatabasePool, db_conn, hs):
         self.hs = hs
