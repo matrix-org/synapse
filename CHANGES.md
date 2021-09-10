@@ -1,10 +1,7 @@
 Synapse 1.42.0rc2 (2021-09-06)
 ==============================
 
-This version of Synapse removes deprecated room-management admin APIs and out-of-date
-email pushers, and improves error handling for fallback templates for user-interactive
-authentication. For more information on these points, server administrators are
-encouraged to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
+Server administrators are reminded to read [the upgrade notes](docs/upgrade.md#upgrading-to-v1420).
 
 Features
 --------
