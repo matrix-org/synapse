@@ -425,9 +425,9 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 context=context,
             )
 
-        insertion_event_id = event_ids.pop(0)
-        chunk_event_id = event_ids.pop(len(event_ids) - 1)
-        historical_event_ids = event_ids
+        insertion_event_id = event_ids[0]
+        chunk_event_id = event_ids[-1]
+        historical_event_ids = event_ids[1:-1]
 
         response_dict = {
             "state_event_ids": state_event_ids_at_start,
