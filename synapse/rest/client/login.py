@@ -486,7 +486,7 @@ class SsoRedirectServlet(RestServlet):
         # register themselves with the main SSOHandler.
         _load_sso_handlers(hs)
         self._sso_handler = hs.get_sso_handler()
-        self._public_baseurl = hs.config.public_baseurl
+        self._public_baseurl = hs.config.server.public_baseurl
 
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None

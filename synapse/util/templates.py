@@ -63,7 +63,7 @@ def build_jinja_env(
     env.filters.update(
         {
             "format_ts": _format_ts_filter,
-            "mxc_to_http": _create_mxc_to_http_filter(config.public_baseurl),
+            "mxc_to_http": _create_mxc_to_http_filter(config.server.public_baseurl),
         }
     )
 

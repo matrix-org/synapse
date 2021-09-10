@@ -249,7 +249,7 @@ class AccountValidityHandler:
 
         renewal_token = await self._get_renewal_token(user_id)
         url = "%s_matrix/client/unstable/account_validity/renew?token=%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             renewal_token,
         )
 

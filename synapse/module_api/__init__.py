@@ -178,7 +178,7 @@ class ModuleApi:
     @property
     def public_baseurl(self) -> str:
         """The configured public base URL for this homeserver."""
-        return self._hs.config.public_baseurl
+        return self._hs.config.server.public_baseurl
 
     @property
     def email_app_name(self) -> str:
