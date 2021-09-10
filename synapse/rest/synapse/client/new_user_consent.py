@@ -63,8 +63,8 @@ class NewUserConsentResource(DirectServeHtmlResource):
             self._sso_handler.render_error(request, "bad_session", e.msg, code=e.code)
             return
 
-        # It should be impossible to get here without having first been through
-        # the pick-a-username step, which ensures chosen_localpart gets set.
+        # It should be impossible to get here without either the user or the mapping provider
+        # having chosen a username, which ensures chosen_localpart gets set.
         if not session.chosen_localpart:
             logger.warning("Session has no user name selected")
             self._sso_handler.render_error(

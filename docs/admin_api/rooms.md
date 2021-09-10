@@ -481,32 +481,44 @@ The following fields are returned in the JSON response body:
 * `new_room_id` - A string representing the room ID of the new room.
 
 
-## Undoing room shutdowns
+## Undoing room deletions
 
-*Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+*Note*: This guide may be outdated by the time you read it. By nature of room deletions being performed at the database level,
 the structure can and does change without notice.
 
-First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+First, it's important to understand that a room deletion is very destructive. Undoing a deletion is not as simple as pretending it
 never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
 to recover at all:
 
 * If the room was invite-only, your users will need to be re-invited.
 * If the room no longer has any members at all, it'll be impossible to rejoin.
-* The first user to rejoin will have to do so via an alias on a different server.
+* The first user to rejoin will have to do so via an alias on a different
+  server (or receive an invite from a user on a different server).
 
 With all that being said, if you still want to try and recover the room:
 
-1. For safety reasons, shut down Synapse.
-2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
-   * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
-   * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
-3. Restart Synapse.
+1. If the room was `block`ed, you must unblock it on your server. This can be
+   accomplished as follows:
 
-You will have to manually handle, if you so choose, the following:
+   1. For safety reasons, shut down Synapse.
+   2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
+      * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
+      * The room ID is the same one supplied to the delete room API, not the Content Violation room.
+   3. Restart Synapse.
 
-* Aliases that would have been redirected to the Content Violation room.
-* Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
-* Removal of the Content Violation room if desired.
+   This step is unnecessary if `block` was not set.
+
+2. Any room aliases on your server that pointed to the deleted room may have
+   been deleted, or redirected to the Content Violation room. These will need
+   to be restored manually.
+
+3. Users on your server that were in the deleted room will have been kicked
+   from the room. Consider whether you want to update their membership
+   (possibly via the [Edit Room Membership API](room_membership.md)) or let
+   them handle rejoining themselves.
+
+4. If `new_room_user_id` was given, a 'Content Violation' will have been
+   created. Consider whether you want to delete that roomm.
 
 ## Deprecated endpoint
 
@@ -536,7 +548,7 @@ POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
 # Forward Extremities Admin API
 
 Enables querying and deleting forward extremities from rooms. When a lot of forward
-extremities accumulate in a room, performance can become degraded. For details, see 
+extremities accumulate in a room, performance can become degraded. For details, see
 [#1760](https://github.com/matrix-org/synapse/issues/1760).
 
 ## Check for forward extremities
@@ -565,7 +577,7 @@ A response as follows will be returned:
 
 ## Deleting forward extremities
 
-**WARNING**: Please ensure you know what you're doing and have read 
+**WARNING**: Please ensure you know what you're doing and have read
 the related issue [#1760](https://github.com/matrix-org/synapse/issues/1760).
 Under no situations should this API be executed as an automated maintenance task!
 

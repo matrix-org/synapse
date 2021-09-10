@@ -22,7 +22,7 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Any, Dict, Generator, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Union
 from urllib import parse as urlparse
 
 import attr
@@ -43,6 +43,8 @@ from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.rest.media.v1._base import get_filename_from_headers
 from synapse.rest.media.v1.media_storage import MediaStorage
+from synapse.rest.media.v1.oembed import OEmbedError, OEmbedProvider
+from synapse.types import JsonDict
 from synapse.util import json_encoder
 from synapse.util.async_helpers import ObservableDeferred
 from synapse.util.caches.expiringcache import ExpiringCache
@@ -71,65 +73,44 @@ OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
 
-# A map of globs to API endpoints.
-_oembed_globs = {
-    # Twitter.
-    "https://publish.twitter.com/oembed": [
-        "https://twitter.com/*/status/*",
-        "https://*.twitter.com/*/status/*",
-        "https://twitter.com/*/moments/*",
-        "https://*.twitter.com/*/moments/*",
-        # Include the HTTP versions too.
-        "http://twitter.com/*/status/*",
-        "http://*.twitter.com/*/status/*",
-        "http://twitter.com/*/moments/*",
-        "http://*.twitter.com/*/moments/*",
-    ],
-}
-# Convert the globs to regular expressions.
-_oembed_patterns = {}
-for endpoint, globs in _oembed_globs.items():
-    for glob in globs:
-        # Convert the glob into a sane regular expression to match against. The
-        # rules followed will be slightly different for the domain portion vs.
-        # the rest.
-        #
-        # 1. The scheme must be one of HTTP / HTTPS (and have no globs).
-        # 2. The domain can have globs, but we limit it to characters that can
-        #    reasonably be a domain part.
-        #    TODO: This does not attempt to handle Unicode domain names.
-        # 3. Other parts allow a glob to be any one, or more, characters.
-        results = urlparse.urlparse(glob)
 
-        # Ensure the scheme does not have wildcards (and is a sane scheme).
-        if results.scheme not in {"http", "https"}:
-            raise ValueError("Insecure oEmbed glob scheme: %s" % (results.scheme,))
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class MediaInfo:
+    """
+    Information parsed from downloading media being previewed.
+    """
 
-        pattern = urlparse.urlunparse(
-            [
-                results.scheme,
-                re.escape(results.netloc).replace("\\*", "[a-zA-Z0-9_-]+"),
-            ]
-            + [re.escape(part).replace("\\*", ".+") for part in results[2:]]
-        )
-        _oembed_patterns[re.compile(pattern)] = endpoint
-
-
-@attr.s(slots=True)
-class OEmbedResult:
-    # Either HTML content or URL must be provided.
-    html = attr.ib(type=Optional[str])
-    url = attr.ib(type=Optional[str])
-    title = attr.ib(type=Optional[str])
-    # Number of seconds to cache the content.
-    cache_age = attr.ib(type=int)
-
-
-class OEmbedError(Exception):
-    """An error occurred processing the oEmbed object."""
+    # The Content-Type header of the response.
+    media_type: str
+    # The length (in bytes) of the downloaded media.
+    media_length: int
+    # The media filename, according to the server. This is parsed from the
+    # returned headers, if possible.
+    download_name: Optional[str]
+    # The time of the preview.
+    created_ts_ms: int
+    # Information from the media storage provider about where the file is stored
+    # on disk.
+    filesystem_id: str
+    filename: str
+    # The URI being previewed.
+    uri: str
+    # The HTTP response code.
+    response_code: int
+    # The timestamp (in milliseconds) of when this preview expires.
+    expires: int
+    # The ETag header of the response.
+    etag: Optional[str]
 
 
 class PreviewUrlResource(DirectServeJsonResource):
+    """
+    Generating URL previews is a complicated task which many potential pitfalls.
+
+    See docs/development/url_previews.md for discussion of the design and
+    algorithm followed in this module.
+    """
+
     isLeaf = True
 
     def __init__(
@@ -156,6 +137,8 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.media_repo = media_repo
         self.primary_base_path = media_repo.primary_base_path
         self.media_storage = media_storage
+
+        self._oembed = OEmbedProvider(hs, self.client)
 
         # We run the background jobs if we're the instance specified (or no
         # instance is specified, where we assume there is only one instance
@@ -275,18 +258,17 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("got media_info of '%s'", media_info)
 
-        if _is_media(media_info["media_type"]):
-            file_id = media_info["filesystem_id"]
+        if _is_media(media_info.media_type):
+            file_id = media_info.filesystem_id
             dims = await self.media_repo._generate_thumbnails(
-                None, file_id, file_id, media_info["media_type"], url_cache=True
+                None, file_id, file_id, media_info.media_type, url_cache=True
             )
 
             og = {
-                "og:description": media_info["download_name"],
-                "og:image": "mxc://%s/%s"
-                % (self.server_name, media_info["filesystem_id"]),
-                "og:image:type": media_info["media_type"],
-                "matrix:image:size": media_info["media_length"],
+                "og:description": media_info.download_name,
+                "og:image": f"mxc://{self.server_name}/{media_info.filesystem_id}",
+                "og:image:type": media_info.media_type,
+                "matrix:image:size": media_info.media_length,
             }
 
             if dims:
@@ -296,14 +278,14 @@ class PreviewUrlResource(DirectServeJsonResource):
                 logger.warning("Couldn't get dims for %s" % url)
 
             # define our OG response for this media
-        elif _is_html(media_info["media_type"]):
+        elif _is_html(media_info.media_type):
             # TODO: somehow stop a big HTML tree from exploding synapse's RAM
 
-            with open(media_info["filename"], "rb") as file:
+            with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            encoding = get_html_media_encoding(body, media_info["media_type"])
-            og = decode_and_calc_og(body, media_info["uri"], encoding)
+            encoding = get_html_media_encoding(body, media_info.media_type)
+            og = decode_and_calc_og(body, media_info.uri, encoding)
 
             # pre-cache the image for posterity
             # FIXME: it might be cleaner to use the same flow as the main /preview_url
@@ -311,14 +293,14 @@ class PreviewUrlResource(DirectServeJsonResource):
             # just rely on the caching on the master request to speed things up.
             if "og:image" in og and og["og:image"]:
                 image_info = await self._download_url(
-                    _rebase_url(og["og:image"], media_info["uri"]), user
+                    _rebase_url(og["og:image"], media_info.uri), user
                 )
 
-                if _is_media(image_info["media_type"]):
+                if _is_media(image_info.media_type):
                     # TODO: make sure we don't choke on white-on-transparent images
-                    file_id = image_info["filesystem_id"]
+                    file_id = image_info.filesystem_id
                     dims = await self.media_repo._generate_thumbnails(
-                        None, file_id, file_id, image_info["media_type"], url_cache=True
+                        None, file_id, file_id, image_info.media_type, url_cache=True
                     )
                     if dims:
                         og["og:image:width"] = dims["width"]
@@ -326,12 +308,11 @@ class PreviewUrlResource(DirectServeJsonResource):
                     else:
                         logger.warning("Couldn't get dims for %s", og["og:image"])
 
-                    og["og:image"] = "mxc://%s/%s" % (
-                        self.server_name,
-                        image_info["filesystem_id"],
-                    )
-                    og["og:image:type"] = image_info["media_type"]
-                    og["matrix:image:size"] = image_info["media_length"]
+                    og[
+                        "og:image"
+                    ] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
+                    og["og:image:type"] = image_info.media_type
+                    og["matrix:image:size"] = image_info.media_length
                 else:
                     del og["og:image"]
         else:
@@ -357,98 +338,17 @@ class PreviewUrlResource(DirectServeJsonResource):
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
             url,
-            media_info["response_code"],
-            media_info["etag"],
-            media_info["expires"] + media_info["created_ts"],
+            media_info.response_code,
+            media_info.etag,
+            media_info.expires + media_info.created_ts_ms,
             jsonog,
-            media_info["filesystem_id"],
-            media_info["created_ts"],
+            media_info.filesystem_id,
+            media_info.created_ts_ms,
         )
 
         return jsonog.encode("utf8")
 
-    def _get_oembed_url(self, url: str) -> Optional[str]:
-        """
-        Check whether the URL should be downloaded as oEmbed content instead.
-
-        Args:
-            url: The URL to check.
-
-        Returns:
-            A URL to use instead or None if the original URL should be used.
-        """
-        for url_pattern, endpoint in _oembed_patterns.items():
-            if url_pattern.fullmatch(url):
-                return endpoint
-
-        # No match.
-        return None
-
-    async def _get_oembed_content(self, endpoint: str, url: str) -> OEmbedResult:
-        """
-        Request content from an oEmbed endpoint.
-
-        Args:
-            endpoint: The oEmbed API endpoint.
-            url: The URL to pass to the API.
-
-        Returns:
-            An object representing the metadata returned.
-
-        Raises:
-            OEmbedError if fetching or parsing of the oEmbed information fails.
-        """
-        try:
-            logger.debug("Trying to get oEmbed content for url '%s'", url)
-            result = await self.client.get_json(
-                endpoint,
-                # TODO Specify max height / width.
-                # Note that only the JSON format is supported.
-                args={"url": url},
-            )
-
-            # Ensure there's a version of 1.0.
-            if result.get("version") != "1.0":
-                raise OEmbedError("Invalid version: %s" % (result.get("version"),))
-
-            oembed_type = result.get("type")
-
-            # Ensure the cache age is None or an int.
-            cache_age = result.get("cache_age")
-            if cache_age:
-                cache_age = int(cache_age)
-
-            oembed_result = OEmbedResult(None, None, result.get("title"), cache_age)
-
-            # HTML content.
-            if oembed_type == "rich":
-                oembed_result.html = result.get("html")
-                return oembed_result
-
-            if oembed_type == "photo":
-                oembed_result.url = result.get("url")
-                return oembed_result
-
-            # TODO Handle link and video types.
-
-            if "thumbnail_url" in result:
-                oembed_result.url = result.get("thumbnail_url")
-                return oembed_result
-
-            raise OEmbedError("Incompatible oEmbed information.")
-
-        except OEmbedError as e:
-            # Trap OEmbedErrors first so we can directly re-raise them.
-            logger.warning("Error parsing oEmbed metadata from %s: %r", url, e)
-            raise
-
-        except Exception as e:
-            # Trap any exception and let the code follow as usual.
-            # FIXME: pass through 404s and other error messages nicely
-            logger.warning("Error downloading oEmbed metadata from %s: %r", url, e)
-            raise OEmbedError() from e
-
-    async def _download_url(self, url: str, user: str) -> Dict[str, Any]:
+    async def _download_url(self, url: str, user: str) -> MediaInfo:
         # TODO: we should probably honour robots.txt... except in practice
         # we're most likely being explicitly triggered by a human rather than a
         # bot, so are we really a robot?
@@ -459,11 +359,11 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         # If this URL can be accessed via oEmbed, use that instead.
         url_to_download: Optional[str] = url
-        oembed_url = self._get_oembed_url(url)
+        oembed_url = self._oembed.get_oembed_url(url)
         if oembed_url:
             # The result might be a new URL to download, or it might be HTML content.
             try:
-                oembed_result = await self._get_oembed_content(oembed_url, url)
+                oembed_result = await self._oembed.get_oembed_content(oembed_url, url)
                 if oembed_result.url:
                     url_to_download = oembed_result.url
                 elif oembed_result.html:
@@ -560,18 +460,18 @@ class PreviewUrlResource(DirectServeJsonResource):
             # therefore not expire it.
             raise
 
-        return {
-            "media_type": media_type,
-            "media_length": length,
-            "download_name": download_name,
-            "created_ts": time_now_ms,
-            "filesystem_id": file_id,
-            "filename": fname,
-            "uri": uri,
-            "response_code": code,
-            "expires": expires,
-            "etag": etag,
-        }
+        return MediaInfo(
+            media_type=media_type,
+            media_length=length,
+            download_name=download_name,
+            created_ts_ms=time_now_ms,
+            filesystem_id=file_id,
+            filename=fname,
+            uri=uri,
+            response_code=code,
+            expires=expires,
+            etag=etag,
+        )
 
     def _start_expire_url_cache_data(self):
         return run_as_background_process(
@@ -717,7 +617,7 @@ def get_html_media_encoding(body: bytes, content_type: str) -> str:
 
 def decode_and_calc_og(
     body: bytes, media_uri: str, request_encoding: Optional[str] = None
-) -> Dict[str, Optional[str]]:
+) -> JsonDict:
     """
     Calculate metadata for an HTML document.
 

@@ -25,7 +25,9 @@ from collections import OrderedDict
 from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
 
 from synapse.api.constants import (
+    EventContentFields,
     EventTypes,
+    GuestAccess,
     HistoryVisibility,
     JoinRules,
     Membership,
@@ -388,9 +390,9 @@ class RoomCreationHandler(BaseHandler):
         old_room_create_event = await self.store.get_create_event_for_room(old_room_id)
 
         # Check if the create event specified a non-federatable room
-        if not old_room_create_event.content.get("m.federate", True):
+        if not old_room_create_event.content.get(EventContentFields.FEDERATE, True):
             # If so, mark the new room as non-federatable as well
-            creation_content["m.federate"] = False
+            creation_content[EventContentFields.FEDERATE] = False
 
         initial_state = {}
 
@@ -909,7 +911,12 @@ class RoomCreationHandler(BaseHandler):
             )
             return last_stream_id
 
-        config = self._presets_dict[preset_config]
+        try:
+            config = self._presets_dict[preset_config]
+        except KeyError:
+            raise SynapseError(
+                400, f"'{preset_config}' is not a valid preset", errcode=Codes.BAD_JSON
+            )
 
         creation_content.update({"creator": creator_id})
         await send(etype=EventTypes.Create, content=creation_content)
@@ -988,7 +995,8 @@ class RoomCreationHandler(BaseHandler):
         if config["guest_can_join"]:
             if (EventTypes.GuestAccess, "") not in initial_state:
                 last_sent_stream_id = await send(
-                    etype=EventTypes.GuestAccess, content={"guest_access": "can_join"}
+                    etype=EventTypes.GuestAccess,
+                    content={EventContentFields.GUEST_ACCESS: GuestAccess.CAN_JOIN},
                 )
 
         for (etype, state_key), content in initial_state.items():

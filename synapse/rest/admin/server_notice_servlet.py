@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Optional, Tuple
 
 from synapse.api.constants import EventTypes
 from synapse.api.errors import NotFoundError, SynapseError
@@ -101,7 +101,9 @@ class SendServerNoticeServlet(RestServlet):
 
         return 200, {"event_id": event.event_id}
 
-    def on_PUT(self, request: SynapseRequest, txn_id: str) -> Tuple[int, JsonDict]:
+    def on_PUT(
+        self, request: SynapseRequest, txn_id: str
+    ) -> Awaitable[Tuple[int, JsonDict]]:
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, txn_id
         )
