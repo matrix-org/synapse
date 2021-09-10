@@ -191,6 +191,52 @@ DB corruption) get stale or out of sync.  If this happens, for now the
 solution to fix it is to execute the SQL <a href="https://github.com/matrix-org/synapse/blob/master/synapse/storage/schema/main/delta/53/user_dir_populate.sql">here</a>
 and then restart synapse. This should then start a background task to
 flush the current tables and regenerate the directory.</p>
+<h2 id="data-model"><a class="header" href="#data-model">Data model</a></h2>
+<p>There are five relevant tables that collectively form the &quot;user directory&quot;.
+Three of them track a master list of all the users we could search for.
+The last two (collectively called the &quot;search tables&quot;) track who can
+see who.</p>
+<p>From all of these tables we exclude three types of local user:</p>
+<ul>
+<li>support users</li>
+<li>appservice users</li>
+<li>deactivated users</li>
+</ul>
+<ul>
+<li>
+<p><code>user_directory</code>. This contains the user_id, display name and avatar we'll
+return when you search the directory.</p>
+<ul>
+<li>Because there's only one directory entry per user, it's important that we only
+ever put publicly visible names here. Otherwise we might leak a private
+nickname or avatar used in a private room.</li>
+<li>Indexed on rooms. Indexed on users.</li>
+</ul>
+</li>
+<li>
+<p><code>user_directory_search</code>. To be joined to <code>user_directory</code>. It contains an extra
+column that enables full text search based on user ids and display names.
+Different schemas for SQLite and Postgres with different code paths to match.</p>
+<ul>
+<li>Indexed on the full text search data. Indexed on users.</li>
+</ul>
+</li>
+<li>
+<p><code>user_directory_stream_pos</code>. When the initial background update to populate
+the directory is complete, we record a stream position here. This indicates
+that synapse should now listen for room changes and incrementally update
+the directory where necessary.</p>
+</li>
+<li>
+<p><code>users_in_public_rooms</code>. Contains associations between users and the public rooms they're in.
+Used to determine which users are in public rooms and should be publicly visible in the directory.</p>
+</li>
+<li>
+<p><code>users_who_share_private_rooms</code>. Rows are triples <code>(L, M, room id)</code> where <code>L</code>
+is a local user and <code>M</code> is a local or remote user. <code>L</code> and <code>M</code> should be
+different, but this isn't enforced by a constraint.</p>
+</li>
+</ul>
 
                     </main>
 
