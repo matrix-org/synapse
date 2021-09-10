@@ -289,7 +289,9 @@ class Config:
         env.filters.update(
             {
                 "format_ts": _format_ts_filter,
-                "mxc_to_http": _create_mxc_to_http_filter(self.public_baseurl),
+                "mxc_to_http": _create_mxc_to_http_filter(
+                    self.root.server.public_baseurl
+                ),
             }
         )
 
