@@ -291,6 +291,8 @@ class Responder:
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class ThumbnailInfo:
+    """Details about a generated thumbnail."""
+
     width: int
     height: int
     method: str
