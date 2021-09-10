@@ -15,7 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Tuple
 
-from synapse.api.errors import AuthError
+from synapse.api.constants import OpenIdUserInfoField
+from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.http.server import HttpServer
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
 from synapse.http.site import SynapseRequest
@@ -64,6 +65,12 @@ class IdTokenServlet(RestServlet):
 
     EXPIRES_MS = 3600 * 1000
 
+    USERINFO_FIELDS = list(
+        item[1]
+        for item in OpenIdUserInfoField.__dict__.items()
+        if not item[0].startswith("_")
+    )
+
     def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.auth = hs.get_auth()
@@ -78,14 +85,25 @@ class IdTokenServlet(RestServlet):
         if user_id != requester.user.to_string():
             raise AuthError(403, "Cannot request tokens for other users.")
 
-        # Parse the request body to make sure it's JSON, but ignore the contents
-        # for now.
-        parse_json_object_from_request(request)
+        json = parse_json_object_from_request(request, allow_empty_body=True)
+
+        userinfo_fields = None
+        if "userinfo_fields" in json:
+            userinfo_fields = json["userinfo_fields"]
+            for field in userinfo_fields:
+                if not field in self.USERINFO_FIELDS:
+                    raise SynapseError(
+                        400,
+                        "Unknown userinfo field '" + field + "'",
+                        Codes.INVALID_PARAM,
+                    )
 
         token = random_string(24)
         ts_valid_until_ms = self.clock.time_msec() + self.EXPIRES_MS
 
-        await self.store.insert_open_id_token(token, ts_valid_until_ms, user_id)
+        await self.store.insert_open_id_token(
+            token, ts_valid_until_ms, user_id, userinfo_fields
+        )
 
         return (
             200,

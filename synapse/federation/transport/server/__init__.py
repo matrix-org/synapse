@@ -17,7 +17,7 @@ from typing import Dict, Iterable, List, Optional, Tuple, Type
 
 from typing_extensions import Literal
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, OpenIdUserInfoField
 from synapse.api.errors import FederationDeniedError, SynapseError
 from synapse.federation.transport.server._base import (
     Authenticator,
@@ -270,7 +270,7 @@ class OpenIdUserInfo(BaseFederationServlet):
                 {"errcode": "M_MISSING_TOKEN", "error": "Access Token required"},
             )
 
-        user_id = await self.handler.on_openid_userinfo(token)
+        user_id, userinfo_fields = await self.handler.on_openid_userinfo(token)
 
         if user_id is None:
             return (
@@ -283,14 +283,21 @@ class OpenIdUserInfo(BaseFederationServlet):
 
         userinfo = {"sub": user_id}
 
-        if self.hs.config.federation.openid_userinfo_fields:
-            if "name" in self.hs.config.federation.openid_userinfo_fields:
+        if userinfo_fields:
+            if OpenIdUserInfoField.DISPLAY_NAME in userinfo_fields:
                 localpart = UserID.from_string(user_id).localpart
                 userinfo[
-                    "name"
+                    OpenIdUserInfoField.DISPLAY_NAME
                 ] = await self.hs.get_datastore().get_profile_displayname(localpart)
-            if "room_powerlevels" in self.hs.config.federation.openid_userinfo_fields:
-                userinfo["room_powerlevels"] = await self._get_powerlevels(user_id)
+            if OpenIdUserInfoField.AVATAR_URL in userinfo_fields:
+                localpart = UserID.from_string(user_id).localpart
+                userinfo[
+                    OpenIdUserInfoField.AVATAR_URL
+                ] = await self.hs.get_datastore().get_profile_avatar_url(localpart)
+            if OpenIdUserInfoField.ROOM_POWERLEVELS in userinfo_fields:
+                userinfo[
+                    OpenIdUserInfoField.ROOM_POWERLEVELS
+                ] = await self._get_powerlevels(user_id)
 
         return 200, userinfo
 

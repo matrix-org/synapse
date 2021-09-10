@@ -888,7 +888,9 @@ class FederationServer(FederationBase):
     @log_function
     async def on_openid_userinfo(self, token: str) -> Optional[str]:
         ts_now_ms = self._clock.time_msec()
-        return await self.store.get_user_id_for_open_id_token(token, ts_now_ms)
+        return await self.store.get_user_id_and_userinfo_fields_for_open_id_token(
+            token, ts_now_ms
+        )
 
     def _transaction_dict_from_pdus(self, pdu_list: List[EventBase]) -> JsonDict:
         """Returns a new Transaction containing the given PDUs suitable for

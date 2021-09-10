@@ -48,14 +48,6 @@ class FederationConfig(Config):
             "allow_device_name_lookup_over_federation", True
         )
 
-        openid_userinfo_fields = config.get("openid_userinfo_fields") or []
-        validate_config(
-            _OPENID_USERINFO_FIELDS_SCHEMA,
-            openid_userinfo_fields,
-            ("openid_userinfo_fields",),
-        )
-        self.openid_userinfo_fields = set(openid_userinfo_fields)
-
     def generate_config_section(self, config_dir_path, server_name, **kwargs):
         return """\
         ## Federation ##
@@ -93,19 +85,7 @@ class FederationConfig(Config):
         # on this homeserver. Defaults to 'true'.
         #
         #allow_device_name_lookup_over_federation: false
-
-        # Uncomment to include additional fields in the OpenID user info. Defaults to none.
-        # Currently available are 'name' (the user's display name) and 'room_powerlevels'
-        # (a mapping between the room id and the user's effective powerlevel)
-        #
-        #openid_userinfo_fields:
-        #  - name
-        #  - room_powerlevels
         """
 
 
 _METRICS_FOR_DOMAINS_SCHEMA = {"type": "array", "items": {"type": "string"}}
-_OPENID_USERINFO_FIELDS_SCHEMA = {
-    "type": "array",
-    "items": {"type": "string", "enum": ["name", "room_powerlevels"]},
-}

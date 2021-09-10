@@ -679,14 +679,6 @@ templates:
 #
 #allow_device_name_lookup_over_federation: false
 
-# Uncomment to include additional fields in the OpenID user info. Defaults to none.
-# Currently available are 'name' (the user's display name) and 'room_powerlevels'
-# (a mapping between the room id and the user's effective powerlevel)
-#
-#openid_userinfo_fields:
-#  - name
-#  - room_powerlevels
-
 
 ## Caching ##
 

@@ -14,7 +14,7 @@
 
 # When updating these values, please leave a short summary of the changes below.
 
-SCHEMA_VERSION = 63
+SCHEMA_VERSION = 64
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the
@@ -32,6 +32,10 @@ Changes in SCHEMA_VERSION = 63:
     - The `public_room_list_stream` table is not written nor read to
       (previously, it was written and read to, but not for any significant purpose).
       https://github.com/matrix-org/synapse/pull/10565
+
+Changes in SCHEMA_VERSION = 64:
+    - Add column `userinfo_fields` to table `open_id_tokens`. The new column is used
+      to persist the additional open id token fields requested by the user.
 """
 
 

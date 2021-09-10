@@ -249,3 +249,9 @@ class GuestAccess:
 
 class ReadReceiptEventFields:
     MSC2285_HIDDEN = "org.matrix.msc2285.hidden"
+
+
+class OpenIdUserInfoField:
+    DISPLAY_NAME = "display_name"
+    AVATAR_URL = "avatar_url"
+    ROOM_POWERLEVELS = "room_powerlevels"
