@@ -78,7 +78,7 @@ class AccountValidityHandler:
             )
 
             # Check the renewal emails to send and send them every 30min.
-            if hs.config.run_background_tasks:
+            if hs.config.worker.run_background_tasks:
                 self.clock.looping_call(self._send_renewal_emails, 30 * 60 * 1000)
 
         self._is_user_expired_callbacks: List[IS_USER_EXPIRED_CALLBACK] = []

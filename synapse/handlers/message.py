@@ -461,7 +461,7 @@ class EventCreationHandler:
         self._dummy_events_threshold = hs.config.dummy_events_threshold
 
         if (
-            self.config.run_background_tasks
+            self.config.worker.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(

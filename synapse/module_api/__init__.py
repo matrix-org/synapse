@@ -640,7 +640,7 @@ class ModuleApi:
         if desc is None:
             desc = f.__name__
 
-        if self._hs.config.run_background_tasks or run_on_all_instances:
+        if self._hs.config.worker.run_background_tasks or run_on_all_instances:
             self._clock.looping_call(
                 run_as_background_process,
                 msec,

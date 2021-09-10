@@ -398,7 +398,7 @@ async def start(hs: "HomeServer"):
 
     # If background tasks are running on the main process, start collecting the
     # phone home stats.
-    if hs.config.run_background_tasks:
+    if hs.config.worker.run_background_tasks:
         start_phone_stats_home(hs)
 
     # We now freeze all allocated objects in the hopes that (almost)

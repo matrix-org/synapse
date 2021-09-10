@@ -81,7 +81,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn.close()
 
         if (
-            self.hs.config.run_background_tasks
+            self.hs.config.worker.run_background_tasks
             and self.hs.config.metrics_flags.known_servers
         ):
             self._known_servers_count = 1

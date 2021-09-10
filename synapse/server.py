@@ -313,7 +313,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         # Register background tasks required by this server. This must be done
         # somewhat manually due to the background tasks not being registered
         # unless handlers are instantiated.
-        if self.config.run_background_tasks:
+        if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
     def start_listening(self) -> None:

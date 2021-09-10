@@ -51,7 +51,7 @@ class DeviceWorkerStore(SQLBaseStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
         super().__init__(database, db_conn, hs)
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(
                 self._prune_old_outbound_device_pokes, 60 * 60 * 1000
             )
