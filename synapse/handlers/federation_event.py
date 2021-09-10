@@ -173,6 +173,9 @@ class FederationEventHandler:
             pdu: received PDU
         """
 
+        # We should never see any outliers here.
+        assert not pdu.internal_metadata.outlier
+
         room_id = pdu.room_id
         event_id = pdu.event_id
 
@@ -232,77 +235,71 @@ class FederationEventHandler:
             )
             return None
 
-        # Check that the event passes auth based on the state at the event. This is
-        # done for events that are to be added to the timeline (non-outliers).
-        #
-        # Get missing pdus if necessary:
-        #  - Fetching any missing prev events to fill in gaps in the graph
-        #  - Fetching state if we have a hole in the graph
-        if not pdu.internal_metadata.is_outlier():
-            prevs = set(pdu.prev_event_ids())
-            seen = await self._store.have_events_in_timeline(prevs)
-            missing_prevs = prevs - seen
+        # Try to fetch any missing prev events to fill in gaps in the graph
+        prevs = set(pdu.prev_event_ids())
+        seen = await self._store.have_events_in_timeline(prevs)
+        missing_prevs = prevs - seen
+
+        if missing_prevs:
+            # We only backfill backwards to the min depth.
+            min_depth = await self.get_min_depth_for_context(pdu.room_id)
+            logger.debug("min_depth: %d", min_depth)
+
+            if min_depth is not None and pdu.depth > min_depth:
+                # If we're missing stuff, ensure we only fetch stuff one
+                # at a time.
+                logger.info(
+                    "Acquiring room lock to fetch %d missing prev_events: %s",
+                    len(missing_prevs),
+                    shortstr(missing_prevs),
+                )
+                with (await self._room_pdu_linearizer.queue(pdu.room_id)):
+                    logger.info(
+                        "Acquired room lock to fetch %d missing prev_events",
+                        len(missing_prevs),
+                    )
+
+                    try:
+                        await self._get_missing_events_for_pdu(
+                            origin, pdu, prevs, min_depth
+                        )
+                    except Exception as e:
+                        raise Exception(
+                            "Error fetching missing prev_events for %s: %s"
+                            % (event_id, e)
+                        ) from e
+
+                # Update the set of things we've seen after trying to
+                # fetch the missing stuff
+                seen = await self._store.have_events_in_timeline(prevs)
+                missing_prevs = prevs - seen
+
+                if not missing_prevs:
+                    logger.info("Found all missing prev_events")
 
             if missing_prevs:
-                # We only backfill backwards to the min depth.
-                min_depth = await self.get_min_depth_for_context(pdu.room_id)
-                logger.debug("min_depth: %d", min_depth)
-
-                if min_depth is not None and pdu.depth > min_depth:
-                    # If we're missing stuff, ensure we only fetch stuff one
-                    # at a time.
-                    logger.info(
-                        "Acquiring room lock to fetch %d missing prev_events: %s",
-                        len(missing_prevs),
-                        shortstr(missing_prevs),
-                    )
-                    with (await self._room_pdu_linearizer.queue(pdu.room_id)):
-                        logger.info(
-                            "Acquired room lock to fetch %d missing prev_events",
-                            len(missing_prevs),
-                        )
-
-                        try:
-                            await self._get_missing_events_for_pdu(
-                                origin, pdu, prevs, min_depth
-                            )
-                        except Exception as e:
-                            raise Exception(
-                                "Error fetching missing prev_events for %s: %s"
-                                % (event_id, e)
-                            ) from e
-
-                    # Update the set of things we've seen after trying to
-                    # fetch the missing stuff
-                    seen = await self._store.have_events_in_timeline(prevs)
-                    missing_prevs = prevs - seen
-
-                    if not missing_prevs:
-                        logger.info("Found all missing prev_events")
-
-                if missing_prevs:
-                    # since this event was pushed to us, it is possible for it to
-                    # become the only forward-extremity in the room, and we would then
-                    # trust its state to be the state for the whole room. This is very
-                    # bad. Further, if the event was pushed to us, there is no excuse
-                    # for us not to have all the prev_events. (XXX: apart from
-                    # min_depth?)
-                    #
-                    # We therefore reject any such events.
-                    logger.warning(
-                        "Rejecting: failed to fetch %d prev events: %s",
-                        len(missing_prevs),
-                        shortstr(missing_prevs),
-                    )
-                    raise FederationError(
-                        "ERROR",
-                        403,
-                        (
-                            "Your server isn't divulging details about prev_events "
-                            "referenced in this event."
-                        ),
-                        affected=pdu.event_id,
-                    )
+                # since this event was pushed to us, it is possible for it to
+                # become the only forward-extremity in the room, and we would then
+                # trust its state to be the state for the whole room. This is very
+                # bad. Further, if the event was pushed to us, there is no excuse
+                # for us not to have all the prev_events. (XXX: apart from
+                # min_depth?)
+                #
+                # We therefore reject any such events.
+                logger.warning(
+                    "Rejecting: failed to fetch %d prev events: %s",
+                    len(missing_prevs),
+                    shortstr(missing_prevs),
+                )
+                raise FederationError(
+                    "ERROR",
+                    403,
+                    (
+                        "Your server isn't divulging details about prev_events "
+                        "referenced in this event."
+                    ),
+                    affected=pdu.event_id,
+                )
 
         await self._process_received_pdu(origin, pdu, state=None)
 
@@ -818,7 +815,7 @@ class FederationEventHandler:
         missing_events = missing_desired_events | missing_auth_events
         logger.debug("Fetching %i events from remote", len(missing_events))
         await self._get_events_and_persist(
-            destination=destination, room_id=room_id, events=missing_events
+            destination=destination, room_id=room_id, event_ids=missing_events
         )
 
         # we need to make sure we re-load from the database to get the rejected
@@ -885,8 +882,13 @@ class FederationEventHandler:
         state: Optional[Iterable[EventBase]],
         backfilled: bool = False,
     ) -> None:
-        """Called when we have a new pdu. We need to do auth checks and put it
-        through the StateHandler.
+        """Called when we have a new non-outlier event.
+
+        This is called when we have a new event to add to the room DAG - either directly
+        via a /send request, retrieved via get_missing_events after a /send request, or
+        backfilled after a client request.
+
+        We need to do auth checks and put it through the StateHandler.
 
         Args:
             origin: server sending the event
@@ -901,16 +903,23 @@ class FederationEventHandler:
                 notification to clients, and validation of device keys.)
         """
         logger.debug("Processing event: %s", event)
+        assert not event.internal_metadata.outlier
 
         try:
             context = await self._state_handler.compute_event_context(
                 event, old_state=state
             )
-            await self._auth_and_persist_event(
-                origin, event, context, state=state, backfilled=backfilled
+            context = await self._check_event_auth(
+                origin,
+                event,
+                context,
+                state=state,
+                backfilled=backfilled,
             )
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
+
+        await self._run_push_actions_and_persist_event(event, context, backfilled)
 
         if backfilled:
             return
@@ -1085,12 +1094,12 @@ class FederationEventHandler:
         )
 
     async def _get_events_and_persist(
-        self, destination: str, room_id: str, events: Iterable[str]
+        self, destination: str, room_id: str, event_ids: Collection[str]
     ) -> None:
         """Fetch the given events from a server, and persist them as outliers.
 
         This function *does not* recursively get missing auth events of the
-        newly fetched events. Callers must include in the `events` argument
+        newly fetched events. Callers must include in the `event_ids` argument
         any missing events from the auth chain.
 
         Logs a warning if we can't find the given event.
@@ -1127,55 +1136,84 @@ class FederationEventHandler:
                         e,
                     )
 
-        await concurrently_execute(get_event, events, 5)
+        await concurrently_execute(get_event, event_ids, 5)
+        logger.info("Fetched %i events of %i requested", len(event_map), len(event_ids))
 
-        # Make a map of auth events for each event. We do this after fetching
-        # all the events as some of the events' auth events will be in the list
-        # of requested events.
+        # we now need to auth the events in an order which ensures that each event's
+        # auth_events are authed before the event itself.
+        #
+        # XXX: it might be possible to kick this process off in parallel with fetching
+        # the events.
+        while event_map:
+            # build a list of events whose auth events are not in the queue.
+            roots = tuple(
+                ev
+                for ev in event_map.values()
+                if not any(aid in event_map for aid in ev.auth_event_ids())
+            )
 
-        auth_events = [
-            aid
-            for event in event_map.values()
-            for aid in event.auth_event_ids()
-            if aid not in event_map
-        ]
+            if not roots:
+                # if *none* of the remaining events are ready, that means
+                # we have a loop. This either means a bug in our logic, or that
+                # somebody has managed to create a loop (which requires finding a
+                # hash collision in room v2 and later).
+                logger.warning(
+                    "Loop found in auth events while fetching missing state/auth "
+                    "events: %s",
+                    shortstr(event_map.keys()),
+                )
+                return
+
+            logger.info(
+                "Persisting %i of %i remaining events", len(roots), len(event_map)
+            )
+
+            await self._auth_and_persist_fetched_events(destination, room_id, roots)
+
+            for ev in roots:
+                del event_map[ev.event_id]
+
+    async def _auth_and_persist_fetched_events(
+        self, origin: str, room_id: str, fetched_events: Collection[EventBase]
+    ) -> None:
+        """Persist the events fetched by _get_events_and_persist.
+
+        The events should not depend on one another, e.g. this should be used to persist
+        a bunch of outliers, but not a chunk of individual events that depend
+        on each other for state calculations.
+
+        We also assume that all of the auth events for all of the events have already
+        been persisted.
+
+        Notifies about the events where appropriate.
+
+        Params:
+            origin: where the events came from
+            room_id: the room that the events are meant to be in (though this has
+               not yet been checked)
+            event_id: map from event_id -> event for the fetched events
+        """
+        # get all the auth events for all the events in this batch. By now, they should
+        # have been persisted.
+        auth_events = {
+            aid for event in fetched_events for aid in event.auth_event_ids()
+        }
         persisted_events = await self._store.get_events(
             auth_events,
             allow_rejected=True,
         )
 
         event_infos = []
-        for event in event_map.values():
+        for event in fetched_events:
             auth = {}
             for auth_event_id in event.auth_event_ids():
-                ae = persisted_events.get(auth_event_id) or event_map.get(auth_event_id)
+                ae = persisted_events.get(auth_event_id)
                 if ae:
                     auth[(ae.type, ae.state_key)] = ae
                 else:
                     logger.info("Missing auth event %s", auth_event_id)
 
             event_infos.append(_NewEventInfo(event, auth))
-
-        if event_infos:
-            await self._auth_and_persist_events(
-                destination,
-                room_id,
-                event_infos,
-            )
-
-    async def _auth_and_persist_events(
-        self,
-        origin: str,
-        room_id: str,
-        event_infos: Collection[_NewEventInfo],
-    ) -> None:
-        """Creates the appropriate contexts and persists events. The events
-        should not depend on one another, e.g. this should be used to persist
-        a bunch of outliers, but not a chunk of individual events that depend
-        on each other for state calculations.
-
-        Notifies about the events where appropriate.
-        """
 
         if not event_infos:
             return
@@ -1207,49 +1245,6 @@ class FederationEventHandler:
             ],
         )
 
-    async def _auth_and_persist_event(
-        self,
-        origin: str,
-        event: EventBase,
-        context: EventContext,
-        state: Optional[Iterable[EventBase]] = None,
-        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
-        backfilled: bool = False,
-    ) -> None:
-        """
-        Process an event by performing auth checks and then persisting to the database.
-
-        Args:
-            origin: The host the event originates from.
-            event: The event itself.
-            context:
-                The event context.
-
-            state:
-                The state events used to check the event for soft-fail. If this is
-                not provided the current state events will be used.
-
-            claimed_auth_event_map:
-                A map of (type, state_key) => event for the event's claimed auth_events.
-                Possibly incomplete, and possibly including events that are not yet
-                persisted, or authed, or in the right room.
-
-                Only populated where we may not already have persisted these events -
-                for example, when populating outliers.
-
-            backfilled: True if the event was backfilled.
-        """
-        context = await self._check_event_auth(
-            origin,
-            event,
-            context,
-            state=state,
-            claimed_auth_event_map=claimed_auth_event_map,
-            backfilled=backfilled,
-        )
-
-        await self._run_push_actions_and_persist_event(event, context, backfilled)
-
     async def _check_event_auth(
         self,
         origin: str,
@@ -1277,15 +1272,16 @@ class FederationEventHandler:
                 Possibly incomplete, and possibly including events that are not yet
                 persisted, or authed, or in the right room.
 
-                Only populated where we may not already have persisted these events -
-                for example, when populating outliers, or the state for a backwards
-                extremity.
+                Only populated when populating outliers.
 
             backfilled: True if the event was backfilled.
 
         Returns:
             The updated context object.
         """
+        # claimed_auth_event_map should be given iff the event is an outlier
+        assert bool(claimed_auth_event_map) == event.internal_metadata.outlier
+
         room_version = await self._store.get_room_version_id(event.room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
@@ -1523,39 +1519,45 @@ class FederationEventHandler:
                     event.room_id, [e.event_id for e in remote_auth_chain]
                 )
 
-                for e in remote_auth_chain:
-                    if e.event_id in seen_remotes:
+                for auth_event in remote_auth_chain:
+                    if auth_event.event_id in seen_remotes:
                         continue
 
-                    if e.event_id == event.event_id:
+                    if auth_event.event_id == event.event_id:
                         continue
 
                     try:
-                        auth_ids = e.auth_event_ids()
+                        auth_ids = auth_event.auth_event_ids()
                         auth = {
                             (e.type, e.state_key): e
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
                         }
-                        e.internal_metadata.outlier = True
+                        auth_event.internal_metadata.outlier = True
 
                         logger.debug(
                             "_check_event_auth %s missing_auth: %s",
                             event.event_id,
-                            e.event_id,
+                            auth_event.event_id,
                         )
                         missing_auth_event_context = (
-                            await self._state_handler.compute_event_context(e)
+                            await self._state_handler.compute_event_context(auth_event)
                         )
-                        await self._auth_and_persist_event(
+
+                        missing_auth_event_context = await self._check_event_auth(
                             origin,
-                            e,
+                            auth_event,
                             missing_auth_event_context,
                             claimed_auth_event_map=auth,
                         )
+                        await self.persist_events_and_notify(
+                            event.room_id, [(auth_event, missing_auth_event_context)]
+                        )
 
-                        if e.event_id in event_auth_events:
-                            auth_events[(e.type, e.state_key)] = e
+                        if auth_event.event_id in event_auth_events:
+                            auth_events[
+                                (auth_event.type, auth_event.state_key)
+                            ] = auth_event
                     except AuthError:
                         pass
 
@@ -1698,10 +1700,13 @@ class FederationEventHandler:
             context: The event context.
             backfilled: True if the event was backfilled.
         """
+        # this method should not be called on outliers (those code paths call
+        # persist_events_and_notify directly.)
+        assert not event.internal_metadata.outlier
+
         try:
             if (
-                not event.internal_metadata.is_outlier()
-                and not backfilled
+                not backfilled
                 and not context.rejected
                 and (await self._store.get_min_depth(event.room_id)) <= event.depth
             ):

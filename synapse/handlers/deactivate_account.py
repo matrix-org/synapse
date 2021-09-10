@@ -131,7 +131,7 @@ class DeactivateAccountHandler(BaseHandler):
         await self.store.add_user_pending_deactivation(user_id)
 
         # delete from user directory
-        await self.user_directory_handler.handle_user_deactivated(user_id)
+        await self.user_directory_handler.handle_local_user_deactivated(user_id)
 
         # Mark the user as erased, if they asked for that
         if erase_data:
