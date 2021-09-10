@@ -45,16 +45,16 @@ class BaseHandler:
         self.request_ratelimiter = Ratelimiter(
             store=self.store, clock=self.clock, rate_hz=0, burst_count=0
         )
-        self._rc_message = self.hs.config.rc_message
+        self._rc_message = self.hs.config.ratelimiting.rc_message
 
         # Check whether ratelimiting room admin message redaction is enabled
         # by the presence of rate limits in the config
-        if self.hs.config.rc_admin_redaction:
+        if self.hs.config.ratelimiting.rc_admin_redaction:
             self.admin_redaction_ratelimiter: Optional[Ratelimiter] = Ratelimiter(
                 store=self.store,
                 clock=self.clock,
-                rate_hz=self.hs.config.rc_admin_redaction.per_second,
-                burst_count=self.hs.config.rc_admin_redaction.burst_count,
+                rate_hz=self.hs.config.ratelimiting.rc_admin_redaction.per_second,
+                burst_count=self.hs.config.ratelimiting.rc_admin_redaction.burst_count,
             )
         else:
             self.admin_redaction_ratelimiter = None

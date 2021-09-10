@@ -370,8 +370,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastore(),
             clock=self.get_clock(),
-            rate_hz=self.config.rc_registration.per_second,
-            burst_count=self.config.rc_registration.burst_count,
+            rate_hz=self.config.ratelimiting.rc_registration.per_second,
+            burst_count=self.config.ratelimiting.rc_registration.burst_count,
         )
 
     @cache_in_self
@@ -766,7 +766,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
+        return FederationRateLimiter(
+            self.get_clock(), config=self.config.ratelimiting.rc_federation
+        )
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
