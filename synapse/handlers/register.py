@@ -102,7 +102,7 @@ class RegistrationHandler(BaseHandler):
 
         self.spam_checker = hs.get_spam_checker()
 
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
                 hs
@@ -696,7 +696,7 @@ class RegistrationHandler(BaseHandler):
             address: the IP address used to perform the registration.
             shadow_banned: Whether to shadow-ban the user
         """
-        if self.hs.config.worker_app:
+        if self.hs.config.worker.worker_app:
             await self._register_client(
                 user_id=user_id,
                 password_hash=password_hash,
@@ -786,7 +786,7 @@ class RegistrationHandler(BaseHandler):
         Does the bits that need doing on the main process. Not for use outside this
         class and RegisterDeviceReplicationServlet.
         """
-        assert not self.hs.config.worker_app
+        assert not self.hs.config.worker.worker_app
         valid_until_ms = None
         if self.session_lifetime is not None:
             if is_guest:
@@ -843,7 +843,7 @@ class RegistrationHandler(BaseHandler):
         """
         # TODO: 3pid registration can actually happen on the workers. Consider
         # refactoring it.
-        if self.hs.config.worker_app:
+        if self.hs.config.worker.worker_app:
             await self._post_registration_client(
                 user_id=user_id, auth_result=auth_result, access_token=access_token
             )

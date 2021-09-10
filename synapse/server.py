@@ -498,7 +498,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_device_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
             return DeviceHandler(self)
@@ -621,7 +621,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_federation_sender(self) -> AbstractFederationSender:
         if self.should_send_federation():
             return FederationSender(self)
-        elif not self.config.worker_app:
+        elif not self.config.worker.worker_app:
             return FederationRemoteSendQueue(self)
         else:
             raise Exception("Workers cannot send federation traffic")
@@ -650,14 +650,14 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_groups_local_handler(
         self,
     ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsLocalWorkerHandler(self)
         else:
             return GroupsLocalHandler(self)
 
     @cache_in_self
     def get_groups_server_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsServerWorkerHandler(self)
         else:
             return GroupsServerHandler(self)
@@ -684,7 +684,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_room_member_handler(self) -> RoomMemberHandler:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
 
@@ -694,13 +694,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_server_notices_manager(self) -> ServerNoticesManager:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
     def get_server_notices_sender(self) -> WorkerServerNoticesSender:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
 

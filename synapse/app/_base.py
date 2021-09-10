@@ -82,7 +82,7 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         run_command (Callable[]): callable that actually runs the reactor
     """
 
-    logger = logging.getLogger(config.worker_app)
+    logger = logging.getLogger(config.worker.worker_app)
 
     start_reactor(
         appname,
@@ -435,7 +435,11 @@ def setup_sentry(hs):
     with sentry_sdk.configure_scope() as scope:
         scope.set_tag("matrix_server_name", hs.config.server_name)
 
-        app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
+        app = (
+            hs.config.worker.worker_app
+            if hs.config.worker.worker_app
+            else "synapse.app.homeserver"
+        )
         name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)

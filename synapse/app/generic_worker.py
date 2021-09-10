@@ -416,7 +416,7 @@ def start(config_options):
         sys.exit(1)
 
     # For backwards compatibility let any of the old app names.
-    assert config.worker_app in (
+    assert config.worker.worker_app in (
         "synapse.app.appservice",
         "synapse.app.client_reader",
         "synapse.app.event_creator",
@@ -430,7 +430,7 @@ def start(config_options):
         "synapse.app.user_dir",
     )
 
-    if config.worker_app == "synapse.app.appservice":
+    if config.worker.worker_app == "synapse.app.appservice":
         if config.appservice.notify_appservices:
             sys.stderr.write(
                 "\nThe appservices must be disabled in the main synapse process"
@@ -446,7 +446,7 @@ def start(config_options):
         # For other worker types we force this to off.
         config.appservice.notify_appservices = False
 
-    if config.worker_app == "synapse.app.user_dir":
+    if config.worker.worker_app == "synapse.app.user_dir":
         if config.server.update_user_directory:
             sys.stderr.write(
                 "\nThe update_user_directory must be disabled in the main synapse process"

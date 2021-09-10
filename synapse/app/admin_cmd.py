@@ -178,12 +178,12 @@ def start(config_options):
         sys.stderr.write("\n" + str(e) + "\n")
         sys.exit(1)
 
-    if config.worker_app is not None:
-        assert config.worker_app == "synapse.app.admin_cmd"
+    if config.worker.worker_app is not None:
+        assert config.worker.worker_app == "synapse.app.admin_cmd"
 
     # Update the config with some basic overrides so that don't have to specify
     # a full worker config.
-    config.worker_app = "synapse.app.admin_cmd"
+    config.worker.worker_app = "synapse.app.admin_cmd"
 
     if (
         not config.worker_daemonize
