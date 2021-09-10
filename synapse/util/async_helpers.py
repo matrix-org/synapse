@@ -31,13 +31,13 @@ from typing import (
     Set,
     TypeVar,
     Union,
-    cast,
 )
 
 import attr
 from typing_extensions import ContextManager
 
 from twisted.internet import defer
+from twisted.internet.base import ReactorBase
 from twisted.internet.defer import CancelledError
 from twisted.internet.interfaces import IReactorTime
 from twisted.python import failure
@@ -269,7 +269,8 @@ class Linearizer:
         if not clock:
             from twisted.internet import reactor
 
-            clock = Clock(cast(IReactorTime, reactor))
+            assert isinstance(reactor, ReactorBase)
+            clock = Clock(reactor)
         self._clock = clock
         self.max_count = max_count
 
