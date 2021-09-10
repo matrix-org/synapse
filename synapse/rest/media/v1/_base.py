@@ -290,6 +290,17 @@ class Responder:
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
+class ThumbnailInfo:
+    width: int
+    height: int
+    method: str
+    # Content type of thumbnail, e.g. image/png
+    type: str
+    # The size of the media file, in bytes.
+    length: Optional[int] = None
+
+
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class FileInfo:
     """Details about a requested/uploaded file."""
 
@@ -300,14 +311,38 @@ class FileInfo:
     # If the file is for the url preview cache
     url_cache: Optional[str] = None
     # Whether the file is a thumbnail or not.
-    thumbnail: bool = False
-    thumbnail_width: Optional[int] = None
-    thumbnail_height: Optional[int] = None
-    thumbnail_method: Optional[str] = None
-    # Content type of thumbnail, e.g. image/png
-    thumbnail_type: Optional[str] = None
-    # The size of the media file, in bytes.
-    thumbnail_length: Optional[int] = None
+    thumbnail: Optional[ThumbnailInfo] = None
+
+    # The below properties exist to maintain compatibility with third-party modules.
+    @property
+    def thumbnail_width(self):
+        if not self.thumbnail:
+            return None
+        return self.thumbnail.width
+
+    @property
+    def thumbnail_height(self):
+        if not self.thumbnail:
+            return None
+        return self.thumbnail.height
+
+    @property
+    def thumbnail_method(self):
+        if not self.thumbnail:
+            return None
+        return self.thumbnail.method
+
+    @property
+    def thumbnail_type(self):
+        if not self.thumbnail:
+            return None
+        return self.thumbnail.type
+
+    @property
+    def thumbnail_length(self):
+        if not self.thumbnail:
+            return None
+        return self.thumbnail.length
 
 
 def get_filename_from_headers(headers: Dict[bytes, List[bytes]]) -> Optional[str]:

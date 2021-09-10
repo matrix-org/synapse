@@ -172,18 +172,13 @@ class MediaStorage:
 
         # fallback for remote thumbnails with no method in the filename
         if file_info.thumbnail and file_info.server_name:
-            # These must exist if it is a thumbnail.
-            assert file_info.thumbnail_width is not None
-            assert file_info.thumbnail_height is not None
-            assert file_info.thumbnail_type is not None
-
             paths.append(
                 self.filepaths.remote_media_thumbnail_rel_legacy(
                     server_name=file_info.server_name,
                     file_id=file_info.file_id,
-                    width=file_info.thumbnail_width,
-                    height=file_info.thumbnail_height,
-                    content_type=file_info.thumbnail_type,
+                    width=file_info.thumbnail.width,
+                    height=file_info.thumbnail.height,
+                    content_type=file_info.thumbnail.type,
                 )
             )
 
@@ -222,17 +217,12 @@ class MediaStorage:
         # Fallback for paths without method names
         # Should be removed in the future
         if file_info.thumbnail and file_info.server_name:
-            # These must exist if it is a thumbnail.
-            assert file_info.thumbnail_width is not None
-            assert file_info.thumbnail_height is not None
-            assert file_info.thumbnail_type is not None
-
             legacy_path = self.filepaths.remote_media_thumbnail_rel_legacy(
                 server_name=file_info.server_name,
                 file_id=file_info.file_id,
-                width=file_info.thumbnail_width,
-                height=file_info.thumbnail_height,
-                content_type=file_info.thumbnail_type,
+                width=file_info.thumbnail.width,
+                height=file_info.thumbnail.height,
+                content_type=file_info.thumbnail.type,
             )
             legacy_local_path = os.path.join(self.local_media_directory, legacy_path)
             if os.path.exists(legacy_local_path):
@@ -263,54 +253,36 @@ class MediaStorage:
         """
         if file_info.url_cache:
             if file_info.thumbnail:
-                # These must exist if it is a thumbnail.
-                assert file_info.thumbnail_width is not None
-                assert file_info.thumbnail_height is not None
-                assert file_info.thumbnail_type is not None
-                assert file_info.thumbnail_method is not None
-
                 return self.filepaths.url_cache_thumbnail_rel(
                     media_id=file_info.file_id,
-                    width=file_info.thumbnail_width,
-                    height=file_info.thumbnail_height,
-                    content_type=file_info.thumbnail_type,
-                    method=file_info.thumbnail_method,
+                    width=file_info.thumbnail.width,
+                    height=file_info.thumbnail.height,
+                    content_type=file_info.thumbnail.type,
+                    method=file_info.thumbnail.method,
                 )
             return self.filepaths.url_cache_filepath_rel(file_info.file_id)
 
         if file_info.server_name:
             if file_info.thumbnail:
-                # These must exist if it is a thumbnail.
-                assert file_info.thumbnail_width is not None
-                assert file_info.thumbnail_height is not None
-                assert file_info.thumbnail_type is not None
-                assert file_info.thumbnail_method is not None
-
                 return self.filepaths.remote_media_thumbnail_rel(
                     server_name=file_info.server_name,
                     file_id=file_info.file_id,
-                    width=file_info.thumbnail_width,
-                    height=file_info.thumbnail_height,
-                    content_type=file_info.thumbnail_type,
-                    method=file_info.thumbnail_method,
+                    width=file_info.thumbnail.width,
+                    height=file_info.thumbnail.height,
+                    content_type=file_info.thumbnail.type,
+                    method=file_info.thumbnail.method,
                 )
             return self.filepaths.remote_media_filepath_rel(
                 file_info.server_name, file_info.file_id
             )
 
         if file_info.thumbnail:
-            # These must exist if it is a thumbnail.
-            assert file_info.thumbnail_width is not None
-            assert file_info.thumbnail_height is not None
-            assert file_info.thumbnail_type is not None
-            assert file_info.thumbnail_method is not None
-
             return self.filepaths.local_media_thumbnail_rel(
                 media_id=file_info.file_id,
-                width=file_info.thumbnail_width,
-                height=file_info.thumbnail_height,
-                content_type=file_info.thumbnail_type,
-                method=file_info.thumbnail_method,
+                width=file_info.thumbnail.width,
+                height=file_info.thumbnail.height,
+                content_type=file_info.thumbnail.type,
+                method=file_info.thumbnail.method,
             )
         return self.filepaths.local_media_filepath_rel(file_info.file_id)
 

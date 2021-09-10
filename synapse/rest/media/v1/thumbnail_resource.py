@@ -26,6 +26,7 @@ from synapse.rest.media.v1.media_storage import MediaStorage
 
 from ._base import (
     FileInfo,
+    ThumbnailInfo,
     parse_media_id,
     respond_404,
     respond_with_file,
@@ -149,11 +150,12 @@ class ThumbnailResource(DirectServeJsonResource):
                     server_name=None,
                     file_id=media_id,
                     url_cache=media_info["url_cache"],
-                    thumbnail=True,
-                    thumbnail_width=info["thumbnail_width"],
-                    thumbnail_height=info["thumbnail_height"],
-                    thumbnail_type=info["thumbnail_type"],
-                    thumbnail_method=info["thumbnail_method"],
+                    thumbnail=ThumbnailInfo(
+                        width=info["thumbnail_width"],
+                        height=info["thumbnail_height"],
+                        type=info["thumbnail_type"],
+                        method=info["thumbnail_method"],
+                    ),
                 )
 
                 t_type = file_info.thumbnail_type
@@ -210,11 +212,12 @@ class ThumbnailResource(DirectServeJsonResource):
                 file_info = FileInfo(
                     server_name=server_name,
                     file_id=media_info["filesystem_id"],
-                    thumbnail=True,
-                    thumbnail_width=info["thumbnail_width"],
-                    thumbnail_height=info["thumbnail_height"],
-                    thumbnail_type=info["thumbnail_type"],
-                    thumbnail_method=info["thumbnail_method"],
+                    thumbnail=ThumbnailInfo(
+                        width=info["thumbnail_width"],
+                        height=info["thumbnail_height"],
+                        type=info["thumbnail_type"],
+                        method=info["thumbnail_method"],
+                    ),
                 )
 
                 t_type = file_info.thumbnail_type
@@ -318,20 +321,16 @@ class ThumbnailResource(DirectServeJsonResource):
                 respond_404(request)
                 return
 
-            # These must exist if it is a thumbnail.
-            assert file_info.thumbnail_width is not None
-            assert file_info.thumbnail_height is not None
-            assert file_info.thumbnail_type is not None
-            assert file_info.thumbnail_method is not None
-            assert file_info.thumbnail_length is not None
+            # The thumbnail property must exist.
+            assert file_info.thumbnail is not None
 
             responder = await self.media_storage.fetch_media(file_info)
             if responder:
                 await respond_with_responder(
                     request,
                     responder,
-                    file_info.thumbnail_type,
-                    file_info.thumbnail_length,
+                    file_info.thumbnail.type,
+                    file_info.thumbnail.length,
                 )
                 return
 
@@ -358,18 +357,18 @@ class ThumbnailResource(DirectServeJsonResource):
                     server_name,
                     file_id=file_id,
                     media_id=media_id,
-                    t_width=file_info.thumbnail_width,
-                    t_height=file_info.thumbnail_height,
-                    t_method=file_info.thumbnail_method,
-                    t_type=file_info.thumbnail_type,
+                    t_width=file_info.thumbnail.width,
+                    t_height=file_info.thumbnail.height,
+                    t_method=file_info.thumbnail.method,
+                    t_type=file_info.thumbnail.type,
                 )
             else:
                 await self.media_repo.generate_local_exact_thumbnail(
                     media_id=media_id,
-                    t_width=file_info.thumbnail_width,
-                    t_height=file_info.thumbnail_height,
-                    t_method=file_info.thumbnail_method,
-                    t_type=file_info.thumbnail_type,
+                    t_width=file_info.thumbnail.width,
+                    t_height=file_info.thumbnail.height,
+                    t_method=file_info.thumbnail.method,
+                    t_type=file_info.thumbnail.type,
                     url_cache=url_cache,
                 )
 
@@ -377,8 +376,8 @@ class ThumbnailResource(DirectServeJsonResource):
             await respond_with_responder(
                 request,
                 responder,
-                file_info.thumbnail_type,
-                file_info.thumbnail_length,
+                file_info.thumbnail.type,
+                file_info.thumbnail.length,
             )
         else:
             logger.info("Failed to find any generated thumbnails")
@@ -502,12 +501,13 @@ class ThumbnailResource(DirectServeJsonResource):
                 file_id=file_id,
                 url_cache=url_cache,
                 server_name=server_name,
-                thumbnail=True,
-                thumbnail_width=thumbnail_info["thumbnail_width"],
-                thumbnail_height=thumbnail_info["thumbnail_height"],
-                thumbnail_type=thumbnail_info["thumbnail_type"],
-                thumbnail_method=thumbnail_info["thumbnail_method"],
-                thumbnail_length=thumbnail_info["thumbnail_length"],
+                thumbnail=ThumbnailInfo(
+                    width=thumbnail_info["thumbnail_width"],
+                    height=thumbnail_info["thumbnail_height"],
+                    type=thumbnail_info["thumbnail_type"],
+                    method=thumbnail_info["thumbnail_method"],
+                    length=thumbnail_info["thumbnail_length"],
+                ),
             )
 
         # No matching thumbnail was found.
