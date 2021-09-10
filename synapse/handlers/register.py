@@ -21,7 +21,13 @@ from prometheus_client import Counter
 from typing_extensions import TypedDict
 
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
+from synapse.api.constants import (
+    MAX_USERID_LENGTH,
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    LoginType,
+)
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
@@ -54,6 +60,22 @@ login_counter = Counter(
     "Number of user logins (since restart)",
     ["guest", "auth_provider"],
 )
+
+
+def init_counters_for_auth_provider(auth_provider_id: str) -> None:
+    """Ensure the prometheus counters for the given auth provider are initialised
+
+    This fixes a problem where the counters are not reported for a given auth provider
+    until the user first logs in/registers.
+    """
+    for is_guest in (True, False):
+        login_counter.labels(guest=is_guest, auth_provider=auth_provider_id)
+        for shadow_banned in (True, False):
+            registration_counter.labels(
+                guest=is_guest,
+                shadow_banned=shadow_banned,
+                auth_provider=auth_provider_id,
+            )
 
 
 class LoginDict(TypedDict):
@@ -95,6 +117,8 @@ class RegistrationHandler(BaseHandler):
 
         self.session_lifetime = hs.config.session_lifetime
         self.access_token_lifetime = hs.config.access_token_lifetime
+
+        init_counters_for_auth_provider("")
 
     async def check_username(
         self,
@@ -387,7 +411,7 @@ class RegistrationHandler(BaseHandler):
 
         # Choose whether to federate the new room.
         if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
-            stub_config["creation_content"] = {"m.federate": False}
+            stub_config["creation_content"] = {EventContentFields.FEDERATE: False}
 
         for r in self.hs.config.registration.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)

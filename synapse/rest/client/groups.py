@@ -15,7 +15,7 @@
 
 import logging
 from functools import wraps
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -26,6 +26,7 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import Codes, SynapseError
 from synapse.handlers.groups_local import GroupsLocalHandler
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -42,14 +43,18 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _validate_group_id(f):
+def _validate_group_id(
+    f: Callable[..., Awaitable[Tuple[int, JsonDict]]]
+) -> Callable[..., Awaitable[Tuple[int, JsonDict]]]:
     """Wrapper to validate the form of the group ID.
 
     Can be applied to any on_FOO methods that accepts a group ID as a URL parameter.
     """
 
     @wraps(f)
-    def wrapper(self, request: Request, group_id: str, *args, **kwargs):
+    def wrapper(
+        self: RestServlet, request: Request, group_id: str, *args: Any, **kwargs: Any
+    ) -> Awaitable[Tuple[int, JsonDict]]:
         if not GroupID.is_valid(group_id):
             raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
 
@@ -155,7 +160,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
         group_id: str,
         category_id: Optional[str],
         room_id: str,
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -187,7 +192,7 @@ class GroupSummaryRoomsCatServlet(RestServlet):
     @_validate_group_id
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, category_id: str, room_id: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -450,7 +455,7 @@ class GroupSummaryUsersRoleServlet(RestServlet):
     @_validate_group_id
     async def on_DELETE(
         self, request: SynapseRequest, group_id: str, role_id: str, user_id: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -673,7 +678,7 @@ class GroupAdminRoomsConfigServlet(RestServlet):
     @_validate_group_id
     async def on_PUT(
         self, request: SynapseRequest, group_id: str, room_id: str, config_key: str
-    ):
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
 
@@ -705,7 +710,7 @@ class GroupAdminUsersInviteServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: SynapseRequest, group_id, user_id
+        self, request: SynapseRequest, group_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
@@ -737,7 +742,7 @@ class GroupAdminUsersKickServlet(RestServlet):
 
     @_validate_group_id
     async def on_PUT(
-        self, request: SynapseRequest, group_id, user_id
+        self, request: SynapseRequest, group_id: str, user_id: str
     ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         requester_user_id = requester.user.to_string()
@@ -930,7 +935,7 @@ class GroupsForUserServlet(RestServlet):
         return 200, result
 
 
-def register_servlets(hs: "HomeServer", http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     GroupServlet(hs).register(http_server)
     GroupSummaryServlet(hs).register(http_server)
     GroupInvitedUsersServlet(hs).register(http_server)

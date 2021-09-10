@@ -29,7 +29,7 @@ from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
-from synapse.rest.client import account, directory, login, profile, room
+from synapse.rest.client import account, directory, login, profile, room, sync
 from synapse.types import JsonDict, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 
@@ -381,6 +381,8 @@ class RoomPermissionsTestCase(RoomBase):
 class RoomsMemberListTestCase(RoomBase):
     """Tests /rooms/$room_id/members/list REST events."""
 
+    servlets = RoomBase.servlets + [sync.register_servlets]
+
     user_id = "@sid1:red"
 
     def test_get_member_list(self):
@@ -395,6 +397,86 @@ class RoomsMemberListTestCase(RoomBase):
     def test_get_member_list_no_permission(self):
         room_id = self.helper.create_room_as("@some_other_guy:red")
         channel = self.make_request("GET", "/rooms/%s/members" % room_id)
+        self.assertEquals(403, channel.code, msg=channel.result["body"])
+
+    def test_get_member_list_no_permission_with_at_token(self):
+        """
+        Tests that a stranger to the room cannot get the member list
+        (in the case that they use an at token).
+        """
+        room_id = self.helper.create_room_as("@someone.else:red")
+
+        # first sync to get an at token
+        channel = self.make_request("GET", "/sync")
+        self.assertEquals(200, channel.code)
+        sync_token = channel.json_body["next_batch"]
+
+        # check that permission is denied for @sid1:red to get the
+        # memberships of @someone.else:red's room.
+        channel = self.make_request(
+            "GET",
+            f"/rooms/{room_id}/members?at={sync_token}",
+        )
+        self.assertEquals(403, channel.code, msg=channel.result["body"])
+
+    def test_get_member_list_no_permission_former_member(self):
+        """
+        Tests that a former member of the room can not get the member list.
+        """
+        # create a room, invite the user and the user joins
+        room_id = self.helper.create_room_as("@alice:red")
+        self.helper.invite(room_id, "@alice:red", self.user_id)
+        self.helper.join(room_id, self.user_id)
+
+        # check that the user can see the member list to start with
+        channel = self.make_request("GET", "/rooms/%s/members" % room_id)
+        self.assertEquals(200, channel.code, msg=channel.result["body"])
+
+        # ban the user
+        self.helper.change_membership(room_id, "@alice:red", self.user_id, "ban")
+
+        # check the user can no longer see the member list
+        channel = self.make_request("GET", "/rooms/%s/members" % room_id)
+        self.assertEquals(403, channel.code, msg=channel.result["body"])
+
+    def test_get_member_list_no_permission_former_member_with_at_token(self):
+        """
+        Tests that a former member of the room can not get the member list
+        (in the case that they use an at token).
+        """
+        # create a room, invite the user and the user joins
+        room_id = self.helper.create_room_as("@alice:red")
+        self.helper.invite(room_id, "@alice:red", self.user_id)
+        self.helper.join(room_id, self.user_id)
+
+        # sync to get an at token
+        channel = self.make_request("GET", "/sync")
+        self.assertEquals(200, channel.code)
+        sync_token = channel.json_body["next_batch"]
+
+        # check that the user can see the member list to start with
+        channel = self.make_request(
+            "GET", "/rooms/%s/members?at=%s" % (room_id, sync_token)
+        )
+        self.assertEquals(200, channel.code, msg=channel.result["body"])
+
+        # ban the user (Note: the user is actually allowed to see this event and
+        # state so that they know they're banned!)
+        self.helper.change_membership(room_id, "@alice:red", self.user_id, "ban")
+
+        # invite a third user and let them join
+        self.helper.invite(room_id, "@alice:red", "@bob:red")
+        self.helper.join(room_id, "@bob:red")
+
+        # now, with the original user, sync again to get a new at token
+        channel = self.make_request("GET", "/sync")
+        self.assertEquals(200, channel.code)
+        sync_token = channel.json_body["next_batch"]
+
+        # check the user can no longer see the updated member list
+        channel = self.make_request(
+            "GET", "/rooms/%s/members?at=%s" % (room_id, sync_token)
+        )
         self.assertEquals(403, channel.code, msg=channel.result["body"])
 
     def test_get_member_list_mixed_memberships(self):

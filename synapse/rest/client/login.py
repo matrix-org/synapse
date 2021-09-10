@@ -1,4 +1,4 @@
-# Copyright 2014-2016 OpenMarket Ltd
+# Copyright 2014-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 
 import logging
 import re
-from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, List, Optional, Tuple
 
 from typing_extensions import TypedDict
 
@@ -79,7 +79,6 @@ class LoginRestServlet(RestServlet):
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
-        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
         self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self.auth = hs.get_auth()
@@ -104,8 +103,14 @@ class LoginRestServlet(RestServlet):
             burst_count=self.hs.config.rc_login_account.burst_count,
         )
 
-    def on_GET(self, request: SynapseRequest):
-        flows = []
+        # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
+        # The reason for this is to ensure that the auth_provider_ids are registered
+        # with SsoHandler, which in turn ensures that the login/registration prometheus
+        # counters are initialised for the auth_provider_ids.
+        _load_sso_handlers(hs)
+
+    def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
+        flows: List[JsonDict] = []
         if self.jwt_enabled:
             flows.append({"type": LoginRestServlet.JWT_TYPE})
             flows.append({"type": LoginRestServlet.JWT_TYPE_DEPRECATED})
@@ -116,25 +121,15 @@ class LoginRestServlet(RestServlet):
             flows.append({"type": LoginRestServlet.CAS_TYPE})
 
         if self.cas_enabled or self.saml2_enabled or self.oidc_enabled:
-            sso_flow: JsonDict = {
-                "type": LoginRestServlet.SSO_TYPE,
-                "identity_providers": [
-                    _get_auth_flow_dict_for_idp(
-                        idp,
-                    )
-                    for idp in self._sso_handler.get_identity_providers().values()
-                ],
-            }
-
-            if self._msc2858_enabled:
-                # backwards-compatibility support for clients which don't
-                # support the stable API yet
-                sso_flow["org.matrix.msc2858.identity_providers"] = [
-                    _get_auth_flow_dict_for_idp(idp, use_unstable_brands=True)
-                    for idp in self._sso_handler.get_identity_providers().values()
-                ]
-
-            flows.append(sso_flow)
+            flows.append(
+                {
+                    "type": LoginRestServlet.SSO_TYPE,
+                    "identity_providers": [
+                        _get_auth_flow_dict_for_idp(idp)
+                        for idp in self._sso_handler.get_identity_providers().values()
+                    ],
+                }
+            )
 
             # While it's valid for us to advertise this login type generally,
             # synapse currently only gives out these tokens as part of the
@@ -151,7 +146,7 @@ class LoginRestServlet(RestServlet):
 
         return 200, {"flows": flows}
 
-    async def on_POST(self, request: SynapseRequest):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, LoginResponse]:
         login_submission = parse_json_object_from_request(request)
 
         if self._msc2918_enabled:
@@ -211,7 +206,7 @@ class LoginRestServlet(RestServlet):
         login_submission: JsonDict,
         appservice: ApplicationService,
         should_issue_refresh_token: bool = False,
-    ):
+    ) -> LoginResponse:
         identifier = login_submission.get("identifier")
         logger.info("Got appservice login request with identifier: %r", identifier)
 
@@ -427,9 +422,7 @@ class LoginRestServlet(RestServlet):
         return result
 
 
-def _get_auth_flow_dict_for_idp(
-    idp: SsoIdentityProvider, use_unstable_brands: bool = False
-) -> JsonDict:
+def _get_auth_flow_dict_for_idp(idp: SsoIdentityProvider) -> JsonDict:
     """Return an entry for the login flow dict
 
     Returns an entry suitable for inclusion in "identity_providers" in the
@@ -437,17 +430,12 @@ def _get_auth_flow_dict_for_idp(
 
     Args:
         idp: the identity provider to describe
-        use_unstable_brands: whether we should use brand identifiers suitable
-           for the unstable API
     """
     e: JsonDict = {"id": idp.idp_id, "name": idp.idp_name}
     if idp.idp_icon:
         e["icon"] = idp.idp_icon
     if idp.idp_brand:
         e["brand"] = idp.idp_brand
-    # use the stable brand identifier if the unstable identifier isn't defined.
-    if use_unstable_brands and idp.unstable_idp_brand:
-        e["brand"] = idp.unstable_idp_brand
     return e
 
 
@@ -461,10 +449,7 @@ class RefreshTokenServlet(RestServlet):
         self._clock = hs.get_clock()
         self.access_token_lifetime = hs.config.access_token_lifetime
 
-    async def on_POST(
-        self,
-        request: SynapseRequest,
-    ):
+    async def on_POST(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
         refresh_submission = parse_json_object_from_request(request)
 
         assert_params_in_dict(refresh_submission, ["refresh_token"])
@@ -499,31 +484,9 @@ class SsoRedirectServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         # make sure that the relevant handlers are instantiated, so that they
         # register themselves with the main SSOHandler.
-        if hs.config.cas_enabled:
-            hs.get_cas_handler()
-        if hs.config.saml2_enabled:
-            hs.get_saml_handler()
-        if hs.config.oidc_enabled:
-            hs.get_oidc_handler()
+        _load_sso_handlers(hs)
         self._sso_handler = hs.get_sso_handler()
-        self._msc2858_enabled = hs.config.experimental.msc2858_enabled
         self._public_baseurl = hs.config.public_baseurl
-
-    def register(self, http_server: HttpServer) -> None:
-        super().register(http_server)
-        if self._msc2858_enabled:
-            # expose additional endpoint for MSC2858 support: backwards-compat support
-            # for clients which don't yet support the stable endpoints.
-            http_server.register_paths(
-                "GET",
-                client_patterns(
-                    "/org.matrix.msc2858/login/sso/redirect/(?P<idp_id>[A-Za-z0-9_.~-]+)$",
-                    releases=(),
-                    unstable=True,
-                ),
-                self.on_GET,
-                self.__class__.__name__,
-            )
 
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None
@@ -569,7 +532,7 @@ class SsoRedirectServlet(RestServlet):
 class CasTicketServlet(RestServlet):
     PATTERNS = client_patterns("/login/cas/ticket", v1=True)
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self._cas_handler = hs.get_cas_handler()
 
@@ -591,10 +554,26 @@ class CasTicketServlet(RestServlet):
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     LoginRestServlet(hs).register(http_server)
     if hs.config.access_token_lifetime is not None:
         RefreshTokenServlet(hs).register(http_server)
     SsoRedirectServlet(hs).register(http_server)
     if hs.config.cas_enabled:
         CasTicketServlet(hs).register(http_server)
+
+
+def _load_sso_handlers(hs: "HomeServer") -> None:
+    """Ensure that the SSO handlers are loaded, if they are enabled by configuration.
+
+    This is mostly useful to ensure that the CAS/SAML/OIDC handlers register themselves
+    with the main SsoHandler.
+
+    It's safe to call this multiple times.
+    """
+    if hs.config.cas.cas_enabled:
+        hs.get_cas_handler()
+    if hs.config.saml2.saml2_enabled:
+        hs.get_saml_handler()
+    if hs.config.oidc.oidc_enabled:
+        hs.get_oidc_handler()

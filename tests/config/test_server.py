@@ -35,7 +35,7 @@ class ServerConfigTestCase(unittest.TestCase):
     def test_unsecure_listener_no_listeners_open_private_ports_false(self):
         conf = yaml.safe_load(
             ServerConfig().generate_config_section(
-                "che.org", "/data_dir_path", False, None
+                "che.org", "/data_dir_path", False, None, config_dir_path="CONFDIR"
             )
         )
 
@@ -55,7 +55,7 @@ class ServerConfigTestCase(unittest.TestCase):
     def test_unsecure_listener_no_listeners_open_private_ports_true(self):
         conf = yaml.safe_load(
             ServerConfig().generate_config_section(
-                "che.org", "/data_dir_path", True, None
+                "che.org", "/data_dir_path", True, None, config_dir_path="CONFDIR"
             )
         )
 
@@ -89,7 +89,7 @@ class ServerConfigTestCase(unittest.TestCase):
 
         conf = yaml.safe_load(
             ServerConfig().generate_config_section(
-                "this.one.listens", "/data_dir_path", True, listeners
+                "this.one.listens", "/data_dir_path", True, listeners, "CONFDIR"
             )
         )
 
@@ -123,7 +123,7 @@ class ServerConfigTestCase(unittest.TestCase):
 
         conf = yaml.safe_load(
             ServerConfig().generate_config_section(
-                "this.one.listens", "/data_dir_path", True, listeners
+                "this.one.listens", "/data_dir_path", True, listeners, "CONFDIR"
             )
         )
 
