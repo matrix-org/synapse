@@ -469,7 +469,7 @@ def start(config_options):
         synapse.metrics.MIN_TIME_BETWEEN_GCS = config.server.gc_seconds
 
     hs = GenericWorkerServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )

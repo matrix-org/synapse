@@ -388,7 +388,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server and server != self.hs.config.server_name:
+        if server and server != self.hs.config.server.server_name:
             # Ensure the server is valid.
             try:
                 parse_and_validate_server_name(server)
@@ -438,7 +438,7 @@ class PublicRoomListRestServlet(TransactionRestServlet):
             limit = None
 
         handler = self.hs.get_room_list_handler()
-        if server and server != self.hs.config.server_name:
+        if server and server != self.hs.config.server.server_name:
             # Ensure the server is valid.
             try:
                 parse_and_validate_server_name(server)

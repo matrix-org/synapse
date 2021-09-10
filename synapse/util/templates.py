@@ -68,7 +68,7 @@ def build_jinja_env(
     )
 
     # common variables for all templates
-    env.globals.update({"server_name": config.server_name})
+    env.globals.update({"server_name": config.server.server_name})
 
     return env
 

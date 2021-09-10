@@ -205,7 +205,7 @@ def start(config_options):
     synapse.events.USE_FROZEN_DICTS = config.use_frozen_dicts
 
     ss = AdminCmdServer(
-        config.server_name,
+        config.server.server_name,
         config=config,
         version_string="Synapse/" + get_version_string(synapse),
     )

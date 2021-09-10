@@ -672,7 +672,7 @@ class StatsStore(StateDeltasStore):
 
         def get_users_media_usage_paginate_txn(txn):
             filters = []
-            args = [self.hs.config.server_name]
+            args = [self.hs.config.server.server_name]
 
             if search_term:
                 filters.append("(lmr.user_id LIKE ? OR displayname LIKE ?)")

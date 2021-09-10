@@ -433,7 +433,7 @@ def setup_sentry(hs):
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("matrix_server_name", hs.config.server_name)
+        scope.set_tag("matrix_server_name", hs.config.server.server_name)
 
         app = (
             hs.config.worker.worker_app

@@ -289,7 +289,7 @@ class AuthHandler(BaseHandler):
             hs.config.sso_account_deactivated_template
         )
 
-        self._server_name = hs.config.server_name
+        self._server_name = hs.config.server.server_name
 
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
@@ -1799,7 +1799,7 @@ class MacaroonGenerator:
 
     def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
             key=self.hs.config.macaroon_secret_key,
         )
