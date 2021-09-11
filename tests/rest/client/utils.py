@@ -138,6 +138,7 @@ class RestHelper:
         extra_data: Optional[dict] = None,
         tok: Optional[str] = None,
         expect_code: int = 200,
+        expect_errcode: str = None,
     ) -> None:
         """
         Send a membership state event into a room.
@@ -150,6 +151,7 @@ class RestHelper:
             extra_data: Extra information to include in the content of the event
             tok: The user access token to use
             expect_code: The expected HTTP response code
+            expect_errcode: The expected Matrix error code
         """
         temp_id = self.auth_user_id
         self.auth_user_id = src
@@ -176,6 +178,15 @@ class RestHelper:
             int(channel.result["code"]),
             channel.result["body"],
         )
+
+        if expect_errcode:
+            assert (
+                str(channel.json_body["errcode"]) == expect_errcode
+            ), "Expected: %r, got: %r, resp: %r" % (
+                expect_errcode,
+                channel.json_body["errcode"],
+                channel.result["body"],
+            )
 
         self.auth_user_id = temp_id
 
