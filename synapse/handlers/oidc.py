@@ -338,9 +338,6 @@ class OidcProvider:
         # optional brand identifier for this auth provider
         self.idp_brand = provider.idp_brand
 
-        # Optional brand identifier for the unstable API (see MSC2858).
-        self.unstable_idp_brand = provider.unstable_idp_brand
-
         self._sso_handler = hs.get_sso_handler()
 
         self._sso_handler.register_identity_provider(self)

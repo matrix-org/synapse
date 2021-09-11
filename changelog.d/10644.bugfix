@@ -1,1 +1,0 @@
-Rooms with unsupported room versions are no longer returned via `/sync`.

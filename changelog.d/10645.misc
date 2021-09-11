@@ -1,1 +1,0 @@
-Make `backfill` and `get_missing_events` use the same codepath.
