@@ -1,1 +1,2 @@
 Based off of kick_users.py this script implements the make_room_admin API call to make a targeted user an admin in the targeted room.
+0
