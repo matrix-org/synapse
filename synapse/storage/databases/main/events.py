@@ -1961,7 +1961,7 @@ class PersistEventsStore:
 
         # postgres throws an error if we try to insert null code points
         if "\u0000" in value:
-             value = value.replace("\u0000", "\u0020")
+            value = value.replace("\u0000", "\u0020")
 
         self.store.store_search_entries_txn(
             txn,
