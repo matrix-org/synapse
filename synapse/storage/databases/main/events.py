@@ -16,7 +16,6 @@
 import itertools
 import logging
 from collections import OrderedDict, namedtuple
-from synapse.logging.opentracing import start_active_span
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -38,6 +37,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
+from synapse.logging.opentracing import start_active_span
 from synapse.logging.utils import log_function
 from synapse.storage._base import db_to_json, make_in_list_sql_clause
 from synapse.storage.database import DatabasePool, LoggingTransaction
@@ -1301,6 +1301,8 @@ class PersistEventsStore:
                     },
                 )
 
+                self._handle_mult_prev_events(txn, [event])
+
                 sql = "UPDATE events SET outlier = ? WHERE event_id = ?"
                 txn.execute(sql, (False, event.event_id))
 
@@ -2123,7 +2125,7 @@ class PersistEventsStore:
             values={"min_depth": depth},
         )
 
-    def _handle_mult_prev_events(self, txn, events):
+    def _handle_mult_prev_events(self, txn, events: Iterable[EventBase]):
         """
         For the given event, update the event edges table and forward and
         backward extremities tables.
@@ -2140,6 +2142,7 @@ class PersistEventsStore:
                 }
                 for ev in events
                 for e_id in ev.prev_event_ids()
+                if not ev.internal_metadata.is_outlier()
             ],
         )
 
