@@ -241,6 +241,7 @@ try:
     try:
         from jaeger_client.reporter import BaseReporter
     except ImportError:
+
         class BaseReporter:  # type: ignore[no-redef]
             pass
 
