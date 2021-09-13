@@ -466,18 +466,18 @@ class FederationClient(FederationBase):
                 pdu.event_id, allow_rejected=True, allow_none=True
             )
 
-        pdu_origin = get_domain_from_id(pdu.sender)
-        if not res and pdu_origin != origin:
-            try:
-                res = await self.get_pdu(
-                    destinations=[pdu_origin],
-                    event_id=pdu.event_id,
-                    room_version=room_version,
-                    outlier=outlier,
-                    timeout=10000,
-                )
-            except SynapseError:
-                pass
+        # pdu_origin = get_domain_from_id(pdu.sender)
+        # if not res and pdu_origin != origin:
+        #     try:
+        #         res = await self.get_pdu(
+        #             destinations=[pdu_origin],
+        #             event_id=pdu.event_id,
+        #             room_version=room_version,
+        #             outlier=outlier,
+        #             timeout=10000,
+        #         )
+        #     except SynapseError:
+        #         pass
 
         if not res:
             logger.warning(
