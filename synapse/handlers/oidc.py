@@ -324,7 +324,7 @@ class OidcProvider:
         self._allow_existing_users = provider.allow_existing_users
 
         self._http_client = hs.get_proxied_http_client()
-        self._server_name: str = hs.config.server_name
+        self._server_name: str = hs.config.server.server_name
 
         # identifier for the external_ids table
         self.idp_id = provider.idp_id

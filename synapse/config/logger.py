@@ -223,7 +223,7 @@ def _setup_stdlib_logging(config, log_config_path, logBeginner: LogBeginner) -> 
     # writes.
 
     log_context_filter = LoggingContextFilter()
-    log_metadata_filter = MetadataFilter({"server_name": config.server_name})
+    log_metadata_filter = MetadataFilter({"server_name": config.server.server_name})
     old_factory = logging.getLogRecordFactory()
 
     def factory(*args, **kwargs):
@@ -335,5 +335,5 @@ def setup_logging(
     # Log immediately so we can grep backwards.
     logging.warning("***** STARTING SERVER *****")
     logging.warning("Server %s version %s", sys.argv[0], get_version_string(synapse))
-    logging.info("Server hostname: %s", config.server_name)
+    logging.info("Server hostname: %s", config.server.server_name)
     logging.info("Instance name: %s", hs.get_instance_name())

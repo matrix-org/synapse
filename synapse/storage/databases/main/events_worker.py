@@ -158,7 +158,7 @@ class EventsWorkerStore(SQLBaseStore):
                     db_conn, "events", "stream_ordering", step=-1
                 )
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             # We periodically clean out old transaction ID mappings
             self._clock.looping_call(
                 self._cleanup_old_transaction_ids,

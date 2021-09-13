@@ -34,10 +34,10 @@ class WellKnownBuilder:
 
     def get_well_known(self):
         # if we don't have a public_baseurl, we can't help much here.
-        if self._config.public_baseurl is None:
+        if self._config.server.public_baseurl is None:
             return None
 
-        result = {"m.homeserver": {"base_url": self._config.public_baseurl}}
+        result = {"m.homeserver": {"base_url": self._config.server.public_baseurl}}
 
         if self._config.default_identity_server:
             result["m.identity_server"] = {

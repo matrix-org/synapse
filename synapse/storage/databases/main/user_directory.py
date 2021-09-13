@@ -510,7 +510,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         self._prefer_local_users_in_search = (
             hs.config.user_directory_search_prefer_local_users
         )
-        self._server_name = hs.config.server_name
+        self._server_name = hs.config.server.server_name
 
     async def remove_from_user_dir(self, user_id: str) -> None:
         def _remove_from_user_dir_txn(txn):

@@ -383,7 +383,7 @@ def init_tracer(hs: "HomeServer"):
 
     config = JaegerConfig(
         config=hs.config.jaeger_config,
-        service_name=f"{hs.config.server_name} {hs.get_instance_name()}",
+        service_name=f"{hs.config.server.server_name} {hs.get_instance_name()}",
         scope_manager=LogContextScopeManager(hs.config),
         metrics_factory=PrometheusMetricsFactory(),
     )

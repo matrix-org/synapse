@@ -59,7 +59,7 @@ class PushRuleRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.notifier = hs.get_notifier()
-        self._is_worker = hs.config.worker_app is not None
+        self._is_worker = hs.config.worker.worker_app is not None
 
         self._users_new_default_push_rules = hs.config.users_new_default_push_rules
 
