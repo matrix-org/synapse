@@ -1090,7 +1090,7 @@ class SyncHandler:
         block_all_presence_data = (
             since_token is None and sync_config.filter_collection.blocks_all_presence()
         )
-        if self.hs_config.use_presence and not block_all_presence_data:
+        if self.hs_config.server.use_presence and not block_all_presence_data:
             logger.debug("Fetching presence data")
             await self._generate_sync_entry_for_presence(
                 sync_result_builder,
