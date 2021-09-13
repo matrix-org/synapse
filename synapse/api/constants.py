@@ -198,6 +198,9 @@ class EventContentFields:
     # cf https://github.com/matrix-org/matrix-doc/pull/1772
     ROOM_TYPE = "type"
 
+    # Whether a room can federate.
+    FEDERATE = "m.federate"
+
     # The creator of the room, as used in `m.room.create` events.
     ROOM_CREATOR = "creator"
 

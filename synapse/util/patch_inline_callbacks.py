@@ -24,7 +24,7 @@ from twisted.python.failure import Failure
 _already_patched = False
 
 
-def do_patch():
+def do_patch() -> None:
     """
     Patch defer.inlineCallbacks so that it checks the state of the logcontext on exit
     """
@@ -107,7 +107,7 @@ def do_patch():
     _already_patched = True
 
 
-def _check_yield_points(f: Callable, changes: List[str]):
+def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
     """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
 

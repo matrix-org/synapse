@@ -22,7 +22,7 @@ from typing_extensions import Counter
 
 from twisted.internet.defer import DeferredLock
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventContentFields, EventTypes, Membership
 from synapse.api.errors import StoreError
 from synapse.storage.database import DatabasePool
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
@@ -590,7 +590,7 @@ class StatsStore(StateDeltasStore):
                 room_state["canonical_alias"] = event.content.get("alias")
             elif event.type == EventTypes.Create:
                 room_state["is_federatable"] = (
-                    event.content.get("m.federate", True) is True
+                    event.content.get(EventContentFields.FEDERATE, True) is True
                 )
 
         await self.update_room_state(room_id, room_state)
