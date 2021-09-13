@@ -33,7 +33,7 @@ from prometheus_client import Counter
 
 import synapse.metrics
 from synapse.api.constants import EventContentFields, EventTypes, RelationTypes
-from synapse.api.room_versions import RoomVersions
+from synapse.api.room_versions import EventFormatVersions, RoomVersions
 from synapse.crypto.event_signing import compute_event_reference_hash
 from synapse.events import EventBase  # noqa: F401
 from synapse.events.snapshot import EventContext  # noqa: F401
@@ -1451,7 +1451,11 @@ class PersistEventsStore:
         return [ec for ec in events_and_contexts if ec[0] not in to_remove]
 
     def _update_metadata_tables_txn(
-        self, txn, events_and_contexts, all_events_and_contexts, backfilled
+        self,
+        txn,
+        events_and_contexts: List[Tuple[EventBase, EventContext]],
+        all_events_and_contexts,
+        backfilled,
     ):
         """Update all the miscellaneous tables for new events
 
@@ -1542,7 +1546,12 @@ class PersistEventsStore:
 
         # Insert event_reference_hashes table.
         self._store_event_reference_hashes_txn(
-            txn, [event for event, _ in events_and_contexts]
+            txn,
+            [
+                event
+                for event, _ in events_and_contexts
+                if event.format_version == EventFormatVersions.V1
+            ],
         )
 
         # Prefill the event cache
