@@ -553,6 +553,15 @@ class MatrixFederationHttpClient:
                         with Measure(self.clock, "outbound_request"):
                             # we don't want all the fancy cookie and redirect handling
                             # that treq.request gives: just use the raw Agent.
+
+                            # To preserve the logging context, the timeout is treated
+                            # in a similar way to `defer.gatherResults`:
+                            # * Each logging context-preserving fork is wrapped in
+                            #   `run_in_background`. In this case there is only one,
+                            #   since the timeout fork is not logging-context aware.
+                            # * The `Deferred` that joins the forks back together is
+                            #   wrapped in `make_deferred_yieldable` to restore the
+                            #   logging context regardless of the path taken.
                             request_deferred = run_in_background(
                                 self.agent.request,
                                 method_bytes,
