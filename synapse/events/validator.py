@@ -88,7 +88,7 @@ class EventValidator:
             self._validate_retention(event)
 
         if event.type == EventTypes.ServerACL:
-            if not server_matches_acl_event(config.server_name, event):
+            if not server_matches_acl_event(config.server.server_name, event):
                 raise SynapseError(
                     400, "Can't create an ACL event that denies the local server"
                 )

@@ -281,7 +281,8 @@ class FederationSender(AbstractFederationSender):
         self._queues_awaiting_rr_flush_by_room: Dict[str, Set[PerDestinationQueue]] = {}
 
         self._rr_txn_interval_per_room_ms = (
-            1000.0 / hs.config.federation_rr_transactions_per_room_per_second
+            1000.0
+            / hs.config.ratelimiting.federation_rr_transactions_per_room_per_second
         )
 
         # wake up destinations that have outstanding PDUs to be caught up
