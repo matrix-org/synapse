@@ -63,7 +63,7 @@ class ProfileHandler(BaseHandler):
 
         self.user_directory_handler = hs.get_user_directory_handler()
 
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self.clock.looping_call(
                 self._update_remote_profile_cache, self.PROFILE_UPDATE_MS
             )

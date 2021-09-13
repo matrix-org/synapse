@@ -1,0 +1,1 @@
+Add a max version for the `jaeger-client` dependency for an incompatibility with the rust reporter.
