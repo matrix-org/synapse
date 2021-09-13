@@ -26,7 +26,7 @@ from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
-from synapse.api.errors import Codes
+from synapse.api.errors import HttpResponseException, Codes
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, room, sync
