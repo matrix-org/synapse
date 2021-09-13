@@ -66,7 +66,7 @@ from synapse.http.client import (
 )
 from synapse.http.federation.matrix_federation_agent import MatrixFederationAgent
 from synapse.logging import opentracing
-from synapse.logging.context import make_deferred_yieldable
+from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.logging.opentracing import set_tag, start_active_span, tags
 from synapse.types import JsonDict
 from synapse.util import json_decoder
@@ -553,20 +553,20 @@ class MatrixFederationHttpClient:
                         with Measure(self.clock, "outbound_request"):
                             # we don't want all the fancy cookie and redirect handling
                             # that treq.request gives: just use the raw Agent.
-                            request_deferred = self.agent.request(
+                            request_deferred = run_in_background(
+                                self.agent.request,
                                 method_bytes,
                                 url_bytes,
                                 headers=Headers(headers_dict),
                                 bodyProducer=producer,
                             )
-
                             request_deferred = timeout_deferred(
                                 request_deferred,
                                 timeout=_sec_timeout,
                                 reactor=self.reactor,
                             )
 
-                            response = await request_deferred
+                            response = await make_deferred_yieldable(request_deferred)
                     except DNSLookupError as e:
                         raise RequestSendFailed(e, can_retry=retry_on_dns_fail) from e
                     except Exception as e:
