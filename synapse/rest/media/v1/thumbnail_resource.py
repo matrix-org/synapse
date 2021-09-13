@@ -115,7 +115,7 @@ class ThumbnailResource(DirectServeJsonResource):
             thumbnail_infos,
             media_id,
             media_id,
-            url_cache=media_info["url_cache"],
+            url_cache=bool(media_info["url_cache"]),
             server_name=None,
         )
 
@@ -175,7 +175,7 @@ class ThumbnailResource(DirectServeJsonResource):
             desired_height,
             desired_method,
             desired_type,
-            url_cache=media_info["url_cache"],
+            url_cache=bool(media_info["url_cache"]),
         )
 
         if file_path:
@@ -274,7 +274,7 @@ class ThumbnailResource(DirectServeJsonResource):
             thumbnail_infos,
             media_id,
             media_info["filesystem_id"],
-            url_cache=None,
+            url_cache=False,
             server_name=server_name,
         )
 
@@ -288,7 +288,7 @@ class ThumbnailResource(DirectServeJsonResource):
         thumbnail_infos: List[Dict[str, Any]],
         media_id: str,
         file_id: str,
-        url_cache: Optional[str] = None,
+        url_cache: bool,
         server_name: Optional[str] = None,
     ) -> None:
         """
@@ -302,7 +302,7 @@ class ThumbnailResource(DirectServeJsonResource):
             desired_type: The desired content-type of the thumbnail.
             thumbnail_infos: A list of dictionaries of candidate thumbnails.
             file_id: The ID of the media that a thumbnail is being requested for.
-            url_cache: The URL cache value.
+            url_cache: True if this is from a URL cache.
             server_name: The server name, if this is a remote thumbnail.
         """
         if thumbnail_infos:
@@ -391,7 +391,7 @@ class ThumbnailResource(DirectServeJsonResource):
         desired_type: str,
         thumbnail_infos: List[Dict[str, Any]],
         file_id: str,
-        url_cache: Optional[str],
+        url_cache: bool,
         server_name: Optional[str],
     ) -> Optional[FileInfo]:
         """
@@ -404,7 +404,7 @@ class ThumbnailResource(DirectServeJsonResource):
             desired_type: The desired content-type of the thumbnail.
             thumbnail_infos: A list of dictionaries of candidate thumbnails.
             file_id: The ID of the media that a thumbnail is being requested for.
-            url_cache: The URL cache value.
+            url_cache: True if this is from a URL cache.
             server_name: The server name, if this is a remote thumbnail.
 
         Returns:

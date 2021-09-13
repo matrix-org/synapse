@@ -261,7 +261,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         if _is_media(media_info.media_type):
             file_id = media_info.filesystem_id
             dims = await self.media_repo._generate_thumbnails(
-                None, file_id, file_id, media_info.media_type, url_cache=url
+                None, file_id, file_id, media_info.media_type, url_cache=True
             )
 
             og = {
@@ -300,7 +300,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                     # TODO: make sure we don't choke on white-on-transparent images
                     file_id = image_info.filesystem_id
                     dims = await self.media_repo._generate_thumbnails(
-                        None, file_id, file_id, image_info.media_type, url_cache=url
+                        None, file_id, file_id, image_info.media_type, url_cache=True
                     )
                     if dims:
                         og["og:image:width"] = dims["width"]
@@ -355,7 +355,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         file_id = datetime.date.today().isoformat() + "_" + random_string(16)
 
-        file_info = FileInfo(server_name=None, file_id=file_id, url_cache=url)
+        file_info = FileInfo(server_name=None, file_id=file_id, url_cache=True)
 
         # If this URL can be accessed via oEmbed, use that instead.
         url_to_download: Optional[str] = url

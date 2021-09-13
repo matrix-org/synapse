@@ -211,7 +211,7 @@ class MediaRepository:
         upload_name = name if name else media_info["upload_name"]
         url_cache = media_info["url_cache"]
 
-        file_info = FileInfo(None, media_id, url_cache=url_cache)
+        file_info = FileInfo(None, media_id, url_cache=bool(url_cache))
 
         responder = await self.media_storage.fetch_media(file_info)
         await respond_with_responder(
@@ -515,7 +515,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: Optional[str],
+        url_cache: bool,
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)
@@ -658,7 +658,7 @@ class MediaRepository:
         media_id: str,
         file_id: str,
         media_type: str,
-        url_cache: Optional[str] = None,
+        url_cache: bool = False,
     ) -> Optional[dict]:
         """Generate and store thumbnails for an image.
 
