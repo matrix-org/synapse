@@ -296,9 +296,12 @@ class PreviewUrlResource(DirectServeJsonResource):
                 body = file.read()
 
             encoding = get_html_media_encoding(body, media_info.media_type)
-            og = decode_and_calc_og(body, media_info.uri, encoding)
-
-            await self._precache_image_url(user, media_info, og)
+            tree = decode_body(body, encoding)
+            if tree is not None:
+                og = _calc_og(tree, media_info.uri)
+                await self._precache_image_url(user, media_info, og)
+            else:
+                og = {}
 
         elif oembed_url and _is_json(media_info.media_type):
             # Handle an oEmbed response.
@@ -621,26 +624,22 @@ def get_html_media_encoding(body: bytes, content_type: str) -> str:
     return "utf-8"
 
 
-def decode_and_calc_og(
-    body: bytes, media_uri: str, request_encoding: Optional[str] = None
-) -> JsonDict:
+def decode_body(
+    body: bytes, request_encoding: Optional[str] = None
+) -> Optional["etree.Element"]:
     """
-    Calculate metadata for an HTML document.
-
-    This uses lxml to parse the HTML document into the OG response. If errors
-    occur during processing of the document, an empty response is returned.
+    This uses lxml to parse the HTML document.
 
     Args:
         body: The HTML document, as bytes.
-        media_url: The URI used to download the body.
         request_encoding: The character encoding of the body, as a string.
 
     Returns:
-        The OG response as a dictionary.
+        The parsed HTML body, or None if an error occurred during processed.
     """
     # If there's no body, nothing useful is going to be found.
     if not body:
-        return {}
+        return None
 
     from lxml import etree
 
@@ -652,25 +651,22 @@ def decode_and_calc_og(
         parser = etree.HTMLParser(recover=True, encoding="utf-8")
     except Exception as e:
         logger.warning("Unable to create HTML parser: %s" % (e,))
-        return {}
+        return None
 
-    def _attempt_calc_og(body_attempt: Union[bytes, str]) -> Dict[str, Optional[str]]:
-        # Attempt to parse the body. If this fails, log and return no metadata.
-        tree = etree.fromstring(body_attempt, parser)
-
-        # The data was successfully parsed, but no tree was found.
-        if tree is None:
-            return {}
-
-        return _calc_og(tree, media_uri)
+    def _attempt_decode_body(
+        body_attempt: Union[bytes, str]
+    ) -> Optional["etree.Element"]:
+        # Attempt to parse the body. Returns None if the body was successfully
+        # parsed, but no tree was found.
+        return etree.fromstring(body_attempt, parser)
 
     # Attempt to parse the body. If this fails, log and return no metadata.
     try:
-        return _attempt_calc_og(body)
+        return _attempt_decode_body(body)
     except UnicodeDecodeError:
         # blindly try decoding the body as utf-8, which seems to fix
         # the charset mismatches on https://google.com
-        return _attempt_calc_og(body.decode("utf-8", "ignore"))
+        return _attempt_decode_body(body.decode("utf-8", "ignore"))
 
 
 def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
