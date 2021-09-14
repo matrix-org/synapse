@@ -14,7 +14,7 @@
 # limitations under the License.
 from typing import TYPE_CHECKING
 
-from synapse.http.server import JsonResource
+from synapse.http.server import HttpServer, JsonResource
 from synapse.rest import admin
 from synapse.rest.client import (
     account,
@@ -78,7 +78,7 @@ class ClientRestResource(JsonResource):
         self.register_servlets(self, hs)
 
     @staticmethod
-    def register_servlets(client_resource, hs: "HomeServer") -> None:
+    def register_servlets(client_resource: HttpServer, hs: "HomeServer") -> None:
         versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
