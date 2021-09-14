@@ -298,7 +298,21 @@ class PreviewUrlResource(DirectServeJsonResource):
             encoding = get_html_media_encoding(body, media_info.media_type)
             tree = decode_body(body, encoding)
             if tree is not None:
-                og = _calc_og(tree, media_info.uri)
+                # Check if this HTML document points to oEmbed information and
+                # defer to that.
+                oembed_url = self._oembed.autodiscover_from_html(tree)
+                og = {}
+                if oembed_url:
+                    oembed_info = await self._download_url(oembed_url, user)
+                    og, expiration_ms = await self._handle_oembed_response(
+                        url, oembed_info, expiration_ms
+                    )
+
+                # If there was no oEmbed URL (or oEmbed parsing failed), attempt
+                # to generate the Open Graph information from the HTML.
+                if not oembed_url or not og:
+                    og = _calc_og(tree, media_info.uri)
+
                 await self._precache_image_url(user, media_info, og)
             else:
                 og = {}
