@@ -42,6 +42,7 @@ from synapse.util.stringutils import random_string
 from ._base import (
     FileInfo,
     Responder,
+    ThumbnailInfo,
     get_filename_from_headers,
     respond_404,
     respond_with_responder,
@@ -210,7 +211,7 @@ class MediaRepository:
         upload_name = name if name else media_info["upload_name"]
         url_cache = media_info["url_cache"]
 
-        file_info = FileInfo(None, media_id, url_cache=url_cache)
+        file_info = FileInfo(None, media_id, url_cache=bool(url_cache))
 
         responder = await self.media_storage.fetch_media(file_info)
         await respond_with_responder(
@@ -514,7 +515,7 @@ class MediaRepository:
         t_height: int,
         t_method: str,
         t_type: str,
-        url_cache: Optional[str],
+        url_cache: bool,
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
             FileInfo(None, media_id, url_cache=url_cache)
@@ -548,11 +549,12 @@ class MediaRepository:
                     server_name=None,
                     file_id=media_id,
                     url_cache=url_cache,
-                    thumbnail=True,
-                    thumbnail_width=t_width,
-                    thumbnail_height=t_height,
-                    thumbnail_method=t_method,
-                    thumbnail_type=t_type,
+                    thumbnail=ThumbnailInfo(
+                        width=t_width,
+                        height=t_height,
+                        method=t_method,
+                        type=t_type,
+                    ),
                 )
 
                 output_path = await self.media_storage.store_file(
@@ -585,7 +587,7 @@ class MediaRepository:
         t_type: str,
     ) -> Optional[str]:
         input_path = await self.media_storage.ensure_media_is_in_local_cache(
-            FileInfo(server_name, file_id, url_cache=False)
+            FileInfo(server_name, file_id)
         )
 
         try:
@@ -616,11 +618,12 @@ class MediaRepository:
                 file_info = FileInfo(
                     server_name=server_name,
                     file_id=file_id,
-                    thumbnail=True,
-                    thumbnail_width=t_width,
-                    thumbnail_height=t_height,
-                    thumbnail_method=t_method,
-                    thumbnail_type=t_type,
+                    thumbnail=ThumbnailInfo(
+                        width=t_width,
+                        height=t_height,
+                        method=t_method,
+                        type=t_type,
+                    ),
                 )
 
                 output_path = await self.media_storage.store_file(
@@ -742,12 +745,13 @@ class MediaRepository:
             file_info = FileInfo(
                 server_name=server_name,
                 file_id=file_id,
-                thumbnail=True,
-                thumbnail_width=t_width,
-                thumbnail_height=t_height,
-                thumbnail_method=t_method,
-                thumbnail_type=t_type,
                 url_cache=url_cache,
+                thumbnail=ThumbnailInfo(
+                    width=t_width,
+                    height=t_height,
+                    method=t_method,
+                    type=t_type,
+                ),
             )
 
             with self.media_storage.store_into_file(file_info) as (f, fname, finish):
