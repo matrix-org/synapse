@@ -1347,7 +1347,7 @@ class AuthHandler(BaseHandler):
         try:
             res = self.macaroon_gen.verify_short_term_login_token(login_token)
         except Exception:
-            raise AuthError(403, "Invalid token", errcode=Codes.FORBIDDEN)
+            raise AuthError(403, "Invalid login token", errcode=Codes.FORBIDDEN)
 
         await self.auth.check_auth_blocking(res.user_id)
         return res
