@@ -13,8 +13,9 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
 from typing import Dict, Iterable, List, Optional, Set, Tuple
+
+import attr
 
 from synapse.api.constants import EventTypes
 from synapse.storage._base import SQLBaseStore
@@ -33,16 +34,15 @@ logger = logging.getLogger(__name__)
 MAX_STATE_DELTA_HOPS = 100
 
 
-class _GetStateGroupDelta(
-    namedtuple("_GetStateGroupDelta", ("prev_group", "delta_ids"))
-):
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class _GetStateGroupDelta:
     """Return type of get_state_group_delta that implements __len__, which lets
-    us use the itrable flag when caching
+    us use the iterable flag when caching
     """
+    prev_group: Optional[int]
+    delta_ids: Optional[StateMap[str]]
 
-    __slots__ = []
-
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.delta_ids) if self.delta_ids else 0
 
 
@@ -110,7 +110,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         the old and the new.
 
         Returns:
-            (prev_group, delta_ids), where both may be None.
+            _GetStateGroupDelta containing prev_group and delta_ids, where both may be None.
         """
 
         def _get_state_group_delta_txn(txn):
