@@ -37,6 +37,7 @@ import attr
 from typing_extensions import ContextManager
 
 from twisted.internet import defer
+from twisted.internet.base import ReactorBase
 from twisted.internet.defer import CancelledError
 from twisted.internet.interfaces import IReactorTime
 from twisted.python import failure
@@ -268,6 +269,7 @@ class Linearizer:
         if not clock:
             from twisted.internet import reactor
 
+            assert isinstance(reactor, ReactorBase)
             clock = Clock(reactor)
         self._clock = clock
         self.max_count = max_count
@@ -411,7 +413,7 @@ class ReadWriteLock:
     # writers and readers have been resolved. The new writer replaces the latest
     # writer.
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Latest readers queued
         self.key_to_current_readers: Dict[str, Set[defer.Deferred]] = {}
 
@@ -503,7 +505,7 @@ def timeout_deferred(
 
     timed_out = [False]
 
-    def time_it_out():
+    def time_it_out() -> None:
         timed_out[0] = True
 
         try:
@@ -550,19 +552,21 @@ def timeout_deferred(
     return new_d
 
 
+# This class can't be generic because it uses slots with attrs.
+# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True, frozen=True)
-class DoneAwaitable:
+class DoneAwaitable:  # should be: Generic[R]
     """Simple awaitable that returns the provided value."""
 
-    value = attr.ib()
+    value = attr.ib(type=Any)  # should be: R
 
     def __await__(self):
         return self
 
-    def __iter__(self):
+    def __iter__(self) -> "DoneAwaitable":
         return self
 
-    def __next__(self):
+    def __next__(self) -> None:
         raise StopIteration(self.value)
 
 

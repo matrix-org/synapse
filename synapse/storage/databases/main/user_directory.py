@@ -196,7 +196,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 )
 
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
-                user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
@@ -207,7 +206,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 to_insert = set()
 
                 if is_public:
-                    for user_id in user_ids:
+                    for user_id in users_with_profile:
                         if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
@@ -217,14 +216,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         await self.add_users_in_public_rooms(room_id, to_insert)
                         to_insert.clear()
                 else:
-                    for user_id in user_ids:
+                    for user_id in users_with_profile:
                         if not self.hs.is_mine_id(user_id):
                             continue
 
                         if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
-                        for other_user_id in user_ids:
+                        for other_user_id in users_with_profile:
                             if user_id == other_user_id:
                                 continue
 
@@ -511,7 +510,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         self._prefer_local_users_in_search = (
             hs.config.user_directory_search_prefer_local_users
         )
-        self._server_name = hs.config.server_name
+        self._server_name = hs.config.server.server_name
 
     async def remove_from_user_dir(self, user_id: str) -> None:
         def _remove_from_user_dir_txn(txn):

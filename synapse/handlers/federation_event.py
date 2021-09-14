@@ -149,7 +149,7 @@ class FederationEventHandler:
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._user_device_resync = (
                 ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
@@ -1009,7 +1009,7 @@ class FederationEventHandler:
             await self._store.mark_remote_user_device_cache_as_stale(sender)
 
             # Immediately attempt a resync in the background
-            if self._config.worker_app:
+            if self._config.worker.worker_app:
                 await self._user_device_resync(user_id=sender)
             else:
                 await self._device_list_updater.user_device_resync(sender)

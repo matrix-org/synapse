@@ -445,26 +445,9 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             [f["type"] for f in channel.json_body["flows"]], expected_flow_types
         )
 
-    @override_config({"experimental_features": {"msc2858_enabled": True}})
-    def test_get_msc2858_login_flows(self):
-        """The SSO flow should include IdP info if MSC2858 is enabled"""
-        channel = self.make_request("GET", "/_matrix/client/r0/login")
-        self.assertEqual(channel.code, 200, channel.result)
-
-        # stick the flows results in a dict by type
-        flow_results: Dict[str, Any] = {}
-        for f in channel.json_body["flows"]:
-            flow_type = f["type"]
-            self.assertNotIn(
-                flow_type, flow_results, "duplicate flow type %s" % (flow_type,)
-            )
-            flow_results[flow_type] = f
-
-        self.assertIn("m.login.sso", flow_results, "m.login.sso was not returned")
-        sso_flow = flow_results.pop("m.login.sso")
-        # we should have a set of IdPs
+        flows = {flow["type"]: flow for flow in channel.json_body["flows"]}
         self.assertCountEqual(
-            sso_flow["org.matrix.msc2858.identity_providers"],
+            flows["m.login.sso"]["identity_providers"],
             [
                 {"id": "cas", "name": "CAS"},
                 {"id": "saml", "name": "SAML"},
@@ -473,19 +456,10 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
             ],
         )
 
-        # the rest of the flows are simple
-        expected_flows = [
-            {"type": "m.login.cas"},
-            {"type": "m.login.token"},
-            {"type": "m.login.password"},
-        ] + ADDITIONAL_LOGIN_FLOWS
-
-        self.assertCountEqual(flow_results.values(), expected_flows)
-
     def test_multi_sso_redirect(self):
         """/login/sso/redirect should redirect to an identity picker"""
         # first hit the redirect url, which should redirect to our idp picker
-        channel = self._make_sso_redirect_request(False, None)
+        channel = self._make_sso_redirect_request(None)
         self.assertEqual(channel.code, 302, channel.result)
         uri = channel.headers.getRawHeaders("Location")[0]
 
@@ -637,13 +611,13 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
 
     def test_client_idp_redirect_to_unknown(self):
         """If the client tries to pick an unknown IdP, return a 404"""
-        channel = self._make_sso_redirect_request(False, "xxx")
+        channel = self._make_sso_redirect_request("xxx")
         self.assertEqual(channel.code, 404, channel.result)
         self.assertEqual(channel.json_body["errcode"], "M_NOT_FOUND")
 
     def test_client_idp_redirect_to_oidc(self):
         """If the client pick a known IdP, redirect to it"""
-        channel = self._make_sso_redirect_request(False, "oidc")
+        channel = self._make_sso_redirect_request("oidc")
         self.assertEqual(channel.code, 302, channel.result)
         oidc_uri = channel.headers.getRawHeaders("Location")[0]
         oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
@@ -651,37 +625,12 @@ class MultiSSOTestCase(unittest.HomeserverTestCase):
         # it should redirect us to the auth page of the OIDC server
         self.assertEqual(oidc_uri_path, TEST_OIDC_AUTH_ENDPOINT)
 
-    @override_config({"experimental_features": {"msc2858_enabled": True}})
-    def test_client_msc2858_redirect_to_oidc(self):
-        """Test the unstable API"""
-        channel = self._make_sso_redirect_request(True, "oidc")
-        self.assertEqual(channel.code, 302, channel.result)
-        oidc_uri = channel.headers.getRawHeaders("Location")[0]
-        oidc_uri_path, oidc_uri_query = oidc_uri.split("?", 1)
-
-        # it should redirect us to the auth page of the OIDC server
-        self.assertEqual(oidc_uri_path, TEST_OIDC_AUTH_ENDPOINT)
-
-    def test_client_idp_redirect_msc2858_disabled(self):
-        """If the client tries to use the MSC2858 endpoint but MSC2858 is disabled, return a 400"""
-        channel = self._make_sso_redirect_request(True, "oidc")
-        self.assertEqual(channel.code, 400, channel.result)
-        self.assertEqual(channel.json_body["errcode"], "M_UNRECOGNIZED")
-
-    def _make_sso_redirect_request(
-        self, unstable_endpoint: bool = False, idp_prov: Optional[str] = None
-    ):
+    def _make_sso_redirect_request(self, idp_prov: Optional[str] = None):
         """Send a request to /_matrix/client/r0/login/sso/redirect
-
-        ... or the unstable equivalent
 
         ... possibly specifying an IDP provider
         """
-        endpoint = (
-            "/_matrix/client/unstable/org.matrix.msc2858/login/sso/redirect"
-            if unstable_endpoint
-            else "/_matrix/client/r0/login/sso/redirect"
-        )
+        endpoint = "/_matrix/client/r0/login/sso/redirect"
         if idp_prov is not None:
             endpoint += "/" + idp_prov
         endpoint += "?redirectUrl=" + urllib.parse.quote_plus(TEST_CLIENT_REDIRECT_URL)

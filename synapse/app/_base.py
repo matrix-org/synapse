@@ -82,7 +82,7 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
         run_command (Callable[]): callable that actually runs the reactor
     """
 
-    logger = logging.getLogger(config.worker_app)
+    logger = logging.getLogger(config.worker.worker_app)
 
     start_reactor(
         appname,
@@ -398,7 +398,7 @@ async def start(hs: "HomeServer"):
 
     # If background tasks are running on the main process, start collecting the
     # phone home stats.
-    if hs.config.run_background_tasks:
+    if hs.config.worker.run_background_tasks:
         start_phone_stats_home(hs)
 
     # We now freeze all allocated objects in the hopes that (almost)
@@ -433,9 +433,13 @@ def setup_sentry(hs):
 
     # We set some default tags that give some context to this instance
     with sentry_sdk.configure_scope() as scope:
-        scope.set_tag("matrix_server_name", hs.config.server_name)
+        scope.set_tag("matrix_server_name", hs.config.server.server_name)
 
-        app = hs.config.worker_app if hs.config.worker_app else "synapse.app.homeserver"
+        app = (
+            hs.config.worker.worker_app
+            if hs.config.worker.worker_app
+            else "synapse.app.homeserver"
+        )
         name = hs.get_instance_name()
         scope.set_tag("worker_app", app)
         scope.set_tag("worker_name", name)
