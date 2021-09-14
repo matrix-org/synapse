@@ -63,7 +63,7 @@ class StateFilter:
         # If `include_others` is set we canonicalise the filter by removing
         # wildcards from the types dictionary
         if self.include_others:
-            # REVIEW: yucky
+            # this is needed to work around the fact that StateFilter is frozen
             object.__setattr__(
                 self,
                 "types",
