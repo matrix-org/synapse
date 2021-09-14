@@ -22,7 +22,7 @@ import re
 import shutil
 import sys
 import traceback
-from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Union
+from typing import TYPE_CHECKING, Dict, Generator, Iterable, Optional, Tuple, Union
 from urllib import parse as urlparse
 
 import attr
@@ -303,18 +303,11 @@ class PreviewUrlResource(DirectServeJsonResource):
             else:
                 og = {}
 
-        elif oembed_url and _is_json(media_info.media_type):
-            # Handle an oEmbed response.
-            with open(media_info.filename, "rb") as file:
-                body = file.read()
-
-            oembed_response = self._oembed.parse_oembed_response(url, body)
-            og = oembed_response.open_graph_result
-
-            # Use the cache age from the oEmbed result, instead of the HTTP response.
-            if oembed_response.cache_age is not None:
-                expiration_ms = oembed_response.cache_age
-
+        elif oembed_url:
+            # Handle the oEmbed information.
+            og, expiration_ms = await self._handle_oembed_response(
+                url, media_info, expiration_ms
+            )
             await self._precache_image_url(user, media_info, og)
 
         else:
@@ -481,6 +474,39 @@ class PreviewUrlResource(DirectServeJsonResource):
             og["matrix:image:size"] = image_info.media_length
         else:
             del og["og:image"]
+
+    async def _handle_oembed_response(
+        self, url: str, media_info: MediaInfo, expiration_ms: int
+    ) -> Tuple[JsonDict, int]:
+        """
+        Parse the downloaded oEmbed info.
+
+        Args:
+            url: The URL which is being previewed (not the one which was
+                requested).
+            media_info: The media being previewed.
+            expiration_ms: The length of time, in milliseconds, the media is valid for.
+
+        Returns:
+            A tuple of:
+                The Open Graph dictionary, if the oEmbed info can be parsed.
+                The (possibly updated) length of time, in milliseconds, the media is valid for.
+        """
+        # If JSON was not returned, there's nothing to do.
+        if not _is_json(media_info.media_type):
+            return {}, expiration_ms
+
+        with open(media_info.filename, "rb") as file:
+            body = file.read()
+
+        oembed_response = self._oembed.parse_oembed_response(url, body)
+        open_graph_result = oembed_response.open_graph_result
+
+        # Use the cache age from the oEmbed result, if one was given.
+        if open_graph_result and oembed_response.cache_age is not None:
+            expiration_ms = oembed_response.cache_age
+
+        return open_graph_result, expiration_ms
 
     def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(
