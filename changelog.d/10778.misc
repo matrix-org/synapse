@@ -1,1 +1,0 @@
-Add a script to update the Debian changelog in a Docker container for systems that aren't Debian-based.
