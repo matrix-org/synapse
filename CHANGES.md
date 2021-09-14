@@ -33,7 +33,7 @@ Improved Documentation
 - Update the documentation to note that the `/spaces` and `/hierarchy` endpoints can be routed to workers. ([\#10648](https://github.com/matrix-org/synapse/issues/10648))
 - Clarify admin API documentation on undoing room deletions. ([\#10735](https://github.com/matrix-org/synapse/issues/10735))
 - Split up the modules documentation and add examples for module developers. ([\#10758](https://github.com/matrix-org/synapse/issues/10758))
-- Correct 2 typographical errors in the *Log Contexts* documentation. ([\#10795](https://github.com/matrix-org/synapse/issues/10795))
+- Correct 2 typographical errors in the [Log Contexts documentation](https://matrix-org.github.io/synapse/latest/log_contexts.html). ([\#10795](https://github.com/matrix-org/synapse/issues/10795))
 - Fix a wording mistake in the sample configuration. Contributed by @bramvdnheuvel:nltrix.net. ([\#10804](https://github.com/matrix-org/synapse/issues/10804))
 
 
@@ -46,8 +46,8 @@ Deprecations and Removals
 Internal Changes
 ----------------
 
-- Add opentracing logging to help debug stuck messages (as described by issue [#9424](https://github.com/matrix-org/synapse/issues/9424)). ([\#10704](https://github.com/matrix-org/synapse/issues/10704))
-- Add type annotations to the synapse.util package. ([\#10601](https://github.com/matrix-org/synapse/issues/10601))
+- Add OpenTracing logging to help debug stuck messages (as described by issue [#9424](https://github.com/matrix-org/synapse/issues/9424)). ([\#10704](https://github.com/matrix-org/synapse/issues/10704))
+- Add type annotations to the `synapse.util` package. ([\#10601](https://github.com/matrix-org/synapse/issues/10601))
 - Ensure `rooms.creator` field is always populated for easy lookup in [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) usage later. ([\#10697](https://github.com/matrix-org/synapse/issues/10697))
 - Add missing type hints to REST servlets. ([\#10707](https://github.com/matrix-org/synapse/issues/10707), [\#10728](https://github.com/matrix-org/synapse/issues/10728), [\#10736](https://github.com/matrix-org/synapse/issues/10736))
 - Do not include rooms with unknown room versions in the spaces summary results. ([\#10727](https://github.com/matrix-org/synapse/issues/10727))
@@ -55,16 +55,16 @@ Internal Changes
 - Clean up some of the federation event authentication code for clarity. ([\#10744](https://github.com/matrix-org/synapse/issues/10744), [\#10745](https://github.com/matrix-org/synapse/issues/10745), [\#10746](https://github.com/matrix-org/synapse/issues/10746), [\#10771](https://github.com/matrix-org/synapse/issues/10771), [\#10773](https://github.com/matrix-org/synapse/issues/10773), [\#10781](https://github.com/matrix-org/synapse/issues/10781))
 - Add an index to `presence_stream` to hopefully speed up startups a little. ([\#10748](https://github.com/matrix-org/synapse/issues/10748))
 - Refactor event size checking code to simplify searching the codebase for the origins of certain error strings that are occasionally emitted. ([\#10750](https://github.com/matrix-org/synapse/issues/10750))
-- Move tests relating to rooms having encryption out of the user_directory tests. ([\#10752](https://github.com/matrix-org/synapse/issues/10752))
+- Move tests relating to rooms having encryption out of the user directory tests. ([\#10752](https://github.com/matrix-org/synapse/issues/10752))
 - Use `attrs` internally for the URL preview code & update documentation. ([\#10753](https://github.com/matrix-org/synapse/issues/10753))
 - Minor speed ups when joining large rooms over federation. ([\#10754](https://github.com/matrix-org/synapse/issues/10754), [\#10755](https://github.com/matrix-org/synapse/issues/10755), [\#10756](https://github.com/matrix-org/synapse/issues/10756), [\#10780](https://github.com/matrix-org/synapse/issues/10780), [\#10784](https://github.com/matrix-org/synapse/issues/10784))
 - Add a constant for `m.federate`. ([\#10775](https://github.com/matrix-org/synapse/issues/10775))
-- Add a script to update the Debian changelog in a Docker container for systems that aren't Debian-based. ([\#10778](https://github.com/matrix-org/synapse/issues/10778))
+- Add a script to update the Debian changelog in a Docker container for systems that are not Debian-based. ([\#10778](https://github.com/matrix-org/synapse/issues/10778))
 - Change the format of authenticated users in logs when a user is being puppeted by and admin user. ([\#10779](https://github.com/matrix-org/synapse/issues/10779))
-- Remove fixed and flakey tests from the sytest-blacklist. ([\#10788](https://github.com/matrix-org/synapse/issues/10788))
+- Remove fixed and flakey tests from the Sytest blacklist. ([\#10788](https://github.com/matrix-org/synapse/issues/10788))
 - Improve internal details of the user directory code. ([\#10789](https://github.com/matrix-org/synapse/issues/10789))
 - Use direct references to config flags. ([\#10798](https://github.com/matrix-org/synapse/issues/10798))
-- Add a max version for the `jaeger-client` dependency for an incompatibility with the rust reporter. ([\#10799](https://github.com/matrix-org/synapse/issues/10799))
+- Ensure the Rust reporter passes type checking with jaeger-client 4.7's type annotations. ([\#10799](https://github.com/matrix-org/synapse/issues/10799))
 
 
 Synapse 1.42.0 (2021-09-07)
