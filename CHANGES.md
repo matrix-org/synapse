@@ -17,11 +17,10 @@ Bugfixes
 --------
 
 - Fix a long-standing bug where room avatars were not included in email notifications. ([\#10658](https://github.com/matrix-org/synapse/issues/10658))
-- Added opentracing logging to help debug stuck messages (as described by issue [#9424](https://github.com/matrix-org/synapse/issues/9424)). ([\#10704](https://github.com/matrix-org/synapse/issues/10704))
 - Fix a bug where the ordering algorithm was skipping the `origin_server_ts` step in the spaces summary resulting in unstable room orderings. ([\#10730](https://github.com/matrix-org/synapse/issues/10730))
-- Allow user registration via SSO to require consent tracking for SSO mapping providers that don't prompt for Matrix ID selection. Contributed by @AndrewFerr. ([\#10733](https://github.com/matrix-org/synapse/issues/10733))
 - Fix edge case when persisting events into a room where there are multiple events we previously hadn't calculated auth chains for (and hadn't marked as needing to be calculated). ([\#10743](https://github.com/matrix-org/synapse/issues/10743))
 - Fix a bug which prevented calls to `/createRoom` that included the `room_alias_name` parameter from being handled by worker processes. ([\#10757](https://github.com/matrix-org/synapse/issues/10757))
+- Fix a bug which prevented user registration via SSO to require consent tracking for SSO mapping providers that don't prompt for Matrix ID selection. Contributed by @AndrewFerr. ([\#10733](https://github.com/matrix-org/synapse/issues/10733))
 - Only return the stripped state events for the `m.space.child` events in a room for the spaces summary from [MSC2946](https://github.com/matrix-org/matrix-doc/pull/2946). ([\#10760](https://github.com/matrix-org/synapse/issues/10760))
 - Properly handle room upgrades of spaces. ([\#10774](https://github.com/matrix-org/synapse/issues/10774))
 - Fix a bug which generated invalid homeserver config when the `frontend_proxy` worker type was passed to the Synapse Worker-based Complement image. ([\#10783](https://github.com/matrix-org/synapse/issues/10783))
@@ -35,7 +34,7 @@ Improved Documentation
 - Clarify admin API documentation on undoing room deletions. ([\#10735](https://github.com/matrix-org/synapse/issues/10735))
 - Split up the modules documentation and add examples for module developers. ([\#10758](https://github.com/matrix-org/synapse/issues/10758))
 - Correct 2 typographical errors in the *Log Contexts* documentation. ([\#10795](https://github.com/matrix-org/synapse/issues/10795))
-- Fixed a wording mistake in the sample configuration. Contributed by @bramvdnheuvel:nltrix.net. ([\#10804](https://github.com/matrix-org/synapse/issues/10804))
+- Fix a wording mistake in the sample configuration. Contributed by @bramvdnheuvel:nltrix.net. ([\#10804](https://github.com/matrix-org/synapse/issues/10804))
 
 
 Deprecations and Removals
@@ -47,6 +46,7 @@ Deprecations and Removals
 Internal Changes
 ----------------
 
+- Add opentracing logging to help debug stuck messages (as described by issue [#9424](https://github.com/matrix-org/synapse/issues/9424)). ([\#10704](https://github.com/matrix-org/synapse/issues/10704))
 - Add type annotations to the synapse.util package. ([\#10601](https://github.com/matrix-org/synapse/issues/10601))
 - Ensure `rooms.creator` field is always populated for easy lookup in [MSC2716](https://github.com/matrix-org/matrix-doc/pull/2716) usage later. ([\#10697](https://github.com/matrix-org/synapse/issues/10697))
 - Add missing type hints to REST servlets. ([\#10707](https://github.com/matrix-org/synapse/issues/10707), [\#10728](https://github.com/matrix-org/synapse/issues/10728), [\#10736](https://github.com/matrix-org/synapse/issues/10736))
