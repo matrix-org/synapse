@@ -1,0 +1,1 @@
+Convert the internal `FileInfo` class to attrs and add type hints.

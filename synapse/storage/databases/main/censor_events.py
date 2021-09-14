@@ -35,7 +35,7 @@ class CensorEventsStore(EventsWorkerStore, CacheInvalidationWorkerStore, SQLBase
         super().__init__(database, db_conn, hs)
 
         if (
-            hs.config.run_background_tasks
+            hs.config.worker.run_background_tasks
             and self.hs.config.redaction_retention_period is not None
         ):
             hs.get_clock().looping_call(self._censor_redactions, 5 * 60 * 1000)

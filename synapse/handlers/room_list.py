@@ -313,7 +313,9 @@ class RoomListHandler(BaseHandler):
 
         # Return whether this room is open to federation users or not
         create_event = current_state[EventTypes.Create, ""]
-        result["m.federate"] = create_event.content.get("m.federate", True)
+        result["m.federate"] = create_event.content.get(
+            EventContentFields.FEDERATE, True
+        )
 
         name_event = current_state.get((EventTypes.Name, ""))
         if name_event:

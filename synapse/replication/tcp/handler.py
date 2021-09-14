@@ -168,7 +168,7 @@ class ReplicationCommandHandler:
                 continue
 
             # Only add any other streams if we're on master.
-            if hs.config.worker_app is not None:
+            if hs.config.worker.worker_app is not None:
                 continue
 
             if stream.NAME == FederationStream.NAME and hs.config.send_federation:
@@ -222,7 +222,7 @@ class ReplicationCommandHandler:
             },
         )
 
-        self._is_master = hs.config.worker_app is None
+        self._is_master = hs.config.worker.worker_app is None
 
         self._federation_sender = None
         if self._is_master and not hs.config.send_federation:

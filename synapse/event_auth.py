@@ -21,7 +21,13 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import MAX_PDU_SIZE, EventTypes, JoinRules, Membership
+from synapse.api.constants import (
+    MAX_PDU_SIZE,
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    Membership,
+)
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -236,7 +242,7 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
     if not creation_event:
         return False
 
-    return creation_event.content.get("m.federate", True) is True
+    return creation_event.content.get(EventContentFields.FEDERATE, True) is True
 
 
 def _is_membership_change_allowed(
