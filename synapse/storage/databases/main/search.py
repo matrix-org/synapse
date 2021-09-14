@@ -15,7 +15,7 @@
 import logging
 import re
 from collections import namedtuple
-from typing import Collection, List, Optional, Set
+from typing import Collection, Iterable, List, Optional, Set
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -33,7 +33,7 @@ SearchEntry = namedtuple(
 
 
 class SearchWorkerStore(SQLBaseStore):
-    def store_search_entries_txn(self, txn, entries):
+    def store_search_entries_txn(self, txn, entries: Iterable[SearchEntry]):
         """Add entries to the search table
 
         Args:
