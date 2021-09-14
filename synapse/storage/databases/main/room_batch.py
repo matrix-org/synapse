@@ -19,9 +19,6 @@ from synapse.storage.database import DatabasePool
 
 
 class RoomBatchStore(SQLBaseStore):
-    def __init__(self, database: DatabasePool, db_conn, hs):
-        super().__init__(database, db_conn, hs)
-
     async def get_insertion_event_by_chunk_id(self, chunk_id: str) -> Optional[str]:
         """Retrieve a insertion event ID.
 
