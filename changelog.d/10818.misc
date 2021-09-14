@@ -1,0 +1,1 @@
+Replace "\u0000" with "\u0020" in message body before insertion into Postgres database.
