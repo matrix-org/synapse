@@ -93,14 +93,14 @@ class LoginRestServlet(RestServlet):
         self._address_ratelimiter = Ratelimiter(
             store=hs.get_datastore(),
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_address.per_second,
-            burst_count=self.hs.config.rc_login_address.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_address.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_address.burst_count,
         )
         self._account_ratelimiter = Ratelimiter(
             store=hs.get_datastore(),
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_account.per_second,
-            burst_count=self.hs.config.rc_login_account.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_account.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_account.burst_count,
         )
 
         # ensure the CAS/SAML/OIDC handlers are loaded on this worker instance.
@@ -486,7 +486,7 @@ class SsoRedirectServlet(RestServlet):
         # register themselves with the main SSOHandler.
         _load_sso_handlers(hs)
         self._sso_handler = hs.get_sso_handler()
-        self._public_baseurl = hs.config.public_baseurl
+        self._public_baseurl = hs.config.server.public_baseurl
 
     async def on_GET(
         self, request: SynapseRequest, idp_id: Optional[str] = None

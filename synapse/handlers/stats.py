@@ -54,7 +54,7 @@ class StatsHandler:
         # Guard to ensure we only process deltas one at a time
         self._is_processing = False
 
-        if self.stats_enabled and hs.config.run_background_tasks:
+        if self.stats_enabled and hs.config.worker.run_background_tasks:
             self.notifier.add_replication_callback(self.notify_new_event)
 
             # We kick this off so that we don't have to wait for a change before

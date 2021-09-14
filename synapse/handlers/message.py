@@ -84,7 +84,7 @@ class MessageHandler:
         # scheduled.
         self._scheduled_expiry: Optional[IDelayedCall] = None
 
-        if not hs.config.worker_app:
+        if not hs.config.worker.worker_app:
             run_as_background_process(
                 "_schedule_next_expiry", self._schedule_next_expiry
             )
@@ -461,7 +461,7 @@ class EventCreationHandler:
         self._dummy_events_threshold = hs.config.dummy_events_threshold
 
         if (
-            self.config.run_background_tasks
+            self.config.worker.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
