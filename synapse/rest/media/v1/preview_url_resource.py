@@ -27,6 +27,7 @@ from urllib import parse as urlparse
 
 import attr
 
+from twisted.internet.defer import Deferred
 from twisted.internet.error import DNSLookupError
 from twisted.web.server import Request
 
@@ -473,7 +474,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             etag=etag,
         )
 
-    def _start_expire_url_cache_data(self):
+    def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(
             "expire_url_cache_data", self._expire_url_cache_data
         )
@@ -782,7 +783,7 @@ def _calc_og(tree: "etree.Element", media_uri: str) -> Dict[str, Optional[str]]:
 
 
 def _iterate_over_text(
-    tree, *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
+    tree: "etree.Element", *tags_to_ignore: Iterable[Union[str, "etree.Comment"]]
 ) -> Generator[str, None, None]:
     """Iterate over the tree returning text nodes in a depth first fashion,
     skipping text nodes inside certain tags.

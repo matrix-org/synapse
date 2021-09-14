@@ -16,7 +16,8 @@
 import logging
 import os
 import urllib
-from typing import Awaitable, Dict, Generator, List, Optional, Tuple
+from types import TracebackType
+from typing import Awaitable, Dict, Generator, List, Optional, Tuple, Type
 
 import attr
 
@@ -122,7 +123,7 @@ def add_file_headers(
         upload_name: The name of the requested file, if any.
     """
 
-    def _quote(x):
+    def _quote(x: str) -> str:
         return urllib.parse.quote(x.encode("utf-8"))
 
     # Default to a UTF-8 charset for text content types.
@@ -282,10 +283,15 @@ class Responder:
         """
         pass
 
-    def __enter__(self):
+    def __enter__(self) -> None:
         pass
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         pass
 
 
@@ -317,31 +323,31 @@ class FileInfo:
 
     # The below properties exist to maintain compatibility with third-party modules.
     @property
-    def thumbnail_width(self):
+    def thumbnail_width(self) -> Optional[int]:
         if not self.thumbnail:
             return None
         return self.thumbnail.width
 
     @property
-    def thumbnail_height(self):
+    def thumbnail_height(self) -> Optional[int]:
         if not self.thumbnail:
             return None
         return self.thumbnail.height
 
     @property
-    def thumbnail_method(self):
+    def thumbnail_method(self) -> Optional[str]:
         if not self.thumbnail:
             return None
         return self.thumbnail.method
 
     @property
-    def thumbnail_type(self):
+    def thumbnail_type(self) -> Optional[str]:
         if not self.thumbnail:
             return None
         return self.thumbnail.type
 
     @property
-    def thumbnail_length(self):
+    def thumbnail_length(self) -> Optional[int]:
         if not self.thumbnail:
             return None
         return self.thumbnail.length
