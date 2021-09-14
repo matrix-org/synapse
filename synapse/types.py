@@ -38,6 +38,7 @@ from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTCP,
+    IReactorThreads,
     IReactorTime,
 )
 
@@ -63,7 +64,12 @@ JsonDict = Dict[str, Any]
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
-    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
+    IReactorTCP,
+    IReactorPluggableNameResolver,
+    IReactorTime,
+    IReactorCore,
+    IReactorThreads,
+    Interface,
 ):
     """The interfaces necessary for Synapse to function."""
 

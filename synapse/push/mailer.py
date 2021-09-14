@@ -130,7 +130,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_synapse/client/password_reset/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -140,7 +140,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.password_reset
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -160,7 +160,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/registration/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -170,7 +170,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -191,7 +191,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/add_threepid/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -201,7 +201,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -852,7 +852,7 @@ class Mailer:
 
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )
 

@@ -330,11 +330,11 @@ class UsernameAvailabilityRestServlet(RestServlet):
                 # Artificially delay requests if rate > sleep_limit/window_size
                 sleep_limit=1,
                 # Amount of artificial delay to apply
-                sleep_msec=1000,
+                sleep_delay=1000,
                 # Error with 429 if more than reject_limit requests are queued
                 reject_limit=1,
                 # Allow 1 request at a time
-                concurrent_requests=1,
+                concurrent=1,
             ),
         )
 
@@ -763,7 +763,10 @@ class RegisterRestServlet(RestServlet):
         Returns:
              dictionary for response from /register
         """
-        result = {"user_id": user_id, "home_server": self.hs.hostname}
+        result: JsonDict = {
+            "user_id": user_id,
+            "home_server": self.hs.hostname,
+        }
         if not params.get("inhibit_login", False):
             device_id = params.get("device_id")
             initial_display_name = params.get("initial_device_display_name")
@@ -814,7 +817,7 @@ class RegisterRestServlet(RestServlet):
             user_id, device_id, initial_display_name, is_guest=True
         )
 
-        result = {
+        result: JsonDict = {
             "user_id": user_id,
             "device_id": device_id,
             "access_token": access_token,

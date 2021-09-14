@@ -244,8 +244,8 @@ class AuthHandler(BaseHandler):
         self._failed_uia_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=self.clock,
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
         )
 
         # The number of seconds to keep a UI auth session active.
@@ -255,14 +255,14 @@ class AuthHandler(BaseHandler):
         self._failed_login_attempts_ratelimiter = Ratelimiter(
             store=self.store,
             clock=hs.get_clock(),
-            rate_hz=self.hs.config.rc_login_failed_attempts.per_second,
-            burst_count=self.hs.config.rc_login_failed_attempts.burst_count,
+            rate_hz=self.hs.config.ratelimiting.rc_login_failed_attempts.per_second,
+            burst_count=self.hs.config.ratelimiting.rc_login_failed_attempts.burst_count,
         )
 
         self._clock = self.hs.get_clock()
 
         # Expire old UI auth sessions after a period of time.
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             self._clock.looping_call(
                 run_as_background_process,
                 5 * 60 * 1000,
@@ -289,7 +289,7 @@ class AuthHandler(BaseHandler):
             hs.config.sso_account_deactivated_template
         )
 
-        self._server_name = hs.config.server_name
+        self._server_name = hs.config.server.server_name
 
         # cast to tuple for use with str.startswith
         self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
@@ -749,7 +749,7 @@ class AuthHandler(BaseHandler):
                         "name": self.hs.config.user_consent_policy_name,
                         "url": "%s_matrix/consent?v=%s"
                         % (
-                            self.hs.config.public_baseurl,
+                            self.hs.config.server.public_baseurl,
                             self.hs.config.user_consent_version,
                         ),
                     },
@@ -1799,7 +1799,7 @@ class MacaroonGenerator:
 
     def _generate_base_macaroon(self, user_id: str) -> pymacaroons.Macaroon:
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
             key=self.hs.config.macaroon_secret_key,
         )
