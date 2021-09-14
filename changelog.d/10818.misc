@@ -1,1 +1,0 @@
-Made a change so that posting an event with "\u0000" no longer causes an internal server error.
