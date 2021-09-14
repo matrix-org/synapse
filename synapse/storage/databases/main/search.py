@@ -55,7 +55,7 @@ class SearchWorkerStore(SQLBaseStore):
                     entry.event_id,
                     entry.room_id,
                     entry.key,
-                    entry.value,
+                    entry.value.replace("\u0000", "\u0020"),
                     entry.stream_ordering,
                     entry.origin_server_ts,
                 )
@@ -178,10 +178,6 @@ class SearchBackgroundUpdateStore(SearchWorkerStore):
                     # If the event body, name or topic isn't a string
                     # then skip over it
                     continue
-
-                # postgres throws an error if we try to insert null code points
-                if "\u0000" in value:
-                    value = value.replace("\u0000", "\u0020")
 
                 event_search_rows.append(
                     SearchEntry(
