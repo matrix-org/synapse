@@ -356,6 +356,60 @@ class StateFilter:
 
         return member_filter, non_member_filter
 
+    def approx_difference(self, subtrahend: "StateFilter") -> "StateFilter":
+        """
+        Returns a state filter which represents self - subtrahend;
+        if the set of state events given by a state filter F are represented as
+        E(F), then the resultant state filter bears this property:
+
+            E(difference(self, subtrahend)) ⊇ E(self) ∖ E(subtrahend)
+
+        Ideally, this should be the narrowest such state filter, but this
+        function returns an approximation (since, for example, the set of
+        possible state keys is infinite).
+        """
+
+        types = dict(self.types)
+        new_include_others = self.include_others and not subtrahend.include_others
+        # if this is an include_others state filter, then all unmentioned
+        # event types are wildcards; otherwise they're empty.
+        current_default_for_unspecified: Optional[FrozenSet[str]] = (
+            None if self.include_others else frozenset()
+        )
+        new_default_for_unspecified: Optional[FrozenSet[str]] = (
+            None if new_include_others else frozenset()
+        )
+
+        for sub_type, sub_keys in subtrahend.types.items():
+            current: Optional[FrozenSet[str]] = types.get(
+                sub_type, current_default_for_unspecified
+            )
+
+            new: Optional[FrozenSet[str]]
+            if sub_keys is None:
+                # anything minus all is none
+                new = frozenset()
+            elif current is None:
+                # all minus a few specific keys is something we can only
+                # approximate as 'all'
+                new = None
+            else:
+                # a few specific keys minus a few specific keys is just the set
+                # difference of those keys
+                new = current.difference(sub_keys)
+
+            if new == new_default_for_unspecified:
+                # if the result is the same as the default assumption,
+                # don't bother storing it.
+                if sub_type in types:
+                    types.pop(sub_type)
+            else:
+                # this is not the same as the default assumption, so
+                # we store it
+                types[sub_type] = new
+
+        return StateFilter(frozendict(types), include_others=new_include_others)
+
 
 class StateGroupStorage:
     """High level interface to fetching state for event."""
