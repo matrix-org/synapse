@@ -321,8 +321,11 @@ class SimpleHttpClient:
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
-        if hs.config.user_agent_suffix:
-            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            self.user_agent = "%s %s" % (
+                self.user_agent,
+                hs.config.server.user_agent_suffix,
+            )
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.

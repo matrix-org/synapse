@@ -21,6 +21,7 @@ from typing import IO, TYPE_CHECKING, Dict, List, Optional, Set, Tuple
 
 import twisted.internet.error
 import twisted.web.http
+from twisted.internet.defer import Deferred
 from twisted.web.resource import Resource
 from twisted.web.server import Request
 
@@ -32,6 +33,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.config._base import ConfigError
+from synapse.config.repository import ThumbnailRequirement
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
@@ -114,7 +116,7 @@ class MediaRepository:
             self._start_update_recently_accessed, UPDATE_RECENTLY_ACCESSED_TS
         )
 
-    def _start_update_recently_accessed(self):
+    def _start_update_recently_accessed(self) -> Deferred:
         return run_as_background_process(
             "update_recently_accessed_media", self._update_recently_accessed
         )
@@ -469,7 +471,9 @@ class MediaRepository:
 
         return media_info
 
-    def _get_thumbnail_requirements(self, media_type):
+    def _get_thumbnail_requirements(
+        self, media_type: str
+    ) -> Tuple[ThumbnailRequirement, ...]:
         scpos = media_type.find(";")
         if scpos > 0:
             media_type = media_type[:scpos]
