@@ -367,7 +367,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                 # postgres insists on autocommit for the index
                 conn.set_session(autocommit=True)
                 try:
-                    txn = conn.LoggingTransaction()
+                    txn = conn.cursor()
                     txn.execute(
                         "CREATE INDEX CONCURRENTLY state_groups_state_type_idx"
                         " ON state_groups_state(state_group, type, state_key)"
@@ -376,7 +376,7 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                 finally:
                     conn.set_session(autocommit=False)
             else:
-                txn = conn.LoggingTransaction()
+                txn = conn.cursor()
                 txn.execute(
                     "CREATE INDEX state_groups_state_type_idx"
                     " ON state_groups_state(state_group, type, state_key)"
