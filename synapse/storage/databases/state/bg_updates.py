@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, cast
+from typing import TYPE_CHECKING, Dict, List, Mapping, Optional, Tuple, Union
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -87,7 +87,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         txn: LoggingTransaction,
         groups: List[int],
         state_filter: Optional[StateFilter] = None,
-    ) -> Dict[int, StateMap[str]]:
+    ) -> Mapping[int, StateMap[str]]:
         state_filter = state_filter or StateFilter.all()
 
         results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
@@ -187,7 +187,7 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                     )
 
         # The results shouldn't be considered mutable.
-        return cast(Dict[int, StateMap[str]], results)
+        return results
 
 
 class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
