@@ -29,6 +29,7 @@ from typing import (
     Mapping,
     Optional,
     Tuple,
+    Type,
     Union,
     cast,
 )
@@ -1816,7 +1817,9 @@ class PasswordProvider:
     """
 
     @classmethod
-    def load(cls, module, config, module_api: ModuleApi) -> "PasswordProvider":
+    def load(
+        cls, module: Type, config: JsonDict, module_api: ModuleApi
+    ) -> "PasswordProvider":
         try:
             pp = module(config=config, account_handler=module_api)
         except Exception as e:
@@ -1824,7 +1827,7 @@ class PasswordProvider:
             raise
         return cls(pp, module_api)
 
-    def __init__(self, pp, module_api: ModuleApi):
+    def __init__(self, pp: "PasswordProvider", module_api: ModuleApi):
         self._pp = pp
         self._module_api = module_api
 
@@ -1876,19 +1879,19 @@ class PasswordProvider:
         """
         # first grandfather in a call to check_password
         if login_type == LoginType.PASSWORD:
-            g = getattr(self._pp, "check_password", None)
-            if g:
+            check_password = getattr(self._pp, "check_password", None)
+            if check_password:
                 qualified_user_id = self._module_api.get_qualified_user_id(username)
-                is_valid = await self._pp.check_password(
+                is_valid = await check_password(
                     qualified_user_id, login_dict["password"]
                 )
                 if is_valid:
                     return qualified_user_id, None
 
-        g = getattr(self._pp, "check_auth", None)
-        if not g:
+        check_auth = getattr(self._pp, "check_auth", None)
+        if not check_auth:
             return None
-        result = await g(username, login_type, login_dict)
+        result = await check_auth(username, login_type, login_dict)
 
         # Check if the return value is a str or a tuple
         if isinstance(result, str):
