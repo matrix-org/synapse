@@ -439,7 +439,7 @@ class AuthHandler(BaseHandler):
 
         return ui_auth_types
 
-    def get_enabled_auth_types(self):
+    def get_enabled_auth_types(self) -> Iterable[str]:
         """Return the enabled user-interactive authentication types
 
         Returns the UI-Auth types which are supported by the homeserver's current
@@ -1480,7 +1480,7 @@ class AuthHandler(BaseHandler):
             Hashed password.
         """
 
-        def _do_hash():
+        def _do_hash() -> str:
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
@@ -1504,7 +1504,7 @@ class AuthHandler(BaseHandler):
             Whether self.hash(password) == stored_hash.
         """
 
-        def _do_validate_hash(checked_hash: bytes):
+        def _do_validate_hash(checked_hash: bytes) -> bool:
             # Normalise the Unicode in the password
             pw = unicodedata.normalize("NFKC", password)
 
@@ -1726,7 +1726,7 @@ class AuthHandler(BaseHandler):
             del self._extra_attributes[user_id]
 
     @staticmethod
-    def add_query_param_to_url(url: str, param_name: str, param: Any):
+    def add_query_param_to_url(url: str, param_name: str, param: Any) -> str:
         url_parts = list(urllib.parse.urlparse(url))
         query = urllib.parse.parse_qsl(url_parts[4], keep_blank_values=True)
         query.append((param_name, param))
@@ -1838,7 +1838,7 @@ class PasswordProvider:
         if g:
             self._supported_login_types.update(g())
 
-    def __str__(self):
+    def __str__(self) -> str:
         return str(self._pp)
 
     def get_supported_login_types(self) -> Mapping[str, Iterable[str]]:

@@ -14,7 +14,7 @@
 # limitations under the License.
 import inspect
 import logging
-from typing import TYPE_CHECKING, Dict, Generic, List, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Dict, Generic, List, Optional, TypeVar, Union
 from urllib.parse import urlencode, urlparse
 
 import attr
@@ -1057,13 +1057,13 @@ class JwtClientSecret:
         self._cached_secret = b""
         self._cached_secret_replacement_time = 0
 
-    def __str__(self):
+    def __str__(self) -> str:
         # if client_auth_method is client_secret_basic, then ClientAuth.prepare calls
         # encode_client_secret_basic, which calls "{}".format(secret), which ends up
         # here.
         return self._get_secret().decode("ascii")
 
-    def __bytes__(self):
+    def __bytes__(self) -> bytes:
         # if client_auth_method is client_secret_post, then ClientAuth.prepare calls
         # encode_client_secret_post, which ends up here.
         return self._get_secret()
@@ -1290,7 +1290,7 @@ class OidcMappingProvider(Generic[C]):
 
 
 # Used to clear out "None" values in templates
-def jinja_finalize(thing):
+def jinja_finalize(thing: Any) -> Any:
     return thing if thing is not None else ""
 
 

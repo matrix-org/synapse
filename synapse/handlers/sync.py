@@ -364,7 +364,9 @@ class SyncHandler:
             )
         else:
 
-            async def current_sync_callback(before_token, after_token) -> SyncResult:
+            async def current_sync_callback(
+                before_token: StreamToken, after_token: StreamToken
+            ) -> SyncResult:
                 return await self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(

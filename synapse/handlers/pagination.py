@@ -24,7 +24,7 @@ from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import Requester
+from synapse.types import JsonDict, Requester
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -60,7 +60,7 @@ class PurgeStatus:
     def __init__(self):
         self.status = PurgeStatus.STATUS_ACTIVE
 
-    def asdict(self):
+    def asdict(self) -> JsonDict:
         return {"status": PurgeStatus.STATUS_TEXT[self.status]}
 
 

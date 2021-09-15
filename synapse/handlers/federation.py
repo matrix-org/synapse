@@ -1240,7 +1240,7 @@ class FederationHandler(BaseHandler):
         # TODO: Make sure we are OK with local_auth or remote_auth having more
         # auth events in them than strictly necessary.
 
-        def sort_fun(ev):
+        def sort_fun(ev: EventBase) -> Tuple[int, str]:
             return ev.depth, ev.event_id
 
         logger.debug("construct_auth_difference after sort_fun!")

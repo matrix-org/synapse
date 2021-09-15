@@ -202,7 +202,7 @@ class E2eKeysHandler:
 
             # Now fetch any devices that we don't have in our cache
             @trace
-            async def do_remote_query(destination):
+            async def do_remote_query(destination: str) -> None:
                 """This is called when we are querying the device list of a user on
                 a remote homeserver and their device list is not in the device list
                 cache. If we share a room with this user and we're not querying for
@@ -447,7 +447,7 @@ class E2eKeysHandler:
                     }
 
         @trace
-        async def claim_client_keys(destination):
+        async def claim_client_keys(destination: str) -> None:
             set_tag("destination", destination)
             device_keys = remote_queries[destination]
             try:

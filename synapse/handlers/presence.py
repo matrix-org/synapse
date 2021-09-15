@@ -29,6 +29,7 @@ from contextlib import contextmanager
 from typing import (
     TYPE_CHECKING,
     Any,
+    Awaitable,
     Callable,
     Collection,
     Dict,
@@ -689,7 +690,7 @@ class PresenceHandler(BasePresenceHandler):
             # Start a LoopingCall in 30s that fires every 5s.
             # The initial delay is to allow disconnected clients a chance to
             # reconnect before we treat them as offline.
-            def run_timeout_handler():
+            def run_timeout_handler() -> Awaitable[None]:
                 return run_as_background_process(
                     "handle_presence_timeouts", self._handle_timeouts
                 )
@@ -698,7 +699,7 @@ class PresenceHandler(BasePresenceHandler):
                 30, self.clock.looping_call, run_timeout_handler, 5000
             )
 
-            def run_persister():
+            def run_persister() -> Awaitable[None]:
                 return run_as_background_process(
                     "persist_presence_changes", self._persist_unpersisted_changes
                 )
@@ -942,8 +943,8 @@ class PresenceHandler(BasePresenceHandler):
         when users disconnect/reconnect.
 
         Args:
-            user_id (str)
-            affect_presence (bool): If false this function will be a no-op.
+            user_id
+            affect_presence: If false this function will be a no-op.
                 Useful for streams that are not associated with an actual
                 client that is being used by a user.
         """

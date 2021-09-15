@@ -386,7 +386,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def copy_room_tags_and_direct_to_room(
-        self, old_room_id, new_room_id, user_id
+        self, old_room_id: str, new_room_id: str, user_id: str
     ) -> None:
         """Copies the tags and direct room state from one room to another.
 

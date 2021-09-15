@@ -1218,7 +1218,7 @@ class FederationEventHandler:
         if not event_infos:
             return
 
-        async def prep(ev_info: _NewEventInfo):
+        async def prep(ev_info: _NewEventInfo) -> EventContext:
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
                 res = await self._state_handler.compute_event_context(event)
