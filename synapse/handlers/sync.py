@@ -1928,7 +1928,7 @@ class SyncHandler:
         tags: Optional[Dict[str, Dict[str, Any]]],
         account_data: Dict[str, JsonDict],
         always_include: bool = False,
-    ):
+    ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`
         based on the `room_builder`.
 

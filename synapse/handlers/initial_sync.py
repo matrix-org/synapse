@@ -150,7 +150,7 @@ class InitialSyncHandler(BaseHandler):
         if limit is None:
             limit = 10
 
-        async def handle_room(event: RoomsForUser):
+        async def handle_room(event: RoomsForUser) -> None:
             d: JsonDict = {
                 "room_id": event.room_id,
                 "membership": event.membership,

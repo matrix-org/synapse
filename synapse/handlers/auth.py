@@ -702,7 +702,7 @@ class AuthHandler(BaseHandler):
         except StoreError:
             raise SynapseError(400, "Unknown session ID: %s" % (session_id,))
 
-    async def _expire_old_sessions(self):
+    async def _expire_old_sessions(self) -> None:
         """
         Invalidate any user interactive authentication sessions that have expired.
         """
@@ -1352,7 +1352,7 @@ class AuthHandler(BaseHandler):
         await self.auth.check_auth_blocking(res.user_id)
         return res
 
-    async def delete_access_token(self, access_token: str):
+    async def delete_access_token(self, access_token: str) -> None:
         """Invalidate a single access token
 
         Args:
@@ -1381,7 +1381,7 @@ class AuthHandler(BaseHandler):
         user_id: str,
         except_token_id: Optional[int] = None,
         device_id: Optional[str] = None,
-    ):
+    ) -> None:
         """Invalidate access tokens belonging to a user
 
         Args:
@@ -1409,7 +1409,7 @@ class AuthHandler(BaseHandler):
 
     async def add_threepid(
         self, user_id: str, medium: str, address: str, validated_at: int
-    ):
+    ) -> None:
         # check if medium has a valid value
         if medium not in ["email", "msisdn"]:
             raise SynapseError(
@@ -1581,7 +1581,7 @@ class AuthHandler(BaseHandler):
         client_redirect_url: str,
         extra_attributes: Optional[JsonDict] = None,
         new_user: bool = False,
-    ):
+    ) -> None:
         """Having figured out a mxid for this user, complete the HTTP request
 
         Args:
@@ -1627,7 +1627,7 @@ class AuthHandler(BaseHandler):
         extra_attributes: Optional[JsonDict] = None,
         new_user: bool = False,
         user_profile_data: Optional[ProfileInfo] = None,
-    ):
+    ) -> None:
         """
         The synchronous portion of complete_sso_login.
 

@@ -512,7 +512,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_id: str,
         new_room_id: str,
         old_room_state: StateMap[str],
-    ):
+    ) -> None:
         # check to see if we have a canonical alias.
         canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))

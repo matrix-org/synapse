@@ -225,7 +225,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: Optional[str],
         n_invites: int,
         update: bool = True,
-    ):
+    ) -> None:
         """Ratelimit more than one invite sent by the given requester in the given room.
 
         Args:
@@ -249,7 +249,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         requester: Optional[Requester],
         room_id: Optional[str],
         invitee_user_id: str,
-    ):
+    ) -> None:
         """Ratelimit invites by room and by target user.
 
         If room ID is missing then we just rate limit by target user.
@@ -1030,7 +1030,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-    ):
+    ) -> None:
         """
         Change the membership status of a user in a room.
 

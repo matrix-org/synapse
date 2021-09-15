@@ -125,7 +125,7 @@ class RegistrationHandler(BaseHandler):
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
-    ):
+    ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,

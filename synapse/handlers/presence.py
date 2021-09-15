@@ -240,7 +240,7 @@ class BasePresenceHandler(abc.ABC):
         """
 
     @abc.abstractmethod
-    async def bump_presence_active_time(self, user: UserID):
+    async def bump_presence_active_time(self, user: UserID) -> None:
         """We've seen the user do something that indicates they're interacting
         with the app.
         """
@@ -274,7 +274,7 @@ class BasePresenceHandler(abc.ABC):
 
     async def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: list
-    ):
+    ) -> None:
         """Process streams received over replication."""
         await self._federation_queue.process_replication_rows(
             stream_name, instance_name, token, rows
@@ -286,7 +286,7 @@ class BasePresenceHandler(abc.ABC):
 
     async def maybe_send_presence_to_interested_destinations(
         self, states: List[UserPresenceState]
-    ):
+    ) -> None:
         """If this instance is a federation sender, send the states to all
         destinations that are interested. Filters out any states for remote
         users.
@@ -309,7 +309,7 @@ class BasePresenceHandler(abc.ABC):
         for destination, host_states in hosts_to_states.items():
             self._federation.send_presence_to_destinations(host_states, [destination])
 
-    async def send_full_presence_to_users(self, user_ids: Collection[str]):
+    async def send_full_presence_to_users(self, user_ids: Collection[str]) -> None:
         """
         Adds to the list of users who should receive a full snapshot of presence
         upon their next sync. Note that this only works for local users.
@@ -468,7 +468,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         if self._user_to_num_current_syncs[user_id] == 1:
             self.mark_as_coming_online(user_id)
 
-        def _end():
+        def _end() -> None:
             # We check that the user_id is in user_to_num_current_syncs because
             # user_to_num_current_syncs may have been cleared if we are
             # shutting down.
@@ -503,7 +503,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
     async def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: list
-    ):
+    ) -> None:
         await super().process_replication_rows(stream_name, instance_name, token, rows)
 
         if stream_name != PresenceStream.NAME:
@@ -978,7 +978,7 @@ class PresenceHandler(BasePresenceHandler):
                     ]
                 )
 
-        async def _end():
+        async def _end() -> None:
             try:
                 self.user_to_num_current_syncs[user_id] -= 1
 
@@ -1264,7 +1264,7 @@ class PresenceHandler(BasePresenceHandler):
         if self._event_processing:
             return
 
-        async def _process_presence():
+        async def _process_presence() -> None:
             assert not self._event_processing
 
             self._event_processing = True
@@ -2074,7 +2074,7 @@ class PresenceFederationQueue:
         if self._queue_presence_updates:
             self._clock.looping_call(self._clear_queue, self._CLEAR_ITEMS_EVERY_MS)
 
-    def _clear_queue(self):
+    def _clear_queue(self) -> None:
         """Clear out older entries from the queue."""
         clear_before = self._clock.time_msec() - self._KEEP_ITEMS_IN_QUEUE_FOR_MS
 
@@ -2205,7 +2205,7 @@ class PresenceFederationQueue:
 
     async def process_replication_rows(
         self, stream_name: str, instance_name: str, token: int, rows: list
-    ):
+    ) -> None:
         if stream_name != PresenceFederationStream.NAME:
             return
 

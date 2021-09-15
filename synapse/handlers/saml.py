@@ -359,7 +359,7 @@ class SamlHandler(BaseHandler):
 
         return remote_user_id
 
-    def expire_sessions(self):
+    def expire_sessions(self) -> None:
         expire_before = self.clock.time_msec() - self._saml2_session_lifetime
         to_expire = set()
         for reqid, data in self._outstanding_requests_dict.items():

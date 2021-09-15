@@ -298,7 +298,7 @@ class MessageHandler:
             for user_id, profile in users_with_profile.items()
         }
 
-    def maybe_schedule_expiry(self, event: EventBase):
+    def maybe_schedule_expiry(self, event: EventBase) -> None:
         """Schedule the expiry of an event if there's not already one scheduled,
         or if the one running is for an event that will expire after the provided
         timestamp.
@@ -318,7 +318,7 @@ class MessageHandler:
         # a task scheduled for a timestamp that's sooner than the provided one.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
-    async def _schedule_next_expiry(self):
+    async def _schedule_next_expiry(self) -> None:
         """Retrieve the ID and the expiry timestamp of the next event to be expired,
         and schedule an expiry task for it.
 
@@ -331,7 +331,7 @@ class MessageHandler:
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
 
-    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int):
+    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int) -> None:
         """Schedule an expiry task for the provided event if there's not already one
         scheduled at a timestamp that's sooner than the provided one.
 
@@ -367,7 +367,7 @@ class MessageHandler:
             event_id,
         )
 
-    async def _expire_event(self, event_id: str):
+    async def _expire_event(self, event_id: str) -> None:
         """Retrieve and expire an event that needs to be expired from the database.
 
         If the event doesn't exist in the database, log it and delete the expiry date
@@ -1477,7 +1477,7 @@ class EventCreationHandler:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
 
-        def _notify():
+        def _notify() -> None:
             try:
                 self.notifier.on_new_room_event(
                     event, event_pos, max_stream_token, extra_users=extra_users
@@ -1523,7 +1523,7 @@ class EventCreationHandler:
         except Exception:
             logger.exception("Error bumping presence active time")
 
-    async def _send_dummy_events_to_fill_extremities(self):
+    async def _send_dummy_events_to_fill_extremities(self) -> None:
         """Background task to send dummy events into rooms that have a large
         number of extremities
         """
@@ -1600,7 +1600,7 @@ class EventCreationHandler:
                 )
         return False
 
-    def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
+    def _expire_rooms_to_exclude_from_dummy_event_insertion(self) -> None:
         expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
         to_expire = set()
         for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():

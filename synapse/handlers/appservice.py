@@ -58,7 +58,7 @@ class ApplicationServicesHandler:
         self.current_max = 0
         self.is_processing = False
 
-    def notify_interested_services(self, max_token: RoomStreamToken):
+    def notify_interested_services(self, max_token: RoomStreamToken) -> None:
         """Notifies (pushes) all application services interested in this event.
 
         Pushing is done asynchronously, so this method won't block for any
@@ -82,7 +82,7 @@ class ApplicationServicesHandler:
         self._notify_interested_services(max_token)
 
     @wrap_as_background_process("notify_interested_services")
-    async def _notify_interested_services(self, max_token: RoomStreamToken):
+    async def _notify_interested_services(self, max_token: RoomStreamToken) -> None:
         with Measure(self.clock, "notify_interested_services"):
             self.is_processing = True
             try:
@@ -184,7 +184,7 @@ class ApplicationServicesHandler:
         stream_key: str,
         new_token: Optional[int],
         users: Optional[Collection[Union[str, UserID]]] = None,
-    ):
+    ) -> None:
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.
 
@@ -226,7 +226,7 @@ class ApplicationServicesHandler:
         stream_key: str,
         new_token: Optional[int],
         users: Collection[Union[str, UserID]],
-    ):
+    ) -> None:
         logger.debug("Checking interested services for %s" % (stream_key))
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:

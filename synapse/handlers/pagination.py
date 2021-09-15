@@ -107,7 +107,7 @@ class PaginationHandler:
 
     async def purge_history_for_rooms_in_range(
         self, min_ms: Optional[int], max_ms: Optional[int]
-    ):
+    ) -> None:
         """Purge outdated events from rooms within the given retention range.
 
         If a default retention policy is defined in the server's configuration and its
@@ -291,7 +291,7 @@ class PaginationHandler:
             self._purges_in_progress_by_room.discard(room_id)
 
             # remove the purge from the list 24 hours after it completes
-            def clear_purge():
+            def clear_purge() -> None:
                 del self._purges_by_id[purge_id]
 
             self.hs.get_reactor().callLater(24 * 3600, clear_purge)
