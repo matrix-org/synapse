@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union, cast
 
 from synapse.storage._base import SQLBaseStore
 from synapse.storage.database import (
@@ -23,6 +23,7 @@ from synapse.storage.database import (
 )
 from synapse.storage.engines import PostgresEngine
 from synapse.storage.state import StateFilter
+from synapse.types import MutableStateMap, StateMap
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -86,10 +87,10 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
         txn: LoggingTransaction,
         groups: List[int],
         state_filter: Optional[StateFilter] = None,
-    ):
+    ) -> Dict[int, StateMap[str]]:
         state_filter = state_filter or StateFilter.all()
 
-        results: Dict[int, Dict[Tuple[str, str], str]] = {group: {} for group in groups}
+        results: Dict[int, MutableStateMap[str]] = {group: {} for group in groups}
 
         where_clause, where_args = state_filter.make_sql_filter_clause()
 
@@ -185,7 +186,8 @@ class StateGroupBackgroundUpdateStore(SQLBaseStore):
                         allow_none=True,
                     )
 
-        return results
+        # The results shouldn't be considered mutable.
+        return cast(Dict[int, StateMap[str]], results)
 
 
 class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
@@ -281,15 +283,15 @@ class StateBackgroundUpdateStore(StateGroupBackgroundUpdateStore):
                         # otherwise read performance degrades.
                         continue
 
-                    prev_state = self._get_state_groups_from_groups_txn(
+                    prev_state_by_group = self._get_state_groups_from_groups_txn(
                         txn, [prev_group]
                     )
-                    prev_state = prev_state[prev_group]
+                    prev_state = prev_state_by_group[prev_group]
 
-                    curr_state = self._get_state_groups_from_groups_txn(
+                    curr_state_by_group = self._get_state_groups_from_groups_txn(
                         txn, [state_group]
                     )
-                    curr_state = curr_state[state_group]
+                    curr_state = curr_state_by_group[state_group]
 
                     if not set(prev_state.keys()) - set(curr_state.keys()):
                         # We can only do a delta if the current has a strict super set
