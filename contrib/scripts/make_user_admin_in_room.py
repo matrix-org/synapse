@@ -33,10 +33,7 @@ def main(hs, room_id, access_token, user_id):
     print(user_id)
     doit = input("\nContinue? [Y]es")
     if len(doit) > 0 and doit.lower() == "y":
-        admin_url = _mkurl(
-        "$HS/_synapse/admin/v1/rooms/$ROOM/make_room_admin",
-        {"$HS": hs, "$ROOM": room_id},
-        )
+        admin_url = "%s/_synapse/admin/v1/rooms/%s/make_room_admin" % (hs, room_id)
         admin_body = {"user_id": user_id}
         print("Making request...")
         res = requests.post(admin_url, data=json.dumps(admin_body), headers=headers)
