@@ -30,6 +30,7 @@ from typing import (
 )
 
 import attr
+from frozendict import frozendict
 from signedjson.key import decode_verify_key_bytes
 from unpaddedbase64 import decode_base64
 from zope.interface import Interface
@@ -466,12 +467,12 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     instance_map = attr.ib(
-        type=Dict[str, int],
-        factory=dict,
+        type=Mapping[str, int],
+        factory=frozendict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
             value_validator=attr.validators.instance_of(int),
-            mapping_validator=attr.validators.instance_of(dict),
+            mapping_validator=attr.validators.instance_of(frozendict),
         ),
     )
 
@@ -507,7 +508,7 @@ class RoomStreamToken:
                 return cls(
                     topological=None,
                     stream=stream,
-                    instance_map=instance_map,
+                    instance_map=frozendict(instance_map),
                 )
         except Exception:
             pass
@@ -540,7 +541,7 @@ class RoomStreamToken:
             for instance in set(self.instance_map).union(other.instance_map)
         }
 
-        return RoomStreamToken(None, max_stream, instance_map)
+        return RoomStreamToken(None, max_stream, frozendict(instance_map))
 
     def as_historical_tuple(self) -> Tuple[int, int]:
         """Returns a tuple of `(topological, stream)` for historical tokens.
