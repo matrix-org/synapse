@@ -18,7 +18,7 @@
 import itertools
 import logging
 from http import HTTPStatus
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 
 from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import verify_signed_json
@@ -1262,11 +1262,11 @@ class FederationHandler(BaseHandler):
 
         logger.debug("construct_auth_difference before get_next!")
 
-        def get_next(it, opt=None):
+        def get_next(it: Iterator[EventBase]) -> Optional[EventBase]:
             try:
                 return next(it)
             except Exception:
-                return opt
+                return None
 
         current_local = get_next(local_iter)
         current_remote = get_next(remote_iter)
@@ -1277,6 +1277,9 @@ class FederationHandler(BaseHandler):
         missing_locals = []
         while current_local or current_remote:
             if current_remote is None:
+                # mypy doesn't realize that current_local must not be None (or
+                # the loop would have stopped).
+                assert current_local is not None
                 missing_locals.append(current_local)
                 current_local = get_next(local_iter)
                 continue
@@ -1305,6 +1308,7 @@ class FederationHandler(BaseHandler):
             if current_local.event_id < current_remote.event_id:
                 missing_locals.append(current_local)
                 current_local = get_next(local_iter)
+                continue
 
             if current_local.event_id > current_remote.event_id:
                 missing_remotes.append(current_remote)
