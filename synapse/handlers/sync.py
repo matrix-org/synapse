@@ -1960,7 +1960,7 @@ class SyncHandler:
 
         with start_active_span("generate_room_entry"):
             set_tag("room_id", room_id)
-            log_kv({"events": len(events or [])})
+            log_kv({"events": len(events or ())})
 
             log_kv(
                 {
