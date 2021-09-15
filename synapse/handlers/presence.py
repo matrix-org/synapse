@@ -374,7 +374,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
 
         self._presence_writer_instance = hs.config.worker.writers.presence[0]
 
-        self._presence_enabled = hs.config.use_presence
+        self._presence_enabled = hs.config.server.use_presence
 
         # Route presence EDUs to the right worker
         hs.get_federation_registry().register_instances_for_edu(
@@ -584,7 +584,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         user_id = target_user.to_string()
 
         # If presence is disabled, no-op
-        if not self.hs.config.use_presence:
+        if not self.hs.config.server.use_presence:
             return
 
         # Proxy request to instance that writes presence
@@ -601,7 +601,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
         with the app.
         """
         # If presence is disabled, no-op
-        if not self.hs.config.use_presence:
+        if not self.hs.config.server.use_presence:
             return
 
         # Proxy request to instance that writes presence
@@ -618,7 +618,7 @@ class PresenceHandler(BasePresenceHandler):
         self.server_name = hs.hostname
         self.wheel_timer: WheelTimer[str] = WheelTimer()
         self.notifier = hs.get_notifier()
-        self._presence_enabled = hs.config.use_presence
+        self._presence_enabled = hs.config.server.use_presence
 
         federation_registry = hs.get_federation_registry()
 
@@ -916,7 +916,7 @@ class PresenceHandler(BasePresenceHandler):
         with the app.
         """
         # If presence is disabled, no-op
-        if not self.hs.config.use_presence:
+        if not self.hs.config.server.use_presence:
             return
 
         user_id = user.to_string()
@@ -949,7 +949,7 @@ class PresenceHandler(BasePresenceHandler):
         """
         # Override if it should affect the user's presence, if presence is
         # disabled.
-        if not self.hs.config.use_presence:
+        if not self.hs.config.server.use_presence:
             affect_presence = False
 
         if affect_presence:
