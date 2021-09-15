@@ -1197,21 +1197,21 @@ class OidcSessionTokenGenerator:
         )
 
 
-@attr.s(frozen=True, slots=True)
+@attr.s(frozen=True, slots=True, auto_attribs=True)
 class OidcSessionData:
     """The attributes which are stored in a OIDC session cookie"""
 
     # the Identity Provider being used
-    idp_id = attr.ib(type=str)
+    idp_id: str
 
     # The `nonce` parameter passed to the OIDC provider.
-    nonce = attr.ib(type=str)
+    nonce: str
 
     # The URL the client gave when it initiated the flow. ("" if this is a UI Auth)
-    client_redirect_url = attr.ib(type=str)
+    client_redirect_url: str
 
     # The session ID of the ongoing UI Auth ("" if this is a login)
-    ui_auth_session_id = attr.ib(type=str)
+    ui_auth_session_id: str
 
 
 class UserAttributeDict(TypedDict):
@@ -1297,13 +1297,13 @@ def jinja_finalize(thing: Any) -> Any:
 env = Environment(finalize=jinja_finalize)
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class JinjaOidcMappingConfig:
-    subject_claim = attr.ib(type=str)
-    localpart_template = attr.ib(type=Optional[Template])
-    display_name_template = attr.ib(type=Optional[Template])
-    email_template = attr.ib(type=Optional[Template])
-    extra_attributes = attr.ib(type=Dict[str, Template])
+    subject_claim: str
+    localpart_template: Optional[Template]
+    display_name_template: Optional[Template]
+    email_template: Optional[Template]
+    extra_attributes: Dict[str, Template]
 
 
 class JinjaOidcMappingProvider(OidcMappingProvider[JinjaOidcMappingConfig]):

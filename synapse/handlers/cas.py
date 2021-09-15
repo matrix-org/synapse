@@ -44,10 +44,10 @@ class CasError(Exception):
         return self.error
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class CasResponse:
-    username = attr.ib(type=str)
-    attributes = attr.ib(type=Dict[str, List[Optional[str]]])
+    username: str
+    attributes: Dict[str, List[Optional[str]]]
 
 
 class CasHandler:

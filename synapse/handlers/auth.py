@@ -1734,9 +1734,9 @@ class AuthHandler(BaseHandler):
         return urllib.parse.urlunparse(url_parts)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class MacaroonGenerator:
-    hs = attr.ib()
+    hs: "HomeServer"
 
     def generate_guest_access_token(self, user_id: str) -> str:
         macaroon = self._generate_base_macaroon(user_id)
