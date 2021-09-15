@@ -116,9 +116,9 @@ class ApplicationServicesHandler:
 
                         if not self.started_scheduler:
 
-                            async def start_scheduler():
+                            async def start_scheduler() -> None:
                                 try:
-                                    return await self.scheduler.start()
+                                    await self.scheduler.start()
                                 except Exception:
                                     logger.error("Application Services Failure")
 

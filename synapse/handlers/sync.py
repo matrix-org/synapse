@@ -1534,12 +1534,12 @@ class SyncHandler:
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
-        async def handle_room_entries(room_entry: "RoomSyncResultBuilder"):
+        async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             with start_active_span("generate_room_entry"):
                 set_tag("room_id", room_entry.room_id)
                 log_kv({"events": len(room_entry.events or [])})
                 logger.debug("Generating room entry for %s", room_entry.room_id)
-                res = await self._generate_room_entry(
+                await self._generate_room_entry(
                     sync_result_builder,
                     ignored_users,
                     room_entry,
@@ -1549,7 +1549,6 @@ class SyncHandler:
                     always_include=sync_result_builder.full_state,
                 )
                 logger.debug("Generated room entry for %s", room_entry.room_id)
-                return res
 
         await concurrently_execute(handle_room_entries, room_entries, 10)
 
