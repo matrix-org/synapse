@@ -26,6 +26,7 @@ import contextlib
 import logging
 from bisect import bisect
 from contextlib import contextmanager
+from types import TracebackType
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -34,11 +35,13 @@ from typing import (
     Collection,
     Dict,
     FrozenSet,
+    Generator,
     Iterable,
     List,
     Optional,
     Set,
     Tuple,
+    Type,
     Union,
 )
 
@@ -364,7 +367,12 @@ class BasePresenceHandler(abc.ABC):
 class _NullContextManager(ContextManager[None]):
     """A context manager which does nothing."""
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(
+        self,
+        exc_type: Optional[Type[BaseException]],
+        exc_val: Optional[BaseException],
+        exc_tb: Optional[TracebackType],
+    ) -> None:
         pass
 
 
@@ -481,7 +489,7 @@ class WorkerPresenceHandler(BasePresenceHandler):
                     self.mark_as_going_offline(user_id)
 
         @contextlib.contextmanager
-        def _user_syncing():
+        def _user_syncing() -> Generator[None, None, None]:
             try:
                 yield
             finally:
@@ -995,7 +1003,7 @@ class PresenceHandler(BasePresenceHandler):
                 logger.exception("Error updating presence after sync")
 
         @contextmanager
-        def _user_syncing():
+        def _user_syncing() -> Generator[None, None, None]:
             try:
                 yield
             finally:
