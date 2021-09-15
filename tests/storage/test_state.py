@@ -105,7 +105,6 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertEqual({ev.event_id for ev in state_list}, {e1.event_id, e2.event_id})
 
     def test_get_state_for_event(self):
-
         # this defaults to a linear DAG as each new injection defaults to whatever
         # forward extremities are currently in the DB for this room.
         e1 = self.inject_state_event(self.room, self.u_alice, EventTypes.Create, "", {})
@@ -483,3 +482,88 @@ class StateStoreTestCase(HomeserverTestCase):
 
         self.assertEqual(is_all, True)
         self.assertDictEqual({(e5.type, e5.state_key): e5.event_id}, state_dict)
+
+    def test_state_filter_difference(self):
+        def assert_difference(
+            minuend: StateFilter, subtrahend: StateFilter, expected: StateFilter
+        ):
+            self.assertEqual(
+                minuend.approx_difference(subtrahend),
+                expected,
+                f"StateFilter difference not correct:\n\n\t{minuend!r}\nminus\n\t{subtrahend!r}\nwas\n\t{minuend.approx_difference(subtrahend)}\nexpected\n\t{expected}",
+            )
+
+        # it's not possible to subtract individual state keys from
+        # a wildcard
+        assert_difference(
+            StateFilter.all(),
+            StateFilter.from_types(
+                ((EventTypes.Member, "@wombat:hs1"), (EventTypes.Member, "@spqr:hs1"))
+            ),
+            StateFilter.all(),
+        )
+        self.assertEqual(
+            StateFilter.all().approx_difference(
+                StateFilter.from_types(
+                    (
+                        (EventTypes.Member, "@wombat:hs1"),
+                        (EventTypes.Member, "@spqr:hs1"),
+                    )
+                )
+            ),
+            StateFilter.all(),
+        )
+
+        # we can subtract wildcards from wildcards
+        assert_difference(StateFilter.all(), StateFilter.all(), StateFilter.none())
+        assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                        EventTypes.CanonicalAlias: None,
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.JoinRules: None}), include_others=False
+            ),
+            StateFilter(
+                types=frozendict(
+                    {EventTypes.Member: frozenset(), EventTypes.JoinRules: frozenset()}
+                ),
+                include_others=True,
+            ),
+        )
+
+        # we can subtract individual state keys, except from wildcards
+        assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:hs1", "@kristina:hs2"}),
+                        EventTypes.CanonicalAlias: None,
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@kristina:hs2"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:hs1"}),
+                        EventTypes.CanonicalAlias: None,
+                    }
+                ),
+                include_others=False,
+            ),
+        )
