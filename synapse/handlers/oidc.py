@@ -249,11 +249,11 @@ class OidcHandler:
 class OidcError(Exception):
     """Used to catch errors when calling the token_endpoint"""
 
-    def __init__(self, error, error_description=None):
+    def __init__(self, error: str, error_description: Optional[str] = None):
         self.error = error
         self.error_description = error_description
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.error_description:
             return f"{self.error}: {self.error_description}"
         return self.error
