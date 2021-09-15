@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, List, Optional, Tuple
 
 from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
@@ -216,7 +216,7 @@ class ReceiptEventSource:
         return visible_events
 
     async def get_new_events(
-        self, from_key: int, room_ids: List[str], user: UserID, **kwargs
+        self, from_key: int, room_ids: List[str], user: UserID, **kwargs: Any
     ) -> Tuple[List[JsonDict], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()

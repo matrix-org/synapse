@@ -1513,7 +1513,7 @@ class PresenceEventSource:
         room_ids: Optional[List[str]] = None,
         include_offline: bool = True,
         explicit_room_id: Optional[str] = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> Tuple[List[UserPresenceState], int]:
         # The process for getting presence events are:
         #  1. Get the rooms the user is in.
