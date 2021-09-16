@@ -43,6 +43,7 @@ class ModuleApiTestCase(HomeserverTestCase):
         self.module_api = homeserver.get_module_api()
         self.event_creation_handler = homeserver.get_event_creation_handler()
         self.sync_handler = homeserver.get_sync_handler()
+        self.auth_handler = homeserver.get_auth_handler()
 
     def make_homeserver(self, reactor, clock):
         return self.setup_test_homeserver(
@@ -92,15 +93,40 @@ class ModuleApiTestCase(HomeserverTestCase):
     def test_get_user_ip_and_agents(self):
         user_id = self.register_user("test_get_user_ip_and_agents_user", "1234")
         info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
-        self.assertIdentical(info, [])
+        self.assertEqual(info, [])
+
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip_1", "user_agent_1", None
+            )
+        )
+        self.get_success(
+            self.store.insert_client_ip(
+                user_id, "access_token", "ip_2", "user_agent_2", None
+            )
+        )
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+
+        self.assertEqual(len(info), 2)
+        ip_1_seen = False
+        ip_2_seen = False
+        for i in info:
+            if i.ip == "ip_1":
+                ip_1_seen = True
+                self.assertEqual(i.user_agent, "user_agent_1")
+            elif i.ip == "ip_2":
+                ip_2_seen = True
+                self.assertEqual(i.user_agent, "user_agent_2")
+        self.assertTrue(ip_1_seen)
+        self.assertTrue(ip_2_seen)
 
     def test_get_user_ip_and_agents__no_user_found(self):
         info = self.get_success(
             self.module_api.get_user_ip_and_agents(
-                "@test_get_user_ip_and_agents_user_nonexistent"
+                "@test_get_user_ip_and_agents_user_nonexistent:example.com"
             )
         )
-        self.assertIdentical(info, [])
+        self.assertEqual(info, [])
 
     def test_sending_events_into_room(self):
         """Tests that a module can send events into a room"""
