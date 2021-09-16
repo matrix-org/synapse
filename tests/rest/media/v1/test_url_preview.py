@@ -14,7 +14,6 @@
 import json
 import os
 import re
-from binascii import unhexlify
 
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
@@ -25,6 +24,7 @@ from synapse.config.oembed import OEmbedEndpointConfig
 
 from tests import unittest
 from tests.server import FakeTransport
+from tests.test_utils import SMALL_PNG
 
 try:
     import lxml
@@ -577,12 +577,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         }
         oembed_content = json.dumps(result).encode("utf-8")
 
-        end_content = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
-
         channel = self.make_request(
             "GET",
             "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
@@ -616,8 +610,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
                 b'Content-Type: image/png; charset="utf8"\r\n\r\n'
             )
-            % (len(end_content),)
-            + end_content
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
         )
 
         self.pump()
