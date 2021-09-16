@@ -313,7 +313,7 @@ class HomeServer(metaclass=abc.ABCMeta):
         # Register background tasks required by this server. This must be done
         # somewhat manually due to the background tasks not being registered
         # unless handlers are instantiated.
-        if self.config.run_background_tasks:
+        if self.config.worker.run_background_tasks:
             self.setup_background_tasks()
 
     def start_listening(self) -> None:
@@ -370,8 +370,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         return Ratelimiter(
             store=self.get_datastore(),
             clock=self.get_clock(),
-            rate_hz=self.config.rc_registration.per_second,
-            burst_count=self.config.rc_registration.burst_count,
+            rate_hz=self.config.ratelimiting.rc_registration.per_second,
+            burst_count=self.config.ratelimiting.rc_registration.burst_count,
         )
 
     @cache_in_self
@@ -392,7 +392,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_http_client_context_factory(self) -> IPolicyForHTTPS:
-        if self.config.use_insecure_ssl_client_just_for_testing_do_not_use:
+        if self.config.tls.use_insecure_ssl_client_just_for_testing_do_not_use:
             return InsecureInterceptableContextFactory()
         return RegularPolicyForHTTPS()
 
@@ -418,8 +418,8 @@ class HomeServer(metaclass=abc.ABCMeta):
         """
         return SimpleHttpClient(
             self,
-            ip_whitelist=self.config.ip_range_whitelist,
-            ip_blacklist=self.config.ip_range_blacklist,
+            ip_whitelist=self.config.server.ip_range_whitelist,
+            ip_blacklist=self.config.server.ip_range_blacklist,
             use_proxy=True,
         )
 
@@ -498,7 +498,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_device_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return DeviceWorkerHandler(self)
         else:
             return DeviceHandler(self)
@@ -621,7 +621,7 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_federation_sender(self) -> AbstractFederationSender:
         if self.should_send_federation():
             return FederationSender(self)
-        elif not self.config.worker_app:
+        elif not self.config.worker.worker_app:
             return FederationRemoteSendQueue(self)
         else:
             raise Exception("Workers cannot send federation traffic")
@@ -650,14 +650,14 @@ class HomeServer(metaclass=abc.ABCMeta):
     def get_groups_local_handler(
         self,
     ) -> Union[GroupsLocalWorkerHandler, GroupsLocalHandler]:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsLocalWorkerHandler(self)
         else:
             return GroupsLocalHandler(self)
 
     @cache_in_self
     def get_groups_server_handler(self):
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return GroupsServerWorkerHandler(self)
         else:
             return GroupsServerHandler(self)
@@ -684,7 +684,7 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_room_member_handler(self) -> RoomMemberHandler:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return RoomMemberWorkerHandler(self)
         return RoomMemberMasterHandler(self)
 
@@ -694,13 +694,13 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_server_notices_manager(self) -> ServerNoticesManager:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             raise Exception("Workers cannot send server notices")
         return ServerNoticesManager(self)
 
     @cache_in_self
     def get_server_notices_sender(self) -> WorkerServerNoticesSender:
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             return WorkerServerNoticesSender(self)
         return ServerNoticesSender(self)
 
@@ -766,7 +766,9 @@ class HomeServer(metaclass=abc.ABCMeta):
 
     @cache_in_self
     def get_federation_ratelimiter(self) -> FederationRateLimiter:
-        return FederationRateLimiter(self.get_clock(), config=self.config.rc_federation)
+        return FederationRateLimiter(
+            self.get_clock(), config=self.config.ratelimiting.rc_federation
+        )
 
     @cache_in_self
     def get_module_api(self) -> ModuleApi:
@@ -799,18 +801,18 @@ class HomeServer(metaclass=abc.ABCMeta):
 
         logger.info(
             "Connecting to redis (host=%r port=%r) for external cache",
-            self.config.redis_host,
-            self.config.redis_port,
+            self.config.redis.redis_host,
+            self.config.redis.redis_port,
         )
 
         return lazyConnection(
             hs=self,
-            host=self.config.redis_host,
-            port=self.config.redis_port,
+            host=self.config.redis.redis_host,
+            port=self.config.redis.redis_port,
             password=self.config.redis.redis_password,
             reconnect=True,
         )
 
     def should_send_federation(self) -> bool:
         "Should this server be sending federation traffic directly?"
-        return self.config.send_federation
+        return self.config.worker.send_federation

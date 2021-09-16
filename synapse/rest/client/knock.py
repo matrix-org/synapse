@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, List, Optional, Tuple
+from typing import TYPE_CHECKING, Awaitable, Dict, List, Optional, Tuple
 
 from twisted.web.server import Request
 
@@ -96,7 +96,9 @@ class KnockRoomAliasServlet(RestServlet):
 
         return 200, {"room_id": room_id}
 
-    def on_PUT(self, request: Request, room_identifier: str, txn_id: str):
+    def on_PUT(
+        self, request: Request, room_identifier: str, txn_id: str
+    ) -> Awaitable[Tuple[int, JsonDict]]:
         set_tag("txn_id", txn_id)
 
         return self.txns.fetch_or_execute_request(

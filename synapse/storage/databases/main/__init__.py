@@ -61,6 +61,7 @@ from .registration import RegistrationStore
 from .rejections import RejectionsStore
 from .relations import RelationsStore
 from .room import RoomStore
+from .room_batch import RoomBatchStore
 from .roommember import RoomMemberStore
 from .search import SearchStore
 from .session import SessionStore
@@ -81,6 +82,7 @@ class DataStore(
     EventsBackgroundUpdatesStore,
     RoomMemberStore,
     RoomStore,
+    RoomBatchStore,
     RegistrationStore,
     StreamStore,
     ProfileStore,
@@ -271,7 +273,7 @@ class DataStore(
 
         def get_users_paginate_txn(txn):
             filters = []
-            args = [self.hs.config.server_name]
+            args = [self.hs.config.server.server_name]
 
             # Set ordering
             order_by_column = UserSortOrder(order_by).value
@@ -356,13 +358,13 @@ def check_database_before_upgrade(cur, database_engine, config: HomeServerConfig
         return
 
     user_domain = get_domain_from_id(rows[0][0])
-    if user_domain == config.server_name:
+    if user_domain == config.server.server_name:
         return
 
     raise Exception(
         "Found users in database not native to %s!\n"
         "You cannot change a synapse server_name after it's been configured"
-        % (config.server_name,)
+        % (config.server.server_name,)
     )
 
 

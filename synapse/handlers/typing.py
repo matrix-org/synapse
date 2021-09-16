@@ -53,7 +53,7 @@ class FollowerTypingHandler:
 
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.clock = hs.get_clock()
         self.is_mine_id = hs.is_mine_id
 
@@ -73,7 +73,7 @@ class FollowerTypingHandler:
         self._room_typing: Dict[str, Set[str]] = {}
 
         self._member_last_federation_poke: Dict[RoomMember, int] = {}
-        self.wheel_timer = WheelTimer(bucket_size=5000)
+        self.wheel_timer: WheelTimer[RoomMember] = WheelTimer(bucket_size=5000)
         self._latest_room_serial = 0
 
         self.clock.looping_call(self._handle_timeouts, 5000)

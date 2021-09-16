@@ -101,7 +101,7 @@ class FederationHandler(BaseHandler):
             hs
         )
 
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._maybe_store_room_on_outlier_membership = (
                 ReplicationStoreRoomOnOutlierMembershipRestServlet.make_client(hs)
             )
@@ -507,6 +507,7 @@ class FederationHandler(BaseHandler):
             await self.store.upsert_room_on_join(
                 room_id=room_id,
                 room_version=room_version_obj,
+                auth_events=auth_chain,
             )
 
             max_stream_id = await self._persist_auth_tree(
@@ -1613,7 +1614,7 @@ class FederationHandler(BaseHandler):
         Args:
             room_id
         """
-        if self.config.worker_app:
+        if self.config.worker.worker_app:
             await self._clean_room_for_join_client(room_id)
         else:
             await self.store.clean_room_for_join(room_id)

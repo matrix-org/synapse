@@ -14,10 +14,15 @@
 
 import logging
 import re
+from http import HTTPStatus
+from typing import TYPE_CHECKING, Awaitable, List, Tuple
+
+from twisted.web.server import Request
 
 from synapse.api.constants import EventContentFields, EventTypes
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.appservice import ApplicationService
+from synapse.http.server import HttpServer
 from synapse.http.servlet import (
     RestServlet,
     assert_params_in_dict,
@@ -25,9 +30,13 @@ from synapse.http.servlet import (
     parse_string,
     parse_strings_from_args,
 )
+from synapse.http.site import SynapseRequest
 from synapse.rest.client.transactions import HttpTransactionCache
-from synapse.types import Requester, UserID, create_requester
+from synapse.types import JsonDict, Requester, UserID, create_requester
 from synapse.util.stringutils import random_string
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +46,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
     API endpoint which can insert a batch of events historically back in time
     next to the given `prev_event`.
 
-    `batch_id` comes from `next_batch_id `in the response of the batch send
+    `batch_id` comes from `next_bacth_id `in the response of the batch send
     endpoint and is derived from the "insertion" events added to each batch.
     It's not required for the first batch send.
 
@@ -66,7 +75,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         ),
     )
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.store = hs.get_datastore()
@@ -76,7 +85,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.txns = HttpTransactionCache(hs)
 
-    async def _inherit_depth_from_prev_ids(self, prev_event_ids) -> int:
+    async def _inherit_depth_from_prev_ids(self, prev_event_ids: List[str]) -> int:
         (
             most_recent_prev_event_id,
             most_recent_prev_event_depth,
@@ -118,7 +127,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
     def _create_insertion_event_dict(
         self, sender: str, room_id: str, origin_server_ts: int
-    ):
+    ) -> JsonDict:
         """Creates an event dict for an "insertion" event with the proper fields
         and a random batch ID.
 
@@ -128,7 +137,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
             origin_server_ts: Timestamp when the event was sent
 
         Returns:
-            Tuple of event ID and stream ordering position
+            The new event dictionary to insert.
         """
 
         next_batch_id = random_string(8)
@@ -164,24 +173,27 @@ class RoomBatchSendEventRestServlet(RestServlet):
 
         return create_requester(user_id, app_service=app_service)
 
-    async def on_POST(self, request, room_id):
+    async def on_POST(
+        self, request: SynapseRequest, room_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=False)
 
         if not requester.app_service:
             raise AuthError(
-                403,
+                HTTPStatus.FORBIDDEN,
                 "Only application services can use the /batchsend endpoint",
             )
 
         body = parse_json_object_from_request(request)
         assert_params_in_dict(body, ["state_events_at_start", "events"])
 
+        assert request.args is not None
         prev_events_from_query = parse_strings_from_args(request.args, "prev_event")
         batch_id_from_query = parse_string(request, "batch_id")
 
         if prev_events_from_query is None:
             raise SynapseError(
-                400,
+                HTTPStatus.BAD_REQUEST,
                 "prev_event query parameter is required when inserting historical messages back in time",
                 errcode=Codes.MISSING_PARAM,
             )
@@ -202,7 +214,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
         prev_state_ids = list(prev_state_map.values())
         auth_event_ids = prev_state_ids
 
-        state_events_at_start = []
+        state_event_ids_at_start = []
         for state_event in body["state_events_at_start"]:
             assert_params_in_dict(
                 state_event, ["type", "origin_server_ts", "content", "sender"]
@@ -268,7 +280,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 )
                 event_id = event.event_id
 
-            state_events_at_start.append(event_id)
+            state_event_ids_at_start.append(event_id)
             auth_event_ids.append(event_id)
 
         events_to_create = body["events"]
@@ -288,7 +300,18 @@ class RoomBatchSendEventRestServlet(RestServlet):
             #  event, which causes the HS to ask for the state at the start of
             #  the batch later.
             prev_event_ids = [fake_prev_event_id]
-            # TODO: Verify the batch_id_from_query corresponds to an insertion event
+
+            # Verify the batch_id_from_query corresponds to an actual insertion event
+            # and have the batch connected.
+            corresponding_insertion_event_id = (
+                await self.store.get_insertion_event_by_batch_id(batch_id_from_query)
+            )
+            if corresponding_insertion_event_id is None:
+                raise SynapseError(
+                    400,
+                    "No insertion event corresponds to the given ?batch_id",
+                    errcode=Codes.INVALID_PARAM,
+                )
             pass
         # Otherwise, create an insertion event to act as a starting point.
         #
@@ -413,28 +436,36 @@ class RoomBatchSendEventRestServlet(RestServlet):
                 context=context,
             )
 
-        # Add the base_insertion_event to the bottom of the list we return
-        if base_insertion_event is not None:
-            event_ids.append(base_insertion_event.event_id)
+        insertion_event_id = event_ids[0]
+        batch_event_id = event_ids[-1]
+        historical_event_ids = event_ids[1:-1]
 
-        return 200, {
-            "state_events": state_events_at_start,
-            "events": event_ids,
+        response_dict = {
+            "state_event_ids": state_event_ids_at_start,
+            "event_ids": historical_event_ids,
             "next_batch_id": insertion_event["content"][
                 EventContentFields.MSC2716_NEXT_BATCH_ID
             ],
+            "insertion_event_id": insertion_event_id,
+            "batch_event_id": batch_event_id,
         }
+        if base_insertion_event is not None:
+            response_dict["base_insertion_event_id"] = base_insertion_event.event_id
 
-    def on_GET(self, request, room_id):
-        return 501, "Not implemented"
+        return HTTPStatus.OK, response_dict
 
-    def on_PUT(self, request, room_id):
+    def on_GET(self, request: Request, room_id: str) -> Tuple[int, str]:
+        return HTTPStatus.NOT_IMPLEMENTED, "Not implemented"
+
+    def on_PUT(
+        self, request: SynapseRequest, room_id: str
+    ) -> Awaitable[Tuple[int, JsonDict]]:
         return self.txns.fetch_or_execute_request(
             request, self.on_POST, request, room_id
         )
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     msc2716_enabled = hs.config.experimental.msc2716_enabled
 
     if msc2716_enabled:

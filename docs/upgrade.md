@@ -85,6 +85,15 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.43.0
+
+## The spaces summary APIs can now be handled by workers
+
+The [available worker applications documentation](https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications)
+has been updated to reflect that calls to the `/spaces`, `/hierarchy`, and
+`/summary` endpoints can now be routed to workers for both client API and
+federation requests.
+
 # Upgrading to v1.42.0
 
 ## Removal of old Room Admin API
@@ -111,7 +120,6 @@ process failed. See the default templates linked above for an example.
 
 Users will stop receiving message updates via email for addresses that were
 once, but not still, linked to their account.
-
 
 # Upgrading to v1.41.0
 
