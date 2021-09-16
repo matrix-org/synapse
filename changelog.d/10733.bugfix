@@ -1,1 +1,0 @@
-Allow user registration via SSO to require consent tracking for SSO mapping providers that don't prompt for Matrix ID selection. Contributed by @AndrewFerr.
