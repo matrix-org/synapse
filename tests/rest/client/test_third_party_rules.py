@@ -368,7 +368,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
 
             # Update the room's power levels with a different value each time so Synapse
             # doesn't consider an update redundant.
-            self.update_power_levels(event_default=i)
+            self._update_power_levels(event_default=i)
 
             # Check that the new event made it to the room's state.
             channel = self.make_request(
