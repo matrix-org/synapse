@@ -307,7 +307,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             oembed_response = self._oembed.parse_oembed_response(
                 media_info.uri, oembed_body
             )
-            og = oembed_response.og
+            og = oembed_response.open_graph_result
 
             # Use the cache age from the oEmbed result, instead of the HTTP response.
             if oembed_response.cache_age is not None:

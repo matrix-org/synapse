@@ -29,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
 class OEmbedResult:
-    og: JsonDict
+    # The Open Graph result (converted from the oEmbed result).
+    open_graph_result: JsonDict
     # Number of seconds to cache the content.
     cache_age: Optional[int]
 
