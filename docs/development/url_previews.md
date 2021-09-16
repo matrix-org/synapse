@@ -25,11 +25,10 @@ When Synapse is asked to preview a URL it does the following:
 3. Kicks off a background process to generate a preview:
    1. Checks the database cache by URL and timestamp and returns the result if it
       has not expired and was successful (a 2xx return code).
-   2. Checks if the URL matches an oEmbed pattern. If it does, replace the URL
-      to fetch.
-   3. If it doesn't match an oEmbed pattern, downloads the URL and stores it
-      into a file via the media storage provider and saves the local media
-      metadata.
+   2. Checks if the URL matches an [oEmbed](https://oembed.com/) pattern. If it
+      does, update the URL to download.
+   3. Downloads the URL and stores it into a file via the media storage provider
+      and saves the local media metadata.
    4. If the media is an image:
       1. Generates thumbnails.
       2. Generates an Open Graph response based on image properties.
@@ -41,7 +40,7 @@ When Synapse is asked to preview a URL it does the following:
             provider and saves the local media metadata.
          2. Generates thumbnails.
          3. Updates the Open Graph response based on image properties.
-   6. If the media is JSON and oEmbed was used:
+   6. If the media is JSON and an oEmbed URL was found:
       1. Convert the oEmbed response to an Open Graph response.
       2. If a thumbnail or image is in the oEmbed response:
          1. Downloads the URL and stores it into a file via the media storage
