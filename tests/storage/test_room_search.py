@@ -34,7 +34,7 @@ class NullByteInsertionTest(HomeserverTestCase):
         Ensure this doesn't break anything.
         """
 
-        # register a user and create a room, creat some messages
+        # register a user and create a room, create some messages
         self.register_user("alice", "password")
         access_token = self.login("alice", "password")
         room_id = self.helper.create_room_as("alice", True, "1", access_token)
