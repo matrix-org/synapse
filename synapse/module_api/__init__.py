@@ -27,6 +27,7 @@ from typing import (
     Union,
 )
 
+import attr
 import jinja2
 
 from twisted.internet import defer
@@ -87,20 +88,16 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+@attr.s(auto_attribs=True)
 class UserIpAndAgent:
     """
-    A ip, user_agent pair used by a user to connect to this homeserver.
+    An IP address and user agent used by a user to connect to this homeserver.
     """
 
     ip: str
     user_agent: str
     # The time at which this user agent/ip was last seen.
     last_seen: int
-
-    def __init__(self, ip: str, user_agent: str, last_seen: int):
-        self.ip = ip
-        self.user_agent = user_agent
-        self.last_seen = last_seen
 
 
 class ModuleApi:
@@ -725,7 +722,11 @@ class ModuleApi:
         )
 
     def is_mine(self, id: Union[str, DomainSpecificString]) -> bool:
-        """Checks whether an ID comes from this homeserver."""
+        """
+        Checks whether an ID comes from this homeserver.
+        
+        Added in Synapse v1.44.0.
+        """
         if isinstance(id, DomainSpecificString):
             return self._hs.is_mine(id)
         else:
@@ -738,6 +739,8 @@ class ModuleApi:
         Return the list of user IPs and agents for a user.
 
         Only useful for local users.
+
+        Added in Synapse v1.44.0.
         """
         # Don't hit the db if this is not a local user.
         is_mine = False
