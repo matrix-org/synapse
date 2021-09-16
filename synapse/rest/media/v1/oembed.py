@@ -90,47 +90,47 @@ class OEmbedProvider:
         # No match.
         return None
 
-    def parse_oembed_response(self, url: str, body: str) -> OEmbedResult:
+    def parse_oembed_response(self, url: str, raw_body: str) -> OEmbedResult:
         """
         Parse the oEmbed response into an Open Graph response.
 
         Args:
             url: The URL which is being previewed (not the one which was
                 requested).
-            body: The oEmbed response as JSON.
+            raw_body: The oEmbed response as JSON.
 
         Returns:
             json-encoded Open Graph data
         """
 
         try:
-            result = json_decoder.decode(body)
+            oembed = json_decoder.decode(raw_body)
 
             # Ensure there's a version of 1.0.
-            oembed_version = result["version"]
+            oembed_version = oembed["version"]
             if oembed_version != "1.0":
                 raise RuntimeError(f"Invalid version: {oembed_version}")
 
             # Ensure the cache age is None or an int.
-            cache_age = result.get("cache_age")
+            cache_age = oembed.get("cache_age")
             if cache_age:
                 cache_age = int(cache_age)
 
             # The results.
-            og = {"og:title": result.get("title")}
+            ppen_graph_response = {"og:title": oembed.get("title")}
 
             # If a thumbnail exists, use it. Note that dimensions will be calculated later.
-            if "thumbnail_url" in result:
-                og["og:image"] = result["thumbnail_url"]
+            if "thumbnail_url" in oembed:
+                ppen_graph_response["og:image"] = oembed["thumbnail_url"]
 
             # Process each type separately.
-            oembed_type = result["type"]
+            oembed_type = oembed["type"]
             if oembed_type == "rich":
-                calc_description_and_urls(og, result["html"])
+                calc_description_and_urls(ppen_graph_response, oembed["html"])
 
             elif oembed_type == "photo":
                 # If this is a photo, use the full image, not the thumbnail.
-                og["og:image"] = result["url"]
+                ppen_graph_response["og:image"] = oembed["url"]
 
             else:
                 raise RuntimeError(f"Unknown oEmbed type: {oembed_type}")
@@ -138,13 +138,13 @@ class OEmbedProvider:
         except Exception as e:
             # Trap any exception and let the code follow as usual.
             logger.warning(f"Error parsing oEmbed metadata from {url}: {e:r}")
-            og = {}
+            ppen_graph_response = {}
             cache_age = None
 
-        return OEmbedResult(og, cache_age)
+        return OEmbedResult(ppen_graph_response, cache_age)
 
 
-def calc_description_and_urls(og: JsonDict, body: str) -> None:
+def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> None:
     """
     Calculate description for an HTML document.
 
@@ -152,14 +152,14 @@ def calc_description_and_urls(og: JsonDict, body: str) -> None:
     occur during processing of the document, an empty response is returned.
 
     Args:
-        og: The current Open Graph summary. This is updated with additional fields.
-        body: The HTML document, as bytes.
+        open_graph_response: The current Open Graph summary. This is updated with additional fields.
+        html_body: The HTML document, as bytes.
 
     Returns:
         The summary
     """
     # If there's no body, nothing useful is going to be found.
-    if not body:
+    if not html_body:
         return
 
     from lxml import etree
@@ -168,7 +168,7 @@ def calc_description_and_urls(og: JsonDict, body: str) -> None:
     parser = etree.HTMLParser(recover=True, encoding="utf-8")
 
     # Attempt to parse the body. If this fails, log and return no metadata.
-    tree = etree.fromstring(body, parser)
+    tree = etree.fromstring(html_body, parser)
 
     # The data was successfully parsed, but no tree was found.
     if tree is None:
@@ -178,4 +178,4 @@ def calc_description_and_urls(og: JsonDict, body: str) -> None:
 
     description = _calc_description(tree)
     if description:
-        og["og:description"] = description
+        open_graph_response["og:description"] = description
