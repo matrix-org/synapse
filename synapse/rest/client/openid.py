@@ -65,11 +65,11 @@ class IdTokenServlet(RestServlet):
 
     EXPIRES_MS = 3600 * 1000
 
-    USERINFO_FIELDS = list(
+    USERINFO_FIELDS = [
         item[1]
         for item in OpenIdUserInfoField.__dict__.items()
         if not item[0].startswith("_")
-    )
+    ]
 
     def __init__(self, hs: "HomeServer"):
         super().__init__()
