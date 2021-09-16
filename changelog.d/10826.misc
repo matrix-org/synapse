@@ -1,0 +1,2 @@
+Opt out of cache expiry for `get_users_who_share_room_with_user`, to hopefully improve `/sync` performance when you
+haven't synced recently.
