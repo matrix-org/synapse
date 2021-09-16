@@ -91,7 +91,7 @@ class IdTokenServlet(RestServlet):
         if "userinfo_fields" in json:
             userinfo_fields = json["userinfo_fields"]
             for field in userinfo_fields:
-                if not field in self.USERINFO_FIELDS:
+                if field not in self.USERINFO_FIELDS:
                     raise SynapseError(
                         400,
                         "Unknown userinfo field '" + field + "'",
