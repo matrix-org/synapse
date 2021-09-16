@@ -646,6 +646,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 for key in ("body", "name", "topic"):
                     v = event.content.get(key, None)
                     if v:
+                        v = v.replace("\u0000", " ")
                         values.append(v)
 
                 if not values:
