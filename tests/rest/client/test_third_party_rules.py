@@ -399,17 +399,15 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
                     "m.room.name": 50,
                     "m.room.power_levels": 100,
                     "m.room.server_acl": 100,
-                    "m.room.tombstone": 100
+                    "m.room.tombstone": 100,
                 },
                 "events_default": event_default,
                 "invite": 0,
                 "kick": 50,
                 "redact": 50,
                 "state_default": 50,
-                "users": {
-                    self.user_id: 100
-                },
-                "users_default": 0
+                "users": {self.user_id: 100},
+                "users_default": 0,
             },
             tok=self.tok,
         )
