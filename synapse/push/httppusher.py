@@ -26,7 +26,7 @@ from synapse.events import EventBase
 from synapse.logging import opentracing
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.push import Pusher, PusherConfig, PusherConfigException
-from synapse.storage.databases.main.event_push_actions import HttpPushAction
+from synapse.storage.databases.main.event_push_actions import BasePushAction
 
 from . import push_rule_evaluator, push_tools
 
@@ -204,7 +204,7 @@ class HttpPusher(Pusher):
                     "app_display_name": self.app_display_name,
                 },
             ):
-                processed = await self._process_one(push_action)
+                processed = await self.process_push_action(push_action)
 
             if processed:
                 http_push_processed_counter.inc()
@@ -274,7 +274,7 @@ class HttpPusher(Pusher):
                     )
                     break
 
-    async def _process_one(self, push_action: HttpPushAction) -> bool:
+    async def process_push_action(self, push_action: BasePushAction) -> bool:
         if "notify" not in push_action["actions"]:
             return True
 

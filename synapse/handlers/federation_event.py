@@ -58,11 +58,14 @@ from synapse.federation.federation_client import InvalidResponseError
 from synapse.logging.context import nested_logging_context, run_in_background
 from synapse.logging.utils import log_function
 from synapse.metrics.background_process_metrics import run_as_background_process
+from synapse.push.bulk_push_rule_evaluator import BulkPushRuleEvaluator
+from synapse.push.httppusher import HttpPusher
 from synapse.replication.http.devices import ReplicationUserDevicesResyncRestServlet
 from synapse.replication.http.federation import (
     ReplicationFederationSendEventsRestServlet,
 )
 from synapse.state import StateResolutionStore
+from synapse.storage.databases.main.event_push_actions import BasePushAction
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.types import (
     PersistedEventPosition,
@@ -96,6 +99,7 @@ class FederationEventHandler:
     """
 
     def __init__(self, hs: "HomeServer"):
+        self._hs = hs
         self._store = hs.get_datastore()
         self._storage = hs.get_storage()
         self._state_store = self._storage.state
@@ -135,6 +139,25 @@ class FederationEventHandler:
         self.room_queues: Dict[str, List[Tuple[EventBase, str]]] = {}
 
         self._room_pdu_linearizer = Linearizer("fed_room_pdu")
+
+    async def notify_remote_invite(
+        self, event: EventBase, context: EventContext
+    ) -> None:
+        actions_by_user, _ = await BulkPushRuleEvaluator(
+            self._hs
+        ).get_action_for_event_by_user(event, context)
+        if event.state_key not in actions_by_user:
+            # No pushers for target user. Nothing to do.
+            return
+        # The pusher expects a differently structured push_action, so we wrangle things into the correct shape here
+        action_for_pusher: BasePushAction = {
+            "actions": actions_by_user[event.state_key],
+            "event_id": event.event_id,
+        }
+        pusherConfigs = await self._store.get_pushers_by_user_id(event.state_key)
+        for pusherConfig in pusherConfigs:
+            p = HttpPusher(self._hs, pusherConfig)
+            await p.process_push_action(action_for_pusher)
 
     async def on_receive_pdu(self, origin: str, pdu: EventBase) -> None:
         """Process a PDU received via a federation /send/ transaction

@@ -41,4 +41,4 @@ class ActionGenerator:
         self, event: EventBase, context: EventContext
     ) -> None:
         with Measure(self.clock, "action_for_event_by_user"):
-            await self.bulk_evaluator.action_for_event_by_user(event, context)
+            await self.bulk_evaluator.store_action_for_event_by_user(event, context)

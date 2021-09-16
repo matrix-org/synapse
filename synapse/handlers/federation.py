@@ -818,6 +818,8 @@ class FederationHandler:
             event.room_id, [(event, context)]
         )
 
+        await self._federation_event_handler.notify_remote_invite(event, context)
+
         return event
 
     async def do_remotely_reject_invite(

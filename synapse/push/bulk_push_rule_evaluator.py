@@ -184,15 +184,30 @@ class BulkPushRuleEvaluator:
 
         return pl_event.content if pl_event else {}, sender_level
 
-    async def action_for_event_by_user(
+    async def store_action_for_event_by_user(
         self, event: EventBase, context: EventContext
     ) -> None:
         """Given an event and context, evaluate the push rules, check if the message
         should increment the unread count, and insert the results into the
         event_push_actions_staging table.
         """
-        count_as_unread = _should_count_as_unread(event, context)
+        actions_by_user, count_as_unread = await self.get_action_for_event_by_user(
+            event, context
+        )
 
+        # Mark in the DB staging area the push actions for users who should be
+        # notified for this event. (This will then get handled when we persist
+        # the event)
+        await self.store.add_push_actions_to_staging(
+            event.event_id,
+            actions_by_user,
+            count_as_unread,
+        )
+
+    async def get_action_for_event_by_user(
+        self, event: EventBase, context: EventContext
+    ) -> Tuple[Dict[str, List[Union[dict, str]]], bool]:
+        count_as_unread = _should_count_as_unread(event, context)
         rules_by_user = await self._get_rules_for_event(event, context)
         actions_by_user: Dict[str, List[Union[dict, str]]] = {}
 
@@ -256,14 +271,7 @@ class BulkPushRuleEvaluator:
                         actions_by_user[uid] = actions
                     break
 
-        # Mark in the DB staging area the push actions for users who should be
-        # notified for this event. (This will then get handled when we persist
-        # the event)
-        await self.store.add_push_actions_to_staging(
-            event.event_id,
-            actions_by_user,
-            count_as_unread,
-        )
+        return actions_by_user, count_as_unread
 
 
 def _condition_checker(
