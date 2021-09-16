@@ -89,6 +89,19 @@ class ModuleApiTestCase(HomeserverTestCase):
         found_user = self.get_success(self.module_api.get_userinfo_by_id("@alice:test"))
         self.assertIsNone(found_user)
 
+    def test_get_user_ip_and_agents(self):
+        user_id = self.register_user("test_get_user_ip_and_agents_user", "1234")
+        info = self.get_success(self.module_api.get_user_ip_and_agents(user_id))
+        self.assertIdentical(info, [])
+
+    def test_get_user_ip_and_agents__no_user_found(self):
+        info = self.get_success(
+            self.module_api.get_user_ip_and_agents(
+                "@test_get_user_ip_and_agents_user_nonexistent"
+            )
+        )
+        self.assertIdentical(info, [])
+
     def test_sending_events_into_room(self):
         """Tests that a module can send events into a room"""
         # Mock out create_and_send_nonmember_event to check whether events are being sent

@@ -27,6 +27,7 @@ from typing import (
 )
 
 import jinja2
+from typing_extensions import TypedDict
 
 from twisted.internet import defer
 from twisted.web.resource import IResource
@@ -46,7 +47,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
+from synapse.types import (
+    DomainSpecificString,
+    JsonDict,
+    Requester,
+    UserID,
+    UserInfo,
+    create_requester,
+)
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -77,6 +85,13 @@ __all__ = [
 ]
 
 logger = logging.getLogger(__name__)
+
+
+class UserIpAndAgent(TypedDict):
+    ip: str
+    user_agent: str
+    # The time at which this user agent/ip was last seen.
+    last_seen: int
 
 
 class ModuleApi:
@@ -699,6 +714,38 @@ class ModuleApi:
             filenames,
             (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )
+
+    def ts(self) -> int:
+        """Return a timestamp for the current time, in milliseconds since the epoch"""
+        return self._hs.get_clock().time_msec()
+
+    def is_mine(self, domain_specific_string: DomainSpecificString) -> bool:
+        """Checks whether an ID comes from this homeserver."""
+        return self._hs.is_mine(domain_specific_string)
+
+    def is_mine_id(self, string: str) -> bool:
+        """Checks whether an ID comes from this homeserver."""
+        return string.split(":", 1)[1] == self._server_name
+
+    async def get_user_ip_and_agents(
+        self, user: UserID, since_ts: Optional[int] = None
+    ) -> List[UserIpAndAgent]:
+        """
+        Return the list of user IPs and agents for a user.
+
+        Only useful for local users.
+        """
+        raw_data = await self._store.get_user_ip_and_agents(user)
+        # Sanitize some of the data. We don't want to return tokens.
+        return [
+            {
+                "ip": str(data["ip"]),
+                "user_agent": str(data["user_agent"]),
+                "last_seen": int(data["last_seen"]),
+            }
+            for data in raw_data
+            if since_ts is None or int(data["last_seen"]) >= since_ts
+        ]
 
 
 class PublicRoomListManager:
