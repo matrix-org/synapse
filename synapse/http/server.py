@@ -37,7 +37,7 @@ from typing import (
 )
 
 import jinja2
-from canonicaljson import iterencode_canonical_json
+from canonicaljson import encode_canonical_json
 from typing_extensions import Protocol
 from zope.interface import implementer
 
@@ -620,12 +620,11 @@ class _ByteProducer:
         self._request = None
 
 
-def _encode_json_bytes(json_object: Any) -> Iterator[bytes]:
+def _encode_json_bytes(json_object: Any) -> bytes:
     """
     Encode an object into JSON. Returns an iterator of bytes.
     """
-    for chunk in json_encoder.iterencode(json_object):
-        yield chunk.encode("utf-8")
+    return json_encoder.encode(json_object).encode("utf-8")
 
 
 def respond_with_json(
@@ -659,7 +658,7 @@ def respond_with_json(
         return None
 
     if canonical_json:
-        encoder = iterencode_canonical_json
+        encoder = encode_canonical_json
     else:
         encoder = _encode_json_bytes
 
@@ -670,7 +669,7 @@ def respond_with_json(
     if send_cors:
         set_cors_headers(request)
 
-    _ByteProducer(request, encoder(json_object))
+    _write_json_to_request_in_thread(request, encoder, json_object)
     return NOT_DONE_YET
 
 
