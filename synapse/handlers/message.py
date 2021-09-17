@@ -1421,7 +1421,7 @@ class EventCreationHandler:
                 # structural protocol level).
                 is_msc2716_event = (
                     original_event.type == EventTypes.MSC2716_INSERTION
-                    or original_event.type == EventTypes.MSC2716_CHUNK
+                    or original_event.type == EventTypes.MSC2716_BATCH
                     or original_event.type == EventTypes.MSC2716_MARKER
                 )
                 if not room_version_obj.msc2716_historical and is_msc2716_event:

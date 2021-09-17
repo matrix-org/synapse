@@ -273,9 +273,9 @@ KNOWN_ROOM_VERSIONS: Dict[str, RoomVersion] = {
         RoomVersions.V6,
         RoomVersions.MSC2176,
         RoomVersions.V7,
-        RoomVersions.MSC2716,
         RoomVersions.V8,
         RoomVersions.V9,
+        RoomVersions.MSC2716v3,
     )
 }
 
