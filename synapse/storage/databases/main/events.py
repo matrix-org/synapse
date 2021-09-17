@@ -1955,7 +1955,6 @@ class PersistEventsStore:
             key (str):
             value (str):
         """
-
         self.store.store_search_entries_txn(
             txn,
             (
