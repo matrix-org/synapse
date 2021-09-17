@@ -73,6 +73,7 @@ class SynapseRequest(Request):
         super().__init__(channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
         self.synapse_site = site
+        self.reactor = site.reactor
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
 
@@ -550,6 +551,7 @@ class SynapseSite(Site):
         Site.__init__(self, resource, reactor=reactor)
 
         self.site_tag = site_tag
+        self.reactor = reactor
 
         assert config.http_options is not None
         proxied = config.http_options.x_forwarded
