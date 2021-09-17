@@ -358,15 +358,33 @@ class StateFilter:
 
     def approx_difference(self, subtrahend: "StateFilter") -> "StateFilter":
         """
-        Returns a state filter which represents self - subtrahend;
-        if the set of state events given by a state filter F are represented as
-        E(F), then the resultant state filter bears this property:
+        Returns a state filter which represents `self - subtrahend`.
+
+        The resultant state filter MUST admit all state events that are admitted
+        by only this filter (`self`) and not `subtrahend`. (1)
+        The resultant filter MAY be an over-approximation: the resultant state
+        filter MAY additionally admit other state events.
+
+
+        Formally, if the set of state events admitted by a state filter F are
+        written as E(F), then the resultant state filter bears this property:
 
             E(difference(self, subtrahend)) ⊇ E(self) ∖ E(subtrahend)
 
-        Ideally, this should be the narrowest such state filter, but this
-        function returns an approximation (since, for example, the set of
-        possible state keys is infinite).
+
+        This function attempts to return the narrowest such state filter.
+        In the case that `self` contains wildcards for state types where
+        `subtrahend` contains specific state keys, an approximation must be made:
+        the resultant state filter keeps the wildcard, as state filters are not
+        able to express 'all state keys except some given examples'.
+        e.g.
+            StateFilter(m.room.member -> None (wildcard))
+                minus
+            StateFilter(m.room.member -> {'@wombat:example.org'})
+                is approximated as
+            StateFilter(m.room.member -> None (wildcard))
+                which satisfies the condition that the resultant state filter
+                is an over-approximation.
         """
 
         types = dict(self.types)
