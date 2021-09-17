@@ -373,7 +373,7 @@ class PusherWorkerStore(SQLBaseStore):
                 txn,
                 table="pushers",
                 column="id",
-                values=(pusher_id for pusher_id, token in pushers if token is None),
+                values=[pusher_id for pusher_id, token in pushers if token is None],
                 keyvalues={},
             )
 
