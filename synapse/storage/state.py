@@ -391,40 +391,47 @@ class StateFilter:
         new_include_others = self.include_others and not subtrahend.include_others
         # if this is an include_others state filter, then all unmentioned
         # event types are wildcards; otherwise they're empty.
+        subtrahend_default_for_unspecified: Optional[FrozenSet[str]] = (
+            None if subtrahend.include_others else frozenset()
+        )
         current_default_for_unspecified: Optional[FrozenSet[str]] = (
             None if self.include_others else frozenset()
         )
         new_default_for_unspecified: Optional[FrozenSet[str]] = (
             None if new_include_others else frozenset()
         )
-
-        for sub_type, sub_keys in subtrahend.types.items():
-            current: Optional[FrozenSet[str]] = types.get(
-                sub_type, current_default_for_unspecified
+        state_types = set(subtrahend.types.keys())
+        state_types.update(set(self.types.keys()))
+        for state_type in state_types:
+            sub_keys: Optional[FrozenSet[str]] = subtrahend.types.get(
+                state_type, subtrahend_default_for_unspecified
+            )
+            current_keys: Optional[FrozenSet[str]] = types.get(
+                state_type, current_default_for_unspecified
             )
 
-            new: Optional[FrozenSet[str]]
+            new_keys: Optional[FrozenSet[str]]
             if sub_keys is None:
                 # anything minus all is none
-                new = frozenset()
-            elif current is None:
+                new_keys = frozenset()
+            elif current_keys is None:
                 # all minus a few specific keys is something we can only
                 # approximate as 'all'
-                new = None
+                new_keys = None
             else:
                 # a few specific keys minus a few specific keys is just the set
                 # difference of those keys
-                new = current.difference(sub_keys)
+                new_keys = current_keys.difference(sub_keys)
 
-            if new == new_default_for_unspecified:
+            if new_keys == new_default_for_unspecified:
                 # if the result is the same as the default assumption,
                 # don't bother storing it.
-                if sub_type in types:
-                    types.pop(sub_type)
+                if state_type in types:
+                    types.pop(state_type)
             else:
                 # this is not the same as the default assumption, so
                 # we store it
-                types[sub_type] = new
+                types[state_type] = new_keys
 
         return StateFilter(frozendict(types), include_others=new_include_others)
 
