@@ -188,7 +188,9 @@ class RoomBatchSendEventRestServlet(RestServlet):
         assert_params_in_dict(body, ["state_events_at_start", "events"])
 
         assert request.args is not None
-        prev_event_ids_from_query = parse_strings_from_args(request.args, "prev_event_id")
+        prev_event_ids_from_query = parse_strings_from_args(
+            request.args, "prev_event_id"
+        )
         chunk_id_from_query = parse_string(request, "chunk_id")
 
         if prev_event_ids_from_query is None:
