@@ -1,1 +1,1 @@
-Made a change so that posting an event with "\u0000" no longer causes an internal server error.
+Fix a bug where sending an `m.room.text` event containing a null byte would cause an internal server error.
