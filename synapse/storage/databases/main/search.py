@@ -55,7 +55,7 @@ class SearchWorkerStore(SQLBaseStore):
                     entry.event_id,
                     entry.room_id,
                     entry.key,
-                    entry.value.replace("\u0000", "\u0020"),
+                    entry.value.replace("\u0000", " "),
                     entry.stream_ordering,
                     entry.origin_server_ts,
                 )
@@ -70,11 +70,16 @@ class SearchWorkerStore(SQLBaseStore):
                 " VALUES (?,?,?,?)"
             )
             args = (
-                (entry.event_id, entry.room_id, entry.key, entry.value)
+                (
+                    entry.event_id,
+                    entry.room_id,
+                    entry.key,
+                    entry.value.replace("\u0000", " "),
+                )
                 for entry in entries
             )
-
             txn.execute_batch(sql, args)
+
         else:
             # This should be unreachable.
             raise Exception("Unrecognized database engine")
