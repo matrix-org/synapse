@@ -29,7 +29,6 @@ import attr
 
 from twisted.internet.defer import Deferred
 from twisted.internet.error import DNSLookupError
-from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -167,7 +166,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 self._start_expire_url_cache_data, 10 * 1000
             )
 
-    async def _async_render_OPTIONS(self, request: Request) -> None:
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 

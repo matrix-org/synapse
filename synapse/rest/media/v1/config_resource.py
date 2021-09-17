@@ -16,8 +16,6 @@
 
 from typing import TYPE_CHECKING
 
-from twisted.web.server import Request
-
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.site import SynapseRequest
 
@@ -39,5 +37,5 @@ class MediaConfigResource(DirectServeJsonResource):
         await self.auth.get_user_by_req(request)
         respond_with_json(request, 200, self.limits_dict, send_cors=True)
 
-    async def _async_render_OPTIONS(self, request: Request) -> None:
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         respond_with_json(request, 200, {}, send_cors=True)
