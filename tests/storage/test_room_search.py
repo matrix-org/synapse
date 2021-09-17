@@ -12,10 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
 import synapse.rest.admin
 from synapse.rest.client import login, room
+from synapse.storage.engines import PostgresEngine
 
 from tests.unittest import HomeserverTestCase
 
@@ -32,8 +31,7 @@ class NullByteInsertionTest(HomeserverTestCase):
         Postgres/SQLite don't like null bytes going into the search tables. Internally
         we replace those with a space.
 
-        Ensure this doesn't break anything.q
-
+        Ensure this doesn't break anything.
         """
 
         # register a user and create a room, create some messages
@@ -75,7 +73,7 @@ class NullByteInsertionTest(HomeserverTestCase):
         )
 
         # check content of highlights if we are using postgres
-        if "SYNAPSE_POSTGRES" in os.environ and os.environ["SYNAPSE_POSTGRES"] == "1":
+        if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("bob", res1.get("highlights"))
             self.assertIn("hi", res1.get("highlights"))
             self.assertIn("another", res2.get("highlights"))
