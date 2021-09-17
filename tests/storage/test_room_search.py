@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 
 import synapse.rest.admin
 from synapse.rest.client import login, room
@@ -28,10 +29,11 @@ class NullByteInsertionTest(HomeserverTestCase):
 
     def test_null_byte(self):
         """
-        Postgres doesn't like null bytes going into the search tables. Internally
+        Postgres/SQLite don't like null bytes going into the search tables. Internally
         we replace those with a space.
 
-        Ensure this doesn't break anything.
+        Ensure this doesn't break anything.q
+
         """
 
         # register a user and create a room, create some messages
@@ -57,15 +59,12 @@ class NullByteInsertionTest(HomeserverTestCase):
             store.search_msgs([room_id], "hi bob", ["content.body"])
         )
         self.assertEquals(res1.get("count"), 1)
-        self.assertIn("bob", res1.get("highlights"))
-        self.assertIn("hi", res1.get("highlights"))
 
         # check that search still works with another unrelated message
         res2 = self.get_success(
             store.search_msgs([room_id], "another", ["content.body"])
         )
         self.assertEquals(res2.get("count"), 1)
-        self.assertIn("another", res2.get("highlights"))
 
         # check that search still works when given a search term that overlaps
         # with the message that we replaced the null byte in and an unrelated one
@@ -74,4 +73,10 @@ class NullByteInsertionTest(HomeserverTestCase):
         res4 = self.get_success(
             store.search_msgs([room_id], "hi alice", ["content.body"])
         )
-        self.assertIn("alice", res4.get("highlights"))
+
+        # check content of highlights if we are using postgres
+        if "SYNAPSE_POSTGRES" in os.environ and os.environ["SYNAPSE_POSTGRES"] == "1":
+            self.assertIn("bob", res1.get("highlights"))
+            self.assertIn("hi", res1.get("highlights"))
+            self.assertIn("another", res2.get("highlights"))
+            self.assertIn("alice", res4.get("highlights"))
