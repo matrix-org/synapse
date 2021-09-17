@@ -281,9 +281,9 @@ class IsUserEvilResource(Resource):
         self.evil_users = config.get(&quot;evil_users&quot;) or []
 
     def render_GET(self, request: Request):
-        user = request.args.get(b&quot;user&quot;)[0]
+        user = request.args.get(b&quot;user&quot;)[0].decode()
         request.setHeader(b&quot;Content-Type&quot;, b&quot;application/json&quot;)
-        return json.dumps({&quot;evil&quot;: user in self.evil_users})
+        return json.dumps({&quot;evil&quot;: user in self.evil_users}).encode()
 
 
 class ListSpamChecker:
