@@ -4,7 +4,7 @@ Synapse 1.43.0rc2 (2021-09-17)
 Bugfixes
 --------
 
-- Added opentrace logging to help debug #9424. ([\#10828](https://github.com/matrix-org/synapse/issues/10828))
+- Added opentracing logging to help debug [\#9424](https://github.com/matrix-org/synapse/issues/9424). ([\#10828](https://github.com/matrix-org/synapse/issues/10828))
 
 
 Synapse 1.43.0rc1 (2021-09-14)
