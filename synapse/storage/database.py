@@ -1891,7 +1891,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        iterable: Collection[Any],
         keyvalues: Dict[str, Any],
     ) -> int:
         """Executes a DELETE query on the named table.
@@ -2098,7 +2098,7 @@ class DatabasePool:
 
 
 def make_in_list_sql_clause(
-    database_engine: BaseDatabaseEngine, column: str, iterable: Iterable
+    database_engine: BaseDatabaseEngine, column: str, iterable: Collection[Any]
 ) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 
