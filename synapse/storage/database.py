@@ -1632,7 +1632,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
     ) -> List[Dict[str, Any]]:
