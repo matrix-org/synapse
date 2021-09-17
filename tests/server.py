@@ -19,6 +19,7 @@ from twisted.internet.interfaces import (
     IPullProducer,
     IPushProducer,
     IReactorPluggableNameResolver,
+    IReactorTime,
     IResolverSimple,
     ITransport,
 )
@@ -181,13 +182,14 @@ class FakeSite:
     site_tag = "test"
     access_logger = logging.getLogger("synapse.access.http.fake")
 
-    def __init__(self, resource: IResource):
+    def __init__(self, resource: IResource, reactor: IReactorTime):
         """
 
         Args:
             resource: the resource to be used for rendering all requests
         """
         self._resource = resource
+        self.reactor = reactor
 
     def getResourceFor(self, request):
         return self._resource

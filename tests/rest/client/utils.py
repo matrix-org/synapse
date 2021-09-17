@@ -372,7 +372,7 @@ class RestHelper:
         path = "/_matrix/media/r0/upload?filename=%s" % (filename,)
         channel = make_request(
             self.hs.get_reactor(),
-            FakeSite(resource),
+            FakeSite(resource, self.hs.get_reactor()),
             "POST",
             path,
             content=image_data,
