@@ -667,7 +667,7 @@ class PersistEventsStore:
             table="event_auth_chain_to_calculate",
             keyvalues={},
             column="event_id",
-            iterable=new_chain_tuples,
+            values=new_chain_tuples,
         )
 
         # Now we need to calculate any new links between chains caused by
