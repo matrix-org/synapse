@@ -669,7 +669,9 @@ def respond_with_json(
     if send_cors:
         set_cors_headers(request)
 
-    _write_json_to_request_in_thread(request, encoder, json_object)
+    run_in_background(
+        _async_write_json_to_request_in_thread, request, encoder, json_object
+    )
     return NOT_DONE_YET
 
 
@@ -810,7 +812,7 @@ def finish_request(request: Request):
         logger.info("Connection disconnected before response was written: %r", e)
 
 
-def _write_json_to_request_in_thread(
+async def _async_write_json_to_request_in_thread(
     request: SynapseRequest,
     json_encoder: Callable[[Any], str],
     json_object: Any,
@@ -826,13 +828,10 @@ def _write_json_to_request_in_thread(
     expensive.
     """
 
-    async def _inner_encode_in_thread():
-        json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
+    json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
 
-        try:
-            request.write(json_str)
-            request.finish()
-        except RuntimeError as e:
-            logger.info("Connection disconnected before response was written: %r", e)
-
-    run_in_background(_inner_encode_in_thread)
+    try:
+        request.write(json_str)
+        request.finish()
+    except RuntimeError as e:
+        logger.info("Connection disconnected before response was written: %r", e)
