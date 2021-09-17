@@ -20,7 +20,7 @@ from typing import Collection, Iterable, List, Optional, Set
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
 from synapse.storage._base import SQLBaseStore, db_to_json, make_in_list_sql_clause
-from synapse.storage.database import DatabasePool
+from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.events_worker import EventRedactBehaviour
 from synapse.storage.engines import PostgresEngine, Sqlite3Engine
 
@@ -33,13 +33,14 @@ SearchEntry = namedtuple(
 
 
 class SearchWorkerStore(SQLBaseStore):
-    def store_search_entries_txn(self, txn, entries: Iterable[SearchEntry]):
+    def store_search_entries_txn(
+        self, txn: LoggingTransaction, entries: Iterable[SearchEntry]
+    ) -> None:
         """Add entries to the search table
 
         Args:
-            txn (cursor):
-            entries (iterable[SearchEntry]):
-                entries to be added to the table
+            txn:
+            entries: entries to be added to the table
         """
         if not self.hs.config.enable_search:
             return
