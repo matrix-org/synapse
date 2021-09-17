@@ -56,7 +56,7 @@ from synapse.api.errors import (
     UnrecognizedRequestError,
 )
 from synapse.http.site import SynapseRequest
-from synapse.logging.context import preserve_fn
+from synapse.logging.context import defer_to_thread, preserve_fn, run_in_background
 from synapse.logging.opentracing import trace_servlet
 from synapse.util import json_encoder
 from synapse.util.caches import intern_dict
@@ -809,3 +809,31 @@ def finish_request(request: Request):
         request.finish()
     except RuntimeError as e:
         logger.info("Connection disconnected before response was written: %r", e)
+
+
+def _write_json_to_request_in_thread(
+    request: SynapseRequest,
+    json_encoder: Callable[[Any], str],
+    json_object: Any,
+):
+    """Encodes the given JSON object on a thread and then writes it to the
+    request.
+
+    This is done so that encoding large JSON objects doesn't block the reactor
+    thread.
+
+    Note: We don't use JsonEncoder.iterencode here as that falls back to the
+    Python implementation (rather than the C backend), which is *much* more
+    expensive.
+    """
+
+    async def _inner_encode_in_thread():
+        json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
+
+        try:
+            request.write(json_str)
+            request.finish()
+        except RuntimeError as e:
+            logger.info("Connection disconnected before response was written: %r", e)
+
+    run_in_background(_inner_encode_in_thread)
