@@ -537,6 +537,22 @@ class StateStoreTestCase(HomeserverTestCase):
             ),
         )
 
+        # subtract two strange wildcards
+        assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.CanonicalAlias: frozenset({""})}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.CanonicalAlias: None}),
+                include_others=False,
+            ),
+        )
+
         # we can subtract individual state keys, except from wildcards
         assert_difference(
             StateFilter(
@@ -566,4 +582,19 @@ class StateStoreTestCase(HomeserverTestCase):
                 ),
                 include_others=False,
             ),
+        )
+
+        # we can subtract wildcards from non-wildcards
+        assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {EventTypes.Member: frozenset({"@wombat:hs1", "@kristina:hs2"})}
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.CanonicalAlias: frozenset({""})}),
+                include_others=True,
+            ),
+            StateFilter.none(),
         )
