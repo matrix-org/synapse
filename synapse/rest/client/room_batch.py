@@ -46,7 +46,7 @@ class RoomBatchSendEventRestServlet(RestServlet):
     API endpoint which can insert a batch of events historically back in time
     next to the given `prev_event`.
 
-    `batch_id` comes from `next_bacth_id `in the response of the batch send
+    `batch_id` comes from `next_batch_id `in the response of the batch send
     endpoint and is derived from the "insertion" events added to each batch.
     It's not required for the first batch send.
 
