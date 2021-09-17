@@ -458,6 +458,9 @@ class RoomStreamToken:
 
     Note: The `RoomStreamToken` cannot have both a topological part and an
     instance map.
+
+    For caching purposes, `RoomStreamToken`s and by extension, all their
+    attributes, must be hashable.
     """
 
     topological = attr.ib(
@@ -467,7 +470,7 @@ class RoomStreamToken:
     stream = attr.ib(type=int, validator=attr.validators.instance_of(int))
 
     instance_map = attr.ib(
-        type=Mapping[str, int],
+        type="frozendict[str, int]",
         factory=frozendict,
         validator=attr.validators.deep_mapping(
             key_validator=attr.validators.instance_of(str),
@@ -594,6 +597,12 @@ class RoomStreamToken:
 
 @attr.s(slots=True, frozen=True)
 class StreamToken:
+    """A collection of positions within multiple streams.
+
+    For caching purposes, `StreamToken`s and by extension, all their attributes,
+    must be hashable.
+    """
+
     room_key = attr.ib(
         type=RoomStreamToken, validator=attr.validators.instance_of(RoomStreamToken)
     )
