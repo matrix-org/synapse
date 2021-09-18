@@ -15,7 +15,7 @@ def _mkurl(template, kws):
 
 
 def main(hs, room_id, access_token, user_id):
-    headers = {'Authorization': 'Bearer %s' % (access_token)}
+    headers = {"Authorization": "***" % (access_token)}
     room_state_url = _mkurl(
         "$HS/_matrix/client/api/v1/rooms/$ROOM/state?access_token=$TOKEN",
         {"$HS": hs, "$ROOM": room_id, "$TOKEN": access_token},
