@@ -41,7 +41,7 @@ class RoomTypingTestCase(unittest.HomeserverTestCase):
             federation_client=Mock(),
         )
 
-        self.event_source = hs.get_event_sources().sources["typing"]
+        self.event_source = hs.get_event_sources().sources.typing
 
         hs.get_federation_handler = Mock()
 

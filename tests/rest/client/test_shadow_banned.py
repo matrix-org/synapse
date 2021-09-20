@@ -193,7 +193,7 @@ class RoomTestCase(_ShadowBannedBase):
         self.assertEquals(200, channel.code)
 
         # There should be no typing events.
-        event_source = self.hs.get_event_sources().sources["typing"]
+        event_source = self.hs.get_event_sources().sources.typing
         self.assertEquals(event_source.get_current_key(), 0)
 
         # The other user can join and send typing events.

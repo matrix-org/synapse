@@ -89,7 +89,7 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.handler = hs.get_typing_handler()
 
-        self.event_source = hs.get_event_sources().sources["typing"]
+        self.event_source = hs.get_event_sources().sources.typing
 
         self.datastore = hs.get_datastore()
         self.datastore.get_destination_retry_timings = Mock(
