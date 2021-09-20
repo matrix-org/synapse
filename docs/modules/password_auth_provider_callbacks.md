@@ -30,7 +30,7 @@ async def check_auth(
 ```
 
 The login type and field names are the things that should be provided by the user in their
-request to the `/login` API. [The spec](https://matrix.org/docs/spec/client_server/latest#user-interactive-authentication-api)
+request to the `/login` API. [The spec](https://matrix.org/docs/spec/client_server/latest#authentication-types)
 defines some types, however user defined ones are also allowed.
 
 It is passed the user field provided by the client (which might not be in `@username:server` form), 
@@ -82,13 +82,14 @@ device ID), and the (now deactivated) access token.
 
 ## Example
 
-The following module implements authentication checkers for two different login types: 
+The example module below implements authentication checkers for two different login types: 
 -  `my.login.type` 
     - Expects a `my_field` field to be sent to `/login`
     - Is checked by the method: `self.check_my_login`
-- `m.login.password`
+- `m.login.password` (defined in [the spec](https://matrix.org/docs/spec/client_server/latest#password-based))
     - Expects a `password` field to be sent to `/login`
     - Is checked by the method: `self.check_pass` 
+
 
 ```python
 from typing import Awaitable, Callable, Optional, Tuple
