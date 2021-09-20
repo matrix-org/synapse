@@ -360,10 +360,12 @@ class StateFilter:
         """
         Returns a state filter which represents `self - subtrahend`.
 
-        The resultant state filter MUST admit all state events that are admitted
-        by only this filter (`self`) and not `subtrahend`.
-        The resultant filter MAY be an over-approximation: the resultant state
-        filter MAY additionally admit some state events from `subtrahend`.
+        The resultant state filter
+        - MUST admit all state events that are admitted
+          by only this filter (`self`) and not `subtrahend`;
+        - MUST NOT admit state events rejected by this filter (`self`); and
+        - MAY be an over-approximation: the resultant state
+          filter MAY additionally admit some state events from `subtrahend`.
 
 
         Formally, if the set of state events admitted by a state filter F are
