@@ -168,7 +168,7 @@ class GroupAttestionRenewer:
 
         return {}
 
-    def _start_renew_attestations(self) -> Deferred[None]:
+    def _start_renew_attestations(self) -> "Deferred[None]":
         return run_as_background_process("renew_attestations", self._renew_attestations)
 
     async def _renew_attestations(self) -> None:
