@@ -24,7 +24,7 @@ from synapse.appservice.scheduler import (
 from synapse.logging.context import make_deferred_yieldable
 
 from tests import unittest
-from tests.test_utils import make_awaitable
+from tests.test_utils import make_awaitable, simple_async_mock
 
 from ..utils import MockClock
 
@@ -122,7 +122,7 @@ class ApplicationServiceSchedulerRecovererTestCase(unittest.TestCase):
         self.as_api = Mock()
         self.store = Mock()
         self.service = Mock()
-        self.callback = Mock()
+        self.callback = simple_async_mock()
         self.recoverer = _Recoverer(
             clock=self.clock,
             as_api=self.as_api,
