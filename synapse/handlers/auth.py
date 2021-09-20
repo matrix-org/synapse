@@ -1999,7 +1999,7 @@ class PasswordAuthProvider:
                 # Note: fields may be empty here. This would allow a modules auth checker to
                 # be called with just 'login_type' and no password or other secrets
 
-                # Need to check that all the field names are strings or will get nasty error later
+                # Need to check that all the field names are strings or may get nasty errors later
                 for f in fields:
                     if not isinstance(f, str):
                         raise RuntimeError(
@@ -2025,9 +2025,7 @@ class PasswordAuthProvider:
                         )
 
                 # Add the new method to the list of auth_checker_callbacks for this login type
-                callback_list = self.auth_checker_callbacks.get(login_type, [])
-                callback_list.append(callback)
-                self.auth_checker_callbacks[login_type] = callback_list
+                self.auth_checker_callbacks.setdefault(login_type, []).append(callback)
 
     def get_supported_login_types(self) -> Mapping[str, Iterable[str]]:
         """Get the login types supported by this password provider
