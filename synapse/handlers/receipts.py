@@ -216,7 +216,11 @@ class ReceiptEventSource:
         return visible_events
 
     async def get_new_events(
-        self, from_key: int, room_ids: Iterable[str], user: UserID, **kwargs: Any
+        self,
+        user: UserID,
+        from_key: int,
+        room_ids: Iterable[str],
+        **kwargs: Any,
     ) -> Tuple[List[JsonDict], int]:
         from_key = int(from_key)
         to_key = self.get_current_key()

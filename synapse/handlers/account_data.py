@@ -171,7 +171,10 @@ class AccountDataEventSource:
         return self.store.get_max_account_data_stream_id()
 
     async def get_new_events(
-        self, user: UserID, from_key: int, **kwargs: Any
+        self,
+        user: UserID,
+        from_key: int,
+        **kwargs: Any,
     ) -> Tuple[List[JsonDict], int]:
         user_id = user.to_string()
         last_stream_id = from_key

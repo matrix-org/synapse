@@ -485,7 +485,10 @@ class TypingNotificationEventSource:
             return (events, handler._latest_room_serial)
 
     async def get_new_events(
-        self, from_key: int, room_ids: Iterable[str], **kwargs: Any
+        self,
+        from_key: int,
+        room_ids: Iterable[str],
+        **kwargs: Any,
     ) -> Tuple[List[JsonDict], int]:
         with Measure(self.clock, "typing.get_new_events"):
             from_key = int(from_key)
