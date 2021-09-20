@@ -724,7 +724,7 @@ class ModuleApi:
     def is_mine(self, id: Union[str, DomainSpecificString]) -> bool:
         """
         Checks whether an ID comes from this homeserver.
-        
+
         Added in Synapse v1.44.0.
         """
         if isinstance(id, DomainSpecificString):
@@ -733,12 +733,13 @@ class ModuleApi:
             return self._hs.is_mine_id(id)
 
     async def get_user_ip_and_agents(
-        self, user_id: str, since_ts: Optional[float] = None
+        self, user_id: str, since_ts: Optional[float] = 0
     ) -> List[UserIpAndAgent]:
         """
         Return the list of user IPs and agents for a user.
 
-        Only useful for local users.
+        Only useful for local users. If since_ts is not specified,
+        return the list since the epoch.
 
         Added in Synapse v1.44.0.
         """
@@ -752,7 +753,7 @@ class ModuleApi:
             pass
         if is_mine:
             raw_data = await self._store.get_user_ip_and_agents(
-                UserID.from_string(user_id)
+                UserID.from_string(user_id), since_ts
             )
             # Sanitize some of the data. We don't want to return tokens.
             return [
@@ -762,7 +763,6 @@ class ModuleApi:
                     last_seen=int(data["last_seen"]),
                 )
                 for data in raw_data
-                if since_ts is None or int(data["last_seen"]) >= since_ts
             ]
         else:
             return []
