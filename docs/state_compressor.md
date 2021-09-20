@@ -1,3 +1,5 @@
+TODO: Update with final contents of README after PR #70 merged in rust-synapse-compress-state repo
+
 # State compressor
 
 The state compressor is an **experimental** tool that attempts to reduce the number of rows 
