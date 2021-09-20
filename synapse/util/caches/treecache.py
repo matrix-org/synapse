@@ -35,17 +35,17 @@ class TreeCache:
         root = {key_1: {key_2: _value}}
     """
 
-    def __init__(self):
-        self.size = 0
+    def __init__(self) -> None:
+        self.size: int = 0
         self.root = TreeCacheNode()
 
-    def __setitem__(self, key, value):
-        return self.set(key, value)
+    def __setitem__(self, key, value) -> None:
+        self.set(key, value)
 
-    def __contains__(self, key):
+    def __contains__(self, key) -> bool:
         return self.get(key, SENTINEL) is not SENTINEL
 
-    def set(self, key, value):
+    def set(self, key, value) -> None:
         if isinstance(value, TreeCacheNode):
             # this would mean we couldn't tell where our tree ended and the value
             # started.
@@ -73,7 +73,7 @@ class TreeCache:
                 return default
         return node.get(key[-1], default)
 
-    def clear(self):
+    def clear(self) -> None:
         self.size = 0
         self.root = TreeCacheNode()
 
@@ -128,7 +128,7 @@ class TreeCache:
     def values(self):
         return iterate_tree_cache_entry(self.root)
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self.size
 
 

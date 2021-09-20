@@ -149,7 +149,7 @@ class FederationEventHandler:
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._user_device_resync = (
                 ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
@@ -1009,14 +1009,14 @@ class FederationEventHandler:
             await self._store.mark_remote_user_device_cache_as_stale(sender)
 
             # Immediately attempt a resync in the background
-            if self._config.worker_app:
+            if self._config.worker.worker_app:
                 await self._user_device_resync(user_id=sender)
             else:
                 await self._device_list_updater.user_device_resync(sender)
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
 
-    async def _handle_marker_event(self, origin: str, marker_event: EventBase):
+    async def _handle_marker_event(self, origin: str, marker_event: EventBase) -> None:
         """Handles backfilling the insertion event when we receive a marker
         event that points to one.
 
@@ -1109,7 +1109,7 @@ class FederationEventHandler:
 
         event_map: Dict[str, EventBase] = {}
 
-        async def get_event(event_id: str):
+        async def get_event(event_id: str) -> None:
             with nested_logging_context(event_id):
                 try:
                     event = await self._federation_client.get_pdu(
@@ -1218,7 +1218,7 @@ class FederationEventHandler:
         if not event_infos:
             return
 
-        async def prep(ev_info: _NewEventInfo):
+        async def prep(ev_info: _NewEventInfo) -> EventContext:
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
                 res = await self._state_handler.compute_event_context(event)
@@ -1692,7 +1692,7 @@ class FederationEventHandler:
 
     async def _run_push_actions_and_persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
-    ):
+    ) -> None:
         """Run the push actions for a received event, and persist it.
 
         Args:

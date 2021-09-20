@@ -1,1 +1,0 @@
-Add an index to `presence_stream` to hopefully speed up startups a little.

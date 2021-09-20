@@ -16,7 +16,7 @@
 import functools
 import os
 import re
-from typing import Callable, List
+from typing import Any, Callable, List
 
 NEW_FORMAT_ID_RE = re.compile(r"^\d\d\d\d-\d\d-\d\d")
 
@@ -27,7 +27,7 @@ def _wrap_in_base_path(func: Callable[..., str]) -> Callable[..., str]:
     """
 
     @functools.wraps(func)
-    def _wrapped(self, *args, **kwargs):
+    def _wrapped(self: "MediaFilePaths", *args: Any, **kwargs: Any) -> str:
         path = func(self, *args, **kwargs)
         return os.path.join(self.base_path, path)
 
@@ -129,7 +129,7 @@ class MediaFilePaths:
     # using the new path.
     def remote_media_thumbnail_rel_legacy(
         self, server_name: str, file_id: str, width: int, height: int, content_type: str
-    ):
+    ) -> str:
         top_level_type, sub_type = content_type.split("/")
         file_name = "%i-%i-%s-%s" % (width, height, top_level_type, sub_type)
         return os.path.join(

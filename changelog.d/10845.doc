@@ -1,0 +1,1 @@
+Fix some crashes in the Module API example code, by adding JSON encoding/decoding.

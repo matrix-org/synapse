@@ -27,10 +27,14 @@ logger = logging.getLogger(__name__)
 KT = TypeVar("KT")
 # The type of the dictionary keys.
 DKT = TypeVar("DKT")
+# The type of the dictionary values.
+DV = TypeVar("DV")
 
 
+# This class can't be generic because it uses slots with attrs.
+# See: https://github.com/python-attrs/attrs/issues/313
 @attr.s(slots=True)
-class DictionaryEntry:
+class DictionaryEntry:  # should be: Generic[DKT, DV].
     """Returned when getting an entry from the cache
 
     Attributes:
@@ -43,10 +47,10 @@ class DictionaryEntry:
     """
 
     full = attr.ib(type=bool)
-    known_absent = attr.ib()
-    value = attr.ib()
+    known_absent = attr.ib(type=Set[Any])  # should be: Set[DKT]
+    value = attr.ib(type=Dict[Any, Any])  # should be: Dict[DKT, DV]
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.value)
 
 
@@ -56,7 +60,7 @@ class _Sentinel(enum.Enum):
     sentinel = object()
 
 
-class DictionaryCache(Generic[KT, DKT]):
+class DictionaryCache(Generic[KT, DKT, DV]):
     """Caches key -> dictionary lookups, supporting caching partial dicts, i.e.
     fetching a subset of dictionary keys for a particular key.
     """
@@ -87,7 +91,7 @@ class DictionaryCache(Generic[KT, DKT]):
 
         Args:
             key
-            dict_key: If given a set of keys then return only those keys
+            dict_keys: If given a set of keys then return only those keys
                 that exist in the cache.
 
         Returns:
@@ -125,8 +129,8 @@ class DictionaryCache(Generic[KT, DKT]):
         self,
         sequence: int,
         key: KT,
-        value: Dict[DKT, Any],
-        fetched_keys: Optional[Set[DKT]] = None,
+        value: Dict[DKT, DV],
+        fetched_keys: Optional[Iterable[DKT]] = None,
     ) -> None:
         """Updates the entry in the cache
 
@@ -151,15 +155,15 @@ class DictionaryCache(Generic[KT, DKT]):
                 self._update_or_insert(key, value, fetched_keys)
 
     def _update_or_insert(
-        self, key: KT, value: Dict[DKT, Any], known_absent: Set[DKT]
+        self, key: KT, value: Dict[DKT, DV], known_absent: Iterable[DKT]
     ) -> None:
         # We pop and reinsert as we need to tell the cache the size may have
         # changed
 
-        entry = self.cache.pop(key, DictionaryEntry(False, set(), {}))
+        entry: DictionaryEntry = self.cache.pop(key, DictionaryEntry(False, set(), {}))
         entry.value.update(value)
         entry.known_absent.update(known_absent)
         self.cache[key] = entry
 
-    def _insert(self, key: KT, value: Dict[DKT, Any], known_absent: Set[DKT]) -> None:
+    def _insert(self, key: KT, value: Dict[DKT, DV], known_absent: Set[DKT]) -> None:
         self.cache[key] = DictionaryEntry(True, known_absent, value)

@@ -134,7 +134,7 @@ def prepare_database(
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
             if (
-                config.worker_app is not None
+                config.worker.worker_app is not None
                 and version_info.current_version != SCHEMA_VERSION
             ):
                 raise UpgradeDatabaseException(
@@ -154,7 +154,7 @@ def prepare_database(
 
             # if it's a worker app, refuse to upgrade the database, to avoid multiple
             # workers doing it at once.
-            if config and config.worker_app is not None:
+            if config and config.worker.worker_app is not None:
                 raise UpgradeDatabaseException(EMPTY_DATABASE_ON_WORKER_ERROR)
 
             _setup_new_database(cur, database_engine, databases=databases)
@@ -355,7 +355,7 @@ def _upgrade_existing_database(
     else:
         assert config
 
-    is_worker = config and config.worker_app is not None
+    is_worker = config and config.worker.worker_app is not None
 
     if (
         current_schema_state.compat_version is not None
