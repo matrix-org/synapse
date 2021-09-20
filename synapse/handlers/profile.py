@@ -254,7 +254,7 @@ class ProfileHandler(BaseHandler):
         requester: Requester,
         new_avatar_url: str,
         by_admin: bool = False,
-    ):
+    ) -> None:
         """Set a new avatar URL for a user.
 
         Args:
@@ -425,7 +425,7 @@ class ProfileHandler(BaseHandler):
             raise
 
     @wrap_as_background_process("Update remote profile")
-    async def _update_remote_profile_cache(self):
+    async def _update_remote_profile_cache(self) -> None:
         """Called periodically to check profiles of remote users we haven't
         checked in a while.
         """

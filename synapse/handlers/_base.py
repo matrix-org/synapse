@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING, Optional
 
 from synapse.api.ratelimiting import Ratelimiter
+from synapse.types import Requester
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -63,16 +64,21 @@ class BaseHandler:
 
         self.event_builder_factory = hs.get_event_builder_factory()
 
-    async def ratelimit(self, requester, update=True, is_admin_redaction=False):
+    async def ratelimit(
+        self,
+        requester: Requester,
+        update: bool = True,
+        is_admin_redaction: bool = False,
+    ) -> None:
         """Ratelimits requests.
 
         Args:
-            requester (Requester)
-            update (bool): Whether to record that a request is being processed.
+            requester
+            update: Whether to record that a request is being processed.
                 Set to False when doing multiple checks for one request (e.g.
                 to check up front if we would reject the request), and set to
                 True for the last call for a given request.
-            is_admin_redaction (bool): Whether this is a room admin/moderator
+            is_admin_redaction: Whether this is a room admin/moderator
                 redacting an event. If so then we may apply different
                 ratelimits depending on config.
 

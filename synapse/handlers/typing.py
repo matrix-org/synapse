@@ -14,7 +14,7 @@
 import logging
 import random
 from collections import namedtuple
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api.errors import AuthError, ShadowBanError, SynapseError
 from synapse.appservice import ApplicationService
@@ -485,7 +485,7 @@ class TypingNotificationEventSource:
             return (events, handler._latest_room_serial)
 
     async def get_new_events(
-        self, from_key: int, room_ids: Iterable[str], **kwargs
+        self, from_key: int, room_ids: Iterable[str], **kwargs: Any
     ) -> Tuple[List[JsonDict], int]:
         with Measure(self.clock, "typing.get_new_events"):
             from_key = int(from_key)

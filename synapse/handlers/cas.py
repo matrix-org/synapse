@@ -34,20 +34,20 @@ logger = logging.getLogger(__name__)
 class CasError(Exception):
     """Used to catch errors when validating the CAS ticket."""
 
-    def __init__(self, error, error_description=None):
+    def __init__(self, error: str, error_description: Optional[str] = None):
         self.error = error
         self.error_description = error_description
 
-    def __str__(self):
+    def __str__(self) -> str:
         if self.error_description:
             return f"{self.error}: {self.error_description}"
         return self.error
 
 
-@attr.s(slots=True, frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class CasResponse:
-    username = attr.ib(type=str)
-    attributes = attr.ib(type=Dict[str, List[Optional[str]]])
+    username: str
+    attributes: Dict[str, List[Optional[str]]]
 
 
 class CasHandler:
@@ -133,11 +133,9 @@ class CasHandler:
             body = pde.response
         except HttpResponseException as e:
             description = (
-                (
-                    'Authorization server responded with a "{status}" error '
-                    "while exchanging the authorization code."
-                ).format(status=e.code),
-            )
+                'Authorization server responded with a "{status}" error '
+                "while exchanging the authorization code."
+            ).format(status=e.code)
             raise CasError("server_error", description) from e
 
         return self._parse_cas_response(body)

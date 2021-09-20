@@ -99,7 +99,7 @@ class AccountValidityHandler:
         on_legacy_send_mail: Optional[ON_LEGACY_SEND_MAIL_CALLBACK] = None,
         on_legacy_renew: Optional[ON_LEGACY_RENEW_CALLBACK] = None,
         on_legacy_admin_request: Optional[ON_LEGACY_ADMIN_REQUEST] = None,
-    ):
+    ) -> None:
         """Register callbacks from module for each hook."""
         if is_user_expired is not None:
             self._is_user_expired_callbacks.append(is_user_expired)
@@ -165,7 +165,7 @@ class AccountValidityHandler:
 
         return False
 
-    async def on_user_registration(self, user_id: str):
+    async def on_user_registration(self, user_id: str) -> None:
         """Tell third-party modules about a user's registration.
 
         Args:
