@@ -199,7 +199,7 @@ def run_as_background_process(  # type: ignore[misc]
     *args: Any,
     bg_start_span: bool = True,
     **kwargs: Any,
-) -> defer.Deferred[Optional[R]]:
+) -> "defer.Deferred[Optional[R]]":
     ...
     # The `type: ignore[misc]` above suppresses
     # "error: Overloaded function signatures 1 and 2 overlap with incompatible return types  [misc]"
@@ -212,7 +212,7 @@ def run_as_background_process(
     *args: Any,
     bg_start_span: bool = True,
     **kwargs: Any,
-) -> defer.Deferred[Optional[R]]:
+) -> "defer.Deferred[Optional[R]]":
     ...
 
 
@@ -225,7 +225,7 @@ def run_as_background_process(
     *args: Any,
     bg_start_span: bool = True,
     **kwargs: Any,
-) -> defer.Deferred[Optional[R]]:
+) -> "defer.Deferred[Optional[R]]":
     """Run the given function in its own logcontext, with resource metrics
 
     This should be used to wrap processes which are fired off to run in the
@@ -304,7 +304,7 @@ def wrap_as_background_process(desc: str) -> Callable[[F], F]:
         @wraps(func)
         def wrap_as_background_process_inner_2(
             *args: Any, **kwargs: Any
-        ) -> defer.Deferred[Optional[R]]:
+        ) -> "defer.Deferred[Optional[R]]":
             return run_as_background_process(desc, func, *args, **kwargs)
 
         return cast(F, wrap_as_background_process_inner_2)
