@@ -68,7 +68,7 @@ class StatsHandler:
 
         self._is_processing = True
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:

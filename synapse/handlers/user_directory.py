@@ -114,7 +114,7 @@ class UserDirectoryHandler(StateDeltasHandler):
         if self._is_processing:
             return
 
-        async def process():
+        async def process() -> None:
             try:
                 await self._unsafe_process()
             finally:

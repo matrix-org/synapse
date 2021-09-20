@@ -541,7 +541,7 @@ class RoomSummaryHandler:
         origin: str,
         requested_room_id: str,
         suggested_only: bool,
-    ):
+    ) -> JsonDict:
         """
         Implementation of the room hierarchy Federation API.
 
