@@ -14,7 +14,7 @@
 import contextlib
 import logging
 import time
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, cast
 
 import attr
 from zope.interface import implementer
@@ -91,11 +91,11 @@ class SynapseRequest(Request):
         self._is_processing = False
 
         # the time when the asynchronous request handler completed its processing
-        self._processing_finished_time = None
+        self._processing_finished_time: Optional[float] = None
 
         # what time we finished sending the response to the client (or the connection
         # dropped)
-        self.finish_time = None
+        self.finish_time: Optional[float] = None
 
     def __repr__(self):
         # We overwrite this so that we don't log ``access_token``
@@ -364,7 +364,11 @@ class SynapseRequest(Request):
         )
 
     def _finished_processing(self):
-        """Log the completion of this request and update the metrics"""
+        """Log the completion of this request and update the metrics.
+
+        Doing so requires the `finish_time` to be non-`None` so we can compute
+        the response send time.
+        """
         assert self.logcontext is not None
         usage = self.logcontext.get_resource_usage()
 
@@ -377,7 +381,10 @@ class SynapseRequest(Request):
 
         # the time between the request handler finishing and the response being sent
         # to the client (nb may be negative)
-        response_send_time = self.finish_time - self._processing_finished_time
+        # TODO can we avoid the cast? Maybe take finish_time as an explicit float param?
+        response_send_time = (
+            cast(float, self.finish_time) - self._processing_finished_time
+        )
 
         user_agent = get_request_user_agent(self, "-")
 
