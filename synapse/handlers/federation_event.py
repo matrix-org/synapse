@@ -1189,6 +1189,9 @@ class FederationEventHandler:
             allow_rejected=True,
         )
 
+        room_version = await self._store.get_room_version_id(room_id)
+        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
         async def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
             with nested_logging_context(suffix=event.event_id):
                 auth = {}
@@ -1207,12 +1210,12 @@ class FederationEventHandler:
                     auth[(ae.type, ae.state_key)] = ae
 
                 context = EventContext.for_outlier()
-                context = await self._check_event_auth(
-                    origin,
-                    event,
-                    context,
-                    claimed_auth_event_map=auth,
-                )
+                try:
+                    event_auth.check(room_version_obj, event, auth_events=auth)
+                except AuthError as e:
+                    logger.warning("Rejecting %r because %s", event, e)
+                    context.rejected = RejectedReason.AUTH_ERROR
+
             return event, context
 
         events_to_persist = (
