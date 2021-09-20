@@ -1,2 +1,0 @@
-Made a change that Synapse Admin API's Rooms Search so that it can now accept non-ASCII characters, allowing admins
-to find rooms with non-ASCII characters.
