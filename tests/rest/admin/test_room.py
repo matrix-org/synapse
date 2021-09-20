@@ -977,13 +977,13 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 access_token=self.admin_user_tok,
             )
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
-            self.assertIn(expected_room_id, channel.json_body.get('rooms')[0].get('room_id'))
-            self.assertIn("ж", channel.json_body.get('rooms')[0].get('name'))
+            self.assertIn(
+                expected_room_id, channel.json_body.get("rooms")[0].get("room_id")
+            )
+            self.assertIn("ж", channel.json_body.get("rooms")[0].get("name"))
 
         search_term = "ж"
         _search_test_utf8(room_id, search_term)
-
-
 
     def test_single_room(self):
         """Test that a single room can be requested correctly"""
