@@ -1815,7 +1815,9 @@ def load_legacy_password_auth_providers(hs: "HomeServer"):
         )
 
 
-def load_single_legacy_password_auth_provider(module: Type, config: JsonDict, api: ModuleApi):
+def load_single_legacy_password_auth_provider(
+    module: Type, config: JsonDict, api: ModuleApi
+):
     try:
         provider = module(config=config, account_handler=api)
     except Exception as e:
