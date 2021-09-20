@@ -20,7 +20,16 @@ import math
 import random
 import string
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 from synapse.api.constants import (
     EventContentFields,
@@ -1182,7 +1191,7 @@ class RoomEventSource:
         user: UserID,
         from_key: RoomStreamToken,
         limit: int,
-        room_ids: List[str],
+        room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:

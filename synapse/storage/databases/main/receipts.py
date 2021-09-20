@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -153,7 +153,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         }
 
     async def get_linearized_receipts_for_rooms(
-        self, room_ids: List[str], to_key: int, from_key: Optional[int] = None
+        self, room_ids: Iterable[str], to_key: int, from_key: Optional[int] = None
     ) -> List[dict]:
         """Get receipts for multiple rooms for sending to clients.
 
