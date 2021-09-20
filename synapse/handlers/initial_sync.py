@@ -413,7 +413,7 @@ class InitialSyncHandler(BaseHandler):
 
         async def get_presence():
             # If presence is disabled, return an empty list
-            if not self.hs.config.use_presence:
+            if not self.hs.config.server.use_presence:
                 return []
 
             states = await presence_handler.get_states(

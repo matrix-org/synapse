@@ -458,7 +458,8 @@ class StateGroupStorage:
             make up the delta between the old and new state groups.
         """
 
-        return await self.stores.state.get_state_group_delta(state_group)
+        state_group_delta = await self.stores.state.get_state_group_delta(state_group)
+        return state_group_delta.prev_group, state_group_delta.delta_ids
 
     async def get_state_groups_ids(
         self, _room_id: str, event_ids: Iterable[str]

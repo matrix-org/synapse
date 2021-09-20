@@ -99,7 +99,7 @@ class StorageProviderWrapper(StorageProvider):
             await maybe_awaitable(self.backend.store_file(path, file_info))  # type: ignore
         else:
             # TODO: Handle errors.
-            async def store():
+            async def store() -> None:
                 try:
                     return await maybe_awaitable(
                         self.backend.store_file(path, file_info)
@@ -128,7 +128,7 @@ class FileStorageProviderBackend(StorageProvider):
         self.cache_directory = hs.config.media_store_path
         self.base_directory = config
 
-    def __str__(self):
+    def __str__(self) -> str:
         return "FileStorageProviderBackend[%s]" % (self.base_directory,)
 
     async def store_file(self, path: str, file_info: FileInfo) -> None:
