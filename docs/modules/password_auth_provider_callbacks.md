@@ -30,7 +30,8 @@ async def check_auth(
 ```
 
 The login type and field names are the things that should be provided by the user in their
-request to the `/login` API. 
+request to the `/login` API. [The spec](https://matrix.org/docs/spec/client_server/latest#user-interactive-authentication-api)
+defines some types, however user defined ones are also allowed.
 
 It is passed the user field provided by the client (which might not be in `@username:server` form), 
 the login type, and a dictionary of login secrets passed by the client.
