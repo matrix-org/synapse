@@ -22,7 +22,9 @@ class StateCompressorConfig(Config):
 
     def read_config(self, config, **kwargs):
         compressor_config = config.get("state_compressor") or {}
-        validate_config(_STATE_COMPRESSOR_SCHEMA, compressor_config, ("state_compressor",))
+        validate_config(
+            _STATE_COMPRESSOR_SCHEMA, compressor_config, ("state_compressor",)
+        )
         self.compressor_enabled = compressor_config.get("enabled") or False
 
         if not self.compressor_enabled:
@@ -31,7 +33,7 @@ class StateCompressorConfig(Config):
         try:
             check_requirements("auto_compressor")
         except DependencyException as e:
-            raise ConfigError(e.message)
+            raise ConfigError from e
 
         self.compressor_chunk_size = compressor_config.get("chunk_size") or 500
         self.compressor_number_of_rooms = compressor_config.get("number_of_rooms") or 5
@@ -63,7 +65,7 @@ class StateCompressorConfig(Config):
           # The (rough) number of state groups to load at one time. Defaults
           # to 500.
           #
-          #chunk_size: 1000 
+          #chunk_size: 1000
 
           # The number of rooms to compress on each run. Defaults to 5.
           #
