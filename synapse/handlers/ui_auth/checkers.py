@@ -70,7 +70,7 @@ class DummyAuthChecker(UserInteractiveAuthChecker):
 class TermsAuthChecker(UserInteractiveAuthChecker):
     AUTH_TYPE = LoginType.TERMS
 
-    def is_enabled(self):
+    def is_enabled(self) -> bool:
         return True
 
     async def check_auth(self, authdict: dict, clientip: str) -> Any:

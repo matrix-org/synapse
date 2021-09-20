@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -150,7 +150,7 @@ class InitialSyncHandler(BaseHandler):
         if limit is None:
             limit = 10
 
-        async def handle_room(event: RoomsForUser):
+        async def handle_room(event: RoomsForUser) -> None:
             d: JsonDict = {
                 "room_id": event.room_id,
                 "membership": event.membership,
@@ -411,7 +411,7 @@ class InitialSyncHandler(BaseHandler):
 
         presence_handler = self.hs.get_presence_handler()
 
-        async def get_presence():
+        async def get_presence() -> List[JsonDict]:
             # If presence is disabled, return an empty list
             if not self.hs.config.server.use_presence:
                 return []
@@ -428,7 +428,7 @@ class InitialSyncHandler(BaseHandler):
                 for s in states
             ]
 
-        async def get_receipts():
+        async def get_receipts() -> List[JsonDict]:
             receipts = await self.store.get_linearized_receipts_for_room(
                 room_id, to_key=now_token.receipt_key
             )

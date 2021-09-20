@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import random
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Any, List, Tuple
 
 from synapse.replication.http.account_data import (
     ReplicationAddTagRestServlet,
@@ -171,7 +171,7 @@ class AccountDataEventSource:
         return self.store.get_max_account_data_stream_id()
 
     async def get_new_events(
-        self, user: UserID, from_key: int, **kwargs
+        self, user: UserID, from_key: int, **kwargs: Any
     ) -> Tuple[List[JsonDict], int]:
         user_id = user.to_string()
         last_stream_id = from_key

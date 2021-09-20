@@ -664,7 +664,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             txn,
             table="state_groups_state",
             column="state_group",
-            iterable=state_groups_to_delete,
+            values=state_groups_to_delete,
             keyvalues={},
         )
 
@@ -675,7 +675,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             txn,
             table="state_group_edges",
             column="state_group",
-            iterable=state_groups_to_delete,
+            values=state_groups_to_delete,
             keyvalues={},
         )
 
@@ -686,6 +686,6 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
             txn,
             table="state_groups",
             column="id",
-            iterable=state_groups_to_delete,
+            values=state_groups_to_delete,
             keyvalues={},
         )
