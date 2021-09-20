@@ -38,43 +38,37 @@ class NullByteInsertionTest(HomeserverTestCase):
         self.register_user("alice", "password")
         access_token = self.login("alice", "password")
         room_id = self.helper.create_room_as("alice", True, "1", access_token)
-        body1 = "hi\u0000bob"
-        body2 = "another message"
-        body3 = "hi alice"
 
         # send messages and ensure they don't cause an internal server
         # error
-        resp1 = self.helper.send(room_id, body1, "1", access_token)
-        resp2 = self.helper.send(room_id, body2, "2", access_token)
-        resp3 = self.helper.send(room_id, body3, "3", access_token)
-        self.assertTrue("event_id" in resp1)
-        self.assertTrue("event_id" in resp2)
-        self.assertTrue("event_id" in resp3)
+        for body in ["hi\u0000bob", "another message", "hi alice"]:
+            response = self.helper.send(room_id, body, tok=access_token)
+            self.assertIn("event_id", response)
 
         # check that search still works with the message where the null byte was replaced
         store = self.hs.get_datastore()
-        res1 = self.get_success(
+        result = self.get_success(
             store.search_msgs([room_id], "hi bob", ["content.body"])
         )
-        self.assertEquals(res1.get("count"), 1)
+        self.assertEquals(result.get("count"), 1)
+        if isinstance(store.database_engine, PostgresEngine):
+            self.assertIn("hi", result.get("highlights"))
+            self.assertIn("bob", result.get("highlights"))
 
         # check that search still works with another unrelated message
-        res2 = self.get_success(
+        result = self.get_success(
             store.search_msgs([room_id], "another", ["content.body"])
         )
-        self.assertEquals(res2.get("count"), 1)
+        self.assertEquals(result.get("count"), 1)
+        if isinstance(store.database_engine, PostgresEngine):
+            self.assertIn("another", result.get("highlights"))
 
         # check that search still works when given a search term that overlaps
         # with the message that we replaced the null byte in and an unrelated one
-        res3 = self.get_success(store.search_msgs([room_id], "hi", ["content.body"]))
-        self.assertEquals(res3.get("count"), 2)
-        res4 = self.get_success(
+        result = self.get_success(store.search_msgs([room_id], "hi", ["content.body"]))
+        self.assertEquals(result.get("count"), 2)
+        result = self.get_success(
             store.search_msgs([room_id], "hi alice", ["content.body"])
         )
-
-        # check content of highlights if we are using postgres
         if isinstance(store.database_engine, PostgresEngine):
-            self.assertIn("bob", res1.get("highlights"))
-            self.assertIn("hi", res1.get("highlights"))
-            self.assertIn("another", res2.get("highlights"))
-            self.assertIn("alice", res4.get("highlights"))
+            self.assertIn("alice", result.get("highlights"))
