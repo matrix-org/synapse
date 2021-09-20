@@ -201,6 +201,8 @@ def run_as_background_process(  # type: ignore[misc]
     **kwargs: Any,
 ) -> defer.Deferred[Optional[R]]:
     ...
+    # The `type: ignore[misc]` above suppresses
+    # "error: Overloaded function signatures 1 and 2 overlap with incompatible return types  [misc]"
 
 
 @overload
@@ -285,11 +287,16 @@ def run_as_background_process(
 F = TypeVar("F", bound=Callable[..., Any])
 
 
+# NB: Return type is incorrect and should be a callable returning an F with a
+#     Deferred[Optional[R]] return, which we can't express correctly until Python 3.10.
 def wrap_as_background_process(desc: str) -> Callable[[F], F]:
     """Decorator that wraps a function that gets called as a background
     process.
 
-    Equivalent of calling the function with `run_as_background_process`
+    Equivalent to calling the function with `run_as_background_process`.
+
+    Note that `run_as_background_process` changes the return type into
+    `Deferred[Optional[T]]`.
     """
 
     # NB: Return type is incorrect and should be F with a Deferred[Optional[R]] return
