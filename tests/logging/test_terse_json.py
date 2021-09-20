@@ -188,7 +188,7 @@ class TerseJsonTestCase(LoggerCleanupMixin, TestCase):
         ]
         self.assertCountEqual(log.keys(), expected_log_keys)
         self.assertEqual(log["log"], "Hello there, wally!")
-        self.assertTrue(log["request"].startswith("POST-"))
+        self.assertIn("POST-", log["request"])
         self.assertEqual(log["ip_address"], "127.0.0.1")
         self.assertEqual(log["site_tag"], "test-site")
         self.assertEqual(log["requester"], "@foo:test")
