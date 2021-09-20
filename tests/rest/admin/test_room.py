@@ -962,7 +962,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             search_term: str,
             expected_http_code: int = 200,
         ):
-            """Search for a room and check that the returned room's id is a match
+            """Search for a room with a non-ascii character in name
+               and check that the returned room's id is a match
 
             Args:
                 expected_room_id: The room_id expected to be returned by the API. Set
@@ -970,10 +971,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 search_term: The term to search for room names with
                 expected_http_code: The expected http code for the request
             """
-            url = "/_synapse/admin/v1/rooms?search_term=%s" % (search_term,)
+            encoded_search_term = urllib.parse.quote(search_term, 'utf-8')
+            url = "/_synapse/admin/v1/rooms?search_term=%s" % (encoded_search_term,)
             channel = self.make_request(
                 "GET",
-                url.encode("UTF-8"),
+                url.encode("ascii"),
                 access_token=self.admin_user_tok,
             )
             self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
