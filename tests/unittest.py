@@ -250,6 +250,7 @@ class HomeserverTestCase(TestCase):
             server_version_string="1",
             max_request_body_size=1234,
             reactor=self.reactor,
+            instance_name="test",
         )
 
         from tests.rest.client.utils import RestHelper

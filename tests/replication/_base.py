@@ -361,6 +361,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
             server_version_string="1",
             max_request_body_size=4096,
             reactor=self.reactor,
+            instance_name="test",
         )
 
         if worker_hs.config.redis.redis_enabled:

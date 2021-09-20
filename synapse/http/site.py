@@ -61,9 +61,17 @@ class SynapseRequest(Request):
         logcontext: the log context for this request
     """
 
-    def __init__(self, channel, *args, max_request_body_size=1024, **kw):
+    def __init__(
+        self,
+        channel,
+        *args,
+        instance_name: str,
+        max_request_body_size: int = 1024,
+        **kw,
+    ):
         Request.__init__(self, channel, *args, **kw)
         self._max_request_body_size = max_request_body_size
+        self._instance_name = instance_name
         self.site: SynapseSite = channel.site
         self._channel = channel  # this is used by the tests
         self.start_time = 0.0
@@ -139,8 +147,8 @@ class SynapseRequest(Request):
         # If there's no authenticated entity, it was the requester.
         self.logcontext.request.authenticated_entity = authenticated_entity or requester
 
-    def get_request_id(self):
-        return "%s-%i" % (self.get_method(), self.request_seq)
+    def get_request_id(self) -> str:
+        return f"{self._instance_name}/{self.get_method()}-{self.request_seq}"
 
     def get_redacted_uri(self) -> str:
         """Gets the redacted URI associated with the request (or placeholder if the URI
@@ -208,9 +216,10 @@ class SynapseRequest(Request):
     def render(self, resrc):
         # this is called once a Resource has been found to serve the request; in our
         # case the Resource in question will normally be a JsonResource.
+        request_id = self.get_request_id()
+        self.setHeader("X-Request-ID", request_id)
 
         # create a LogContext for this request
-        request_id = self.get_request_id()
         self.logcontext = LoggingContext(
             request_id,
             request=ContextRequest(
@@ -523,6 +532,7 @@ class SynapseSite(Site):
         server_version_string,
         max_request_body_size: int,
         reactor: IReactorTime,
+        instance_name: str,
     ):
         """
 
@@ -547,7 +557,10 @@ class SynapseSite(Site):
 
         def request_factory(channel, queued) -> Request:
             return request_class(
-                channel, max_request_body_size=max_request_body_size, queued=queued
+                channel,
+                max_request_body_size=max_request_body_size,
+                queued=queued,
+                instance_name=instance_name,
             )
 
         self.requestFactory = request_factory  # type: ignore

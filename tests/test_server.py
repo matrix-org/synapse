@@ -204,6 +204,7 @@ class OptionsResourceTests(unittest.TestCase):
             "1.0",
             max_request_body_size=1234,
             reactor=self.reactor,
+            instance_name="test",
         )
 
         # render the request and return the channel

@@ -142,6 +142,7 @@ class SynapseHomeServer(HomeServer):
             self.version_string,
             max_request_body_size=max_request_body_size(self.config),
             reactor=self.get_reactor(),
+            instance_name="homeserver",
         )
 
         if tls:

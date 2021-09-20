@@ -377,6 +377,7 @@ class GenericWorkerServer(HomeServer):
                 self.version_string,
                 max_request_body_size=max_request_body_size(self.config),
                 reactor=self.get_reactor(),
+                instance_name=f"generic_worker_{site_tag}",
             ),
             reactor=self.get_reactor(),
         )
