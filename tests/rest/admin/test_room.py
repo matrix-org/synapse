@@ -971,7 +971,7 @@ class RoomTestCase(unittest.HomeserverTestCase):
                 search_term: The term to search for room names with
                 expected_http_code: The expected http code for the request
             """
-            encoded_search_term = urllib.parse.quote(search_term, 'utf-8')
+            encoded_search_term = urllib.parse.quote(search_term, "utf-8")
             url = "/_synapse/admin/v1/rooms?search_term=%s" % (encoded_search_term,)
             channel = self.make_request(
                 "GET",
