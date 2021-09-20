@@ -1190,7 +1190,7 @@ class RoomEventSource:
         self,
         user: UserID,
         from_key: RoomStreamToken,
-        limit: int,
+        limit: Optional[int],
         room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
