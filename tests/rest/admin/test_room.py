@@ -941,12 +941,11 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
 
-    def test_search_term_non_ASCII(self):
+    def test_search_term_non_ascii(self):
         """Test that searching for a room with non-ASCII characters works correctly"""
 
         # Create test room
         room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
-
         room_name = "ж"
 
         # Set the name for the room
@@ -957,35 +956,17 @@ class RoomTestCase(unittest.HomeserverTestCase):
             tok=self.admin_user_tok,
         )
 
-        def _search_test_utf8(
-            expected_room_id,
-            search_term: str,
-            expected_http_code: int = 200,
-        ):
-            """Search for a room with a non-ascii character in name
-               and check that the returned room's id is a match
-
-            Args:
-                expected_room_id: The room_id expected to be returned by the API. Set
-                    to None to expect zero results for the search
-                search_term: The term to search for room names with
-                expected_http_code: The expected http code for the request
-            """
-            encoded_search_term = urllib.parse.quote(search_term, "utf-8")
-            url = "/_synapse/admin/v1/rooms?search_term=%s" % (encoded_search_term,)
-            channel = self.make_request(
-                "GET",
-                url.encode("ascii"),
-                access_token=self.admin_user_tok,
-            )
-            self.assertEqual(expected_http_code, channel.code, msg=channel.json_body)
-            self.assertIn(
-                expected_room_id, channel.json_body.get("rooms")[0].get("room_id")
-            )
-            self.assertIn("ж", channel.json_body.get("rooms")[0].get("name"))
-
-        search_term = "ж"
-        _search_test_utf8(room_id, search_term)
+        # make the request and test that the response is what we wanted
+        search_term = urllib.parse.quote("ж", "utf-8")
+        url = "/_synapse/admin/v1/rooms?search_term=%s" % (search_term,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertIn(room_id, channel.json_body.get("rooms")[0].get("room_id"))
+        self.assertIn("ж", channel.json_body.get("rooms")[0].get("name"))
 
     def test_single_room(self):
         """Test that a single room can be requested correctly"""
