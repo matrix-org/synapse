@@ -105,7 +105,7 @@ class JsonResourceTests(unittest.TestCase):
         def _callback(request, **kwargs):
             d = Deferred()
             d.addCallback(_throw)
-            self.reactor.callLater(1, d.callback, True)
+            self.reactor.callLater(0.5, d.callback, True)
             return make_deferred_yieldable(d)
 
         res = JsonResource(self.homeserver)
