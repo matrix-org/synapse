@@ -364,7 +364,9 @@ class SyncHandler:
             )
         else:
 
-            async def current_sync_callback(before_token, after_token) -> SyncResult:
+            async def current_sync_callback(
+                before_token: StreamToken, after_token: StreamToken
+            ) -> SyncResult:
                 return await self.current_sync_for_user(sync_config, since_token)
 
             result = await self.notifier.wait_for_events(
@@ -1532,9 +1534,9 @@ class SyncHandler:
         newly_joined_rooms = room_changes.newly_joined_rooms
         newly_left_rooms = room_changes.newly_left_rooms
 
-        async def handle_room_entries(room_entry: "RoomSyncResultBuilder"):
+        async def handle_room_entries(room_entry: "RoomSyncResultBuilder") -> None:
             logger.debug("Generating room entry for %s", room_entry.room_id)
-            res = await self._generate_room_entry(
+            await self._generate_room_entry(
                 sync_result_builder,
                 ignored_users,
                 room_entry,
@@ -1544,7 +1546,6 @@ class SyncHandler:
                 always_include=sync_result_builder.full_state,
             )
             logger.debug("Generated room entry for %s", room_entry.room_id)
-            return res
 
         await concurrently_execute(handle_room_entries, room_entries, 10)
 
@@ -1925,7 +1926,7 @@ class SyncHandler:
         tags: Optional[Dict[str, Dict[str, Any]]],
         account_data: Dict[str, JsonDict],
         always_include: bool = False,
-    ):
+    ) -> None:
         """Populates the `joined` and `archived` section of `sync_result_builder`
         based on the `room_builder`.
 

@@ -205,7 +205,7 @@ class SsoHandler:
 
         self._consent_at_registration = hs.config.consent.user_consent_at_registration
 
-    def register_identity_provider(self, p: SsoIdentityProvider):
+    def register_identity_provider(self, p: SsoIdentityProvider) -> None:
         p_id = p.idp_id
         assert p_id not in self._identity_providers
         self._identity_providers[p_id] = p
@@ -856,7 +856,7 @@ class SsoHandler:
 
     async def handle_terms_accepted(
         self, request: Request, session_id: str, terms_version: str
-    ):
+    ) -> None:
         """Handle a request to the new-user 'consent' endpoint
 
         Will serve an HTTP response to the request.
@@ -959,7 +959,7 @@ class SsoHandler:
             new_user=True,
         )
 
-    def _expire_old_sessions(self):
+    def _expire_old_sessions(self) -> None:
         to_expire = []
         now = int(self._clock.time_msec())
 

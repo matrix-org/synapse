@@ -14,7 +14,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Set
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, Dict, Iterable, List, Set
 
 from synapse.api.errors import HttpResponseException, RequestSendFailed, SynapseError
 from synapse.types import GroupID, JsonDict, get_domain_from_id
@@ -25,12 +25,14 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def _create_rerouter(func_name):
+def _create_rerouter(func_name: str) -> Callable[..., Awaitable[JsonDict]]:
     """Returns an async function that looks at the group id and calls the function
     on federation or the local group server if the group is local
     """
 
-    async def f(self, group_id, *args, **kwargs):
+    async def f(
+        self: "GroupsLocalWorkerHandler", group_id: str, *args: Any, **kwargs: Any
+    ) -> JsonDict:
         if not GroupID.is_valid(group_id):
             raise SynapseError(400, "%s is not a legal group ID" % (group_id,))
 

@@ -15,6 +15,8 @@
 import logging
 from typing import TYPE_CHECKING, Any, Dict, Optional, Set
 
+import attr
+
 from twisted.python.failure import Failure
 
 from synapse.api.constants import EventTypes, Membership
@@ -24,7 +26,7 @@ from synapse.logging.context import run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.state import StateFilter
 from synapse.streams.config import PaginationConfig
-from synapse.types import Requester
+from synapse.types import JsonDict, Requester
 from synapse.util.async_helpers import ReadWriteLock
 from synapse.util.stringutils import random_string
 from synapse.visibility import filter_events_for_client
@@ -36,15 +38,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+@attr.s(slots=True, auto_attribs=True)
 class PurgeStatus:
     """Object tracking the status of a purge request
 
     This class contains information on the progress of a purge request, for
     return by get_purge_status.
-
-    Attributes:
-        status (int): Tracks whether this request has completed. One of
-            STATUS_{ACTIVE,COMPLETE,FAILED}
     """
 
     STATUS_ACTIVE = 0
@@ -57,10 +56,10 @@ class PurgeStatus:
         STATUS_FAILED: "failed",
     }
 
-    def __init__(self):
-        self.status = PurgeStatus.STATUS_ACTIVE
+    # Tracks whether this request has completed. One of STATUS_{ACTIVE,COMPLETE,FAILED}.
+    status: int = STATUS_ACTIVE
 
-    def asdict(self):
+    def asdict(self) -> JsonDict:
         return {"status": PurgeStatus.STATUS_TEXT[self.status]}
 
 
@@ -107,7 +106,7 @@ class PaginationHandler:
 
     async def purge_history_for_rooms_in_range(
         self, min_ms: Optional[int], max_ms: Optional[int]
-    ):
+    ) -> None:
         """Purge outdated events from rooms within the given retention range.
 
         If a default retention policy is defined in the server's configuration and its
@@ -291,7 +290,7 @@ class PaginationHandler:
             self._purges_in_progress_by_room.discard(room_id)
 
             # remove the purge from the list 24 hours after it completes
-            def clear_purge():
+            def clear_purge() -> None:
                 del self._purges_by_id[purge_id]
 
             self.hs.get_reactor().callLater(24 * 3600, clear_purge)
