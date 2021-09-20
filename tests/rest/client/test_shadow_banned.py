@@ -210,7 +210,13 @@ class RoomTestCase(_ShadowBannedBase):
         # These appear in the room.
         self.assertEquals(event_source.get_current_key(), 1)
         events = self.get_success(
-            event_source.get_new_events(from_key=0, room_ids=[room_id])
+            event_source.get_new_events(
+                user=UserID.from_string(self.other_user_id),
+                from_key=0,
+                limit=None,
+                room_ids=[room_id],
+                is_guest=False,
+            )
         )
         self.assertEquals(
             events[0],

@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import random
-from typing import TYPE_CHECKING, Any, List, Tuple
+from typing import TYPE_CHECKING, Collection, List, Optional, Tuple
 
 from synapse.replication.http.account_data import (
     ReplicationAddTagRestServlet,
@@ -174,7 +174,10 @@ class AccountDataEventSource:
         self,
         user: UserID,
         from_key: int,
-        **kwargs: Any,
+        limit: Optional[int],
+        room_ids: Collection[str],
+        is_guest: bool,
+        explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[JsonDict], int]:
         user_id = user.to_string()
         last_stream_id = from_key
