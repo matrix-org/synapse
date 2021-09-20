@@ -1807,7 +1807,7 @@ class MacaroonGenerator:
         return macaroon
 
 
-def load_legacy_password_auth_providers(hs: "HomeServer"):
+def load_legacy_password_auth_providers(hs: "HomeServer") -> None:
     module_api = hs.get_module_api()
     for module, config in hs.config.password_providers:
         load_single_legacy_password_auth_provider(
@@ -1817,7 +1817,7 @@ def load_legacy_password_auth_providers(hs: "HomeServer"):
 
 def load_single_legacy_password_auth_provider(
     module: Type, config: JsonDict, api: ModuleApi
-):
+) -> None:
     try:
         provider = module(config=config, account_handler=api)
     except Exception as e:
@@ -1906,7 +1906,7 @@ def load_single_legacy_password_auth_provider(
 
             return wrapped_check_3pid_auth
 
-        def run(*args, **kwargs):
+        def run(*args: Tuple, **kwargs: Dict) -> Awaitable:
             # mypy doesn't do well across function boundaries so we need to tell it
             # f is definitely not None.
             assert f is not None
@@ -1970,7 +1970,7 @@ class PasswordAuthProvider:
     It allows modules to provide alternative methods for authentication
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # lists of callbacks
         self.check_3pid_auth_callbacks: List[CHECK_3PID_AUTH_CALLBACK] = []
         self.on_logged_out_callbacks: List[ON_LOGGED_OUT_CALLBACK] = []
@@ -1986,7 +1986,7 @@ class PasswordAuthProvider:
         check_3pid_auth: Optional[CHECK_3PID_AUTH_CALLBACK] = None,
         on_logged_out: Optional[ON_LOGGED_OUT_CALLBACK] = None,
         auth_checkers: Optional[Dict[Tuple[str, Tuple], CHECK_AUTH_CALLBACK]] = None,
-    ):
+    ) -> None:
         # Register check_3pid_auth callback
         if check_3pid_auth is not None:
             self.check_3pid_auth_callbacks.append(check_3pid_auth)
