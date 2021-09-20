@@ -243,7 +243,8 @@ def run_as_background_process(
         args: positional args for func
         kwargs: keyword args for func
 
-    Returns: Deferred which returns the result of func, or `None` if func raises.
+    Returns:
+        Deferred which returns the result of func, or `None` if func raises.
         Note that the returned Deferred does not follow the synapse logcontext
         rules.
     """
