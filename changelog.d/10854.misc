@@ -1,0 +1,1 @@
+Include a request id in Synapse's HTTP responses to aid debugging.
