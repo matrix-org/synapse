@@ -448,32 +448,34 @@ class PreviewUrlResource(DirectServeJsonResource):
             media_info: The media being previewed.
             og: The Open Graph dictionary. This is modified with image information.
         """
-        #
+        # If there's no image or it is blank, there's nothing to do.
+        if "og:image" not in og or not og["og:image"]:
+            return
+
         # FIXME: it might be cleaner to use the same flow as the main /preview_url
         # request itself and benefit from the same caching etc.  But for now we
         # just rely on the caching on the master request to speed things up.
-        if "og:image" in og and og["og:image"]:
-            image_info = await self._download_url(
-                _rebase_url(og["og:image"], media_info.uri), user
+        image_info = await self._download_url(
+            _rebase_url(og["og:image"], media_info.uri), user
+        )
+
+        if _is_media(image_info.media_type):
+            # TODO: make sure we don't choke on white-on-transparent images
+            file_id = image_info.filesystem_id
+            dims = await self.media_repo._generate_thumbnails(
+                None, file_id, file_id, image_info.media_type, url_cache=True
             )
-
-            if _is_media(image_info.media_type):
-                # TODO: make sure we don't choke on white-on-transparent images
-                file_id = image_info.filesystem_id
-                dims = await self.media_repo._generate_thumbnails(
-                    None, file_id, file_id, image_info.media_type, url_cache=True
-                )
-                if dims:
-                    og["og:image:width"] = dims["width"]
-                    og["og:image:height"] = dims["height"]
-                else:
-                    logger.warning("Couldn't get dims for %s", og["og:image"])
-
-                og["og:image"] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
-                og["og:image:type"] = image_info.media_type
-                og["matrix:image:size"] = image_info.media_length
+            if dims:
+                og["og:image:width"] = dims["width"]
+                og["og:image:height"] = dims["height"]
             else:
-                del og["og:image"]
+                logger.warning("Couldn't get dims for %s", og["og:image"])
+
+            og["og:image"] = f"mxc://{self.server_name}/{image_info.filesystem_id}"
+            og["og:image:type"] = image_info.media_type
+            og["matrix:image:size"] = image_info.media_length
+        else:
+            del og["og:image"]
 
     def _start_expire_url_cache_data(self) -> Deferred:
         return run_as_background_process(
