@@ -5,7 +5,7 @@ This release drops support for the deprecated, unstable API for [MSC2858 (Multip
 
 The documentation has been updated with configuration for routing `/spaces`, `/hierarchy` and `/summary` to workers. See [the upgrade notes](https://github.com/matrix-org/synapse/blob/release-v1.43/docs/upgrade.md#upgrading-to-v1430) for more details.
 
-No significant changes sheirarchyince 1.43.0rc2.
+No significant changes since 1.43.0rc2.
 
 Synapse 1.43.0rc2 (2021-09-17)
 ==============================
