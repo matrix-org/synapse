@@ -608,7 +608,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         client.dataReceived(
             (
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b'Content-Type: image/png; charset="utf8"\r\n\r\n'
+                b"Content-Type: image/png\r\n\r\n"
             )
             % (len(SMALL_PNG),)
             + SMALL_PNG
@@ -624,7 +624,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertTrue(channel.json_body["og:image"].startswith("mxc://"))
         self.assertEqual(channel.json_body["og:image:height"], 1)
         self.assertEqual(channel.json_body["og:image:width"], 1)
-        self.assertTrue(channel.json_body["og:image:type"].startswith("image/png"))
+        self.assertEqual(channel.json_body["og:image:type"], "image/png")
 
     def test_oembed_rich(self):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
