@@ -1,1 +1,1 @@
-Properly remove stale files from GitHub pages.
+Properly remove deleted files from GitHub pages when generating the documentation.
