@@ -125,7 +125,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         # Attempt to access media
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -164,7 +164,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         # Attempt to access media
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -525,7 +525,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(download_resource),
+            FakeSite(download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,

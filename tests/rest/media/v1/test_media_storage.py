@@ -252,7 +252,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             self.media_id,
             shorthand=False,
@@ -384,7 +384,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         params = "?width=32&height=32&method=scale"
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -413,7 +413,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
 
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
@@ -433,7 +433,7 @@ class MediaRepoTests(unittest.HomeserverTestCase):
         params = "?width=32&height=32&method=" + method
         channel = make_request(
             self.reactor,
-            FakeSite(self.thumbnail_resource),
+            FakeSite(self.thumbnail_resource, self.reactor),
             "GET",
             self.media_id + params,
             shorthand=False,
