@@ -65,6 +65,7 @@ from synapse.replication.http.streams import ReplicationGetStreamUpdates
 from synapse.replication.tcp.commands import ClearUserSyncsCommand
 from synapse.replication.tcp.streams import PresenceFederationStream, PresenceStream
 from synapse.storage.databases.main import DataStore
+from synapse.streams import EventSource
 from synapse.types import JsonDict, UserID, get_domain_from_id
 from synapse.util.async_helpers import Linearizer
 from synapse.util.caches.descriptors import _CacheContext, cached
@@ -1500,7 +1501,7 @@ def format_user_presence_state(
     return content
 
 
-class PresenceEventSource:
+class PresenceEventSource(EventSource[int, UserPresenceState]):
     def __init__(self, hs: "HomeServer"):
         # We can't call get_presence_handler here because there's a cycle:
         #
@@ -1519,10 +1520,11 @@ class PresenceEventSource:
         self,
         user: UserID,
         from_key: Optional[int],
+        limit: Optional[int] = None,
         room_ids: Optional[List[str]] = None,
-        include_offline: bool = True,
+        is_guest: bool = False,
         explicit_room_id: Optional[str] = None,
-        **kwargs: Any,
+        include_offline: bool = True,
     ) -> Tuple[List[UserPresenceState], int]:
         # The process for getting presence events are:
         #  1. Get the rooms the user is in.

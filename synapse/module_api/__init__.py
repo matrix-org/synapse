@@ -91,7 +91,7 @@ class ModuleApi:
         self._auth = hs.get_auth()
         self._auth_handler = auth_handler
         self._server_name = hs.hostname
-        self._presence_stream = hs.get_event_sources().sources["presence"]
+        self._presence_stream = hs.get_event_sources().sources.presence
         self._state = hs.get_state_handler()
         self._clock: Clock = hs.get_clock()
         self._send_email_handler = hs.get_send_email_handler()
