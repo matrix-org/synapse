@@ -965,8 +965,8 @@ class RoomTestCase(unittest.HomeserverTestCase):
             access_token=self.admin_user_tok,
         )
         self.assertEqual(200, channel.code, msg=channel.json_body)
-        self.assertIn(room_id, channel.json_body.get("rooms")[0].get("room_id"))
-        self.assertIn("ж", channel.json_body.get("rooms")[0].get("name"))
+        self.assertEqual(room_id, channel.json_body.get("rooms")[0].get("room_id"))
+        self.assertEqual("ж", channel.json_body.get("rooms")[0].get("name"))
 
     def test_single_room(self):
         """Test that a single room can be requested correctly"""
