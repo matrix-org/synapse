@@ -15,6 +15,7 @@ import threading
 from typing import Dict
 from unittest.mock import Mock
 
+from synapse.api.constants import EventTypes
 from synapse.events import EventBase
 from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.module_api import ModuleApi
@@ -327,3 +328,86 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         correctly.
         """
         self.helper.create_room_as(self.user_id, tok=self.tok, expect_code=403)
+
+    def test_sent_event_end_up_in_room_state(self):
+        """Tests that a state event sent by a module while processing another state event
+        doesn't get dropped from the state of the room. This is to guard against a bug
+        where Synapse has been observed doing so, see https://github.com/matrix-org/synapse/issues/10830
+        """
+        event_type = "org.matrix.test_state"
+
+        # This content will be updated later on, and since we actually use a reference on
+        # the dict it does the right thing. It's a bit hacky but a handy way of making
+        # sure the state actually gets updated.
+        event_content = {"i": -1}
+
+        api = self.hs.get_module_api()
+
+        # Define a callback that sends a custom event on power levels update.
+        async def test_fn(event: EventBase, state_events):
+            if event.is_state and event.type == EventTypes.PowerLevels:
+                await api.create_and_send_event_into_room(
+                    {
+                        "room_id": event.room_id,
+                        "sender": event.sender,
+                        "type": event_type,
+                        "content": event_content,
+                        "state_key": "",
+                    }
+                )
+            return True, None
+
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [test_fn]
+
+        # Sometimes the bug might not happen the first time the event type is added
+        # to the state but might happen when an event updates the state of the room for
+        # that type, so we test updating the state several times.
+        for i in range(5):
+            # Update the content of the custom state event to be sent by the callback.
+            event_content["i"] = i
+
+            # Update the room's power levels with a different value each time so Synapse
+            # doesn't consider an update redundant.
+            self._update_power_levels(event_default=i)
+
+            # Check that the new event made it to the room's state.
+            channel = self.make_request(
+                method="GET",
+                path="/rooms/" + self.room_id + "/state/" + event_type,
+                access_token=self.tok,
+            )
+
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(channel.json_body["i"], i)
+
+    def _update_power_levels(self, event_default: int = 0):
+        """Updates the room's power levels.
+
+        Args:
+            event_default: Value to use for 'events_default'.
+        """
+        self.helper.send_state(
+            room_id=self.room_id,
+            event_type=EventTypes.PowerLevels,
+            body={
+                "ban": 50,
+                "events": {
+                    "m.room.avatar": 50,
+                    "m.room.canonical_alias": 50,
+                    "m.room.encryption": 100,
+                    "m.room.history_visibility": 100,
+                    "m.room.name": 50,
+                    "m.room.power_levels": 100,
+                    "m.room.server_acl": 100,
+                    "m.room.tombstone": 100,
+                },
+                "events_default": event_default,
+                "invite": 0,
+                "kick": 50,
+                "redact": 50,
+                "state_default": 50,
+                "users": {self.user_id: 100},
+                "users_default": 0,
+            },
+            tok=self.tok,
+        )
