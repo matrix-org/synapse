@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import TYPE_CHECKING
+
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 
@@ -19,12 +21,15 @@ try:
 except ImportError:
     state_compressor = None
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
-def setup_state_compressor(hs):
+
+def setup_state_compressor(hs: "HomeServer"):
     """Schedules the state compressor to run regularly"""
 
     # Return if cannot import auto_compressor
-    if not state_compressor:
+    if not state_compressor or not hs.config.workers.run_background_tasks:
         return
 
     # Return if compressor isn't enabled
