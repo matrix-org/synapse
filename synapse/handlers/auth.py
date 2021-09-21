@@ -217,8 +217,8 @@ class AuthHandler(BaseHandler):
 
         self.hs = hs  # FIXME better possibility to access registrationHandler later?
         self.macaroon_gen = hs.get_macaroon_generator()
-        self._password_enabled = hs.config.password_enabled
-        self._password_localdb_enabled = hs.config.password_localdb_enabled
+        self._password_enabled = hs.config.auth.password_enabled
+        self._password_localdb_enabled = hs.config.auth.password_localdb_enabled
 
         # start out by assuming PASSWORD is enabled; we will remove it later if not.
         login_types = set()
@@ -250,7 +250,7 @@ class AuthHandler(BaseHandler):
         )
 
         # The number of seconds to keep a UI auth session active.
-        self._ui_auth_session_timeout = hs.config.ui_auth_session_timeout
+        self._ui_auth_session_timeout = hs.config.auth.ui_auth_session_timeout
 
         # Ratelimitier for failed /login attempts
         self._failed_login_attempts_ratelimiter = Ratelimiter(
@@ -1016,7 +1016,7 @@ class AuthHandler(BaseHandler):
     def can_change_password(self) -> bool:
         """Get whether users on this server are allowed to change or set a password.
 
-        Both `config.password_enabled` and `config.password_localdb_enabled` must be true.
+        Both `config.auth.password_enabled` and `config.auth.password_localdb_enabled` must be true.
 
         Note that any account (even SSO accounts) are allowed to add passwords if the above
         is true.
@@ -1486,7 +1486,7 @@ class AuthHandler(BaseHandler):
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.hashpw(
-                pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
                 bcrypt.gensalt(self.bcrypt_rounds),
             ).decode("ascii")
 
@@ -1510,7 +1510,7 @@ class AuthHandler(BaseHandler):
             pw = unicodedata.normalize("NFKC", password)
 
             return bcrypt.checkpw(
-                pw.encode("utf8") + self.hs.config.password_pepper.encode("utf8"),
+                pw.encode("utf8") + self.hs.config.auth.password_pepper.encode("utf8"),
                 checked_hash,
             )
 
