@@ -941,6 +941,33 @@ class RoomTestCase(unittest.HomeserverTestCase):
         _search_test(None, "bar")
         _search_test(None, "", expected_http_code=400)
 
+    def test_search_term_non_ascii(self):
+        """Test that searching for a room with non-ASCII characters works correctly"""
+
+        # Create test room
+        room_id = self.helper.create_room_as(self.admin_user, tok=self.admin_user_tok)
+        room_name = "ж"
+
+        # Set the name for the room
+        self.helper.send_state(
+            room_id,
+            "m.room.name",
+            {"name": room_name},
+            tok=self.admin_user_tok,
+        )
+
+        # make the request and test that the response is what we wanted
+        search_term = urllib.parse.quote("ж", "utf-8")
+        url = "/_synapse/admin/v1/rooms?search_term=%s" % (search_term,)
+        channel = self.make_request(
+            "GET",
+            url.encode("ascii"),
+            access_token=self.admin_user_tok,
+        )
+        self.assertEqual(200, channel.code, msg=channel.json_body)
+        self.assertEqual(room_id, channel.json_body.get("rooms")[0].get("room_id"))
+        self.assertEqual("ж", channel.json_body.get("rooms")[0].get("name"))
+
     def test_single_room(self):
         """Test that a single room can be requested correctly"""
         # Create two test rooms
