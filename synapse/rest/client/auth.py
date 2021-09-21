@@ -70,7 +70,7 @@ class AuthRestServlet(RestServlet):
                 terms_url="%s_matrix/consent?v=%s"
                 % (
                     self.hs.config.server.public_baseurl,
-                    self.hs.config.user_consent_version,
+                    self.hs.config.consent.user_consent_version,
                 ),
                 myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.TERMS),
@@ -139,7 +139,7 @@ class AuthRestServlet(RestServlet):
                     terms_url="%s_matrix/consent?v=%s"
                     % (
                         self.hs.config.server.public_baseurl,
-                        self.hs.config.user_consent_version,
+                        self.hs.config.consent.user_consent_version,
                     ),
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.TERMS),

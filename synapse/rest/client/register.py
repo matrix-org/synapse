@@ -897,7 +897,7 @@ def _calculate_registration_flows(
         flows.append([LoginType.MSISDN, LoginType.EMAIL_IDENTITY])
 
     # Prepend m.login.terms to all flows if we're requiring consent
-    if config.user_consent_at_registration:
+    if config.consent.user_consent_at_registration:
         for flow in flows:
             flow.insert(0, LoginType.TERMS)
 
