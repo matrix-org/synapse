@@ -214,11 +214,10 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, displayname_to_set
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
 
         await self._update_join_states(requester, target_user)
 
@@ -300,11 +299,10 @@ class ProfileHandler(BaseHandler):
             target_user.localpart, avatar_url_to_set
         )
 
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(target_user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                target_user.to_string(), profile
-            )
+        profile = await self.store.get_profileinfo(target_user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(
+            target_user.to_string(), profile
+        )
 
         await self._update_join_states(requester, target_user)
 
