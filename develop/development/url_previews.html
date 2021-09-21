@@ -213,12 +213,10 @@ is also used to de-duplicate processing of multiple in-flight requests at once.)
 <ol>
 <li>Checks the database cache by URL and timestamp and returns the result if it
 has not expired and was successful (a 2xx return code).</li>
-<li>Checks if the URL matches an oEmbed pattern. If it does, fetch the oEmbed
-response. If this is an image, replace the URL to fetch and continue. If
-if it is HTML content, use the HTML as the document and continue.</li>
-<li>If it doesn't match an oEmbed pattern, downloads the URL and stores it
-into a file via the media storage provider and saves the local media
-metadata.</li>
+<li>Checks if the URL matches an <a href="https://oembed.com/">oEmbed</a> pattern. If it
+does, update the URL to download.</li>
+<li>Downloads the URL and stores it into a file via the media storage provider
+and saves the local media metadata.</li>
 <li>If the media is an image:
 <ol>
 <li>Generates thumbnails.</li>
@@ -230,6 +228,19 @@ metadata.</li>
 <li>Decodes the HTML via the stored file.</li>
 <li>Generates an Open Graph response from the HTML.</li>
 <li>If an image exists in the Open Graph response:
+<ol>
+<li>Downloads the URL and stores it into a file via the media storage
+provider and saves the local media metadata.</li>
+<li>Generates thumbnails.</li>
+<li>Updates the Open Graph response based on image properties.</li>
+</ol>
+</li>
+</ol>
+</li>
+<li>If the media is JSON and an oEmbed URL was found:
+<ol>
+<li>Convert the oEmbed response to an Open Graph response.</li>
+<li>If a thumbnail or image is in the oEmbed response:
 <ol>
 <li>Downloads the URL and stores it into a file via the media storage
 provider and saves the local media metadata.</li>
