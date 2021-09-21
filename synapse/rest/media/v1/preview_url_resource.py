@@ -302,12 +302,10 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         elif oembed_url and _is_json(media_info.media_type):
             # Handle an oEmbed response.
-            with open(media_info.filename, "r") as utf8_file:
-                oembed_body = utf8_file.read()
+            with open(media_info.filename, "rb") as file:
+                body = file.read()
 
-            oembed_response = self._oembed.parse_oembed_response(
-                media_info.uri, oembed_body
-            )
+            oembed_response = self._oembed.parse_oembed_response(media_info.uri, body)
             og = oembed_response.open_graph_result
 
             # Use the cache age from the oEmbed result, instead of the HTTP response.

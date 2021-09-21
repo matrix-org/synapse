@@ -94,21 +94,22 @@ class OEmbedProvider:
         # No match.
         return None
 
-    def parse_oembed_response(self, url: str, raw_body: str) -> OEmbedResult:
+    def parse_oembed_response(self, url: str, raw_body: bytes) -> OEmbedResult:
         """
         Parse the oEmbed response into an Open Graph response.
 
         Args:
             url: The URL which is being previewed (not the one which was
                 requested).
-            raw_body: The oEmbed response as JSON.
+            raw_body: The oEmbed response as JSON encoded as bytes.
 
         Returns:
             json-encoded Open Graph data
         """
 
         try:
-            oembed = json_decoder.decode(raw_body)
+            # oEmbed responses *must* be UTF-8 according to the spec.
+            oembed = json_decoder.decode(raw_body.decode("utf-8"))
 
             # Ensure there's a version of 1.0.
             oembed_version = oembed["version"]
