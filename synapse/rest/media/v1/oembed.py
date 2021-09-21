@@ -32,6 +32,9 @@ class OEmbedResult:
     # The Open Graph result (converted from the oEmbed result).
     open_graph_result: JsonDict
     # Number of seconds to cache the content.
+    #
+    # This will be None if no cache-age is provided in the oEmbed response (or
+    # if the oEmbed response cannot be turned into an Open Graph response).
     cache_age: Optional[int]
 
 
