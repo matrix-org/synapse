@@ -547,7 +547,7 @@ class SynapseSite(Site):
         proxied = config.http_options.x_forwarded
         request_class = XForwardedForRequest if proxied else SynapseRequest
 
-        def request_factory(channel, queued) -> Request:
+        def request_factory(channel, queued: bool) -> Request:
             return request_class(
                 channel,
                 max_request_body_size=max_request_body_size,
