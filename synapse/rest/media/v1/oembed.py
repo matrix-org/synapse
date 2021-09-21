@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class OEmbedResult:
     # The Open Graph result (converted from the oEmbed result).
     open_graph_result: JsonDict
-    # Number of seconds to cache the content, according to the oEmbed response.
+    # Number of milliseconds to cache the content, according to the oEmbed response.
     #
     # This will be None if no cache-age is provided in the oEmbed response (or
     # if the oEmbed response cannot be turned into an Open Graph response).
@@ -121,7 +121,7 @@ class OEmbedProvider:
             # Ensure the cache age is None or an int.
             cache_age = oembed.get("cache_age")
             if cache_age:
-                cache_age = int(cache_age)
+                cache_age = int(cache_age) * 1000
 
             # The results.
             open_graph_response = {
