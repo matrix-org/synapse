@@ -158,7 +158,7 @@ class ReceiptsWorkerStore(SQLBaseStore):
         """Get receipts for multiple rooms for sending to clients.
 
         Args:
-            room_id: List of room_ids.
+            room_id: The room IDs to fetch receipts of.
             to_key: Max stream id to fetch receipts up to.
             from_key: Min stream id to fetch receipts from. None fetches
                 from the start.
