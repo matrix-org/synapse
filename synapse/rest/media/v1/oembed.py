@@ -121,20 +121,20 @@ class OEmbedProvider:
                 cache_age = int(cache_age)
 
             # The results.
-            ppen_graph_response = {"og:title": oembed.get("title")}
+            open_graph_response = {"og:title": oembed.get("title")}
 
             # If a thumbnail exists, use it. Note that dimensions will be calculated later.
             if "thumbnail_url" in oembed:
-                ppen_graph_response["og:image"] = oembed["thumbnail_url"]
+                open_graph_response["og:image"] = oembed["thumbnail_url"]
 
             # Process each type separately.
             oembed_type = oembed["type"]
             if oembed_type == "rich":
-                calc_description_and_urls(ppen_graph_response, oembed["html"])
+                calc_description_and_urls(open_graph_response, oembed["html"])
 
             elif oembed_type == "photo":
                 # If this is a photo, use the full image, not the thumbnail.
-                ppen_graph_response["og:image"] = oembed["url"]
+                open_graph_response["og:image"] = oembed["url"]
 
             else:
                 raise RuntimeError(f"Unknown oEmbed type: {oembed_type}")
@@ -142,10 +142,10 @@ class OEmbedProvider:
         except Exception as e:
             # Trap any exception and let the code follow as usual.
             logger.warning(f"Error parsing oEmbed metadata from {url}: {e:r}")
-            ppen_graph_response = {}
+            open_graph_response = {}
             cache_age = None
 
-        return OEmbedResult(ppen_graph_response, cache_age)
+        return OEmbedResult(open_graph_response, cache_age)
 
 
 def calc_description_and_urls(open_graph_response: JsonDict, html_body: str) -> None:
