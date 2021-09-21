@@ -14,7 +14,7 @@
 
 # When updating these values, please leave a short summary of the changes below.
 
-SCHEMA_VERSION = 63
+SCHEMA_VERSION = 64
 """Represents the expectations made by the codebase about the database schema
 
 This should be incremented whenever the codebase changes its requirements on the

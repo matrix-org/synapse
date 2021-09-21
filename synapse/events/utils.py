@@ -141,9 +141,9 @@ def prune_event_dict(room_version: RoomVersion, event_dict: dict) -> dict:
     elif event_type == EventTypes.Redaction and room_version.msc2176_redaction_rules:
         add_fields("redacts")
     elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_INSERTION:
-        add_fields(EventContentFields.MSC2716_NEXT_CHUNK_ID)
-    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_CHUNK:
-        add_fields(EventContentFields.MSC2716_CHUNK_ID)
+        add_fields(EventContentFields.MSC2716_NEXT_BATCH_ID)
+    elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_BATCH:
+        add_fields(EventContentFields.MSC2716_BATCH_ID)
     elif room_version.msc2716_redactions and event_type == EventTypes.MSC2716_MARKER:
         add_fields(EventContentFields.MSC2716_MARKER_INSERTION)
 
