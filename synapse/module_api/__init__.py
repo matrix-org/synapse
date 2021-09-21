@@ -733,7 +733,7 @@ class ModuleApi:
             return self._hs.is_mine_id(id)
 
     async def get_user_ip_and_agents(
-        self, user_id: str, since_ts: Optional[float] = 0
+        self, user_id: str, since_ts: int = 0
     ) -> List[UserIpAndAgent]:
         """
         Return the list of user IPs and agents for a user.
@@ -751,6 +751,7 @@ class ModuleApi:
                 is_mine = True
         except Exception:
             pass
+
         if is_mine:
             raw_data = await self._store.get_user_ip_and_agents(
                 UserID.from_string(user_id), since_ts

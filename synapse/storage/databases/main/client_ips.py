@@ -555,7 +555,7 @@ class ClientIpStore(ClientIpWorkerStore):
         return ret
 
     async def get_user_ip_and_agents(
-        self, user: UserID, since_ts: Optional[float] = 0
+        self, user: UserID, since_ts: int = 0
     ) -> List[Dict[str, Union[str, int]]]:
         """
         Fetch IP/User Agent connection since a given timestamp.
