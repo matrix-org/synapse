@@ -16,7 +16,7 @@ import os
 
 import synapse.rest.admin
 from synapse.api.urls import ConsentURIBuilder
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.rest.consent import consent_resource
 
 from tests import unittest

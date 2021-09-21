@@ -27,6 +27,7 @@ from synapse import event_auth
 from synapse.api.constants import (
     EventContentFields,
     EventTypes,
+    GuestAccess,
     Membership,
     RelationTypes,
     UserTypes,
@@ -45,6 +46,7 @@ from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
 from synapse.events.validator import EventValidator
+from synapse.handlers.directory import DirectoryHandler
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.replication.http.send_event import ReplicationSendEventRestServlet
@@ -83,7 +85,7 @@ class MessageHandler:
         # scheduled.
         self._scheduled_expiry: Optional[IDelayedCall] = None
 
-        if not hs.config.worker_app:
+        if not hs.config.worker.worker_app:
             run_as_background_process(
                 "_schedule_next_expiry", self._schedule_next_expiry
             )
@@ -183,20 +185,37 @@ class MessageHandler:
 
             if not last_events:
                 raise NotFoundError("Can't find event for token %s" % (at_token,))
+            last_event = last_events[0]
+
+            # check whether the user is in the room at that time to determine
+            # whether they should be treated as peeking.
+            state_map = await self.state_store.get_state_for_event(
+                last_event.event_id,
+                StateFilter.from_types([(EventTypes.Member, user_id)]),
+            )
+
+            joined = False
+            membership_event = state_map.get((EventTypes.Member, user_id))
+            if membership_event:
+                joined = membership_event.membership == Membership.JOIN
+
+            is_peeking = not joined
 
             visible_events = await filter_events_for_client(
                 self.storage,
                 user_id,
                 last_events,
                 filter_send_to_client=False,
+                is_peeking=is_peeking,
             )
 
-            event = last_events[0]
             if visible_events:
                 room_state_events = await self.state_store.get_state_for_events(
-                    [event.event_id], state_filter=state_filter
+                    [last_event.event_id], state_filter=state_filter
                 )
-                room_state: Mapping[Any, EventBase] = room_state_events[event.event_id]
+                room_state: Mapping[Any, EventBase] = room_state_events[
+                    last_event.event_id
+                ]
             else:
                 raise AuthError(
                     403,
@@ -280,7 +299,7 @@ class MessageHandler:
             for user_id, profile in users_with_profile.items()
         }
 
-    def maybe_schedule_expiry(self, event: EventBase):
+    def maybe_schedule_expiry(self, event: EventBase) -> None:
         """Schedule the expiry of an event if there's not already one scheduled,
         or if the one running is for an event that will expire after the provided
         timestamp.
@@ -300,7 +319,7 @@ class MessageHandler:
         # a task scheduled for a timestamp that's sooner than the provided one.
         self._schedule_expiry_for_event(event.event_id, expiry_ts)
 
-    async def _schedule_next_expiry(self):
+    async def _schedule_next_expiry(self) -> None:
         """Retrieve the ID and the expiry timestamp of the next event to be expired,
         and schedule an expiry task for it.
 
@@ -313,7 +332,7 @@ class MessageHandler:
             event_id, expiry_ts = res
             self._schedule_expiry_for_event(event_id, expiry_ts)
 
-    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int):
+    def _schedule_expiry_for_event(self, event_id: str, expiry_ts: int) -> None:
         """Schedule an expiry task for the provided event if there's not already one
         scheduled at a timestamp that's sooner than the provided one.
 
@@ -349,7 +368,7 @@ class MessageHandler:
             event_id,
         )
 
-    async def _expire_event(self, event_id: str):
+    async def _expire_event(self, event_id: str) -> None:
         """Retrieve and expire an event that needs to be expired from the database.
 
         If the event doesn't exist in the database, log it and delete the expiry date
@@ -409,7 +428,7 @@ class EventCreationHandler:
 
         self.send_event = ReplicationSendEventRestServlet.make_client(hs)
 
-        # This is only used to get at ratelimit function, and maybe_kick_guest_users
+        # This is only used to get at ratelimit function
         self.base_handler = BaseHandler(hs)
 
         # We arbitrarily limit concurrent event creation for a room to 5.
@@ -443,7 +462,7 @@ class EventCreationHandler:
         self._dummy_events_threshold = hs.config.dummy_events_threshold
 
         if (
-            self.config.run_background_tasks
+            self.config.worker.run_background_tasks
             and self.config.cleanup_extremities_with_dummy_events
         ):
             self.clock.looping_call(
@@ -1211,7 +1230,10 @@ class EventCreationHandler:
             self._external_cache_joined_hosts_updates[state_entry.state_group] = None
 
     async def _validate_canonical_alias(
-        self, directory_handler, room_alias_str: str, expected_room_id: str
+        self,
+        directory_handler: DirectoryHandler,
+        room_alias_str: str,
+        expected_room_id: str,
     ) -> None:
         """
         Ensure that the given room alias points to the expected room ID.
@@ -1289,7 +1311,7 @@ class EventCreationHandler:
                 requester, is_admin_redaction=is_admin_redaction
             )
 
-        await self.base_handler.maybe_kick_guest_users(event, context)
+        await self._maybe_kick_guest_users(event, context)
 
         if event.type == EventTypes.CanonicalAlias:
             # Validate a newly added alias or newly added alt_aliases.
@@ -1376,6 +1398,9 @@ class EventCreationHandler:
                 allow_none=True,
             )
 
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
             # we can make some additional checks now if we have the original event.
             if original_event:
                 if original_event.type == EventTypes.Create:
@@ -1387,15 +1412,34 @@ class EventCreationHandler:
                 if original_event.type == EventTypes.ServerACL:
                     raise AuthError(403, "Redacting server ACL events is not permitted")
 
+                # Add a little safety stop-gap to prevent people from trying to
+                # redact MSC2716 related events when they're in a room version
+                # which does not support it yet. We allow people to use MSC2716
+                # events in existing room versions but only from the room
+                # creator since it does not require any changes to the auth
+                # rules and in effect, the redaction algorithm . In the
+                # supported room version, we add the `historical` power level to
+                # auth the MSC2716 related events and adjust the redaction
+                # algorthim to keep the `historical` field around (redacting an
+                # event should only strip fields which don't affect the
+                # structural protocol level).
+                is_msc2716_event = (
+                    original_event.type == EventTypes.MSC2716_INSERTION
+                    or original_event.type == EventTypes.MSC2716_CHUNK
+                    or original_event.type == EventTypes.MSC2716_MARKER
+                )
+                if not room_version_obj.msc2716_historical and is_msc2716_event:
+                    raise AuthError(
+                        403,
+                        "Redacting MSC2716 events is not supported in this room version",
+                    )
+
             prev_state_ids = await context.get_prev_state_ids()
             auth_events_ids = self._event_auth_handler.compute_auth_events(
                 event, prev_state_ids, for_verification=True
             )
             auth_events_map = await self.store.get_events(auth_events_ids)
             auth_events = {(e.type, e.state_key): e for e in auth_events_map.values()}
-
-            room_version = await self.store.get_room_version_id(event.room_id)
-            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             if event_auth.check_redaction(
                 room_version_obj, event, auth_events=auth_events
@@ -1437,7 +1481,7 @@ class EventCreationHandler:
             # If there's an expiry timestamp on the event, schedule its expiry.
             self._message_handler.maybe_schedule_expiry(event)
 
-        def _notify():
+        def _notify() -> None:
             try:
                 self.notifier.on_new_room_event(
                     event, event_pos, max_stream_token, extra_users=extra_users
@@ -1454,6 +1498,28 @@ class EventCreationHandler:
 
         return event
 
+    async def _maybe_kick_guest_users(
+        self, event: EventBase, context: EventContext
+    ) -> None:
+        if event.type != EventTypes.GuestAccess:
+            return
+
+        guest_access = event.content.get(EventContentFields.GUEST_ACCESS)
+        if guest_access == GuestAccess.CAN_JOIN:
+            return
+
+        current_state_ids = await context.get_current_state_ids()
+
+        # since this is a client-generated event, it cannot be an outlier and we must
+        # therefore have the state ids.
+        assert current_state_ids is not None
+        current_state_dict = await self.store.get_events(
+            list(current_state_ids.values())
+        )
+        current_state = list(current_state_dict.values())
+        logger.info("maybe_kick_guest_users %r", current_state)
+        await self.hs.get_room_member_handler().kick_guest_users(current_state)
+
     async def _bump_active_time(self, user: UserID) -> None:
         try:
             presence = self.hs.get_presence_handler()
@@ -1461,7 +1527,7 @@ class EventCreationHandler:
         except Exception:
             logger.exception("Error bumping presence active time")
 
-    async def _send_dummy_events_to_fill_extremities(self):
+    async def _send_dummy_events_to_fill_extremities(self) -> None:
         """Background task to send dummy events into rooms that have a large
         number of extremities
         """
@@ -1538,7 +1604,7 @@ class EventCreationHandler:
                 )
         return False
 
-    def _expire_rooms_to_exclude_from_dummy_event_insertion(self):
+    def _expire_rooms_to_exclude_from_dummy_event_insertion(self) -> None:
         expire_before = self.clock.time_msec() - _DUMMY_EVENT_ROOM_EXCLUSION_EXPIRY
         to_expire = set()
         for room_id, time in self._rooms_to_exclude_from_dummy_event_insertion.items():

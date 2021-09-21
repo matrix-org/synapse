@@ -11,7 +11,19 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import logging
+
 from synapse.config._base import Config, ConfigError
+
+logger = logging.getLogger(__name__)
+
+LEGACY_TEMPLATE_DIR_WARNING = """
+This server's configuration file is using the deprecated 'template_dir' setting in the
+'account_validity' section. Support for this setting has been deprecated and will be
+removed in a future version of Synapse. Server admins should instead use the new
+'custom_templates_directory' setting documented here:
+https://matrix-org.github.io/synapse/latest/templates.html
+---------------------------------------------------------------------------------------"""
 
 
 class AccountValidityConfig(Config):
@@ -69,6 +81,8 @@ class AccountValidityConfig(Config):
 
         # Load account validity templates.
         account_validity_template_dir = account_validity_config.get("template_dir")
+        if account_validity_template_dir is not None:
+            logger.warning(LEGACY_TEMPLATE_DIR_WARNING)
 
         account_renewed_template_filename = account_validity_config.get(
             "account_renewed_html_path", "account_renewed.html"
@@ -78,6 +92,11 @@ class AccountValidityConfig(Config):
         )
 
         # Read and store template content
+        custom_template_directories = (
+            self.root.server.custom_template_directory,
+            account_validity_template_dir,
+        )
+
         (
             self.account_validity_account_renewed_template,
             self.account_validity_account_previously_renewed_template,
@@ -88,5 +107,5 @@ class AccountValidityConfig(Config):
                 "account_previously_renewed.html",
                 invalid_token_template_filename,
             ],
-            account_validity_template_dir,
+            (td for td in custom_template_directories if td),
         )

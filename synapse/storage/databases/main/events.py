@@ -575,7 +575,13 @@ class PersistEventsStore:
 
             missing_auth_chains.clear()
 
-            for auth_id, event_type, state_key, chain_id, sequence_number in txn:
+            for (
+                auth_id,
+                event_type,
+                state_key,
+                chain_id,
+                sequence_number,
+            ) in txn.fetchall():
                 event_to_types[auth_id] = (event_type, state_key)
 
                 if chain_id is None:
@@ -661,7 +667,7 @@ class PersistEventsStore:
             table="event_auth_chain_to_calculate",
             keyvalues={},
             column="event_id",
-            iterable=new_chain_tuples,
+            values=new_chain_tuples,
         )
 
         # Now we need to calculate any new links between chains caused by
@@ -1379,18 +1385,18 @@ class PersistEventsStore:
         # If we're persisting an unredacted event we go and ensure
         # that we mark any redactions that reference this event as
         # requiring censoring.
-        sql = "UPDATE redactions SET have_censored = ? WHERE redacts = ?"
-        txn.execute_batch(
-            sql,
-            (
-                (
-                    False,
-                    event.event_id,
-                )
-                for event, _ in events_and_contexts
-                if not event.internal_metadata.is_redacted()
-            ),
+        unredacted_events = [
+            event.event_id
+            for event, _ in events_and_contexts
+            if not event.internal_metadata.is_redacted()
+        ]
+        sql = "UPDATE redactions SET have_censored = ? WHERE "
+        clause, args = make_in_list_sql_clause(
+            self.database_engine,
+            "redacts",
+            unredacted_events,
         )
+        txn.execute(sql + clause, [False] + args)
 
         state_events_and_contexts = [
             ec for ec in events_and_contexts if ec[0].is_state()
@@ -1502,6 +1508,9 @@ class PersistEventsStore:
 
             self._handle_event_relations(txn, event)
 
+            self._handle_insertion_event(txn, event)
+            self._handle_chunk_event(txn, event)
+
             # Store the labels for this event.
             labels = event.content.get(EventContentFields.LABELS)
             if labels:
@@ -1538,35 +1547,32 @@ class PersistEventsStore:
         to_prefill = []
 
         rows = []
-        N = 200
-        for i in range(0, len(events_and_contexts), N):
-            ev_map = {e[0].event_id: e[0] for e in events_and_contexts[i : i + N]}
-            if not ev_map:
-                break
 
-            sql = (
-                "SELECT "
-                " e.event_id as event_id, "
-                " r.redacts as redacts,"
-                " rej.event_id as rejects "
-                " FROM events as e"
-                " LEFT JOIN rejections as rej USING (event_id)"
-                " LEFT JOIN redactions as r ON e.event_id = r.redacts"
-                " WHERE "
-            )
+        ev_map = {e.event_id: e for e, _ in events_and_contexts}
+        if not ev_map:
+            return
 
-            clause, args = make_in_list_sql_clause(
-                self.database_engine, "e.event_id", list(ev_map)
-            )
+        sql = (
+            "SELECT "
+            " e.event_id as event_id, "
+            " r.redacts as redacts,"
+            " rej.event_id as rejects "
+            " FROM events as e"
+            " LEFT JOIN rejections as rej USING (event_id)"
+            " LEFT JOIN redactions as r ON e.event_id = r.redacts"
+            " WHERE "
+        )
 
-            txn.execute(sql + clause, args)
-            rows = self.db_pool.cursor_to_dict(txn)
-            for row in rows:
-                event = ev_map[row["event_id"]]
-                if not row["rejects"] and not row["redacts"]:
-                    to_prefill.append(
-                        _EventCacheEntry(event=event, redacted_event=None)
-                    )
+        clause, args = make_in_list_sql_clause(
+            self.database_engine, "e.event_id", list(ev_map)
+        )
+
+        txn.execute(sql + clause, args)
+        rows = self.db_pool.cursor_to_dict(txn)
+        for row in rows:
+            event = ev_map[row["event_id"]]
+            if not row["rejects"] and not row["redacts"]:
+                to_prefill.append(_EventCacheEntry(event=event, redacted_event=None))
 
         def prefill():
             for cache_entry in to_prefill:
@@ -1754,6 +1760,128 @@ class PersistEventsStore:
         if rel_type == RelationTypes.REPLACE:
             txn.call_after(self.store.get_applicable_edit.invalidate, (parent_id,))
 
+    def _handle_insertion_event(self, txn: LoggingTransaction, event: EventBase):
+        """Handles keeping track of insertion events and edges/connections.
+        Part of MSC2716.
+
+        Args:
+            txn: The database transaction object
+            event: The event to process
+        """
+
+        if event.type != EventTypes.MSC2716_INSERTION:
+            # Not a insertion event
+            return
+
+        # Skip processing an insertion event if the room version doesn't
+        # support it or the event is not from the room creator.
+        room_version = self.store.get_room_version_txn(txn, event.room_id)
+        room_creator = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="rooms",
+            keyvalues={"room_id": event.room_id},
+            retcol="creator",
+            allow_none=True,
+        )
+        if (
+            not room_version.msc2716_historical
+            or not self.hs.config.experimental.msc2716_enabled
+            or event.sender != room_creator
+        ):
+            return
+
+        next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
+        if next_chunk_id is None:
+            # Invalid insertion event without next chunk ID
+            return
+
+        logger.debug(
+            "_handle_insertion_event (next_chunk_id=%s) %s", next_chunk_id, event
+        )
+
+        # Keep track of the insertion event and the chunk ID
+        self.db_pool.simple_insert_txn(
+            txn,
+            table="insertion_events",
+            values={
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "next_chunk_id": next_chunk_id,
+            },
+        )
+
+        # Insert an edge for every prev_event connection
+        for prev_event_id in event.prev_events:
+            self.db_pool.simple_insert_txn(
+                txn,
+                table="insertion_event_edges",
+                values={
+                    "event_id": event.event_id,
+                    "room_id": event.room_id,
+                    "insertion_prev_event_id": prev_event_id,
+                },
+            )
+
+    def _handle_chunk_event(self, txn: LoggingTransaction, event: EventBase):
+        """Handles inserting the chunk edges/connections between the chunk event
+        and an insertion event. Part of MSC2716.
+
+        Args:
+            txn: The database transaction object
+            event: The event to process
+        """
+
+        if event.type != EventTypes.MSC2716_CHUNK:
+            # Not a chunk event
+            return
+
+        # Skip processing a chunk event if the room version doesn't
+        # support it or the event is not from the room creator.
+        room_version = self.store.get_room_version_txn(txn, event.room_id)
+        room_creator = self.db_pool.simple_select_one_onecol_txn(
+            txn,
+            table="rooms",
+            keyvalues={"room_id": event.room_id},
+            retcol="creator",
+            allow_none=True,
+        )
+        if (
+            not room_version.msc2716_historical
+            or not self.hs.config.experimental.msc2716_enabled
+            or event.sender != room_creator
+        ):
+            return
+
+        chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
+        if chunk_id is None:
+            # Invalid chunk event without a chunk ID
+            return
+
+        logger.debug("_handle_chunk_event chunk_id=%s %s", chunk_id, event)
+
+        # Keep track of the insertion event and the chunk ID
+        self.db_pool.simple_insert_txn(
+            txn,
+            table="chunk_events",
+            values={
+                "event_id": event.event_id,
+                "room_id": event.room_id,
+                "chunk_id": chunk_id,
+            },
+        )
+
+        # When we receive an event with a `chunk_id` referencing the
+        # `next_chunk_id` of the insertion event, we can remove it from the
+        # `insertion_event_extremities` table.
+        sql = """
+            DELETE FROM insertion_event_extremities WHERE event_id IN (
+                SELECT event_id FROM insertion_events
+                WHERE next_chunk_id = ?
+            )
+        """
+
+        txn.execute(sql, (chunk_id,))
+
     def _handle_redaction(self, txn, redacted_event_id):
         """Handles receiving a redaction and checking whether we need to remove
         any redacted relations from the database.
@@ -1859,6 +1987,15 @@ class PersistEventsStore:
                 events_and_context.
         """
 
+        # Only non outlier events will have push actions associated with them,
+        # so let's filter them out. (This makes joining large rooms faster, as
+        # these queries took seconds to process all the state events).
+        non_outlier_events = [
+            event
+            for event, _ in events_and_contexts
+            if not event.internal_metadata.is_outlier()
+        ]
+
         sql = """
             INSERT INTO event_push_actions (
                 room_id, event_id, user_id, actions, stream_ordering,
@@ -1869,7 +2006,7 @@ class PersistEventsStore:
             WHERE event_id = ?
         """
 
-        if events_and_contexts:
+        if non_outlier_events:
             txn.execute_batch(
                 sql,
                 (
@@ -1879,12 +2016,12 @@ class PersistEventsStore:
                         event.depth,
                         event.event_id,
                     )
-                    for event, _ in events_and_contexts
+                    for event in non_outlier_events
                 ),
             )
 
             room_to_event_ids: Dict[str, List[str]] = {}
-            for e, _ in events_and_contexts:
+            for e in non_outlier_events:
                 room_to_event_ids.setdefault(e.room_id, []).append(e.event_id)
 
             for room_id, event_ids in room_to_event_ids.items():
@@ -1909,7 +2046,11 @@ class PersistEventsStore:
         # persisted.
         txn.execute_batch(
             "DELETE FROM event_push_actions_staging WHERE event_id = ?",
-            ((event.event_id,) for event, _ in all_events_and_contexts),
+            (
+                (event.event_id,)
+                for event, _ in all_events_and_contexts
+                if not event.internal_metadata.is_outlier()
+            ),
         )
 
     def _remove_push_actions_for_event_id_txn(self, txn, room_id, event_id):
@@ -2010,15 +2151,17 @@ class PersistEventsStore:
 
         Forward extremities are handled when we first start persisting the events.
         """
+        # From the events passed in, add all of the prev events as backwards extremities.
+        # Ignore any events that are already backwards extrems or outliers.
         query = (
             "INSERT INTO event_backward_extremities (event_id, room_id)"
             " SELECT ?, ? WHERE NOT EXISTS ("
-            " SELECT 1 FROM event_backward_extremities"
-            " WHERE event_id = ? AND room_id = ?"
+            "   SELECT 1 FROM event_backward_extremities"
+            "   WHERE event_id = ? AND room_id = ?"
             " )"
             " AND NOT EXISTS ("
-            " SELECT 1 FROM events WHERE event_id = ? AND room_id = ? "
-            " AND outlier = ?"
+            "   SELECT 1 FROM events WHERE event_id = ? AND room_id = ? "
+            "   AND outlier = ?"
             " )"
         )
 
@@ -2032,6 +2175,8 @@ class PersistEventsStore:
             ],
         )
 
+        # Delete all these events that we've already fetched and now know that their
+        # prev events are the new backwards extremeties.
         query = (
             "DELETE FROM event_backward_extremities"
             " WHERE event_id = ? AND room_id = ?"

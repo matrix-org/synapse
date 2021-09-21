@@ -1,1 +1,0 @@
-Fix an error which prevented the Github Actions workflow to build the docker images from running.

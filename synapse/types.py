@@ -38,6 +38,7 @@ from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTCP,
+    IReactorThreads,
     IReactorTime,
 )
 
@@ -63,7 +64,12 @@ JsonDict = Dict[str, Any]
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
-    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
+    IReactorTCP,
+    IReactorPluggableNameResolver,
+    IReactorTime,
+    IReactorCore,
+    IReactorThreads,
+    Interface,
 ):
     """The interfaces necessary for Synapse to function."""
 
@@ -505,7 +511,7 @@ class RoomStreamToken:
                 )
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, "Invalid room stream token %r" % (string,))
 
     @classmethod
     def parse_stream_token(cls, string: str) -> "RoomStreamToken":
@@ -514,7 +520,7 @@ class RoomStreamToken:
                 return cls(topological=None, stream=int(string[1:]))
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, "Invalid room stream token %r" % (string,))
 
     def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
         """Return a new token such that if an event is after both this token and
@@ -613,7 +619,7 @@ class StreamToken:
                 await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
             )
         except Exception:
-            raise SynapseError(400, "Invalid Token")
+            raise SynapseError(400, "Invalid stream token")
 
     async def to_string(self, store: "DataStore") -> str:
         return self._SEPARATOR.join(
@@ -751,3 +757,32 @@ def get_verify_key_from_cross_signing_key(key_info):
     # and return that one key
     for key_id, key_data in keys.items():
         return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+
+
+@attr.s(auto_attribs=True, frozen=True, slots=True)
+class UserInfo:
+    """Holds information about a user. Result of get_userinfo_by_id.
+
+    Attributes:
+        user_id:  ID of the user.
+        appservice_id:  Application service ID that created this user.
+        consent_server_notice_sent:  Version of policy documents the user has been sent.
+        consent_version:  Version of policy documents the user has consented to.
+        creation_ts:  Creation timestamp of the user.
+        is_admin:  True if the user is an admin.
+        is_deactivated:  True if the user has been deactivated.
+        is_guest:  True if the user is a guest user.
+        is_shadow_banned:  True if the user has been shadow-banned.
+        user_type:  User type (None for normal user, 'support' and 'bot' other options).
+    """
+
+    user_id: UserID
+    appservice_id: Optional[int]
+    consent_server_notice_sent: Optional[str]
+    consent_version: Optional[str]
+    user_type: Optional[str]
+    creation_ts: int
+    is_admin: bool
+    is_deactivated: bool
+    is_guest: bool
+    is_shadow_banned: bool

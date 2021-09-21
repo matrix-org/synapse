@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, List, Optional, Tuple
 
 from twisted.internet import defer
 
@@ -21,6 +21,7 @@ from synapse.api.constants import EduTypes, EventTypes, Membership
 from synapse.api.errors import SynapseError
 from synapse.events.validator import EventValidator
 from synapse.handlers.presence import format_user_presence_state
+from synapse.handlers.receipts import ReceiptEventSource
 from synapse.logging.context import make_deferred_yieldable, run_in_background
 from synapse.storage.roommember import RoomsForUser
 from synapse.streams.config import PaginationConfig
@@ -134,6 +135,8 @@ class InitialSyncHandler(BaseHandler):
             joined_rooms,
             to_key=int(now_token.receipt_key),
         )
+        if self.hs.config.experimental.msc2285_enabled:
+            receipt = ReceiptEventSource.filter_out_hidden(receipt, user_id)
 
         tags_by_room = await self.store.get_tags_for_user(user_id)
 
@@ -147,8 +150,8 @@ class InitialSyncHandler(BaseHandler):
         if limit is None:
             limit = 10
 
-        async def handle_room(event: RoomsForUser):
-            d = {
+        async def handle_room(event: RoomsForUser) -> None:
+            d: JsonDict = {
                 "room_id": event.room_id,
                 "membership": event.membership,
                 "visibility": (
@@ -408,9 +411,9 @@ class InitialSyncHandler(BaseHandler):
 
         presence_handler = self.hs.get_presence_handler()
 
-        async def get_presence():
+        async def get_presence() -> List[JsonDict]:
             # If presence is disabled, return an empty list
-            if not self.hs.config.use_presence:
+            if not self.hs.config.server.use_presence:
                 return []
 
             states = await presence_handler.get_states(
@@ -425,12 +428,14 @@ class InitialSyncHandler(BaseHandler):
                 for s in states
             ]
 
-        async def get_receipts():
+        async def get_receipts() -> List[JsonDict]:
             receipts = await self.store.get_linearized_receipts_for_room(
                 room_id, to_key=now_token.receipt_key
             )
             if not receipts:
-                receipts = []
+                return []
+            if self.hs.config.experimental.msc2285_enabled:
+                receipts = ReceiptEventSource.filter_out_hidden(receipts, user_id)
             return receipts
 
         presence, receipts, (messages, token) = await make_deferred_yieldable(

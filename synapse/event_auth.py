@@ -21,7 +21,13 @@ from signedjson.key import decode_verify_key_bytes
 from signedjson.sign import SignatureVerifyException, verify_signed_json
 from unpaddedbase64 import decode_base64
 
-from synapse.api.constants import MAX_PDU_SIZE, EventTypes, JoinRules, Membership
+from synapse.api.constants import (
+    MAX_PDU_SIZE,
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    Membership,
+)
 from synapse.api.errors import AuthError, EventSizeError, SynapseError
 from synapse.api.room_versions import (
     KNOWN_ROOM_VERSIONS,
@@ -205,25 +211,29 @@ def check(
     if event.type == EventTypes.Redaction:
         check_redaction(room_version_obj, event, auth_events)
 
+    if (
+        event.type == EventTypes.MSC2716_INSERTION
+        or event.type == EventTypes.MSC2716_CHUNK
+        or event.type == EventTypes.MSC2716_MARKER
+    ):
+        check_historical(room_version_obj, event, auth_events)
+
     logger.debug("Allowing! %s", event)
 
 
 def _check_size_limits(event: EventBase) -> None:
-    def too_big(field):
-        raise EventSizeError("%s too large" % (field,))
-
     if len(event.user_id) > 255:
-        too_big("user_id")
+        raise EventSizeError("'user_id' too large")
     if len(event.room_id) > 255:
-        too_big("room_id")
+        raise EventSizeError("'room_id' too large")
     if event.is_state() and len(event.state_key) > 255:
-        too_big("state_key")
+        raise EventSizeError("'state_key' too large")
     if len(event.type) > 255:
-        too_big("type")
+        raise EventSizeError("'type' too large")
     if len(event.event_id) > 255:
-        too_big("event_id")
+        raise EventSizeError("'event_id' too large")
     if len(encode_canonical_json(event.get_pdu_json())) > MAX_PDU_SIZE:
-        too_big("event")
+        raise EventSizeError("event too large")
 
 
 def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
@@ -232,7 +242,7 @@ def _can_federate(event: EventBase, auth_events: StateMap[EventBase]) -> bool:
     if not creation_event:
         return False
 
-    return creation_event.content.get("m.federate", True) is True
+    return creation_event.content.get(EventContentFields.FEDERATE, True) is True
 
 
 def _is_membership_change_allowed(
@@ -363,10 +373,7 @@ def _is_membership_change_allowed(
             raise AuthError(403, "You are banned from this room")
         elif join_rule == JoinRules.PUBLIC:
             pass
-        elif (
-            room_version.msc3083_join_rules
-            and join_rule == JoinRules.MSC3083_RESTRICTED
-        ):
+        elif room_version.msc3083_join_rules and join_rule == JoinRules.RESTRICTED:
             # This is the same as public, but the event must contain a reference
             # to the server who authorised the join. If the event does not contain
             # the proper content it is rejected.
@@ -539,6 +546,37 @@ def check_redaction(
     raise AuthError(403, "You don't have permission to redact events")
 
 
+def check_historical(
+    room_version_obj: RoomVersion,
+    event: EventBase,
+    auth_events: StateMap[EventBase],
+) -> None:
+    """Check whether the event sender is allowed to send historical related
+    events like "insertion", "chunk", and "marker".
+
+    Returns:
+        None
+
+    Raises:
+        AuthError if the event sender is not allowed to send historical related events
+        ("insertion", "chunk", and "marker").
+    """
+    # Ignore the auth checks in room versions that do not support historical
+    # events
+    if not room_version_obj.msc2716_historical:
+        return
+
+    user_level = get_user_power_level(event.user_id, auth_events)
+
+    historical_level = get_named_level(auth_events, "historical", 100)
+
+    if user_level < historical_level:
+        raise AuthError(
+            403,
+            'You don\'t have permission to send send historical related events ("insertion", "chunk", and "marker")',
+        )
+
+
 def _check_power_levels(
     room_version_obj: RoomVersion,
     event: EventBase,
@@ -654,7 +692,7 @@ def get_user_power_level(user_id: str, auth_events: StateMap[EventBase]) -> int:
     power_level_event = get_power_level_event(auth_events)
     if power_level_event:
         level = power_level_event.content.get("users", {}).get(user_id)
-        if not level:
+        if level is None:
             level = power_level_event.content.get("users_default", 0)
 
         if level is None:

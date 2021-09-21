@@ -14,12 +14,18 @@
 
 import logging
 from collections import namedtuple
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 
 import msgpack
 from unpaddedbase64 import decode_base64, encode_base64
 
-from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
+from synapse.api.constants import (
+    EventContentFields,
+    EventTypes,
+    GuestAccess,
+    HistoryVisibility,
+    JoinRules,
+)
 from synapse.api.errors import (
     Codes,
     HttpResponseException,
@@ -27,7 +33,7 @@ from synapse.api.errors import (
     SynapseError,
 )
 from synapse.types import JsonDict, ThirdPartyInstanceID
-from synapse.util.caches.descriptors import cached
+from synapse.util.caches.descriptors import _CacheContext, cached
 from synapse.util.caches.response_cache import ResponseCache
 
 from ._base import BaseHandler
@@ -163,7 +169,7 @@ class RoomListHandler(BaseHandler):
             ignore_non_federatable=from_federation,
         )
 
-        def build_room_entry(room):
+        def build_room_entry(room: JsonDict) -> JsonDict:
             entry = {
                 "room_id": room["room_id"],
                 "name": room["name"],
@@ -243,10 +249,10 @@ class RoomListHandler(BaseHandler):
         self,
         room_id: str,
         num_joined_users: int,
-        cache_context,
+        cache_context: _CacheContext,
         with_alias: bool = True,
         allow_private: bool = False,
-    ) -> Optional[dict]:
+    ) -> Optional[JsonDict]:
         """Returns the entry for a room
 
         Args:
@@ -307,7 +313,9 @@ class RoomListHandler(BaseHandler):
 
         # Return whether this room is open to federation users or not
         create_event = current_state[EventTypes.Create, ""]
-        result["m.federate"] = create_event.content.get("m.federate", True)
+        result["m.federate"] = create_event.content.get(
+            EventContentFields.FEDERATE, True
+        )
 
         name_event = current_state.get((EventTypes.Name, ""))
         if name_event:
@@ -336,8 +344,8 @@ class RoomListHandler(BaseHandler):
         guest_event = current_state.get((EventTypes.GuestAccess, ""))
         guest = None
         if guest_event:
-            guest = guest_event.content.get("guest_access", None)
-        result["guest_can_join"] = guest == "can_join"
+            guest = guest_event.content.get(EventContentFields.GUEST_ACCESS)
+        result["guest_can_join"] = guest == GuestAccess.CAN_JOIN
 
         avatar_event = current_state.get(("m.room.avatar", ""))
         if avatar_event:
@@ -356,6 +364,12 @@ class RoomListHandler(BaseHandler):
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
     ) -> JsonDict:
+        """Get the public room list from remote server
+
+        Raises:
+            SynapseError
+        """
+
         if not self.enable_room_list_search:
             return {"chunk": [], "total_room_count_estimate": 0}
 
@@ -395,13 +409,16 @@ class RoomListHandler(BaseHandler):
             limit = None
             since_token = None
 
-        res = await self._get_remote_list_cached(
-            server_name,
-            limit=limit,
-            since_token=since_token,
-            include_all_networks=include_all_networks,
-            third_party_instance_id=third_party_instance_id,
-        )
+        try:
+            res = await self._get_remote_list_cached(
+                server_name,
+                limit=limit,
+                since_token=since_token,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
+        except (RequestSendFailed, HttpResponseException):
+            raise SynapseError(502, "Failed to fetch room list")
 
         if search_filter:
             res = {
@@ -423,20 +440,21 @@ class RoomListHandler(BaseHandler):
         include_all_networks: bool = False,
         third_party_instance_id: Optional[str] = None,
     ) -> JsonDict:
+        """Wrapper around FederationClient.get_public_rooms that caches the
+        result.
+        """
+
         repl_layer = self.hs.get_federation_client()
         if search_filter:
             # We can't cache when asking for search
-            try:
-                return await repl_layer.get_public_rooms(
-                    server_name,
-                    limit=limit,
-                    since_token=since_token,
-                    search_filter=search_filter,
-                    include_all_networks=include_all_networks,
-                    third_party_instance_id=third_party_instance_id,
-                )
-            except (RequestSendFailed, HttpResponseException):
-                raise SynapseError(502, "Failed to fetch room list")
+            return await repl_layer.get_public_rooms(
+                server_name,
+                limit=limit,
+                since_token=since_token,
+                search_filter=search_filter,
+                include_all_networks=include_all_networks,
+                third_party_instance_id=third_party_instance_id,
+            )
 
         key = (
             server_name,
@@ -489,7 +507,7 @@ class RoomListNextBatch(
             )
         )
 
-    def copy_and_replace(self, **kwds) -> "RoomListNextBatch":
+    def copy_and_replace(self, **kwds: Any) -> "RoomListNextBatch":
         return self._replace(**kwds)
 
 

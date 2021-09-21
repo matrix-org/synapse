@@ -46,7 +46,7 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Start the user parter loop so it can resume parting users from rooms where
         # it left off (if it has work left to do).
-        if hs.config.run_background_tasks:
+        if hs.config.worker.run_background_tasks:
             hs.get_reactor().callWhenRunning(self._start_user_parting)
 
         self._account_validity_enabled = (
@@ -131,7 +131,7 @@ class DeactivateAccountHandler(BaseHandler):
         await self.store.add_user_pending_deactivation(user_id)
 
         # delete from user directory
-        await self.user_directory_handler.handle_user_deactivated(user_id)
+        await self.user_directory_handler.handle_local_user_deactivated(user_id)
 
         # Mark the user as erased, if they asked for that
         if erase_data:
@@ -257,11 +257,8 @@ class DeactivateAccountHandler(BaseHandler):
         """
         # Add the user to the directory, if necessary.
         user = UserID.from_string(user_id)
-        if self.hs.config.user_directory_search_all_users:
-            profile = await self.store.get_profileinfo(user.localpart)
-            await self.user_directory_handler.handle_local_profile_change(
-                user_id, profile
-            )
+        profile = await self.store.get_profileinfo(user.localpart)
+        await self.user_directory_handler.handle_local_profile_change(user_id, profile)
 
         # Ensure the user is not marked as erased.
         await self.store.mark_user_not_erased(user_id)

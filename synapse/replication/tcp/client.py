@@ -73,7 +73,7 @@ class DirectTcpReplicationClientFactory(ReconnectingClientFactory):
     ):
         self.client_name = client_name
         self.command_handler = command_handler
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.hs = hs
         self._clock = hs.get_clock()  # As self.clock is defined in super class
 
@@ -285,7 +285,7 @@ class ReplicationDataHandler:
 
         # Create a new deferred that times out after N seconds, as we don't want
         # to wedge here forever.
-        deferred = Deferred()
+        deferred: "Deferred[None]" = Deferred()
         deferred = timeout_deferred(
             deferred, _WAIT_FOR_REPLICATION_TIMEOUT_SECONDS, self._reactor
         )
@@ -392,6 +392,11 @@ class FederationSenderHandler:
         for receipt in rows:
             # we only want to send on receipts for our own users
             if not self._is_mine_id(receipt.user_id):
+                continue
+            if (
+                receipt.data.get("hidden", False)
+                and self._hs.config.experimental.msc2285_enabled
+            ):
                 continue
             receipt_info = ReadReceipt(
                 receipt.room_id,

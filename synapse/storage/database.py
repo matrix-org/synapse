@@ -15,6 +15,7 @@
 # limitations under the License.
 import logging
 import time
+from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
@@ -279,18 +280,18 @@ class LoggingTransaction:
         else:
             self.executemany(sql, args)
 
-    def execute_values(self, sql: str, *args: Any) -> List[Tuple]:
+    def execute_values(self, sql: str, *args: Any, fetch: bool = True) -> List[Tuple]:
         """Corresponds to psycopg2.extras.execute_values. Only available when
         using postgres.
 
-        Always sets fetch=True when caling `execute_values`, so will return the
-        results.
+        The `fetch` parameter must be set to False if the query does not return
+        rows (e.g. INSERTs).
         """
         assert isinstance(self.database_engine, PostgresEngine)
         from psycopg2.extras import execute_values  # type: ignore
 
         return self._do_execute(
-            lambda *x: execute_values(self.txn, *x, fetch=True), sql, *args
+            lambda *x: execute_values(self.txn, *x, fetch=fetch), sql, *args
         )
 
     def execute(self, sql: str, *args: Any) -> None:
@@ -397,6 +398,7 @@ class DatabasePool:
     ):
         self.hs = hs
         self._clock = hs.get_clock()
+        self._txn_limit = database_config.config.get("txn_limit", 0)
         self._database_config = database_config
         self._db_pool = make_pool(hs.get_reactor(), database_config, engine)
 
@@ -405,6 +407,9 @@ class DatabasePool:
         self._previous_txn_total_time = 0.0
         self._current_txn_total_time = 0.0
         self._previous_loop_ts = 0.0
+
+        # Transaction counter: key is the twisted thread id, value is the current count
+        self._txn_counters: Dict[int, int] = defaultdict(int)
 
         # TODO(paul): These can eventually be removed once the metrics code
         #   is running in mainline, and we have some nice monitoring frontends
@@ -750,10 +755,26 @@ class DatabasePool:
                     sql_scheduling_timer.observe(sched_duration_sec)
                     context.add_database_scheduled(sched_duration_sec)
 
+                    if self._txn_limit > 0:
+                        tid = self._db_pool.threadID()
+                        self._txn_counters[tid] += 1
+
+                        if self._txn_counters[tid] > self._txn_limit:
+                            logger.debug(
+                                "Reconnecting database connection over transaction limit"
+                            )
+                            conn.reconnect()
+                            opentracing.log_kv(
+                                {"message": "reconnected due to txn limit"}
+                            )
+                            self._txn_counters[tid] = 1
+
                     if self.engine.is_connection_closed(conn):
                         logger.debug("Reconnecting closed database connection")
                         conn.reconnect()
                         opentracing.log_kv({"message": "reconnected"})
+                        if self._txn_limit > 0:
+                            self._txn_counters[tid] = 1
 
                     try:
                         if db_autocommit:
@@ -899,13 +920,23 @@ class DatabasePool:
             if k != keys[0]:
                 raise RuntimeError("All items must have the same keys")
 
-        sql = "INSERT INTO %s (%s) VALUES(%s)" % (
-            table,
-            ", ".join(k for k in keys[0]),
-            ", ".join("?" for _ in keys[0]),
-        )
+        if isinstance(txn.database_engine, PostgresEngine):
+            # We use `execute_values` as it can be a lot faster than `execute_batch`,
+            # but it's only available on postgres.
+            sql = "INSERT INTO %s (%s) VALUES ?" % (
+                table,
+                ", ".join(k for k in keys[0]),
+            )
 
-        txn.execute_batch(sql, vals)
+            txn.execute_values(sql, vals, fetch=False)
+        else:
+            sql = "INSERT INTO %s (%s) VALUES(%s)" % (
+                table,
+                ", ".join(k for k in keys[0]),
+                ", ".join("?" for _ in keys[0]),
+            )
+
+            txn.execute_batch(sql, vals)
 
     async def simple_upsert(
         self,
@@ -920,13 +951,13 @@ class DatabasePool:
 
         `lock` should generally be set to True (the default), but can be set
         to False if either of the following are true:
-
-        * there is a UNIQUE INDEX on the key columns. In this case a conflict
-          will cause an IntegrityError in which case this function will retry
-          the update.
-
-        * we somehow know that we are the only thread which will be updating
-          this table.
+            1. there is a UNIQUE INDEX on the key columns. In this case a conflict
+            will cause an IntegrityError in which case this function will retry
+            the update.
+            2. we somehow know that we are the only thread which will be updating
+            this table.
+        As an additional note, this parameter only matters for old SQLite versions
+        because we will use native upserts otherwise.
 
         Args:
             table: The table to upsert into
@@ -1260,20 +1291,33 @@ class DatabasePool:
                 k + "=EXCLUDED." + k for k in value_names
             )
 
-        sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s" % (
-            table,
-            ", ".join(k for k in allnames),
-            ", ".join("?" for _ in allnames),
-            ", ".join(key_names),
-            latter,
-        )
-
         args = []
 
         for x, y in zip(key_values, value_values):
             args.append(tuple(x) + tuple(y))
 
-        return txn.execute_batch(sql, args)
+        if isinstance(txn.database_engine, PostgresEngine):
+            # We use `execute_values` as it can be a lot faster than `execute_batch`,
+            # but it's only available on postgres.
+            sql = "INSERT INTO %s (%s) VALUES ? ON CONFLICT (%s) DO %s" % (
+                table,
+                ", ".join(k for k in allnames),
+                ", ".join(key_names),
+                latter,
+            )
+
+            txn.execute_values(sql, args, fetch=False)
+
+        else:
+            sql = "INSERT INTO %s (%s) VALUES (%s) ON CONFLICT (%s) DO %s" % (
+                table,
+                ", ".join(k for k in allnames),
+                ", ".join("?" for _ in allnames),
+                ", ".join(key_names),
+                latter,
+            )
+
+            return txn.execute_batch(sql, args)
 
     @overload
     async def simple_select_one(
@@ -1588,7 +1632,7 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        iterable: Collection[Any],
         keyvalues: Dict[str, Any],
         retcols: Iterable[str],
     ) -> List[Dict[str, Any]]:
@@ -1847,29 +1891,32 @@ class DatabasePool:
         txn: LoggingTransaction,
         table: str,
         column: str,
-        iterable: Iterable[Any],
+        values: Collection[Any],
         keyvalues: Dict[str, Any],
     ) -> int:
         """Executes a DELETE query on the named table.
 
-        Filters rows by if value of `column` is in `iterable`.
+        Deletes the rows:
+          - whose value of `column` is in `values`; AND
+          - that match extra column-value pairs specified in `keyvalues`.
 
         Args:
             txn: Transaction object
             table: string giving the table name
-            column: column name to test for inclusion against `iterable`
-            iterable: list
-            keyvalues: dict of column names and values to select the rows with
+            column: column name to test for inclusion against `values`
+            values: values of `column` which choose rows to delete
+            keyvalues: dict of extra column names and values to select the rows
+                with. They will be ANDed together with the main predicate.
 
         Returns:
             Number rows deleted
         """
-        if not iterable:
+        if not values:
             return 0
 
         sql = "DELETE FROM %s" % table
 
-        clause, values = make_in_list_sql_clause(txn.database_engine, column, iterable)
+        clause, values = make_in_list_sql_clause(txn.database_engine, column, values)
         clauses = [clause]
 
         for key, value in keyvalues.items():
@@ -2054,7 +2101,7 @@ class DatabasePool:
 
 
 def make_in_list_sql_clause(
-    database_engine: BaseDatabaseEngine, column: str, iterable: Iterable
+    database_engine: BaseDatabaseEngine, column: str, iterable: Collection[Any]
 ) -> Tuple[str, list]:
     """Returns an SQL clause that checks the given column is in the iterable.
 

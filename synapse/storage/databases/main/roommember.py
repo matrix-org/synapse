@@ -81,7 +81,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         txn.close()
 
         if (
-            self.hs.config.run_background_tasks
+            self.hs.config.worker.run_background_tasks
             and self.hs.config.metrics_flags.known_servers
         ):
             self._known_servers_count = 1
@@ -196,6 +196,11 @@ class RoomMemberWorkerStore(EventsWorkerStore):
     ) -> Dict[str, ProfileInfo]:
         """Get a mapping from user ID to profile information for all users in a given room.
 
+        The profile information comes directly from this room's `m.room.member`
+        events, and so may be specific to this room rather than part of a user's
+        global profile. To avoid privacy leaks, the profile data should only be
+        revealed to users who are already in this room.
+
         Args:
             room_id: The ID of the room to retrieve the users of.
 
@@ -307,7 +312,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
     @cached()
-    async def get_invited_rooms_for_local_user(self, user_id: str) -> RoomsForUser:
+    async def get_invited_rooms_for_local_user(
+        self, user_id: str
+    ) -> List[RoomsForUser]:
         """Get all the rooms the *local* user is invited to.
 
         Args:
@@ -384,9 +391,10 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
         sql = """
-            SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering
+            SELECT room_id, e.sender, c.membership, event_id, e.stream_ordering, r.room_version
             FROM local_current_membership AS c
             INNER JOIN events AS e USING (room_id, event_id)
+            INNER JOIN rooms AS r USING (room_id)
             WHERE
                 user_id = ?
                 AND %s
@@ -395,7 +403,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         )
 
         txn.execute(sql, (user_id, *args))
-        results = [RoomsForUser(**r) for r in self.db_pool.cursor_to_dict(txn)]
+        results = [RoomsForUser(*r) for r in txn]
 
         return results
 
@@ -445,7 +453,8 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         Returns:
             Returns the rooms the user is in currently, along with the stream
-            ordering of the most recent join for that user and room.
+            ordering of the most recent join for that user and room, along with
+            the room version of the room.
         """
         return await self.db_pool.runInteraction(
             "get_rooms_for_user_with_stream_ordering",
@@ -522,7 +531,9 @@ class RoomMemberWorkerStore(EventsWorkerStore):
             _get_users_server_still_shares_room_with_txn,
         )
 
-    async def get_rooms_for_user(self, user_id: str, on_invalidate=None):
+    async def get_rooms_for_user(
+        self, user_id: str, on_invalidate=None
+    ) -> FrozenSet[str]:
         """Returns a set of room_ids the user is currently joined to.
 
         If a remote user only returns rooms this server is currently
@@ -629,14 +640,12 @@ class RoomMemberWorkerStore(EventsWorkerStore):
         # We don't update the event cache hit ratio as it completely throws off
         # the hit ratio counts. After all, we don't populate the cache if we
         # miss it here
-        event_map = self._get_events_from_cache(
-            member_event_ids, allow_rejected=False, update_metrics=False
-        )
+        event_map = self._get_events_from_cache(member_event_ids, update_metrics=False)
 
         missing_member_event_ids = []
         for event_id in member_event_ids:
             ev_entry = event_map.get(event_id)
-            if ev_entry:
+            if ev_entry and not ev_entry.event.rejected_reason:
                 if ev_entry.event.membership == Membership.JOIN:
                     users_in_room[ev_entry.event.state_key] = ProfileInfo(
                         display_name=ev_entry.event.content.get("displayname", None),

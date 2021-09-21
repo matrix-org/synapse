@@ -16,7 +16,16 @@
 
 import enum
 import threading
-from typing import Callable, Generic, Iterable, MutableMapping, Optional, TypeVar, Union
+from typing import (
+    Callable,
+    Generic,
+    Iterable,
+    MutableMapping,
+    Optional,
+    TypeVar,
+    Union,
+    cast,
+)
 
 from prometheus_client import Gauge
 
@@ -84,7 +93,7 @@ class DeferredCache(Generic[KT, VT]):
             TreeCache, "MutableMapping[KT, CacheEntry]"
         ] = cache_type()
 
-        def metrics_cb():
+        def metrics_cb() -> None:
             cache_pending_metric.labels(name).set(len(self._pending_deferred_cache))
 
         # cache is used for completed results and maps to the result itself, rather than
@@ -104,7 +113,7 @@ class DeferredCache(Generic[KT, VT]):
     def max_entries(self):
         return self.cache.max_size
 
-    def check_thread(self):
+    def check_thread(self) -> None:
         expected_thread = self.thread
         if expected_thread is None:
             self.thread = threading.current_thread()
@@ -166,7 +175,7 @@ class DeferredCache(Generic[KT, VT]):
     def set(
         self,
         key: KT,
-        value: defer.Deferred,
+        value: "defer.Deferred[VT]",
         callback: Optional[Callable[[], None]] = None,
     ) -> defer.Deferred:
         """Adds a new entry to the cache (or updates an existing one).
@@ -214,7 +223,7 @@ class DeferredCache(Generic[KT, VT]):
         if value.called:
             result = value.result
             if not isinstance(result, failure.Failure):
-                self.cache.set(key, result, callbacks)
+                self.cache.set(key, cast(VT, result), callbacks)
             return value
 
         # otherwise, we'll add an entry to the _pending_deferred_cache for now,
@@ -226,7 +235,7 @@ class DeferredCache(Generic[KT, VT]):
 
         self._pending_deferred_cache[key] = entry
 
-        def compare_and_pop():
+        def compare_and_pop() -> bool:
             """Check if our entry is still the one in _pending_deferred_cache, and
             if so, pop it.
 
@@ -247,7 +256,7 @@ class DeferredCache(Generic[KT, VT]):
 
             return False
 
-        def cb(result):
+        def cb(result) -> None:
             if compare_and_pop():
                 self.cache.set(key, result, entry.callbacks)
             else:
@@ -259,7 +268,7 @@ class DeferredCache(Generic[KT, VT]):
                 # not have been. Either way, let's double-check now.
                 entry.invalidate()
 
-        def eb(_fail):
+        def eb(_fail) -> None:
             compare_and_pop()
             entry.invalidate()
 
@@ -305,7 +314,7 @@ class DeferredCache(Generic[KT, VT]):
             for entry in iterate_tree_cache_entry(entry):
                 entry.invalidate()
 
-    def invalidate_all(self):
+    def invalidate_all(self) -> None:
         self.check_thread()
         self.cache.clear()
         for entry in self._pending_deferred_cache.values():
@@ -323,7 +332,7 @@ class CacheEntry:
         self.callbacks = set(callbacks)
         self.invalidated = False
 
-    def invalidate(self):
+    def invalidate(self) -> None:
         if not self.invalidated:
             self.invalidated = True
             for callback in self.callbacks:

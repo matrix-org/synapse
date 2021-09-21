@@ -25,11 +25,14 @@ import attr
 import yaml
 from netaddr import AddrFormatError, IPNetwork, IPSet
 
+from twisted.conch.ssh.keys import Key
+
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS
 from synapse.util.module_loader import load_module
 from synapse.util.stringutils import parse_and_validate_server_name
 
 from ._base import Config, ConfigError
+from ._util import validate_config
 
 logger = logging.Logger(__name__)
 
@@ -216,6 +219,16 @@ class ListenerConfig:
     http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
 
 
+@attr.s(frozen=True)
+class ManholeConfig:
+    """Object describing the configuration of the manhole"""
+
+    username = attr.ib(type=str, validator=attr.validators.instance_of(str))
+    password = attr.ib(type=str, validator=attr.validators.instance_of(str))
+    priv_key = attr.ib(type=Optional[Key])
+    pub_key = attr.ib(type=Optional[Key])
+
+
 class ServerConfig(Config):
     section = "server"
 
@@ -248,6 +261,7 @@ class ServerConfig(Config):
             self.use_presence = config.get("use_presence", True)
 
         # Custom presence router module
+        # This is the legacy way of configuring it (the config should now be put in the modules section)
         self.presence_router_module_class = None
         self.presence_router_config = None
         presence_router_config = presence_config.get("presence_router")
@@ -648,6 +662,41 @@ class ServerConfig(Config):
                 )
             )
 
+        manhole_settings = config.get("manhole_settings") or {}
+        validate_config(
+            _MANHOLE_SETTINGS_SCHEMA, manhole_settings, ("manhole_settings",)
+        )
+
+        manhole_username = manhole_settings.get("username", "matrix")
+        manhole_password = manhole_settings.get("password", "rabbithole")
+        manhole_priv_key_path = manhole_settings.get("ssh_priv_key_path")
+        manhole_pub_key_path = manhole_settings.get("ssh_pub_key_path")
+
+        manhole_priv_key = None
+        if manhole_priv_key_path is not None:
+            try:
+                manhole_priv_key = Key.fromFile(manhole_priv_key_path)
+            except Exception as e:
+                raise ConfigError(
+                    f"Failed to read manhole private key file {manhole_priv_key_path}"
+                ) from e
+
+        manhole_pub_key = None
+        if manhole_pub_key_path is not None:
+            try:
+                manhole_pub_key = Key.fromFile(manhole_pub_key_path)
+            except Exception as e:
+                raise ConfigError(
+                    f"Failed to read manhole public key file {manhole_pub_key_path}"
+                ) from e
+
+        self.manhole_settings = ManholeConfig(
+            username=manhole_username,
+            password=manhole_password,
+            priv_key=manhole_priv_key,
+            pub_key=manhole_pub_key,
+        )
+
         metrics_port = config.get("metrics_port")
         if metrics_port:
             logger.warning(METRICS_PORT_WARNING)
@@ -710,11 +759,29 @@ class ServerConfig(Config):
             # Turn the list into a set to improve lookup speed.
             self.next_link_domain_whitelist = set(next_link_domain_whitelist)
 
+        templates_config = config.get("templates") or {}
+        if not isinstance(templates_config, dict):
+            raise ConfigError("The 'templates' section must be a dictionary")
+
+        self.custom_template_directory: Optional[str] = templates_config.get(
+            "custom_template_directory"
+        )
+        if self.custom_template_directory is not None and not isinstance(
+            self.custom_template_directory, str
+        ):
+            raise ConfigError("'custom_template_directory' must be a string")
+
     def has_tls_listener(self) -> bool:
         return any(listener.tls for listener in self.listeners)
 
     def generate_config_section(
-        self, server_name, data_dir_path, open_private_ports, listeners, **kwargs
+        self,
+        server_name,
+        data_dir_path,
+        open_private_ports,
+        listeners,
+        config_dir_path,
+        **kwargs,
     ):
         ip_range_blacklist = "\n".join(
             "        #  - '%s'" % ip for ip in DEFAULT_IP_RANGE_BLACKLIST
@@ -858,20 +925,6 @@ class ServerConfig(Config):
           #
           #enabled: false
 
-          # Presence routers are third-party modules that can specify additional logic
-          # to where presence updates from users are routed.
-          #
-          presence_router:
-            # The custom module's class. Uncomment to use a custom presence router module.
-            #
-            #module: "my_custom_router.PresenceRouter"
-
-            # Configuration options of the custom module. Refer to your module's
-            # documentation for available options.
-            #
-            #config:
-            #  example_option: 'something'
-
         # Whether to require authentication to retrieve profile data (avatars,
         # display names) of other users through the client API. Defaults to
         # 'false'. Note that profile data is also available via the federation
@@ -959,6 +1012,8 @@ class ServerConfig(Config):
         # listed here, since they correspond to unroutable addresses.)
         #
         # This option replaces federation_ip_range_blacklist in Synapse v1.25.0.
+        #
+        # Note: The value is ignored when an HTTP proxy is in use
         #
         #ip_range_blacklist:
 %(ip_range_blacklist)s
@@ -1066,6 +1121,24 @@ class ServerConfig(Config):
           #- port: 9000
           #  bind_addresses: ['::1', '127.0.0.1']
           #  type: manhole
+
+        # Connection settings for the manhole
+        #
+        manhole_settings:
+          # The username for the manhole. This defaults to 'matrix'.
+          #
+          #username: manhole
+
+          # The password for the manhole. This defaults to 'rabbithole'.
+          #
+          #password: mypassword
+
+          # The private and public SSH key pair used to encrypt the manhole traffic.
+          # If these are left unset, then hardcoded and non-secret keys are used,
+          # which could allow traffic to be intercepted if sent over a public network.
+          #
+          #ssh_priv_key_path: %(config_dir_path)s/id_rsa
+          #ssh_pub_key_path: %(config_dir_path)s/id_rsa.pub
 
         # Forward extremities can build up in a room due to networking delays between
         # homeservers. Once this happens in a large room, calculation of the state of
@@ -1282,6 +1355,19 @@ class ServerConfig(Config):
         # all domains.
         #
         #next_link_domain_whitelist: ["matrix.org"]
+
+        # Templates to use when generating email or HTML page contents.
+        #
+        templates:
+          # Directory in which Synapse will try to find template files to use to generate
+          # email or HTML page contents.
+          # If not set, or a file is not found within the template directory, a default
+          # template from within the Synapse package will be used.
+          #
+          # See https://matrix-org.github.io/synapse/latest/templates.html for more
+          # information about using custom templates.
+          #
+          #custom_template_directory: /path/to/custom/templates/
         """
             % locals()
         )
@@ -1422,3 +1508,14 @@ def _warn_if_webclient_configured(listeners: Iterable[ListenerConfig]) -> None:
                 if name == "webclient":
                     logger.warning(NO_MORE_WEB_CLIENT_WARNING)
                     return
+
+
+_MANHOLE_SETTINGS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "username": {"type": "string"},
+        "password": {"type": "string"},
+        "ssh_priv_key_path": {"type": "string"},
+        "ssh_pub_key_path": {"type": "string"},
+    },
+}

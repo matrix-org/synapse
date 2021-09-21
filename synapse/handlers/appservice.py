@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Union
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Union
 
 from prometheus_client import Counter
 
@@ -58,7 +58,7 @@ class ApplicationServicesHandler:
         self.current_max = 0
         self.is_processing = False
 
-    def notify_interested_services(self, max_token: RoomStreamToken):
+    def notify_interested_services(self, max_token: RoomStreamToken) -> None:
         """Notifies (pushes) all application services interested in this event.
 
         Pushing is done asynchronously, so this method won't block for any
@@ -82,7 +82,7 @@ class ApplicationServicesHandler:
         self._notify_interested_services(max_token)
 
     @wrap_as_background_process("notify_interested_services")
-    async def _notify_interested_services(self, max_token: RoomStreamToken):
+    async def _notify_interested_services(self, max_token: RoomStreamToken) -> None:
         with Measure(self.clock, "notify_interested_services"):
             self.is_processing = True
             try:
@@ -100,7 +100,7 @@ class ApplicationServicesHandler:
                     for event in events:
                         events_by_room.setdefault(event.room_id, []).append(event)
 
-                    async def handle_event(event):
+                    async def handle_event(event: EventBase) -> None:
                         # Gather interested services
                         services = await self._get_services_for_event(event)
                         if len(services) == 0:
@@ -116,9 +116,9 @@ class ApplicationServicesHandler:
 
                         if not self.started_scheduler:
 
-                            async def start_scheduler():
+                            async def start_scheduler() -> None:
                                 try:
-                                    return await self.scheduler.start()
+                                    await self.scheduler.start()
                                 except Exception:
                                     logger.error("Application Services Failure")
 
@@ -131,11 +131,13 @@ class ApplicationServicesHandler:
 
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(event.event_id)
+                        assert ts is not None
+
                         synapse.metrics.event_processing_lag_by_event.labels(
                             "appservice_sender"
                         ).observe((now - ts) / 1000)
 
-                    async def handle_room_events(events):
+                    async def handle_room_events(events: Iterable[EventBase]) -> None:
                         for event in events:
                             await handle_event(event)
 
@@ -166,6 +168,7 @@ class ApplicationServicesHandler:
                     if events:
                         now = self.clock.time_msec()
                         ts = await self.store.get_received_ts(events[-1].event_id)
+                        assert ts is not None
 
                         synapse.metrics.event_processing_lag.labels(
                             "appservice_sender"
@@ -181,7 +184,7 @@ class ApplicationServicesHandler:
         stream_key: str,
         new_token: Optional[int],
         users: Optional[Collection[Union[str, UserID]]] = None,
-    ):
+    ) -> None:
         """This is called by the notifier in the background
         when a ephemeral event handled by the homeserver.
 
@@ -223,7 +226,7 @@ class ApplicationServicesHandler:
         stream_key: str,
         new_token: Optional[int],
         users: Collection[Union[str, UserID]],
-    ):
+    ) -> None:
         logger.debug("Checking interested services for %s" % (stream_key))
         with Measure(self.clock, "notify_interested_services_ephemeral"):
             for service in services:
@@ -392,9 +395,6 @@ class ApplicationServicesHandler:
                     protocols[p].append(info)
 
         def _merge_instances(infos: List[JsonDict]) -> JsonDict:
-            if not infos:
-                return {}
-
             # Merge the 'instances' lists of multiple results, but just take
             # the other fields from the first as they ought to be identical
             # copy the result so as not to corrupt the cached one
@@ -406,7 +406,9 @@ class ApplicationServicesHandler:
 
             return combined
 
-        return {p: _merge_instances(protocols[p]) for p in protocols.keys()}
+        return {
+            p: _merge_instances(protocols[p]) for p in protocols.keys() if protocols[p]
+        }
 
     async def _get_services_for_event(
         self, event: EventBase

@@ -33,6 +33,9 @@ DEFAULT_CONFIG = """\
 # 'name' gives the database engine to use: either 'sqlite3' (for SQLite) or
 # 'psycopg2' (for PostgreSQL).
 #
+# 'txn_limit' gives the maximum number of transactions to run per connection
+# before reconnecting. Defaults to 0, which means no limit.
+#
 # 'args' gives options which are passed through to the database engine,
 # except for options starting 'cp_', which are used to configure the Twisted
 # connection pool. For a reference to valid arguments, see:
@@ -53,6 +56,7 @@ DEFAULT_CONFIG = """\
 #
 #database:
 #  name: psycopg2
+#  txn_limit: 10000
 #  args:
 #    user: synapse_user
 #    password: secretpassword

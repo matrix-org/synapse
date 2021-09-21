@@ -19,7 +19,13 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Iterable, List, Optional, Set, Tuple
 
 from synapse import types
-from synapse.api.constants import AccountDataTypes, EventTypes, Membership
+from synapse.api.constants import (
+    AccountDataTypes,
+    EventContentFields,
+    EventTypes,
+    GuestAccess,
+    Membership,
+)
 from synapse.api.errors import (
     AuthError,
     Codes,
@@ -31,6 +37,7 @@ from synapse.api.ratelimiting import Ratelimiter
 from synapse.event_auth import get_named_level, get_power_level_event
 from synapse.events import EventBase
 from synapse.events.snapshot import EventContext
+from synapse.handlers.profile import MAX_AVATAR_URL_LEN, MAX_DISPLAYNAME_LEN
 from synapse.types import (
     JsonDict,
     Requester,
@@ -38,6 +45,7 @@ from synapse.types import (
     RoomID,
     StateMap,
     UserID,
+    create_requester,
     get_domain_from_id,
 )
 from synapse.util.async_helpers import Linearizer
@@ -64,6 +72,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.auth = hs.get_auth()
         self.state_handler = hs.get_state_handler()
         self.config = hs.config
+        self._server_name = hs.hostname
 
         self.federation_handler = hs.get_federation_handler()
         self.directory_handler = hs.get_directory_handler()
@@ -74,7 +83,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.account_data_handler = hs.get_account_data_handler()
         self.event_auth_handler = hs.get_event_auth_handler()
 
-        self.member_linearizer = Linearizer(name="member")
+        self.member_linearizer: Linearizer = Linearizer(name="member")
 
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
@@ -109,9 +118,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             burst_count=hs.config.ratelimiting.rc_invites_per_user.burst_count,
         )
 
-        # This is only used to get at ratelimit function, and
-        # maybe_kick_guest_users. It's fine there are multiple of these as
-        # it doesn't store state.
+        # This is only used to get at the ratelimit function. It's fine there are
+        # multiple of these as it doesn't store state.
         self.base_handler = BaseHandler(hs)
 
     @abc.abstractmethod
@@ -217,7 +225,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         room_id: Optional[str],
         n_invites: int,
         update: bool = True,
-    ):
+    ) -> None:
         """Ratelimit more than one invite sent by the given requester in the given room.
 
         Args:
@@ -241,7 +249,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         requester: Optional[Requester],
         room_id: Optional[str],
         invitee_user_id: str,
-    ):
+    ) -> None:
         """Ratelimit invites by room and by target user.
 
         If room ID is missing then we just rate limit by target user.
@@ -378,7 +386,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return result_event.event_id, result_event.internal_metadata.stream_ordering
 
     async def copy_room_tags_and_direct_to_room(
-        self, old_room_id, new_room_id, user_id
+        self, old_room_id: str, new_room_id: str, user_id: str
     ) -> None:
         """Copies the tags and direct room state from one room to another.
 
@@ -551,6 +559,20 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             content.pop("displayname", None)
             content.pop("avatar_url", None)
 
+        if len(content.get("displayname") or "") > MAX_DISPLAYNAME_LEN:
+            raise SynapseError(
+                400,
+                f"Displayname is too long (max {MAX_DISPLAYNAME_LEN})",
+                errcode=Codes.BAD_JSON,
+            )
+
+        if len(content.get("avatar_url") or "") > MAX_AVATAR_URL_LEN:
+            raise SynapseError(
+                400,
+                f"Avatar URL is too long (max {MAX_AVATAR_URL_LEN})",
+                errcode=Codes.BAD_JSON,
+            )
+
         effective_membership_state = action
         if action in ["kick", "unban"]:
             effective_membership_state = "leave"
@@ -646,7 +668,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     " (membership=%s)" % old_membership,
                     errcode=Codes.BAD_STATE,
                 )
-            if old_membership == "ban" and action != "unban":
+            if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
                 raise SynapseError(
                     403,
                     "Cannot %s user who was banned" % (action,),
@@ -1008,7 +1030,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         event: EventBase,
         context: EventContext,
         ratelimit: bool = True,
-    ):
+    ) -> None:
         """
         Change the membership status of a user in a room.
 
@@ -1075,9 +1097,61 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         return bool(
             guest_access
             and guest_access.content
-            and "guest_access" in guest_access.content
-            and guest_access.content["guest_access"] == "can_join"
+            and guest_access.content.get(EventContentFields.GUEST_ACCESS)
+            == GuestAccess.CAN_JOIN
         )
+
+    async def kick_guest_users(self, current_state: Iterable[EventBase]) -> None:
+        """Kick any local guest users from the room.
+
+        This is called when the room state changes from guests allowed to not-allowed.
+
+        Params:
+            current_state: the current state of the room. We will iterate this to look
+               for guest users to kick.
+        """
+        for member_event in current_state:
+            try:
+                if member_event.type != EventTypes.Member:
+                    continue
+
+                if not self.hs.is_mine_id(member_event.state_key):
+                    continue
+
+                if member_event.content["membership"] not in {
+                    Membership.JOIN,
+                    Membership.INVITE,
+                }:
+                    continue
+
+                if (
+                    "kind" not in member_event.content
+                    or member_event.content["kind"] != "guest"
+                ):
+                    continue
+
+                # We make the user choose to leave, rather than have the
+                # event-sender kick them. This is partially because we don't
+                # need to worry about power levels, and partially because guest
+                # users are a concept which doesn't hugely work over federation,
+                # and having homeservers have their own users leave keeps more
+                # of that decision-making and control local to the guest-having
+                # homeserver.
+                target_user = UserID.from_string(member_event.state_key)
+                requester = create_requester(
+                    target_user, is_guest=True, authenticated_entity=self._server_name
+                )
+                handler = self.hs.get_room_member_handler()
+                await handler.update_membership(
+                    requester,
+                    target_user,
+                    member_event.room_id,
+                    "leave",
+                    ratelimit=False,
+                    require_consent=False,
+                )
+            except Exception as e:
+                logger.exception("Error kicking guest user: %s" % (e,))
 
     async def lookup_room_alias(
         self, room_alias: RoomAlias
@@ -1237,6 +1311,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         if room_name_event:
             room_name = room_name_event.content.get("name", "")
 
+        room_type = None
+        room_create_event = room_state.get((EventTypes.Create, ""))
+        if room_create_event:
+            room_type = room_create_event.content.get(EventContentFields.ROOM_TYPE)
+
         room_join_rules = ""
         join_rules_event = room_state.get((EventTypes.JoinRules, ""))
         if join_rules_event:
@@ -1263,6 +1342,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             room_avatar_url=room_avatar_url,
             room_join_rules=room_join_rules,
             room_name=room_name,
+            room_type=room_type,
             inviter_display_name=inviter_display_name,
             inviter_avatar_url=inviter_avatar_url,
             id_access_token=id_access_token,
@@ -1326,7 +1406,6 @@ class RoomMemberMasterHandler(RoomMemberHandler):
 
         self.distributor = hs.get_distributor()
         self.distributor.declare("user_left_room")
-        self._server_name = hs.hostname
 
     async def _is_remote_room_too_complex(
         self, room_id: str, remote_room_hosts: List[str]

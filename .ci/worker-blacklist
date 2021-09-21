@@ -1,0 +1,2 @@
+# This file serves as a blacklist for SyTest tests that we expect will fail in
+# Synapse when run under worker mode. For more details, see sytest-blacklist.

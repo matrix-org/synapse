@@ -12,41 +12,40 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from synapse.http.server import JsonResource
+from typing import TYPE_CHECKING
+
+from synapse.http.server import HttpServer, JsonResource
 from synapse.rest import admin
-from synapse.rest.client import versions
-from synapse.rest.client.v1 import (
-    directory,
-    events,
-    initial_sync,
-    login as v1_login,
-    logout,
-    presence,
-    profile,
-    push_rule,
-    pusher,
-    room,
-    voip,
-)
-from synapse.rest.client.v2_alpha import (
+from synapse.rest.client import (
     account,
     account_data,
     account_validity,
     auth,
     capabilities,
     devices,
+    directory,
+    events,
     filter,
     groups,
+    initial_sync,
     keys,
     knock,
+    login as v1_login,
+    logout,
     notifications,
     openid,
     password_policy,
+    presence,
+    profile,
+    push_rule,
+    pusher,
     read_marker,
     receipts,
     register,
     relations,
     report_event,
+    room,
+    room_batch,
     room_keys,
     room_upgrade_rest_servlet,
     sendtodevice,
@@ -56,7 +55,12 @@ from synapse.rest.client.v2_alpha import (
     thirdparty,
     tokenrefresh,
     user_directory,
+    versions,
+    voip,
 )
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class ClientRestResource(JsonResource):
@@ -69,12 +73,12 @@ class ClientRestResource(JsonResource):
        * etc
     """
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         JsonResource.__init__(self, hs, canonical_json=False)
         self.register_servlets(self, hs)
 
     @staticmethod
-    def register_servlets(client_resource, hs):
+    def register_servlets(client_resource: HttpServer, hs: "HomeServer") -> None:
         versions.register_servlets(hs, client_resource)
 
         # Deprecated in r0
@@ -84,7 +88,6 @@ class ClientRestResource(JsonResource):
         # Partially deprecated in r0
         events.register_servlets(hs, client_resource)
 
-        # "v1" + "r0"
         room.register_servlets(hs, client_resource)
         v1_login.register_servlets(hs, client_resource)
         profile.register_servlets(hs, client_resource)
@@ -94,8 +97,6 @@ class ClientRestResource(JsonResource):
         pusher.register_servlets(hs, client_resource)
         push_rule.register_servlets(hs, client_resource)
         logout.register_servlets(hs, client_resource)
-
-        # "v2"
         sync.register_servlets(hs, client_resource)
         filter.register_servlets(hs, client_resource)
         account.register_servlets(hs, client_resource)
@@ -117,6 +118,7 @@ class ClientRestResource(JsonResource):
         user_directory.register_servlets(hs, client_resource)
         groups.register_servlets(hs, client_resource)
         room_upgrade_rest_servlet.register_servlets(hs, client_resource)
+        room_batch.register_servlets(hs, client_resource)
         capabilities.register_servlets(hs, client_resource)
         account_validity.register_servlets(hs, client_resource)
         relations.register_servlets(hs, client_resource)

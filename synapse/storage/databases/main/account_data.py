@@ -494,7 +494,7 @@ class AccountDataWorkerStore(SQLBaseStore):
             txn,
             table="ignored_users",
             column="ignored_user_id",
-            iterable=previously_ignored_users - currently_ignored_users,
+            values=previously_ignored_users - currently_ignored_users,
             keyvalues={"ignorer_user_id": user_id},
         )
 

@@ -1,0 +1,1 @@
+Fix GitHub Actions config so we can run sytest on synapse from parallel branches.
