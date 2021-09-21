@@ -30,7 +30,7 @@ jobs:
       - run: pip install tox
       - run: tox -e py
         env:
-          TRIAL_FLAGS: "--jobs=2"
+          TRIAL_FLAGS: "--jobs=4"
 
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact

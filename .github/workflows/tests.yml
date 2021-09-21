@@ -113,7 +113,7 @@ jobs:
         run: until pg_isready -h localhost; do sleep 1; done
       - run: tox -e py,combine
         env:
-          TRIAL_FLAGS: "--jobs=2"
+          TRIAL_FLAGS: "--jobs=4"
           SYNAPSE_POSTGRES: ${{ matrix.database == 'postgres' || '' }}
           SYNAPSE_POSTGRES_HOST: localhost
           SYNAPSE_POSTGRES_USER: postgres
@@ -141,7 +141,7 @@ jobs:
           workdir: /github/workspace
           entrypoint: .ci/scripts/test_old_deps.sh
         env:
-          TRIAL_FLAGS: "--jobs=2"
+          TRIAL_FLAGS: "--jobs=4"
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
@@ -171,7 +171,7 @@ jobs:
       - run: pip install tox
       - run: tox -e py,combine
         env:
-          TRIAL_FLAGS: "--jobs=2"
+          TRIAL_FLAGS: "--jobs=4"
       - name: Dump logs
         # Note: Dumps to workflow logs instead of using actions/upload-artifact
         #       This keeps logs colocated with failing jobs
