@@ -73,6 +73,7 @@ OG_TAG_NAME_MAXLEN = 50
 OG_TAG_VALUE_MAXLEN = 1000
 
 ONE_HOUR = 60 * 60 * 1000
+ONE_DAY = 24 * ONE_HOUR
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
@@ -265,8 +266,8 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         logger.debug("got media_info of '%s'", media_info)
 
-        # The timestamp of when this media expires.
-        expiration_ts_ms = media_info.expires + media_info.created_ts_ms
+        # The number of milliseconds that the response should be considered valid.
+        expiration_ms = media_info.expires
 
         if _is_media(media_info.media_type):
             file_id = media_info.filesystem_id
@@ -311,7 +312,7 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             # Use the cache age from the oEmbed result, instead of the HTTP response.
             if oembed_response.cache_age is not None:
-                expiration_ts_ms = oembed_response.cache_age + media_info.created_ts_ms
+                expiration_ms = oembed_response.cache_age
 
             await self._precache_image_url(user, media_info, og)
 
@@ -335,12 +336,15 @@ class PreviewUrlResource(DirectServeJsonResource):
 
         jsonog = json_encoder.encode(og)
 
+        # Cap the amount of time to consider a response valid.
+        expiration_ms = min(expiration_ms, ONE_DAY)
+
         # store OG in history-aware DB cache
         await self.store.store_url_cache(
             url,
             media_info.response_code,
             media_info.etag,
-            expiration_ts_ms,
+            media_info.created_ts_ms + expiration_ms,
             jsonog,
             media_info.filesystem_id,
             media_info.created_ts_ms,
