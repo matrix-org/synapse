@@ -37,7 +37,7 @@ class _EventSourcesInner:
 
     def get_sources(
         self,
-    ) -> Generator[
+    ) -> Iterator[
         Tuple[
             str,
             Union[
@@ -48,8 +48,6 @@ class _EventSourcesInner:
                 AccountDataEventSource,
             ],
         ],
-        None,
-        None,
     ]:
         for attribute in _EventSourcesInner.__attrs_attrs__:  # type: ignore[attr-defined]
             yield attribute.name, getattr(self, attribute.name)
