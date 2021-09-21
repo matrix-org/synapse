@@ -210,7 +210,7 @@ class AuthHandler(BaseHandler):
 
         self.password_providers = [
             PasswordProvider.load(module, config, account_handler)
-            for module, config in hs.config.password_providers
+            for module, config in hs.config.authproviders.password_providers
         ]
 
         logger.info("Extra password_providers: %s", self.password_providers)
