@@ -21,6 +21,7 @@ from synapse.replication.http.account_data import (
     ReplicationRoomAccountDataRestServlet,
     ReplicationUserAccountDataRestServlet,
 )
+from synapse.streams import EventSource
 from synapse.types import JsonDict, UserID
 
 if TYPE_CHECKING:
@@ -163,7 +164,7 @@ class AccountDataHandler:
             return response["max_stream_id"]
 
 
-class AccountDataEventSource:
+class AccountDataEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 

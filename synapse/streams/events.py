@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import TYPE_CHECKING, Iterator, Tuple, Union
+from typing import TYPE_CHECKING, Iterator, Tuple
 
 import attr
 
@@ -21,6 +21,7 @@ from synapse.handlers.presence import PresenceEventSource
 from synapse.handlers.receipts import ReceiptEventSource
 from synapse.handlers.room import RoomEventSource
 from synapse.handlers.typing import TypingNotificationEventSource
+from synapse.streams import EventSource
 from synapse.types import StreamToken
 
 if TYPE_CHECKING:
@@ -35,20 +36,7 @@ class _EventSourcesInner:
     receipt: ReceiptEventSource
     account_data: AccountDataEventSource
 
-    def get_sources(
-        self,
-    ) -> Iterator[
-        Tuple[
-            str,
-            Union[
-                RoomEventSource,
-                PresenceEventSource,
-                TypingNotificationEventSource,
-                ReceiptEventSource,
-                AccountDataEventSource,
-            ],
-        ],
-    ]:
+    def get_sources(self) -> Iterator[Tuple[str, EventSource]]:
         for attribute in _EventSourcesInner.__attrs_attrs__:  # type: ignore[attr-defined]
             yield attribute.name, getattr(self, attribute.name)
 

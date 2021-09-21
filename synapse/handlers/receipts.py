@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING, Iterable, List, Optional, Tuple
 from synapse.api.constants import ReadReceiptEventFields
 from synapse.appservice import ApplicationService
 from synapse.handlers._base import BaseHandler
+from synapse.streams import EventSource
 from synapse.types import JsonDict, ReadReceipt, UserID, get_domain_from_id
 
 if TYPE_CHECKING:
@@ -162,7 +163,7 @@ class ReceiptsHandler(BaseHandler):
             await self.federation_sender.send_read_receipt(receipt)
 
 
-class ReceiptEventSource:
+class ReceiptEventSource(EventSource[int, JsonDict]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
         self.config = hs.config
