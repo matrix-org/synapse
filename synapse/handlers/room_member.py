@@ -668,7 +668,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                     " (membership=%s)" % old_membership,
                     errcode=Codes.BAD_STATE,
                 )
-            if old_membership == "ban" and action != "unban":
+            if old_membership == "ban" and action not in ["ban", "unban", "leave"]:
                 raise SynapseError(
                     403,
                     "Cannot %s user who was banned" % (action,),

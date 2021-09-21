@@ -26,7 +26,7 @@ from twisted.internet import defer
 
 import synapse.rest.admin
 from synapse.api.constants import EventContentFields, EventTypes, Membership
-from synapse.api.errors import HttpResponseException
+from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, room, sync
@@ -375,6 +375,91 @@ class RoomPermissionsTestCase(RoomBase):
             targ=self.rmcreator_id,
             membership=Membership.LEAVE,
             expect_code=403,
+        )
+
+    # tests the "from banned" line from the table in https://spec.matrix.org/unstable/client-server-api/#mroommember
+    def test_member_event_from_ban(self):
+        room = self.created_rmid
+        self.helper.invite(room=room, src=self.rmcreator_id, targ=self.user_id)
+        self.helper.join(room=room, user=self.user_id)
+
+        other = "@burgundy:red"
+
+        # User cannot ban other since they do not have required power level
+        self.helper.change_membership(
+            room=room,
+            src=self.user_id,
+            targ=other,
+            membership=Membership.BAN,
+            expect_code=403,  # expect failure
+            expect_errcode=Codes.FORBIDDEN,
+        )
+
+        # Admin bans other
+        self.helper.change_membership(
+            room=room,
+            src=self.rmcreator_id,
+            targ=other,
+            membership=Membership.BAN,
+            expect_code=200,
+        )
+
+        # from ban to invite: Must never happen.
+        self.helper.change_membership(
+            room=room,
+            src=self.rmcreator_id,
+            targ=other,
+            membership=Membership.INVITE,
+            expect_code=403,  # expect failure
+            expect_errcode=Codes.BAD_STATE,
+        )
+
+        # from ban to join: Must never happen.
+        self.helper.change_membership(
+            room=room,
+            src=other,
+            targ=other,
+            membership=Membership.JOIN,
+            expect_code=403,  # expect failure
+            expect_errcode=Codes.BAD_STATE,
+        )
+
+        # from ban to ban: No change.
+        self.helper.change_membership(
+            room=room,
+            src=self.rmcreator_id,
+            targ=other,
+            membership=Membership.BAN,
+            expect_code=200,
+        )
+
+        # from ban to knock: Must never happen.
+        self.helper.change_membership(
+            room=room,
+            src=self.rmcreator_id,
+            targ=other,
+            membership=Membership.KNOCK,
+            expect_code=403,  # expect failure
+            expect_errcode=Codes.BAD_STATE,
+        )
+
+        # User cannot unban other since they do not have required power level
+        self.helper.change_membership(
+            room=room,
+            src=self.user_id,
+            targ=other,
+            membership=Membership.LEAVE,
+            expect_code=403,  # expect failure
+            expect_errcode=Codes.FORBIDDEN,
+        )
+
+        # from ban to leave: User was unbanned.
+        self.helper.change_membership(
+            room=room,
+            src=self.rmcreator_id,
+            targ=other,
+            membership=Membership.LEAVE,
+            expect_code=200,
         )
 
 
