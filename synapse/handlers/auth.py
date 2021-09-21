@@ -739,7 +739,7 @@ class AuthHandler(BaseHandler):
         return canonical_id
 
     def _get_params_recaptcha(self) -> dict:
-        return {"public_key": self.hs.config.recaptcha_public_key}
+        return {"public_key": self.hs.config.captcha.recaptcha_public_key}
 
     def _get_params_terms(self) -> dict:
         return {

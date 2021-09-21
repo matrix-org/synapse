@@ -47,7 +47,7 @@ class AuthRestServlet(RestServlet):
         self.auth = hs.get_auth()
         self.auth_handler = hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
-        self.recaptcha_template = hs.config.recaptcha_template
+        self.recaptcha_template = hs.config.captcha.recaptcha_template
         self.terms_template = hs.config.terms_template
         self.registration_token_template = hs.config.registration_token_template
         self.success_template = hs.config.fallback_success_template
@@ -62,7 +62,7 @@ class AuthRestServlet(RestServlet):
                 session=session,
                 myurl="%s/r0/auth/%s/fallback/web"
                 % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                sitekey=self.hs.config.recaptcha_public_key,
+                sitekey=self.hs.config.captcha.recaptcha_public_key,
             )
         elif stagetype == LoginType.TERMS:
             html = self.terms_template.render(
@@ -118,7 +118,7 @@ class AuthRestServlet(RestServlet):
                     session=session,
                     myurl="%s/r0/auth/%s/fallback/web"
                     % (CLIENT_API_PREFIX, LoginType.RECAPTCHA),
-                    sitekey=self.hs.config.recaptcha_public_key,
+                    sitekey=self.hs.config.captcha.recaptcha_public_key,
                     error=e.msg,
                 )
             else:

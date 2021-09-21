@@ -902,7 +902,7 @@ def _calculate_registration_flows(
             flow.insert(0, LoginType.TERMS)
 
     # Prepend recaptcha to all flows if we're requiring captcha
-    if config.enable_registration_captcha:
+    if config.captcha.enable_registration_captcha:
         for flow in flows:
             flow.insert(0, LoginType.RECAPTCHA)
 

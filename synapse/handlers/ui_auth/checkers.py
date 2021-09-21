@@ -82,10 +82,10 @@ class RecaptchaAuthChecker(UserInteractiveAuthChecker):
 
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self._enabled = bool(hs.config.recaptcha_private_key)
+        self._enabled = bool(hs.config.captcha.recaptcha_private_key)
         self._http_client = hs.get_proxied_http_client()
-        self._url = hs.config.recaptcha_siteverify_api
-        self._secret = hs.config.recaptcha_private_key
+        self._url = hs.config.captcha.recaptcha_siteverify_api
+        self._secret = hs.config.captcha.recaptcha_private_key
 
     def is_enabled(self) -> bool:
         return self._enabled
