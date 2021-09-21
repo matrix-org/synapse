@@ -20,7 +20,16 @@ import math
 import random
 import string
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 from synapse.api.constants import (
     EventContentFields,
@@ -47,6 +56,7 @@ from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
+from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
     MutableStateMap,
@@ -1173,7 +1183,7 @@ class RoomContextHandler:
         return results
 
 
-class RoomEventSource:
+class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
@@ -1181,8 +1191,8 @@ class RoomEventSource:
         self,
         user: UserID,
         from_key: RoomStreamToken,
-        limit: int,
-        room_ids: List[str],
+        limit: Optional[int],
+        room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:

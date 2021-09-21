@@ -125,7 +125,7 @@ class ListRoomRestServlet(RestServlet):
                 errcode=Codes.INVALID_PARAM,
             )
 
-        search_term = parse_string(request, "search_term")
+        search_term = parse_string(request, "search_term", encoding="utf-8")
         if search_term == "":
             raise SynapseError(
                 400,

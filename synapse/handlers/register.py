@@ -295,11 +295,10 @@ class RegistrationHandler(BaseHandler):
                 shadow_banned=shadow_banned,
             )
 
-            if self.hs.config.user_directory_search_all_users:
-                profile = await self.store.get_profileinfo(localpart)
-                await self.user_directory_handler.handle_local_profile_change(
-                    user_id, profile
-                )
+            profile = await self.store.get_profileinfo(localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         else:
             # autogen a sequential user ID

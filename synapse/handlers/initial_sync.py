@@ -125,7 +125,7 @@ class InitialSyncHandler(BaseHandler):
 
         now_token = self.hs.get_event_sources().get_current_token()
 
-        presence_stream = self.hs.get_event_sources().sources["presence"]
+        presence_stream = self.hs.get_event_sources().sources.presence
         presence, _ = await presence_stream.get_new_events(
             user, from_key=None, include_offline=False
         )
