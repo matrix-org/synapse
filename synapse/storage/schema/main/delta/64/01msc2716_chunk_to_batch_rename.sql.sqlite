@@ -15,7 +15,7 @@
 
 -- Re-create the insertion_events table since SQLite doesn't support better
 -- renames for columns (next_chunk_id -> next_batch_id)
-DROP TABLE insertion_events
+DROP TABLE insertion_events;
 CREATE TABLE IF NOT EXISTS insertion_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
@@ -26,7 +26,7 @@ CREATE INDEX IF NOT EXISTS insertion_events_next_batch_id ON insertion_events(ne
 
 -- Re-create the chunk_events table since SQLite doesn't support better renames
 -- for columns (chunk_id -> batch_id)
-DROP TABLE chunk_events
+DROP TABLE chunk_events;
 CREATE TABLE IF NOT EXISTS batch_events(
     event_id TEXT NOT NULL,
     room_id TEXT NOT NULL,
