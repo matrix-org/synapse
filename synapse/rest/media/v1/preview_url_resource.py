@@ -532,7 +532,7 @@ class PreviewUrlResource(DirectServeJsonResource):
         # These may be cached for a bit on the client (i.e., they
         # may have a room open with a preview url thing open).
         # So we wait a couple of days before deleting, just in case.
-        expire_before = now - 2 * 24 * ONE_HOUR
+        expire_before = now - 2 * ONE_DAY
         media_ids = await self.store.get_url_cache_media_before(expire_before)
 
         removed_media = []
