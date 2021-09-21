@@ -365,7 +365,7 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         if state_filter_left_over.types or state_filter_left_over.include_others:
             # we need to fire off a request for remaining state
-            # ostd log contexts?
+            # REVIEW log contexts?
             fired_off_requests.append(
                 make_deferred_yieldable(
                     self._get_state_for_group_fire_request(group, state_filter)
@@ -374,14 +374,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
 
         for request in reusable_requests:
             # Observe the requests that we want to re-use
-            # ostd log contexts?
+            # REVIEW log contexts?
             fired_off_requests.append(make_deferred_yieldable(request.observe()))
 
-        # ostd is this right wrt. log context rules?
+        # REVIEW is this right wrt. log context rules?
         gathered = await make_deferred_yieldable(
-            defer.gatherResults(
-                fired_off_requests, consumeErrors=True  # ostd not sure this is wanted
-            )
+            defer.gatherResults(fired_off_requests, consumeErrors=True)
         )
 
         # assemble our result.
@@ -441,11 +439,12 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
                 )
             )
 
-        # ostd suspicious log context rules
+        # REVIEW suspicious log context rules
+        # REVIEW am I right in thinking that we want consumeErrors=True?
+        #       My understanding is that it just prevents logspam, but it will
+        #       still fail on the first error response?
         results_from_requests = await make_deferred_yieldable(
-            defer.gatherResults(
-                deferred_requests, consumeErrors=False
-            )  # ostd consumeErrors??
+            defer.gatherResults(deferred_requests, consumeErrors=True)
         )
 
         for group, group_result in zip(incomplete_groups, results_from_requests):
