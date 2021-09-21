@@ -1,1 +1,1 @@
-Fix a bug where sending an `m.room.text` event containing a null byte would cause an internal server error.
+Fix a long-standing bug where an `m.room.text` event containing a null byte would cause an internal server error.

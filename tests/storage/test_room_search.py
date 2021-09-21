@@ -34,18 +34,18 @@ class NullByteInsertionTest(HomeserverTestCase):
         Ensure this doesn't break anything.
         """
 
-        # register a user and create a room, create some messages
+        # Register a user and create a room, create some messages
         self.register_user("alice", "password")
         access_token = self.login("alice", "password")
-        room_id = self.helper.create_room_as("alice", True, "1", access_token)
+        room_id = self.helper.create_room_as("alice", tok=access_token)
 
-        # send messages and ensure they don't cause an internal server
+        # Send messages and ensure they don't cause an internal server
         # error
         for body in ["hi\u0000bob", "another message", "hi alice"]:
             response = self.helper.send(room_id, body, tok=access_token)
             self.assertIn("event_id", response)
 
-        # check that search still works with the message where the null byte was replaced
+        # Check that search works for the message where the null byte was replaced
         store = self.hs.get_datastore()
         result = self.get_success(
             store.search_msgs([room_id], "hi bob", ["content.body"])
@@ -55,7 +55,7 @@ class NullByteInsertionTest(HomeserverTestCase):
             self.assertIn("hi", result.get("highlights"))
             self.assertIn("bob", result.get("highlights"))
 
-        # check that search still works with another unrelated message
+        # Check that search works for an unrelated message
         result = self.get_success(
             store.search_msgs([room_id], "another", ["content.body"])
         )
@@ -63,8 +63,8 @@ class NullByteInsertionTest(HomeserverTestCase):
         if isinstance(store.database_engine, PostgresEngine):
             self.assertIn("another", result.get("highlights"))
 
-        # check that search still works when given a search term that overlaps
-        # with the message that we replaced the null byte in and an unrelated one
+        # Check that search works for a search term that overlaps with the message
+        # containing a null byte and an unrelated message.
         result = self.get_success(store.search_msgs([room_id], "hi", ["content.body"]))
         self.assertEquals(result.get("count"), 2)
         result = self.get_success(

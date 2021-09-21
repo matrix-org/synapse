@@ -32,12 +32,13 @@ SearchEntry = namedtuple(
 )
 
 
-class SearchWorkerStore(SQLBaseStore):
-    def _clean_value_for_search(self, value: str) -> str:
-        """Replaces null code points in string as postgres/sql do not
-        like the insertion of strings with null code points"""
-        return value.replace("\u0000", " ")
+def _clean_value_for_search(value: str) -> str:
+    """Replaces null code points in string as postgres/sql do not
+    like the insertion of strings with null code points"""
+    return value.replace("\u0000", " ")
 
+
+class SearchWorkerStore(SQLBaseStore):
     def store_search_entries_txn(
         self, txn: LoggingTransaction, entries: Iterable[SearchEntry]
     ) -> None:
@@ -61,7 +62,7 @@ class SearchWorkerStore(SQLBaseStore):
                     entry.event_id,
                     entry.room_id,
                     entry.key,
-                    self._clean_value_for_search(entry.value),
+                    _clean_value_for_search(entry.value),
                     entry.stream_ordering,
                     entry.origin_server_ts,
                 )
@@ -80,7 +81,7 @@ class SearchWorkerStore(SQLBaseStore):
                     entry.event_id,
                     entry.room_id,
                     entry.key,
-                    self._clean_value_for_search(entry.value),
+                    _clean_value_for_search(entry.value),
                 )
                 for entry in entries
             )
@@ -657,7 +658,7 @@ class SearchStore(SearchBackgroundUpdateStore):
                 for key in ("body", "name", "topic"):
                     v = event.content.get(key, None)
                     if v:
-                        v = self._clean_value_for_search(v)
+                        v = _clean_value_for_search(v)
                         values.append(v)
 
                 if not values:
