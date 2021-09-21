@@ -77,7 +77,7 @@ class LoginRestServlet(RestServlet):
 
         # SSO configuration.
         self.saml2_enabled = hs.config.saml2_enabled
-        self.cas_enabled = hs.config.cas_enabled
+        self.cas_enabled = hs.config.cas.cas_enabled
         self.oidc_enabled = hs.config.oidc_enabled
         self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
@@ -559,7 +559,7 @@ def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     if hs.config.access_token_lifetime is not None:
         RefreshTokenServlet(hs).register(http_server)
     SsoRedirectServlet(hs).register(http_server)
-    if hs.config.cas_enabled:
+    if hs.config.cas.cas_enabled:
         CasTicketServlet(hs).register(http_server)
 
 
