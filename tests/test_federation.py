@@ -76,9 +76,18 @@ class MessageAcceptTests(unittest.HomeserverTestCase):
 
         self.handler = self.homeserver.get_federation_handler()
         federation_event_handler = self.homeserver.get_federation_event_handler()
-        federation_event_handler._check_event_auth = lambda origin, event, context, state, claimed_auth_event_map, backfilled: succeed(
-            context
-        )
+
+        async def _check_event_auth(
+            origin,
+            event,
+            context,
+            state=None,
+            claimed_auth_event_map=None,
+            backfilled=False,
+        ):
+            return context
+
+        federation_event_handler._check_event_auth = _check_event_auth
         self.client = self.homeserver.get_federation_client()
         self.client._check_sigs_and_hash_and_fetch = lambda dest, pdus, **k: succeed(
             pdus

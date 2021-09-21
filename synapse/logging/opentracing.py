@@ -236,8 +236,17 @@ except ImportError:
 try:
     from rust_python_jaeger_reporter import Reporter
 
+    # jaeger-client 4.7.0 requires that reporters inherit from BaseReporter, which
+    # didn't exist before that version.
+    try:
+        from jaeger_client.reporter import BaseReporter
+    except ImportError:
+
+        class BaseReporter:  # type: ignore[no-redef]
+            pass
+
     @attr.s(slots=True, frozen=True)
-    class _WrappedRustReporter:
+    class _WrappedRustReporter(BaseReporter):
         """Wrap the reporter to ensure `report_span` never throws."""
 
         _reporter = attr.ib(type=Reporter, default=attr.Factory(Reporter))
@@ -374,7 +383,7 @@ def init_tracer(hs: "HomeServer"):
 
     config = JaegerConfig(
         config=hs.config.jaeger_config,
-        service_name=f"{hs.config.server_name} {hs.get_instance_name()}",
+        service_name=f"{hs.config.server.server_name} {hs.get_instance_name()}",
         scope_manager=LogContextScopeManager(hs.config),
         metrics_factory=PrometheusMetricsFactory(),
     )
@@ -382,6 +391,7 @@ def init_tracer(hs: "HomeServer"):
     # If we have the rust jaeger reporter available let's use that.
     if RustReporter:
         logger.info("Using rust_python_jaeger_reporter library")
+        assert config.sampler is not None
         tracer = config.create_tracer(RustReporter(), config.sampler)
         opentracing.set_global_tracer(tracer)
     else:

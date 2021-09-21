@@ -13,14 +13,20 @@
 # limitations under the License.
 
 import logging
-from typing import Tuple
+from typing import TYPE_CHECKING, Awaitable, Tuple
 
 from synapse.http import servlet
+from synapse.http.server import HttpServer
 from synapse.http.servlet import assert_params_in_dict, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.logging.opentracing import set_tag, trace
 from synapse.rest.client.transactions import HttpTransactionCache
+from synapse.types import JsonDict
 
 from ._base import client_patterns
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +36,7 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         "/sendToDevice/(?P<message_type>[^/]*)/(?P<txn_id>[^/]*)$"
     )
 
-    def __init__(self, hs):
-        """
-        Args:
-            hs (synapse.server.HomeServer): server
-        """
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
         self.hs = hs
         self.auth = hs.get_auth()
@@ -42,14 +44,18 @@ class SendToDeviceRestServlet(servlet.RestServlet):
         self.device_message_handler = hs.get_device_message_handler()
 
     @trace(opname="sendToDevice")
-    def on_PUT(self, request, message_type, txn_id):
+    def on_PUT(
+        self, request: SynapseRequest, message_type: str, txn_id: str
+    ) -> Awaitable[Tuple[int, JsonDict]]:
         set_tag("message_type", message_type)
         set_tag("txn_id", txn_id)
         return self.txns.fetch_or_execute_request(
             request, self._put, request, message_type, txn_id
         )
 
-    async def _put(self, request, message_type, txn_id):
+    async def _put(
+        self, request: SynapseRequest, message_type: str, txn_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
         content = parse_json_object_from_request(request)
@@ -59,9 +65,8 @@ class SendToDeviceRestServlet(servlet.RestServlet):
             requester, message_type, content["messages"]
         )
 
-        response: Tuple[int, dict] = (200, {})
-        return response
+        return 200, {}
 
 
-def register_servlets(hs, http_server):
+def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:
     SendToDeviceRestServlet(hs).register(http_server)

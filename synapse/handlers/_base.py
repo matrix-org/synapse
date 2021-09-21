@@ -15,10 +15,7 @@
 import logging
 from typing import TYPE_CHECKING, Optional
 
-import synapse.types
-from synapse.api.constants import EventTypes, Membership
 from synapse.api.ratelimiting import Ratelimiter
-from synapse.types import UserID
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -48,16 +45,16 @@ class BaseHandler:
         self.request_ratelimiter = Ratelimiter(
             store=self.store, clock=self.clock, rate_hz=0, burst_count=0
         )
-        self._rc_message = self.hs.config.rc_message
+        self._rc_message = self.hs.config.ratelimiting.rc_message
 
         # Check whether ratelimiting room admin message redaction is enabled
         # by the presence of rate limits in the config
-        if self.hs.config.rc_admin_redaction:
+        if self.hs.config.ratelimiting.rc_admin_redaction:
             self.admin_redaction_ratelimiter: Optional[Ratelimiter] = Ratelimiter(
                 store=self.store,
                 clock=self.clock,
-                rate_hz=self.hs.config.rc_admin_redaction.per_second,
-                burst_count=self.hs.config.rc_admin_redaction.burst_count,
+                rate_hz=self.hs.config.ratelimiting.rc_admin_redaction.per_second,
+                burst_count=self.hs.config.ratelimiting.rc_admin_redaction.burst_count,
             )
         else:
             self.admin_redaction_ratelimiter = None
@@ -115,68 +112,3 @@ class BaseHandler:
                 burst_count=burst_count,
                 update=update,
             )
-
-    async def maybe_kick_guest_users(self, event, context=None):
-        # Technically this function invalidates current_state by changing it.
-        # Hopefully this isn't that important to the caller.
-        if event.type == EventTypes.GuestAccess:
-            guest_access = event.content.get("guest_access", "forbidden")
-            if guest_access != "can_join":
-                if context:
-                    current_state_ids = await context.get_current_state_ids()
-                    current_state_dict = await self.store.get_events(
-                        list(current_state_ids.values())
-                    )
-                    current_state = list(current_state_dict.values())
-                else:
-                    current_state_map = await self.state_handler.get_current_state(
-                        event.room_id
-                    )
-                    current_state = list(current_state_map.values())
-
-                logger.info("maybe_kick_guest_users %r", current_state)
-                await self.kick_guest_users(current_state)
-
-    async def kick_guest_users(self, current_state):
-        for member_event in current_state:
-            try:
-                if member_event.type != EventTypes.Member:
-                    continue
-
-                target_user = UserID.from_string(member_event.state_key)
-                if not self.hs.is_mine(target_user):
-                    continue
-
-                if member_event.content["membership"] not in {
-                    Membership.JOIN,
-                    Membership.INVITE,
-                }:
-                    continue
-
-                if (
-                    "kind" not in member_event.content
-                    or member_event.content["kind"] != "guest"
-                ):
-                    continue
-
-                # We make the user choose to leave, rather than have the
-                # event-sender kick them. This is partially because we don't
-                # need to worry about power levels, and partially because guest
-                # users are a concept which doesn't hugely work over federation,
-                # and having homeservers have their own users leave keeps more
-                # of that decision-making and control local to the guest-having
-                # homeserver.
-                requester = synapse.types.create_requester(
-                    target_user, is_guest=True, authenticated_entity=self.server_name
-                )
-                handler = self.hs.get_room_member_handler()
-                await handler.update_membership(
-                    requester,
-                    target_user,
-                    member_event.room_id,
-                    "leave",
-                    ratelimit=False,
-                    require_consent=False,
-                )
-            except Exception as e:
-                logger.exception("Error kicking guest user: %s" % (e,))
