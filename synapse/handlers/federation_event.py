@@ -149,7 +149,7 @@ class FederationEventHandler:
         self._ephemeral_messages_enabled = hs.config.server.enable_ephemeral_messages
 
         self._send_events = ReplicationFederationSendEventsRestServlet.make_client(hs)
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._user_device_resync = (
                 ReplicationUserDevicesResyncRestServlet.make_client(hs)
             )
@@ -909,11 +909,17 @@ class FederationEventHandler:
             context = await self._state_handler.compute_event_context(
                 event, old_state=state
             )
-            await self._auth_and_persist_event(
-                origin, event, context, state=state, backfilled=backfilled
+            context = await self._check_event_auth(
+                origin,
+                event,
+                context,
+                state=state,
+                backfilled=backfilled,
             )
         except AuthError as e:
             raise FederationError("ERROR", e.code, e.msg, affected=event.event_id)
+
+        await self._run_push_actions_and_persist_event(event, context, backfilled)
 
         if backfilled:
             return
@@ -1003,14 +1009,14 @@ class FederationEventHandler:
             await self._store.mark_remote_user_device_cache_as_stale(sender)
 
             # Immediately attempt a resync in the background
-            if self._config.worker_app:
+            if self._config.worker.worker_app:
                 await self._user_device_resync(user_id=sender)
             else:
                 await self._device_list_updater.user_device_resync(sender)
         except Exception:
             logger.exception("Failed to resync device for %s", sender)
 
-    async def _handle_marker_event(self, origin: str, marker_event: EventBase):
+    async def _handle_marker_event(self, origin: str, marker_event: EventBase) -> None:
         """Handles backfilling the insertion event when we receive a marker
         event that points to one.
 
@@ -1103,7 +1109,7 @@ class FederationEventHandler:
 
         event_map: Dict[str, EventBase] = {}
 
-        async def get_event(event_id: str):
+        async def get_event(event_id: str) -> None:
             with nested_logging_context(event_id):
                 try:
                     event = await self._federation_client.get_pdu(
@@ -1212,7 +1218,7 @@ class FederationEventHandler:
         if not event_infos:
             return
 
-        async def prep(ev_info: _NewEventInfo):
+        async def prep(ev_info: _NewEventInfo) -> EventContext:
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
                 res = await self._state_handler.compute_event_context(event)
@@ -1238,51 +1244,6 @@ class FederationEventHandler:
                 for ev_info, context in zip(event_infos, contexts)
             ],
         )
-
-    async def _auth_and_persist_event(
-        self,
-        origin: str,
-        event: EventBase,
-        context: EventContext,
-        state: Optional[Iterable[EventBase]] = None,
-        claimed_auth_event_map: Optional[StateMap[EventBase]] = None,
-        backfilled: bool = False,
-    ) -> None:
-        """
-        Process an event by performing auth checks and then persisting to the database.
-
-        Args:
-            origin: The host the event originates from.
-            event: The event itself.
-            context:
-                The event context.
-
-            state:
-                The state events used to check the event for soft-fail. If this is
-                not provided the current state events will be used.
-
-            claimed_auth_event_map:
-                A map of (type, state_key) => event for the event's claimed auth_events.
-                Possibly incomplete, and possibly including events that are not yet
-                persisted, or authed, or in the right room.
-
-                Only populated when populating outliers.
-
-            backfilled: True if the event was backfilled.
-        """
-        # claimed_auth_event_map should be given iff the event is an outlier
-        assert bool(claimed_auth_event_map) == event.internal_metadata.outlier
-
-        context = await self._check_event_auth(
-            origin,
-            event,
-            context,
-            state=state,
-            claimed_auth_event_map=claimed_auth_event_map,
-            backfilled=backfilled,
-        )
-
-        await self._run_push_actions_and_persist_event(event, context, backfilled)
 
     async def _check_event_auth(
         self,
@@ -1558,39 +1519,45 @@ class FederationEventHandler:
                     event.room_id, [e.event_id for e in remote_auth_chain]
                 )
 
-                for e in remote_auth_chain:
-                    if e.event_id in seen_remotes:
+                for auth_event in remote_auth_chain:
+                    if auth_event.event_id in seen_remotes:
                         continue
 
-                    if e.event_id == event.event_id:
+                    if auth_event.event_id == event.event_id:
                         continue
 
                     try:
-                        auth_ids = e.auth_event_ids()
+                        auth_ids = auth_event.auth_event_ids()
                         auth = {
                             (e.type, e.state_key): e
                             for e in remote_auth_chain
                             if e.event_id in auth_ids or e.type == EventTypes.Create
                         }
-                        e.internal_metadata.outlier = True
+                        auth_event.internal_metadata.outlier = True
 
                         logger.debug(
                             "_check_event_auth %s missing_auth: %s",
                             event.event_id,
-                            e.event_id,
+                            auth_event.event_id,
                         )
                         missing_auth_event_context = (
-                            await self._state_handler.compute_event_context(e)
+                            await self._state_handler.compute_event_context(auth_event)
                         )
-                        await self._auth_and_persist_event(
+
+                        missing_auth_event_context = await self._check_event_auth(
                             origin,
-                            e,
+                            auth_event,
                             missing_auth_event_context,
                             claimed_auth_event_map=auth,
                         )
+                        await self.persist_events_and_notify(
+                            event.room_id, [(auth_event, missing_auth_event_context)]
+                        )
 
-                        if e.event_id in event_auth_events:
-                            auth_events[(e.type, e.state_key)] = e
+                        if auth_event.event_id in event_auth_events:
+                            auth_events[
+                                (auth_event.type, auth_event.state_key)
+                            ] = auth_event
                     except AuthError:
                         pass
 
@@ -1725,7 +1692,7 @@ class FederationEventHandler:
 
     async def _run_push_actions_and_persist_event(
         self, event: EventBase, context: EventContext, backfilled: bool = False
-    ):
+    ) -> None:
         """Run the push actions for a received event, and persist it.
 
         Args:
@@ -1733,10 +1700,13 @@ class FederationEventHandler:
             context: The event context.
             backfilled: True if the event was backfilled.
         """
+        # this method should not be called on outliers (those code paths call
+        # persist_events_and_notify directly.)
+        assert not event.internal_metadata.outlier
+
         try:
             if (
-                not event.internal_metadata.is_outlier()
-                and not backfilled
+                not backfilled
                 and not context.rejected
                 and (await self._store.get_min_depth(event.room_id)) <= event.depth
             ):

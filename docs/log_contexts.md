@@ -10,7 +10,7 @@ Logcontexts are also used for CPU and database accounting, so that we
 can track which requests were responsible for high CPU use or database
 activity.
 
-The `synapse.logging.context` module provides a facilities for managing
+The `synapse.logging.context` module provides facilities for managing
 the current log context (as well as providing the `LoggingContextFilter`
 class).
 
@@ -351,7 +351,7 @@ and the awaitable chain is now orphaned, and will be garbage-collected at
 some point. Note that `await_something_interesting` is a coroutine, 
 which Python implements as a generator function.  When Python
 garbage-collects generator functions, it gives them a chance to 
-clean up by making the `async` (or `yield`) raise a `GeneratorExit`
+clean up by making the `await` (or `yield`) raise a `GeneratorExit`
 exception. In our case, that means that the `__exit__` handler of
 `PreserveLoggingContext` will carefully restore the request context, but
 there is now nothing waiting for its return, so the request context is

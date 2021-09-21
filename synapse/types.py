@@ -38,6 +38,7 @@ from twisted.internet.interfaces import (
     IReactorCore,
     IReactorPluggableNameResolver,
     IReactorTCP,
+    IReactorThreads,
     IReactorTime,
 )
 
@@ -63,7 +64,12 @@ JsonDict = Dict[str, Any]
 # Note that this seems to require inheriting *directly* from Interface in order
 # for mypy-zope to realize it is an interface.
 class ISynapseReactor(
-    IReactorTCP, IReactorPluggableNameResolver, IReactorTime, IReactorCore, Interface
+    IReactorTCP,
+    IReactorPluggableNameResolver,
+    IReactorTime,
+    IReactorCore,
+    IReactorThreads,
+    Interface,
 ):
     """The interfaces necessary for Synapse to function."""
 
@@ -505,7 +511,7 @@ class RoomStreamToken:
                 )
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, "Invalid room stream token %r" % (string,))
 
     @classmethod
     def parse_stream_token(cls, string: str) -> "RoomStreamToken":
@@ -514,7 +520,7 @@ class RoomStreamToken:
                 return cls(topological=None, stream=int(string[1:]))
         except Exception:
             pass
-        raise SynapseError(400, "Invalid token %r" % (string,))
+        raise SynapseError(400, "Invalid room stream token %r" % (string,))
 
     def copy_and_advance(self, other: "RoomStreamToken") -> "RoomStreamToken":
         """Return a new token such that if an event is after both this token and
@@ -613,7 +619,7 @@ class StreamToken:
                 await RoomStreamToken.parse(store, keys[0]), *(int(k) for k in keys[1:])
             )
         except Exception:
-            raise SynapseError(400, "Invalid Token")
+            raise SynapseError(400, "Invalid stream token")
 
     async def to_string(self, store: "DataStore") -> str:
         return self._SEPARATOR.join(

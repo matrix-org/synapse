@@ -21,7 +21,13 @@ from prometheus_client import Counter
 from typing_extensions import TypedDict
 
 from synapse import types
-from synapse.api.constants import MAX_USERID_LENGTH, EventTypes, JoinRules, LoginType
+from synapse.api.constants import (
+    MAX_USERID_LENGTH,
+    EventContentFields,
+    EventTypes,
+    JoinRules,
+    LoginType,
+)
 from synapse.api.errors import AuthError, Codes, ConsentNotGivenError, SynapseError
 from synapse.appservice import ApplicationService
 from synapse.config.server import is_threepid_reserved
@@ -96,7 +102,7 @@ class RegistrationHandler(BaseHandler):
 
         self.spam_checker = hs.get_spam_checker()
 
-        if hs.config.worker_app:
+        if hs.config.worker.worker_app:
             self._register_client = ReplicationRegisterServlet.make_client(hs)
             self._register_device_client = RegisterDeviceReplicationServlet.make_client(
                 hs
@@ -119,7 +125,7 @@ class RegistrationHandler(BaseHandler):
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
-    ):
+    ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
@@ -289,11 +295,10 @@ class RegistrationHandler(BaseHandler):
                 shadow_banned=shadow_banned,
             )
 
-            if self.hs.config.user_directory_search_all_users:
-                profile = await self.store.get_profileinfo(localpart)
-                await self.user_directory_handler.handle_local_profile_change(
-                    user_id, profile
-                )
+            profile = await self.store.get_profileinfo(localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         else:
             # autogen a sequential user ID
@@ -405,7 +410,7 @@ class RegistrationHandler(BaseHandler):
 
         # Choose whether to federate the new room.
         if not self.hs.config.registration.autocreate_auto_join_rooms_federated:
-            stub_config["creation_content"] = {"m.federate": False}
+            stub_config["creation_content"] = {EventContentFields.FEDERATE: False}
 
         for r in self.hs.config.registration.auto_join_rooms:
             logger.info("Auto-joining %s to %s", user_id, r)
@@ -690,7 +695,7 @@ class RegistrationHandler(BaseHandler):
             address: the IP address used to perform the registration.
             shadow_banned: Whether to shadow-ban the user
         """
-        if self.hs.config.worker_app:
+        if self.hs.config.worker.worker_app:
             await self._register_client(
                 user_id=user_id,
                 password_hash=password_hash,
@@ -780,7 +785,7 @@ class RegistrationHandler(BaseHandler):
         Does the bits that need doing on the main process. Not for use outside this
         class and RegisterDeviceReplicationServlet.
         """
-        assert not self.hs.config.worker_app
+        assert not self.hs.config.worker.worker_app
         valid_until_ms = None
         if self.session_lifetime is not None:
             if is_guest:
@@ -837,7 +842,7 @@ class RegistrationHandler(BaseHandler):
         """
         # TODO: 3pid registration can actually happen on the workers. Consider
         # refactoring it.
-        if self.hs.config.worker_app:
+        if self.hs.config.worker.worker_app:
             await self._post_registration_client(
                 user_id=user_id, auth_result=auth_result, access_token=access_token
             )

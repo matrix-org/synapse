@@ -1,6 +1,4 @@
-# Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2018-2019 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2016-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,6 +31,7 @@ from synapse.api.constants import (
     Membership,
     RoomCreationPreset,
     RoomEncryptionAlgorithms,
+    RoomTypes,
 )
 from synapse.api.errors import (
     AuthError,
@@ -185,7 +184,7 @@ class RoomCreationHandler(BaseHandler):
 
     async def _upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ):
+    ) -> str:
         """
         Args:
             requester: the user requesting the upgrade
@@ -390,14 +389,14 @@ class RoomCreationHandler(BaseHandler):
         old_room_create_event = await self.store.get_create_event_for_room(old_room_id)
 
         # Check if the create event specified a non-federatable room
-        if not old_room_create_event.content.get("m.federate", True):
+        if not old_room_create_event.content.get(EventContentFields.FEDERATE, True):
             # If so, mark the new room as non-federatable as well
-            creation_content["m.federate"] = False
+            creation_content[EventContentFields.FEDERATE] = False
 
         initial_state = {}
 
         # Replicate relevant room events
-        types_to_copy = (
+        types_to_copy: List[Tuple[str, Optional[str]]] = [
             (EventTypes.JoinRules, ""),
             (EventTypes.Name, ""),
             (EventTypes.Topic, ""),
@@ -408,7 +407,16 @@ class RoomCreationHandler(BaseHandler):
             (EventTypes.ServerACL, ""),
             (EventTypes.RelatedGroups, ""),
             (EventTypes.PowerLevels, ""),
-        )
+        ]
+
+        # If the old room was a space, copy over the room type and the rooms in
+        # the space.
+        if (
+            old_room_create_event.content.get(EventContentFields.ROOM_TYPE)
+            == RoomTypes.SPACE
+        ):
+            creation_content[EventContentFields.ROOM_TYPE] = RoomTypes.SPACE
+            types_to_copy.append((EventTypes.SpaceChild, None))
 
         old_room_state_ids = await self.store.get_filtered_current_state_ids(
             old_room_id, StateFilter.from_types(types_to_copy)
@@ -419,6 +427,11 @@ class RoomCreationHandler(BaseHandler):
         for k, old_event_id in old_room_state_ids.items():
             old_event = old_room_state_events.get(old_event_id)
             if old_event:
+                # If the event is an space child event with empty content, it was
+                # removed from the space and should be ignored.
+                if k[0] == EventTypes.SpaceChild and not old_event.content:
+                    continue
+
                 initial_state[k] = old_event.content
 
         # deep-copy the power-levels event before we start modifying it
@@ -497,7 +510,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_id: str,
         new_room_id: str,
         old_room_state: StateMap[str],
-    ):
+    ) -> None:
         # check to see if we have a canonical alias.
         canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
@@ -887,7 +900,7 @@ class RoomCreationHandler(BaseHandler):
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
-        def create(etype: str, content: JsonDict, **kwargs) -> JsonDict:
+        def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
 
             e.update(event_keys)
@@ -895,7 +908,7 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype: str, content: JsonDict, **kwargs) -> int:
+        async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
@@ -1018,7 +1031,7 @@ class RoomCreationHandler(BaseHandler):
         creator_id: str,
         is_public: bool,
         room_version: RoomVersion,
-    ):
+    ) -> str:
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
@@ -1082,7 +1095,7 @@ class RoomContextHandler:
         users = await self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
-        async def filter_evts(events):
+        async def filter_evts(events: List[EventBase]) -> List[EventBase]:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(

@@ -85,19 +85,17 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_rooms", rooms)
             del rooms
 
-            # If search all users is on, get all the users we want to add.
-            if self.hs.config.user_directory_search_all_users:
-                sql = (
-                    "CREATE TABLE IF NOT EXISTS "
-                    + TEMP_TABLE
-                    + "_users(user_id TEXT NOT NULL)"
-                )
-                txn.execute(sql)
+            sql = (
+                "CREATE TABLE IF NOT EXISTS "
+                + TEMP_TABLE
+                + "_users(user_id TEXT NOT NULL)"
+            )
+            txn.execute(sql)
 
-                txn.execute("SELECT name FROM users")
-                users = [{"user_id": x[0]} for x in txn.fetchall()]
+            txn.execute("SELECT name FROM users")
+            users = [{"user_id": x[0]} for x in txn.fetchall()]
 
-                self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
+            self.db_pool.simple_insert_many_txn(txn, TEMP_TABLE + "_users", users)
 
         new_pos = await self.get_max_stream_id_in_current_state_deltas()
         await self.db_pool.runInteraction(
@@ -196,7 +194,6 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 )
 
                 users_with_profile = await self.get_users_in_room_with_profiles(room_id)
-                user_ids = set(users_with_profile)
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
@@ -207,7 +204,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                 to_insert = set()
 
                 if is_public:
-                    for user_id in user_ids:
+                    for user_id in users_with_profile:
                         if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
@@ -217,14 +214,14 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         await self.add_users_in_public_rooms(room_id, to_insert)
                         to_insert.clear()
                 else:
-                    for user_id in user_ids:
+                    for user_id in users_with_profile:
                         if not self.hs.is_mine_id(user_id):
                             continue
 
                         if self.get_if_app_services_interested_in_user(user_id):
                             continue
 
-                        for other_user_id in user_ids:
+                        for other_user_id in users_with_profile:
                             if user_id == other_user_id:
                                 continue
 
@@ -266,13 +263,8 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
     async def _populate_user_directory_process_users(self, progress, batch_size):
         """
-        If search_all_users is enabled, add all of the users to the user directory.
+        Add all local users to the user directory.
         """
-        if not self.hs.config.user_directory_search_all_users:
-            await self.db_pool.updates._end_background_update(
-                "populate_user_directory_process_users"
-            )
-            return 1
 
         def _get_next_batch(txn):
             sql = "SELECT user_id FROM %s LIMIT %s" % (
@@ -511,7 +503,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         self._prefer_local_users_in_search = (
             hs.config.user_directory_search_prefer_local_users
         )
-        self._server_name = hs.config.server_name
+        self._server_name = hs.config.server.server_name
 
     async def remove_from_user_dir(self, user_id: str) -> None:
         def _remove_from_user_dir_txn(txn):

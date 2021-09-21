@@ -40,15 +40,15 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-@attr.s(slots=True)
+@attr.s(slots=True, auto_attribs=True)
 class Saml2SessionData:
     """Data we track about SAML2 sessions"""
 
     # time the session was created, in milliseconds
-    creation_time = attr.ib()
+    creation_time: int
     # The user interactive authentication session ID associated with this SAML
     # session (or None if this SAML session is for an initial login).
-    ui_auth_session_id = attr.ib(type=Optional[str], default=None)
+    ui_auth_session_id: Optional[str] = None
 
 
 class SamlHandler(BaseHandler):
@@ -80,7 +80,6 @@ class SamlHandler(BaseHandler):
         # the SsoIdentityProvider protocol type.
         self.idp_icon = None
         self.idp_brand = None
-        self.unstable_idp_brand = None
 
         # a map from saml session id to Saml2SessionData object
         self._outstanding_requests_dict: Dict[str, Saml2SessionData] = {}
@@ -360,7 +359,7 @@ class SamlHandler(BaseHandler):
 
         return remote_user_id
 
-    def expire_sessions(self):
+    def expire_sessions(self) -> None:
         expire_before = self.clock.time_msec() - self._saml2_session_lifetime
         to_expire = set()
         for reqid, data in self._outstanding_requests_dict.items():
@@ -392,10 +391,10 @@ MXID_MAPPER_MAP: Dict[str, Callable[[str], str]] = {
 }
 
 
-@attr.s
+@attr.s(auto_attribs=True)
 class SamlConfig:
-    mxid_source_attribute = attr.ib()
-    mxid_mapper = attr.ib()
+    mxid_source_attribute: str
+    mxid_mapper: Callable[[str], str]
 
 
 class DefaultSamlMappingProvider:

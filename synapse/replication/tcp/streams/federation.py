@@ -42,7 +42,7 @@ class FederationStream(Stream):
     ROW_TYPE = FederationStreamRow
 
     def __init__(self, hs: "HomeServer"):
-        if hs.config.worker_app is None:
+        if hs.config.worker.worker_app is None:
             # master process: get updates from the FederationRemoteSendQueue.
             # (if the master is configured to send federation itself, federation_sender
             # will be a real FederationSender, which has stubs for current_token and

@@ -1,1 +1,0 @@
-Fix a bug which prevented calls to `/createRoom` that included the `room_alias_name` parameter from being handled by worker processes.

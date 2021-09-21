@@ -19,7 +19,7 @@ import subprocess
 logger = logging.getLogger(__name__)
 
 
-def get_version_string(module):
+def get_version_string(module) -> str:
     """Given a module calculate a git-aware version string for it.
 
     If called on a module not in a git checkout will return `__verison__`.
