@@ -203,6 +203,9 @@ def run_as_background_process(  # type: ignore[misc]
     ...
     # The `type: ignore[misc]` above suppresses
     # "error: Overloaded function signatures 1 and 2 overlap with incompatible return types  [misc]"
+    #
+    # Overloads are used instead of a `Union` here because mypy fails to infer the type of `R`
+    # and complains about almost every call to this function when `func` is a `Union`.
 
 
 @overload
@@ -287,19 +290,19 @@ def run_as_background_process(
 F = TypeVar("F", bound=Callable[..., Any])
 
 
-# NB: Return type is incorrect and should be a callable returning an F with a
-#     Deferred[Optional[R]] return, which we can't express correctly until Python 3.10.
 def wrap_as_background_process(desc: str) -> Callable[[F], F]:
     """Decorator that wraps a function that gets called as a background
     process.
 
     Equivalent to calling the function with `run_as_background_process`.
 
-    Note that `run_as_background_process` changes the return type into
+    Note that the annotated return type of this function is incorrect.
+    The return type of the function, once wrapped, is actually a
     `Deferred[Optional[T]]`.
     """
 
     # NB: Return type is incorrect and should be F with a Deferred[Optional[R]] return
+    #     We can't expression the return types correctly until Python 3.10.
     def wrap_as_background_process_inner(func: F) -> F:
         @wraps(func)
         def wrap_as_background_process_inner_2(
