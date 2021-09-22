@@ -33,8 +33,11 @@ SearchEntry = namedtuple(
 
 
 def _clean_value_for_search(value: str) -> str:
-    """Replaces null code points in string as postgres/sqlite do not
-    like the insertion of strings with null code points"""
+    """
+    Replaces any null code points in the string with spaces as
+    Postgres and SQLite do not like the insertion of strings with
+    null code points into the full-text search tables.
+    """
     return value.replace("\u0000", " ")
 
 
