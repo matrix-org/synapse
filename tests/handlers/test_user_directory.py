@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from unittest.mock import Mock
+from urllib.parse import quote
 
 from twisted.internet import defer
 
@@ -33,7 +34,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        synapse.rest.admin.register_servlets,
         room.register_servlets,
     ]
 
@@ -133,15 +134,9 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     def test_reactivation_makes_regular_user_searchable(self):
         user = self.register_user("regular", "pass")
-        password_hash = self.get_success(
-            self.store.db_pool.simple_select_one_onecol(
-                "users",
-                {"name": user},
-                "password_hash",
-            )
-        )
         user_token = self.login(user, "pass")
         admin_user = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin_user, "pass")
 
         # Ensure the regular user is publicly visible and searchable.
         self.helper.create_room_as(user, is_public=True, tok=user_token)
@@ -160,13 +155,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(s["results"], [])
 
         # Reactivate the user
-        self.get_success(deactivate_handler.activate_account(user))
-        # Hackily reset password by restoring the old pw hash.
-        self.get_success(
-            self.hs.get_set_password_handler().set_password(
-                user, password_hash, logout_devices=False
-            )
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{quote(user)}",
+            access_token=admin_token,
+            content={"deactivated": False, "password": "pass"},
         )
+        self.assertEqual(channel.code, 200)
         user_token = self.login(user, "pass")
         self.helper.create_room_as(user, is_public=True, tok=user_token)
 
