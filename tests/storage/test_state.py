@@ -672,7 +672,12 @@ class StateFilterDifferenceTestCase(TestCase):
                 types=frozendict({EventTypes.Member: None}), include_others=True
             ),
             StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({"@wombat:spqr"})}),
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr"}),
+                        EventTypes.Create: frozenset({""}),
+                    }
+                ),
                 include_others=False,
             ),
             StateFilter(types=frozendict(), include_others=True),
@@ -1060,16 +1065,6 @@ class StateFilterDifferenceTestCase(TestCase):
         )
 
     def test_state_filter_difference(self):
-        # it's not possible to subtract individual state keys from
-        # a wildcard
-        self.assert_difference(
-            StateFilter.all(),
-            StateFilter.from_types(
-                ((EventTypes.Member, "@wombat:hs1"), (EventTypes.Member, "@spqr:hs1"))
-            ),
-            StateFilter.all(),
-        )
-
         # we can subtract wildcards from wildcards
         self.assert_difference(StateFilter.all(), StateFilter.all(), StateFilter.none())
         self.assert_difference(
