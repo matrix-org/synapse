@@ -483,40 +483,31 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertEqual(is_all, True)
         self.assertDictEqual({(e5.type, e5.state_key): e5.event_id}, state_dict)
 
-    def test_state_filter_difference(self):
-        def assert_difference(
-            minuend: StateFilter, subtrahend: StateFilter, expected: StateFilter
-        ):
-            self.assertEqual(
-                minuend.approx_difference(subtrahend),
-                expected,
-                f"StateFilter difference not correct:\n\n\t{minuend!r}\nminus\n\t{subtrahend!r}\nwas\n\t{minuend.approx_difference(subtrahend)}\nexpected\n\t{expected}",
-            )
 
+class StateFilterDifferenceTestCase(HomeserverTestCase):
+    def assert_difference(
+        self, minuend: StateFilter, subtrahend: StateFilter, expected: StateFilter
+    ):
+        self.assertEqual(
+            minuend.approx_difference(subtrahend),
+            expected,
+            f"StateFilter difference not correct:\n\n\t{minuend!r}\nminus\n\t{subtrahend!r}\nwas\n\t{minuend.approx_difference(subtrahend)}\nexpected\n\t{expected}",
+        )
+
+    def test_state_filter_difference(self):
         # it's not possible to subtract individual state keys from
         # a wildcard
-        assert_difference(
+        self.assert_difference(
             StateFilter.all(),
             StateFilter.from_types(
                 ((EventTypes.Member, "@wombat:hs1"), (EventTypes.Member, "@spqr:hs1"))
             ),
             StateFilter.all(),
         )
-        self.assertEqual(
-            StateFilter.all().approx_difference(
-                StateFilter.from_types(
-                    (
-                        (EventTypes.Member, "@wombat:hs1"),
-                        (EventTypes.Member, "@spqr:hs1"),
-                    )
-                )
-            ),
-            StateFilter.all(),
-        )
 
         # we can subtract wildcards from wildcards
-        assert_difference(StateFilter.all(), StateFilter.all(), StateFilter.none())
-        assert_difference(
+        self.assert_difference(StateFilter.all(), StateFilter.all(), StateFilter.none())
+        self.assert_difference(
             StateFilter(
                 types=frozendict(
                     {
@@ -538,7 +529,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         # subtract two strange wildcards
-        assert_difference(
+        self.assert_difference(
             StateFilter(
                 types=frozendict({EventTypes.Member: None}),
                 include_others=True,
@@ -554,7 +545,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         # we can subtract individual state keys, except from wildcards
-        assert_difference(
+        self.assert_difference(
             StateFilter(
                 types=frozendict(
                     {
@@ -585,7 +576,7 @@ class StateStoreTestCase(HomeserverTestCase):
         )
 
         # we can subtract wildcards from non-wildcards
-        assert_difference(
+        self.assert_difference(
             StateFilter(
                 types=frozendict(
                     {EventTypes.Member: frozenset({"@wombat:hs1", "@kristina:hs2"})}
