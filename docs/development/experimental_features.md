@@ -9,8 +9,8 @@ applicable for features which:
   (e.g. a feature is incomplete, buggy, performs poorly, or needs further testing).
 
 Note that this only really applies to features which are expected to be desirable
-to a broad audience. The [module infrastructure](../modules/index.md) should be
-investigated for non-standard features.
+to a broad audience. The [module infrastructure](../modules/index.md) should
+instead be investigated for non-standard features.
 
 Guarding experimental features behind configuration flags should help with some
 of the following scenarios:
