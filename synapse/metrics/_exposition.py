@@ -39,15 +39,10 @@ from synapse.util import caches
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
-INF = float("inf")
-MINUS_INF = float("-inf")
-
-
-def floatToGoString(d: Any) -> str:
-    d = float(d)
-    if d == INF:
+def floatToGoString(d: float) -> str:
+    if d == math.inf:
         return "+Inf"
-    elif d == MINUS_INF:
+    elif d == -math.inf:
         return "-Inf"
     elif math.isnan(d):
         return "NaN"
