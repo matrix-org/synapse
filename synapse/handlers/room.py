@@ -1,6 +1,4 @@
-# Copyright 2014 - 2016 OpenMarket Ltd
-# Copyright 2018-2019 New Vector Ltd
-# Copyright 2019 The Matrix.org Foundation C.I.C.
+# Copyright 2016-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,7 +20,16 @@ import math
 import random
 import string
 from collections import OrderedDict
-from typing import TYPE_CHECKING, Any, Awaitable, Dict, List, Optional, Tuple
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Awaitable,
+    Collection,
+    Dict,
+    List,
+    Optional,
+    Tuple,
+)
 
 from synapse.api.constants import (
     EventContentFields,
@@ -49,6 +56,7 @@ from synapse.events import EventBase
 from synapse.events.utils import copy_power_levels_contents
 from synapse.rest.admin._base import assert_user_is_admin
 from synapse.storage.state import StateFilter
+from synapse.streams import EventSource
 from synapse.types import (
     JsonDict,
     MutableStateMap,
@@ -186,7 +194,7 @@ class RoomCreationHandler(BaseHandler):
 
     async def _upgrade_room(
         self, requester: Requester, old_room_id: str, new_version: RoomVersion
-    ):
+    ) -> str:
         """
         Args:
             requester: the user requesting the upgrade
@@ -512,7 +520,7 @@ class RoomCreationHandler(BaseHandler):
         old_room_id: str,
         new_room_id: str,
         old_room_state: StateMap[str],
-    ):
+    ) -> None:
         # check to see if we have a canonical alias.
         canonical_alias_event = None
         canonical_alias_event_id = old_room_state.get((EventTypes.CanonicalAlias, ""))
@@ -902,7 +910,7 @@ class RoomCreationHandler(BaseHandler):
 
         event_keys = {"room_id": room_id, "sender": creator_id, "state_key": ""}
 
-        def create(etype: str, content: JsonDict, **kwargs) -> JsonDict:
+        def create(etype: str, content: JsonDict, **kwargs: Any) -> JsonDict:
             e = {"type": etype, "content": content}
 
             e.update(event_keys)
@@ -910,7 +918,7 @@ class RoomCreationHandler(BaseHandler):
 
             return e
 
-        async def send(etype: str, content: JsonDict, **kwargs) -> int:
+        async def send(etype: str, content: JsonDict, **kwargs: Any) -> int:
             event = create(etype, content, **kwargs)
             logger.debug("Sending %s in new room", etype)
             # Allow these events to be sent even if the user is shadow-banned to
@@ -1033,7 +1041,7 @@ class RoomCreationHandler(BaseHandler):
         creator_id: str,
         is_public: bool,
         room_version: RoomVersion,
-    ):
+    ) -> str:
         # autogen room IDs and try to create it. We may clash, so just
         # try a few times till one goes through, giving up eventually.
         attempts = 0
@@ -1097,7 +1105,7 @@ class RoomContextHandler:
         users = await self.store.get_users_in_room(room_id)
         is_peeking = user.to_string() not in users
 
-        async def filter_evts(events):
+        async def filter_evts(events: List[EventBase]) -> List[EventBase]:
             if use_admin_priviledge:
                 return events
             return await filter_events_for_client(
@@ -1175,7 +1183,7 @@ class RoomContextHandler:
         return results
 
 
-class RoomEventSource:
+class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
     def __init__(self, hs: "HomeServer"):
         self.store = hs.get_datastore()
 
@@ -1183,8 +1191,8 @@ class RoomEventSource:
         self,
         user: UserID,
         from_key: RoomStreamToken,
-        limit: int,
-        room_ids: List[str],
+        limit: Optional[int],
+        room_ids: Collection[str],
         is_guest: bool,
         explicit_room_id: Optional[str] = None,
     ) -> Tuple[List[EventBase], RoomStreamToken]:

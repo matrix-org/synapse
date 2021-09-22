@@ -667,7 +667,7 @@ class PersistEventsStore:
             table="event_auth_chain_to_calculate",
             keyvalues={},
             column="event_id",
-            iterable=new_chain_tuples,
+            values=new_chain_tuples,
         )
 
         # Now we need to calculate any new links between chains caused by
@@ -1509,7 +1509,7 @@ class PersistEventsStore:
             self._handle_event_relations(txn, event)
 
             self._handle_insertion_event(txn, event)
-            self._handle_chunk_event(txn, event)
+            self._handle_batch_event(txn, event)
 
             # Store the labels for this event.
             labels = event.content.get(EventContentFields.LABELS)
@@ -1790,23 +1790,23 @@ class PersistEventsStore:
         ):
             return
 
-        next_chunk_id = event.content.get(EventContentFields.MSC2716_NEXT_CHUNK_ID)
-        if next_chunk_id is None:
-            # Invalid insertion event without next chunk ID
+        next_batch_id = event.content.get(EventContentFields.MSC2716_NEXT_BATCH_ID)
+        if next_batch_id is None:
+            # Invalid insertion event without next batch ID
             return
 
         logger.debug(
-            "_handle_insertion_event (next_chunk_id=%s) %s", next_chunk_id, event
+            "_handle_insertion_event (next_batch_id=%s) %s", next_batch_id, event
         )
 
-        # Keep track of the insertion event and the chunk ID
+        # Keep track of the insertion event and the batch ID
         self.db_pool.simple_insert_txn(
             txn,
             table="insertion_events",
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "next_chunk_id": next_chunk_id,
+                "next_batch_id": next_batch_id,
             },
         )
 
@@ -1822,8 +1822,8 @@ class PersistEventsStore:
                 },
             )
 
-    def _handle_chunk_event(self, txn: LoggingTransaction, event: EventBase):
-        """Handles inserting the chunk edges/connections between the chunk event
+    def _handle_batch_event(self, txn: LoggingTransaction, event: EventBase):
+        """Handles inserting the batch edges/connections between the batch event
         and an insertion event. Part of MSC2716.
 
         Args:
@@ -1831,11 +1831,11 @@ class PersistEventsStore:
             event: The event to process
         """
 
-        if event.type != EventTypes.MSC2716_CHUNK:
-            # Not a chunk event
+        if event.type != EventTypes.MSC2716_BATCH:
+            # Not a batch event
             return
 
-        # Skip processing a chunk event if the room version doesn't
+        # Skip processing a batch event if the room version doesn't
         # support it or the event is not from the room creator.
         room_version = self.store.get_room_version_txn(txn, event.room_id)
         room_creator = self.db_pool.simple_select_one_onecol_txn(
@@ -1852,35 +1852,35 @@ class PersistEventsStore:
         ):
             return
 
-        chunk_id = event.content.get(EventContentFields.MSC2716_CHUNK_ID)
-        if chunk_id is None:
-            # Invalid chunk event without a chunk ID
+        batch_id = event.content.get(EventContentFields.MSC2716_BATCH_ID)
+        if batch_id is None:
+            # Invalid batch event without a batch ID
             return
 
-        logger.debug("_handle_chunk_event chunk_id=%s %s", chunk_id, event)
+        logger.debug("_handle_batch_event batch_id=%s %s", batch_id, event)
 
-        # Keep track of the insertion event and the chunk ID
+        # Keep track of the insertion event and the batch ID
         self.db_pool.simple_insert_txn(
             txn,
-            table="chunk_events",
+            table="batch_events",
             values={
                 "event_id": event.event_id,
                 "room_id": event.room_id,
-                "chunk_id": chunk_id,
+                "batch_id": batch_id,
             },
         )
 
-        # When we receive an event with a `chunk_id` referencing the
-        # `next_chunk_id` of the insertion event, we can remove it from the
+        # When we receive an event with a `batch_id` referencing the
+        # `next_batch_id` of the insertion event, we can remove it from the
         # `insertion_event_extremities` table.
         sql = """
             DELETE FROM insertion_event_extremities WHERE event_id IN (
                 SELECT event_id FROM insertion_events
-                WHERE next_chunk_id = ?
+                WHERE next_batch_id = ?
             )
         """
 
-        txn.execute(sql, (chunk_id,))
+        txn.execute(sql, (batch_id,))
 
     def _handle_redaction(self, txn, redacted_event_id):
         """Handles receiving a redaction and checking whether we need to remove

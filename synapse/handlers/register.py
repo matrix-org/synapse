@@ -125,7 +125,7 @@ class RegistrationHandler(BaseHandler):
         localpart: str,
         guest_access_token: Optional[str] = None,
         assigned_user_id: Optional[str] = None,
-    ):
+    ) -> None:
         if types.contains_invalid_mxid_characters(localpart):
             raise SynapseError(
                 400,
@@ -295,11 +295,10 @@ class RegistrationHandler(BaseHandler):
                 shadow_banned=shadow_banned,
             )
 
-            if self.hs.config.user_directory_search_all_users:
-                profile = await self.store.get_profileinfo(localpart)
-                await self.user_directory_handler.handle_local_profile_change(
-                    user_id, profile
-                )
+            profile = await self.store.get_profileinfo(localpart)
+            await self.user_directory_handler.handle_local_profile_change(
+                user_id, profile
+            )
 
         else:
             # autogen a sequential user ID

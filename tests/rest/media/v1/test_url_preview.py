@@ -24,6 +24,7 @@ from synapse.config.oembed import OEmbedEndpointConfig
 
 from tests import unittest
 from tests.server import FakeTransport
+from tests.test_utils import SMALL_PNG
 
 try:
     import lxml
@@ -576,13 +577,6 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         }
         oembed_content = json.dumps(result).encode("utf-8")
 
-        end_content = (
-            b"<html><head>"
-            b"<title>Some Title</title>"
-            b'<meta property="og:description" content="hi" />'
-            b"</head></html>"
-        )
-
         channel = self.make_request(
             "GET",
             "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
@@ -606,6 +600,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
 
+        # Ensure a second request is made to the photo URL.
         client = self.reactor.tcpClients[1][2].buildProtocol(None)
         server = AccumulatingProtocol()
         server.makeConnection(FakeTransport(client, self.reactor))
@@ -613,18 +608,23 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         client.dataReceived(
             (
                 b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                b'Content-Type: text/html; charset="utf8"\r\n\r\n'
+                b"Content-Type: image/png\r\n\r\n"
             )
-            % (len(end_content),)
-            + end_content
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
         )
 
         self.pump()
 
+        # Ensure the URL is what was requested.
+        self.assertIn(b"/matrixdotorg", server.data)
+
         self.assertEqual(channel.code, 200)
-        self.assertEqual(
-            channel.json_body, {"og:title": "Some Title", "og:description": "hi"}
-        )
+        self.assertIsNone(channel.json_body["og:title"])
+        self.assertTrue(channel.json_body["og:image"].startswith("mxc://"))
+        self.assertEqual(channel.json_body["og:image:height"], 1)
+        self.assertEqual(channel.json_body["og:image:width"], 1)
+        self.assertEqual(channel.json_body["og:image:type"], "image/png")
 
     def test_oembed_rich(self):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
