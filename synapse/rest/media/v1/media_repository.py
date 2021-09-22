@@ -92,7 +92,9 @@ class MediaRepository:
         self.recently_accessed_remotes: Set[Tuple[str, str]] = set()
         self.recently_accessed_locals: Set[str] = set()
 
-        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.federation_domain_whitelist = (
+            hs.config.federation.federation_domain_whitelist
+        )
 
         # List of StorageProviders where we should search for media and
         # potentially upload to.
