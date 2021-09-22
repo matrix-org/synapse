@@ -15,9 +15,11 @@ import logging
 from typing import (
     TYPE_CHECKING,
     Awaitable,
+    Collection,
     Dict,
     Iterable,
     List,
+    Mapping,
     Optional,
     Set,
     Tuple,
@@ -132,6 +134,23 @@ class StateFilter:
         return StateFilter(
             types=frozendict({EventTypes.Member: frozenset(members)}),
             include_others=True,
+        )
+
+    @staticmethod
+    def freeze(types: Mapping[str, Optional[Collection[str]]], include_others: bool):
+        """
+        Returns a (frozen) StateFilter with the same contents as the parameters
+        specified here, which can be made of mutable types.
+        """
+        types_with_frozen_values: Dict[str, Optional[FrozenSet[str]]] = {}
+        for state_types, state_keys in types.items():
+            if state_keys is not None:
+                types_with_frozen_values[state_types] = frozenset(state_keys)
+            else:
+                types_with_frozen_values[state_types] = None
+
+        return StateFilter(
+            frozendict(types_with_frozen_values), include_others=include_others
         )
 
     def return_expanded(self) -> "StateFilter":
