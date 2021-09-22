@@ -1221,7 +1221,7 @@ class FederationEventHandler:
         async def prep(ev_info: _NewEventInfo) -> EventContext:
             event = ev_info.event
             with nested_logging_context(suffix=event.event_id):
-                res = await self._state_handler.compute_event_context(event)
+                res = EventContext.for_outlier()
                 res = await self._check_event_auth(
                     origin,
                     event,
@@ -1540,10 +1540,7 @@ class FederationEventHandler:
                             event.event_id,
                             auth_event.event_id,
                         )
-                        missing_auth_event_context = (
-                            await self._state_handler.compute_event_context(auth_event)
-                        )
-
+                        missing_auth_event_context = EventContext.for_outlier()
                         missing_auth_event_context = await self._check_event_auth(
                             origin,
                             auth_event,
