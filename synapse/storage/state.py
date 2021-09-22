@@ -388,6 +388,9 @@ class StateFilter:
         * minus_wildcards represents entire state types to remove
         * plus_wildcards represents entire state types to add
         * plus_state_keys represents individual state keys to add
+
+        See `recompose_from_four_parts` for the other direction of this
+        correspondence.
         """
         all_part: bool = self.include_others
         minus_wildcards: Set[str] = set()
@@ -408,6 +411,61 @@ class StateFilter:
                     plus_state_keys.add((state_type, state_key))
 
         return all_part, minus_wildcards, plus_wildcards, plus_state_keys
+
+    @staticmethod
+    def recompose_from_four_parts(
+        all_part: bool,
+        minus_wildcards: Set[str],
+        plus_wildcards: Set[str],
+        plus_state_keys: Set[StateKey],
+    ) -> "StateFilter":
+        """
+        Recomposes a state filter from 4 parts.
+
+        See `decompose_into_four_parts` (the other direction of this
+        correspondence) for descriptions on each of the parts.
+        """
+
+        # {state type -> set of state keys OR None for wildcard}
+        # (The same structure as that of a StateFilter.)
+        new_types: Dict[str, Optional[Set[str]]] = {}
+
+        if all_part:
+            for minus_wildcard in minus_wildcards:
+                if minus_wildcard not in plus_wildcards:
+                    # as long as the wildcard is not added back in, we
+                    # reset that state type to allow no state keys.
+                    new_types[minus_wildcard] = set()
+
+            for state_type, state_key in plus_state_keys:
+                # We don't bother adding the state key if there's no set for
+                # its state type, because that means it's already included
+                # by virtue of the 'all' part.
+                if state_type in new_types:
+                    state_set = new_types[state_type]
+                    # We only just added this set so it can't be None.
+                    assert state_set is not None
+                    # Add the state key to the set.
+                    state_set.add(state_key)
+        else:
+            # As we don't start out with any types to begin with, we don't
+            # care about 'minus' wildcards.
+
+            # Add all 'plus' wildcards.
+            for plus_wildcard in plus_wildcards:
+                new_types[plus_wildcard] = None
+
+            # Add all the 'plus' state keys, taking care not to overwrite any
+            # wildcards that have already been added.
+            for state_type, state_key in plus_state_keys:
+                if state_type in new_types:
+                    state_set = new_types[state_type]
+                    if state_set is not None:
+                        state_set.add(state_key)
+                else:
+                    new_types[state_type] = {state_key}
+
+        return StateFilter.freeze(new_types, include_others=all_part)
 
     def approx_difference(self, subtrahend: "StateFilter") -> "StateFilter":
         """
