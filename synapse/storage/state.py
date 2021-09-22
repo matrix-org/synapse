@@ -391,7 +391,7 @@ class StateFilter:
                 is an over-approximation.
         """
 
-        types = dict(self.types)
+        types = dict()
         new_include_others = self.include_others and not subtrahend.include_others
         # if this is an include_others state filter, then all unmentioned
         # event types are wildcards; otherwise they're empty.
@@ -410,7 +410,7 @@ class StateFilter:
             sub_keys: Optional[FrozenSet[str]] = subtrahend.types.get(
                 state_type, subtrahend_default_for_unspecified
             )
-            current_keys: Optional[FrozenSet[str]] = types.get(
+            current_keys: Optional[FrozenSet[str]] = self.types.get(
                 state_type, current_default_for_unspecified
             )
 
@@ -427,12 +427,7 @@ class StateFilter:
                 # difference of those keys
                 new_keys = current_keys.difference(sub_keys)
 
-            if new_keys == new_default_for_unspecified:
-                # if the result is the same as the default assumption,
-                # don't bother storing it.
-                if state_type in types:
-                    types.pop(state_type)
-            else:
+            if new_keys != new_default_for_unspecified:
                 # this is not the same as the default assumption, so
                 # we store it
                 types[state_type] = new_keys
