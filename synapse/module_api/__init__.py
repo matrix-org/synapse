@@ -119,14 +119,16 @@ class ModuleApi:
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
-            app_name = self._hs.config.email_app_name
+            app_name = self._hs.config.email.email_app_name
 
-            self._from_string = self._hs.config.email_notif_from % {"app": app_name}
+            self._from_string = self._hs.config.email.email_notif_from % {
+                "app": app_name
+            }
         except (KeyError, TypeError):
             # If substitution failed (which can happen if the string contains
             # placeholders other than just "app", or if the type of the placeholder is
             # not a string), fall back to the bare strings.
-            self._from_string = self._hs.config.email_notif_from
+            self._from_string = self._hs.config.email.email_notif_from
 
         self._raw_from = email.utils.parseaddr(self._from_string)[1]
 

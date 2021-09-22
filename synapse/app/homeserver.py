@@ -195,7 +195,7 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
-            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )

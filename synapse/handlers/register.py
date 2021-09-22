@@ -913,8 +913,8 @@ class RegistrationHandler(BaseHandler):
         # getting mail spam where they weren't before if email
         # notifs are set up on a homeserver)
         if (
-            self.hs.config.email_enable_notifs
-            and self.hs.config.email_notif_for_new_users
+            self.hs.config.email.email_enable_notifs
+            and self.hs.config.email.email_notif_for_new_users
             and token
         ):
             # Pull the ID of the access token back out of the db
