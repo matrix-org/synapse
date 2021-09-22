@@ -624,7 +624,7 @@ class FederationHandler(BaseHandler):
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -814,7 +814,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -843,7 +843,7 @@ class FederationHandler(BaseHandler):
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -1115,8 +1115,7 @@ class FederationHandler(BaseHandler):
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
             e.internal_metadata.outlier = True
-            ctx = await self.state_handler.compute_event_context(e)
-            events_to_context[e.event_id] = ctx
+            events_to_context[e.event_id] = EventContext.for_outlier()
 
         event_map = {
             e.event_id: e for e in itertools.chain(auth_events, state, [event])
