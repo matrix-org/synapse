@@ -39,6 +39,8 @@ import logging
 from collections import namedtuple
 from typing import TYPE_CHECKING, Collection, Dict, List, Optional, Set, Tuple
 
+from frozendict import frozendict
+
 from twisted.internet import defer
 
 from synapse.api.filtering import Filter
@@ -379,7 +381,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
                 if p > min_pos
             }
 
-        return RoomStreamToken(None, min_pos, positions)
+        return RoomStreamToken(None, min_pos, frozendict(positions))
 
     async def get_room_events_stream_for_rooms(
         self,
