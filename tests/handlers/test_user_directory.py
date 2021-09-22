@@ -150,7 +150,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(s["results"][0]["user_id"], user)
 
         # Deactivate the user and check they're not searchable.
-        deactivate_handler = self.hs._deactivate_account_handler
+        deactivate_handler = self.hs.get_deactivate_account_handler()
         self.get_success(
             deactivate_handler.deactivate_account(
                 user, erase_data=False, requester=create_requester(admin_user)
