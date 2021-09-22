@@ -16,7 +16,7 @@
 
 import abc
 import os
-from typing import Dict, Optional, Tuple, Type
+from typing import Any, Dict, Iterable, List, Optional, Tuple, Type, Union
 
 from unpaddedbase64 import encode_base64
 
@@ -86,7 +86,7 @@ class DefaultDictProperty(DictProperty):
 
     __slots__ = ["default"]
 
-    def __init__(self, key, default):
+    def __init__(self, key: str, default: Any):
         super().__init__(key)
         self.default = default
 
@@ -111,22 +111,25 @@ class _EventInternalMetadata:
         # in the DAG)
         self.outlier = False
 
-    out_of_band_membership: bool = DictProperty("out_of_band_membership")
-    send_on_behalf_of: str = DictProperty("send_on_behalf_of")
-    recheck_redaction: bool = DictProperty("recheck_redaction")
-    soft_failed: bool = DictProperty("soft_failed")
-    proactively_send: bool = DictProperty("proactively_send")
-    redacted: bool = DictProperty("redacted")
-    txn_id: str = DictProperty("txn_id")
-    token_id: int = DictProperty("token_id")
-    historical: bool = DictProperty("historical")
+    # Tell mypy to ignore the types of properties defined by DictProperty until
+    # that is properly annotated.
+
+    out_of_band_membership: bool = DictProperty("out_of_band_membership")  # type: ignore[assignment]
+    send_on_behalf_of: str = DictProperty("send_on_behalf_of")  # type: ignore[assignment]
+    recheck_redaction: bool = DictProperty("recheck_redaction")  # type: ignore[assignment]
+    soft_failed: bool = DictProperty("soft_failed")  # type: ignore[assignment]
+    proactively_send: bool = DictProperty("proactively_send")  # type: ignore[assignment]
+    redacted: bool = DictProperty("redacted")  # type: ignore[assignment]
+    txn_id: str = DictProperty("txn_id")  # type: ignore[assignment]
+    token_id: int = DictProperty("token_id")  # type: ignore[assignment]
+    historical: bool = DictProperty("historical")  # type: ignore[assignment]
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before: RoomStreamToken = DictProperty("before")
-    after: RoomStreamToken = DictProperty("after")
-    order: Tuple[int, int] = DictProperty("order")
+    before: RoomStreamToken = DictProperty("before")  # type: ignore[assignment]
+    after: RoomStreamToken = DictProperty("after")  # type: ignore[assignment]
+    order: Tuple[int, int] = DictProperty("order")  # type: ignore[assignment]
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)
@@ -162,9 +165,6 @@ class _EventInternalMetadata:
 
         If the sender of the redaction event is allowed to redact any event
         due to auth rules, then this will always return false.
-
-        Returns:
-            bool
         """
         return self._dict.get("recheck_redaction", False)
 
@@ -176,32 +176,23 @@ class _EventInternalMetadata:
                sent to clients.
             2. They should not be added to the forward extremities (and
                therefore not to current state).
-
-        Returns:
-            bool
         """
         return self._dict.get("soft_failed", False)
 
-    def should_proactively_send(self):
+    def should_proactively_send(self) -> bool:
         """Whether the event, if ours, should be sent to other clients and
         servers.
 
         This is used for sending dummy events internally. Servers and clients
         can still explicitly fetch the event.
-
-        Returns:
-            bool
         """
         return self._dict.get("proactively_send", True)
 
-    def is_redacted(self):
+    def is_redacted(self) -> bool:
         """Whether the event has been redacted.
 
         This is used for efficiently checking whether an event has been
         marked as redacted without needing to make another database call.
-
-        Returns:
-            bool
         """
         return self._dict.get("redacted", False)
 
@@ -241,29 +232,32 @@ class EventBase(metaclass=abc.ABCMeta):
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
-    auth_events = DictProperty("auth_events")
-    depth = DictProperty("depth")
-    content = DictProperty("content")
-    hashes = DictProperty("hashes")
-    origin = DictProperty("origin")
-    origin_server_ts = DictProperty("origin_server_ts")
-    prev_events = DictProperty("prev_events")
-    redacts = DefaultDictProperty("redacts", None)
-    room_id = DictProperty("room_id")
-    sender = DictProperty("sender")
-    state_key = DictProperty("state_key")
-    type = DictProperty("type")
-    user_id = DictProperty("sender")
+    # Tell mypy to ignore the types of properties defined by DictProperty until
+    # that is properly annotated.
+
+    auth_events = DictProperty("auth_events")  # type: ignore[assignment]
+    depth: int = DictProperty("depth")  # type: ignore[assignment]
+    content = DictProperty("content")  # type: ignore[assignment]
+    hashes: Dict[str, str] = DictProperty("hashes")  # type: ignore[assignment]
+    origin: str = DictProperty("origin")  # type: ignore[assignment]
+    origin_server_ts: int = DictProperty("origin_server_ts")  # type: ignore[assignment]
+    prev_events = DictProperty("prev_events")  # type: ignore[assignment]
+    redacts = DefaultDictProperty("redacts", None)  # type: ignore[assignment]
+    room_id: str = DictProperty("room_id")  # type: ignore[assignment]
+    sender: str = DictProperty("sender")  # type: ignore[assignment]
+    state_key = DictProperty("state_key")  # type: ignore[assignment]
+    type: str = DictProperty("type")  # type: ignore[assignment]
+    user_id: str = DictProperty("sender")  # type: ignore[assignment]
 
     @property
     def event_id(self) -> str:
         raise NotImplementedError()
 
     @property
-    def membership(self):
+    def membership(self) -> str:
         return self.content["membership"]
 
-    def is_state(self):
+    def is_state(self) -> bool:
         return hasattr(self, "state_key") and self.state_key is not None
 
     def get_dict(self) -> JsonDict:
@@ -272,13 +266,13 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return d
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Optional[Any] = None) -> Any:
         return self._dict.get(key, default)
 
-    def get_internal_metadata_dict(self):
+    def get_internal_metadata_dict(self) -> JsonDict:
         return self.internal_metadata.get_dict()
 
-    def get_pdu_json(self, time_now=None) -> JsonDict:
+    def get_pdu_json(self, time_now: Optional[int] = None) -> JsonDict:
         pdu_json = self.get_dict()
 
         if time_now is not None and "age_ts" in pdu_json["unsigned"]:
@@ -305,49 +299,49 @@ class EventBase(metaclass=abc.ABCMeta):
 
         return template_json
 
-    def __set__(self, instance, value):
+    def __set__(self, instance: Any, value: Any) -> None:
         raise AttributeError("Unrecognized attribute %s" % (instance,))
 
-    def __getitem__(self, field):
+    def __getitem__(self, field: str) -> Optional[Any]:
         return self._dict[field]
 
-    def __contains__(self, field):
+    def __contains__(self, field: str) -> bool:
         return field in self._dict
 
-    def items(self):
+    def items(self) -> List[Tuple[str, Optional[Any]]]:
         return list(self._dict.items())
 
-    def keys(self):
+    def keys(self) -> Iterable[str]:
         return self._dict.keys()
 
-    def prev_event_ids(self):
+    def prev_event_ids(self) -> List[str]:
         """Returns the list of prev event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
         Returns:
-            list[str]: The list of event IDs of this event's prev_events
+            The list of event IDs of this event's prev_events
         """
         return [e for e, _ in self.prev_events]
 
-    def auth_event_ids(self):
+    def auth_event_ids(self) -> List[str]:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
         Returns:
-            list[str]: The list of event IDs of this event's auth_events
+            The list of event IDs of this event's auth_events
         """
         return [e for e, _ in self.auth_events]
 
-    def freeze(self):
+    def freeze(self) -> None:
         """'Freeze' the event dict, so it cannot be modified by accident"""
 
         # this will be a no-op if the event dict is already frozen.
         self._dict = freeze(self._dict)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.__repr__()
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "<%s event_id=%r, type=%r, state_key=%r, outlier=%s>" % (
             self.__class__.__name__,
             self.event_id,
@@ -439,7 +433,7 @@ class FrozenEventV2(EventBase):
         else:
             frozen_dict = event_dict
 
-        self._event_id = None
+        self._event_id: Optional[str] = None
 
         super().__init__(
             frozen_dict,
@@ -451,7 +445,7 @@ class FrozenEventV2(EventBase):
         )
 
     @property
-    def event_id(self):
+    def event_id(self) -> str:
         # We have to import this here as otherwise we get an import loop which
         # is hard to break.
         from synapse.crypto.event_signing import compute_event_reference_hash
@@ -461,21 +455,21 @@ class FrozenEventV2(EventBase):
         self._event_id = "$" + encode_base64(compute_event_reference_hash(self)[1])
         return self._event_id
 
-    def prev_event_ids(self):
+    def prev_event_ids(self) -> List[str]:
         """Returns the list of prev event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
         Returns:
-            list[str]: The list of event IDs of this event's prev_events
+            The list of event IDs of this event's prev_events
         """
         return self.prev_events
 
-    def auth_event_ids(self):
+    def auth_event_ids(self) -> List[str]:
         """Returns the list of auth event IDs. The order matches the order
         specified in the event, though there is no meaning to it.
 
         Returns:
-            list[str]: The list of event IDs of this event's auth_events
+            The list of event IDs of this event's auth_events
         """
         return self.auth_events
 
@@ -486,7 +480,7 @@ class FrozenEventV3(FrozenEventV2):
     format_version = EventFormatVersions.V3  # All events of this type are V3
 
     @property
-    def event_id(self):
+    def event_id(self) -> str:
         # We have to import this here as otherwise we get an import loop which
         # is hard to break.
         from synapse.crypto.event_signing import compute_event_reference_hash
@@ -499,12 +493,14 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
+def _event_type_from_format_version(
+    format_version: int,
+) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV3]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
     Args:
-        format_version (int): The event format version
+        format_version: The event format version
 
     Returns:
         type: A type that can be initialized as per the initializer of
