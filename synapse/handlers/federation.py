@@ -593,6 +593,10 @@ class FederationHandler(BaseHandler):
             target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
         )
 
+        # Mark the knock as an outlier as we don't yet have the state at this point in
+        # the DAG.
+        event.internal_metadata.outlier = True
+
         # Record the room ID and its version so that we have a record of the room
         await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=event_format_version
