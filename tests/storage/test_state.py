@@ -818,11 +818,19 @@ class StateFilterDifferenceTestCase(TestCase):
                 types=frozendict({EventTypes.Member: None}), include_others=True
             ),
             StateFilter(
-                types=frozendict({EventTypes.Member: frozenset({"@wombat:spqr"})}),
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
                 include_others=True,
             ),
             StateFilter(
-                types=frozendict({EventTypes.Member: None}), include_others=False
+                types=frozendict(
+                    {EventTypes.Member: None, EventTypes.CanonicalAlias: None}
+                ),
+                include_others=False,
             ),
         )
 
@@ -876,6 +884,7 @@ class StateFilterDifferenceTestCase(TestCase):
                     {
                         EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
                         EventTypes.CanonicalAlias: frozenset({""}),
+                        EventTypes.Create: frozenset({""}),
                     }
                 ),
                 include_others=True,
@@ -884,6 +893,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 types=frozendict(
                     {
                         EventTypes.Member: frozenset({"@wombat:spqr"}),
+                        EventTypes.Create: frozenset(),
                     }
                 ),
                 include_others=True,
@@ -892,6 +902,7 @@ class StateFilterDifferenceTestCase(TestCase):
                 types=frozendict(
                     {
                         EventTypes.Member: frozenset({"@spqr:spqr"}),
+                        EventTypes.Create: frozenset({""}),
                     }
                 ),
                 include_others=False,
@@ -1070,99 +1081,10 @@ class StateFilterDifferenceTestCase(TestCase):
         that are not explicitly tested by the more in-depth tests.
         """
 
-        self.assert_difference(
-            StateFilter.all(),
-            StateFilter.all(),
-            StateFilter.none()
-        )
+        self.assert_difference(StateFilter.all(), StateFilter.all(), StateFilter.none())
 
         self.assert_difference(
             StateFilter.all(),
             StateFilter.none(),
             StateFilter.all(),
-        )
-
-    def test_state_filter_difference(self):
-        # we can subtract wildcards from wildcards
-        self.assert_difference(
-            StateFilter(
-                types=frozendict(
-                    {
-                        EventTypes.Member: frozenset(),
-                        EventTypes.CanonicalAlias: None,
-                    }
-                ),
-                include_others=True,
-            ),
-            StateFilter(
-                types=frozendict({EventTypes.JoinRules: None}), include_others=False
-            ),
-            StateFilter(
-                types=frozendict(
-                    {EventTypes.Member: frozenset(), EventTypes.JoinRules: frozenset()}
-                ),
-                include_others=True,
-            ),
-        )
-
-        # subtract two strange wildcards
-        self.assert_difference(
-            StateFilter(
-                types=frozendict({EventTypes.Member: None}),
-                include_others=True,
-            ),
-            StateFilter(
-                types=frozendict({EventTypes.CanonicalAlias: frozenset({""})}),
-                include_others=True,
-            ),
-            StateFilter(
-                types=frozendict({EventTypes.CanonicalAlias: None}),
-                include_others=False,
-            ),
-        )
-
-        # we can subtract individual state keys, except from wildcards
-        self.assert_difference(
-            StateFilter(
-                types=frozendict(
-                    {
-                        EventTypes.Member: frozenset({"@wombat:hs1", "@kristina:hs2"}),
-                        EventTypes.CanonicalAlias: None,
-                    }
-                ),
-                include_others=False,
-            ),
-            StateFilter(
-                types=frozendict(
-                    {
-                        EventTypes.Member: frozenset({"@kristina:hs2"}),
-                        EventTypes.CanonicalAlias: frozenset({""}),
-                    }
-                ),
-                include_others=False,
-            ),
-            StateFilter(
-                types=frozendict(
-                    {
-                        EventTypes.Member: frozenset({"@wombat:hs1"}),
-                        EventTypes.CanonicalAlias: None,
-                    }
-                ),
-                include_others=False,
-            ),
-        )
-
-        # we can subtract wildcards from non-wildcards
-        self.assert_difference(
-            StateFilter(
-                types=frozendict(
-                    {EventTypes.Member: frozenset({"@wombat:hs1", "@kristina:hs2"})}
-                ),
-                include_others=False,
-            ),
-            StateFilter(
-                types=frozendict({EventTypes.CanonicalAlias: frozenset({""})}),
-                include_others=True,
-            ),
-            StateFilter.none(),
         )
