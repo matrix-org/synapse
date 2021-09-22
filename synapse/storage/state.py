@@ -29,7 +29,7 @@ from frozendict import frozendict
 
 from synapse.api.constants import EventTypes
 from synapse.events import EventBase
-from synapse.types import MutableStateMap, StateMap
+from synapse.types import MutableStateMap, StateKey, StateMap
 
 if TYPE_CHECKING:
     from typing import FrozenSet  # noqa: used within quoted type hint; flake8 sad
@@ -355,6 +355,40 @@ class StateFilter:
         )
 
         return member_filter, non_member_filter
+
+    def decompose_into_four_parts(
+        self,
+    ) -> Tuple[bool, Set[str], Set[str], Set[StateKey]]:
+        """
+        Decomposes this state filter into 4 constituent parts, which can be
+        thought of as this:
+            all? - minus_wildcards + plus_wildcards + plus_state_keys
+
+        where
+        * all represents ALL state
+        * minus_wildcards represents entire state types to remove
+        * plus_wildcards represents entire state types to add
+        * plus_state_keys represents individual state keys to add
+        """
+        all_part: bool = self.include_others
+        minus_wildcards: Set[str] = set()
+        plus_wildcards: Set[str] = set()
+        plus_state_keys: Set[StateKey] = set()
+
+        for state_type, state_keys in self.types.items():
+            if state_keys is None:
+                # this is a wildcard
+                if not all_part:
+                    plus_wildcards.add(state_type)
+            else:
+                if all_part:
+                    # we remove the wildcard on this type, because we will
+                    # instead specify individual keys
+                    minus_wildcards.add(state_type)
+                for state_key in state_keys:
+                    plus_state_keys.add((state_type, state_key))
+
+        return all_part, minus_wildcards, plus_wildcards, plus_state_keys
 
     def approx_difference(self, subtrahend: "StateFilter") -> "StateFilter":
         """
