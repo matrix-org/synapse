@@ -4,11 +4,11 @@ It can be desirable to implement "experimental" features which are disabled by
 default and must be explicitly enabled via the Synapse configuration. This is
 applicable for features which:
 
-* Are unstable in the Matrix spec (e.g. those defined by an MSC).
-* Developers are not confident are ready for use by general Synapse administrators/users
+* Are unstable in the Matrix spec (e.g. those defined by an MSC that has not yet been merged).
+* Developers are not confident in their use by general Synapse administrators/users
   (e.g. a feature is incomplete, buggy, performs poorly, or needs further testing).
 
-Note that this does *not* include features which are not expected to be desirable
+Note that this only really applies to features which are expected to be desirable
 to a broad audience. The [module infrastructure](../modules/index.md) should be
 investigated for non-standard features.
 
@@ -29,8 +29,8 @@ administrators to explicitly opt-in), although there are situations where it mak
 sense (from a product point-of-view) to enable features by default. This is
 expected and not an issue.
 
-It is not a requirement that experimental features require a configuration flag,
-but if one should be included if unsure.
+It is not a requirement for experimental features to be behind a configuration flag,
+but one should be used if unsure.
 
 New experimental configuration flags should be added under the `experimental`
 configuration key (see the `synapse.config.experimental` file) and either explain
