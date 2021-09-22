@@ -40,7 +40,7 @@ from twisted.internet.interfaces import IReactorTime
 from synapse.config import cache as cache_config
 from synapse.metrics.background_process_metrics import wrap_as_background_process
 from synapse.util import Clock, caches
-from synapse.util.caches import CacheMetric, register_cache
+from synapse.util.caches import CacheMetric, EvictionReason, register_cache
 from synapse.util.caches.treecache import TreeCache, iterate_tree_cache_entry
 from synapse.util.linked_list import ListNode
 
@@ -403,7 +403,7 @@ class LruCache(Generic[KT, VT]):
                 evicted_len = delete_node(node)
                 cache.pop(node.key, None)
                 if metrics:
-                    metrics.inc_evictions(evicted_len)
+                    metrics.inc_evictions(EvictionReason.size, evicted_len)
 
         def synchronized(f: FT) -> FT:
             @wraps(f)
