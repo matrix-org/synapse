@@ -1803,7 +1803,6 @@ class PersistEventsStore:
                 "next_batch_id": next_batch_id,
             },
             retcol="event_id",
-            desc="get_device_list_last_stream_id_for_remote",
             allow_none=True,
         )
         if conflicting_insertion_event_id is not None:
