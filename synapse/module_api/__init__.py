@@ -723,7 +723,13 @@ class ModuleApi:
 
     def is_mine(self, id: Union[str, DomainSpecificString]) -> bool:
         """
-        Checks whether an ID comes from this homeserver.
+        Checks whether an ID (user id, room, ...) comes from this homeserver.
+
+        Args:
+            id: any Matrix id (e.g. user id, room id, ...), either as a raw id,
+                e.g. string "@user:example.com" or as a parsed UserID, RoomID, ...
+        Returns:
+            True if id comes from this homeserver, False otherwise.
 
         Added in Synapse v1.44.0.
         """
@@ -738,8 +744,14 @@ class ModuleApi:
         """
         Return the list of user IPs and agents for a user.
 
-        Only useful for local users. If since_ts is not specified,
-        return the list since the epoch.
+        Args:
+            user_id: the id of a user, local or remote
+            since_ts: a timestamp in seconds since the epoch,
+                or the epoch itself if not specified.
+        Returns:
+            The list of all UserIpAndAgent that the user has
+            used to connect to this homeserver since `since_ts`.
+            If the user is remote, this list is empty.
 
         Added in Synapse v1.44.0.
         """
