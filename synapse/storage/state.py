@@ -405,7 +405,7 @@ class StateFilter:
             None if new_include_others else frozenset()
         )
         state_types = set(subtrahend.types.keys())
-        state_types.update(set(self.types.keys()))
+        state_types.update(self.types.keys())
         for state_type in state_types:
             sub_keys: Optional[FrozenSet[str]] = subtrahend.types.get(
                 state_type, subtrahend_default_for_unspecified
