@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Awaitable, Callable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Awaitable, Callable, List, Optional, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.events import EventBase
@@ -38,7 +38,7 @@ CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK = Callable[
 ]
 
 
-def load_legacy_third_party_event_rules(hs: "HomeServer"):
+def load_legacy_third_party_event_rules(hs: "HomeServer") -> None:
     """Wrapper that loads a third party event rules module configured using the old
     configuration, and registers the hooks they implement.
     """
@@ -112,7 +112,7 @@ def load_legacy_third_party_event_rules(hs: "HomeServer"):
 
             return wrap_on_create_room
 
-        def run(*args, **kwargs):
+        def run(*args: Any, **kwargs: Any) -> Awaitable:
             # mypy doesn't do well across function boundaries so we need to tell it
             # f is definitely not None.
             assert f is not None
@@ -162,7 +162,7 @@ class ThirdPartyEventRules:
         check_visibility_can_be_modified: Optional[
             CHECK_VISIBILITY_CAN_BE_MODIFIED_CALLBACK
         ] = None,
-    ):
+    ) -> None:
         """Register callbacks from modules for each hook."""
         if check_event_allowed is not None:
             self._check_event_allowed_callbacks.append(check_event_allowed)
