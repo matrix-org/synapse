@@ -243,19 +243,22 @@ class EventContext:
         await self._ensure_fetched()
         return self._current_state_ids
 
-    async def get_prev_state_ids(self):
+    async def get_prev_state_ids(self) -> StateMap[str]:
         """
         Gets the room state map, excluding this event.
 
         For a non-state event, this will be the same as get_current_state_ids().
 
         Returns:
-            dict[(str, str), str]|None: Returns None if state_group
-                is None, which happens when the associated event is an outlier.
-                Maps a (type, state_key) to the event ID of the state event matching
-                this tuple.
+            Returns {} if state_group is None, which happens when the associated
+            event is an outlier.
+
+            Maps a (type, state_key) to the event ID of the state event matching
+            this tuple.
         """
         await self._ensure_fetched()
+        # There *should* be previous state IDs now.
+        assert self._prev_state_ids is not None
         return self._prev_state_ids
 
     def get_cached_current_state_ids(self) -> Optional[StateMap[str]]:
