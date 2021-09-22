@@ -14,7 +14,7 @@
 
 import functools
 import sys
-from typing import Any, Callable, List
+from typing import Any, Callable, Generator, List
 
 from twisted.internet import defer
 from twisted.internet.defer import Deferred
@@ -37,12 +37,14 @@ def do_patch() -> None:
     if _already_patched:
         return
 
-    def new_inline_callbacks(f):
+    def new_inline_callbacks(f: Callable[..., Generator]) -> Callable[..., Any]:
         @functools.wraps(f)
-        def wrapped(*args, **kwargs):
+        def wrapped(*args: Any, **kwargs: Any) -> Any:
             start_context = current_context()
             changes: List[str] = []
-            orig = orig_inline_callbacks(_check_yield_points(f, changes))
+            orig: Callable[..., Deferred] = orig_inline_callbacks(
+                _check_yield_points(f, changes)
+            )
 
             try:
                 res = orig(*args, **kwargs)
@@ -84,7 +86,7 @@ def do_patch() -> None:
                 print(err, file=sys.stderr)
                 raise Exception(err)
 
-            def check_ctx(r):
+            def check_ctx(r: Any) -> Any:
                 if current_context() != start_context:
                     for err in changes:
                         print(err, file=sys.stderr)
@@ -107,7 +109,7 @@ def do_patch() -> None:
     _already_patched = True
 
 
-def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
+def _check_yield_points(f: Callable[..., Generator], changes: List[str]) -> Callable:
     """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
 
@@ -127,7 +129,7 @@ def _check_yield_points(f: Callable, changes: List[str]) -> Callable:
     from synapse.logging.context import current_context
 
     @functools.wraps(f)
-    def check_yield_points_inner(*args, **kwargs):
+    def check_yield_points_inner(*args: Any, **kwargs: Any) -> Any:
         gen = f(*args, **kwargs)
 
         last_yield_line_no = gen.gi_frame.f_lineno
