@@ -1,0 +1,1 @@
+Allow `.` and `~` characters when creating registration tokens as per the [change to MSC3231](https://github.com/matrix-org/matrix-doc/pull/3231/commits/79939f955b34113404b5d363a981f790aa7ec0e7).
