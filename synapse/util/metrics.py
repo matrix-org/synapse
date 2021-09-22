@@ -14,7 +14,7 @@
 
 import logging
 from functools import wraps
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, Protocol, TypeVar, cast
 
 from prometheus_client import Counter
 
@@ -53,8 +53,14 @@ block_db_sched_duration = Counter(
     "synapse_util_metrics_block_db_sched_duration_seconds", "", ["block_name"]
 )
 
+
+class InFlightBlockMetrics(Protocol):
+    real_time_max: float
+    real_time_sum: float
+
+
 # Tracks the number of blocks currently active
-in_flight = InFlightGauge(
+in_flight = InFlightGauge[InFlightBlockMetrics](
     "synapse_util_metrics_block_in_flight",
     "",
     labels=["block_name"],
@@ -168,7 +174,7 @@ class Measure:
         """
         return self._logging_context.get_resource_usage()
 
-    def _update_in_flight(self, metrics):
+    def _update_in_flight(self, metrics: InFlightBlockMetrics):
         """Gets called when processing in flight metrics"""
         duration = self.clock.time() - self.start
 

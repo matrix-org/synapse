@@ -24,11 +24,13 @@ from typing import (
     Any,
     Callable,
     Dict,
+    Generic,
     Iterable,
     Optional,
     Sequence,
     Set,
     Tuple,
+    Type,
     TypeVar,
     Union,
     cast,
@@ -113,11 +115,12 @@ class LaterGauge:
         all_gauges[self.name] = self
 
 
-# Placeholder for `InFlightGauge._metrics_class`, which is created dynamically
-_MetricsEntry = Any
+# `MetricsEntry` only makes sense when it is a `Protocol`,
+# but `Protocol` can't be used as a `TypeVar` bound.
+MetricsEntry = TypeVar("MetricsEntry")
 
 
-class InFlightGauge:
+class InFlightGauge(Generic[MetricsEntry]):
     """Tracks number of things (e.g. requests, Measure blocks, etc) in flight
     at any given time.
 
@@ -147,13 +150,13 @@ class InFlightGauge:
 
         # Create a class which have the sub_metrics values as attributes, which
         # default to 0 on initialization. Used to pass to registered callbacks.
-        self._metrics_class = attr.make_class(
+        self._metrics_class: Type[MetricsEntry] = attr.make_class(
             "_MetricsEntry", attrs={x: attr.ib(0) for x in sub_metrics}, slots=True
         )
 
         # Counts number of in flight blocks for a given set of label values
         self._registrations: Dict[
-            Tuple[str, ...], Set[Callable[[_MetricsEntry], None]]
+            Tuple[str, ...], Set[Callable[[MetricsEntry], None]]
         ] = {}
 
         # Protects access to _registrations
@@ -164,7 +167,7 @@ class InFlightGauge:
     def register(
         self,
         key: Tuple[str, ...],
-        callback: Callable[[_MetricsEntry], None],
+        callback: Callable[[MetricsEntry], None],
     ) -> None:
         """Registers that we've entered a new block with labels `key`.
 
@@ -184,7 +187,7 @@ class InFlightGauge:
     def unregister(
         self,
         key: Tuple[str, ...],
-        callback: Callable[[_MetricsEntry], None],
+        callback: Callable[[MetricsEntry], None],
     ) -> None:
         """Registers that we've exited a block with labels `key`."""
 
