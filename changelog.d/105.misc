@@ -1,0 +1,1 @@
+Ensure the Rust reporter passes type checking with jaeger-client 4.7's type annotations.
