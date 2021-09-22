@@ -16,7 +16,7 @@
 
 import abc
 import os
-from typing import Dict, Optional, Tuple, Type
+from typing import Dict, Optional, Tuple, Type, Union
 
 from unpaddedbase64 import encode_base64
 
@@ -111,22 +111,22 @@ class _EventInternalMetadata:
         # in the DAG)
         self.outlier = False
 
-    out_of_band_membership: bool = DictProperty("out_of_band_membership")
-    send_on_behalf_of: str = DictProperty("send_on_behalf_of")
-    recheck_redaction: bool = DictProperty("recheck_redaction")
-    soft_failed: bool = DictProperty("soft_failed")
-    proactively_send: bool = DictProperty("proactively_send")
-    redacted: bool = DictProperty("redacted")
-    txn_id: str = DictProperty("txn_id")
-    token_id: int = DictProperty("token_id")
-    historical: bool = DictProperty("historical")
+    out_of_band_membership: bool = DictProperty("out_of_band_membership")  # type: ignore[assignment]
+    send_on_behalf_of: str = DictProperty("send_on_behalf_of")  # type: ignore[assignment]
+    recheck_redaction: bool = DictProperty("recheck_redaction")  # type: ignore[assignment]
+    soft_failed: bool = DictProperty("soft_failed")  # type: ignore[assignment]
+    proactively_send: bool = DictProperty("proactively_send")  # type: ignore[assignment]
+    redacted: bool = DictProperty("redacted")  # type: ignore[assignment]
+    txn_id: str = DictProperty("txn_id")  # type: ignore[assignment]
+    token_id: int = DictProperty("token_id")  # type: ignore[assignment]
+    historical: bool = DictProperty("historical")  # type: ignore[assignment]
 
     # XXX: These are set by StreamWorkerStore._set_before_and_after.
     # I'm pretty sure that these are never persisted to the database, so shouldn't
     # be here
-    before: RoomStreamToken = DictProperty("before")
-    after: RoomStreamToken = DictProperty("after")
-    order: Tuple[int, int] = DictProperty("order")
+    before: RoomStreamToken = DictProperty("before")  # type: ignore[assignment]
+    after: RoomStreamToken = DictProperty("after")  # type: ignore[assignment]
+    order: Tuple[int, int] = DictProperty("order")  # type: ignore[assignment]
 
     def get_dict(self) -> JsonDict:
         return dict(self._dict)
@@ -241,19 +241,19 @@ class EventBase(metaclass=abc.ABCMeta):
 
         self.internal_metadata = _EventInternalMetadata(internal_metadata_dict)
 
-    auth_events = DictProperty("auth_events")
-    depth = DictProperty("depth")
-    content = DictProperty("content")
-    hashes = DictProperty("hashes")
-    origin = DictProperty("origin")
-    origin_server_ts = DictProperty("origin_server_ts")
-    prev_events = DictProperty("prev_events")
-    redacts = DefaultDictProperty("redacts", None)
-    room_id = DictProperty("room_id")
-    sender = DictProperty("sender")
-    state_key = DictProperty("state_key")
-    type = DictProperty("type")
-    user_id = DictProperty("sender")
+    auth_events = DictProperty("auth_events")  # type: ignore[assignment]
+    depth = DictProperty("depth")  # type: ignore[assignment]
+    content = DictProperty("content")  # type: ignore[assignment]
+    hashes = DictProperty("hashes")  # type: ignore[assignment]
+    origin = DictProperty("origin")  # type: ignore[assignment]
+    origin_server_ts = DictProperty("origin_server_ts")  # type: ignore[assignment]
+    prev_events = DictProperty("prev_events")  # type: ignore[assignment]
+    redacts = DefaultDictProperty("redacts", None)  # type: ignore[assignment]
+    room_id = DictProperty("room_id")  # type: ignore[assignment]
+    sender = DictProperty("sender")  # type: ignore[assignment]
+    state_key = DictProperty("state_key")  # type: ignore[assignment]
+    type = DictProperty("type")  # type: ignore[assignment]
+    user_id = DictProperty("sender")  # type: ignore[assignment]
 
     @property
     def event_id(self) -> str:
@@ -439,7 +439,7 @@ class FrozenEventV2(EventBase):
         else:
             frozen_dict = event_dict
 
-        self._event_id = None
+        self._event_id: Optional[str] = None
 
         super().__init__(
             frozen_dict,
@@ -499,12 +499,14 @@ class FrozenEventV3(FrozenEventV2):
         return self._event_id
 
 
-def _event_type_from_format_version(format_version: int) -> Type[EventBase]:
+def _event_type_from_format_version(
+    format_version: int,
+) -> Type[Union[FrozenEvent, FrozenEventV2, FrozenEventV2]]:
     """Returns the python type to use to construct an Event object for the
     given event format version.
 
     Args:
-        format_version (int): The event format version
+        format_version: The event format version
 
     Returns:
         type: A type that can be initialized as per the initializer of
