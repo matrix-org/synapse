@@ -1064,9 +1064,26 @@ class StateFilterDifferenceTestCase(TestCase):
             ),
         )
 
+    def test_state_filter_difference_simple_cases(self):
+        """
+        Tests some very simple cases of the StateFilter approx_difference,
+        that are not explicitly tested by the more in-depth tests.
+        """
+
+        self.assert_difference(
+            StateFilter.all(),
+            StateFilter.all(),
+            StateFilter.none()
+        )
+
+        self.assert_difference(
+            StateFilter.all(),
+            StateFilter.none(),
+            StateFilter.all(),
+        )
+
     def test_state_filter_difference(self):
         # we can subtract wildcards from wildcards
-        self.assert_difference(StateFilter.all(), StateFilter.all(), StateFilter.none())
         self.assert_difference(
             StateFilter(
                 types=frozendict(
