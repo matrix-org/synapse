@@ -21,7 +21,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.storage.state import StateFilter
 from synapse.types import RoomID, UserID
 
-from tests.unittest import HomeserverTestCase
+from tests.unittest import HomeserverTestCase, TestCase
 
 logger = logging.getLogger(__name__)
 
@@ -484,7 +484,7 @@ class StateStoreTestCase(HomeserverTestCase):
         self.assertDictEqual({(e5.type, e5.state_key): e5.event_id}, state_dict)
 
 
-class StateFilterDifferenceTestCase(HomeserverTestCase):
+class StateFilterDifferenceTestCase(TestCase):
     def assert_difference(
         self, minuend: StateFilter, subtrahend: StateFilter, expected: StateFilter
     ):
@@ -492,6 +492,571 @@ class StateFilterDifferenceTestCase(HomeserverTestCase):
             minuend.approx_difference(subtrahend),
             expected,
             f"StateFilter difference not correct:\n\n\t{minuend!r}\nminus\n\t{subtrahend!r}\nwas\n\t{minuend.approx_difference(subtrahend)}\nexpected\n\t{expected}",
+        )
+
+    def test_state_filter_difference_no_include_other_minus_no_include_other(self):
+        """
+        Tests the StateFilter.approx_difference method
+        where, in a.approx_difference(b), both a and b do not have the
+        include_others flag set.
+        """
+        # (wildcard on state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None, EventTypes.Create: None}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {EventTypes.Member: None, EventTypes.CanonicalAlias: None}
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Create: None}), include_others=False
+            ),
+        )
+
+        # (wildcard on state keys) - (specific state keys)
+        # This one is an over-approximation because we can't represent
+        # 'all state keys except a few named examples'
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=False
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: frozenset({"@wombat:spqr"})}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=False
+            ),
+        )
+
+        # (wildcard on state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.CanonicalAlias: frozenset({""})}),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (specific state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr"}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+        )
+
+    def test_state_filter_difference_include_other_minus_no_include_other(self):
+        """
+        Tests the StateFilter.approx_difference method
+        where, in a.approx_difference(b), only a has the include_others flag set.
+        """
+        # (wildcard on state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None, EventTypes.Create: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {EventTypes.Member: None, EventTypes.CanonicalAlias: None}
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Create: None,
+                        EventTypes.Member: frozenset(),
+                        EventTypes.CanonicalAlias: frozenset(),
+                    }
+                ),
+                include_others=True,
+            ),
+        )
+
+        # (wildcard on state keys) - (specific state keys)
+        # This one is an over-approximation because we can't represent
+        # 'all state keys except a few named examples'
+        # This also shows that the resultant state filter is normalised.
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=True
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: frozenset({"@wombat:spqr"})}),
+                include_others=False,
+            ),
+            StateFilter(types=frozendict(), include_others=True),
+        )
+
+        # (wildcard on state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(),
+                include_others=True,
+            ),
+        )
+
+        # (specific state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=True,
+            ),
+        )
+
+        # (specific state keys) - (specific state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr"}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+        )
+
+        # (specific state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+        )
+
+    def test_state_filter_difference_include_other_minus_include_other(self):
+        """
+        Tests the StateFilter.approx_difference method
+        where, in a.approx_difference(b), both a and b have the include_others
+        flag set.
+        """
+        # (wildcard on state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None, EventTypes.Create: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {EventTypes.Member: None, EventTypes.CanonicalAlias: None}
+                ),
+                include_others=True,
+            ),
+            StateFilter(types=frozendict(), include_others=False),
+        )
+
+        # (wildcard on state keys) - (specific state keys)
+        # This one is an over-approximation because we can't represent
+        # 'all state keys except a few named examples'
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=True
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: frozenset({"@wombat:spqr"})}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=False
+            ),
+        )
+
+        # (wildcard on state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (specific state keys)
+        # This one is an over-approximation because we can't represent
+        # 'all state keys except a few named examples'
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr"}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@spqr:spqr"}),
+                    }
+                ),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                    }
+                ),
+                include_others=False,
+            ),
+        )
+
+    def test_state_filter_difference_no_include_other_minus_include_other(self):
+        """
+        Tests the StateFilter.approx_difference method
+        where, in a.approx_difference(b), only b has the include_others flag set.
+        """
+        # (wildcard on state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None, EventTypes.Create: None}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {EventTypes.Member: None, EventTypes.CanonicalAlias: None}
+                ),
+                include_others=True,
+            ),
+            StateFilter(types=frozendict(), include_others=False),
+        )
+
+        # (wildcard on state keys) - (specific state keys)
+        # This one is an over-approximation because we can't represent
+        # 'all state keys except a few named examples'
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=False
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: frozenset({"@wombat:spqr"})}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}), include_others=False
+            ),
+        )
+
+        # (wildcard on state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (wildcard on state keys):
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict({EventTypes.Member: None}),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (specific state keys)
+        # This one is an over-approximation because we can't represent
+        # 'all state keys except a few named examples'
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr"}),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@spqr:spqr"}),
+                    }
+                ),
+                include_others=False,
+            ),
+        )
+
+        # (specific state keys) - (no state keys)
+        self.assert_difference(
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                        EventTypes.CanonicalAlias: frozenset({""}),
+                    }
+                ),
+                include_others=False,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset(),
+                    }
+                ),
+                include_others=True,
+            ),
+            StateFilter(
+                types=frozendict(
+                    {
+                        EventTypes.Member: frozenset({"@wombat:spqr", "@spqr:spqr"}),
+                    }
+                ),
+                include_others=False,
+            ),
         )
 
     def test_state_filter_difference(self):
