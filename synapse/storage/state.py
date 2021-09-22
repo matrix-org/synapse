@@ -391,48 +391,54 @@ class StateFilter:
                 is an over-approximation.
         """
 
-        types = dict()
+        new_types = {}
         new_include_others = self.include_others and not subtrahend.include_others
-        # if this is an include_others state filter, then all unmentioned
-        # event types are wildcards; otherwise they're empty.
-        subtrahend_default_for_unspecified: Optional[FrozenSet[str]] = (
-            None if subtrahend.include_others else frozenset()
-        )
+
+        # When include_others is set, that means that all unmentioned state event
+        # types are equivalent to wildcards (i.e. None).
+        # When include_others is not set, that means that all unmentioned state event
+        # types are equivalent to empty sets of state keys.
         current_default_for_unspecified: Optional[FrozenSet[str]] = (
             None if self.include_others else frozenset()
+        )
+        subtrahend_default_for_unspecified: Optional[FrozenSet[str]] = (
+            None if subtrahend.include_others else frozenset()
         )
         new_default_for_unspecified: Optional[FrozenSet[str]] = (
             None if new_include_others else frozenset()
         )
+
+        # Get all the state types we need to consider.
         state_types = set(subtrahend.types.keys())
         state_types.update(self.types.keys())
+
         for state_type in state_types:
-            sub_keys: Optional[FrozenSet[str]] = subtrahend.types.get(
-                state_type, subtrahend_default_for_unspecified
-            )
             current_keys: Optional[FrozenSet[str]] = self.types.get(
                 state_type, current_default_for_unspecified
             )
+            subtrahend_keys: Optional[FrozenSet[str]] = subtrahend.types.get(
+                state_type, subtrahend_default_for_unspecified
+            )
 
             new_keys: Optional[FrozenSet[str]]
-            if sub_keys is None:
-                # anything minus all is none
+            if subtrahend_keys is None:
+                # (anything) removing everything leaves you with nothing
                 new_keys = frozenset()
             elif current_keys is None:
-                # all minus a few specific keys is something we can only
-                # approximate as 'all'
+                # everything with a few specific keys removed is something we
+                # can only approximate as 'everything'
                 new_keys = None
             else:
-                # a few specific keys minus a few specific keys is just the set
-                # difference of those keys
-                new_keys = current_keys.difference(sub_keys)
+                # a few specific keys with a few specific keys removed is just
+                # the set difference of those keys
+                new_keys = current_keys.difference(subtrahend_keys)
 
             if new_keys != new_default_for_unspecified:
-                # this is not the same as the default assumption, so
-                # we store it
-                types[state_type] = new_keys
+                # the keys for this state type are not the same as the default
+                # implied by `include_others`, so we will store them explicitly.
+                new_types[state_type] = new_keys
 
-        return StateFilter(frozendict(types), include_others=new_include_others)
+        return StateFilter(frozendict(new_types), include_others=new_include_others)
 
 
 class StateGroupStorage:
