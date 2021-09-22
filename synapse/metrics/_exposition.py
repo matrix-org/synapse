@@ -25,7 +25,7 @@ import math
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Type, Union
 from urllib.parse import parse_qs, urlparse
 
 from prometheus_client import REGISTRY, CollectorRegistry
@@ -39,7 +39,8 @@ from synapse.util import caches
 CONTENT_TYPE_LATEST = "text/plain; version=0.0.4; charset=utf-8"
 
 
-def floatToGoString(d: float) -> str:
+def floatToGoString(d: Union[int, float]) -> str:
+    d = float(d)
     if d == math.inf:
         return "+Inf"
     elif d == -math.inf:
