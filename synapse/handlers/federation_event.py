@@ -1192,7 +1192,7 @@ class FederationEventHandler:
         room_version = await self._store.get_room_version_id(room_id)
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
-        async def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
+        def prep(event: EventBase) -> Optional[Tuple[EventBase, EventContext]]:
             with nested_logging_context(suffix=event.event_id):
                 auth = {}
                 for auth_event_id in event.auth_event_ids():
@@ -1218,9 +1218,7 @@ class FederationEventHandler:
 
             return event, context
 
-        events_to_persist = (
-            x for x in await yieldable_gather_results(prep, fetched_events) if x
-        )
+        events_to_persist = (x for x in (prep(event) for event in fetched_events) if x)
         await self.persist_events_and_notify(room_id, tuple(events_to_persist))
 
     async def _check_event_auth(
