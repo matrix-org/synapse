@@ -1623,28 +1623,32 @@ class FederationEventHandler:
             event_id: the event for which we are lacking auth events
         """
         try:
-            remote_auth_chain = await self._federation_client.get_event_auth(
-                destination, room_id, event_id
-            )
+            remote_event_map = {
+                e.event_id: e
+                for e in await self._federation_client.get_event_auth(
+                    destination, room_id, event_id
+                )
+            }
         except RequestSendFailed as e1:
             # The other side isn't around or doesn't implement the
             # endpoint, so lets just bail out.
             logger.info("Failed to get event auth from remote: %s", e1)
             return
 
+        logger.info("/event_auth returned %i events", len(remote_event_map))
+
         # `event` may be returned, but we should not yet process it.
-        remote_auth_chain = [x for x in remote_auth_chain if x.event_id != event_id]
+        remote_event_map.pop(event_id, None)
 
         # nor should we reprocess any events we have already seen.
         seen_remotes = await self._store.have_seen_events(
-            room_id, [e.event_id for e in remote_auth_chain]
+            room_id, remote_event_map.keys()
         )
-        remote_auth_chain = [
-            x for x in remote_auth_chain if x.event_id not in seen_remotes
-        ]
+        for s in seen_remotes:
+            remote_event_map.pop(s, None)
 
         await self._auth_and_persist_fetched_events(
-            destination, room_id, remote_auth_chain
+            destination, room_id, remote_event_map.values()
         )
 
     async def _update_context_for_auth_events(
