@@ -78,7 +78,7 @@ class LoginRestServlet(RestServlet):
         # SSO configuration.
         self.saml2_enabled = hs.config.saml2_enabled
         self.cas_enabled = hs.config.cas.cas_enabled
-        self.oidc_enabled = hs.config.oidc_enabled
+        self.oidc_enabled = hs.config.oidc.oidc_enabled
         self._msc2918_enabled = hs.config.access_token_lifetime is not None
 
         self.auth = hs.get_auth()

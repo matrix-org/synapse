@@ -366,7 +366,7 @@ def setup(config_options):
 
     async def start():
         # Load the OIDC provider metadatas, if OIDC is enabled.
-        if hs.config.oidc_enabled:
+        if hs.config.oidc.oidc_enabled:
             oidc = hs.get_oidc_handler()
             # Loading the provider metadata also ensures the provider config is valid.
             await oidc.load_metadata()
