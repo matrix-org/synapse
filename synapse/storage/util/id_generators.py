@@ -657,15 +657,15 @@ class MultiWriterIdGenerator:
         txn.execute(sql, (self._stream_name, self._instance_name, pos))
 
 
-@attr.s(slots=True)
+@attr.s(auto_attribs=True)
 class _AsyncCtxManagerWrapper(Generic[T]):
     """Helper class to convert a plain context manager to an async one.
 
     This is mainly useful if you have a plain context manager but the interface
     requires an async one.
     """
-
-    inner = attr.ib(type=ContextManager[T])
+    __slots__ = ["inner"]
+    inner: ContextManager[T]
 
     async def __aenter__(self) -> T:
         return self.inner.__enter__()
