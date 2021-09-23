@@ -195,7 +195,7 @@ class ManageRegistrationTokensTestCase(unittest.HomeserverTestCase):
         """Check right error is raised when server can't generate unique token."""
         # Create all possible single character tokens
         tokens = []
-        for c in string.ascii_letters + string.digits + "-_":
+        for c in string.ascii_letters + string.digits + "._~-":
             tokens.append(
                 {
                     "token": c,
