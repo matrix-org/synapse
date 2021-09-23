@@ -269,7 +269,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.config.enable_metrics:
+        if name == "metrics" and self.config.metrics.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -305,7 +305,7 @@ class SynapseHomeServer(HomeServer):
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"

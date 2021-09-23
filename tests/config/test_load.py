@@ -101,7 +101,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
         # The default Metrics Flags are off by default.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.metrics_flags.known_servers)
+        self.assertFalse(config.metrics.metrics_flags.known_servers)
 
     def generate_config(self):
         with redirect_stdout(StringIO()):

@@ -395,7 +395,7 @@ class GenericWorkerServer(HomeServer):
                     manhole_globals={"hs": self},
                 )
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"

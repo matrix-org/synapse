@@ -82,7 +82,7 @@ class RoomMemberWorkerStore(EventsWorkerStore):
 
         if (
             self.hs.config.worker.run_background_tasks
-            and self.hs.config.metrics_flags.known_servers
+            and self.hs.config.metrics.metrics_flags.known_servers
         ):
             self._known_servers_count = 1
             self.hs.get_clock().looping_call(
