@@ -556,7 +556,7 @@ class RoomStreamToken:
                 "Cannot call `RoomStreamToken.as_historical_tuple` on live token"
             )
 
-        return (self.topological, self.stream)
+        return self.topological, self.stream
 
     def get_stream_pos_for_instance(self, instance_name: str) -> int:
         """Get the stream position that the given writer was at at this token.
@@ -766,7 +766,7 @@ def get_verify_key_from_cross_signing_key(key_info):
         raise ValueError("Invalid key")
     # and return that one key
     for key_id, key_data in keys.items():
-        return (key_id, decode_verify_key_bytes(key_id, decode_base64(key_data)))
+        return key_id, decode_verify_key_bytes(key_id, decode_base64(key_data))
 
 
 @attr.s(auto_attribs=True, frozen=True, slots=True)

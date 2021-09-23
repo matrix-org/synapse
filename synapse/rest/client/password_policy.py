@@ -40,7 +40,7 @@ class PasswordPolicyServlet(RestServlet):
 
     def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.enabled or not self.policy:
-            return (200, {})
+            return 200, {}
 
         policy = {}
 
@@ -54,7 +54,7 @@ class PasswordPolicyServlet(RestServlet):
             if param in self.policy:
                 policy["m.%s" % param] = self.policy[param]
 
-        return (200, policy)
+        return 200, policy
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

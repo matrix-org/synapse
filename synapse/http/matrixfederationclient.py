@@ -1186,7 +1186,7 @@ class MatrixFederationHttpClient:
             request.method,
             request.uri.decode("ascii"),
         )
-        return (length, headers)
+        return length, headers
 
 
 def _flatten_response_never_received(e):

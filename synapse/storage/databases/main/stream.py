@@ -624,7 +624,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._set_before_and_after(events, rows)
 
-        return (events, token)
+        return events, token
 
     async def get_recent_event_ids_for_room(
         self, room_id: str, limit: int, end_token: RoomStreamToken
@@ -1242,7 +1242,7 @@ class StreamWorkerStore(EventsWorkerStore, SQLBaseStore, metaclass=abc.ABCMeta):
 
         self._set_before_and_after(events, rows)
 
-        return (events, token)
+        return events, token
 
     @cached()
     async def get_id_for_instance(self, instance_name: str) -> int:
