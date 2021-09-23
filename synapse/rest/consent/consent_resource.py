@@ -100,13 +100,13 @@ class ConsentResource(DirectServeHtmlResource):
             loader=loader, autoescape=jinja2.select_autoescape(["html", "htm", "xml"])
         )
 
-        if hs.config.form_secret is None:
+        if hs.config.key.form_secret is None:
             raise ConfigError(
                 "Consent resource is enabled but form_secret is not set in "
                 "config file. It should be set to an arbitrary secret string."
             )
 
-        self._hmac_secret = hs.config.form_secret.encode("utf-8")
+        self._hmac_secret = hs.config.key.form_secret.encode("utf-8")
 
     async def _async_render_GET(self, request: Request) -> None:
         version = parse_string(request, "v", default=self._default_consent_version)
