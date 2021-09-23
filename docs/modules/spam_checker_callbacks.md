@@ -63,6 +63,10 @@ information regarding third-party identifiers.
 If no invite and/or 3PID invite were specified in the room creation request, the
 corresponding list(s) will be empty.
 
+**Note**: This callback is not called when a room is cloned (e.g. during a room upgrade)
+since no invites are sent when cloning a room. To cover this case, modules also need to
+implement `user_may_create_room`.
+
 ### `user_may_create_room_alias`
 
 ```python
