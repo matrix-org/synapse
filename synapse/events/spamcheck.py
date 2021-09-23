@@ -78,7 +78,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
     """
     spam_checkers: List[Any] = []
     api = hs.get_module_api()
-    for module, config in hs.config.spam_checkers:
+    for module, config in hs.config.spamchecker.spam_checkers:
         # Older spam checkers don't accept the `api` argument, so we
         # try and detect support.
         spam_args = inspect.getfullargspec(module)
