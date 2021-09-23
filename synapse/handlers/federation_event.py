@@ -1505,61 +1505,22 @@ class FederationEventHandler:
             # If we don't have all the auth events, we need to get them.
             logger.info("auth_events contains unknown events: %s", missing_auth)
             try:
-                try:
-                    remote_auth_chain = await self._federation_client.get_event_auth(
-                        origin, event.room_id, event.event_id
-                    )
-                except RequestSendFailed as e1:
-                    # The other side isn't around or doesn't implement the
-                    # endpoint, so lets just bail out.
-                    logger.info("Failed to get event auth from remote: %s", e1)
-                    return context, auth_events
-
-                seen_remotes = await self._store.have_seen_events(
-                    event.room_id, [e.event_id for e in remote_auth_chain]
+                await self._get_remote_auth_chain_for_event(
+                    origin, event.room_id, event.event_id
                 )
-
-                for auth_event in remote_auth_chain:
-                    if auth_event.event_id in seen_remotes:
-                        continue
-
-                    if auth_event.event_id == event.event_id:
-                        continue
-
-                    try:
-                        auth_ids = auth_event.auth_event_ids()
-                        auth = {
-                            (e.type, e.state_key): e
-                            for e in remote_auth_chain
-                            if e.event_id in auth_ids or e.type == EventTypes.Create
-                        }
-                        auth_event.internal_metadata.outlier = True
-
-                        logger.debug(
-                            "_check_event_auth %s missing_auth: %s",
-                            event.event_id,
-                            auth_event.event_id,
-                        )
-                        missing_auth_event_context = EventContext.for_outlier()
-                        missing_auth_event_context = await self._check_event_auth(
-                            origin,
-                            auth_event,
-                            missing_auth_event_context,
-                            claimed_auth_event_map=auth,
-                        )
-                        await self.persist_events_and_notify(
-                            event.room_id, [(auth_event, missing_auth_event_context)]
-                        )
-
-                        if auth_event.event_id in event_auth_events:
-                            auth_events[
-                                (auth_event.type, auth_event.state_key)
-                            ] = auth_event
-                    except AuthError:
-                        pass
-
             except Exception:
                 logger.exception("Failed to get auth chain")
+            else:
+                # load any auth events we might have persisted from the database. This
+                # has the side-effect of correctly setting the rejected_reason on them.
+                auth_events.update(
+                    {
+                        (ae.type, ae.state_key): ae
+                        for ae in await self._store.get_events_as_list(
+                            missing_auth, allow_rejected=True
+                        )
+                    }
+                )
 
         if event.internal_metadata.is_outlier():
             # XXX: given that, for an outlier, we'll be working with the
@@ -1632,6 +1593,65 @@ class FederationEventHandler:
         )
 
         return context, auth_events
+
+    async def _get_remote_auth_chain_for_event(
+        self, destination: str, room_id: str, event_id: str
+    ) -> None:
+        """If we are missing some of an event's auth events, attempt to request them
+
+        Args:
+            destination: where to fetch the auth tree from
+            room_id: the room in which we are lacking auth events
+            event_id: the event for which we are lacking auth events
+        """
+        try:
+            remote_auth_chain = await self._federation_client.get_event_auth(
+                destination, room_id, event_id
+            )
+        except RequestSendFailed as e1:
+            # The other side isn't around or doesn't implement the
+            # endpoint, so lets just bail out.
+            logger.info("Failed to get event auth from remote: %s", e1)
+            return
+
+        seen_remotes = await self._store.have_seen_events(
+            room_id, [e.event_id for e in remote_auth_chain]
+        )
+
+        for auth_event in remote_auth_chain:
+            if auth_event.event_id in seen_remotes:
+                continue
+
+            if auth_event.event_id == event_id:
+                continue
+
+            try:
+                auth_ids = auth_event.auth_event_ids()
+                auth = {
+                    (e.type, e.state_key): e
+                    for e in remote_auth_chain
+                    if e.event_id in auth_ids or e.type == EventTypes.Create
+                }
+                auth_event.internal_metadata.outlier = True
+
+                logger.debug(
+                    "_check_event_auth %s missing_auth: %s",
+                    event_id,
+                    auth_event.event_id,
+                )
+                missing_auth_event_context = EventContext.for_outlier()
+                missing_auth_event_context = await self._check_event_auth(
+                    destination,
+                    auth_event,
+                    missing_auth_event_context,
+                    claimed_auth_event_map=auth,
+                )
+                await self.persist_events_and_notify(
+                    room_id,
+                    [(auth_event, missing_auth_event_context)],
+                )
+            except AuthError:
+                pass
 
     async def _update_context_for_auth_events(
         self, event: EventBase, context: EventContext, auth_events: StateMap[EventBase]
