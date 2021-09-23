@@ -76,16 +76,16 @@ class MediaRepository:
         self.clock = hs.get_clock()
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
-        self.max_upload_size = hs.config.max_upload_size
-        self.max_image_pixels = hs.config.max_image_pixels
+        self.max_upload_size = hs.config.media.max_upload_size
+        self.max_image_pixels = hs.config.media.max_image_pixels
 
         Thumbnailer.set_limits(self.max_image_pixels)
 
-        self.primary_base_path: str = hs.config.media_store_path
+        self.primary_base_path: str = hs.config.media.media_store_path
         self.filepaths: MediaFilePaths = MediaFilePaths(self.primary_base_path)
 
-        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
-        self.thumbnail_requirements = hs.config.thumbnail_requirements
+        self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
+        self.thumbnail_requirements = hs.config.media.thumbnail_requirements
 
         self.remote_media_linearizer = Linearizer(name="media_remote")
 
@@ -100,7 +100,11 @@ class MediaRepository:
         # potentially upload to.
         storage_providers = []
 
-        for clz, provider_config, wrapper_config in hs.config.media_storage_providers:
+        for (
+            clz,
+            provider_config,
+            wrapper_config,
+        ) in hs.config.media.media_storage_providers:
             backend = clz(hs, provider_config)
             provider = StorageProviderWrapper(
                 backend,
@@ -971,7 +975,7 @@ class MediaRepositoryResource(Resource):
 
     def __init__(self, hs: "HomeServer"):
         # If we're not configured to use it, raise if we somehow got here.
-        if not hs.config.can_load_media_repo:
+        if not hs.config.media.can_load_media_repo:
             raise ConfigError("Synapse is not configured to use a media repo.")
 
         super().__init__()
@@ -982,7 +986,7 @@ class MediaRepositoryResource(Resource):
         self.putChild(
             b"thumbnail", ThumbnailResource(hs, media_repo, media_repo.media_storage)
         )
-        if hs.config.url_preview_enabled:
+        if hs.config.media.url_preview_enabled:
             self.putChild(
                 b"preview_url",
                 PreviewUrlResource(hs, media_repo, media_repo.media_storage),

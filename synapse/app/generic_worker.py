@@ -321,7 +321,7 @@ class GenericWorkerServer(HomeServer):
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
-                    if self.config.can_load_media_repo:
+                    if self.config.media.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
 
                         # We need to serve the admin servlets for media on the

@@ -53,7 +53,7 @@ class MediaStorageTests(unittest.HomeserverTestCase):
         self.primary_base_path = os.path.join(self.test_dir, "primary")
         self.secondary_base_path = os.path.join(self.test_dir, "secondary")
 
-        hs.config.media_store_path = self.primary_base_path
+        hs.config.media.media_store_path = self.primary_base_path
 
         storage_providers = [FileStorageProviderBackend(hs, self.secondary_base_path)]
 

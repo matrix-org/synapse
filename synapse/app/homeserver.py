@@ -234,7 +234,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.config.enable_media_repo:
+            if self.config.media.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
