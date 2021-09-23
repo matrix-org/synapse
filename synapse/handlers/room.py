@@ -1235,7 +1235,7 @@ class RoomEventSource(EventSource[RoomStreamToken, EventBase]):
             else:
                 end_key = to_key
 
-        return (events, end_key)
+        return events, end_key
 
     def get_current_key(self) -> RoomStreamToken:
         return self.store.get_room_max_token()

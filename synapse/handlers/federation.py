@@ -1369,7 +1369,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
         EventValidator().validate_new(event, self.config)
-        return (event, context)
+        return event, context
 
     async def _check_signature(self, event: EventBase, context: EventContext) -> None:
         """

@@ -666,7 +666,7 @@ class EventCreationHandler:
 
         self.validator.validate_new(event, self.config)
 
-        return (event, context)
+        return event, context
 
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
@@ -1004,7 +1004,7 @@ class EventCreationHandler:
 
         logger.debug("Created event %s", event.event_id)
 
-        return (event, context)
+        return event, context
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
