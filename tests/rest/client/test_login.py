@@ -97,7 +97,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
-        self.hs.config.enable_registration_captcha = False
+        self.hs.config.captcha.enable_registration_captcha = False
 
         return self.hs
 

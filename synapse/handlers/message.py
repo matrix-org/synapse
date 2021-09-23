@@ -443,7 +443,7 @@ class EventCreationHandler:
         )
 
         self._block_events_without_consent_error = (
-            self.config.block_events_without_consent_error
+            self.config.consent.block_events_without_consent_error
         )
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
@@ -744,7 +744,7 @@ class EventCreationHandler:
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
-        if u["consent_version"] == self.config.user_consent_version:
+        if u["consent_version"] == self.config.consent.user_consent_version:
             return
 
         consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)

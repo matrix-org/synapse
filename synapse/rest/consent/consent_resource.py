@@ -84,14 +84,15 @@ class ConsentResource(DirectServeHtmlResource):
         # this is required by the request_handler wrapper
         self.clock = hs.get_clock()
 
-        self._default_consent_version = hs.config.user_consent_version
-        if self._default_consent_version is None:
+        # Consent must be configured to create this resource.
+        default_consent_version = hs.config.consent.user_consent_version
+        consent_template_directory = hs.config.consent.user_consent_template_dir
+        if default_consent_version is None or consent_template_directory is None:
             raise ConfigError(
                 "Consent resource is enabled but user_consent section is "
                 "missing in config file."
             )
-
-        consent_template_directory = hs.config.user_consent_template_dir
+        self._default_consent_version = default_consent_version
 
         # TODO: switch to synapse.util.templates.build_jinja_env
         loader = jinja2.FileSystemLoader(consent_template_directory)

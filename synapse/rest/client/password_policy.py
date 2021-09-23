@@ -35,8 +35,8 @@ class PasswordPolicyServlet(RestServlet):
     def __init__(self, hs: "HomeServer"):
         super().__init__()
 
-        self.policy = hs.config.password_policy
-        self.enabled = hs.config.password_policy_enabled
+        self.policy = hs.config.auth.password_policy
+        self.enabled = hs.config.auth.password_policy_enabled
 
     def on_GET(self, request: Request) -> Tuple[int, JsonDict]:
         if not self.enabled or not self.policy:
