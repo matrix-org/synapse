@@ -1632,17 +1632,18 @@ class FederationEventHandler:
             logger.info("Failed to get event auth from remote: %s", e1)
             return
 
+        # `event` may be returned, but we should not yet process it.
+        remote_auth_chain = [x for x in remote_auth_chain if x.event_id != event_id]
+
+        # nor should we reprocess any events we have already seen.
         seen_remotes = await self._store.have_seen_events(
             room_id, [e.event_id for e in remote_auth_chain]
         )
+        remote_auth_chain = [
+            x for x in remote_auth_chain if x.event_id not in seen_remotes
+        ]
 
         for auth_event in remote_auth_chain:
-            if auth_event.event_id in seen_remotes:
-                continue
-
-            if auth_event.event_id == event_id:
-                continue
-
             try:
                 auth_ids = auth_event.auth_event_ids()
                 auth = {
