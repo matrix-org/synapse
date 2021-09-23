@@ -29,6 +29,41 @@ Called when processing an invitation. The module must return a `bool` indicating
 the inviter can invite the invitee to the given room. Both inviter and invitee are
 represented by their Matrix user ID (e.g. `@alice:example.com`).
 
+### `user_may_send_threepid_invite`
+
+```python
+async def user_may_send_3pid_invite(
+    inviter: str,
+    invitee: Dict[str, str],
+    room_id: str,
+) -> bool
+```
+
+Called when processing an invitation using a third-party identifier (also called a 3PID,
+e.g. an email address or a phone number). The module must return a `bool` indicating
+whether the inviter can invite the invitee to the given room.
+
+The inviter is represented by their Matrix user ID (e.g. `@alice:example.com`), and the
+invitee is represented by a dict describing the third-party identifier to send an
+invitation to, with a `medium` key indicating the identifier's medium (e.g. "email") and
+an `address` key indicating the identifier's address (e.g. `alice@example.com`). See
+[the Matrix specification](https://matrix.org/docs/spec/appendices#pid-types) for more
+information regarding third-party identifiers.
+
+For example, a call to this callback to send an invitation to the email address
+`alice@example.com` would look like this:
+
+```python
+await user_may_send_3pid_invite(
+    "@bob:example.com",  # The inviter's user ID
+    {"medium": "email", "address": "alice@example.com"},  # The 3PID to invite
+    "!some_room:example.com",  # The ID of the room to send the invite into
+)
+```
+
+**Note**: If the third-party identifier is already associated with a matrix user ID,
+[`user_may_invite`](#user_may_invite) will be used instead.
+
 ### `user_may_create_room`
 
 ```python

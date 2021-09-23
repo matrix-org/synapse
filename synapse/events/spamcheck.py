@@ -45,6 +45,10 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     Awaitable[Union[bool, str]],
 ]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
+USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
+    [str, Dict[str, str], str],
+    Awaitable[bool]
+]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
@@ -163,6 +167,9 @@ class SpamChecker:
     def __init__(self):
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
+        self._user_may_send_3pid_invite_callbacks: List[
+            USER_MAY_SEND_3PID_INVITE_CALLBACK
+        ] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
         self._user_may_create_room_alias_callbacks: List[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
@@ -182,6 +189,9 @@ class SpamChecker:
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
+        user_may_send_3pid_invite: Optional[
+            USER_MAY_SEND_3PID_INVITE_CALLBACK
+        ] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
@@ -199,6 +209,11 @@ class SpamChecker:
 
         if user_may_invite is not None:
             self._user_may_invite_callbacks.append(user_may_invite)
+
+        if user_may_send_3pid_invite is not None:
+            self._user_may_send_3pid_invite_callbacks.append(
+                user_may_send_3pid_invite,
+            )
 
         if user_may_create_room is not None:
             self._user_may_create_room_callbacks.append(user_may_create_room)
@@ -262,6 +277,32 @@ class SpamChecker:
         """
         for callback in self._user_may_invite_callbacks:
             if await callback(inviter_userid, invitee_userid, room_id) is False:
+                return False
+
+        return True
+
+    async def user_may_send_3pid_invite(
+        self, inviter_userid: str, invitee_threepid: Dict[str, str], room_id: str
+    ) -> bool:
+        """Checks if a given user may invite a given threepid into the room
+
+        If this method returns false, the threepid invite will be rejected.
+
+        Note that if the threepid is already associated with a Matrix user ID, Synapse
+        will call user_may_invite with said user ID instead.
+
+        Args:
+            inviter_userid: The user ID of the sender of the invitation
+            invitee_threepid: The threepid targeted in the invitation, as a dict including
+                a "medium" key indicating the threepid's medium (e.g. "email") and an
+                "address" key indicating the threepid's address (e.g. "alice@example.com")
+            room_id: The room ID
+
+        Returns:
+            True if the user may send the invite, otherwise False
+        """
+        for callback in self._user_may_send_3pid_invite_callbacks:
+            if await callback(inviter_userid, invitee_threepid, room_id) is False:
                 return False
 
         return True

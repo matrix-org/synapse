@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Iterable
+from typing import Iterable, Optional, Dict
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -30,7 +30,7 @@ from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, room, sync
-from synapse.types import JsonDict, RoomAlias, UserID, create_requester
+from synapse.types import JsonDict, RoomAlias, UserID, create_requester, Requester
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -2315,3 +2315,136 @@ class RoomCanonicalAliasTestCase(unittest.HomeserverTestCase):
         """An alias which does not point to the room raises a SynapseError."""
         self._set_canonical_alias({"alias": "@unknown:test"}, expected_code=400)
         self._set_canonical_alias({"alt_aliases": ["@unknown:test"]}, expected_code=400)
+
+
+class ThreepidInviteTestCase(unittest.HomeserverTestCase):
+
+    servlets = [
+        admin.register_servlets,
+        login.register_servlets,
+        room.register_servlets,
+    ]
+
+    def prepare(self, reactor, clock, homeserver):
+        self.user_id = self.register_user("thomas", "hackme")
+        self.tok = self.login("thomas", "hackme")
+
+        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+
+    def test_threepid_invite_spamcheck(self):
+        # Mock a few functions to prevent the test from failing due to failing to talk to
+        # a remote IS. We keep the mock for _mock_make_and_store_3pid_invite around so we
+        # can check its call_count later on during the test.
+        make_invite_mock = self._mock_make_and_store_3pid_invite()
+        self._mock_lookup_3pid()
+
+        # Add a mock to the spamchecker callbacks for user_may_send_3pid_invite. Make it
+        # allow everything for now.
+        return_value = True
+
+        async def _user_may_send_3pid_invite(
+            inviter: str,
+            invitee: Dict[str, str],
+            room_id: str,
+        ) -> bool:
+            return return_value
+
+        allow_mock = Mock(side_effect=_user_may_send_3pid_invite)
+
+        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(allow_mock)
+
+        # Send a 3PID invite into the room and check that it succeeded.
+        email_to_invite = "teresa@example.com"
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "id_access_token": "sometoken",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEquals(channel.code, 200)
+
+        # Check that the callback was called with the right params.
+        expected_call_args = (
+            (
+                self.user_id,
+                {"medium": "email", "address": email_to_invite},
+                self.room_id,
+            ),
+        )
+
+        self.assertEquals(allow_mock.call_args, expected_call_args, allow_mock.call_args)
+
+        # Check that the call to send the invite was made.
+        self.assertEquals(make_invite_mock.call_count, 1)
+
+        # Now change the return value of the callback to deny any invite and test that
+        # we can't send the invite.
+        return_value = False
+        channel = self.make_request(
+            method="POST",
+            path="/rooms/" + self.room_id + "/invite",
+            content={
+                "id_server": "example.com",
+                "id_access_token": "sometoken",
+                "medium": "email",
+                "address": email_to_invite,
+            },
+            access_token=self.tok,
+        )
+        self.assertEquals(channel.code, 403)
+
+        # Also check that it stopped before calling _make_and_store_3pid_invite.
+        self.assertEquals(make_invite_mock.call_count, 1)
+
+    def _mock_make_and_store_3pid_invite(self) -> Mock:
+        """Mocks RoomMemberHandler._make_and_store_3pid_invite with a function that just
+        returns the integer 0.
+
+        Returns:
+            The Mock object _make_and_store_3pid_invite was replaced with.
+        """
+        async def _make_and_store_3pid_invite(
+            requester: Requester,
+            id_server: str,
+            medium: str,
+            address: str,
+            room_id: str,
+            user: UserID,
+            txn_id: Optional[str],
+            id_access_token: Optional[str] = None,
+        ) -> int:
+            return 0
+
+        mock = Mock(side_effect=_make_and_store_3pid_invite)
+
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = mock
+
+        return mock
+
+    def _mock_lookup_3pid(self) -> Mock:
+        """Mocks IdentityHandler.lookup_3pid with a function that just returns None (ie
+        no binding for the 3PID.
+
+        Returns:
+            The Mock object lookup_3pid was replaced with.
+        """
+        async def _lookup_3pid(
+            id_server: str,
+            medium: str,
+            address: str,
+            id_access_token: Optional[str] = None,
+        ) -> Optional[str]:
+            return None
+
+        mock = Mock(side_effect=_lookup_3pid)
+
+        self.hs.get_identity_handler().lookup_3pid = mock
+
+        return mock
+
+
