@@ -97,7 +97,9 @@ class RemoteKey(DirectServeJsonResource):
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
-        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.federation_domain_whitelist = (
+            hs.config.federation.federation_domain_whitelist
+        )
         self.config = hs.config
 
     async def _async_render_GET(self, request: Request) -> None:
@@ -235,7 +237,7 @@ class RemoteKey(DirectServeJsonResource):
             signed_keys = []
             for key_json in json_results:
                 key_json = json_decoder.decode(key_json.decode("utf-8"))
-                for signing_key in self.config.key_server_signing_keys:
+                for signing_key in self.config.key.key_server_signing_keys:
                     key_json = sign_json(
                         key_json, self.config.server.server_name, signing_key
                     )

@@ -395,7 +395,7 @@ class GenericWorkerServer(HomeServer):
                     manhole_globals={"hs": self},
                 )
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"
@@ -488,7 +488,7 @@ def start(config_options):
     register_start(_base.start, hs)
 
     # redirect stdio to the logs, if configured.
-    if not hs.config.no_redirect_stdio:
+    if not hs.config.logging.no_redirect_stdio:
         redirect_stdio_to_logs()
 
     _base.start_worker_reactor("synapse-generic-worker", config)

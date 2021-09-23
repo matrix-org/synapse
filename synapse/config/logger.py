@@ -322,7 +322,7 @@ def setup_logging(
 
     """
     log_config_path = (
-        config.worker_log_config if use_worker_options else config.log_config
+        config.worker_log_config if use_worker_options else config.logging.log_config
     )
 
     # Perform one-time logging configuration.
