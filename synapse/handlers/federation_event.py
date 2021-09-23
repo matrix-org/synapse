@@ -1650,7 +1650,6 @@ class FederationEventHandler:
                     for e in remote_auth_chain
                     if e.event_id in auth_ids or e.type == EventTypes.Create
                 }
-                auth_event.internal_metadata.outlier = True
 
                 logger.debug(
                     "_check_event_auth %s missing_auth: %s",
