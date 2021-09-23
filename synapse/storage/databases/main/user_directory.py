@@ -54,7 +54,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         self,
         database: DatabasePool,
         db_conn: Connection,
-        hs: HomeServer,
+        hs: "HomeServer",
     ):
         super().__init__(database, db_conn, hs)
 
@@ -546,7 +546,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         self,
         database: DatabasePool,
         db_conn: Connection,
-        hs: HomeServer,
+        hs: "HomeServer",
     ) -> None:
         super().__init__(database, db_conn, hs)
 
