@@ -15,7 +15,7 @@
 import logging
 from functools import wraps
 from types import TracebackType
-from typing import Any, Callable, Optional, Protocol, Type, TypeVar, cast
+from typing import Any, Callable, Optional, Protocol, Type, TypeVar, cast, Awaitable
 
 from prometheus_client import Counter
 
@@ -64,7 +64,7 @@ in_flight = InFlightGauge(
 )
 
 R = TypeVar("R")
-F = Callable[..., R]
+F = Callable[..., Awaitable[R]]
 
 
 class HasClock(Protocol):
@@ -98,7 +98,7 @@ def measure_func(name: Optional[str] = None) -> Callable[[F], F]:
                 r = await func(self, *args, **kwargs)
             return r
 
-        return cast(F, measured_func)
+        return measured_func
 
     return wrapper
 
