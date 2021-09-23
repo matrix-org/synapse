@@ -513,7 +513,6 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
 
         hs.config.appservice.app_service_config_files = [f1, f2]
         hs.config.caches.event_cache_size = 1
-        hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
             database = hs.get_datastores().databases[0]
