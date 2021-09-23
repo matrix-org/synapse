@@ -757,7 +757,9 @@ class RoomCreationHandler(BaseHandler):
             )
 
         if is_public:
-            if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):
+            if not self.config.roomdirectory.is_publishing_room_allowed(
+                user_id, room_id, room_alias
+            ):
                 # Lets just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?

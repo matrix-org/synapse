@@ -48,7 +48,7 @@ class DirectoryHandler(BaseHandler):
         self.event_creation_handler = hs.get_event_creation_handler()
         self.store = hs.get_datastore()
         self.config = hs.config
-        self.enable_room_list_search = hs.config.enable_room_list_search
+        self.enable_room_list_search = hs.config.roomdirectory.enable_room_list_search
         self.require_membership = hs.config.require_membership_for_aliases
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
@@ -143,7 +143,7 @@ class DirectoryHandler(BaseHandler):
             ):
                 raise AuthError(403, "This user is not permitted to create this alias")
 
-            if not self.config.is_alias_creation_allowed(
+            if not self.config.roomdirectory.is_alias_creation_allowed(
                 user_id, room_id, room_alias_str
             ):
                 # Lets just return a generic message, as there may be all sorts of
@@ -459,7 +459,7 @@ class DirectoryHandler(BaseHandler):
             if canonical_alias:
                 room_aliases.append(canonical_alias)
 
-            if not self.config.is_publishing_room_allowed(
+            if not self.config.roomdirectory.is_publishing_room_allowed(
                 user_id, room_id, room_aliases
             ):
                 # Lets just return a generic message, as there may be all sorts of
