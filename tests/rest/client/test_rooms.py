@@ -18,7 +18,7 @@
 """Tests REST events for /rooms paths."""
 
 import json
-from typing import Iterable, Optional, Dict
+from typing import Dict, Iterable, Optional
 from unittest.mock import Mock, call
 from urllib import parse as urlparse
 
@@ -30,7 +30,7 @@ from synapse.api.errors import Codes, HttpResponseException
 from synapse.handlers.pagination import PurgeStatus
 from synapse.rest import admin
 from synapse.rest.client import account, directory, login, profile, room, sync
-from synapse.types import JsonDict, RoomAlias, UserID, create_requester, Requester
+from synapse.types import JsonDict, Requester, RoomAlias, UserID, create_requester
 from synapse.util.stringutils import random_string
 
 from tests import unittest
@@ -2351,7 +2351,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         allow_mock = Mock(side_effect=_user_may_send_3pid_invite)
 
-        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(allow_mock)
+        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(
+            allow_mock
+        )
 
         # Send a 3PID invite into the room and check that it succeeded.
         email_to_invite = "teresa@example.com"
@@ -2377,7 +2379,9 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             ),
         )
 
-        self.assertEquals(allow_mock.call_args, expected_call_args, allow_mock.call_args)
+        self.assertEquals(
+            allow_mock.call_args, expected_call_args, allow_mock.call_args
+        )
 
         # Check that the call to send the invite was made.
         self.assertEquals(make_invite_mock.call_count, 1)
@@ -2408,6 +2412,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         Returns:
             The Mock object _make_and_store_3pid_invite was replaced with.
         """
+
         async def _make_and_store_3pid_invite(
             requester: Requester,
             id_server: str,
@@ -2433,6 +2438,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         Returns:
             The Mock object lookup_3pid was replaced with.
         """
+
         async def _lookup_3pid(
             id_server: str,
             medium: str,
@@ -2446,5 +2452,3 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         self.hs.get_identity_handler().lookup_3pid = mock
 
         return mock
-
-

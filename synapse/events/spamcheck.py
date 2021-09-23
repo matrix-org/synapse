@@ -46,8 +46,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
 ]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
 USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
-    [str, Dict[str, str], str],
-    Awaitable[bool]
+    [str, Dict[str, str], str], Awaitable[bool]
 ]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
@@ -189,9 +188,7 @@ class SpamChecker:
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
-        user_may_send_3pid_invite: Optional[
-            USER_MAY_SEND_3PID_INVITE_CALLBACK
-        ] = None,
+        user_may_send_3pid_invite: Optional[USER_MAY_SEND_3PID_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
