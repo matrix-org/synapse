@@ -560,7 +560,7 @@ class HomeserverTestCase(TestCase):
         Returns:
             The MXID of the new user.
         """
-        self.hs.config.registration_shared_secret = "shared"
+        self.hs.config.registration.registration_shared_secret = "shared"
 
         # Create the user
         channel = self.make_request("GET", "/_synapse/admin/v1/register")
