@@ -186,9 +186,9 @@ def start(config_options):
     config.worker.worker_app = "synapse.app.admin_cmd"
 
     if (
-        not config.worker_daemonize
-        and not config.worker_log_file
-        and not config.worker_log_config
+        not config.worker.worker_daemonize
+        and not config.worker.worker_log_file
+        and not config.worker.worker_log_config
     ):
         # Since we're meant to be run as a "command" let's not redirect stdio
         # unless we've actually set log config.
