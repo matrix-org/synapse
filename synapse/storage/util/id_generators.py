@@ -17,15 +17,34 @@ import threading
 from collections import OrderedDict
 from contextlib import contextmanager
 from types import TracebackType
-from typing import Dict, Iterable, List, Optional, Set, Tuple, Union, Type, ContextManager, Generic, TypeVar, \
-    AsyncContextManager, cast, Sequence, Generator
+from typing import (
+    AsyncContextManager,
+    ContextManager,
+    Dict,
+    Generator,
+    Generic,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+    cast,
+)
 
 import attr
 from sortedcontainers import SortedSet
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.storage.database import DatabasePool, LoggingTransaction, LoggingDatabaseConnection
-from synapse.storage.types import Cursor, Connection
+from synapse.storage.database import (
+    DatabasePool,
+    LoggingDatabaseConnection,
+    LoggingTransaction,
+)
+from synapse.storage.types import Connection, Cursor
 from synapse.storage.util.sequence import PostgresSequenceGenerator
 
 logger = logging.getLogger(__name__)
@@ -51,10 +70,7 @@ class IdGenerator:
 
 
 def _load_current_id(
-    db_conn: LoggingDatabaseConnection,
-    table: str,
-    column: str,
-    step: int = 1
+    db_conn: LoggingDatabaseConnection, table: str, column: str, step: int = 1
 ) -> int:
     # debug logging for https://github.com/matrix-org/synapse/issues/7968
     logger.info("initialising stream generator for %s(%s)", table, column)
