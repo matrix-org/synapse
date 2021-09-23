@@ -277,7 +277,9 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = hs.config.sso.sso_redirect_confirm_template
+        self._sso_redirect_confirm_template = (
+            hs.config.sso.sso_redirect_confirm_template
+        )
 
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are

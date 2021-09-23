@@ -192,7 +192,9 @@ class SsoHandler:
         # authentication session. It tells the user they can close the window.
         self._sso_auth_success_template = hs.config.sso.sso_auth_success_template
 
-        self._sso_update_profile_information = hs.config.sso.sso_update_profile_information
+        self._sso_update_profile_information = (
+            hs.config.sso.sso_update_profile_information
+        )
 
         # a lock on the mappings
         self._mapping_lock = Linearizer(name="sso_user_mapping", clock=hs.get_clock())
