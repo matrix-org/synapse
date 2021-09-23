@@ -91,7 +91,7 @@ class FederationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_proxied_blacklisted_http_client()
         self._replication = hs.get_replication_data_handler()

@@ -98,7 +98,7 @@ class RegistrationHandler(BaseHandler):
         self.macaroon_gen = hs.get_macaroon_generator()
         self._account_validity_handler = hs.get_account_validity_handler()
         self._user_consent_version = self.hs.config.consent.user_consent_version
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self._server_name = hs.hostname
 
         self.spam_checker = hs.get_spam_checker()
