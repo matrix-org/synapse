@@ -126,7 +126,7 @@ class RoomCreationHandler(BaseHandler):
         for preset_name, preset_config in self._presets_dict.items():
             encrypted = (
                 preset_name
-                in self.config.encryption_enabled_by_default_for_room_presets
+                in self.config.room.encryption_enabled_by_default_for_room_presets
             )
             preset_config["encrypted"] = encrypted
 
