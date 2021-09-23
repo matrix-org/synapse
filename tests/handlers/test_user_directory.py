@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from unittest.mock import Mock
+from urllib.parse import quote
 
 from twisted.internet import defer
 
@@ -20,6 +21,7 @@ from synapse.api.constants import UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
 from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
+from synapse.types import create_requester
 
 from tests import unittest
 from tests.unittest import override_config
@@ -32,7 +34,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        synapse.rest.admin.register_servlets,
         room.register_servlets,
     ]
 
@@ -129,6 +131,44 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
         self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
+
+    def test_reactivation_makes_regular_user_searchable(self):
+        user = self.register_user("regular", "pass")
+        user_token = self.login(user, "pass")
+        admin_user = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin_user, "pass")
+
+        # Ensure the regular user is publicly visible and searchable.
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
+
+        # Deactivate the user and check they're not searchable.
+        deactivate_handler = self.hs.get_deactivate_account_handler()
+        self.get_success(
+            deactivate_handler.deactivate_account(
+                user, erase_data=False, requester=create_requester(admin_user)
+            )
+        )
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(s["results"], [])
+
+        # Reactivate the user
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{quote(user)}",
+            access_token=admin_token,
+            content={"deactivated": False, "password": "pass"},
+        )
+        self.assertEqual(channel.code, 200)
+        user_token = self.login(user, "pass")
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+
+        # Check they're searchable.
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
 
     def test_private_room(self):
         """
