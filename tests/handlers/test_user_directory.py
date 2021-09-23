@@ -450,7 +450,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         visible.
         """
         self.handler.search_all_users = True
-        self.hs.config.user_directory_search_all_users = True
+        self.hs.config.userdirectory.user_directory_search_all_users = True
 
         u1 = self.register_user("user1", "pass")
         self.register_user("user2", "pass")
@@ -606,7 +606,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         return hs
 
     def test_disabling_room_list(self):
-        self.config.user_directory_search_enabled = True
+        self.config.userdirectory.user_directory_search_enabled = True
 
         # First we create a room with another user so that user dir is non-empty
         # for our user
@@ -623,7 +623,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         self.assertTrue(len(channel.json_body["results"]) > 0)
 
         # Disable user directory and check search returns nothing
-        self.config.user_directory_search_enabled = False
+        self.config.userdirectory.user_directory_search_enabled = False
         channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )
