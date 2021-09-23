@@ -488,7 +488,7 @@ def start(config_options):
     register_start(_base.start, hs)
 
     # redirect stdio to the logs, if configured.
-    if not hs.config.no_redirect_stdio:
+    if not hs.config.logging.no_redirect_stdio:
         redirect_stdio_to_logs()
 
     _base.start_worker_reactor("synapse-generic-worker", config)
