@@ -277,23 +277,23 @@ class AuthHandler(BaseHandler):
         # after the SSO completes and before redirecting them back to their client.
         # It notifies the user they are about to give access to their matrix account
         # to the client.
-        self._sso_redirect_confirm_template = hs.config.sso_redirect_confirm_template
+        self._sso_redirect_confirm_template = hs.config.sso.sso_redirect_confirm_template
 
         # The following template is shown during user interactive authentication
         # in the fallback auth scenario. It notifies the user that they are
         # authenticating for an operation to occur on their account.
-        self._sso_auth_confirm_template = hs.config.sso_auth_confirm_template
+        self._sso_auth_confirm_template = hs.config.sso.sso_auth_confirm_template
 
         # The following template is shown during the SSO authentication process if
         # the account is deactivated.
         self._sso_account_deactivated_template = (
-            hs.config.sso_account_deactivated_template
+            hs.config.sso.sso_account_deactivated_template
         )
 
         self._server_name = hs.config.server.server_name
 
         # cast to tuple for use with str.startswith
-        self._whitelisted_sso_clients = tuple(hs.config.sso_client_whitelist)
+        self._whitelisted_sso_clients = tuple(hs.config.sso.sso_client_whitelist)
 
         # A mapping of user ID to extra attributes to include in the login
         # response.

@@ -62,7 +62,6 @@ class SamlHandler(BaseHandler):
             hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
         self._saml2_attribute_requirements = hs.config.saml2.attribute_requirements
-        self._error_template = hs.config.sso_error_template
 
         # plugin to do custom mapping from saml response to mxid
         self._user_mapping_provider = hs.config.saml2.saml2_user_mapping_provider_class(
