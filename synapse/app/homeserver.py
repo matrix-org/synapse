@@ -278,7 +278,7 @@ class SynapseHomeServer(HomeServer):
         return resources
 
     def start_listening(self):
-        if self.config.redis_enabled:
+        if self.config.redis.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
