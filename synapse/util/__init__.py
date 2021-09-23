@@ -50,7 +50,10 @@ def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
     if type(obj) is frozendict:
         # fishing the protected dict out of the object is a bit nasty,
         # but we don't really want the overhead of copying the dict.
-        return obj._dict
+        try:
+            return obj._dict
+        except AttributeError:
+            return dict(obj)
     raise TypeError(
         "Object of type %s is not JSON serializable" % obj.__class__.__name__
     )
