@@ -14,10 +14,22 @@
 
 import logging
 import re
-from typing import Dict, Iterable, List, Optional, Sequence, Set, Tuple, cast
+from typing import (
+    TYPE_CHECKING,
+    Dict,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    cast,
+)
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 from synapse.api.constants import EventTypes, HistoryVisibility, JoinRules
-from synapse.server import HomeServer
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.state import StateFilter
 from synapse.storage.databases.main.state_deltas import StateDeltasStore
@@ -531,7 +543,10 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
     SHARE_PRIVATE_WORKING_SET = 500
 
     def __init__(
-        self, database: DatabasePool, db_conn: Connection, hs: HomeServer
+        self,
+        database: DatabasePool,
+        db_conn: Connection,
+        hs: HomeServer,
     ) -> None:
         super().__init__(database, db_conn, hs)
 
