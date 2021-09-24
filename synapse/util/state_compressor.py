@@ -25,6 +25,25 @@ if TYPE_CHECKING:
     from synapse.server import HomeServer
 
 
+# The postgres connection options that the rust library understands. See
+# https://docs.rs/tokio-postgres/0.7.2/tokio_postgres/config/struct.Config.html#keys
+_VALID_POSTGRES_CONN_ARGS = {
+    "user",
+    "password",
+    "dbname",
+    "options",
+    "application_name",
+    "sslmode",
+    "host",
+    "port",
+    "connect_timeout",
+    "keepalives",
+    "keepalives_idle",
+    "target_session_attrs",
+    "channel_binding",
+}
+
+
 def setup_state_compressor(hs: "HomeServer"):
     """Schedules the state compressor to run regularly"""
 
@@ -42,15 +61,27 @@ def setup_state_compressor(hs: "HomeServer"):
     if db_config["name"] != "psycopg2":
         return
 
-    # construct the database URL from the database config
-    db_args = db_config["args"]
-    db_url = "postgresql://{username}:{password}@{host}:{port}/{database}".format(
-        username=db_args["user"],
-        password=db_args["password"],
-        host=db_args["host"],
-        port=db_args["port"],
-        database=db_args["database"],
-    )
+    # Construct the database URL from the database config.
+    #
+    # This is a bit convoluted as the rust postgres library doesn't have a
+    # default host/user, so we use the existing Synapse connections to look up
+    # what parameters were used there. On the flip side, psycopg2 has some
+    # parameters that rust doesn't understand, so we need to filter them out.
+    #
+    # Note: we need to connect to the *state* database.
+    conn_info = hs.get_datastores().state.db_pool.postgres_connection_info
+    assert conn_info is not None
+
+    effective_db_args = {}
+    for key, value in conn_info.dsn_parameters.items():
+        if key in _VALID_POSTGRES_CONN_ARGS:
+            effective_db_args[key] = value
+
+    # psycopg2 has a handy util function from going from dictionary to a DSN
+    # (postgres connection string.)
+    from psycopg2.extensions import make_dsn
+
+    db_url = make_dsn("", **effective_db_args)
 
     # The method to be called periodically
     def run_state_compressor():
