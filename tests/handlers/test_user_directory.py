@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from typing import List, Tuple
-from unittest.mock import Mock
+from unittest.mock import patch
 from urllib.parse import quote
 
 from twisted.internet import defer
@@ -125,19 +125,22 @@ class UserDirectoryTestCase(GetUserDirectoryTables, unittest.HomeserverTestCase)
                 user_id=s_user_id, password_hash=None, user_type=UserTypes.SUPPORT
             )
         )
-
-        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
-        self.store.remove_from_user_dir.not_called()
+        with patch.object(
+            self.store, "remove_from_user_dir", return_value=defer.succeed(None)
+        ) as mock:
+            self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
+        mock.not_called()
 
     def test_handle_user_deactivated_regular_user(self):
         r_user_id = "@regular:test"
         self.get_success(
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
-        self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
-        self.store.remove_from_user_dir.called_once_with(r_user_id)
+        with patch.object(
+            self.store, "remove_from_user_dir", return_value=defer.succeed(None)
+        ) as mock:
+            self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
+        mock.called_once_with(r_user_id)
 
     def test_reactivation_makes_regular_user_searchable(self):
         user = self.register_user("regular", "pass")
