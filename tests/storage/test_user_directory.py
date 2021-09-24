@@ -11,16 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Tuple, Dict
+from typing import Dict, List, Tuple
 from unittest.mock import Mock, patch
 
 from synapse.api.constants import UserTypes
 from synapse.appservice import ApplicationService
 from synapse.rest import admin
-from synapse.rest.client import room, login
+from synapse.rest.client import login, room
 from synapse.storage import DataStore
-from synapse.types import UserID, create_requester
-from tests.test_utils.event_injection import inject_member_event
+
 from tests.unittest import HomeserverTestCase, override_config
 
 
@@ -237,6 +236,8 @@ class UserDirectoryInitialPopulationTestcase(
         self.assertEqual(self.get_users_in_public_rooms(), [])
         self.assertEqual(self.get_users_who_share_private_rooms(), [])
         self.assertEqual(self.get_users_in_user_directory(), {})
+
+
 ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
