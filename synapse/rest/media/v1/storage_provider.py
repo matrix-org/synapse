@@ -138,8 +138,7 @@ class FileStorageProviderBackend(StorageProvider):
         backup_fname = os.path.join(self.base_directory, path)
 
         dirname = os.path.dirname(backup_fname)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        os.makedirs(dirname, exist_ok=True)
 
         await defer_to_thread(
             self.hs.get_reactor(), shutil.copyfile, primary_fname, backup_fname
