@@ -673,6 +673,7 @@ class RoomsCreateTestCase(RoomBase):
         """Tests that the user_may_join_room spam checker callback is correctly bypassed
         when creating a new room.
         """
+
         async def user_may_join_room(
             mxid: str,
             room_id: str,
@@ -684,7 +685,9 @@ class RoomsCreateTestCase(RoomBase):
         self.hs.get_spam_checker()._user_may_join_room_callbacks.append(join_mock)
 
         channel = self.make_request(
-            "POST", "/createRoom", {},
+            "POST",
+            "/createRoom",
+            {},
         )
         self.assertEquals(channel.code, 200, channel.json_body)
 
