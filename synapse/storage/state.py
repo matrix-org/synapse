@@ -417,40 +417,25 @@ class StateFilter:
         # (The same structure as that of a StateFilter.)
         new_types: Dict[str, Optional[Set[str]]] = {}
 
+        # if we start with all, insert the excluded statetypes as empty sets
+        # to prevent them from being included
         if all_part:
-            for minus_wildcard in minus_wildcards:
-                if minus_wildcard not in plus_wildcards:
-                    # as long as the wildcard is not added back in, we
-                    # reset that state type to allow no state keys.
-                    new_types[minus_wildcard] = set()
+            new_types.update({state_type: set() for state_type in minus_wildcards})
 
-            for state_type, state_key in plus_state_keys:
-                # We don't bother adding the state key if there's no set for
-                # its state type, because that means it's already included
-                # by virtue of the 'all' part.
-                if state_type in new_types:
-                    state_set = new_types[state_type]
-                    # We only just added this set so it can't be None.
-                    assert state_set is not None
-                    # Add the state key to the set.
-                    state_set.add(state_key)
-        else:
-            # As we don't start out with any types to begin with, we don't
-            # care about 'minus' wildcards.
+        # insert the plus wildcards
+        new_types.update({state_type: None for state_type in plus_wildcards})
 
-            # Add all 'plus' wildcards.
-            for plus_wildcard in plus_wildcards:
-                new_types[plus_wildcard] = None
-
-            # Add all the 'plus' state keys, taking care not to overwrite any
-            # wildcards that have already been added.
-            for state_type, state_key in plus_state_keys:
-                if state_type in new_types:
-                    state_set = new_types[state_type]
-                    if state_set is not None:
-                        state_set.add(state_key)
-                else:
-                    new_types[state_type] = {state_key}
+        # insert the specific state keys
+        for state_type, state_key in plus_state_keys:
+            if state_type in new_types:
+                entry = new_types[state_type]
+                if entry is not None:
+                    entry.add(state_key)
+            elif not all_part:
+                # don't insert if the entire type is already included by
+                # include_others as this would actually shrink the state allowed
+                # by this filter.
+                new_types[state_type] = {state_key}
 
         return StateFilter.freeze(new_types, include_others=all_part)
 
