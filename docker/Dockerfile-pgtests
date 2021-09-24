@@ -11,9 +11,6 @@ RUN python3 -m pip install tox
 # Initialise the db
 RUN su -c '/usr/lib/postgresql/10/bin/initdb -D /var/lib/postgresql/data -E "UTF-8" --lc-collate="en_US.UTF-8" --lc-ctype="en_US.UTF-8" --username=postgres' postgres
 
-# Create a volume for tox's workdir (so we don't have to fetch dependencies from PyPI every run)
-VOLUME /tox
-
 ADD run_pg_tests.sh /run_pg_tests.sh
 
 # Use the "exec form" of ENTRYPOINT (https://docs.docker.com/engine/reference/builder/#entrypoint)
