@@ -19,7 +19,7 @@ import logging
 import os.path
 import re
 from textwrap import indent
-from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 import attr
 import yaml
@@ -236,22 +236,20 @@ class RetentionConfig:
     longest_max_lifetime: Optional[int]
 
 
-@attr.s
+@attr.s(frozen=True)
 class LimitRemoteRoomsConfig:
-    enabled = attr.ib(
-        validator=attr.validators.instance_of(bool), default=False
-    )
-    complexity = attr.ib(
+    enabled: bool = attr.ib(validator=attr.validators.instance_of(bool), default=False)
+    complexity: Union[float, int] = attr.ib(
         validator=attr.validators.instance_of(
             (float, int)  # type: ignore[arg-type] # noqa
         ),
         default=1.0,
     )
-    complexity_error = attr.ib(
+    complexity_error: str = attr.ib(
         validator=attr.validators.instance_of(str),
         default=ROOM_COMPLEXITY_TOO_GREAT,
     )
-    admins_can_join = attr.ib(
+    admins_can_join: bool = attr.ib(
         validator=attr.validators.instance_of(bool), default=False
     )
 
