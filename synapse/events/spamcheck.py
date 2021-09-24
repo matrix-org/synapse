@@ -44,6 +44,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
+USER_MAY_JOIN_ROOM_CALLBACK = Callable[[str, str, bool], Awaitable[bool]]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
@@ -162,6 +163,7 @@ def load_legacy_spam_checkers(hs: "synapse.server.HomeServer"):
 class SpamChecker:
     def __init__(self):
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
+        self._user_may_join_room_callbacks: List[USER_MAY_JOIN_ROOM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
         self._user_may_create_room_alias_callbacks: List[
@@ -181,6 +183,7 @@ class SpamChecker:
     def register_callbacks(
         self,
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
+        user_may_join_room: Optional[USER_MAY_JOIN_ROOM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
         user_may_create_room_alias: Optional[
@@ -196,6 +199,9 @@ class SpamChecker:
         """Register callbacks from module for each hook."""
         if check_event_for_spam is not None:
             self._check_event_for_spam_callbacks.append(check_event_for_spam)
+
+        if user_may_join_room is not None:
+            self._user_may_join_room_callbacks.append(user_may_join_room)
 
         if user_may_invite is not None:
             self._user_may_invite_callbacks.append(user_may_invite)
@@ -244,6 +250,24 @@ class SpamChecker:
                 return res
 
         return False
+
+    async def user_may_join_room(self, userid: str, room_id: str, is_invited: bool):
+        """Checks if a given users is allowed to join a room.
+        Not called when a user creates a room.
+
+        Args:
+            userid: The ID of the user wanting to join the room
+            room_id: The ID of the room the user wants to join
+            is_invited: Whether the user is invited into the room
+
+        Returns:
+            bool: Whether the user may join the room
+        """
+        for callback in self._user_may_join_room_callbacks:
+            if await callback(userid, room_id, is_invited) is False:
+                return False
+
+        return True
 
     async def user_may_invite(
         self, inviter_userid: str, invitee_userid: str, room_id: str
