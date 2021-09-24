@@ -327,8 +327,8 @@ class MatrixFederationHttpClient:
         self.reactor = hs.get_reactor()
 
         user_agent = hs.version_string
-        if hs.config.user_agent_suffix:
-            user_agent = "%s %s" % (user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            user_agent = "%s %s" % (user_agent, hs.config.server.user_agent_suffix)
         user_agent = user_agent.encode("ascii")
 
         federation_agent = MatrixFederationAgent(

@@ -86,11 +86,11 @@ def start_worker_reactor(appname, config, run_command=reactor.run):
 
     start_reactor(
         appname,
-        soft_file_limit=config.soft_file_limit,
+        soft_file_limit=config.server.soft_file_limit,
         gc_thresholds=config.gc_thresholds,
         pid_file=config.worker.worker_pid_file,
         daemonize=config.worker.worker_daemonize,
-        print_pidfile=config.print_pidfile,
+        print_pidfile=config.server.print_pidfile,
         logger=logger,
         run_command=run_command,
     )

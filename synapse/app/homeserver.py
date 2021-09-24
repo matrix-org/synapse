@@ -248,7 +248,7 @@ class SynapseHomeServer(HomeServer):
             resources[SERVER_KEY_V2_PREFIX] = KeyApiV2Resource(self)
 
         if name == "webclient":
-            webclient_loc = self.config.web_client_location
+            webclient_loc = self.config.server.web_client_location
 
             if webclient_loc is None:
                 logger.warning(
@@ -343,7 +343,7 @@ def setup(config_options):
         # generating config files and shouldn't try to continue.
         sys.exit(0)
 
-    events.USE_FROZEN_DICTS = config.use_frozen_dicts
+    events.USE_FROZEN_DICTS = config.server.use_frozen_dicts
     synapse.util.caches.TRACK_MEMORY_USAGE = config.caches.track_memory_usage
 
     if config.server.gc_seconds:
@@ -439,11 +439,11 @@ def run(hs):
 
     _base.start_reactor(
         "synapse-homeserver",
-        soft_file_limit=hs.config.soft_file_limit,
+        soft_file_limit=hs.config.server.soft_file_limit,
         gc_thresholds=hs.config.gc_thresholds,
-        pid_file=hs.config.pid_file,
-        daemonize=hs.config.daemonize,
-        print_pidfile=hs.config.print_pidfile,
+        pid_file=hs.config.server.pid_file,
+        daemonize=hs.config.server.daemonize,
+        print_pidfile=hs.config.server.print_pidfile,
         logger=logger,
     )
 
