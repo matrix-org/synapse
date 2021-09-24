@@ -184,49 +184,47 @@ KNOWN_RESOURCES = {
 
 @attr.s(frozen=True)
 class HttpResourceConfig:
-    names = attr.ib(
-        type=List[str],
+    names: List[str] = attr.ib(
         factory=list,
         validator=attr.validators.deep_iterable(attr.validators.in_(KNOWN_RESOURCES)),  # type: ignore
     )
-    compress = attr.ib(
-        type=bool,
+    compress: bool = attr.ib(
         default=False,
         validator=attr.validators.optional(attr.validators.instance_of(bool)),  # type: ignore[arg-type]
     )
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class HttpListenerConfig:
     """Object describing the http-specific parts of the config of a listener"""
 
-    x_forwarded = attr.ib(type=bool, default=False)
-    resources = attr.ib(type=List[HttpResourceConfig], factory=list)
-    additional_resources = attr.ib(type=Dict[str, dict], factory=dict)
-    tag = attr.ib(type=str, default=None)
+    x_forwarded: bool = False
+    resources: List[HttpResourceConfig] = attr.ib(factory=list)
+    additional_resources: Dict[str, dict] = attr.ib(factory=dict)
+    tag: Optional[str] = None
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ListenerConfig:
     """Object describing the configuration of a single listener."""
 
-    port = attr.ib(type=int, validator=attr.validators.instance_of(int))
-    bind_addresses = attr.ib(type=List[str])
-    type = attr.ib(type=str, validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
-    tls = attr.ib(type=bool, default=False)
+    port: int = attr.ib(validator=attr.validators.instance_of(int))
+    bind_addresses: List[str]
+    type: str = attr.ib(validator=attr.validators.in_(KNOWN_LISTENER_TYPES))
+    tls: bool = False
 
     # http_options is only populated if type=http
-    http_options = attr.ib(type=Optional[HttpListenerConfig], default=None)
+    http_options: Optional[HttpListenerConfig] = None
 
 
-@attr.s(frozen=True)
+@attr.s(slots=True, frozen=True, auto_attribs=True)
 class ManholeConfig:
     """Object describing the configuration of the manhole"""
 
-    username = attr.ib(type=str, validator=attr.validators.instance_of(str))
-    password = attr.ib(type=str, validator=attr.validators.instance_of(str))
-    priv_key = attr.ib(type=Optional[Key])
-    pub_key = attr.ib(type=Optional[Key])
+    username: str = attr.ib(validator=attr.validators.instance_of(str))
+    password: str = attr.ib(validator=attr.validators.instance_of(str))
+    priv_key: Optional[Key]
+    pub_key: Optional[Key]
 
 
 @attr.s(slots=True, frozen=True, auto_attribs=True)
