@@ -782,6 +782,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.pump()
         self.assertEqual(channel.code, 200)
 
+        # Move cached file into the storage provider
         os.makedirs(os.path.dirname(storage_provider_path), exist_ok=True)
         os.rename(media_store_path, storage_provider_path)
 
@@ -834,6 +835,7 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         media_store_path = os.path.join(self.media_store_path, rel_file_path)
         os.remove(media_store_path)
 
+        # Move cached thumbnails into the storage provider
         os.makedirs(os.path.dirname(storage_provider_thumbnail_path), exist_ok=True)
         os.rename(media_store_thumbnail_path, storage_provider_thumbnail_path)
 
