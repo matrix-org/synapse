@@ -65,6 +65,8 @@ MAX_PERSISTENT_EVENTS_PER_TRANSACTION = 100
 # Maximum number of ephemeral events to provide in an AS transaction.
 MAX_EPHEMERAL_EVENTS_PER_TRANSACTION = 100
 
+# Maximum number of syntethci events to provide in an AS transaction.
+MAX_SYNTHETIC_EVENTS_PER_TRANSACTION = 100
 
 class ApplicationServiceScheduler:
     """Public facing API for this module. Does the required DI to tie the
@@ -99,6 +101,11 @@ class ApplicationServiceScheduler:
     ):
         self.queuer.enqueue_ephemeral(service, events)
 
+    def submit_synthetic_events_for_as(
+        self, service: ApplicationService, events: List[JsonDict]
+    ):
+        self.queuer.enqueue_ephemeral(service, events)
+
 
 class _ServiceQueuer:
     """Queue of events waiting to be sent to appservices.
@@ -111,6 +118,7 @@ class _ServiceQueuer:
     def __init__(self, txn_ctrl, clock):
         self.queued_events = {}  # dict of {service_id: [events]}
         self.queued_ephemeral = {}  # dict of {service_id: [events]}
+        self.queued_synthetic = {}  # dict of {service_id: [events]}
 
         # the appservices which currently have a transaction in flight
         self.requests_in_flight = set()
@@ -134,6 +142,10 @@ class _ServiceQueuer:
         self.queued_ephemeral.setdefault(service.id, []).extend(events)
         self._start_background_request(service)
 
+    def enqueue_syntheic(self, service: ApplicationService, events: List[JsonDict]):
+        self.queued_synthetic.setdefault(service.id, []).extend(events)
+        self._start_background_request(service)
+
     async def _send_request(self, service: ApplicationService):
         # sanity-check: we shouldn't get here if this service already has a sender
         # running.
@@ -150,11 +162,15 @@ class _ServiceQueuer:
                 ephemeral = all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
                 del all_events_ephemeral[:MAX_EPHEMERAL_EVENTS_PER_TRANSACTION]
 
-                if not events and not ephemeral:
+                all_events_synthetic = self.queued_synthetic.get(service.id, [])
+                synthetic = all_events_ephemeral[:MAX_SYNTHETIC_EVENTS_PER_TRANSACTION]
+                del all_events_synthetic[:MAX_SYNTHETIC_EVENTS_PER_TRANSACTION]
+
+                if not events and not ephemeral and not synthetic:
                     return
 
                 try:
-                    await self.txn_ctrl.send(service, events, ephemeral)
+                    await self.txn_ctrl.send(service, events, ephemeral, synthetic)
                 except Exception:
                     logger.exception("AS request failed")
         finally:
@@ -191,10 +207,11 @@ class _TransactionController:
         service: ApplicationService,
         events: List[EventBase],
         ephemeral: Optional[List[JsonDict]] = None,
+        synthetic_events: Optional[List[JsonDict]] = None,
     ):
         try:
             txn = await self.store.create_appservice_txn(
-                service=service, events=events, ephemeral=ephemeral or []
+                service=service, events=events, ephemeral=ephemeral or [], synthetic_events=synthetic_events
             )
             service_is_up = await self._is_service_up(service)
             if service_is_up:

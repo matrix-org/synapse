@@ -187,6 +187,7 @@ class ApplicationService:
         for user_id in member_list:
             if self.is_interested_in_user(user_id):
                 return True
+                
         return False
 
     def _matches_room_id(self, event: EventBase) -> bool:
@@ -233,6 +234,15 @@ class ApplicationService:
 
         return False
 
+    def is_interested_in_synthetic_user_event(self, event_type: str, user_id: UserID):
+        for regex_obj in self.namespaces["users"]:
+            if not regex_obj["regex"].match(user_id):
+                continue
+            # TODO: Validate structure further up.
+            if event_type in regex_obj.get("uk.half-shot.msc3395.synthetic_events", {"events": []})["events"]:
+                return True
+        return False
+
     @cached(num_args=1)
     async def is_interested_in_presence(
         self, user_id: UserID, store: "DataStore"
@@ -258,10 +268,10 @@ class ApplicationService:
         return False
 
     def is_interested_in_user(self, user_id: str) -> bool:
-        return (
-            bool(self._matches_regex(user_id, ApplicationService.NS_USERS))
-            or user_id == self.sender
-        )
+        if user_id == self.sender:
+            return True
+        regex_obj = self._matches_regex(user_id, ApplicationService.NS_USERS)
+        return regex_obj and regex_obj.get("uk.half-shot.msc3395.events", True)
 
     def is_interested_in_alias(self, alias: str) -> bool:
         return bool(self._matches_regex(alias, ApplicationService.NS_ALIASES))
@@ -329,11 +339,13 @@ class AppServiceTransaction:
         id: int,
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        synthetic_events: Optional[JsonDict] = None,
     ):
         self.service = service
         self.id = id
         self.events = events
         self.ephemeral = ephemeral
+        self.synthetic_events = synthetic_events
 
     async def send(self, as_api: "ApplicationServiceApi") -> bool:
         """Sends this transaction using the provided AS API interface.
@@ -347,6 +359,7 @@ class AppServiceTransaction:
             service=self.service,
             events=self.events,
             ephemeral=self.ephemeral,
+            synthetic_events=self.synthetic_events,
             txn_id=self.id,
         )
 

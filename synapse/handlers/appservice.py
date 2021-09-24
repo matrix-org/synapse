@@ -179,6 +179,58 @@ class ApplicationServicesHandler:
             finally:
                 self.is_processing = False
 
+    def notify_synthetic_event(
+        self,
+        event_type: str,
+        user_id: UserID,
+        content: JsonDict,
+    ) -> None:
+        """This is called when another service wishes to 
+        notify about a synthetic event.
+
+        This will determine which appservices
+        are interested in the event, and submit them.
+
+        Events will only be pushed to appservices
+        that have opted into ephemeral events
+
+        Args:
+            event_type: The type of event to notify about.
+            user_id: The user_id of the user involved in the event.
+            content: The content of the event itself.
+        """
+        if not self.notify_appservices:
+            return
+
+        logger.debug("Checking interested services for synthetic event %s:%s" % (event_type, user_id))
+        services = self._get_services_for_user_synthetic_event(event_type, user_id)
+
+        if not services:
+            return
+
+        # We only start a new background process if necessary rather than
+        # optimistically (to cut down on overhead).
+        self._notify_synthetic_event(
+            services, user_id, {
+                "type": event_type,
+                "content": content,   
+            }
+        )
+
+    @wrap_as_background_process("notify_synthetic_event")
+    async def _notify_synthetic_event(
+        self,
+        services: List[ApplicationService],
+        user_id: UserID,
+        event: JsonDict,
+    ) -> None:
+        logger.debug("Submitting synthetic event to interested services %s:%s" % (event["type"], user_id))
+        with Measure(self.clock, "notify_synthetic_event"):
+            for service in services:
+                # TODO: Store event in DB if we can't submit it now.
+                self.scheduler.submit_synthetic_events_for_as(service, [event])
+
+
     def notify_interested_services_ephemeral(
         self,
         stream_key: str,
@@ -434,11 +486,15 @@ class ApplicationServicesHandler:
 
     def _get_services_for_user(self, user_id: str) -> List[ApplicationService]:
         services = self.store.get_app_services()
-        return [s for s in services if (s.is_interested_in_user(user_id))]
+        return [s for s in services if s.is_interested_in_user(user_id)]
 
     def _get_services_for_3pn(self, protocol: str) -> List[ApplicationService]:
         services = self.store.get_app_services()
         return [s for s in services if s.is_interested_in_protocol(protocol)]
+
+    def _get_services_for_user_synthetic_event(self, event_type: str, user_id: str) -> List[ApplicationService]:
+        services = self.store.get_app_services()
+        return [s for s in services if s.is_interested_in_synthetic_user_event(event_type, user_id)]
 
     async def _is_unknown_user(self, user_id: str) -> bool:
         if not self.is_mine_id(user_id):

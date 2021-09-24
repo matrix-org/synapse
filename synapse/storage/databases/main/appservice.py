@@ -194,6 +194,7 @@ class ApplicationServiceTransactionWorkerStore(
         service: ApplicationService,
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        synthetic_events: Optional[List[JsonDict]] = None,
     ) -> AppServiceTransaction:
         """Atomically creates a new transaction for this application service
         with the given list of events. Ephemeral events are NOT persisted to the
@@ -233,7 +234,7 @@ class ApplicationServiceTransactionWorkerStore(
                 (service.id, new_txn_id, event_ids),
             )
             return AppServiceTransaction(
-                service=service, id=new_txn_id, events=events, ephemeral=ephemeral
+                service=service, id=new_txn_id, events=events, ephemeral=ephemeral, synthetic_events=synthetic_events
             )
 
         return await self.db_pool.runInteraction(

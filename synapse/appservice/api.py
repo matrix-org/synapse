@@ -203,6 +203,7 @@ class ApplicationServiceApi(SimpleHttpClient):
         service: "ApplicationService",
         events: List[EventBase],
         ephemeral: List[JsonDict],
+        synthetic_events: Optional[List[JsonDict]],
         txn_id: Optional[int] = None,
     ):
         if service.url is None:
@@ -218,11 +219,15 @@ class ApplicationServiceApi(SimpleHttpClient):
 
         uri = service.url + ("/transactions/%s" % urllib.parse.quote(str(txn_id)))
 
+        body = {"events": events}
+
         # Never send ephemeral events to appservices that do not support it
         if service.supports_ephemeral:
-            body = {"events": events, "de.sorunome.msc2409.ephemeral": ephemeral}
-        else:
-            body = {"events": events}
+            body["de.sorunome.msc2409.ephemeral"] = ephemeral
+        
+        # We will only populate this if the appservice requests synthetic events
+        if synthetic_events and len(synthetic_events):
+            body["uk.half-shot.msc3395.synthetic_events"] = synthetic_events
 
         try:
             await self.put_json(
