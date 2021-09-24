@@ -238,9 +238,10 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 # Update each user in the user directory.
                 for user_id, profile in users_with_profile.items():
-                    await self.update_profile_in_user_dir(
-                        user_id, profile.display_name, profile.avatar_url
-                    )
+                    if not await self.is_excluded_from_user_dir(user_id):
+                        await self.update_profile_in_user_dir(
+                            user_id, profile.display_name, profile.avatar_url
+                        )
 
                 to_insert = set()
 
@@ -349,10 +350,11 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
         )
 
         for user_id in users_to_work_on:
-            profile = await self.get_profileinfo(get_localpart_from_id(user_id))
-            await self.update_profile_in_user_dir(
-                user_id, profile.display_name, profile.avatar_url
-            )
+            if not await self.is_excluded_from_user_dir(user_id):
+                profile = await self.get_profileinfo(get_localpart_from_id(user_id))
+                await self.update_profile_in_user_dir(
+                    user_id, profile.display_name, profile.avatar_url
+                )
 
             # We've finished processing a user. Delete it from the table.
             await self.db_pool.simple_delete_one(

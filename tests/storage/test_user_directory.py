@@ -213,6 +213,7 @@ class UserDirectoryInitialPopulationTestcase(
 
         as_user = "@as_user_potato:test"
         self.get_success(self.store.register_user(user_id=as_user, password_hash=None))
+        # TODO add AS user to a public and private room.
 
         # TODO can we configure the app service up front somehow? This is a hack.
         mock_regex = Mock()
@@ -220,8 +221,8 @@ class UserDirectoryInitialPopulationTestcase(
         with patch.object(self.store, "exclusive_user_regex", mock_regex):
             self._purge_and_rebuild_user_dir()
 
-        # TODO add AS user to a public and private room. Check that
-        # users_in_public_rooms and users_who_share_private_rooms is empty.
+        # TODO after putting AS userin a room, check that
+        #  users_in_public_rooms and users_who_share_private_rooms is empty.
         self.assertEqual(self.get_users_in_user_directory(), {})
 
     def test_population_excludes_deactivated_user(self):

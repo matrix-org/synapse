@@ -128,7 +128,7 @@ class UserDirectoryTestCase(GetUserDirectoryTables, unittest.HomeserverTestCase)
             self.store, "remove_from_user_dir", return_value=defer.succeed(None)
         ) as mock:
             self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
-        mock.not_called()
+        self.get_success(mock.not_called())
 
     def test_handle_user_deactivated_regular_user(self):
         r_user_id = "@regular:test"
@@ -139,7 +139,7 @@ class UserDirectoryTestCase(GetUserDirectoryTables, unittest.HomeserverTestCase)
             self.store, "remove_from_user_dir", return_value=defer.succeed(None)
         ) as mock:
             self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
-        mock.called_once_with(r_user_id)
+        self.get_success(mock.called_once_with(r_user_id))
 
     def test_reactivation_makes_regular_user_searchable(self):
         user = self.register_user("regular", "pass")
