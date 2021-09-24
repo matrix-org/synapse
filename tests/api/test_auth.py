@@ -217,7 +217,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
             key=self.hs.config.key.macaroon_secret_key,
         )
@@ -239,7 +239,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         user_id = "@baldrick:matrix.org"
         macaroon = pymacaroons.Macaroon(
-            location=self.hs.config.server_name,
+            location=self.hs.config.server.server_name,
             identifier="key",
             key=self.hs.config.key.macaroon_secret_key,
         )
@@ -303,7 +303,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]
@@ -332,7 +332,7 @@ class AuthTestCase(unittest.HomeserverTestCase):
 
         appservice = ApplicationService(
             "abcd",
-            self.hs.config.server_name,
+            self.hs.config.server.server_name,
             id="1234",
             namespaces={
                 "users": [{"regex": "@_appservice.*:sender", "exclusive": True}]

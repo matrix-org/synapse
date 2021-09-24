@@ -74,7 +74,7 @@ async def phone_stats_home(hs, stats, stats_process=_stats_process):
     store = hs.get_datastore()
 
     stats["homeserver"] = hs.config.server.server_name
-    stats["server_context"] = hs.config.server_context
+    stats["server_context"] = hs.config.server.server_context
     stats["timestamp"] = now
     stats["uptime_seconds"] = uptime
     version = sys.version_info

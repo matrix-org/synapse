@@ -366,7 +366,7 @@ def _upgrade_existing_database(
             + "new for the server to understand"
         )
 
-    # some of the deltas assume that config.server_name is set correctly, so now
+    # some of the deltas assume that server_name is set correctly, so now
     # is a good time to run the sanity check.
     if not is_empty and "main" in databases:
         from synapse.storage.databases.main import check_database_before_upgrade
