@@ -14,8 +14,8 @@ RUN su -c '/usr/lib/postgresql/10/bin/initdb -D /var/lib/postgresql/data -E "UTF
 # Create a volume for tox's workdir (so we don't have to fetch dependencies from PyPI every run)
 VOLUME /tox
 
-ADD run_pg_tests.sh /pg_tests.sh
+ADD run_pg_tests.sh /run_pg_tests.sh
 
 # Use the "exec form" of ENTRYPOINT (https://docs.docker.com/engine/reference/builder/#entrypoint)
 # so that we can `docker run` this container and pass arguments to pg_tests.sh
-ENTRYPOINT ["/pg_tests.sh"]
+ENTRYPOINT ["/run_pg_tests.sh"]
