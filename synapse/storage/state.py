@@ -504,15 +504,13 @@ class StateFilter:
 
         if sub_all:
             if self_all:
-                self_concretes_or_wild_types = self_wildcards.union(
-                    typ for typ, _key in self_concrete_keys
-                )
                 # If self starts with all, then we add as wildcards any
-                # types which appear in the subtrahend's exclusion filter but do
-                # not already appear in self's concrete or wild types.
-                # This is needed to handle the fact that `include_others` includes
-                # all unspecified state types.
-                new_wildcards |= sub_excludes.difference(self_concretes_or_wild_types)
+                # types which appear in the subtrahend's exclusion filter (but
+                # aren't in the self exclusion filter). This is as the subtrahend
+                # filter will return everything BUT the types in its exclusion, so
+                # we need to add those excluded types that also match the self
+                # filter as wildcard types in the new filter.
+                new_wildcards |= sub_excludes.difference(self_excludes)
 
             # If subtrahend is an `include_others` then the difference isn't.
             new_all = False
