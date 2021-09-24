@@ -258,7 +258,7 @@ class CleanupExtremDummyEventsTestCase(HomeserverTestCase):
         info, _ = self.get_success(self.room_creator.create_room(self.requester, {}))
         self.room_id = info["room_id"]
         self.event_creator = homeserver.get_event_creation_handler()
-        homeserver.config.user_consent_version = self.CONSENT_VERSION
+        homeserver.config.consent.user_consent_version = self.CONSENT_VERSION
 
     def test_send_dummy_event(self):
         self._create_extremity_rich_graph()

@@ -320,7 +320,7 @@ class DirectServeJsonResource(_AsyncResource):
 
     def _send_response(
         self,
-        request: Request,
+        request: SynapseRequest,
         code: int,
         response_object: Any,
     ):
@@ -629,7 +629,7 @@ def _encode_json_bytes(json_object: Any) -> Iterator[bytes]:
 
 
 def respond_with_json(
-    request: Request,
+    request: SynapseRequest,
     code: int,
     json_object: Any,
     send_cors: bool = False,

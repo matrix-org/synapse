@@ -501,8 +501,6 @@ class FederationClient(FederationBase):
             destination, auth_chain, outlier=True, room_version=room_version
         )
 
-        signed_auth.sort(key=lambda e: e.depth)
-
         return signed_auth
 
     def _is_unknown_endpoint(

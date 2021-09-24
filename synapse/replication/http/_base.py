@@ -168,8 +168,8 @@ class ReplicationEndpoint(metaclass=abc.ABCMeta):
         client = hs.get_simple_http_client()
         local_instance_name = hs.get_instance_name()
 
-        master_host = hs.config.worker_replication_host
-        master_port = hs.config.worker_replication_http_port
+        master_host = hs.config.worker.worker_replication_host
+        master_port = hs.config.worker.worker_replication_http_port
 
         instance_map = hs.config.worker.instance_map
 

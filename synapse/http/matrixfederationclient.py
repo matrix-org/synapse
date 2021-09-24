@@ -465,8 +465,9 @@ class MatrixFederationHttpClient:
             _sec_timeout = self.default_timeout
 
         if (
-            self.hs.config.federation_domain_whitelist is not None
-            and request.destination not in self.hs.config.federation_domain_whitelist
+            self.hs.config.federation.federation_domain_whitelist is not None
+            and request.destination
+            not in self.hs.config.federation.federation_domain_whitelist
         ):
             raise FederationDeniedError(request.destination)
 
@@ -1186,7 +1187,7 @@ class MatrixFederationHttpClient:
             request.method,
             request.uri.decode("ascii"),
         )
-        return (length, headers)
+        return length, headers
 
 
 def _flatten_response_never_received(e):
