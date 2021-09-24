@@ -1,1 +1,1 @@
-Avoid storing URL cache files in storage providers. Server admins may safely delete the `url_cache/` and `url_cache_thumbnails/` directories from any configured storage providers.
+Avoid storing URL cache files in storage providers. Server admins may safely delete the `url_cache/` and `url_cache_thumbnails/` directories from any configured storage providers to reclaim space.
