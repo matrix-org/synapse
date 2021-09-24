@@ -229,6 +229,15 @@ class ManholeConfig:
     pub_key = attr.ib(type=Optional[Key])
 
 
+@attr.s(slots=True, frozen=True, auto_attribs=True)
+class RetentionConfig:
+    """Object describing the configuration of the manhole"""
+
+    interval: int
+    shortest_max_lifetime: Optional[int]
+    longest_max_lifetime: Optional[int]
+
+
 class ServerConfig(Config):
     section = "server"
 
@@ -519,7 +528,7 @@ class ServerConfig(Config):
                 " greater than 'allowed_lifetime_max'"
             )
 
-        self.retention_purge_jobs: List[Dict[str, Optional[int]]] = []
+        self.retention_purge_jobs: List[RetentionConfig] = []
         for purge_job_config in retention_config.get("purge_jobs", []):
             interval_config = purge_job_config.get("interval")
 
@@ -553,20 +562,12 @@ class ServerConfig(Config):
                 )
 
             self.retention_purge_jobs.append(
-                {
-                    "interval": interval,
-                    "shortest_max_lifetime": shortest_max_lifetime,
-                    "longest_max_lifetime": longest_max_lifetime,
-                }
+                RetentionConfig(interval, shortest_max_lifetime, longest_max_lifetime)
             )
 
         if not self.retention_purge_jobs:
             self.retention_purge_jobs = [
-                {
-                    "interval": self.parse_duration("1d"),
-                    "shortest_max_lifetime": None,
-                    "longest_max_lifetime": None,
-                }
+                RetentionConfig(self.parse_duration("1d"), None, None)
             ]
 
         self.listeners = [parse_listener_def(x) for x in config.get("listeners", [])]
