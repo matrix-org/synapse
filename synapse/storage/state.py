@@ -474,54 +474,66 @@ class StateFilter:
                 is an over-approximation.
         """
 
-        new_types = {}
-        new_include_others = self.include_others and not subtrahend.include_others
+        # We first transform self and subtrahend into an alternative representation:
+        #   - whether or not they include all events to begin with ('all')
+        #   - if so, which event types are excluded? ('excludes')
+        #   - which entire event types to include ('wildcards')
+        #   - which concrete state keys to include ('concrete state keys')
+        (self_all, self_excludes), (
+            self_wildcards,
+            self_concrete_keys,
+        ) = self.decompose_into_four_parts()
+        (sub_all, sub_excludes), (
+            sub_wildcards,
+            sub_concrete_keys,
+        ) = subtrahend.decompose_into_four_parts()
 
-        # When include_others is set, that means that all unmentioned state event
-        # types are equivalent to wildcards (i.e. None).
-        # When include_others is not set, that means that all unmentioned state event
-        # types are equivalent to empty sets of state keys.
-        current_default_for_unspecified: Optional[FrozenSet[str]] = (
-            None if self.include_others else frozenset()
-        )
-        subtrahend_default_for_unspecified: Optional[FrozenSet[str]] = (
-            None if subtrahend.include_others else frozenset()
-        )
-        new_default_for_unspecified: Optional[FrozenSet[str]] = (
-            None if new_include_others else frozenset()
-        )
+        # Start with an estimate of the difference based on self
+        new_all = self_all
+        # Wildcards from the subtrahend can be added to the exclusion filter
+        new_excludes = self_excludes | sub_wildcards
+        # We remove wildcards that appeared as wildcards in the subtrahend
+        new_wildcards = self_wildcards - sub_wildcards
+        # We filter out the concrete state keys that appear in the subtrahend
+        # as wildcards or concrete state keys.
+        new_concrete_keys = {
+            (state_type, state_key)
+            for (state_type, state_key) in self_concrete_keys
+            if state_type not in sub_wildcards
+        } - sub_concrete_keys
 
-        # Get all the state types we need to consider.
-        state_types = set(subtrahend.types.keys())
-        state_types.update(self.types.keys())
-
-        for state_type in state_types:
-            current_keys: Optional[FrozenSet[str]] = self.types.get(
-                state_type, current_default_for_unspecified
+        if self_all:
+            self_concretes_or_wild_types = self_wildcards.union(
+                typ for typ, _key in self_concrete_keys
             )
-            subtrahend_keys: Optional[FrozenSet[str]] = subtrahend.types.get(
-                state_type, subtrahend_default_for_unspecified
-            )
+            # If self starts with all, then we add as wildcards any
+            # types which appear in the subtrahend's exclusion filter but do
+            # not already appear in self's concrete or wild types.
+            # This is needed to handle the fact that `include_others` includes
+            # all unspecified state types.
+            new_wildcards |= sub_excludes.difference(self_concretes_or_wild_types)
 
-            new_keys: Optional[FrozenSet[str]]
-            if subtrahend_keys is None:
-                # (anything) removing everything leaves you with nothing
-                new_keys = frozenset()
-            elif current_keys is None:
-                # everything with a few specific keys removed is something we
-                # can only approximate as 'everything'
-                new_keys = None
-            else:
-                # a few specific keys with a few specific keys removed is just
-                # the set difference of those keys
-                new_keys = current_keys.difference(subtrahend_keys)
+        if sub_all:
+            # If subtrahend is an `include_others` then the difference isn't.
+            new_all = False
+            # (We have no need for excludes when we don't start with all, as there
+            #  is nothing to exclude.)
+            new_excludes = set()
 
-            if new_keys != new_default_for_unspecified:
-                # the keys for this state type are not the same as the default
-                # implied by `include_others`, so we will store them explicitly.
-                new_types[state_type] = new_keys
+            # We also filter out all state types that aren't in the exclusion
+            # list of the subtrahend.
+            new_wildcards &= sub_excludes
+            new_concrete_keys = {
+                (state_type, state_key)
+                for (state_type, state_key) in new_concrete_keys
+                if state_type in sub_excludes
+            }
 
-        return StateFilter(frozendict(new_types), include_others=new_include_others)
+        # Transform our newly-constructed state filter from the alternative
+        # representation back into the normal StateFilter representation.
+        return StateFilter.recompose_from_four_parts(
+            new_all, new_excludes, new_wildcards, new_concrete_keys
+        )
 
 
 class StateGroupStorage:
