@@ -246,7 +246,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
 
                 if is_public:
                     for user_id in users_with_profile:
-                        if self.get_if_app_services_interested_in_user(user_id):
+                        if await self.is_excluded_from_user_dir(user_id):
                             continue
 
                         to_insert.add(user_id)
@@ -259,7 +259,7 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
                         if not self.hs.is_mine_id(user_id):
                             continue
 
-                        if self.get_if_app_services_interested_in_user(user_id):
+                        if await self.is_excluded_from_user_dir(user_id):
                             continue
 
                         for other_user_id in users_with_profile:
@@ -368,6 +368,22 @@ class UserDirectoryBackgroundUpdateStore(StateDeltasStore):
             )
 
         return len(users_to_work_on)
+
+    async def is_excluded_from_user_dir(self, user: str) -> bool:
+        """Certain classes of local user are omitted from the user directory.
+        Is this user one of them?
+        """
+        if self.hs.is_mine_id(user):
+            # Support users are for diagnostics and should not appear in the user directory.
+            if await self.is_support_user(user):
+                return True
+            # Deactivated users aren't contactable, so should not appear in the user directory.
+            if await self.get_user_deactivated_status(user):
+                return True
+            # App service users aren't usually contactable, so exclude them.
+            if self.get_if_app_services_interested_in_user(user):
+                return True
+        return False
 
     async def is_room_world_readable_or_publicly_joinable(self, room_id: str) -> bool:
         """Check if the room is either world_readable or publically joinable"""
