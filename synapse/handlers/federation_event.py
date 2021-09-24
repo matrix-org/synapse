@@ -1194,10 +1194,17 @@ class FederationEventHandler:
                 auth = {}
                 for auth_event_id in event.auth_event_ids():
                     ae = persisted_events.get(auth_event_id)
-                    if ae:
-                        auth[(ae.type, ae.state_key)] = ae
-                    else:
-                        logger.info("Missing auth event %s", auth_event_id)
+                    if not ae:
+                        logger.warning(
+                            "Event %s relies on auth_event %s, which could not be found.",
+                            event,
+                            auth_event_id,
+                        )
+                        # the fact we can't find the auth event doesn't mean it doesn't
+                        # exist, which means it is premature to reject `event`. Instead we
+                        # just ignore it for now.
+                        return None
+                    auth[(ae.type, ae.state_key)] = ae
 
                 context = EventContext.for_outlier()
                 context = await self._check_event_auth(
@@ -1208,8 +1215,10 @@ class FederationEventHandler:
                 )
             return event, context
 
-        events_to_persist = await yieldable_gather_results(prep, fetched_events)
-        await self.persist_events_and_notify(room_id, events_to_persist)
+        events_to_persist = (
+            x for x in await yieldable_gather_results(prep, fetched_events) if x
+        )
+        await self.persist_events_and_notify(room_id, tuple(events_to_persist))
 
     async def _check_event_auth(
         self,
@@ -1235,8 +1244,7 @@ class FederationEventHandler:
 
             claimed_auth_event_map:
                 A map of (type, state_key) => event for the event's claimed auth_events.
-                Possibly incomplete, and possibly including events that are not yet
-                persisted, or authed, or in the right room.
+                Possibly including events that were rejected, or are in the wrong room.
 
                 Only populated when populating outliers.
 
