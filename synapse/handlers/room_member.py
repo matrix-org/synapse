@@ -617,7 +617,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 is_requester_admin = await self.auth.is_server_admin(requester.user)
 
             if not is_requester_admin:
-                if self.config.block_non_admin_invites:
+                if self.config.server.block_non_admin_invites:
                     logger.info(
                         "Blocking invite: user is not admin and non-admin "
                         "invites disabled"
@@ -1222,7 +1222,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         Raises:
             ShadowBanError if the requester has been shadow-banned.
         """
-        if self.config.block_non_admin_invites:
+        if self.config.server.block_non_admin_invites:
             is_requester_admin = await self.auth.is_server_admin(requester.user)
             if not is_requester_admin:
                 raise SynapseError(

@@ -44,10 +44,10 @@ class CapabilitiesRestServlet(RestServlet):
         await self.auth.get_user_by_req(request, allow_guest=True)
         change_password = self.auth_handler.can_change_password()
 
-        response = {
+        response: JsonDict = {
             "capabilities": {
                 "m.room_versions": {
-                    "default": self.config.default_room_version.identifier,
+                    "default": self.config.server.default_room_version.identifier,
                     "available": {
                         v.identifier: v.disposition
                         for v in KNOWN_ROOM_VERSIONS.values()
