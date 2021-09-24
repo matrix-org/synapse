@@ -38,6 +38,7 @@ class DeactivateAccountHandler(BaseHandler):
         self._room_member_handler = hs.get_room_member_handler()
         self._identity_handler = hs.get_identity_handler()
         self._profile_handler = hs.get_profile_handler()
+        self._application_service_handler = hs.get_application_service_handler()
         self.user_directory_handler = hs.get_user_directory_handler()
         self._server_name = hs.hostname
 
@@ -158,6 +159,16 @@ class DeactivateAccountHandler(BaseHandler):
 
         # Mark the user as deactivated.
         await self.store.set_user_deactivated_status(user_id, True)
+
+
+        # Inform interested appservices
+        self._application_service_handler.notify_synthetic_event(
+            "m.user.deactivated",
+            user_id,
+            { 
+                "user_id": user_id,
+            }
+        )
 
         return identity_server_supports_unbinding
 

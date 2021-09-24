@@ -1371,6 +1371,17 @@ class AuthHandler(BaseHandler):
                 access_token=access_token,
             )
 
+
+        # Inform interested appservices
+        self.hs.get_application_service_handler().notify_synthetic_event(
+            "m.user.logout",
+            user_id,
+            { 
+                "user_id": user_info.user_id,
+                "device_id": user_info.device_id,
+            }
+        )
+
         # delete pushers associated with this access token
         if user_info.token_id is not None:
             await self.hs.get_pusherpool().remove_pushers_by_access_token(
@@ -1406,6 +1417,16 @@ class AuthHandler(BaseHandler):
         # delete pushers associated with the access tokens
         await self.hs.get_pusherpool().remove_pushers_by_access_token(
             user_id, (token_id for _, token_id, _ in tokens_and_devices)
+        )
+
+        # Inform interested appservices
+        self.hs.get_application_service_handler().notify_synthetic_event(
+            "m.user.logout",
+            user_id,
+            { 
+                "user_id": user_id,
+                "device_id": device_id,
+            }
         )
 
     async def add_threepid(

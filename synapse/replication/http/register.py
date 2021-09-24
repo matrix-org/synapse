@@ -30,6 +30,7 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
         super().__init__(hs)
         self.store = hs.get_datastore()
         self.registration_handler = hs.get_registration_handler()
+        self._application_service_handler = hs.get_application_service_handler()
 
     @staticmethod
     async def _serialize_payload(
@@ -89,6 +90,20 @@ class ReplicationRegisterServlet(ReplicationEndpoint):
             user_type=content["user_type"],
             address=content["address"],
             shadow_banned=content["shadow_banned"],
+        )
+
+        # Inform interested appservices
+        self._application_service_handler.notify_synthetic_event(
+            "m.user.registration",
+            user_id,
+            { 
+                "user_id": user_id,
+                "guest": content["make_guest"],
+                "org.matrix.synapse.admin": content["admin"],
+                "org.matrix.synapse.user_type": content["user_type"],
+                "org.matrix.synapse.shadow_banned": content["shadow_banned"],
+                "org.matrix.synapse.appservice_id": content["appservice_id"],
+            }
         )
 
         return 200, {}

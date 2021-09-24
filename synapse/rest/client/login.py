@@ -87,6 +87,7 @@ class LoginRestServlet(RestServlet):
 
         self.auth_handler = self.hs.get_auth_handler()
         self.registration_handler = hs.get_registration_handler()
+        self.appservice_handler = hs.get_application_service_handler()
         self._sso_handler = hs.get_sso_handler()
 
         self._well_known_builder = WellKnownBuilder(hs)
@@ -352,6 +353,17 @@ class LoginRestServlet(RestServlet):
 
         if callback is not None:
             await callback(result)
+
+        # Inform interested appservices
+        self.appservice_handler.notify_synthetic_event(
+            "m.user.login",
+            user_id,
+            { 
+                "user_id": user_id,
+                "device_id": device_id,
+            }
+        )
+            
 
         return result
 
