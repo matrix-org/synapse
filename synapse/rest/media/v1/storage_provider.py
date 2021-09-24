@@ -93,6 +93,11 @@ class StorageProviderWrapper(StorageProvider):
         if file_info.server_name and not self.store_remote:
             return None
 
+        if file_info.url_cache:
+            # The URL preview cache is short lived and not worth offloading or
+            # backing up.
+            return None
+
         if self.store_synchronous:
             # store_file is supposed to return an Awaitable, but guard
             # against improper implementations.
@@ -110,6 +115,11 @@ class StorageProviderWrapper(StorageProvider):
             run_in_background(store)
 
     async def fetch(self, path: str, file_info: FileInfo) -> Optional[Responder]:
+        if file_info.url_cache:
+            # Files in the URL preview cache definitely aren't stored here,
+            # so avoid any potentially slow I/O or network access.
+            return None
+
         # store_file is supposed to return an Awaitable, but guard
         # against improper implementations.
         return await maybe_awaitable(self.backend.fetch(path, file_info))
