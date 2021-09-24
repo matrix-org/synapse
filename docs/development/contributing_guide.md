@@ -173,7 +173,7 @@ SYNAPSE_TEST_LOG_LEVEL=DEBUG trial tests
 ### Running tests under PostgreSQL
 
 Invoking `trial` as above will use an in-memory SQLite database. This is great for
-quick development and testing. However, we only support using a PostgreSQL database
+quick development and testing. However, we recommend using a PostgreSQL database
 in production (and indeed, we have some code paths specific to each database).
 This means that we need to run our unit tests against PostgreSQL too. Our CI does
 this automatically for pull requests and release candidates, but it's sometimes
@@ -199,8 +199,8 @@ trial
 
 #### Prebuilt container
 
-Since configuring PostgreSQL can be fiddley, we can use of a pre-made
-docker container to host postgres and run our tests for us. To do so, run
+Since configuring PostgreSQL can be fiddly, we can make use of a pre-made
+Docker container to set up PostgreSQL and run our tests for us. To do so, run
 
 ```shell
 scripts-dev/test_postgresql.sh
@@ -215,7 +215,7 @@ scripts-dev/test_postgresql.sh tests.replication.test_sharded_event_persister.Ev
 
 The container creates a folder in your Synapse checkout called
 `.tox-pg-container` and uses this as a tox environment. The output of any
-`trial` runs goes into `_trial_temp` in your synapse source directory---the same
+`trial` runs goes into `_trial_temp` in your synapse source directory — the same
 as running `trial` directly on your host machine.
 
 ## Run the integration tests ([Sytest](https://github.com/matrix-org/sytest)).
