@@ -9,7 +9,11 @@
 set -e
 
 # Build, and tag
-docker build docker/ -f docker/Dockerfile-pgtests -t synapsepgtests
+docker build docker/ \
+  --build-arg "UID=$(id -u)" \
+  --build-arg "GID=$(id -g)" \
+  -f docker/Dockerfile-pgtests \
+  -t synapsepgtests
 
 # Run, mounting the current directory into /src
 docker run --rm -it -v "$(pwd):/src" -v synapse-pg-test-tox:/tox synapsepgtests "$@"

@@ -11,7 +11,7 @@ set -e
 export PGUSER=postgres
 
 # Start the database
-su -c '/usr/lib/postgresql/10/bin/pg_ctl -w -D /var/lib/postgresql/data start' postgres
+sudo -u postgres /usr/lib/postgresql/10/bin/pg_ctl -w -D /var/lib/postgresql/data start
 
 # Run the tests
 cd /src
