@@ -61,7 +61,7 @@ class Databases:
                     databases=database_config.databases,
                 )
 
-                database = DatabasePool(hs, database_config, engine)
+                database = DatabasePool(hs, database_config, engine, db_conn)
 
                 if "main" in database_config.databases:
                     logger.info(

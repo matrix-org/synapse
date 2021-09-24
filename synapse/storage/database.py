@@ -19,6 +19,7 @@ from collections import defaultdict
 from sys import intern
 from time import monotonic as monotonic_time
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Collection,
@@ -51,6 +52,9 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.background_updates import BackgroundUpdater
 from synapse.storage.engines import BaseDatabaseEngine, PostgresEngine, Sqlite3Engine
 from synapse.storage.types import Connection, Cursor
+
+if TYPE_CHECKING:
+    from psycopg2.extensions import ConnectionInfo
 
 # python 3 does not have a maximum int value
 MAX_TXN_ID = 2 ** 63 - 1
@@ -395,6 +399,7 @@ class DatabasePool:
         hs,
         database_config: DatabaseConnectionConfig,
         engine: BaseDatabaseEngine,
+        db_conn: LoggingDatabaseConnection,
     ):
         self.hs = hs
         self._clock = hs.get_clock()
@@ -426,6 +431,13 @@ class DatabasePool:
         # unsafe to use native upserts.
         if isinstance(self.engine, Sqlite3Engine):
             self._unsafe_to_upsert_tables.add("user_directory_search")
+
+        # We store the connection info for later use when using postgres
+        # (primarily to allow things like the state auto compressor to connect
+        # to the DB).
+        self.postgres_connection_info: Optional["ConnectionInfo"] = None
+        if isinstance(self.engine, PostgresEngine):
+            self.postgres_connection_info = db_conn.info
 
         if self.engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished
