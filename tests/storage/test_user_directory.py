@@ -188,6 +188,55 @@ class UserDirectoryInitialPopulationTestcase(
         # All three should have entries in the directory
         self.assertEqual(set(self.get_users_in_user_directory().keys()), {u1, u2, u3})
 
+    def test_population_excludes_support_user(self):
+        support = "@support1:test"
+        self.get_success(
+            self.store.register_user(
+                user_id=support, password_hash=None, user_type=UserTypes.SUPPORT
+            )
+        )
+
+        self._purge_and_rebuild_user_dir()
+        # TODO add support user to a public and private room. Check that
+        # users_in_public_rooms and users_who_share_private_rooms is empty.
+        self.assertEqual(self.get_users_in_user_directory(), {})
+
+    def test_population_excludes_appservice_user(self):
+        as_token = "i_am_an_app_service"
+        appservice = ApplicationService(
+            as_token,
+            self.hs.config.server_name,
+            id="1234",
+            namespaces={"users": [{"regex": r"@as_user.*", "exclusive": True}]},
+            sender="@as:test",
+        )
+        self.store.services_cache.append(appservice)
+
+        as_user = "@as_user_potato:test"
+        self.get_success(self.store.register_user(user_id=as_user, password_hash=None))
+
+        # TODO can we configure the app service up front somehow? This is a hack.
+        mock_regex = Mock()
+        mock_regex.match = lambda user_id: user_id == as_user
+        with patch.object(self.store, "exclusive_user_regex", mock_regex):
+            self._purge_and_rebuild_user_dir()
+
+        # TODO add AS user to a public and private room. Check that
+        # users_in_public_rooms and users_who_share_private_rooms is empty.
+        self.assertEqual(self.get_users_in_user_directory(), {})
+
+    def test_population_excludes_deactivated_user(self):
+        user = self.register_user("rip", "pass")
+        user_token = self.login(user, "pass")
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+        self.helper.create_room_as(user, is_public=False, tok=user_token)
+        self.get_success(self.store.set_user_deactivated_status(user, True))
+
+        self._purge_and_rebuild_user_dir()
+
+        self.assertEqual(self.get_users_in_public_rooms(), [])
+        self.assertEqual(self.get_users_who_share_private_rooms(), [])
+        self.assertEqual(self.get_users_in_user_directory(), {})
 ALICE = "@alice:a"
 BOB = "@bob:b"
 BOBBY = "@bobby:a"
