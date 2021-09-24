@@ -1144,12 +1144,10 @@ class FederationEventHandler:
     ) -> None:
         """Persist the events fetched by _get_events_and_persist or _get_remote_auth_chain_for_event
 
-        The events should not depend on one another, e.g. this should be used to persist
-        a bunch of outliers, but not a chunk of individual events that depend
-        on each other for state calculations.
+        The events to be persisted must be outliers.
 
-        We first sort the events so that they do not depend on each other, then
-        persist them.
+        We first sort the events to make sure that we process each event's auth_events
+        before the event itself, and then auth and persist them.
 
         Notifies about the events where appropriate.
 
@@ -1161,9 +1159,6 @@ class FederationEventHandler:
         """
         event_map = {event.event_id: event for event in events}
 
-        # we now need to auth the events in an order which ensures that each event's
-        # auth_events are authed before the event itself.
-        #
         # XXX: it might be possible to kick this process off in parallel with fetching
         # the events.
         while event_map:
