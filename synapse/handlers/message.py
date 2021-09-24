@@ -1390,9 +1390,6 @@ class EventCreationHandler:
                     self.room_prejoin_state_types,
                 )
 
-        room_version = await self.store.get_room_version_id(event.room_id)
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-
         if event.type == EventTypes.Redaction:
             original_event = await self.store.get_event(
                 event.redacts,
@@ -1401,6 +1398,9 @@ class EventCreationHandler:
                 allow_rejected=False,
                 allow_none=True,
             )
+
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
 
             # we can make some additional checks now if we have the original event.
             if original_event:
@@ -1462,20 +1462,40 @@ class EventCreationHandler:
             if prev_state_ids:
                 raise AuthError(403, "Changing the room create event is forbidden")
 
-        if room_version_obj.msc2716_historical and event.type == EventTypes.MSC2716_INSERTION:
-            next_batch_id = event.content.get(EventContentFields.MSC2716_NEXT_BATCH_ID)
-            conflicting_insertion_event_id = await self.store.get_insertion_event_by_batch_id(event.room_id, next_batch_id)
-            if conflicting_insertion_event_id is not None:
-                # The current insertion event that we're processing is invalid
-                # because an insertion event already exists in the room with the
-                # same next_batch_id. We can't allow multiple because the batch
-                # pointing will get weird, e.g. we can't determine which insertion
-                # event the batch event is pointing to.
-                raise SynapseError(
-                    HTTPStatus.BAD_REQUEST,
-                    "Another insertion event already exists with the same next_batch_id",
-                    errcode=Codes.INVALID_PARAM,
+        if event.type == EventTypes.MSC2716_INSERTION:
+            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
+
+            create_event = await self.store.get_create_event_for_room(
+                event.room_id
+            )
+            room_creator = create_event.content.get(EventContentFields.ROOM_CREATOR)
+
+            # Only check an insertion event if the room version
+            # supports it or the event is from the room creator.
+            if room_version_obj.msc2716_historical or (
+                self._config.experimental.msc2716_enabled
+                and event.sender == room_creator
+            ):
+                next_batch_id = event.content.get(
+                    EventContentFields.MSC2716_NEXT_BATCH_ID
                 )
+                conflicting_insertion_event_id = (
+                    await self.store.get_insertion_event_by_batch_id(
+                        event.room_id, next_batch_id
+                    )
+                )
+                if conflicting_insertion_event_id is not None:
+                    # The current insertion event that we're processing is invalid
+                    # because an insertion event already exists in the room with the
+                    # same next_batch_id. We can't allow multiple because the batch
+                    # pointing will get weird, e.g. we can't determine which insertion
+                    # event the batch event is pointing to.
+                    raise SynapseError(
+                        HTTPStatus.BAD_REQUEST,
+                        "Another insertion event already exists with the same next_batch_id",
+                        errcode=Codes.INVALID_PARAM,
+                    )
 
         # Mark any `m.historical` messages as backfilled so they don't appear
         # in `/sync` and have the proper decrementing `stream_ordering` as we import
