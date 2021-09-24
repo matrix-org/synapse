@@ -44,13 +44,10 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     ["synapse.events.EventBase"],
     Awaitable[Union[bool, str]],
 ]
-# FIXME: Callback signature differs from mainline
-USER_MAY_INVITE_CALLBACK = Callable[
-    [str, Optional[str], Optional[dict], str, bool, bool], Awaitable[bool]
-]
-# FIXME: Callback signature differs from mainline
-USER_MAY_CREATE_ROOM_CALLBACK = Callable[
-    [str, List[str], List[dict], bool], Awaitable[bool]
+USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
+USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
+USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK = Callable[
+    [str, List[str], List[Dict[str, str]]], Awaitable[bool]
 ]
 USER_MAY_CREATE_ROOM_ALIAS_CALLBACK = Callable[[str, RoomAlias], Awaitable[bool]]
 USER_MAY_PUBLISH_ROOM_CALLBACK = Callable[[str, str], Awaitable[bool]]
@@ -173,6 +170,9 @@ class SpamChecker:
         self._check_event_for_spam_callbacks: List[CHECK_EVENT_FOR_SPAM_CALLBACK] = []
         self._user_may_invite_callbacks: List[USER_MAY_INVITE_CALLBACK] = []
         self._user_may_create_room_callbacks: List[USER_MAY_CREATE_ROOM_CALLBACK] = []
+        self._user_may_create_room_with_invites_callbacks: List[
+            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
+        ] = []
         self._user_may_create_room_alias_callbacks: List[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = []
@@ -193,6 +193,9 @@ class SpamChecker:
         check_event_for_spam: Optional[CHECK_EVENT_FOR_SPAM_CALLBACK] = None,
         user_may_invite: Optional[USER_MAY_INVITE_CALLBACK] = None,
         user_may_create_room: Optional[USER_MAY_CREATE_ROOM_CALLBACK] = None,
+        user_may_create_room_with_invites: Optional[
+            USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK
+        ] = None,
         user_may_create_room_alias: Optional[
             USER_MAY_CREATE_ROOM_ALIAS_CALLBACK
         ] = None,
@@ -213,6 +216,11 @@ class SpamChecker:
 
         if user_may_create_room is not None:
             self._user_may_create_room_callbacks.append(user_may_create_room)
+
+        if user_may_create_room_with_invites is not None:
+            self._user_may_create_room_with_invites_callbacks.append(
+                user_may_create_room_with_invites,
+            )
 
         if user_may_create_room_alias is not None:
             self._user_may_create_room_alias_callbacks.append(
@@ -334,6 +342,34 @@ class SpamChecker:
                 await callback(userid, invite_list, third_party_invite_list, cloning)
                 is False
             ):
+                return False
+
+        return True
+
+    async def user_may_create_room_with_invites(
+        self,
+        userid: str,
+        invites: List[str],
+        threepid_invites: List[Dict[str, str]],
+    ) -> bool:
+        """Checks if a given user may create a room with invites
+
+        If this method returns false, the creation request will be rejected.
+
+        Args:
+            userid: The ID of the user attempting to create a room
+            invites: The IDs of the Matrix users to be invited if the room creation is
+                allowed.
+            threepid_invites: The threepids to be invited if the room creation is allowed,
+                as a dict including a "medium" key indicating the threepid's medium (e.g.
+                "email") and an "address" key indicating the threepid's address (e.g.
+                "alice@example.com")
+
+        Returns:
+            True if the user may create the room, otherwise False
+        """
+        for callback in self._user_may_create_room_with_invites_callbacks:
+            if await callback(userid, invites, threepid_invites) is False:
                 return False
 
         return True
