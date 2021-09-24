@@ -1420,7 +1420,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Returns: bool of whether the complexity is too great, or None
             if unable to be fetched
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.federation_handler.get_room_complexity(
             remote_room_hosts, room_id
         )
@@ -1436,7 +1436,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
         Args:
             room_id: The room ID to check for complexity.
         """
-        max_complexity = self.hs.config.limit_remote_rooms.complexity
+        max_complexity = self.hs.config.server.limit_remote_rooms.complexity
         complexity = await self.store.get_room_complexity(room_id)
 
         return complexity["v1"] > max_complexity
@@ -1472,7 +1472,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             if too_complex is True:
                 raise SynapseError(
                     code=400,
-                    msg=self.hs.config.limit_remote_rooms.complexity_error,
+                    msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                     errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
                 )
 
@@ -1507,7 +1507,7 @@ class RoomMemberMasterHandler(RoomMemberHandler):
             )
             raise SynapseError(
                 code=400,
-                msg=self.hs.config.limit_remote_rooms.complexity_error,
+                msg=self.hs.config.server.limit_remote_rooms.complexity_error,
                 errcode=Codes.RESOURCE_LIMIT_EXCEEDED,
             )
 
