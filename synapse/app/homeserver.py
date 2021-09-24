@@ -440,7 +440,7 @@ def run(hs):
     _base.start_reactor(
         "synapse-homeserver",
         soft_file_limit=hs.config.server.soft_file_limit,
-        gc_thresholds=hs.config.gc_thresholds,
+        gc_thresholds=hs.config.server.gc_thresholds,
         pid_file=hs.config.server.pid_file,
         daemonize=hs.config.server.daemonize,
         print_pidfile=hs.config.server.print_pidfile,

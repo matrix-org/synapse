@@ -413,7 +413,9 @@ class EventCreationHandler:
         self.server_name = hs.hostname
         self.notifier = hs.get_notifier()
         self.config = hs.config
-        self.require_membership_for_aliases = hs.config.require_membership_for_aliases
+        self.require_membership_for_aliases = (
+            hs.config.server.require_membership_for_aliases
+        )
         self._events_shard_config = self.config.worker.events_shard_config
         self._instance_name = hs.get_instance_name()
 

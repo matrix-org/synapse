@@ -90,7 +90,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.third_party_event_rules = hs.get_third_party_event_rules()
         self._server_notices_mxid = self.config.servernotices.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
-        self.allow_per_room_profiles = self.config.allow_per_room_profiles
+        self.allow_per_room_profiles = self.config.server.allow_per_room_profiles
 
         self._join_rate_limiter_local = Ratelimiter(
             store=self.store,
