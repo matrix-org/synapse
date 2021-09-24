@@ -17,12 +17,11 @@ from typing import TYPE_CHECKING, Dict
 
 from signedjson.sign import sign_json
 
-from twisted.web.server import Request
-
 from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
 from synapse.types import JsonDict
 from synapse.util import json_decoder
 from synapse.util.async_helpers import yieldable_gather_results
@@ -102,7 +101,7 @@ class RemoteKey(DirectServeJsonResource):
         )
         self.config = hs.config
 
-    async def _async_render_GET(self, request: Request) -> None:
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
         assert request.postpath is not None
         if len(request.postpath) == 1:
             (server,) = request.postpath
@@ -119,7 +118,7 @@ class RemoteKey(DirectServeJsonResource):
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    async def _async_render_POST(self, request: Request) -> None:
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         content = parse_json_object_from_request(request)
 
         query = content["server_keys"]
@@ -128,7 +127,7 @@ class RemoteKey(DirectServeJsonResource):
 
     async def query_keys(
         self,
-        request: Request,
+        request: SynapseRequest,
         query: JsonDict,
         query_remote_on_cache_miss: bool = False,
     ) -> None:

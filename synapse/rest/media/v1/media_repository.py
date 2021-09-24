@@ -23,7 +23,6 @@ import twisted.internet.error
 import twisted.web.http
 from twisted.internet.defer import Deferred
 from twisted.web.resource import Resource
-from twisted.web.server import Request
 
 from synapse.api.errors import (
     FederationDeniedError,
@@ -34,6 +33,7 @@ from synapse.api.errors import (
 )
 from synapse.config._base import ConfigError
 from synapse.config.repository import ThumbnailRequirement
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import UserID
@@ -189,7 +189,7 @@ class MediaRepository:
         return "mxc://%s/%s" % (self.server_name, media_id)
 
     async def get_local_media(
-        self, request: Request, media_id: str, name: Optional[str]
+        self, request: SynapseRequest, media_id: str, name: Optional[str]
     ) -> None:
         """Responds to requests for local media, if exists, or returns 404.
 
@@ -223,7 +223,11 @@ class MediaRepository:
         )
 
     async def get_remote_media(
-        self, request: Request, server_name: str, media_id: str, name: Optional[str]
+        self,
+        request: SynapseRequest,
+        server_name: str,
+        media_id: str,
+        name: Optional[str],
     ) -> None:
         """Respond to requests for remote media.
 
