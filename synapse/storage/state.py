@@ -375,7 +375,7 @@ class StateFilter:
 
         return member_filter, non_member_filter
 
-    def decompose_into_four_parts(
+    def _decompose_into_four_parts(
         self,
     ) -> Tuple[Tuple[bool, Set[str]], Tuple[Set[str], Set[StateKey]]]:
         """
@@ -400,7 +400,7 @@ class StateFilter:
         return (is_all, excluded_types), (wildcard_types, concrete_keys)
 
     @staticmethod
-    def recompose_from_four_parts(
+    def _recompose_from_four_parts(
         all_part: bool,
         minus_wildcards: Set[str],
         plus_wildcards: Set[str],
@@ -482,11 +482,11 @@ class StateFilter:
         (self_all, self_excludes), (
             self_wildcards,
             self_concrete_keys,
-        ) = self.decompose_into_four_parts()
+        ) = self._decompose_into_four_parts()
         (sub_all, sub_excludes), (
             sub_wildcards,
             sub_concrete_keys,
-        ) = subtrahend.decompose_into_four_parts()
+        ) = subtrahend._decompose_into_four_parts()
 
         # Start with an estimate of the difference based on self
         new_all = self_all
@@ -531,7 +531,7 @@ class StateFilter:
 
         # Transform our newly-constructed state filter from the alternative
         # representation back into the normal StateFilter representation.
-        return StateFilter.recompose_from_four_parts(
+        return StateFilter._recompose_from_four_parts(
             new_all, new_excludes, new_wildcards, new_concrete_keys
         )
 
