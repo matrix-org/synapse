@@ -1,0 +1,1 @@
+Avoid storing URL cache files in storage providers.
