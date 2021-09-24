@@ -1795,24 +1795,6 @@ class PersistEventsStore:
             # Invalid insertion event without next batch ID
             return
 
-        conflicting_insertion_event_id = self.db_pool.simple_select_one_onecol_txn(
-            txn,
-            table="insertion_events",
-            keyvalues={
-                "room_id": event.room_id,
-                "next_batch_id": next_batch_id,
-            },
-            retcol="event_id",
-            allow_none=True,
-        )
-        if conflicting_insertion_event_id is not None:
-            # The new  insertion event is invalid because there already exists
-            # and insertion event in the room with the same next_batch_id. We
-            # can't allow multiple because the batch pointing will get weird,
-            # e.g. we can't determine which insertion event the batch event is
-            # pointing to.
-            return
-
         logger.debug(
             "_handle_insertion_event (next_batch_id=%s) %s", next_batch_id, event
         )
