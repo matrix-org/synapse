@@ -377,7 +377,7 @@ class StateFilter:
 
     def decompose_into_four_parts(
         self,
-    ) -> Tuple[bool, Set[str], Set[str], Set[StateKey]]:
+    ) -> Tuple[Tuple[bool, Set[str]], Tuple[Set[str], Set[StateKey]]]:
         """
         Decomposes this state filter into 4 constituent parts, which can be
         thought of as this:
@@ -392,25 +392,12 @@ class StateFilter:
         See `recompose_from_four_parts` for the other direction of this
         correspondence.
         """
-        all_part: bool = self.include_others
-        minus_wildcards: Set[str] = set()
-        plus_wildcards: Set[str] = set()
-        plus_state_keys: Set[StateKey] = set()
+        is_all = self.include_others
+        excluded_types: Set[str] = {t for t in self.types if is_all}
+        wildcard_types: Set[str] = {t for t, s in self.types.items() if s is None}
+        concrete_keys: Set[StateKey] = set(self.concrete_types())
 
-        for state_type, state_keys in self.types.items():
-            if state_keys is None:
-                # this is a wildcard
-                if not all_part:
-                    plus_wildcards.add(state_type)
-            else:
-                if all_part:
-                    # we remove the wildcard on this type, because we will
-                    # instead specify individual keys
-                    minus_wildcards.add(state_type)
-                for state_key in state_keys:
-                    plus_state_keys.add((state_type, state_key))
-
-        return all_part, minus_wildcards, plus_wildcards, plus_state_keys
+        return (is_all, excluded_types), (wildcard_types, concrete_keys)
 
     @staticmethod
     def recompose_from_four_parts(
