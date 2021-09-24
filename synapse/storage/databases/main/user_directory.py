@@ -551,7 +551,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
         super().__init__(database, db_conn, hs)
 
         self._prefer_local_users_in_search = (
-            hs.config.user_directory_search_prefer_local_users
+            hs.config.userdirectory.user_directory_search_prefer_local_users
         )
         self._server_name = hs.config.server.server_name
 
@@ -741,7 +741,7 @@ class UserDirectoryStore(UserDirectoryBackgroundUpdateStore):
                 }
         """
 
-        if self.hs.config.user_directory_search_all_users:
+        if self.hs.config.userdirectory.user_directory_search_all_users:
             join_args = (user_id,)
             where_clause = "user_id != ?"
         else:

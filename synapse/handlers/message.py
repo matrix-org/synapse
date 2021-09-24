@@ -692,10 +692,10 @@ class EventCreationHandler:
         return False
 
     async def _is_server_notices_room(self, room_id: str) -> bool:
-        if self.config.server_notices_mxid is None:
+        if self.config.servernotices.server_notices_mxid is None:
             return False
         user_ids = await self.store.get_users_in_room(room_id)
-        return self.config.server_notices_mxid in user_ids
+        return self.config.servernotices.server_notices_mxid in user_ids
 
     async def assert_accepted_privacy_policy(self, requester: Requester) -> None:
         """Check if a user has accepted the privacy policy
@@ -731,8 +731,8 @@ class EventCreationHandler:
 
         # exempt the system notices user
         if (
-            self.config.server_notices_mxid is not None
-            and user_id == self.config.server_notices_mxid
+            self.config.servernotices.server_notices_mxid is not None
+            and user_id == self.config.servernotices.server_notices_mxid
         ):
             return
 

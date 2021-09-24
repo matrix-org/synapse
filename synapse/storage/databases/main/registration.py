@@ -2015,7 +2015,7 @@ class RegistrationStore(StatsStore, RegistrationBackgroundUpdateStore):
                 (user_id_obj.localpart, create_profile_with_displayname),
             )
 
-        if self.hs.config.stats_enabled:
+        if self.hs.config.stats.stats_enabled:
             # we create a new completed user statistics row
 
             # we don't strictly need current_token since this user really can't

@@ -53,7 +53,7 @@ class ThumbnailResource(DirectServeJsonResource):
         self.store = hs.get_datastore()
         self.media_repo = media_repo
         self.media_storage = media_storage
-        self.dynamic_thumbnails = hs.config.dynamic_thumbnails
+        self.dynamic_thumbnails = hs.config.media.dynamic_thumbnails
         self.server_name = hs.hostname
 
     async def _async_render_GET(self, request: SynapseRequest) -> None:

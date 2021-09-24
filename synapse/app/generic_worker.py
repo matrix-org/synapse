@@ -140,7 +140,7 @@ class KeyUploadServlet(RestServlet):
         self.auth = hs.get_auth()
         self.store = hs.get_datastore()
         self.http_client = hs.get_simple_http_client()
-        self.main_uri = hs.config.worker_main_http_uri
+        self.main_uri = hs.config.worker.worker_main_http_uri
 
     async def on_POST(self, request: Request, device_id: Optional[str]):
         requester = await self.auth.get_user_by_req(request, allow_guest=True)
@@ -321,7 +321,7 @@ class GenericWorkerServer(HomeServer):
                 elif name == "federation":
                     resources.update({FEDERATION_PREFIX: TransportLayerServer(self)})
                 elif name == "media":
-                    if self.config.can_load_media_repo:
+                    if self.config.media.can_load_media_repo:
                         media_repo = self.get_media_repository_resource()
 
                         # We need to serve the admin servlets for media on the
@@ -384,7 +384,7 @@ class GenericWorkerServer(HomeServer):
         logger.info("Synapse worker now listening on port %d", port)
 
     def start_listening(self):
-        for listener in self.config.worker_listeners:
+        for listener in self.config.worker.worker_listeners:
             if listener.type == "http":
                 self._listen_http(listener)
             elif listener.type == "manhole":

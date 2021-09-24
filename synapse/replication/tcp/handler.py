@@ -322,8 +322,8 @@ class ReplicationCommandHandler:
         else:
             client_name = hs.get_instance_name()
             self._factory = DirectTcpReplicationClientFactory(hs, client_name, self)
-            host = hs.config.worker_replication_host
-            port = hs.config.worker_replication_port
+            host = hs.config.worker.worker_replication_host
+            port = hs.config.worker.worker_replication_port
             hs.get_reactor().connectTCP(host.encode(), port, self._factory)
 
     def get_streams(self) -> Dict[str, Stream]:

@@ -126,7 +126,7 @@ class RoomCreationHandler(BaseHandler):
         for preset_name, preset_config in self._presets_dict.items():
             encrypted = (
                 preset_name
-                in self.config.encryption_enabled_by_default_for_room_presets
+                in self.config.room.encryption_enabled_by_default_for_room_presets
             )
             preset_config["encrypted"] = encrypted
 
@@ -141,7 +141,7 @@ class RoomCreationHandler(BaseHandler):
         self._upgrade_response_cache: ResponseCache[Tuple[str, str]] = ResponseCache(
             hs.get_clock(), "room_upgrade", timeout_ms=FIVE_MINUTES_IN_MS
         )
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
 
         self.third_party_event_rules = hs.get_third_party_event_rules()
 
@@ -757,7 +757,9 @@ class RoomCreationHandler(BaseHandler):
             )
 
         if is_public:
-            if not self.config.is_publishing_room_allowed(user_id, room_id, room_alias):
+            if not self.config.roomdirectory.is_publishing_room_allowed(
+                user_id, room_id, room_alias
+            ):
                 # Lets just return a generic message, as there may be all sorts of
                 # reasons why we said no. TODO: Allow configurable error messages
                 # per alias creation rule?

@@ -43,7 +43,7 @@ class DeleteMediaByIDTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
 
     def test_no_auth(self):
         """
@@ -200,7 +200,7 @@ class DeleteMediaByDateSizeTestCase(unittest.HomeserverTestCase):
         self.admin_user = self.register_user("admin", "pass", admin=True)
         self.admin_user_tok = self.login("admin", "pass")
 
-        self.filepaths = MediaFilePaths(hs.config.media_store_path)
+        self.filepaths = MediaFilePaths(hs.config.media.media_store_path)
         self.url = "/_synapse/admin/v1/media/%s/delete" % self.server_name
 
     def test_no_auth(self):
