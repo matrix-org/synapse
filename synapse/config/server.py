@@ -236,6 +236,26 @@ class RetentionConfig:
     longest_max_lifetime: Optional[int]
 
 
+@attr.s
+class LimitRemoteRoomsConfig:
+    enabled = attr.ib(
+        validator=attr.validators.instance_of(bool), default=False
+    )
+    complexity = attr.ib(
+        validator=attr.validators.instance_of(
+            (float, int)  # type: ignore[arg-type] # noqa
+        ),
+        default=1.0,
+    )
+    complexity_error = attr.ib(
+        validator=attr.validators.instance_of(str),
+        default=ROOM_COMPLEXITY_TOO_GREAT,
+    )
+    admins_can_join = attr.ib(
+        validator=attr.validators.instance_of(bool), default=False
+    )
+
+
 class ServerConfig(Config):
     section = "server"
 
@@ -589,25 +609,6 @@ class ServerConfig(Config):
 
         self.gc_thresholds = read_gc_thresholds(config.get("gc_thresholds", None))
         self.gc_seconds = self.read_gc_intervals(config.get("gc_min_interval", None))
-
-        @attr.s
-        class LimitRemoteRoomsConfig:
-            enabled = attr.ib(
-                validator=attr.validators.instance_of(bool), default=False
-            )
-            complexity = attr.ib(
-                validator=attr.validators.instance_of(
-                    (float, int)  # type: ignore[arg-type] # noqa
-                ),
-                default=1.0,
-            )
-            complexity_error = attr.ib(
-                validator=attr.validators.instance_of(str),
-                default=ROOM_COMPLEXITY_TOO_GREAT,
-            )
-            admins_can_join = attr.ib(
-                validator=attr.validators.instance_of(bool), default=False
-            )
 
         self.limit_remote_rooms = LimitRemoteRoomsConfig(
             **(config.get("limit_remote_rooms") or {})
