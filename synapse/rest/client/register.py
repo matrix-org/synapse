@@ -682,7 +682,7 @@ class RegisterRestServlet(RestServlet):
             # written to the db
             if threepid:
                 if is_threepid_reserved(
-                    self.hs.config.mau_limits_reserved_threepids, threepid
+                    self.hs.config.server.mau_limits_reserved_threepids, threepid
                 ):
                     await self.store.upsert_monthly_active_user(registered_user_id)
 

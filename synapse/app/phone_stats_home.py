@@ -171,7 +171,7 @@ def start_phone_stats_home(hs):
         current_mau_count_by_service = {}
         reserved_users = ()
         store = hs.get_datastore()
-        if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
+        if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
             current_mau_count = await store.get_monthly_active_count()
             current_mau_count_by_service = (
                 await store.get_monthly_active_count_by_service()
@@ -183,9 +183,9 @@ def start_phone_stats_home(hs):
             current_mau_by_service_gauge.labels(app_service).set(float(count))
 
         registered_reserved_users_mau_gauge.set(float(len(reserved_users)))
-        max_mau_gauge.set(float(hs.config.max_mau_value))
+        max_mau_gauge.set(float(hs.config.server.max_mau_value))
 
-    if hs.config.limit_usage_by_mau or hs.config.mau_stats_only:
+    if hs.config.server.limit_usage_by_mau or hs.config.server.mau_stats_only:
         generate_monthly_active_users()
         clock.looping_call(generate_monthly_active_users, 5 * 60 * 1000)
     # End of monthly active user settings

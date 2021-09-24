@@ -854,7 +854,7 @@ class RegistrationHandler(BaseHandler):
             # Necessary due to auth checks prior to the threepid being
             # written to the db
             if is_threepid_reserved(
-                self.hs.config.mau_limits_reserved_threepids, threepid
+                self.hs.config.server.mau_limits_reserved_threepids, threepid
             ):
                 await self.store.upsert_monthly_active_user(user_id)
 
