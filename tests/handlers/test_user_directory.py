@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List, Tuple
 from unittest.mock import Mock
 from urllib.parse import quote
 
@@ -325,7 +326,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
 
-    def get_users_in_public_rooms(self):
+    def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
         r = self.get_success(
             self.store.db_pool.simple_select_list(
                 "users_in_public_rooms", None, ("user_id", "room_id")
@@ -336,7 +337,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             retval.append((i["user_id"], i["room_id"]))
         return retval
 
-    def get_users_who_share_private_rooms(self):
+    def get_users_who_share_private_rooms(self) -> List[Tuple[str, str, str]]:
         return self.get_success(
             self.store.db_pool.simple_select_list(
                 "users_who_share_private_rooms",
