@@ -10,11 +10,10 @@ set -e
 # Set PGUSER so Synapse's tests know what user to connect to the database with
 export PGUSER=postgres
 
-# Initialise & start the database
-su -c '/usr/lib/postgresql/9.6/bin/initdb -D /var/lib/postgresql/data -E "UTF-8" --lc-collate="en_US.UTF-8" --lc-ctype="en_US.UTF-8" --username=postgres' postgres
-su -c '/usr/lib/postgresql/9.6/bin/pg_ctl -w -D /var/lib/postgresql/data start' postgres
+# Start the database
+sudo -u postgres /usr/lib/postgresql/10/bin/pg_ctl -w -D /var/lib/postgresql/data start
 
 # Run the tests
 cd /src
 export TRIAL_FLAGS="-j 4"
-tox --workdir=/tmp -e py35-postgres
+tox --workdir=./.tox-pg-container -e py36-postgres "$@"
