@@ -102,8 +102,8 @@ class PurgeEventsStore(StateGroupWorkerStore, CacheInvalidationWorkerStore):
             (room_id,),
         )
         rows = txn.fetchall()
-        # if we already have no forwards extremities (for example because they were 
-        # cleared out by the `delete_old_current_state_events` background database 
+        # if we already have no forwards extremities (for example because they were
+        # cleared out by the `delete_old_current_state_events` background database
         # update), then we may as well carry on.
         if rows:
             max_depth = max(row[1] for row in rows)
