@@ -47,8 +47,10 @@ For more details, see
 
 ##### Matrix.org packages
 
-Matrix.org provides Debian/Ubuntu packages of Synapse via
-<https://packages.matrix.org/debian/>.  To install the latest release:
+Matrix.org provides Debian/Ubuntu packages of Synapse, for the amd64
+architecture via <https://packages.matrix.org/debian/>.  
+
+To install the latest release:
 
 ```sh
 sudo apt install -y lsb-release wget apt-transport-https
