@@ -186,7 +186,7 @@ When following this route please make sure that the [Platform-specific prerequis
 System requirements:
 
 - POSIX-compliant system (tested on Linux & OS X)
-- Python 3.5.2 or later, up to Python 3.9.
+- Python 3.6 or later, up to Python 3.9.
 - At least 1GB of free RAM if you want to join large public rooms like #matrix:matrix.org
 
 To install the Synapse homeserver run:
