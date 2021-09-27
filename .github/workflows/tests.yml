@@ -203,23 +203,19 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - sytest-tag: bionic
+          - sytest-tag: dinsic
 
-          - sytest-tag: bionic
+          - sytest-tag: dinsic
             postgres: postgres
 
-          - sytest-tag: testing
+          - sytest-tag: dinsic
             postgres: postgres
 
-          - sytest-tag: bionic
+          - sytest-tag: dinsic
             postgres: multi-postgres
             workers: workers
 
-          - sytest-tag: buster
-            postgres: multi-postgres
-            workers: workers
-
-          - sytest-tag: buster
+          - sytest-tag: dinsic
             postgres: postgres
             workers: workers
             redis: redis
