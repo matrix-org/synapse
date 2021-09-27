@@ -240,7 +240,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
         if self.hs.config.redis.redis_enabled:
             # Handle attempts to connect to fake redis server.
             self.reactor.add_tcp_client_callback(
-                b"localhost",
+                "localhost",
                 6379,
                 self.connect_any_redis_attempts,
             )
