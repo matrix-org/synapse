@@ -287,7 +287,7 @@ class DeferredCache(Generic[KT, VT]):
         callbacks = [callback] if callback else []
         self.cache.set(key, value, callbacks=callbacks)
 
-    def invalidate(self, key: KT) -> None:
+    def invalidate(self, key) -> None:
         """Delete a key, or tree of entries
 
         If the cache is backed by a regular dict, then "key" must be of
