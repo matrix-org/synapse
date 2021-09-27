@@ -15,7 +15,7 @@
 import logging
 from functools import wraps
 from types import TracebackType
-from typing import Any, Callable, Optional, Protocol, Type, TypeVar, cast, Awaitable
+from typing import Any, Callable, Optional, Protocol, Type, TypeVar, cast
 
 from prometheus_client import Counter
 
@@ -63,15 +63,14 @@ in_flight = InFlightGauge(
     sub_metrics=["real_time_max", "real_time_sum"],
 )
 
-R = TypeVar("R")
-F = Callable[..., Awaitable[R]]
+T = TypeVar("T", bound=Callable[..., Any])
 
 
 class HasClock(Protocol):
     clock: Clock
 
 
-def measure_func(name: Optional[str] = None) -> Callable[[F], F]:
+def measure_func(name: Optional[str] = None) -> Callable[[T], T]:
     """
     Used to decorate an async function with a `Measure` context manager.
 
@@ -89,16 +88,16 @@ def measure_func(name: Optional[str] = None) -> Callable[[F], F]:
 
     """
 
-    def wrapper(func: F) -> F:
+    def wrapper(func: T) -> T:
         block_name = func.__name__ if name is None else name
 
         @wraps(func)
-        async def measured_func(self: HasClock, *args: Any, **kwargs: Any) -> R:
+        async def measured_func(self: HasClock, *args: Any, **kwargs: Any) -> Any:
             with Measure(self.clock, block_name):
                 r = await func(self, *args, **kwargs)
             return r
 
-        return measured_func
+        return cast(T, measured_func)
 
     return wrapper
 
