@@ -64,27 +64,11 @@ def check(
     Returns:
          if the auth checks pass.
     """
-    assert isinstance(auth_events, dict)
-
     if do_size_check:
         _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
-
-    room_id = event.room_id
-
-    # We need to ensure that the auth events are actually for the same room, to
-    # stop people from using powers they've been granted in other rooms for
-    # example.
-    for auth_event in auth_events.values():
-        if auth_event.room_id != room_id:
-            raise AuthError(
-                403,
-                "During auth for event %s in room %s, found event %s in the state "
-                "which is in room %s"
-                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
-            )
 
     if do_sig_check:
         sender_domain = get_domain_from_id(event.sender)
@@ -124,6 +108,53 @@ def check(
             )
             if not event.signatures.get(authoriser_domain):
                 raise AuthError(403, "Event not signed by authorising server")
+
+    check_auth_rules_for_event(room_version_obj, event, auth_events)
+
+
+def check_auth_rules_for_event(
+    room_version_obj: RoomVersion, event: EventBase, auth_events: StateMap[EventBase]
+) -> None:
+    """Check that an event complies with the auth rules
+
+    Checks whether an event passes the auth rules with a given set of state events
+
+    Assumes that we have already checked that the event is the right shape (it has
+    enough signatures, has a room ID, etc). In other words:
+
+     - it's fine for use in state resolution, when we have already decided whether to
+       accept the event or not, and are now trying to decide whether it should make it
+       into the room state
+
+     - when we're doing the initial event auth, it is only suitable in combination with
+       a bunch of other tests.
+
+    Args:
+        room_version_obj: the version of the room
+        event: the event being checked.
+        auth_events: the room state to check the events against.
+
+    Raises:
+        AuthError if the checks fail
+    """
+    assert isinstance(auth_events, dict)
+
+    # We need to ensure that the auth events are actually for the same room, to
+    # stop people from using powers they've been granted in other rooms for
+    # example.
+    #
+    # Arguably we don't need to do this when we're just doing state res, as presumably
+    # the state res algorithm isn't silly enough to give us events from different rooms.
+    # Still, it's easier to do it anyway.
+    room_id = event.room_id
+    for auth_event in auth_events.values():
+        if auth_event.room_id != room_id:
+            raise AuthError(
+                403,
+                "During auth for event %s in room %s, found event %s in the state "
+                "which is in room %s"
+                % (event.event_id, room_id, auth_event.event_id, auth_event.room_id),
+            )
 
     # Implementation of https://matrix.org/docs/spec/rooms/v1#authorization-rules
     #
