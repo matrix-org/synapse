@@ -29,7 +29,6 @@ import attr
 
 from twisted.internet.defer import Deferred
 from twisted.internet.error import DNSLookupError
-from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.client import SimpleHttpClient
@@ -126,14 +125,14 @@ class PreviewUrlResource(DirectServeJsonResource):
         self.auth = hs.get_auth()
         self.clock = hs.get_clock()
         self.filepaths = media_repo.filepaths
-        self.max_spider_size = hs.config.max_spider_size
+        self.max_spider_size = hs.config.media.max_spider_size
         self.server_name = hs.hostname
         self.store = hs.get_datastore()
         self.client = SimpleHttpClient(
             hs,
             treq_args={"browser_like_redirects": True},
-            ip_whitelist=hs.config.url_preview_ip_range_whitelist,
-            ip_blacklist=hs.config.url_preview_ip_range_blacklist,
+            ip_whitelist=hs.config.media.url_preview_ip_range_whitelist,
+            ip_blacklist=hs.config.media.url_preview_ip_range_blacklist,
             use_proxy=True,
         )
         self.media_repo = media_repo
@@ -151,8 +150,8 @@ class PreviewUrlResource(DirectServeJsonResource):
             or instance_running_jobs == hs.get_instance_name()
         )
 
-        self.url_preview_url_blacklist = hs.config.url_preview_url_blacklist
-        self.url_preview_accept_language = hs.config.url_preview_accept_language
+        self.url_preview_url_blacklist = hs.config.media.url_preview_url_blacklist
+        self.url_preview_accept_language = hs.config.media.url_preview_accept_language
 
         # memory cache mapping urls to an ObservableDeferred returning
         # JSON-encoded OG metadata
@@ -168,7 +167,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 self._start_expire_url_cache_data, 10 * 1000
             )
 
-    async def _async_render_OPTIONS(self, request: Request) -> None:
+    async def _async_render_OPTIONS(self, request: SynapseRequest) -> None:
         request.setHeader(b"Allow", b"OPTIONS, GET")
         respond_with_json(request, 200, {}, send_cors=True)
 
@@ -305,7 +304,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             with open(media_info.filename, "rb") as file:
                 body = file.read()
 
-            oembed_response = self._oembed.parse_oembed_response(media_info.uri, body)
+            oembed_response = self._oembed.parse_oembed_response(url, body)
             og = oembed_response.open_graph_result
 
             # Use the cache age from the oEmbed result, instead of the HTTP response.
@@ -486,7 +485,6 @@ class PreviewUrlResource(DirectServeJsonResource):
 
     async def _expire_url_cache_data(self) -> None:
         """Clean up expired url cache content, media and thumbnails."""
-        # TODO: Delete from backup media store
 
         assert self._worker_run_media_background_jobs
 

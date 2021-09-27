@@ -328,7 +328,7 @@ class BaseMultiWorkerStreamTestCase(unittest.HomeserverTestCase):
 
         # Set up TCP replication between master and the new worker if we don't
         # have Redis support enabled.
-        if not worker_hs.config.redis_enabled:
+        if not worker_hs.config.redis.redis_enabled:
             repl_handler = ReplicationCommandHandler(worker_hs)
             client = ClientReplicationStreamProtocol(
                 worker_hs,

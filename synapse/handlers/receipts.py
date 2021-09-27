@@ -238,7 +238,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
         if self.config.experimental.msc2285_enabled:
             events = ReceiptEventSource.filter_out_hidden(events, user.to_string())
 
-        return (events, to_key)
+        return events, to_key
 
     async def get_new_events_as(
         self, from_key: int, service: ApplicationService
@@ -270,7 +270,7 @@ class ReceiptEventSource(EventSource[int, JsonDict]):
 
             events.append(event)
 
-        return (events, to_key)
+        return events, to_key
 
     def get_current_key(self, direction: str = "f") -> int:
         return self.store.get_max_receipt_stream_id()

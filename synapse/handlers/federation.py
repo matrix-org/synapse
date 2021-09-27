@@ -91,7 +91,7 @@ class FederationHandler(BaseHandler):
         self.spam_checker = hs.get_spam_checker()
         self.event_creation_handler = hs.get_event_creation_handler()
         self._event_auth_handler = hs.get_event_auth_handler()
-        self._server_notices_mxid = hs.config.server_notices_mxid
+        self._server_notices_mxid = hs.config.servernotices.server_notices_mxid
         self.config = hs.config
         self.http_client = hs.get_proxied_blacklisted_http_client()
         self._replication = hs.get_replication_data_handler()
@@ -593,6 +593,13 @@ class FederationHandler(BaseHandler):
             target_hosts, room_id, knockee, Membership.KNOCK, content, params=params
         )
 
+        # Mark the knock as an outlier as we don't yet have the state at this point in
+        # the DAG.
+        event.internal_metadata.outlier = True
+
+        # ... but tell /sync to send it to clients anyway.
+        event.internal_metadata.out_of_band_membership = True
+
         # Record the room ID and its version so that we have a record of the room
         await self._maybe_store_room_on_outlier_membership(
             room_id=event.room_id, room_version=event_format_version
@@ -617,7 +624,7 @@ class FederationHandler(BaseHandler):
         # in the invitee's sync stream. It is stripped out for all other local users.
         event.unsigned["knock_room_state"] = stripped_room_state["knock_state_events"]
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -807,7 +814,7 @@ class FederationHandler(BaseHandler):
             )
         )
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -836,7 +843,7 @@ class FederationHandler(BaseHandler):
 
         await self.federation_client.send_leave(host_list, event)
 
-        context = await self.state_handler.compute_event_context(event)
+        context = EventContext.for_outlier()
         stream_id = await self._federation_event_handler.persist_events_and_notify(
             event.room_id, [(event, context)]
         )
@@ -1108,8 +1115,7 @@ class FederationHandler(BaseHandler):
         events_to_context = {}
         for e in itertools.chain(auth_events, state):
             e.internal_metadata.outlier = True
-            ctx = await self.state_handler.compute_event_context(e)
-            events_to_context[e.event_id] = ctx
+            events_to_context[e.event_id] = EventContext.for_outlier()
 
         event_map = {
             e.event_id: e for e in itertools.chain(auth_events, state, [event])
@@ -1363,7 +1369,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
         EventValidator().validate_new(event, self.config)
-        return (event, context)
+        return event, context
 
     async def _check_signature(self, event: EventBase, context: EventContext) -> None:
         """
