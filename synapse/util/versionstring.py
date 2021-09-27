@@ -39,7 +39,9 @@ def get_version_string(module: ModuleType) -> str:
     if cached_version is not None:
         return cached_version
 
-    version_string = getattr(module, "__version__", "<unknown>")
+    # We want this to fail loudly with an AttributeError. Type-ignore this so
+    # mypy only considers the happy path.
+    version_string = module.__version__  # type: ignore[attr-defined]
 
     try:
         null = open(os.devnull, "w")
@@ -101,7 +103,12 @@ def get_version_string(module: ModuleType) -> str:
                 s for s in (git_branch, git_tag, git_commit, git_dirty) if s
             )
 
-            version_string = "%s (%s)" % (version_string, git_version)
+            version_string = "%s (%s)" % (
+                # If the __version__ attribute doesn't exist, we'll have failed
+                # loudly above.
+                module.__version__,  # type: ignore[attr-defined]
+                git_version,
+            )
     except Exception as e:
         logger.info("Failed to check for git repository: %s", e)
 
