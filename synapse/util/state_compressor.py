@@ -69,11 +69,11 @@ def setup_state_compressor(hs: "HomeServer"):
     # parameters that rust doesn't understand, so we need to filter them out.
     #
     # Note: we need to connect to the *state* database.
-    conn_info = hs.get_datastores().state.db_pool.postgres_connection_info
-    assert conn_info is not None
+    conn_info_params = hs.get_datastores().state.db_pool.postgres_connection_info_parameters
+    assert conn_info_params is not None
 
     effective_db_args = {}
-    for key, value in conn_info.dsn_parameters.items():
+    for key, value in conn_info_params.items():
         if key in _VALID_POSTGRES_CONN_ARGS:
             effective_db_args[key] = value
 
