@@ -45,9 +45,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
     Awaitable[Union[bool, str]],
 ]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
-USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
-    [str, str, str, str], Awaitable[bool]
-]
+USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[[str, str, str, str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK = Callable[
     [str, List[str], List[Dict[str, str]]], Awaitable[bool]
