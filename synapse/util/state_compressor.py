@@ -57,16 +57,14 @@ def setup_state_compressor(hs: "HomeServer"):
         return
 
     # Check that the database being used is postgres
-    if hs.get_datastores().state is not None:
-        for conf in hs.config.database.databases:
-            if conf.name == "state":
-                db_config = conf.config
-                break
-    else:
-        for conf in hs.config.database.databases:
-            if conf.name == "master":
-                db_config = conf.config
-                break
+    db_config = None
+    for conf in hs.config.database.databases:
+        if "state" in conf.databases:
+            db_config = conf.config
+            break
+
+    # One of the databases should have the state tables in
+    assert db_config is not None
 
     if db_config["name"] != "psycopg2":
         return
