@@ -52,7 +52,7 @@ class ApplicationServicesHandler:
         self.scheduler = hs.get_application_service_scheduler()
         self.started_scheduler = False
         self.clock = hs.get_clock()
-        self.notify_appservices = hs.config.notify_appservices
+        self.notify_appservices = hs.config.appservice.notify_appservices
         self.event_sources = hs.get_event_sources()
 
         self.current_max = 0

@@ -88,7 +88,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         self.clock = hs.get_clock()
         self.spam_checker = hs.get_spam_checker()
         self.third_party_event_rules = hs.get_third_party_event_rules()
-        self._server_notices_mxid = self.config.server_notices_mxid
+        self._server_notices_mxid = self.config.servernotices.server_notices_mxid
         self._enable_lookup = hs.config.enable_3pid_lookup
         self.allow_per_room_profiles = self.config.allow_per_room_profiles
 

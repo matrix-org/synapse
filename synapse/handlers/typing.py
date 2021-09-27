@@ -483,7 +483,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
 
                 events.append(self._make_event_for(room_id))
 
-            return (events, handler._latest_room_serial)
+            return events, handler._latest_room_serial
 
     async def get_new_events(
         self,
@@ -507,7 +507,7 @@ class TypingNotificationEventSource(EventSource[int, JsonDict]):
 
                 events.append(self._make_event_for(room_id))
 
-            return (events, handler._latest_room_serial)
+            return events, handler._latest_room_serial
 
     def get_current_key(self) -> int:
         return self.get_typing_handler()._latest_room_serial

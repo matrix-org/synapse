@@ -27,6 +27,7 @@ from twisted.web.server import Request
 
 from synapse.api.errors import Codes, SynapseError, cs_error
 from synapse.http.server import finish_request, respond_with_json
+from synapse.http.site import SynapseRequest
 from synapse.logging.context import make_deferred_yieldable
 from synapse.util.stringutils import is_ascii
 
@@ -74,7 +75,7 @@ def parse_media_id(request: Request) -> Tuple[str, str, Optional[str]]:
         )
 
 
-def respond_404(request: Request) -> None:
+def respond_404(request: SynapseRequest) -> None:
     respond_with_json(
         request,
         404,
@@ -84,7 +85,7 @@ def respond_404(request: Request) -> None:
 
 
 async def respond_with_file(
-    request: Request,
+    request: SynapseRequest,
     media_type: str,
     file_path: str,
     file_size: Optional[int] = None,
@@ -221,7 +222,7 @@ def _can_encode_filename_as_token(x: str) -> bool:
 
 
 async def respond_with_responder(
-    request: Request,
+    request: SynapseRequest,
     responder: "Optional[Responder]",
     media_type: str,
     file_size: Optional[int],

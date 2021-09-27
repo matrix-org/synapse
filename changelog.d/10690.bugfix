@@ -1,0 +1,1 @@
+Fix a long-standing bug that caused an `AssertionError` when purging history in certain rooms. Contributed by @Kokokokoka.

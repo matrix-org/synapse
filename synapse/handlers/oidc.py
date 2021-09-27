@@ -277,7 +277,7 @@ class OidcProvider:
         self._token_generator = token_generator
 
         self._config = provider
-        self._callback_url: str = hs.config.oidc_callback_url
+        self._callback_url: str = hs.config.oidc.oidc_callback_url
 
         # Calculate the prefix for OIDC callback paths based on the public_baseurl.
         # We'll insert this into the Path= parameter of any session cookies we set.

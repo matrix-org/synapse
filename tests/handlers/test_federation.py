@@ -308,7 +308,12 @@ class FederationTestCase(unittest.HomeserverTestCase):
         async def get_event_auth(
             destination: str, room_id: str, event_id: str
         ) -> List[EventBase]:
-            return auth_events
+            return [
+                event_from_pdu_json(
+                    ae.get_pdu_json(), room_version=room_version, outlier=True
+                )
+                for ae in auth_events
+            ]
 
         self.handler.federation_client.get_event_auth = get_event_auth
 
