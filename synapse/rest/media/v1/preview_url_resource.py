@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
-import errno
 import fnmatch
 import itertools
 import logging
@@ -504,11 +503,11 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
@@ -538,11 +537,11 @@ class PreviewUrlResource(DirectServeJsonResource):
             fname = self.filepaths.url_cache_filepath(media_id)
             try:
                 os.remove(fname)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             try:
                 dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
@@ -554,11 +553,11 @@ class PreviewUrlResource(DirectServeJsonResource):
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
             try:
                 shutil.rmtree(thumbnail_dir)
+            except FileNotFoundError:
+                pass  # If the path doesn't exist, meh
             except OSError as e:
-                # If the path doesn't exist, meh
-                if e.errno != errno.ENOENT:
-                    logger.warning("Failed to remove media: %r: %s", media_id, e)
-                    continue
+                logger.warning("Failed to remove media: %r: %s", media_id, e)
+                continue
 
             removed_media.append(media_id)
 
