@@ -57,9 +57,21 @@ def setup_state_compressor(hs: "HomeServer"):
         return
 
     # Check that the database being used is postgres
-    db_config = hs.config.database.get_single_database().config
+    if hs.get_datastores().state is not None:
+        for conf in hs.config.database.databases:
+            if conf.name == "state":
+                db_config = conf.config
+                break
+    else:
+        for conf in hs.config.database.databases:
+            if conf.name == "master":
+                db_config = conf.config
+                break
+
     if db_config["name"] != "psycopg2":
         return
+
+    password = db_config.get("args").get("password")
 
     # Construct the database URL from the database config.
     #
@@ -76,6 +88,11 @@ def setup_state_compressor(hs: "HomeServer"):
     for key, value in conn_info_params.items():
         if key in _VALID_POSTGRES_CONN_ARGS:
             effective_db_args[key] = value
+
+    # We cannot extract the password from the connection info, so use the value extracted
+    # from synapse's config
+    if password is not None:
+        effective_db_args["password"] = password
 
     # psycopg2 has a handy util function from going from dictionary to a DSN
     # (postgres connection string.)
