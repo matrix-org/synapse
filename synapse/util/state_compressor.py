@@ -89,11 +89,11 @@ def setup_state_compressor(hs: "HomeServer"):
             desc="State Compressor",
             func=defer_to_thread,
             reactor=hs.get_reactor(),
-            f=state_compressor.compress_largest_rooms,
+            f=state_compressor.compress_state_events_table,
             db_url=db_url,
             chunk_size=compressor_config.compressor_chunk_size,
             default_levels=compressor_config.compressor_default_levels,
-            number_of_rooms=compressor_config.compressor_number_of_rooms,
+            number_of_chunks=compressor_config.compressor_number_of_chunks,
         )
 
     # Call the compressor every `time_between_runs` milliseconds

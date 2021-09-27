@@ -36,7 +36,7 @@ class StateCompressorConfig(Config):
             raise ConfigError from e
 
         self.compressor_chunk_size = compressor_config.get("chunk_size") or 500
-        self.compressor_number_of_rooms = compressor_config.get("number_of_rooms") or 5
+        self.compressor_number_of_chunks = compressor_config.get("number_of_chunks") or 50
         self.compressor_default_levels = (
             compressor_config.get("default_levels") or "100,50,25"
         )
@@ -67,9 +67,9 @@ class StateCompressorConfig(Config):
           #
           #chunk_size: 1000
 
-          # The number of rooms to compress on each run. Defaults to 5.
+          # The number of chunks to compress on each run. Defaults to 50.
           #
-          #number_of_rooms: 1
+          #number_of_chunks: 1
 
           # The default level sizes for the compressor to use. Defaults to
           # 100,50,25.
