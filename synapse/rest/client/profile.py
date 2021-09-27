@@ -13,7 +13,6 @@
 # limitations under the License.
 
 """ This module contains REST servlets to do with profile: /profile/<paths> """
-from twisted.internet import defer
 
 from synapse.api.errors import Codes, SynapseError
 from synapse.http.servlet import RestServlet, parse_json_object_from_request
@@ -28,7 +27,6 @@ class ProfileDisplaynameRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
-        self.http_client = hs.get_simple_http_client()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, user_id):
@@ -68,26 +66,10 @@ class ProfileDisplaynameRestServlet(RestServlet):
 
         await self.profile_handler.set_displayname(user, requester, new_name, is_admin)
 
-        if self.hs.config.shadow_server:
-            shadow_user = UserID(user.localpart, self.hs.config.shadow_server.get("hs"))
-            self.shadow_displayname(shadow_user.to_string(), content)
-
         return 200, {}
 
     def on_OPTIONS(self, request, user_id):
         return 200, {}
-
-    @defer.inlineCallbacks
-    def shadow_displayname(self, user_id, body):
-        # TODO: retries
-        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
-        as_token = self.hs.config.shadow_server.get("as_token")
-
-        yield self.http_client.put_json(
-            "%s/_matrix/client/r0/profile/%s/displayname?access_token=%s&user_id=%s"
-            % (shadow_hs_url, user_id, as_token, user_id),
-            body,
-        )
 
 
 class ProfileAvatarURLRestServlet(RestServlet):
@@ -97,7 +79,6 @@ class ProfileAvatarURLRestServlet(RestServlet):
         super().__init__()
         self.hs = hs
         self.profile_handler = hs.get_profile_handler()
-        self.http_client = hs.get_simple_http_client()
         self.auth = hs.get_auth()
 
     async def on_GET(self, request, user_id):
@@ -136,26 +117,10 @@ class ProfileAvatarURLRestServlet(RestServlet):
             user, requester, new_avatar_url, is_admin
         )
 
-        if self.hs.config.shadow_server:
-            shadow_user = UserID(user.localpart, self.hs.config.shadow_server.get("hs"))
-            self.shadow_avatar_url(shadow_user.to_string(), content)
-
         return 200, {}
 
     def on_OPTIONS(self, request, user_id):
         return 200, {}
-
-    @defer.inlineCallbacks
-    def shadow_avatar_url(self, user_id, body):
-        # TODO: retries
-        shadow_hs_url = self.hs.config.shadow_server.get("hs_url")
-        as_token = self.hs.config.shadow_server.get("as_token")
-
-        yield self.http_client.put_json(
-            "%s/_matrix/client/r0/profile/%s/avatar_url?access_token=%s&user_id=%s"
-            % (shadow_hs_url, user_id, as_token, user_id),
-            body,
-        )
 
 
 class ProfileRestServlet(RestServlet):

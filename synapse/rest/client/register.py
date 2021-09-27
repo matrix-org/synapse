@@ -481,8 +481,6 @@ class RegisterRestServlet(RestServlet):
 
             result = await self._do_appservice_registration(
                 desired_username,
-                password,
-                desired_display_name,
                 access_token,
                 body,
                 should_issue_refresh_token=should_issue_refresh_token,
@@ -738,14 +736,6 @@ class RegisterRestServlet(RestServlet):
                 ):
                     await self.store.upsert_monthly_active_user(registered_user_id)
 
-            if self.hs.config.shadow_server:
-                await self.registration_handler.shadow_register(
-                    localpart=desired_username,
-                    display_name=desired_display_name,
-                    auth_result=auth_result,
-                    params=params,
-                )
-
             # Remember that the user account has been registered (and the user
             # ID it was registered with, since it might not have been specified).
             await self.auth_handler.set_session_data(
@@ -774,43 +764,19 @@ class RegisterRestServlet(RestServlet):
     async def _do_appservice_registration(
         self,
         username,
-        password,
-        display_name,
         as_token,
         body,
         should_issue_refresh_token: bool = False,
     ):
-        if password:
-            # Hash the password
-            #
-            # In mainline hashing of the password was moved further on in the registration
-            # flow, but we need it here for the AS use-case of shadow servers
-            password = await self.auth_handler.hash(password)
-
         user_id = await self.registration_handler.appservice_register(
-            username, as_token, password, display_name
+            username, as_token
         )
-        result = await self._create_registration_details(
+        return await self._create_registration_details(
             user_id,
             body,
             is_appservice_ghost=True,
             should_issue_refresh_token=should_issue_refresh_token,
         )
-
-        auth_result = body.get("auth_result")
-        if auth_result and LoginType.EMAIL_IDENTITY in auth_result:
-            threepid = auth_result[LoginType.EMAIL_IDENTITY]
-            await self.registration_handler.register_email_threepid(
-                user_id, threepid, result["access_token"]
-            )
-
-        if auth_result and LoginType.MSISDN in auth_result:
-            threepid = auth_result[LoginType.MSISDN]
-            await self.registration_handler.register_msisdn_threepid(
-                user_id, threepid, result["access_token"]
-            )
-
-        return result
 
     async def _create_registration_details(
         self,
