@@ -512,12 +512,14 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            for dir in dirs:
+                try:
                     os.rmdir(dir)
-            except Exception:
-                pass
+                except FileNotFoundError:
+                    pass  # Already deleted, continue with deleting the rest
+                except Exception:
+                    break  # Failed, skip deleting the rest of the parent dirs
 
         await self.store.delete_url_cache(removed_media)
 
@@ -544,12 +546,14 @@ class PreviewUrlResource(DirectServeJsonResource):
                 logger.warning("Failed to remove media: %r: %s", media_id, e)
                 continue
 
-            try:
-                dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-                for dir in dirs:
+            dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
+            for dir in dirs:
+                try:
                     os.rmdir(dir)
-            except Exception:
-                pass
+                except FileNotFoundError:
+                    pass  # Already deleted, continue with deleting the rest
+                except Exception:
+                    break  # Failed, skip deleting the rest of the parent dirs
 
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
             try:
@@ -562,12 +566,16 @@ class PreviewUrlResource(DirectServeJsonResource):
 
             removed_media.append(media_id)
 
-            try:
-                dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
-                for dir in dirs:
+            dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
+            # Note that one of the directories to be deleted has already been
+            # removed by the `rmtree` above.
+            for dir in dirs:
+                try:
                     os.rmdir(dir)
-            except Exception:
-                pass
+                except FileNotFoundError:
+                    pass  # Already deleted, continue with deleting the rest
+                except Exception:
+                    break  # Failed, skip deleting the rest of the parent dirs
 
         await self.store.delete_url_cache_media(removed_media)
 
