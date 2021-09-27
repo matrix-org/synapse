@@ -42,7 +42,7 @@ from synapse.storage.state import StateFilter
 from synapse.storage.types import Cursor
 from synapse.storage.util.sequence import build_sequence_generator
 from synapse.types import MutableStateMap, StateKey, StateMap
-from synapse.util.async_helpers import ObservableDeferred
+from synapse.util.async_helpers import ObservableDeferred, yieldable_gather_results
 from synapse.util.caches.descriptors import cached
 from synapse.util.caches.dictionary_cache import DictionaryCache
 
@@ -431,20 +431,10 @@ class StateGroupDataStore(StateBackgroundUpdateStore, SQLBaseStore):
         if not incomplete_groups:
             return state
 
-        deferred_requests = []
-        for group in incomplete_groups:
-            deferred_requests.append(
-                make_deferred_yieldable(
-                    self._get_state_for_group_using_inflight_cache(group, state_filter)
-                )
-            )
-
-        # REVIEW suspicious log context rules
-        # REVIEW am I right in thinking that we want consumeErrors=True?
-        #       My understanding is that it just prevents logspam, but it will
-        #       still fail on the first error response?
-        results_from_requests = await make_deferred_yieldable(
-            defer.gatherResults(deferred_requests, consumeErrors=True)
+        results_from_requests = await yieldable_gather_results(
+            self._get_state_for_group_using_inflight_cache,
+            incomplete_groups,
+            state_filter,
         )
 
         for group, group_result in zip(incomplete_groups, results_from_requests):
