@@ -15,9 +15,10 @@
 import logging
 from functools import wraps
 from types import TracebackType
-from typing import Any, Callable, Optional, Protocol, Type, TypeVar, cast
+from typing import Any, Callable, Optional, Type, TypeVar, cast
 
 from prometheus_client import Counter
+from typing_extensions import Protocol
 
 from synapse.logging.context import (
     ContextResourceUsage,
