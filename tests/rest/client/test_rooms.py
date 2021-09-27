@@ -2413,19 +2413,21 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
             The Mock object _make_and_store_3pid_invite was replaced with.
         """
 
-        async def _make_and_store_3pid_invite(
-            requester: Requester,
-            id_server: str,
-            medium: str,
-            address: str,
-            room_id: str,
-            user: UserID,
-            txn_id: Optional[str],
-            id_access_token: Optional[str] = None,
-        ) -> int:
-            return 0
+        # async def _make_and_store_3pid_invite(
+        #     requester: Requester,
+        #     id_server: str,
+        #     medium: str,
+        #     address: str,
+        #     room_id: str,
+        #     user: UserID,
+        #     txn_id: Optional[str],
+        #     id_access_token: Optional[str] = None,
+        # ) -> int:
+        #     return 0
+        #
+        # mock = Mock(side_effect=_make_and_store_3pid_invite)
 
-        mock = Mock(side_effect=_make_and_store_3pid_invite)
+        mock = Mock(return_value=0)
 
         self.hs.get_room_member_handler()._make_and_store_3pid_invite = mock
 
