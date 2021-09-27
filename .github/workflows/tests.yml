@@ -209,9 +209,6 @@ jobs:
             postgres: postgres
 
           - sytest-tag: dinsic
-            postgres: postgres
-
-          - sytest-tag: dinsic
             postgres: multi-postgres
             workers: workers
 
