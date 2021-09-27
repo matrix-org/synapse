@@ -278,7 +278,7 @@ class SpamChecker:
             bool: Whether the user may join the room
         """
         for callback in self._user_may_join_room_callbacks:
-            if await callback(userid, room_id, is_invited) is False:
+            if await callback(user_id, room_id, is_invited) is False:
                 return False
 
         return True
