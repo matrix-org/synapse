@@ -1487,6 +1487,11 @@ dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
 </code></pre>
 </li>
 </ul>
+<h1 id="upgrading-to-v1440"><a class="header" href="#upgrading-to-v1440">Upgrading to v1.44.0</a></h1>
+<h2 id="the-url-preview-cache-is-no-longer-mirrored-to-storage-providers"><a class="header" href="#the-url-preview-cache-is-no-longer-mirrored-to-storage-providers">The URL preview cache is no longer mirrored to storage providers</a></h2>
+<p>The <code>url_cache/</code> and <code>url_cache_thumbnails/</code> directories in the media store are
+no longer mirrored to storage providers. These two directories can be safely
+deleted from any configured storage providers to reclaim space.</p>
 <h1 id="upgrading-to-v1430"><a class="header" href="#upgrading-to-v1430">Upgrading to v1.43.0</a></h1>
 <h2 id="the-spaces-summary-apis-can-now-be-handled-by-workers"><a class="header" href="#the-spaces-summary-apis-can-now-be-handled-by-workers">The spaces summary APIs can now be handled by workers</a></h2>
 <p>The <a href="https://matrix-org.github.io/synapse/latest/workers.html#available-worker-applications">available worker applications documentation</a>
