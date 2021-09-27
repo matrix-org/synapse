@@ -732,14 +732,16 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 and requester.user.to_string() == self._server_notices_mxid
             ):
                 # allow the server notices mxid to join rooms
-                is_requester_admin = True
+                bypass_spam_checker = True
 
             else:
-                is_requester_admin = await self.auth.is_server_admin(requester.user)
+                bypass_spam_checker = await self.auth.is_server_admin(
+                    requester.user
+                )
 
             inviter = await self._get_inviter(target.to_string(), room_id)
             if (
-                not is_requester_admin
+                not bypass_spam_checker
                 # We assume that if the spam checker allowed the user to create
                 # a room then they're allowed to join it.
                 and not new_room
