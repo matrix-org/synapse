@@ -46,7 +46,7 @@ CHECK_EVENT_FOR_SPAM_CALLBACK = Callable[
 ]
 USER_MAY_INVITE_CALLBACK = Callable[[str, str, str], Awaitable[bool]]
 USER_MAY_SEND_3PID_INVITE_CALLBACK = Callable[
-    [str, Dict[str, str], str], Awaitable[bool]
+    [str, str, str, str], Awaitable[bool]
 ]
 USER_MAY_CREATE_ROOM_CALLBACK = Callable[[str], Awaitable[bool]]
 USER_MAY_CREATE_ROOM_WITH_INVITES_CALLBACK = Callable[
@@ -293,7 +293,7 @@ class SpamChecker:
         return True
 
     async def user_may_send_3pid_invite(
-        self, inviter_userid: str, invitee_threepid: Dict[str, str], room_id: str
+        self, inviter_userid: str, medium: str, address: str, room_id: str
     ) -> bool:
         """Checks if a given user may invite a given threepid into the room
 
@@ -304,16 +304,15 @@ class SpamChecker:
 
         Args:
             inviter_userid: The user ID of the sender of the invitation
-            invitee_threepid: The threepid targeted in the invitation, as a dict including
-                a "medium" key indicating the threepid's medium (e.g. "email") and an
-                "address" key indicating the threepid's address (e.g. "alice@example.com")
+            medium: The 3PID's medium (e.g. "email")
+            address: The 3PID's address (e.g. "alice@example.com")
             room_id: The room ID
 
         Returns:
             True if the user may send the invite, otherwise False
         """
         for callback in self._user_may_send_3pid_invite_callbacks:
-            if await callback(inviter_userid, invitee_threepid, room_id) is False:
+            if await callback(inviter_userid, medium, address, room_id) is False:
                 return False
 
         return True

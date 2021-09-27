@@ -2459,7 +2459,8 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         async def _user_may_send_3pid_invite(
             inviter: str,
-            invitee: Dict[str, str],
+            medium: str,
+            address: str,
             room_id: str,
         ) -> bool:
             return return_value
@@ -2486,13 +2487,7 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         self.assertEquals(channel.code, 200)
 
         # Check that the callback was called with the right params.
-        expected_call_args = (
-            (
-                self.user_id,
-                {"medium": "email", "address": email_to_invite},
-                self.room_id,
-            ),
-        )
+        expected_call_args = ((self.user_id, "email", email_to_invite, self.room_id),)
 
         self.assertEquals(
             allow_mock.call_args, expected_call_args, allow_mock.call_args

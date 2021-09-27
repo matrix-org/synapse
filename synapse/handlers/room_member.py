@@ -1270,7 +1270,8 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
             # Check if the spamchecker(s) allow this invite to go through.
             if not await self.spam_checker.user_may_send_3pid_invite(
                 inviter_userid=requester.user.to_string(),
-                invitee_threepid={"medium": medium, "address": address},
+                medium=medium,
+                address=address,
                 room_id=room_id,
             ):
                 raise SynapseError(403, "Cannot send threepid invite")
