@@ -1,0 +1,1 @@
+Fix invalidating one-time key count cache after claiming keys. Contributed by Tulir at Beeper.

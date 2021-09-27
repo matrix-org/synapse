@@ -201,7 +201,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         """Ensure a piece of media is quarantined when trying to access it."""
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -271,7 +271,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access the media
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_name_and_media_id,
             shorthand=False,
@@ -458,7 +458,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access each piece of media
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_and_media_id_2,
             shorthand=False,

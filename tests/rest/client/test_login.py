@@ -97,7 +97,7 @@ class LoginRestServletTestCase(unittest.HomeserverTestCase):
         self.hs.config.enable_registration = True
         self.hs.config.registrations_require_3pid = []
         self.hs.config.auto_join_rooms = []
-        self.hs.config.enable_registration_captcha = False
+        self.hs.config.captcha.enable_registration_captcha = False
 
         return self.hs
 
@@ -815,9 +815,9 @@ class JWTTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-        self.hs.config.jwt_enabled = True
-        self.hs.config.jwt_secret = self.jwt_secret
-        self.hs.config.jwt_algorithm = self.jwt_algorithm
+        self.hs.config.jwt.jwt_enabled = True
+        self.hs.config.jwt.jwt_secret = self.jwt_secret
+        self.hs.config.jwt.jwt_algorithm = self.jwt_algorithm
         return self.hs
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_secret) -> str:
@@ -1023,9 +1023,9 @@ class JWTPubKeyTestCase(unittest.HomeserverTestCase):
 
     def make_homeserver(self, reactor, clock):
         self.hs = self.setup_test_homeserver()
-        self.hs.config.jwt_enabled = True
-        self.hs.config.jwt_secret = self.jwt_pubkey
-        self.hs.config.jwt_algorithm = "RS256"
+        self.hs.config.jwt.jwt_enabled = True
+        self.hs.config.jwt.jwt_secret = self.jwt_pubkey
+        self.hs.config.jwt.jwt_algorithm = "RS256"
         return self.hs
 
     def jwt_encode(self, payload: Dict[str, Any], secret: str = jwt_privatekey) -> str:

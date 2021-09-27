@@ -193,10 +193,11 @@ class _Node(Generic[KT, VT]):
         cache: "weakref.ReferenceType[LruCache]",
         clock: Clock,
         callbacks: Collection[Callable[[], None]] = (),
+        prune_unread_entries: bool = True,
     ):
         self._list_node = ListNode.insert_after(self, root)
-        self._global_list_node = None
-        if USE_GLOBAL_LIST:
+        self._global_list_node: Optional[_TimedListNode] = None
+        if USE_GLOBAL_LIST and prune_unread_entries:
             self._global_list_node = _TimedListNode.insert_after(self, GLOBAL_ROOT)
             self._global_list_node.update_last_access(clock)
 
@@ -305,6 +306,7 @@ class LruCache(Generic[KT, VT]):
         metrics_collection_callback: Optional[Callable[[], None]] = None,
         apply_cache_factor_from_config: bool = True,
         clock: Optional[Clock] = None,
+        prune_unread_entries: bool = True,
     ):
         """
         Args:
@@ -420,7 +422,15 @@ class LruCache(Generic[KT, VT]):
         def add_node(
             key: KT, value: VT, callbacks: Collection[Callable[[], None]] = ()
         ) -> None:
-            node = _Node(list_root, key, value, weak_ref_to_self, real_clock, callbacks)
+            node = _Node(
+                list_root,
+                key,
+                value,
+                weak_ref_to_self,
+                real_clock,
+                callbacks,
+                prune_unread_entries,
+            )
             cache[key] = node
 
             if size_callback:

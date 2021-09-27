@@ -405,7 +405,9 @@ class TestCreateAliasACL(unittest.HomeserverTestCase):
         rd_config = RoomDirectoryConfig()
         rd_config.read_config(config)
 
-        self.hs.config.is_alias_creation_allowed = rd_config.is_alias_creation_allowed
+        self.hs.config.roomdirectory.is_alias_creation_allowed = (
+            rd_config.is_alias_creation_allowed
+        )
 
         return hs
 

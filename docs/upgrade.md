@@ -85,6 +85,13 @@ process, for example:
     dpkg -i matrix-synapse-py3_1.3.0+stretch1_amd64.deb
     ```
 
+# Upgrading to v1.44.0
+
+## The URL preview cache is no longer mirrored to storage providers
+The `url_cache/` and `url_cache_thumbnails/` directories in the media store are
+no longer mirrored to storage providers. These two directories can be safely
+deleted from any configured storage providers to reclaim space.
+
 # Upgrading to v1.43.0
 
 ## The spaces summary APIs can now be handled by workers

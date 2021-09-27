@@ -54,19 +54,18 @@ class Saml2SessionData:
 class SamlHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self._saml_client = Saml2Client(hs.config.saml2_sp_config)
-        self._saml_idp_entityid = hs.config.saml2_idp_entityid
+        self._saml_client = Saml2Client(hs.config.saml2.saml2_sp_config)
+        self._saml_idp_entityid = hs.config.saml2.saml2_idp_entityid
 
-        self._saml2_session_lifetime = hs.config.saml2_session_lifetime
+        self._saml2_session_lifetime = hs.config.saml2.saml2_session_lifetime
         self._grandfathered_mxid_source_attribute = (
-            hs.config.saml2_grandfathered_mxid_source_attribute
+            hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
         self._saml2_attribute_requirements = hs.config.saml2.attribute_requirements
-        self._error_template = hs.config.sso_error_template
 
         # plugin to do custom mapping from saml response to mxid
-        self._user_mapping_provider = hs.config.saml2_user_mapping_provider_class(
-            hs.config.saml2_user_mapping_provider_config,
+        self._user_mapping_provider = hs.config.saml2.saml2_user_mapping_provider_class(
+            hs.config.saml2.saml2_user_mapping_provider_config,
             ModuleApi(hs, hs.get_auth_handler()),
         )
 
@@ -411,7 +410,7 @@ class DefaultSamlMappingProvider:
         self._mxid_mapper = parsed_config.mxid_mapper
 
         self._grandfathered_mxid_source_attribute = (
-            module_api._hs.config.saml2_grandfathered_mxid_source_attribute
+            module_api._hs.config.saml2.saml2_grandfathered_mxid_source_attribute
         )
 
     def get_remote_user_id(
