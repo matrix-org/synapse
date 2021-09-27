@@ -117,7 +117,7 @@ def do_patch() -> None:
 def _check_yield_points(
     f: Callable[..., Generator[Deferred[object], object, T]],
     changes: List[str],
-)-> Callable:
+) -> Callable:
     """Wraps a generator that is about to be passed to defer.inlineCallbacks
     checking that after every yield the log contexts are correct.
 
@@ -137,7 +137,9 @@ def _check_yield_points(
     from synapse.logging.context import current_context
 
     @functools.wraps(f)
-    def check_yield_points_inner(*args: Any, **kwargs: Any) -> Generator[Deferred[object], object, T]:
+    def check_yield_points_inner(
+        *args: Any, **kwargs: Any
+    ) -> Generator[Deferred[object], object, T]:
         gen = f(*args, **kwargs)
 
         last_yield_line_no = gen.gi_frame.f_lineno
