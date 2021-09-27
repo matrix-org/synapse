@@ -21,7 +21,6 @@ from typing import (
     Any,
     Callable,
     Collection,
-    Dict,
     Generic,
     Iterable,
     List,
@@ -85,16 +84,6 @@ VT = TypeVar("VT")
 
 # a general type var, distinct from either KT or VT
 T = TypeVar("T")
-
-
-# TODO I think this is this unused?
-def enumerate_leaves(node: Dict, depth: int) -> Any:
-    if depth == 0:
-        yield node
-    else:
-        for n in node.values():
-            yield from enumerate_leaves(n, depth - 1)
-
 
 P = TypeVar("P")
 
