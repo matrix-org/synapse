@@ -908,6 +908,11 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
                 Membership.JOIN,
                 Membership.INVITE,
             ):
+                # The event content should *not* include the authorising user as
+                # it won't be properly signed. Strip it out since it might come
+                # back from a client updating a display name / avatar.
+                content.pop(EventContentFields.AUTHORISING_USER, None)
+
                 return False, []
 
         # If the local host has a user who can issue invites, then a local
