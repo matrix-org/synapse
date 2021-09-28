@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import datetime
+import errno
 import fnmatch
 import itertools
 import logging
@@ -496,6 +497,27 @@ class PreviewUrlResource(DirectServeJsonResource):
             logger.info("Still running DB updates; skipping expiry")
             return
 
+        def try_remove_parent_dirs(dirs: Iterable[str]) -> None:
+            """Attempt to remove the given chain of parent directories
+
+            Args:
+                dirs: The list of directory paths to delete, with children appearing
+                    before their parents.
+            """
+            for dir in dirs:
+                try:
+                    os.rmdir(dir)
+                except FileNotFoundError:
+                    # Already deleted, continue with deleting the rest
+                    pass
+                except OSError as e:
+                    # Failed, skip deleting the rest of the parent dirs
+                    if e.errno != errno.ENOTEMPTY:
+                        logger.warning(
+                            "Failed to remove media directory: %r: %s", dir, e
+                        )
+                    break
+
         # First we delete expired url cache entries
         media_ids = await self.store.get_expired_url_cache(now)
 
@@ -513,13 +535,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             removed_media.append(media_id)
 
             dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-            for dir in dirs:
-                try:
-                    os.rmdir(dir)
-                except FileNotFoundError:
-                    pass  # Already deleted, continue with deleting the rest
-                except Exception:
-                    break  # Failed, skip deleting the rest of the parent dirs
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache(removed_media)
 
@@ -547,13 +563,7 @@ class PreviewUrlResource(DirectServeJsonResource):
                 continue
 
             dirs = self.filepaths.url_cache_filepath_dirs_to_delete(media_id)
-            for dir in dirs:
-                try:
-                    os.rmdir(dir)
-                except FileNotFoundError:
-                    pass  # Already deleted, continue with deleting the rest
-                except Exception:
-                    break  # Failed, skip deleting the rest of the parent dirs
+            try_remove_parent_dirs(dirs)
 
             thumbnail_dir = self.filepaths.url_cache_thumbnail_directory(media_id)
             try:
@@ -569,13 +579,7 @@ class PreviewUrlResource(DirectServeJsonResource):
             dirs = self.filepaths.url_cache_thumbnail_dirs_to_delete(media_id)
             # Note that one of the directories to be deleted has already been
             # removed by the `rmtree` above.
-            for dir in dirs:
-                try:
-                    os.rmdir(dir)
-                except FileNotFoundError:
-                    pass  # Already deleted, continue with deleting the rest
-                except Exception:
-                    break  # Failed, skip deleting the rest of the parent dirs
+            try_remove_parent_dirs(dirs)
 
         await self.store.delete_url_cache_media(removed_media)
 
