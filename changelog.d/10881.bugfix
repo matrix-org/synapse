@@ -1,1 +1,0 @@
-Fix application service users being subject to MAU blocking if MAU had been reached, even if configured not to be blocked.
