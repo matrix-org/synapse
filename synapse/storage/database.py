@@ -433,7 +433,11 @@ class DatabasePool:
         # to the DB).
         self.postgres_connection_info_parameters: Optional[Dict] = None
         if isinstance(self.engine, PostgresEngine):
-            self.postgres_connection_info_parameters = db_conn.info.dsn_parameters
+            self.postgres_connection_info_parameters = dict(db_conn.info.dsn_parameters)
+            # For some reason it doesn't always include the host, so explicitly
+            # include the things we care about from the info object
+            self.postgres_connection_info_parameters["host"] = db_conn.info.host
+            self.postgres_connection_info_parameters["user"] = db_conn.info.user
 
         if self.engine.can_native_upsert:
             # Check ASAP (and then later, every 1s) to see if we have finished
