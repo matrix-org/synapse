@@ -447,12 +447,12 @@ class StateFilter:
         database if we want the state included by `self` but already have the state
         included by `other`.
 
-        The resultant state filter
+        The returned state filter
         - MUST include all state events that are included by this filter (`self`)
           unless they are included by `other`;
         - MUST NOT include state events not included by this filter (`self`); and
-        - MAY be an over-approximation: the resultant state
-          filter MAY additionally include some state events from `other`.
+        - MAY be an over-approximation: the returned state filter
+          MAY additionally include some state events from `other`.
 
 
         Formally, if the set of state events included by a state filter F are
@@ -466,7 +466,7 @@ class StateFilter:
         This implementation attempts to return the narrowest such state filter.
         In the case that `self` contains wildcards for state types where
         `other` contains specific state keys, an approximation must be made:
-        the resultant state filter keeps the wildcard, as state filters are not
+        the returned state filter keeps the wildcard, as state filters are not
         able to express 'all state keys except some given examples'.
         e.g.
             StateFilter(m.room.member -> None (wildcard))
