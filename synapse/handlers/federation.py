@@ -718,8 +718,8 @@ class FederationHandler(BaseHandler):
                         state_ids,
                     )
 
-        builder = self.event_builder_factory.new(
-            room_version.identifier,
+        builder = self.event_builder_factory.for_room_version(
+            room_version,
             {
                 "type": EventTypes.Member,
                 "content": event_content,
