@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import List, Tuple
 from unittest.mock import Mock
 from urllib.parse import quote
 
@@ -25,6 +24,7 @@ from synapse.storage.roommember import ProfileInfo
 from synapse.types import create_requester
 
 from tests import unittest
+from tests.storage.test_user_directory import GetUserDirectoryTables
 from tests.unittest import override_config
 
 
@@ -50,6 +50,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.handler = hs.get_user_directory_handler()
         self.event_builder_factory = self.hs.get_event_builder_factory()
         self.event_creation_handler = self.hs.get_event_creation_handler()
+        self.user_dir_helper = GetUserDirectoryTables(self.store)
 
     def test_handle_local_profile_change_with_support_user(self):
         support_user_id = "@support:test"
@@ -191,11 +192,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         self.assertEqual(
-            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+            self.user_dir_helper._compress_shared(shares_private),
+            {(u1, u2, room), (u2, u1, room)},
         )
         self.assertEqual(public_users, [])
 
@@ -215,10 +221,14 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.leave(room, user=u2, tok=u2_token)
 
         # Check we have removed the values.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
-        self.assertEqual(self._compress_shared(shares_private), set())
+        self.assertEqual(self.user_dir_helper._compress_shared(shares_private), set())
         self.assertEqual(public_users, [])
 
         # User1 now gets no search results for any of the other users.
@@ -246,11 +256,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         self.assertEqual(
-            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+            self.user_dir_helper._compress_shared(shares_private),
+            {(u1, u2, room), (u2, u1, room)},
         )
         self.assertEqual(public_users, [])
 
@@ -300,11 +315,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.helper.join(room, user=u2, tok=u2_token)
 
         # Check we have populated the database correctly.
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         self.assertEqual(
-            self._compress_shared(shares_private), {(u1, u2, room), (u2, u1, room)}
+            self.user_dir_helper._compress_shared(shares_private),
+            {(u1, u2, room), (u2, u1, room)},
         )
         self.assertEqual(public_users, [])
 
@@ -316,35 +336,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         # We get one search result when searching for user2 by user1.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
-
-    def _compress_shared(self, shared):
-        """
-        Compress a list of users who share rooms dicts to a list of tuples.
-        """
-        r = set()
-        for i in shared:
-            r.add((i["user_id"], i["other_user_id"], i["room_id"]))
-        return r
-
-    def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
-        r = self.get_success(
-            self.store.db_pool.simple_select_list(
-                "users_in_public_rooms", None, ("user_id", "room_id")
-            )
-        )
-        retval = []
-        for i in r:
-            retval.append((i["user_id"], i["room_id"]))
-        return retval
-
-    def get_users_who_share_private_rooms(self) -> List[Tuple[str, str, str]]:
-        return self.get_success(
-            self.store.db_pool.simple_select_list(
-                "users_who_share_private_rooms",
-                None,
-                ["user_id", "other_user_id", "room_id"],
-            )
-        )
 
     def _add_background_updates(self):
         """
@@ -415,8 +406,12 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.get_success(self.store.update_user_directory_stream_pos(None))
         self.get_success(self.store.delete_all_from_user_dir())
 
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         # Nothing updated yet
         self.assertEqual(shares_private, [])
@@ -432,15 +427,19 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         # User 1 and User 2 are in the same public room
         self.assertEqual(set(public_users), {(u1, room), (u2, room)})
 
         # User 1 and User 3 share private rooms
         self.assertEqual(
-            self._compress_shared(shares_private),
+            self.user_dir_helper._compress_shared(shares_private),
             {(u1, u3, private_room), (u3, u1, private_room)},
         )
 
@@ -471,12 +470,16 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
                 self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
-        shares_private = self.get_users_who_share_private_rooms()
-        public_users = self.get_users_in_public_rooms()
+        shares_private = self.get_success(
+            self.user_dir_helper.get_users_who_share_private_rooms()
+        )
+        public_users = self.get_success(
+            self.user_dir_helper.get_users_in_public_rooms()
+        )
 
         # No users share rooms
         self.assertEqual(public_users, [])
-        self.assertEqual(self._compress_shared(shares_private), set())
+        self.assertEqual(self.user_dir_helper._compress_shared(shares_private), set())
 
         # Despite not sharing a room, search_all_users means we get a search
         # result.
