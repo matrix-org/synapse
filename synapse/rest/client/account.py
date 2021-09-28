@@ -878,9 +878,13 @@ class WhoamiRestServlet(RestServlet):
         self.auth = hs.get_auth()
 
     async def on_GET(self, request: SynapseRequest) -> Tuple[int, JsonDict]:
-        requester = await self.auth.get_user_by_req(request)
+        requester = await self.auth.get_user_by_req(request, allow_guest=True)
 
-        response = {"user_id": requester.user.to_string()}
+        response = {
+            "user_id": requester.user.to_string(),
+            # MSC: https://github.com/matrix-org/matrix-doc/pull/3069
+            "org.matrix.msc3069.is_guest": bool(requester.is_guest),
+        }
 
         # Appservices and similar accounts do not have device IDs
         # that we can report on, so exclude them for compliance.
