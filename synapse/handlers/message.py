@@ -39,6 +39,7 @@ from synapse.api.errors import (
     NotFoundError,
     ShadowBanError,
     SynapseError,
+    UnsupportedRoomVersionError,
 )
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersions
 from synapse.api.urls import ConsentURIBuilder
@@ -549,16 +550,22 @@ class EventCreationHandler:
         await self.auth.check_auth_blocking(requester=requester)
 
         if event_dict["type"] == EventTypes.Create and event_dict["state_key"] == "":
-            room_version = event_dict["content"]["room_version"]
+            room_version_id = event_dict["content"]["room_version"]
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version_obj:
+                # this can happen if support is withdrawn for a room version
+                raise UnsupportedRoomVersionError(room_version_id)
         else:
             try:
-                room_version = await self.store.get_room_version_id(
+                room_version_obj = await self.store.get_room_version(
                     event_dict["room_id"]
                 )
             except NotFoundError:
                 raise AuthError(403, "Unknown room")
 
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
 
         self.validator.validate_builder(builder)
 
@@ -1069,9 +1076,17 @@ class EventCreationHandler:
             EventTypes.Create,
             "",
         ):
-            room_version = event.content.get("room_version", RoomVersions.V1.identifier)
+            room_version_id = event.content.get(
+                "room_version", RoomVersions.V1.identifier
+            )
+            room_version_obj = KNOWN_ROOM_VERSIONS.get(room_version_id)
+            if not room_version_obj:
+                raise UnsupportedRoomVersionError(
+                    "Attempt to create a room with unsupported room version %s"
+                    % (room_version_id,)
+                )
         else:
-            room_version = await self.store.get_room_version_id(event.room_id)
+            room_version_obj = await self.store.get_room_version(event.room_id)
 
         if event.internal_metadata.is_out_of_band_membership():
             # the only sort of out-of-band-membership events we expect to see here are
@@ -1081,7 +1096,7 @@ class EventCreationHandler:
         else:
             try:
                 await self._event_auth_handler.check_from_context(
-                    room_version, event, context
+                    room_version_obj.identifier, event, context
                 )
             except AuthError as err:
                 logger.warning("Denying new event %r because %s", event, err)
