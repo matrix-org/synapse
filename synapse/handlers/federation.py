@@ -746,7 +746,6 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        validate_event_for_room_version(room_version, event, do_sig_check=False)
         await self._event_auth_handler.check_auth_rules_from_context(
             room_version, event, context
         )
@@ -920,7 +919,6 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            validate_event_for_room_version(room_version_obj, event, do_sig_check=False)
             await self._event_auth_handler.check_auth_rules_from_context(
                 room_version_obj, event, context
             )
@@ -983,7 +981,6 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            validate_event_for_room_version(room_version_obj, event, do_sig_check=False)
             await self._event_auth_handler.check_auth_rules_from_context(
                 room_version_obj, event, context
             )
