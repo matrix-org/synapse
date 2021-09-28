@@ -707,29 +707,29 @@ def respond_with_json_bytes(
     if send_cors:
         set_cors_headers(request)
 
-    _write_json_bytes_to_request(request, json_bytes)
+    _write_bytes_to_request(request, json_bytes)
     return NOT_DONE_YET
 
 
-def _write_json_bytes_to_request(request: Request, json_bytes: bytes) -> None:
-    """Writes the JSON bytes to the request using an appropriate producer.
+def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
+    """Writes the bytes to the request using an appropriate producer.
 
     Note: This should be used instead of `Request.write` to correctly handle
     large response bodies.
     """
 
-    # The problem with dumping all of the json response into the `Request`
-    # object at once (via `Request.write`) is that doing so starts the timeout
-    # for the next request to be received: so if it takes longer than 60s to
-    # stream back the response to the client, the client never gets it.
+    # The problem with dumping all of the response into the `Request` object at
+    # once (via `Request.write`) is that doing so starts the timeout for the
+    # next request to be received: so if it takes longer than 60s to stream back
+    # the response to the client, the client never gets it.
     #
     # The correct solution is to use a Producer; then the timeout is only
     # started once all of the content is sent over the TCP connection.
 
-    # To make sure we don't write the whole of the json at once we split it up
-    # into chunks.
+    # To make sure we don't write all of the bytes at once we split it up into
+    # chunks.
     chunk_size = 4096
-    bytes_generator = chunk_seq(json_bytes, chunk_size)
+    bytes_generator = chunk_seq(bytes_to_write, chunk_size)
 
     # We use a `_ByteProducer` here rather than `NoRangeStaticProducer` as the
     # unit tests can't cope with being given a pull producer.
@@ -850,4 +850,4 @@ async def _async_write_json_to_request_in_thread(
 
     json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
 
-    _write_json_bytes_to_request(request, json_str)
+    _write_bytes_to_request(request, json_str)
