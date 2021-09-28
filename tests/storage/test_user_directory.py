@@ -11,11 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
+
+from twisted.internet.testing import MemoryReactor
 
 from synapse.rest import admin
 from synapse.rest.client import login, room
+from synapse.server import HomeServer
 from synapse.storage import DataStore
+from synapse.util import Clock
 
 from tests.unittest import HomeserverTestCase, override_config
 
@@ -32,7 +36,9 @@ class GetUserDirectoryTables:
     def __init__(self, store: DataStore):
         self.store = store
 
-    def _compress_shared(self, shared: List[Dict[str, str]]):
+    def _compress_shared(
+        self, shared: List[Dict[str, str]]
+    ) -> Set[Tuple[str, str, str]]:
         """
         Compress a list of users who share rooms dicts to a list of tuples.
         """
@@ -72,11 +78,11 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
         self.user_dir_helper = GetUserDirectoryTables(self.store)
 
-    def _purge_and_rebuild_user_dir(self):
+    def _purge_and_rebuild_user_dir(self) -> None:
         """Nuke the user directory tables, start the background process to
         repopulate them, and wait for the process to complete. This allows us
         to inspect the outcome of the background process alone, without any of
@@ -146,7 +152,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
                 self.store.db_pool.updates.do_next_background_update(100), by=0.1
             )
 
-    def test_initial(self):
+    def test_initial(self) -> None:
         """
         The user directory's initial handler correctly updates the search tables.
         """
@@ -200,7 +206,7 @@ class UserDirectoryInitialPopulationTestcase(HomeserverTestCase):
 
 
 class UserDirectoryStoreTestCase(HomeserverTestCase):
-    def prepare(self, reactor, clock, hs):
+    def prepare(self, reactor: MemoryReactor, clock: Clock, hs: HomeServer) -> None:
         self.store = hs.get_datastore()
 
         # alice and bob are both in !room_id. bobby is not but shares
@@ -211,7 +217,7 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         self.get_success(self.store.update_profile_in_user_dir(BELA, "Bela", None))
         self.get_success(self.store.add_users_in_public_rooms("!room:id", (ALICE, BOB)))
 
-    def test_search_user_dir(self):
+    def test_search_user_dir(self) -> None:
         # normally when alice searches the directory she should just find
         # bob because bobby doesn't share a room with her.
         r = self.get_success(self.store.search_user_dir(ALICE, "bob", 10))
@@ -222,7 +228,7 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         )
 
     @override_config({"user_directory": {"search_all_users": True}})
-    def test_search_user_dir_all_users(self):
+    def test_search_user_dir_all_users(self) -> None:
         r = self.get_success(self.store.search_user_dir(ALICE, "bob", 10))
         self.assertFalse(r["limited"])
         self.assertEqual(2, len(r["results"]))
@@ -236,7 +242,7 @@ class UserDirectoryStoreTestCase(HomeserverTestCase):
         )
 
     @override_config({"user_directory": {"search_all_users": True}})
-    def test_search_user_dir_stop_words(self):
+    def test_search_user_dir_stop_words(self) -> None:
         """Tests that a user can look up another user by searching for the start if its
         display name even if that name happens to be a common English word that would
         usually be ignored in full text searches.
