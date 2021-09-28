@@ -24,8 +24,10 @@ from typing import (
     List,
     Optional,
     Tuple,
+    Union,
 )
 
+import attr
 import jinja2
 
 from twisted.internet import defer
@@ -46,7 +48,14 @@ from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.storage.database import DatabasePool, LoggingTransaction
 from synapse.storage.databases.main.roommember import ProfileInfo
 from synapse.storage.state import StateFilter
-from synapse.types import JsonDict, Requester, UserID, UserInfo, create_requester
+from synapse.types import (
+    DomainSpecificString,
+    JsonDict,
+    Requester,
+    UserID,
+    UserInfo,
+    create_requester,
+)
 from synapse.util import Clock
 from synapse.util.caches.descriptors import cached
 
@@ -79,6 +88,18 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 
+@attr.s(auto_attribs=True)
+class UserIpAndAgent:
+    """
+    An IP address and user agent used by a user to connect to this homeserver.
+    """
+
+    ip: str
+    user_agent: str
+    # The time at which this user agent/ip was last seen.
+    last_seen: int
+
+
 class ModuleApi:
     """A proxy object that gets passed to various plugin modules so they
     can register new users etc if necessary.
@@ -98,14 +119,16 @@ class ModuleApi:
         self.custom_template_dir = hs.config.server.custom_template_directory
 
         try:
-            app_name = self._hs.config.email_app_name
+            app_name = self._hs.config.email.email_app_name
 
-            self._from_string = self._hs.config.email_notif_from % {"app": app_name}
+            self._from_string = self._hs.config.email.email_notif_from % {
+                "app": app_name
+            }
         except (KeyError, TypeError):
             # If substitution failed (which can happen if the string contains
             # placeholders other than just "app", or if the type of the placeholder is
             # not a string), fall back to the bare strings.
-            self._from_string = self._hs.config.email_notif_from
+            self._from_string = self._hs.config.email.email_notif_from
 
         self._raw_from = email.utils.parseaddr(self._from_string)[1]
 
@@ -699,6 +722,65 @@ class ModuleApi:
             filenames,
             (td for td in (self.custom_template_dir, custom_template_directory) if td),
         )
+
+    def is_mine(self, id: Union[str, DomainSpecificString]) -> bool:
+        """
+        Checks whether an ID (user id, room, ...) comes from this homeserver.
+
+        Args:
+            id: any Matrix id (e.g. user id, room id, ...), either as a raw id,
+                e.g. string "@user:example.com" or as a parsed UserID, RoomID, ...
+        Returns:
+            True if id comes from this homeserver, False otherwise.
+
+        Added in Synapse v1.44.0.
+        """
+        if isinstance(id, DomainSpecificString):
+            return self._hs.is_mine(id)
+        else:
+            return self._hs.is_mine_id(id)
+
+    async def get_user_ip_and_agents(
+        self, user_id: str, since_ts: int = 0
+    ) -> List[UserIpAndAgent]:
+        """
+        Return the list of user IPs and agents for a user.
+
+        Args:
+            user_id: the id of a user, local or remote
+            since_ts: a timestamp in seconds since the epoch,
+                or the epoch itself if not specified.
+        Returns:
+            The list of all UserIpAndAgent that the user has
+            used to connect to this homeserver since `since_ts`.
+            If the user is remote, this list is empty.
+
+        Added in Synapse v1.44.0.
+        """
+        # Don't hit the db if this is not a local user.
+        is_mine = False
+        try:
+            # Let's be defensive against ill-formed strings.
+            if self.is_mine(user_id):
+                is_mine = True
+        except Exception:
+            pass
+
+        if is_mine:
+            raw_data = await self._store.get_user_ip_and_agents(
+                UserID.from_string(user_id), since_ts
+            )
+            # Sanitize some of the data. We don't want to return tokens.
+            return [
+                UserIpAndAgent(
+                    ip=str(data["ip"]),
+                    user_agent=str(data["user_agent"]),
+                    last_seen=int(data["last_seen"]),
+                )
+                for data in raw_data
+            ]
+        else:
+            return []
 
 
 class PublicRoomListManager:

@@ -21,6 +21,7 @@ from twisted.internet.error import DNSLookupError
 from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.config.oembed import OEmbedEndpointConfig
+from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from tests import unittest
 from tests.server import FakeTransport
@@ -620,11 +621,12 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertIn(b"/matrixdotorg", server.data)
 
         self.assertEqual(channel.code, 200)
-        self.assertIsNone(channel.json_body["og:title"])
-        self.assertTrue(channel.json_body["og:image"].startswith("mxc://"))
-        self.assertEqual(channel.json_body["og:image:height"], 1)
-        self.assertEqual(channel.json_body["og:image:width"], 1)
-        self.assertEqual(channel.json_body["og:image:type"], "image/png")
+        body = channel.json_body
+        self.assertEqual(body["og:url"], "http://twitter.com/matrixdotorg/status/12345")
+        self.assertTrue(body["og:image"].startswith("mxc://"))
+        self.assertEqual(body["og:image:height"], 1)
+        self.assertEqual(body["og:image:width"], 1)
+        self.assertEqual(body["og:image:type"], "image/png")
 
     def test_oembed_rich(self):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
@@ -633,6 +635,8 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         result = {
             "version": "1.0",
             "type": "rich",
+            # Note that this provides the author, not the title.
+            "author_name": "Alice",
             "html": "<div>Content Preview</div>",
         }
         end_content = json.dumps(result).encode("utf-8")
@@ -660,9 +664,14 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
         self.pump()
         self.assertEqual(channel.code, 200)
+        body = channel.json_body
         self.assertEqual(
-            channel.json_body,
-            {"og:title": None, "og:description": "Content Preview"},
+            body,
+            {
+                "og:url": "http://twitter.com/matrixdotorg/status/12345",
+                "og:title": "Alice",
+                "og:description": "Content Preview",
+            },
         )
 
     def test_oembed_format(self):
@@ -705,7 +714,140 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         self.assertIn(b"format=json", server.data)
 
         self.assertEqual(channel.code, 200)
+        body = channel.json_body
         self.assertEqual(
-            channel.json_body,
-            {"og:title": None, "og:description": "Content Preview"},
+            body,
+            {
+                "og:url": "http://www.hulu.com/watch/12345",
+                "og:description": "Content Preview",
+            },
+        )
+
+    def _download_image(self):
+        """Downloads an image into the URL cache.
+
+        Returns:
+            A (host, media_id) tuple representing the MXC URI of the image.
+        """
+        self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://cdn.twitter.com/matrixdotorg",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nContent-Type: image/png\r\n\r\n"
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        mxc_uri = body["og:image"]
+        host, _port, media_id = parse_and_validate_mxc_uri(mxc_uri)
+        self.assertIsNone(_port)
+        return host, media_id
+
+    def test_storage_providers_exclude_files(self):
+        """Test that files are not stored in or fetched from storage providers."""
+        host, media_id = self._download_image()
+
+        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        media_store_path = os.path.join(self.media_store_path, rel_file_path)
+        storage_provider_path = os.path.join(self.storage_path, rel_file_path)
+
+        # Check storage
+        self.assertTrue(os.path.isfile(media_store_path))
+        self.assertFalse(
+            os.path.isfile(storage_provider_path),
+            "URL cache file was unexpectedly stored in a storage provider",
+        )
+
+        # Check fetching
+        channel = self.make_request(
+            "GET",
+            f"download/{host}/{media_id}",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # Move cached file into the storage provider
+        os.makedirs(os.path.dirname(storage_provider_path), exist_ok=True)
+        os.rename(media_store_path, storage_provider_path)
+
+        channel = self.make_request(
+            "GET",
+            f"download/{host}/{media_id}",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(
+            channel.code,
+            404,
+            "URL cache file was unexpectedly retrieved from a storage provider",
+        )
+
+    def test_storage_providers_exclude_thumbnails(self):
+        """Test that thumbnails are not stored in or fetched from storage providers."""
+        host, media_id = self._download_image()
+
+        rel_thumbnail_path = (
+            self.preview_url.filepaths.url_cache_thumbnail_directory_rel(media_id)
+        )
+        media_store_thumbnail_path = os.path.join(
+            self.media_store_path, rel_thumbnail_path
+        )
+        storage_provider_thumbnail_path = os.path.join(
+            self.storage_path, rel_thumbnail_path
+        )
+
+        # Check storage
+        self.assertTrue(os.path.isdir(media_store_thumbnail_path))
+        self.assertFalse(
+            os.path.isdir(storage_provider_thumbnail_path),
+            "URL cache thumbnails were unexpectedly stored in a storage provider",
+        )
+
+        # Check fetching
+        channel = self.make_request(
+            "GET",
+            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # Remove the original, otherwise thumbnails will regenerate
+        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        media_store_path = os.path.join(self.media_store_path, rel_file_path)
+        os.remove(media_store_path)
+
+        # Move cached thumbnails into the storage provider
+        os.makedirs(os.path.dirname(storage_provider_thumbnail_path), exist_ok=True)
+        os.rename(media_store_thumbnail_path, storage_provider_thumbnail_path)
+
+        channel = self.make_request(
+            "GET",
+            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(
+            channel.code,
+            404,
+            "URL cache thumbnail was unexpectedly retrieved from a storage provider",
         )

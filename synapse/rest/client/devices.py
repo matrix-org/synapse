@@ -211,7 +211,7 @@ class DehydratedDeviceServlet(RestServlet):
         if dehydrated_device is not None:
             (device_id, device_data) = dehydrated_device
             result = {"device_id": device_id, "device_data": device_data}
-            return (200, result)
+            return 200, result
         else:
             raise errors.NotFoundError("No dehydrated device available")
 
@@ -293,7 +293,7 @@ class ClaimDehydratedDeviceServlet(RestServlet):
             submission["device_id"],
         )
 
-        return (200, result)
+        return 200, result
 
 
 def register_servlets(hs: "HomeServer", http_server: HttpServer) -> None:

@@ -309,7 +309,7 @@ class ProfileHandler(BaseHandler):
     async def on_profile_query(self, args: JsonDict) -> JsonDict:
         """Handles federation profile query requests."""
 
-        if not self.hs.config.allow_profile_lookup_over_federation:
+        if not self.hs.config.federation.allow_profile_lookup_over_federation:
             raise SynapseError(
                 403,
                 "Profile lookup over federation is disabled on this homeserver",
