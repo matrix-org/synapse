@@ -560,7 +560,7 @@ class PerDestinationQueue:
 
         assert len(edus) <= limit, "get_device_updates_by_remote returned too many EDUs"
 
-        return (edus, now_stream_id)
+        return edus, now_stream_id
 
     async def _get_to_device_message_edus(self, limit: int) -> Tuple[List[Edu], int]:
         last_device_stream_id = self._last_device_stream_id
@@ -593,7 +593,7 @@ class PerDestinationQueue:
                 stream_id,
             )
 
-        return (edus, stream_id)
+        return edus, stream_id
 
     def _start_catching_up(self) -> None:
         """

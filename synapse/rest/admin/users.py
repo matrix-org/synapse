@@ -368,8 +368,8 @@ class UserRestServletV2(RestServlet):
                         user_id, medium, address, current_time
                     )
                     if (
-                        self.hs.config.email_enable_notifs
-                        and self.hs.config.email_notif_for_new_users
+                        self.hs.config.email.email_enable_notifs
+                        and self.hs.config.email.email_notif_for_new_users
                     ):
                         await self.pusher_pool.add_pusher(
                             user_id=user_id,

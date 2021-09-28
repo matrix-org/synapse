@@ -195,7 +195,7 @@ class SynapseHomeServer(HomeServer):
                 }
             )
 
-            if self.config.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
+            if self.config.email.threepid_behaviour_email == ThreepidBehaviour.LOCAL:
                 from synapse.rest.synapse.client.password_reset import (
                     PasswordResetSubmitTokenResource,
                 )
@@ -234,7 +234,7 @@ class SynapseHomeServer(HomeServer):
             )
 
         if name in ["media", "federation", "client"]:
-            if self.config.enable_media_repo:
+            if self.config.media.enable_media_repo:
                 media_repo = self.get_media_repository_resource()
                 resources.update(
                     {MEDIA_PREFIX: media_repo, LEGACY_MEDIA_PREFIX: media_repo}
@@ -269,7 +269,7 @@ class SynapseHomeServer(HomeServer):
                 # https://twistedmatrix.com/trac/ticket/7678
                 resources[WEB_CLIENT_PREFIX] = File(webclient_loc)
 
-        if name == "metrics" and self.config.enable_metrics:
+        if name == "metrics" and self.config.metrics.enable_metrics:
             resources[METRICS_PREFIX] = MetricsResource(RegistryProxy)
 
         if name == "replication":
@@ -278,7 +278,7 @@ class SynapseHomeServer(HomeServer):
         return resources
 
     def start_listening(self):
-        if self.config.redis_enabled:
+        if self.config.redis.redis_enabled:
             # If redis is enabled we connect via the replication command handler
             # in the same way as the workers (since we're effectively a client
             # rather than a server).
@@ -305,7 +305,7 @@ class SynapseHomeServer(HomeServer):
                 for s in services:
                     reactor.addSystemEventTrigger("before", "shutdown", s.stopListening)
             elif listener.type == "metrics":
-                if not self.config.enable_metrics:
+                if not self.config.metrics.enable_metrics:
                     logger.warning(
                         "Metrics listener configured, but "
                         "enable_metrics is not True!"
@@ -366,7 +366,7 @@ def setup(config_options):
 
     async def start():
         # Load the OIDC provider metadatas, if OIDC is enabled.
-        if hs.config.oidc_enabled:
+        if hs.config.oidc.oidc_enabled:
             oidc = hs.get_oidc_handler()
             # Loading the provider metadata also ensures the provider config is valid.
             await oidc.load_metadata()
@@ -455,7 +455,7 @@ def main():
         hs = setup(sys.argv[1:])
 
         # redirect stdio to the logs, if configured.
-        if not hs.config.no_redirect_stdio:
+        if not hs.config.logging.no_redirect_stdio:
             redirect_stdio_to_logs()
 
         run(hs)

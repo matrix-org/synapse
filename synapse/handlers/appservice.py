@@ -52,7 +52,7 @@ class ApplicationServicesHandler:
         self.scheduler = hs.get_application_service_scheduler()
         self.started_scheduler = False
         self.clock = hs.get_clock()
-        self.notify_appservices = hs.config.notify_appservices
+        self.notify_appservices = hs.config.appservice.notify_appservices
         self.event_sources = hs.get_event_sources()
 
         self.current_max = 0
@@ -254,7 +254,7 @@ class ApplicationServicesHandler:
     async def _handle_typing(
         self, service: ApplicationService, new_token: int
     ) -> List[JsonDict]:
-        typing_source = self.event_sources.sources["typing"]
+        typing_source = self.event_sources.sources.typing
         # Get the typing events from just before current
         typing, _ = await typing_source.get_new_events_as(
             service=service,
@@ -269,7 +269,7 @@ class ApplicationServicesHandler:
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "read_receipt"
         )
-        receipts_source = self.event_sources.sources["receipt"]
+        receipts_source = self.event_sources.sources.receipt
         receipts, _ = await receipts_source.get_new_events_as(
             service=service, from_key=from_key
         )
@@ -279,7 +279,7 @@ class ApplicationServicesHandler:
         self, service: ApplicationService, users: Collection[Union[str, UserID]]
     ) -> List[JsonDict]:
         events: List[JsonDict] = []
-        presence_source = self.event_sources.sources["presence"]
+        presence_source = self.event_sources.sources.presence
         from_key = await self.store.get_type_stream_id_for_appservice(
             service, "presence"
         )

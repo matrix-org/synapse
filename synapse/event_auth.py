@@ -113,7 +113,8 @@ def check(
                 raise AuthError(403, "Event not signed by sending server")
 
         is_invite_via_allow_rule = (
-            event.type == EventTypes.Member
+            room_version_obj.msc3083_join_rules
+            and event.type == EventTypes.Member
             and event.membership == Membership.JOIN
             and "join_authorised_via_users_server" in event.content
         )
@@ -213,7 +214,7 @@ def check(
 
     if (
         event.type == EventTypes.MSC2716_INSERTION
-        or event.type == EventTypes.MSC2716_CHUNK
+        or event.type == EventTypes.MSC2716_BATCH
         or event.type == EventTypes.MSC2716_MARKER
     ):
         check_historical(room_version_obj, event, auth_events)
@@ -552,14 +553,14 @@ def check_historical(
     auth_events: StateMap[EventBase],
 ) -> None:
     """Check whether the event sender is allowed to send historical related
-    events like "insertion", "chunk", and "marker".
+    events like "insertion", "batch", and "marker".
 
     Returns:
         None
 
     Raises:
         AuthError if the event sender is not allowed to send historical related events
-        ("insertion", "chunk", and "marker").
+        ("insertion", "batch", and "marker").
     """
     # Ignore the auth checks in room versions that do not support historical
     # events
@@ -573,7 +574,7 @@ def check_historical(
     if user_level < historical_level:
         raise AuthError(
             403,
-            'You don\'t have permission to send send historical related events ("insertion", "chunk", and "marker")',
+            'You don\'t have permission to send send historical related events ("insertion", "batch", and "marker")',
         )
 
 

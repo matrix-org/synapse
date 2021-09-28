@@ -132,8 +132,7 @@ class MediaStorage:
         fname = os.path.join(self.local_media_directory, path)
 
         dirname = os.path.dirname(fname)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        os.makedirs(dirname, exist_ok=True)
 
         finished_called = [False]
 
@@ -244,8 +243,7 @@ class MediaStorage:
                 return legacy_local_path
 
         dirname = os.path.dirname(local_path)
-        if not os.path.exists(dirname):
-            os.makedirs(dirname)
+        os.makedirs(dirname, exist_ok=True)
 
         for provider in self.storage_providers:
             res: Any = await provider.fetch(path, file_info)

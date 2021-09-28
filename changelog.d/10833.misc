@@ -1,0 +1,1 @@
+Extend the ModuleApi to let plug-ins check whether an ID is local and to access IP + User Agent data.

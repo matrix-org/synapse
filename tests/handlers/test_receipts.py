@@ -23,7 +23,7 @@ from tests import unittest
 
 class ReceiptsTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, hs):
-        self.event_source = hs.get_event_sources().sources["receipt"]
+        self.event_source = hs.get_event_sources().sources.receipt
 
     # In the first param of _test_filters_hidden we use "hidden" instead of
     # ReadReceiptEventFields.MSC2285_HIDDEN. We do this because we're mocking

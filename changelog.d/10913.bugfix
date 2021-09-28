@@ -1,0 +1,1 @@
+Fix race conditions when creating media store and config directories.

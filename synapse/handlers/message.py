@@ -443,7 +443,7 @@ class EventCreationHandler:
         )
 
         self._block_events_without_consent_error = (
-            self.config.block_events_without_consent_error
+            self.config.consent.block_events_without_consent_error
         )
 
         # we need to construct a ConsentURIBuilder here, as it checks that the necessary
@@ -666,7 +666,7 @@ class EventCreationHandler:
 
         self.validator.validate_new(event, self.config)
 
-        return (event, context)
+        return event, context
 
     async def _is_exempt_from_privacy_policy(
         self, builder: EventBuilder, requester: Requester
@@ -692,10 +692,10 @@ class EventCreationHandler:
         return False
 
     async def _is_server_notices_room(self, room_id: str) -> bool:
-        if self.config.server_notices_mxid is None:
+        if self.config.servernotices.server_notices_mxid is None:
             return False
         user_ids = await self.store.get_users_in_room(room_id)
-        return self.config.server_notices_mxid in user_ids
+        return self.config.servernotices.server_notices_mxid in user_ids
 
     async def assert_accepted_privacy_policy(self, requester: Requester) -> None:
         """Check if a user has accepted the privacy policy
@@ -731,8 +731,8 @@ class EventCreationHandler:
 
         # exempt the system notices user
         if (
-            self.config.server_notices_mxid is not None
-            and user_id == self.config.server_notices_mxid
+            self.config.servernotices.server_notices_mxid is not None
+            and user_id == self.config.servernotices.server_notices_mxid
         ):
             return
 
@@ -744,7 +744,7 @@ class EventCreationHandler:
         if u["appservice_id"] is not None:
             # users registered by an appservice are exempt
             return
-        if u["consent_version"] == self.config.user_consent_version:
+        if u["consent_version"] == self.config.consent.user_consent_version:
             return
 
         consent_uri = self._consent_uri_builder.build_user_consent_uri(user.localpart)
@@ -1004,7 +1004,7 @@ class EventCreationHandler:
 
         logger.debug("Created event %s", event.event_id)
 
-        return (event, context)
+        return event, context
 
     @measure_func("handle_new_client_event")
     async def handle_new_client_event(
@@ -1425,7 +1425,7 @@ class EventCreationHandler:
                 # structural protocol level).
                 is_msc2716_event = (
                     original_event.type == EventTypes.MSC2716_INSERTION
-                    or original_event.type == EventTypes.MSC2716_CHUNK
+                    or original_event.type == EventTypes.MSC2716_BATCH
                     or original_event.type == EventTypes.MSC2716_MARKER
                 )
                 if not room_version_obj.msc2716_historical and is_msc2716_event:
