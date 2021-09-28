@@ -62,6 +62,38 @@ def check(
     Returns:
          if the auth checks pass.
     """
+    validate_event_for_room_version(room_version_obj, event, do_sig_check)
+    check_auth_rules_for_event(room_version_obj, event, auth_events)
+
+
+def validate_event_for_room_version(
+    room_version_obj: RoomVersion, event: EventBase, do_sig_check: bool = True
+) -> None:
+    """Ensure that the event complies with the limits, and has the right signatures
+
+    NB: does not *validate* the signatures - it assumes that any signatures present
+    have already been checked.
+
+    NB: it does not check that the event satisfies the auth rules (that is done in
+    check_auth_rules_for_event) - these tests are independent of the rest of the state
+    in the room.
+
+    NB: This is used to check events that have been received over federation. As such,
+    it can only enforce the checks specified in the relevant room version, to avoid
+    a split-brain situation where some servers accept such events, and others reject
+    them.
+
+    TODO: consider moving this into EventValidator
+
+    Args:
+        room_version_obj: the version of the room which contains this event
+        event: the event to be checked
+        do_sig_check: True if it should be verified that the sending server
+            signed the event.
+
+    Raises:
+        SynapseError if there is a problem with the event
+    """
     _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
@@ -105,8 +137,6 @@ def check(
             )
             if not event.signatures.get(authoriser_domain):
                 raise AuthError(403, "Event not signed by authorising server")
-
-    check_auth_rules_for_event(room_version_obj, event, auth_events)
 
 
 def check_auth_rules_for_event(
