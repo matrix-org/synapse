@@ -2450,26 +2450,16 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Mock a few functions to prevent the test from failing due to failing to talk to
         # a remote IS. We keep the mock for _mock_make_and_store_3pid_invite around so we
         # can check its call_count later on during the test.
-        make_invite_mock = self._mock_make_and_store_3pid_invite()
-        self._mock_lookup_3pid()
+        make_invite_mock = Mock(return_value=make_awaitable(0))
+        self.hs.get_room_member_handler()._make_and_store_3pid_invite = make_invite_mock
+        self.hs.get_identity_handler().lookup_3pid = Mock(
+            return_value=make_awaitable(None),
+        )
 
         # Add a mock to the spamchecker callbacks for user_may_send_3pid_invite. Make it
         # allow everything for now.
-        return_value = True
-
-        async def _user_may_send_3pid_invite(
-            inviter: str,
-            medium: str,
-            address: str,
-            room_id: str,
-        ) -> bool:
-            return return_value
-
-        allow_mock = Mock(side_effect=_user_may_send_3pid_invite)
-
-        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(
-            allow_mock
-        )
+        mock = Mock(return_value=make_awaitable(True))
+        self.hs.get_spam_checker()._user_may_send_3pid_invite_callbacks.append(mock)
 
         # Send a 3PID invite into the room and check that it succeeded.
         email_to_invite = "teresa@example.com"
@@ -2489,16 +2479,14 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
         # Check that the callback was called with the right params.
         expected_call_args = ((self.user_id, "email", email_to_invite, self.room_id),)
 
-        self.assertEquals(
-            allow_mock.call_args, expected_call_args, allow_mock.call_args
-        )
+        self.assertEquals(mock.call_args, expected_call_args, mock.call_args)
 
         # Check that the call to send the invite was made.
         self.assertEquals(make_invite_mock.call_count, 1)
 
         # Now change the return value of the callback to deny any invite and test that
         # we can't send the invite.
-        return_value = False
+        mock.return_value = make_awaitable(False)
         channel = self.make_request(
             method="POST",
             path="/rooms/" + self.room_id + "/invite",
@@ -2514,51 +2502,3 @@ class ThreepidInviteTestCase(unittest.HomeserverTestCase):
 
         # Also check that it stopped before calling _make_and_store_3pid_invite.
         self.assertEquals(make_invite_mock.call_count, 1)
-
-    def _mock_make_and_store_3pid_invite(self) -> Mock:
-        """Mocks RoomMemberHandler._make_and_store_3pid_invite with a function that just
-        returns the integer 0.
-
-        Returns:
-            The Mock object _make_and_store_3pid_invite was replaced with.
-        """
-
-        async def _make_and_store_3pid_invite(
-            requester: Requester,
-            id_server: str,
-            medium: str,
-            address: str,
-            room_id: str,
-            user: UserID,
-            txn_id: Optional[str],
-            id_access_token: Optional[str] = None,
-        ) -> int:
-            return 0
-
-        mock = Mock(side_effect=_make_and_store_3pid_invite)
-
-        self.hs.get_room_member_handler()._make_and_store_3pid_invite = mock
-
-        return mock
-
-    def _mock_lookup_3pid(self) -> Mock:
-        """Mocks IdentityHandler.lookup_3pid with a function that just returns None (ie
-        no binding for the 3PID.
-
-        Returns:
-            The Mock object lookup_3pid was replaced with.
-        """
-
-        async def _lookup_3pid(
-            id_server: str,
-            medium: str,
-            address: str,
-            id_access_token: Optional[str] = None,
-        ) -> Optional[str]:
-            return None
-
-        mock = Mock(side_effect=_lookup_3pid)
-
-        self.hs.get_identity_handler().lookup_3pid = mock
-
-        return mock
