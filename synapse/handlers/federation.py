@@ -1256,7 +1256,7 @@ class FederationHandler(BaseHandler):
             )
 
             event, context = await self.add_display_name_to_third_party_invite(
-                room_version_obj.identifier, event_dict, event, context
+                room_version_obj, event_dict, event, context
             )
 
             EventValidator().validate_new(event, self.config)
@@ -1313,7 +1313,7 @@ class FederationHandler(BaseHandler):
             builder=builder
         )
         event, context = await self.add_display_name_to_third_party_invite(
-            room_version_obj.identifier, event_dict, event, context
+            room_version_obj, event_dict, event, context
         )
 
         try:
@@ -1335,7 +1335,7 @@ class FederationHandler(BaseHandler):
 
     async def add_display_name_to_third_party_invite(
         self,
-        room_version: str,
+        room_version_obj: RoomVersion,
         event_dict: JsonDict,
         event: EventBase,
         context: EventContext,
@@ -1367,7 +1367,9 @@ class FederationHandler(BaseHandler):
             # auth checks. If we need the invite and don't have it then the
             # auth check code will explode appropriately.
 
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
         EventValidator().validate_builder(builder)
         event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
