@@ -116,11 +116,11 @@ def check(
             room_version_obj.msc3083_join_rules
             and event.type == EventTypes.Member
             and event.membership == Membership.JOIN
-            and "join_authorised_via_users_server" in event.content
+            and EventContentFields.AUTHORISING_USER in event.content
         )
         if is_invite_via_allow_rule:
             authoriser_domain = get_domain_from_id(
-                event.content["join_authorised_via_users_server"]
+                event.content[EventContentFields.AUTHORISING_USER]
             )
             if not event.signatures.get(authoriser_domain):
                 raise AuthError(403, "Event not signed by authorising server")
@@ -382,7 +382,9 @@ def _is_membership_change_allowed(
             # Note that if the caller is in the room or invited, then they do
             # not need to meet the allow rules.
             if not caller_in_room and not caller_invited:
-                authorising_user = event.content.get("join_authorised_via_users_server")
+                authorising_user = event.content.get(
+                    EventContentFields.AUTHORISING_USER
+                )
 
                 if authorising_user is None:
                     raise AuthError(403, "Join event is missing authorising user.")
@@ -837,10 +839,10 @@ def auth_types_for_event(
                 auth_types.add(key)
 
         if room_version.msc3083_join_rules and membership == Membership.JOIN:
-            if "join_authorised_via_users_server" in event.content:
+            if EventContentFields.AUTHORISING_USER in event.content:
                 key = (
                     EventTypes.Member,
-                    event.content["join_authorised_via_users_server"],
+                    event.content[EventContentFields.AUTHORISING_USER],
                 )
                 auth_types.add(key)
 

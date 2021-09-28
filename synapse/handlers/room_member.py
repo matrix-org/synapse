@@ -939,7 +939,7 @@ class RoomMemberHandler(metaclass=abc.ABCMeta):
         # be included in the event content in order to efficiently validate
         # the event.
         content[
-            "join_authorised_via_users_server"
+            EventContentFields.AUTHORISING_USER
         ] = await self.event_auth_handler.get_user_which_could_invite(
             room_id,
             current_state_ids,
