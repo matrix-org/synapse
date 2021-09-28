@@ -1,1 +1,0 @@
-Update development testing script `test_postgresql.sh` to use a supported Python version and make re-runs quicker.
