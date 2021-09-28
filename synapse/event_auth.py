@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 
 def validate_event_for_room_version(
-    room_version_obj: RoomVersion, event: EventBase, do_sig_check: bool = True
+    room_version_obj: RoomVersion, event: EventBase
 ) -> None:
     """Ensure that the event complies with the limits, and has the right signatures
 
@@ -63,8 +63,6 @@ def validate_event_for_room_version(
     Args:
         room_version_obj: the version of the room which contains this event
         event: the event to be checked
-        do_sig_check: True if it should be verified that the sending server
-            signed the event.
 
     Raises:
         SynapseError if there is a problem with the event
@@ -74,44 +72,44 @@ def validate_event_for_room_version(
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
 
-    if do_sig_check:
-        sender_domain = get_domain_from_id(event.sender)
+    # check that the event has the correct signatures
+    sender_domain = get_domain_from_id(event.sender)
 
-        is_invite_via_3pid = (
-            event.type == EventTypes.Member
-            and event.membership == Membership.INVITE
-            and "third_party_invite" in event.content
+    is_invite_via_3pid = (
+        event.type == EventTypes.Member
+        and event.membership == Membership.INVITE
+        and "third_party_invite" in event.content
+    )
+
+    # Check the sender's domain has signed the event
+    if not event.signatures.get(sender_domain):
+        # We allow invites via 3pid to have a sender from a different
+        # HS, as the sender must match the sender of the original
+        # 3pid invite. This is checked further down with the
+        # other dedicated membership checks.
+        if not is_invite_via_3pid:
+            raise AuthError(403, "Event not signed by sender's server")
+
+    if event.format_version in (EventFormatVersions.V1,):
+        # Only older room versions have event IDs to check.
+        event_id_domain = get_domain_from_id(event.event_id)
+
+        # Check the origin domain has signed the event
+        if not event.signatures.get(event_id_domain):
+            raise AuthError(403, "Event not signed by sending server")
+
+    is_invite_via_allow_rule = (
+        room_version_obj.msc3083_join_rules
+        and event.type == EventTypes.Member
+        and event.membership == Membership.JOIN
+        and "join_authorised_via_users_server" in event.content
+    )
+    if is_invite_via_allow_rule:
+        authoriser_domain = get_domain_from_id(
+            event.content["join_authorised_via_users_server"]
         )
-
-        # Check the sender's domain has signed the event
-        if not event.signatures.get(sender_domain):
-            # We allow invites via 3pid to have a sender from a different
-            # HS, as the sender must match the sender of the original
-            # 3pid invite. This is checked further down with the
-            # other dedicated membership checks.
-            if not is_invite_via_3pid:
-                raise AuthError(403, "Event not signed by sender's server")
-
-        if event.format_version in (EventFormatVersions.V1,):
-            # Only older room versions have event IDs to check.
-            event_id_domain = get_domain_from_id(event.event_id)
-
-            # Check the origin domain has signed the event
-            if not event.signatures.get(event_id_domain):
-                raise AuthError(403, "Event not signed by sending server")
-
-        is_invite_via_allow_rule = (
-            room_version_obj.msc3083_join_rules
-            and event.type == EventTypes.Member
-            and event.membership == Membership.JOIN
-            and "join_authorised_via_users_server" in event.content
-        )
-        if is_invite_via_allow_rule:
-            authoriser_domain = get_domain_from_id(
-                event.content["join_authorised_via_users_server"]
-            )
-            if not event.signatures.get(authoriser_domain):
-                raise AuthError(403, "Event not signed by authorising server")
+        if not event.signatures.get(authoriser_domain):
+            raise AuthError(403, "Event not signed by authorising server")
 
 
 def check_auth_rules_for_event(
