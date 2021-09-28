@@ -41,31 +41,6 @@ from synapse.types import StateMap, UserID, get_domain_from_id
 logger = logging.getLogger(__name__)
 
 
-def check(
-    room_version_obj: RoomVersion,
-    event: EventBase,
-    auth_events: StateMap[EventBase],
-    do_sig_check: bool = True,
-) -> None:
-    """Checks if this event is correctly authed.
-
-    Args:
-        room_version_obj: the version of the room
-        event: the event being checked.
-        auth_events: the existing room state.
-        do_sig_check: True if it should be verified that the sending server
-            signed the event.
-
-    Raises:
-        AuthError if the checks fail
-
-    Returns:
-         if the auth checks pass.
-    """
-    validate_event_for_room_version(room_version_obj, event, do_sig_check)
-    check_auth_rules_for_event(room_version_obj, event, auth_events)
-
-
 def validate_event_for_room_version(
     room_version_obj: RoomVersion, event: EventBase, do_sig_check: bool = True
 ) -> None:

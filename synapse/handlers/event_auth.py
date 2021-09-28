@@ -23,6 +23,10 @@ from synapse.api.constants import (
 )
 from synapse.api.errors import AuthError, Codes, SynapseError
 from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
+from synapse.event_auth import (
+    check_auth_rules_for_event,
+    validate_event_for_room_version,
+)
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -57,9 +61,8 @@ class EventAuthHandler:
         auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
 
         room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-        event_auth.check(
-            room_version_obj, event, auth_events=auth_events, do_sig_check=do_sig_check
-        )
+        validate_event_for_room_version(room_version_obj, event, do_sig_check)
+        check_auth_rules_for_event(room_version_obj, event, auth_events)
 
     def compute_auth_events(
         self,
