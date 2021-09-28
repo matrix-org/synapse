@@ -711,6 +711,27 @@ def respond_with_json_bytes(
     return NOT_DONE_YET
 
 
+async def _async_write_json_to_request_in_thread(
+    request: SynapseRequest,
+    json_encoder: Callable[[Any], bytes],
+    json_object: Any,
+):
+    """Encodes the given JSON object on a thread and then writes it to the
+    request.
+
+    This is done so that encoding large JSON objects doesn't block the reactor
+    thread.
+
+    Note: We don't use JsonEncoder.iterencode here as that falls back to the
+    Python implementation (rather than the C backend), which is *much* more
+    expensive.
+    """
+
+    json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
+
+    _write_bytes_to_request(request, json_str)
+
+
 def _write_bytes_to_request(request: Request, bytes_to_write: bytes) -> None:
     """Writes the bytes to the request using an appropriate producer.
 
@@ -830,24 +851,3 @@ def finish_request(request: Request):
         request.finish()
     except RuntimeError as e:
         logger.info("Connection disconnected before response was written: %r", e)
-
-
-async def _async_write_json_to_request_in_thread(
-    request: SynapseRequest,
-    json_encoder: Callable[[Any], bytes],
-    json_object: Any,
-):
-    """Encodes the given JSON object on a thread and then writes it to the
-    request.
-
-    This is done so that encoding large JSON objects doesn't block the reactor
-    thread.
-
-    Note: We don't use JsonEncoder.iterencode here as that falls back to the
-    Python implementation (rather than the C backend), which is *much* more
-    expensive.
-    """
-
-    json_str = await defer_to_thread(request.reactor, json_encoder, json_object)
-
-    _write_bytes_to_request(request, json_str)
