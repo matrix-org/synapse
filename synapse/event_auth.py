@@ -113,7 +113,8 @@ def check(
                 raise AuthError(403, "Event not signed by sending server")
 
         is_invite_via_allow_rule = (
-            event.type == EventTypes.Member
+            room_version_obj.msc3083_join_rules
+            and event.type == EventTypes.Member
             and event.membership == Membership.JOIN
             and "join_authorised_via_users_server" in event.content
         )
