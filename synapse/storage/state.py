@@ -443,6 +443,10 @@ class StateFilter:
         """
         Returns a state filter which represents `self - other`.
 
+        This is useful for determining what state remains to be pulled out of the
+        database if we want the state included by `self` but already have the state
+        included by `other`.
+
         The resultant state filter
         - MUST include all state events that are included by this filter (`self`)
           unless they are included by `other`;
