@@ -456,20 +456,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.register_user("user2", "pass")
         u3 = self.register_user("user3", "pass")
 
-        # Wipe the user dir
-        self.get_success(self.store.update_user_directory_stream_pos(None))
-        self.get_success(self.store.delete_all_from_user_dir())
-
-        # Do the initial population of the user directory via the background update
-        self._add_background_updates()
-
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
-
         shares_private = self.get_success(
             self.user_dir_helper.get_users_who_share_private_rooms()
         )
@@ -537,15 +523,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         local_users = [local_user_1, local_user_2, local_user_3]
         remote_users = [remote_user_1, remote_user_2, remote_user_3]
-
-        # Populate the user directory via background update
-        self._add_background_updates()
-        while not self.get_success(
-            self.store.db_pool.updates.has_completed_background_updates()
-        ):
-            self.get_success(
-                self.store.db_pool.updates.do_next_background_update(100), by=0.1
-            )
 
         # The local searching user searches for the term "user", which other users have
         # in their user id
