@@ -476,12 +476,15 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         tok = self.login("kermit", "test", device_id=device_id)
 
         whoami = self._whoami(tok)
-        self.assertEqual(whoami, {
-            "user_id": user_id,
-            "device_id": device_id,
-            # Unstable until MSC3069 enters spec
-            "org.matrix.msc3069.is_guest": False,
-        })
+        self.assertEqual(
+            whoami,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": False,
+            },
+        )
 
     def test_GET_whoami_guests(self):
         channel = self.make_request(
@@ -492,12 +495,15 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         device_id = channel.json_body["device_id"]
 
         whoami = self._whoami(tok)
-        self.assertEqual(whoami, {
-            "user_id": user_id,
-            "device_id": device_id,
-            # Unstable until MSC3069 enters spec
-            "org.matrix.msc3069.is_guest": True,
-        })
+        self.assertEqual(
+            whoami,
+            {
+                "user_id": user_id,
+                "device_id": device_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": True,
+            },
+        )
 
     def test_GET_whoami_appservices(self):
         user_id = "@as:test"
