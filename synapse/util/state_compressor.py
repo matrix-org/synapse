@@ -79,7 +79,9 @@ def setup_state_compressor(hs: "HomeServer"):
     # parameters that rust doesn't understand, so we need to filter them out.
     #
     # Note: we need to connect to the *state* database.
-    conn_info_params = hs.get_datastores().state.db_pool.postgres_connection_info_parameters
+    conn_info_params = (
+        hs.get_datastores().state.db_pool.postgres_connection_info_parameters
+    )
     assert conn_info_params is not None
 
     effective_db_args = {}
@@ -100,7 +102,7 @@ def setup_state_compressor(hs: "HomeServer"):
 
     # The method to be called periodically
     def run_state_compressor():
-        run_as_background_process(
+        return run_as_background_process(
             desc="State Compressor",
             func=defer_to_thread,
             reactor=hs.get_reactor(),
