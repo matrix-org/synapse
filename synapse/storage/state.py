@@ -444,14 +444,14 @@ class StateFilter:
         Returns a state filter which represents `self - other`.
 
         The resultant state filter
-        - MUST admit all state events that are admitted
-          by only this filter (`self`) and not `other`;
-        - MUST NOT admit state events rejected by this filter (`self`); and
+        - MUST include all state events that are included by this filter (`self`)
+          unless they are included by `other`;
+        - MUST NOT include state events not included by this filter (`self`); and
         - MAY be an over-approximation: the resultant state
-          filter MAY additionally admit some state events from `other`.
+          filter MAY additionally include some state events from `other`.
 
 
-        Formally, if the set of state events admitted by a state filter F are
+        Formally, if the set of state events included by a state filter F are
         written as E(F), then the resultant state filter bears this property:
 
             E(self) ∖ E(other)
@@ -470,8 +470,6 @@ class StateFilter:
             StateFilter(m.room.member -> {'@wombat:example.org'})
                 is approximated as
             StateFilter(m.room.member -> None (wildcard))
-                which satisfies the condition that the resultant state filter
-                is an over-approximation.
         """
 
         # We first transform self and other into an alternative representation:
