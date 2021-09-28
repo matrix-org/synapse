@@ -439,29 +439,29 @@ class StateFilter:
 
         return StateFilter.freeze(new_types, include_others=all_part)
 
-    def approx_difference(self, subtrahend: "StateFilter") -> "StateFilter":
+    def approx_difference(self, other: "StateFilter") -> "StateFilter":
         """
-        Returns a state filter which represents `self - subtrahend`.
+        Returns a state filter which represents `self - other`.
 
         The resultant state filter
         - MUST admit all state events that are admitted
-          by only this filter (`self`) and not `subtrahend`;
+          by only this filter (`self`) and not `other`;
         - MUST NOT admit state events rejected by this filter (`self`); and
         - MAY be an over-approximation: the resultant state
-          filter MAY additionally admit some state events from `subtrahend`.
+          filter MAY additionally admit some state events from `other`.
 
 
         Formally, if the set of state events admitted by a state filter F are
         written as E(F), then the resultant state filter bears this property:
 
-            E(self) ∖ E(subtrahend)
-                ⊆ E(approx_difference(self, subtrahend))
+            E(self) ∖ E(other)
+                ⊆ E(approx_difference(self, other))
                 ⊆ E(self)
 
 
         This implementation attempts to return the narrowest such state filter.
         In the case that `self` contains wildcards for state types where
-        `subtrahend` contains specific state keys, an approximation must be made:
+        `other` contains specific state keys, an approximation must be made:
         the resultant state filter keeps the wildcard, as state filters are not
         able to express 'all state keys except some given examples'.
         e.g.
@@ -474,7 +474,7 @@ class StateFilter:
                 is an over-approximation.
         """
 
-        # We first transform self and subtrahend into an alternative representation:
+        # We first transform self and other into an alternative representation:
         #   - whether or not they include all events to begin with ('all')
         #   - if so, which event types are excluded? ('excludes')
         #   - which entire event types to include ('wildcards')
@@ -486,15 +486,15 @@ class StateFilter:
         (sub_all, sub_excludes), (
             sub_wildcards,
             sub_concrete_keys,
-        ) = subtrahend._decompose_into_four_parts()
+        ) = other._decompose_into_four_parts()
 
         # Start with an estimate of the difference based on self
         new_all = self_all
-        # Wildcards from the subtrahend can be added to the exclusion filter
+        # Wildcards from the other can be added to the exclusion filter
         new_excludes = self_excludes | sub_wildcards
-        # We remove wildcards that appeared as wildcards in the subtrahend
+        # We remove wildcards that appeared as wildcards in the other
         new_wildcards = self_wildcards - sub_wildcards
-        # We filter out the concrete state keys that appear in the subtrahend
+        # We filter out the concrete state keys that appear in the other
         # as wildcards or concrete state keys.
         new_concrete_keys = {
             (state_type, state_key)
@@ -505,21 +505,21 @@ class StateFilter:
         if sub_all:
             if self_all:
                 # If self starts with all, then we add as wildcards any
-                # types which appear in the subtrahend's exclusion filter (but
-                # aren't in the self exclusion filter). This is as the subtrahend
+                # types which appear in the other's exclusion filter (but
+                # aren't in the self exclusion filter). This is as the other
                 # filter will return everything BUT the types in its exclusion, so
                 # we need to add those excluded types that also match the self
                 # filter as wildcard types in the new filter.
                 new_wildcards |= sub_excludes.difference(self_excludes)
 
-            # If subtrahend is an `include_others` then the difference isn't.
+            # If other is an `include_others` then the difference isn't.
             new_all = False
             # (We have no need for excludes when we don't start with all, as there
             #  is nothing to exclude.)
             new_excludes = set()
 
             # We also filter out all state types that aren't in the exclusion
-            # list of the subtrahend.
+            # list of the other.
             new_wildcards &= sub_excludes
             new_concrete_keys = {
                 (state_type, state_key)
