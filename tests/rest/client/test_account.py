@@ -470,6 +470,11 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         register.register_servlets,
     ]
 
+    def default_config(self):
+        config = super().default_config()
+        config["allow_guest_access"] = True
+        return config
+
     def test_GET_whoami(self):
         device_id = "wouldgohere"
         user_id = self.register_user("kermit", "test")
@@ -519,7 +524,14 @@ class WhoamiTestCase(unittest.HomeserverTestCase):
         self.hs.get_datastore().services_cache.append(appservice)
 
         whoami = self._whoami(as_token)
-        self.assertEqual(whoami, {"user_id": user_id})
+        self.assertEqual(
+            whoami,
+            {
+                "user_id": user_id,
+                # Unstable until MSC3069 enters spec
+                "org.matrix.msc3069.is_guest": False,
+            },
+        )
         self.assertFalse(hasattr(whoami, "device_id"))
 
     def _whoami(self, tok):
