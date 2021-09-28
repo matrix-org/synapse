@@ -746,10 +746,10 @@ class FederationHandler(BaseHandler):
 
         # The remote hasn't signed it yet, obviously. We'll do the full checks
         # when we get the event back in `on_send_join_request`
-        await self._event_auth_handler.check_from_context(
-            room_version.identifier, event, context, do_sig_check=False
+        validate_event_for_room_version(room_version, event, do_sig_check=False)
+        await self._event_auth_handler.check_auth_rules_from_context(
+            room_version, event, context
         )
-
         return event
 
     async def on_invite_request(
@@ -920,8 +920,9 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context, do_sig_check=False
+            validate_event_for_room_version(room_version_obj, event, do_sig_check=False)
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
@@ -982,8 +983,9 @@ class FederationHandler(BaseHandler):
         try:
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context, do_sig_check=False
+            validate_event_for_room_version(room_version_obj, event, do_sig_check=False)
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
@@ -1271,8 +1273,9 @@ class FederationHandler(BaseHandler):
             event.internal_metadata.send_on_behalf_of = self.hs.hostname
 
             try:
-                await self._event_auth_handler.check_from_context(
-                    room_version_obj.identifier, event, context
+                validate_event_for_room_version(room_version_obj, event)
+                await self._event_auth_handler.check_auth_rules_from_context(
+                    room_version_obj, event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1322,8 +1325,9 @@ class FederationHandler(BaseHandler):
         )
 
         try:
-            await self._event_auth_handler.check_from_context(
-                room_version_obj.identifier, event, context
+            validate_event_for_room_version(room_version_obj, event)
+            await self._event_auth_handler.check_auth_rules_from_context(
+                room_version_obj, event, context
             )
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)

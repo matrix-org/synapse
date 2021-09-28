@@ -22,11 +22,8 @@ from synapse.api.constants import (
     RestrictedJoinRuleTypes,
 )
 from synapse.api.errors import AuthError, Codes, SynapseError
-from synapse.api.room_versions import KNOWN_ROOM_VERSIONS, RoomVersion
-from synapse.event_auth import (
-    check_auth_rules_for_event,
-    validate_event_for_room_version,
-)
+from synapse.api.room_versions import RoomVersion
+from synapse.event_auth import check_auth_rules_for_event
 from synapse.events import EventBase
 from synapse.events.builder import EventBuilder
 from synapse.events.snapshot import EventContext
@@ -49,19 +46,16 @@ class EventAuthHandler:
         self._store = hs.get_datastore()
         self._server_name = hs.hostname
 
-    async def check_from_context(
+    async def check_auth_rules_from_context(
         self,
-        room_version: str,
+        room_version_obj: RoomVersion,
         event: EventBase,
         context: EventContext,
-        do_sig_check: bool = True,
     ) -> None:
+        """Check an event passes the auth rules at its own auth events"""
         auth_event_ids = event.auth_event_ids()
         auth_events_by_id = await self._store.get_events(auth_event_ids)
         auth_events = {(e.type, e.state_key): e for e in auth_events_by_id.values()}
-
-        room_version_obj = KNOWN_ROOM_VERSIONS[room_version]
-        validate_event_for_room_version(room_version_obj, event, do_sig_check)
         check_auth_rules_for_event(room_version_obj, event, auth_events)
 
     def compute_auth_events(
