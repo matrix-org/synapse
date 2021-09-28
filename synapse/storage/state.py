@@ -454,15 +454,6 @@ class StateFilter:
         - MAY be an over-approximation: the returned state filter
           MAY additionally include some state events from `other`.
 
-
-        Formally, if the set of state events included by a state filter F are
-        written as E(F), then the resultant state filter bears this property:
-
-            E(self) ∖ E(other)
-                ⊆ E(approx_difference(self, other))
-                ⊆ E(self)
-
-
         This implementation attempts to return the narrowest such state filter.
         In the case that `self` contains wildcards for state types where
         `other` contains specific state keys, an approximation must be made:
