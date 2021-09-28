@@ -897,9 +897,9 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        room_version = await self.store.get_room_version_id(room_id)
-        builder = self.event_builder_factory.new(
-            room_version,
+        room_version_obj = await self.store.get_room_version(room_id)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj,
             {
                 "type": EventTypes.Member,
                 "content": {"membership": Membership.LEAVE},
@@ -917,7 +917,7 @@ class FederationHandler(BaseHandler):
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_leave_request`
             await self._event_auth_handler.check_from_context(
-                room_version, event, context, do_sig_check=False
+                room_version_obj.identifier, event, context, do_sig_check=False
             )
         except AuthError as e:
             logger.warning("Failed to create new leave %r because %s", event, e)
@@ -949,10 +949,10 @@ class FederationHandler(BaseHandler):
             )
             raise SynapseError(403, "User not from origin", Codes.FORBIDDEN)
 
-        room_version = await self.store.get_room_version_id(room_id)
+        room_version_obj = await self.store.get_room_version(room_id)
 
-        builder = self.event_builder_factory.new(
-            room_version,
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj,
             {
                 "type": EventTypes.Member,
                 "content": {"membership": Membership.KNOCK},
@@ -979,7 +979,7 @@ class FederationHandler(BaseHandler):
             # The remote hasn't signed it yet, obviously. We'll do the full checks
             # when we get the event back in `on_send_knock_request`
             await self._event_auth_handler.check_from_context(
-                room_version, event, context, do_sig_check=False
+                room_version_obj.identifier, event, context, do_sig_check=False
             )
         except AuthError as e:
             logger.warning("Failed to create new knock %r because %s", event, e)
@@ -1245,8 +1245,10 @@ class FederationHandler(BaseHandler):
         }
 
         if await self._event_auth_handler.check_host_in_room(room_id, self.hs.hostname):
-            room_version = await self.store.get_room_version_id(room_id)
-            builder = self.event_builder_factory.new(room_version, event_dict)
+            room_version_obj = await self.store.get_room_version(room_id)
+            builder = self.event_builder_factory.for_room_version(
+                room_version_obj, event_dict
+            )
 
             EventValidator().validate_builder(builder)
             event, context = await self.event_creation_handler.create_new_client_event(
@@ -1254,7 +1256,7 @@ class FederationHandler(BaseHandler):
             )
 
             event, context = await self.add_display_name_to_third_party_invite(
-                room_version, event_dict, event, context
+                room_version_obj.identifier, event_dict, event, context
             )
 
             EventValidator().validate_new(event, self.config)
@@ -1265,7 +1267,7 @@ class FederationHandler(BaseHandler):
 
             try:
                 await self._event_auth_handler.check_from_context(
-                    room_version, event, context
+                    room_version_obj.identifier, event, context
                 )
             except AuthError as e:
                 logger.warning("Denying new third party invite %r because %s", event, e)
@@ -1299,22 +1301,24 @@ class FederationHandler(BaseHandler):
 
         """
         assert_params_in_dict(event_dict, ["room_id"])
-        room_version = await self.store.get_room_version_id(event_dict["room_id"])
+        room_version_obj = await self.store.get_room_version(event_dict["room_id"])
 
         # NB: event_dict has a particular specced format we might need to fudge
         # if we change event formats too much.
-        builder = self.event_builder_factory.new(room_version, event_dict)
+        builder = self.event_builder_factory.for_room_version(
+            room_version_obj, event_dict
+        )
 
         event, context = await self.event_creation_handler.create_new_client_event(
             builder=builder
         )
         event, context = await self.add_display_name_to_third_party_invite(
-            room_version, event_dict, event, context
+            room_version_obj.identifier, event_dict, event, context
         )
 
         try:
             await self._event_auth_handler.check_from_context(
-                room_version, event, context
+                room_version_obj.identifier, event, context
             )
         except AuthError as e:
             logger.warning("Denying third party invite %r because %s", event, e)
