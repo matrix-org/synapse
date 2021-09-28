@@ -481,26 +481,26 @@ class StateFilter:
             self_wildcards,
             self_concrete_keys,
         ) = self._decompose_into_four_parts()
-        (sub_all, sub_excludes), (
-            sub_wildcards,
-            sub_concrete_keys,
+        (other_all, other_excludes), (
+            other_wildcards,
+            other_concrete_keys,
         ) = other._decompose_into_four_parts()
 
         # Start with an estimate of the difference based on self
         new_all = self_all
         # Wildcards from the other can be added to the exclusion filter
-        new_excludes = self_excludes | sub_wildcards
+        new_excludes = self_excludes | other_wildcards
         # We remove wildcards that appeared as wildcards in the other
-        new_wildcards = self_wildcards - sub_wildcards
+        new_wildcards = self_wildcards - other_wildcards
         # We filter out the concrete state keys that appear in the other
         # as wildcards or concrete state keys.
         new_concrete_keys = {
             (state_type, state_key)
             for (state_type, state_key) in self_concrete_keys
-            if state_type not in sub_wildcards
-        } - sub_concrete_keys
+            if state_type not in other_wildcards
+        } - other_concrete_keys
 
-        if sub_all:
+        if other_all:
             if self_all:
                 # If self starts with all, then we add as wildcards any
                 # types which appear in the other's exclusion filter (but
@@ -508,7 +508,7 @@ class StateFilter:
                 # filter will return everything BUT the types in its exclusion, so
                 # we need to add those excluded types that also match the self
                 # filter as wildcard types in the new filter.
-                new_wildcards |= sub_excludes.difference(self_excludes)
+                new_wildcards |= other_excludes.difference(self_excludes)
 
             # If other is an `include_others` then the difference isn't.
             new_all = False
@@ -518,11 +518,11 @@ class StateFilter:
 
             # We also filter out all state types that aren't in the exclusion
             # list of the other.
-            new_wildcards &= sub_excludes
+            new_wildcards &= other_excludes
             new_concrete_keys = {
                 (state_type, state_key)
                 for (state_type, state_key) in new_concrete_keys
-                if state_type in sub_excludes
+                if state_type in other_excludes
             }
 
         # Transform our newly-constructed state filter from the alternative
