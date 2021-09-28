@@ -31,7 +31,7 @@ class StateCompressorConfig(Config):
             return
 
         try:
-            check_requirements("auto_compressor")
+            check_requirements("synapse_auto_compressor")
         except DependencyException as e:
             raise ConfigError from e
 

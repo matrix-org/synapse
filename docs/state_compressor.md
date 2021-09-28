@@ -6,8 +6,8 @@ can be found on [its github repository](https://github.com/matrix-org/rust-synap
 
 ## Enabling the state compressor
 
-The state compressor requires the python library for the `auto_compressor` tool to be 
-installed. Instructions for this can be found in [the `python.md` file in the source
+The state compressor requires the python library for the `synapse_auto_compressor` tool to be 
+installed. This can be done with pip or by following the instructions for this can be found in [the `python.md` file in the source
 repo](https://github.com/matrix-org/rust-synapse-compress-state/blob/main/docs/python.md).
 
 The following configuration options are provided:
@@ -41,7 +41,7 @@ An example configuration:
 state_compressor:
     enabled: true
     chunk_size: 500
-    number_of_chunks: 5
+    number_of_chunks: 50
     default_levels: 100,50,25
     time_between_runs: 1d
 ```

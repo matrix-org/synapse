@@ -115,7 +115,7 @@ CONDITIONAL_REQUIREMENTS = {
     # Required to use experimental `caches.track_memory_usage` config option.
     "cache_memory": ["pympler"],
     # Needs to be manually installed to use
-    "auto_compressor": ["auto_compressor"],
+    "synapse_auto_compressor": ["synapse_auto_compressor"],
 }
 
 ALL_OPTIONAL_REQUIREMENTS: Set[str] = set()

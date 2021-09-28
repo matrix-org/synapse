@@ -17,7 +17,7 @@ from synapse.logging.context import defer_to_thread
 from synapse.metrics.background_process_metrics import run_as_background_process
 
 try:
-    import auto_compressor as state_compressor
+    import synapse_auto_compressor as state_compressor
 except ImportError:
     state_compressor = None
 
@@ -47,7 +47,7 @@ _VALID_POSTGRES_CONN_ARGS = {
 def setup_state_compressor(hs: "HomeServer"):
     """Schedules the state compressor to run regularly"""
 
-    # Return if cannot import auto_compressor
+    # Return if cannot import synapse_auto_compressor
     if not state_compressor or not hs.config.worker.run_background_tasks:
         return
 
