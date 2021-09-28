@@ -57,14 +57,14 @@ def load_appservices(hostname, config_files):
         return []
 
     # Dicts of value -> filename
-    seen_as_tokens = {}  # type: Dict[str, str]
-    seen_ids = {}  # type: Dict[str, str]
+    seen_as_tokens: Dict[str, str] = {}
+    seen_ids: Dict[str, str] = {}
 
     appservices = []
 
     for config_file in config_files:
         try:
-            with open(config_file, "r") as f:
+            with open(config_file) as f:
                 appservice = _load_appservice(hostname, yaml.safe_load(f), config_file)
                 if appservice.id in seen_ids:
                     raise ConfigError(

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,10 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import TYPE_CHECKING, Tuple
 
 from synapse.api.errors import SynapseError
 from synapse.http.servlet import RestServlet
+from synapse.http.site import SynapseRequest
 from synapse.rest.admin._base import admin_patterns, assert_user_is_admin
+from synapse.types import JsonDict
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +31,14 @@ class DeleteGroupAdminRestServlet(RestServlet):
 
     PATTERNS = admin_patterns("/delete_group/(?P<group_id>[^/]*)")
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         self.group_server = hs.get_groups_server_handler()
         self.is_mine_id = hs.is_mine_id
         self.auth = hs.get_auth()
 
-    async def on_POST(self, request, group_id):
+    async def on_POST(
+        self, request: SynapseRequest, group_id: str
+    ) -> Tuple[int, JsonDict]:
         requester = await self.auth.get_user_by_req(request)
         await assert_user_is_admin(self.auth, requester.user)
 

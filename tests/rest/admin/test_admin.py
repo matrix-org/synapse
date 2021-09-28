@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2018 New Vector Ltd
+# Copyright 2018-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +15,7 @@
 import json
 import os
 import urllib.parse
-from binascii import unhexlify
-
-from mock import Mock
+from unittest.mock import Mock
 
 from twisted.internet.defer import Deferred
 
@@ -26,11 +23,11 @@ import synapse.rest.admin
 from synapse.http.server import JsonResource
 from synapse.logging.context import make_deferred_yieldable
 from synapse.rest.admin import VersionServlet
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import groups
+from synapse.rest.client import groups, login, room
 
 from tests import unittest
 from tests.server import FakeSite, make_request
+from tests.test_utils import SMALL_PNG
 
 
 class VersionTestCase(unittest.HomeserverTestCase):
@@ -68,7 +65,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
         # Create a new group
         channel = self.make_request(
             "POST",
-            "/create_group".encode("ascii"),
+            b"/create_group",
             access_token=self.admin_user_tok,
             content={"localpart": "test"},
         )
@@ -131,9 +128,7 @@ class DeleteGroupTestCase(unittest.HomeserverTestCase):
 
     def _get_groups_user_is_in(self, access_token):
         """Returns the list of groups the user is in (given their access token)"""
-        channel = self.make_request(
-            "GET", "/joined_groups".encode("ascii"), access_token=access_token
-        )
+        channel = self.make_request("GET", b"/joined_groups", access_token=access_token)
 
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
 
@@ -155,11 +150,6 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         self.media_repo = hs.get_media_repository_resource()
         self.download_resource = self.media_repo.children[b"download"]
         self.upload_resource = self.media_repo.children[b"upload"]
-        self.image_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
 
     def make_homeserver(self, reactor, clock):
 
@@ -211,7 +201,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         """Ensure a piece of media is quarantined when trying to access it."""
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_and_media_id,
             shorthand=False,
@@ -271,7 +261,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media into the room
         response = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=admin_user_tok
         )
 
         # Extract media ID from the response
@@ -281,7 +271,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access the media
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_name_and_media_id,
             shorthand=False,
@@ -319,10 +309,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media
         response_1 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
         response_2 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
 
         # Extract mxcs
@@ -386,10 +376,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media
         response_1 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
         response_2 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
 
         # Extract media IDs
@@ -426,10 +416,10 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
 
         # Upload some media
         response_1 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
         response_2 = self.helper.upload_media(
-            self.upload_resource, self.image_data, tok=non_admin_user_tok
+            self.upload_resource, SMALL_PNG, tok=non_admin_user_tok
         )
 
         # Extract media IDs
@@ -468,7 +458,7 @@ class QuarantineMediaTestCase(unittest.HomeserverTestCase):
         # Attempt to access each piece of media
         channel = make_request(
             self.reactor,
-            FakeSite(self.download_resource),
+            FakeSite(self.download_resource, self.reactor),
             "GET",
             server_and_media_id_2,
             shorthand=False,

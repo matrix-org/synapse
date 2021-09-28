@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018-2019 New Vector Ltd
 #
@@ -21,9 +20,8 @@ import time
 import uuid
 import warnings
 from typing import Type
+from unittest.mock import Mock, patch
 from urllib import parse as urlparse
-
-from mock import Mock, patch
 
 from twisted.internet import defer
 
@@ -155,6 +153,10 @@ def default_config(name, parse=False):
             "local": {"per_second": 10000, "burst_count": 10000},
             "remote": {"per_second": 10000, "burst_count": 10000},
         },
+        "rc_invites": {
+            "per_room": {"per_second": 10000, "burst_count": 10000},
+            "per_user": {"per_second": 10000, "burst_count": 10000},
+        },
         "rc_3pid_validation": {"per_second": 10000, "burst_count": 10000},
         "saml2_enabled": False,
         "public_baseurl": None,
@@ -191,7 +193,7 @@ def setup_test_homeserver(
     config=None,
     reactor=None,
     homeserver_to_use: Type[HomeServer] = TestHomeServer,
-    **kwargs
+    **kwargs,
 ):
     """
     Setup a homeserver suitable for running tests against.  Keyword arguments
@@ -236,6 +238,9 @@ def setup_test_homeserver(
             "name": "sqlite3",
             "args": {"database": ":memory:", "cp_min": 1, "cp_max": 1},
         }
+
+    if "db_txn_limit" in kwargs:
+        database_config["txn_limit"] = kwargs["db_txn_limit"]
 
     database = DatabaseConnectionConfig("master", database_config)
     config.database.databases = [database]
@@ -305,7 +310,7 @@ def setup_test_homeserver(
             # database for a few more seconds due to flakiness, preventing
             # us from dropping it when the test is over. If we can't drop
             # it, warn and move on.
-            for x in range(5):
+            for _ in range(5):
                 try:
                     cur.execute("DROP DATABASE IF EXISTS %s;" % (test_db,))
                     db_conn.commit()
@@ -429,7 +434,7 @@ class MockHttpResource:
                     )
                     return code, response
                 except CodeMessageException as e:
-                    return (e.code, cs_error(e.msg, code=e.errcode))
+                    return e.code, cs_error(e.msg, code=e.errcode)
 
         raise KeyError("No event can handle %s" % path)
 

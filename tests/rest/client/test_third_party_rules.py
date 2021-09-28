@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the 'License');
@@ -14,21 +13,23 @@
 # limitations under the License.
 import threading
 from typing import Dict
+from unittest.mock import Mock
 
-from mock import Mock
-
+from synapse.api.constants import EventTypes
 from synapse.events import EventBase
+from synapse.events.third_party_rules import load_legacy_third_party_event_rules
 from synapse.module_api import ModuleApi
 from synapse.rest import admin
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 from synapse.types import Requester, StateMap
+from synapse.util.frozenutils import unfreeze
 
 from tests import unittest
 
 thread_local = threading.local()
 
 
-class ThirdPartyRulesTestModule:
+class LegacyThirdPartyRulesTestModule:
     def __init__(self, config: Dict, module_api: ModuleApi):
         # keep a record of the "current" rules module, so that the test can patch
         # it if desired.
@@ -48,8 +49,26 @@ class ThirdPartyRulesTestModule:
         return config
 
 
-def current_rules_module() -> ThirdPartyRulesTestModule:
-    return thread_local.rules_module
+class LegacyDenyNewRooms(LegacyThirdPartyRulesTestModule):
+    def __init__(self, config: Dict, module_api: ModuleApi):
+        super().__init__(config, module_api)
+
+    def on_create_room(
+        self, requester: Requester, config: dict, is_requester_admin: bool
+    ):
+        return False
+
+
+class LegacyChangeEvents(LegacyThirdPartyRulesTestModule):
+    def __init__(self, config: Dict, module_api: ModuleApi):
+        super().__init__(config, module_api)
+
+    async def check_event_allowed(self, event: EventBase, state: StateMap[EventBase]):
+        d = event.get_dict()
+        content = unfreeze(event.content)
+        content["foo"] = "bar"
+        d["content"] = content
+        return d
 
 
 class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
@@ -59,20 +78,23 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         room.register_servlets,
     ]
 
-    def default_config(self):
-        config = super().default_config()
-        config["third_party_event_rules"] = {
-            "module": __name__ + ".ThirdPartyRulesTestModule",
-            "config": {},
-        }
-        return config
+    def make_homeserver(self, reactor, clock):
+        hs = self.setup_test_homeserver()
+
+        load_legacy_third_party_event_rules(hs)
+
+        return hs
 
     def prepare(self, reactor, clock, homeserver):
         # Create a user and room to play with during the tests
         self.user_id = self.register_user("kermit", "monkey")
         self.tok = self.login("kermit", "monkey")
 
-        self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+        # Some tests might prevent room creation on purpose.
+        try:
+            self.room_id = self.helper.create_room_as(self.user_id, tok=self.tok)
+        except Exception:
+            pass
 
     def test_third_party_rules(self):
         """Tests that a forbidden event is forbidden from being sent, but an allowed one
@@ -81,10 +103,12 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         # patch the rules module with a Mock which will return False for some event
         # types
         async def check(ev, state):
-            return ev.type != "foo.bar.forbidden"
+            return ev.type != "foo.bar.forbidden", None
 
         callback = Mock(spec=[], side_effect=check)
-        current_rules_module().check_event_allowed = callback
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [
+            callback
+        ]
 
         channel = self.make_request(
             "PUT",
@@ -118,9 +142,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         # first patch the event checker so that it will try to modify the event
         async def check(ev: EventBase, state):
             ev.content = {"x": "y"}
-            return True
+            return True, None
 
-        current_rules_module().check_event_allowed = check
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [check]
 
         # now send the event
         channel = self.make_request(
@@ -129,7 +153,19 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             {"x": "x"},
             access_token=self.tok,
         )
-        self.assertEqual(channel.result["code"], b"500", channel.result)
+        # check_event_allowed has some error handling, so it shouldn't 500 just because a
+        # module did something bad.
+        self.assertEqual(channel.code, 200, channel.result)
+        event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.code, 200, channel.result)
+        ev = channel.json_body
+        self.assertEqual(ev["content"]["x"], "x")
 
     def test_modify_event(self):
         """The module can return a modified version of the event"""
@@ -137,9 +173,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         async def check(ev: EventBase, state):
             d = ev.get_dict()
             d["content"] = {"x": "y"}
-            return d
+            return True, d
 
-        current_rules_module().check_event_allowed = check
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [check]
 
         # now send the event
         channel = self.make_request(
@@ -170,9 +206,9 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
                 "msgtype": "m.text",
                 "body": d["content"]["body"].upper(),
             }
-            return d
+            return True, d
 
-        current_rules_module().check_event_allowed = check
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [check]
 
         # Send an event, then edit it.
         channel = self.make_request(
@@ -224,7 +260,7 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
         self.assertEqual(ev["content"]["body"], "EDITED BODY")
 
     def test_send_event(self):
-        """Tests that the module can send an event into a room via the module api"""
+        """Tests that a module can send an event into a room via the module api"""
         content = {
             "msgtype": "m.text",
             "body": "Hello!",
@@ -235,13 +271,143 @@ class ThirdPartyRulesTestCase(unittest.HomeserverTestCase):
             "content": content,
             "sender": self.user_id,
         }
-        event = self.get_success(
-            current_rules_module().module_api.create_and_send_event_into_room(
-                event_dict
-            )
-        )  # type: EventBase
+        event: EventBase = self.get_success(
+            self.hs.get_module_api().create_and_send_event_into_room(event_dict)
+        )
 
         self.assertEquals(event.sender, self.user_id)
         self.assertEquals(event.room_id, self.room_id)
         self.assertEquals(event.type, "m.room.message")
         self.assertEquals(event.content, content)
+
+    @unittest.override_config(
+        {
+            "third_party_event_rules": {
+                "module": __name__ + ".LegacyChangeEvents",
+                "config": {},
+            }
+        }
+    )
+    def test_legacy_check_event_allowed(self):
+        """Tests that the wrapper for legacy check_event_allowed callbacks works
+        correctly.
+        """
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/client/r0/rooms/%s/send/m.room.message/1" % self.room_id,
+            {
+                "msgtype": "m.text",
+                "body": "Original body",
+            },
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+
+        event_id = channel.json_body["event_id"]
+
+        channel = self.make_request(
+            "GET",
+            "/_matrix/client/r0/rooms/%s/event/%s" % (self.room_id, event_id),
+            access_token=self.tok,
+        )
+        self.assertEqual(channel.result["code"], b"200", channel.result)
+
+        self.assertIn("foo", channel.json_body["content"].keys())
+        self.assertEqual(channel.json_body["content"]["foo"], "bar")
+
+    @unittest.override_config(
+        {
+            "third_party_event_rules": {
+                "module": __name__ + ".LegacyDenyNewRooms",
+                "config": {},
+            }
+        }
+    )
+    def test_legacy_on_create_room(self):
+        """Tests that the wrapper for legacy on_create_room callbacks works
+        correctly.
+        """
+        self.helper.create_room_as(self.user_id, tok=self.tok, expect_code=403)
+
+    def test_sent_event_end_up_in_room_state(self):
+        """Tests that a state event sent by a module while processing another state event
+        doesn't get dropped from the state of the room. This is to guard against a bug
+        where Synapse has been observed doing so, see https://github.com/matrix-org/synapse/issues/10830
+        """
+        event_type = "org.matrix.test_state"
+
+        # This content will be updated later on, and since we actually use a reference on
+        # the dict it does the right thing. It's a bit hacky but a handy way of making
+        # sure the state actually gets updated.
+        event_content = {"i": -1}
+
+        api = self.hs.get_module_api()
+
+        # Define a callback that sends a custom event on power levels update.
+        async def test_fn(event: EventBase, state_events):
+            if event.is_state and event.type == EventTypes.PowerLevels:
+                await api.create_and_send_event_into_room(
+                    {
+                        "room_id": event.room_id,
+                        "sender": event.sender,
+                        "type": event_type,
+                        "content": event_content,
+                        "state_key": "",
+                    }
+                )
+            return True, None
+
+        self.hs.get_third_party_event_rules()._check_event_allowed_callbacks = [test_fn]
+
+        # Sometimes the bug might not happen the first time the event type is added
+        # to the state but might happen when an event updates the state of the room for
+        # that type, so we test updating the state several times.
+        for i in range(5):
+            # Update the content of the custom state event to be sent by the callback.
+            event_content["i"] = i
+
+            # Update the room's power levels with a different value each time so Synapse
+            # doesn't consider an update redundant.
+            self._update_power_levels(event_default=i)
+
+            # Check that the new event made it to the room's state.
+            channel = self.make_request(
+                method="GET",
+                path="/rooms/" + self.room_id + "/state/" + event_type,
+                access_token=self.tok,
+            )
+
+            self.assertEqual(channel.code, 200)
+            self.assertEqual(channel.json_body["i"], i)
+
+    def _update_power_levels(self, event_default: int = 0):
+        """Updates the room's power levels.
+
+        Args:
+            event_default: Value to use for 'events_default'.
+        """
+        self.helper.send_state(
+            room_id=self.room_id,
+            event_type=EventTypes.PowerLevels,
+            body={
+                "ban": 50,
+                "events": {
+                    "m.room.avatar": 50,
+                    "m.room.canonical_alias": 50,
+                    "m.room.encryption": 100,
+                    "m.room.history_visibility": 100,
+                    "m.room.name": 50,
+                    "m.room.power_levels": 100,
+                    "m.room.server_acl": 100,
+                    "m.room.tombstone": 100,
+                },
+                "events_default": event_default,
+                "invite": 0,
+                "kick": 50,
+                "redact": 50,
+                "state_default": 50,
+                "users": {self.user_id: 100},
+                "users_default": 0,
+            },
+            tok=self.tok,
+        )

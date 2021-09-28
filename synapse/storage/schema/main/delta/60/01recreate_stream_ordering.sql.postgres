@@ -1,0 +1,45 @@
+/* Copyright 2021 The Matrix.org Foundation C.I.C
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+-- This migration handles the process of changing the type of `stream_ordering` to
+-- a BIGINT.
+--
+-- Note that this is only a problem on postgres as sqlite only has one "integer" type
+-- which can cope with values up to 2^63.
+
+-- First add a new column to contain the bigger stream_ordering
+ALTER TABLE events ADD COLUMN stream_ordering2 BIGINT;
+
+-- Create a rule which will populate it for new rows.
+CREATE OR REPLACE RULE "populate_stream_ordering2" AS
+    ON INSERT TO events
+    DO UPDATE events SET stream_ordering2=NEW.stream_ordering WHERE stream_ordering=NEW.stream_ordering;
+
+-- Start a bg process to populate it for old events
+INSERT INTO background_updates (ordering, update_name, progress_json) VALUES
+  (6001, 'populate_stream_ordering2', '{}');
+
+-- ... and some more to build indexes on it. These aren't really interdependent
+-- but the backround_updates manager can only handle a single dependency per update.
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
+  (6001, 'index_stream_ordering2', '{}', 'populate_stream_ordering2'),
+  (6001, 'index_stream_ordering2_room_order', '{}', 'index_stream_ordering2'),
+  (6001, 'index_stream_ordering2_contains_url', '{}', 'index_stream_ordering2_room_order'),
+  (6001, 'index_stream_ordering2_room_stream', '{}', 'index_stream_ordering2_contains_url'),
+  (6001, 'index_stream_ordering2_ts', '{}', 'index_stream_ordering2_room_stream');
+
+-- ... and another to do the switcheroo
+INSERT INTO background_updates (ordering, update_name, progress_json, depends_on) VALUES
+  (6001, 'replace_stream_ordering_column', '{}', 'index_stream_ordering2_ts');

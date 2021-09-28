@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+from typing import Iterable, Optional
 
 from canonicaljson import encode_canonical_json
 
@@ -19,7 +20,7 @@ from synapse.api.room_versions import RoomVersions
 from synapse.events import FrozenEvent, _EventInternalMetadata, make_event_from_dict
 from synapse.handlers.room import RoomEventSource
 from synapse.replication.slave.storage.events import SlavedEventStore
-from synapse.storage.roommember import RoomsForUser
+from synapse.storage.roommember import GetRoomsForUserWithStreamOrdering, RoomsForUser
 from synapse.types import PersistedEventPosition
 
 from tests.server import FakeTransport
@@ -149,6 +150,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                     "invite",
                     event.event_id,
                     event.internal_metadata.stream_ordering,
+                    RoomVersions.V1.identifier,
                 )
             ],
         )
@@ -215,7 +217,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         self.check(
             "get_rooms_for_user_with_stream_ordering",
             (USER_ID_2,),
-            {(ROOM_ID, expected_pos)},
+            {GetRoomsForUserWithStreamOrdering(ROOM_ID, expected_pos)},
         )
 
     def test_get_rooms_for_user_with_stream_ordering_with_multi_event_persist(self):
@@ -304,7 +306,10 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
                 expected_pos = PersistedEventPosition(
                     "master", j2.internal_metadata.stream_ordering
                 )
-                self.assertEqual(joined_rooms, {(ROOM_ID, expected_pos)})
+                self.assertEqual(
+                    joined_rooms,
+                    {GetRoomsForUserWithStreamOrdering(ROOM_ID, expected_pos)},
+                )
 
     event_id = 0
 
@@ -332,15 +337,18 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         room_id=ROOM_ID,
         type="m.room.message",
         key=None,
-        internal={},
+        internal: Optional[dict] = None,
         depth=None,
-        prev_events=[],
-        auth_events=[],
-        prev_state=[],
+        prev_events: Optional[list] = None,
+        auth_events: Optional[list] = None,
+        prev_state: Optional[list] = None,
         redacts=None,
-        push_actions=[],
-        **content
+        push_actions: Iterable = frozenset(),
+        **content,
     ):
+        prev_events = prev_events or []
+        auth_events = auth_events or []
+        prev_state = prev_state or []
 
         if depth is None:
             depth = self.event_id
@@ -369,7 +377,7 @@ class SlavedEventStoreTestCase(BaseSlavedStoreTestCase):
         if redacts is not None:
             event_dict["redacts"] = redacts
 
-        event = make_event_from_dict(event_dict, internal_metadata_dict=internal)
+        event = make_event_from_dict(event_dict, internal_metadata_dict=internal or {})
 
         self.event_id += 1
         state_handler = self.hs.get_state_handler()

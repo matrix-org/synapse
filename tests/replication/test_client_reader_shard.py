@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 import logging
 
-from synapse.rest.client.v2_alpha import register
+from synapse.rest.client import register
 
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import make_request

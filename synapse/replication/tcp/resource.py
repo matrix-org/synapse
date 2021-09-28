@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,7 +40,7 @@ class ReplicationStreamProtocolFactory(Factory):
     def __init__(self, hs):
         self.command_handler = hs.get_tcp_replication()
         self.clock = hs.get_clock()
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
 
         # If we've created a `ReplicationStreamProtocolFactory` then we're
         # almost certainly registering a replication listener, so let's ensure

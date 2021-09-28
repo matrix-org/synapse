@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,7 +47,7 @@ class DeviceRestServlet(RestServlet):
         self.store = hs.get_datastore()
 
     async def on_GET(
-        self, request: SynapseRequest, user_id, device_id: str
+        self, request: SynapseRequest, user_id: str, device_id: str
     ) -> Tuple[int, JsonDict]:
         await assert_requester_is_admin(self.auth, request)
 

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,6 +19,7 @@ from io import StringIO
 
 import yaml
 
+from synapse.config import ConfigError
 from synapse.config.homeserver import HomeServerConfig
 
 from tests import unittest
@@ -35,15 +35,15 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
     def test_load_fails_if_server_name_missing(self):
         self.generate_config_and_remove_lines_containing("server_name")
-        with self.assertRaises(Exception):
+        with self.assertRaises(ConfigError):
             HomeServerConfig.load_config("", ["-c", self.file])
-        with self.assertRaises(Exception):
+        with self.assertRaises(ConfigError):
             HomeServerConfig.load_or_generate_config("", ["-c", self.file])
 
     def test_generates_and_loads_macaroon_secret_key(self):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             raw = yaml.safe_load(f)
         self.assertIn("macaroon_secret_key", raw)
 
@@ -52,10 +52,10 @@ class ConfigLoadingTestCase(unittest.TestCase):
             hasattr(config, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.macaroon_secret_key) < 5:
+        if len(config.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.macaroon_secret_key,)
+                "was: %r" % (config.key.macaroon_secret_key,)
             )
 
         config = HomeServerConfig.load_or_generate_config("", ["-c", self.file])
@@ -63,10 +63,10 @@ class ConfigLoadingTestCase(unittest.TestCase):
             hasattr(config, "macaroon_secret_key"),
             "Want config to have attr macaroon_secret_key",
         )
-        if len(config.macaroon_secret_key) < 5:
+        if len(config.key.macaroon_secret_key) < 5:
             self.fail(
                 "Want macaroon secret key to be string of at least length 5,"
-                "was: %r" % (config.macaroon_secret_key,)
+                "was: %r" % (config.key.macaroon_secret_key,)
             )
 
     def test_load_succeeds_if_macaroon_secret_key_missing(self):
@@ -101,7 +101,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
 
         # The default Metrics Flags are off by default.
         config = HomeServerConfig.load_config("", ["-c", self.file])
-        self.assertFalse(config.metrics_flags.known_servers)
+        self.assertFalse(config.metrics.metrics_flags.known_servers)
 
     def generate_config(self):
         with redirect_stdout(StringIO()):
@@ -120,7 +120,7 @@ class ConfigLoadingTestCase(unittest.TestCase):
     def generate_config_and_remove_lines_containing(self, needle):
         self.generate_config()
 
-        with open(self.file, "r") as f:
+        with open(self.file) as f:
             contents = f.readlines()
         contents = [line for line in contents if needle not in line]
         with open(self.file, "w") as f:

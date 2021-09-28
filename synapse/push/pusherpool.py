@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -63,10 +61,8 @@ class PusherPool:
         self.store = self.hs.get_datastore()
         self.clock = self.hs.get_clock()
 
-        self._account_validity = hs.config.account_validity
-
         # We shard the handling of push notifications by user ID.
-        self._pusher_shard_config = hs.config.push.pusher_shard_config
+        self._pusher_shard_config = hs.config.worker.pusher_shard_config
         self._instance_name = hs.get_instance_name()
         self._should_start_pushers = (
             self._instance_name in self._pusher_shard_config.instances
@@ -86,7 +82,9 @@ class PusherPool:
         self._last_room_stream_id_seen = self.store.get_room_max_stream_ordering()
 
         # map from user id to app_id:pushkey to pusher
-        self.pushers = {}  # type: Dict[str, Dict[str, Pusher]]
+        self.pushers: Dict[str, Dict[str, Pusher]] = {}
+
+        self._account_validity_handler = hs.get_account_validity_handler()
 
     def start(self) -> None:
         """Starts the pushers off in a background process."""
@@ -237,12 +235,9 @@ class PusherPool:
 
             for u in users_affected:
                 # Don't push if the user account has expired
-                if self._account_validity.enabled:
-                    expired = await self.store.is_account_expired(
-                        u, self.clock.time_msec()
-                    )
-                    if expired:
-                        continue
+                expired = await self._account_validity_handler.is_user_expired(u)
+                if expired:
+                    continue
 
                 if u in self.pushers:
                     for p in self.pushers[u].values():
@@ -267,12 +262,9 @@ class PusherPool:
 
             for u in users_affected:
                 # Don't push if the user account has expired
-                if self._account_validity.enabled:
-                    expired = await self.store.is_account_expired(
-                        u, self.clock.time_msec()
-                    )
-                    if expired:
-                        continue
+                expired = await self._account_validity_handler.is_user_expired(u)
+                if expired:
+                    continue
 
                 if u in self.pushers:
                     for p in self.pushers[u].values():

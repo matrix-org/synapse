@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -34,6 +33,7 @@ import treq
 from canonicaljson import encode_canonical_json
 from netaddr import AddrFormatError, IPAddress, IPSet
 from prometheus_client import Counter
+from typing_extensions import Protocol
 from zope.interface import implementer, provider
 
 from OpenSSL import SSL
@@ -160,7 +160,7 @@ class _IPBlacklistingResolver:
     def resolveHostName(
         self, recv: IResolutionReceiver, hostname: str, portNumber: int = 0
     ) -> IResolutionReceiver:
-        addresses = []  # type: List[IAddress]
+        addresses: List[IAddress] = []
 
         def _callback() -> None:
             has_bad_ip = False
@@ -297,7 +297,7 @@ class SimpleHttpClient:
     def __init__(
         self,
         hs: "HomeServer",
-        treq_args: Dict[str, Any] = {},
+        treq_args: Optional[Dict[str, Any]] = None,
         ip_whitelist: Optional[IPSet] = None,
         ip_blacklist: Optional[IPSet] = None,
         use_proxy: bool = False,
@@ -317,12 +317,15 @@ class SimpleHttpClient:
 
         self._ip_whitelist = ip_whitelist
         self._ip_blacklist = ip_blacklist
-        self._extra_treq_args = treq_args
+        self._extra_treq_args = treq_args or {}
 
         self.user_agent = hs.version_string
         self.clock = hs.get_clock()
-        if hs.config.user_agent_suffix:
-            self.user_agent = "%s %s" % (self.user_agent, hs.config.user_agent_suffix)
+        if hs.config.server.user_agent_suffix:
+            self.user_agent = "%s %s" % (
+                self.user_agent,
+                hs.config.server.user_agent_suffix,
+            )
 
         # We use this for our body producers to ensure that they use the correct
         # reactor.
@@ -333,9 +336,9 @@ class SimpleHttpClient:
         if self._ip_blacklist:
             # If we have an IP blacklist, we need to use a DNS resolver which
             # filters out blacklisted IP addresses, to prevent DNS rebinding.
-            self.reactor = BlacklistingReactorWrapper(
+            self.reactor: ISynapseReactor = BlacklistingReactorWrapper(
                 hs.get_reactor(), self._ip_whitelist, self._ip_blacklist
-            )  # type: ISynapseReactor
+            )
         else:
             self.reactor = hs.get_reactor()
 
@@ -349,14 +352,14 @@ class SimpleHttpClient:
         pool.maxPersistentPerHost = max((100 * hs.config.caches.global_factor, 5))
         pool.cachedConnectionTimeout = 2 * 60
 
-        self.agent = ProxyAgent(
+        self.agent: IAgent = ProxyAgent(
             self.reactor,
             hs.get_reactor(),
             connectTimeout=15,
             contextFactory=self.hs.get_http_client_context_factory(),
             pool=pool,
             use_proxy=use_proxy,
-        )  # type: IAgent
+        )
 
         if self._ip_blacklist:
             # If we have an IP blacklist, we then install the blacklisting Agent
@@ -411,7 +414,7 @@ class SimpleHttpClient:
                         cooperator=self._cooperator,
                     )
 
-                request_deferred = treq.request(
+                request_deferred: defer.Deferred = treq.request(
                     method,
                     uri,
                     agent=self.agent,
@@ -421,7 +424,7 @@ class SimpleHttpClient:
                     # response bodies.
                     unbuffered=True,
                     **self._extra_treq_args,
-                )  # type: defer.Deferred
+                )
 
                 # we use our own timeout mechanism rather than treq's as a workaround
                 # for https://twistedmatrix.com/trac/ticket/9534.
@@ -590,7 +593,7 @@ class SimpleHttpClient:
         uri: str,
         json_body: Any,
         args: Optional[QueryParams] = None,
-        headers: RawHeaders = None,
+        headers: Optional[RawHeaders] = None,
     ) -> Any:
         """Puts some json to the given URI.
 
@@ -755,6 +758,16 @@ def _timeout_to_request_timed_out_error(f: Failure):
     return f
 
 
+class ByteWriteable(Protocol):
+    """The type of object which must be passed into read_body_with_max_size.
+
+    Typically this is a file object.
+    """
+
+    def write(self, data: bytes) -> int:
+        pass
+
+
 class BodyExceededMaxSize(Exception):
     """The maximum allowed size of the HTTP body was exceeded."""
 
@@ -762,7 +775,7 @@ class BodyExceededMaxSize(Exception):
 class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
     """A protocol which immediately errors upon receiving data."""
 
-    transport = None  # type: Optional[ITCPTransport]
+    transport: Optional[ITCPTransport] = None
 
     def __init__(self, deferred: defer.Deferred):
         self.deferred = deferred
@@ -788,10 +801,10 @@ class _DiscardBodyWithMaxSizeProtocol(protocol.Protocol):
 class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
     """A protocol which reads body to a stream, erroring if the body exceeds a maximum size."""
 
-    transport = None  # type: Optional[ITCPTransport]
+    transport: Optional[ITCPTransport] = None
 
     def __init__(
-        self, stream: BinaryIO, deferred: defer.Deferred, max_size: Optional[int]
+        self, stream: ByteWriteable, deferred: defer.Deferred, max_size: Optional[int]
     ):
         self.stream = stream
         self.deferred = deferred
@@ -803,7 +816,12 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
         if self.deferred.called:
             return
 
-        self.stream.write(data)
+        try:
+            self.stream.write(data)
+        except Exception:
+            self.deferred.errback()
+            return
+
         self.length += len(data)
         # The first time the maximum size is exceeded, error and cancel the
         # connection. dataReceived might be called again if data was received
@@ -831,8 +849,8 @@ class _ReadBodyWithMaxSizeProtocol(protocol.Protocol):
 
 
 def read_body_with_max_size(
-    response: IResponse, stream: BinaryIO, max_size: Optional[int]
-) -> defer.Deferred:
+    response: IResponse, stream: ByteWriteable, max_size: Optional[int]
+) -> "defer.Deferred[int]":
     """
     Read a HTTP response body to a file-object. Optionally enforcing a maximum file size.
 
@@ -847,7 +865,7 @@ def read_body_with_max_size(
     Returns:
         A Deferred which resolves to the length of the read body.
     """
-    d = defer.Deferred()
+    d: "defer.Deferred[int]" = defer.Deferred()
 
     # If the Content-Length header gives a size larger than the maximum allowed
     # size, do not bother downloading the body.

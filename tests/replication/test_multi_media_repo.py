@@ -1,5 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2020 The Matrix.org Foundation C.I.C.
+# Copyright 2020-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +13,6 @@
 # limitations under the License.
 import logging
 import os
-from binascii import unhexlify
 from typing import Optional, Tuple
 
 from twisted.internet.protocol import Factory
@@ -23,16 +21,17 @@ from twisted.web.http import HTTPChannel
 from twisted.web.server import Request
 
 from synapse.rest import admin
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 from synapse.server import HomeServer
 
 from tests.http import TestServerTLSConnectionFactory, get_test_ca_cert_file
 from tests.replication._base import BaseMultiWorkerStreamTestCase
 from tests.server import FakeChannel, FakeSite, FakeTransport, make_request
+from tests.test_utils import SMALL_PNG
 
 logger = logging.getLogger(__name__)
 
-test_server_connection_factory = None  # type: Optional[TestServerTLSConnectionFactory]
+test_server_connection_factory: Optional[TestServerTLSConnectionFactory] = None
 
 
 class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
@@ -69,9 +68,9 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         resource = hs.get_media_repository_resource().children[b"download"]
         channel = make_request(
             self.reactor,
-            FakeSite(resource),
+            FakeSite(resource, self.reactor),
             "GET",
-            "/{}/{}".format(target, media_id),
+            f"/{target}/{media_id}",
             shorthand=False,
             access_token=self.access_token,
             await_result=False,
@@ -114,7 +113,7 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         self.assertEqual(request.method, b"GET")
         self.assertEqual(
             request.path,
-            "/_matrix/media/r0/download/{}/{}".format(target, media_id).encode("utf-8"),
+            f"/_matrix/media/r0/download/{target}/{media_id}".encode("utf-8"),
         )
         self.assertEqual(
             request.requestHeaders.getRawHeaders(b"host"), [target.encode("utf-8")]
@@ -191,31 +190,25 @@ class MediaRepoShardTestCase(BaseMultiWorkerStreamTestCase):
         channel1, request1 = self._get_media_req(hs1, "example.com:443", "PIC1")
         channel2, request2 = self._get_media_req(hs2, "example.com:443", "PIC1")
 
-        png_data = unhexlify(
-            b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-            b"0000001f15c4890000000a49444154789c63000100000500010d"
-            b"0a2db40000000049454e44ae426082"
-        )
-
         request1.setResponseCode(200)
         request1.responseHeaders.setRawHeaders(b"Content-Type", [b"image/png"])
-        request1.write(png_data)
+        request1.write(SMALL_PNG)
         request1.finish()
 
         self.pump(0.1)
 
         self.assertEqual(channel1.code, 200, channel1.result["body"])
-        self.assertEqual(channel1.result["body"], png_data)
+        self.assertEqual(channel1.result["body"], SMALL_PNG)
 
         request2.setResponseCode(200)
         request2.responseHeaders.setRawHeaders(b"Content-Type", [b"image/png"])
-        request2.write(png_data)
+        request2.write(SMALL_PNG)
         request2.finish()
 
         self.pump(0.1)
 
         self.assertEqual(channel2.code, 200, channel2.result["body"])
-        self.assertEqual(channel2.result["body"], png_data)
+        self.assertEqual(channel2.result["body"], SMALL_PNG)
 
         # We expect only three new thumbnails to have been persisted.
         self.assertEqual(start_count + 3, self._count_remote_thumbnails())

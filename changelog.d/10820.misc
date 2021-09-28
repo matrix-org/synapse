@@ -1,0 +1,1 @@
+Fix a long-standing bug where an `m.room.message` event containing a null byte would cause an internal server error.

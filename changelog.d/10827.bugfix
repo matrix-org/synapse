@@ -1,0 +1,1 @@
+Fix error in deprecated `/initialSync` endpoint when using the undocumented `from` and `to` parameters.

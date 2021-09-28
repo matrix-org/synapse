@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -24,10 +23,13 @@ class WellKnownTests(unittest.HomeserverTestCase):
         # replace the JsonResource with a WellKnownResource
         return WellKnownResource(self.hs)
 
+    @unittest.override_config(
+        {
+            "public_baseurl": "https://tesths",
+            "default_identity_server": "https://testis",
+        }
+    )
     def test_well_known(self):
-        self.hs.config.public_baseurl = "https://tesths"
-        self.hs.config.default_identity_server = "https://testis"
-
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )
@@ -36,14 +38,17 @@ class WellKnownTests(unittest.HomeserverTestCase):
         self.assertEqual(
             channel.json_body,
             {
-                "m.homeserver": {"base_url": "https://tesths"},
+                "m.homeserver": {"base_url": "https://tesths/"},
                 "m.identity_server": {"base_url": "https://testis"},
             },
         )
 
+    @unittest.override_config(
+        {
+            "public_baseurl": None,
+        }
+    )
     def test_well_known_no_public_baseurl(self):
-        self.hs.config.public_baseurl = None
-
         channel = self.make_request(
             "GET", "/.well-known/matrix/client", shorthand=False
         )

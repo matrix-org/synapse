@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,8 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from mock import Mock
+from typing import List, Optional
+from unittest.mock import Mock
 
 from twisted.internet import defer
 
@@ -37,8 +36,8 @@ def create_event(
     state_key=None,
     depth=2,
     event_id=None,
-    prev_events=[],
-    **kwargs
+    prev_events: Optional[List[str]] = None,
+    **kwargs,
 ):
     global _next_event_id
 
@@ -58,7 +57,7 @@ def create_event(
         "sender": "@user_id:example.com",
         "room_id": "!room_id:example.com",
         "depth": depth,
-        "prev_events": prev_events,
+        "prev_events": prev_events or [],
     }
 
     if state_key is not None:
@@ -107,7 +106,7 @@ class StateGroupStore:
         }
 
     async def get_state_group_delta(self, name):
-        return (None, None)
+        return None, None
 
     def register_events(self, events):
         for e in events:
@@ -169,6 +168,7 @@ class StateTestCase(unittest.TestCase):
                 "get_state_handler",
                 "get_clock",
                 "get_state_resolution_handler",
+                "get_account_validity_handler",
                 "hostname",
             ]
         )
@@ -200,7 +200,7 @@ class StateTestCase(unittest.TestCase):
 
         self.store.register_events(graph.walk())
 
-        context_store = {}  # type: dict[str, EventContext]
+        context_store: dict[str, EventContext] = {}
 
         for event in graph.walk():
             context = yield defer.ensureDeferred(

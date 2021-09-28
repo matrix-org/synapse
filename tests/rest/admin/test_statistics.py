@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
+# Copyright 2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +14,14 @@
 # limitations under the License.
 
 import json
-from binascii import unhexlify
 from typing import Any, Dict, List, Optional
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login
+from synapse.rest.client import login
 
 from tests import unittest
+from tests.test_utils import SMALL_PNG
 
 
 class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
@@ -468,17 +468,10 @@ class UserMediaStatisticsTestCase(unittest.HomeserverTestCase):
             number_media: Number of media to be created for the user
         """
         upload_resource = self.media_repo.children[b"upload"]
-        for i in range(number_media):
-            # file size is 67 Byte
-            image_data = unhexlify(
-                b"89504e470d0a1a0a0000000d4948445200000001000000010806"
-                b"0000001f15c4890000000a49444154789c63000100000500010d"
-                b"0a2db40000000049454e44ae426082"
-            )
-
+        for _ in range(number_media):
             # Upload some media into the room
             self.helper.upload_media(
-                upload_resource, image_data, tok=user_token, expect_code=200
+                upload_resource, SMALL_PNG, tok=user_token, expect_code=200
             )
 
     def _check_fields(self, content: List[Dict[str, Any]]):

@@ -1,6 +1,4 @@
-# -*- coding: utf-8 -*-
-# Copyright 2019 New Vector Ltd
-# Copyright 2020 The Matrix.org Foundation C.I.C
+# Copyright 2019-2021 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,9 +18,9 @@ Utilities for running the unit tests
 import sys
 import warnings
 from asyncio import Future
+from binascii import unhexlify
 from typing import Any, Awaitable, Callable, TypeVar
-
-from mock import Mock
+from unittest.mock import Mock
 
 import attr
 
@@ -119,3 +117,13 @@ class FakeResponse:
     def deliverBody(self, protocol):
         protocol.dataReceived(self.body)
         protocol.connectionLost(Failure(ResponseDone()))
+
+
+# A small image used in some tests.
+#
+# Resolution: 1×1, MIME type: image/png, Extension: png, Size: 67 B
+SMALL_PNG = unhexlify(
+    b"89504e470d0a1a0a0000000d4948445200000001000000010806"
+    b"0000001f15c4890000000a49444154789c63000100000500010d"
+    b"0a2db40000000049454e44ae426082"
+)

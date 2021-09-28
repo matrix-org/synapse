@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,8 +14,7 @@
 import json
 import os
 import tempfile
-
-from mock import Mock
+from unittest.mock import Mock
 
 import yaml
 
@@ -43,9 +41,8 @@ class ApplicationServiceStoreTestCase(unittest.TestCase):
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files = self.as_yaml_files
+        hs.config.appservice.app_service_config_files = self.as_yaml_files
         hs.config.caches.event_cache_size = 1
-        hs.config.password_providers = []
 
         self.as_token = "token1"
         self.as_url = "some_url"
@@ -110,9 +107,8 @@ class ApplicationServiceTransactionStoreTestCase(unittest.TestCase):
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files = self.as_yaml_files
+        hs.config.appservice.app_service_config_files = self.as_yaml_files
         hs.config.caches.event_cache_size = 1
-        hs.config.password_providers = []
 
         self.as_list = [
             {"token": "token1", "url": "https://matrix-as.org", "id": "id_1"},
@@ -498,9 +494,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files = [f1, f2]
+        hs.config.appservice.app_service_config_files = [f1, f2]
         hs.config.caches.event_cache_size = 1
-        hs.config.password_providers = []
 
         database = hs.get_datastores().databases[0]
         ApplicationServiceStore(
@@ -516,9 +511,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files = [f1, f2]
+        hs.config.appservice.app_service_config_files = [f1, f2]
         hs.config.caches.event_cache_size = 1
-        hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
             database = hs.get_datastores().databases[0]
@@ -542,9 +536,8 @@ class ApplicationServiceStoreConfigTestCase(unittest.TestCase):
             self.addCleanup, federation_sender=Mock(), federation_client=Mock()
         )
 
-        hs.config.app_service_config_files = [f1, f2]
+        hs.config.appservice.app_service_config_files = [f1, f2]
         hs.config.caches.event_cache_size = 1
-        hs.config.password_providers = []
 
         with self.assertRaises(ConfigError) as cm:
             database = hs.get_datastores().databases[0]

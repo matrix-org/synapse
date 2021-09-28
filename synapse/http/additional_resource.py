@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,7 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import TYPE_CHECKING
+
+from twisted.web.server import Request
+
 from synapse.http.server import DirectServeJsonResource
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 
 class AdditionalResource(DirectServeJsonResource):
@@ -26,7 +32,7 @@ class AdditionalResource(DirectServeJsonResource):
     and exception handling.
     """
 
-    def __init__(self, hs, handler):
+    def __init__(self, hs: "HomeServer", handler):
         """Initialise AdditionalResource
 
         The ``handler`` should return a deferred which completes when it has
@@ -34,14 +40,14 @@ class AdditionalResource(DirectServeJsonResource):
         ``request.write()``, and call ``request.finish()``.
 
         Args:
-            hs (synapse.server.HomeServer): homeserver
+            hs: homeserver
             handler ((twisted.web.server.Request) -> twisted.internet.defer.Deferred):
                 function to be called to handle the request.
         """
         super().__init__()
         self._handler = handler
 
-    def _async_render(self, request):
+    def _async_render(self, request: Request):
         # Cheekily pass the result straight through, so we don't need to worry
         # if its an awaitable or not.
         return self._handler(request)

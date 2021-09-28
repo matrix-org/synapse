@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -70,7 +69,7 @@ def _get_requested_host(request: IRequest) -> bytes:
         return hostname
 
     # no Host header, use the address/port that the request arrived on
-    host = request.getHost()  # type: Union[address.IPv4Address, address.IPv6Address]
+    host: Union[address.IPv4Address, address.IPv6Address] = request.getHost()
 
     hostname = host.host.encode("ascii")
 

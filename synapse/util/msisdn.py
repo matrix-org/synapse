@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,19 +17,19 @@ import phonenumbers
 from synapse.api.errors import SynapseError
 
 
-def phone_number_to_msisdn(country, number):
+def phone_number_to_msisdn(country: str, number: str) -> str:
     """
     Takes an ISO-3166-1 2 letter country code and phone number and
     returns an msisdn representing the canonical version of that
     phone number.
     Args:
-        country (str): ISO-3166-1 2 letter country code
-        number (str): Phone number in a national or international format
+        country: ISO-3166-1 2 letter country code
+        number: Phone number in a national or international format
 
     Returns:
-        (str) The canonical form of the phone number, as an msisdn
+        The canonical form of the phone number, as an msisdn
     Raises:
-            SynapseError if the number could not be parsed.
+        SynapseError if the number could not be parsed.
     """
     try:
         phoneNumber = phonenumbers.parse(number, country)

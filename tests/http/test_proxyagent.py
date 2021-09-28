@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,19 +14,23 @@
 import base64
 import logging
 import os
-from typing import Optional
+from typing import Iterable, Optional
 from unittest.mock import patch
 
 import treq
 from netaddr import IPSet
+from parameterized import parameterized
 
 from twisted.internet import interfaces  # noqa: F401
+from twisted.internet.endpoints import HostnameEndpoint, _WrapperEndpoint
+from twisted.internet.interfaces import IProtocol, IProtocolFactory
 from twisted.internet.protocol import Factory
-from twisted.protocols.tls import TLSMemoryBIOFactory
+from twisted.protocols.tls import TLSMemoryBIOFactory, TLSMemoryBIOProtocol
 from twisted.web.http import HTTPChannel
 
 from synapse.http.client import BlacklistingReactorWrapper
-from synapse.http.proxyagent import ProxyAgent
+from synapse.http.connectproxyclient import ProxyCredentials
+from synapse.http.proxyagent import ProxyAgent, parse_proxy
 
 from tests.http import TestServerTLSConnectionFactory, get_test_https_policy
 from tests.server import FakeTransport, ThreadedMemoryReactorClock
@@ -38,33 +41,208 @@ logger = logging.getLogger(__name__)
 HTTPFactory = Factory.forProtocol(HTTPChannel)
 
 
+class ProxyParserTests(TestCase):
+    """
+    Values for test
+    [
+        proxy_string,
+        expected_scheme,
+        expected_hostname,
+        expected_port,
+        expected_credentials,
+    ]
+    """
+
+    @parameterized.expand(
+        [
+            # host
+            [b"localhost", b"http", b"localhost", 1080, None],
+            [b"localhost:9988", b"http", b"localhost", 9988, None],
+            # host+scheme
+            [b"https://localhost", b"https", b"localhost", 1080, None],
+            [b"https://localhost:1234", b"https", b"localhost", 1234, None],
+            # ipv4
+            [b"1.2.3.4", b"http", b"1.2.3.4", 1080, None],
+            [b"1.2.3.4:9988", b"http", b"1.2.3.4", 9988, None],
+            # ipv4+scheme
+            [b"https://1.2.3.4", b"https", b"1.2.3.4", 1080, None],
+            [b"https://1.2.3.4:9988", b"https", b"1.2.3.4", 9988, None],
+            # ipv6 - without brackets is broken
+            # [
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+            #     b"http",
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+            #     1080,
+            #     None,
+            # ],
+            # [
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+            #     b"http",
+            #     b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+            #     1080,
+            #     None,
+            # ],
+            # [b"::1", b"http", b"::1", 1080, None],
+            # [b"::ffff:0.0.0.0", b"http", b"::ffff:0.0.0.0", 1080, None],
+            # ipv6 - with brackets
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:effe]",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                1080,
+                None,
+            ],
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:1234]",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                1080,
+                None,
+            ],
+            [b"[::1]", b"http", b"::1", 1080, None],
+            [b"[::ffff:0.0.0.0]", b"http", b"::ffff:0.0.0.0", 1080, None],
+            # ipv6+port
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:effe]:9988",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                9988,
+                None,
+            ],
+            [
+                b"[2001:0db8:85a3:0000:0000:8a2e:0370:1234]:9988",
+                b"http",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                9988,
+                None,
+            ],
+            [b"[::1]:9988", b"http", b"::1", 9988, None],
+            [b"[::ffff:0.0.0.0]:9988", b"http", b"::ffff:0.0.0.0", 9988, None],
+            # ipv6+scheme
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:effe]",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                1080,
+                None,
+            ],
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:1234]",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                1080,
+                None,
+            ],
+            [b"https://[::1]", b"https", b"::1", 1080, None],
+            [b"https://[::ffff:0.0.0.0]", b"https", b"::ffff:0.0.0.0", 1080, None],
+            # ipv6+scheme+port
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:effe]:9988",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:effe",
+                9988,
+                None,
+            ],
+            [
+                b"https://[2001:0db8:85a3:0000:0000:8a2e:0370:1234]:9988",
+                b"https",
+                b"2001:0db8:85a3:0000:0000:8a2e:0370:1234",
+                9988,
+                None,
+            ],
+            [b"https://[::1]:9988", b"https", b"::1", 9988, None],
+            # with credentials
+            [
+                b"https://user:pass@1.2.3.4:9988",
+                b"https",
+                b"1.2.3.4",
+                9988,
+                b"user:pass",
+            ],
+            [b"user:pass@1.2.3.4:9988", b"http", b"1.2.3.4", 9988, b"user:pass"],
+            [
+                b"https://user:pass@proxy.local:9988",
+                b"https",
+                b"proxy.local",
+                9988,
+                b"user:pass",
+            ],
+            [
+                b"user:pass@proxy.local:9988",
+                b"http",
+                b"proxy.local",
+                9988,
+                b"user:pass",
+            ],
+        ]
+    )
+    def test_parse_proxy(
+        self,
+        proxy_string: bytes,
+        expected_scheme: bytes,
+        expected_hostname: bytes,
+        expected_port: int,
+        expected_credentials: Optional[bytes],
+    ):
+        """
+        Tests that a given proxy URL will be broken into the components.
+        Args:
+            proxy_string: The proxy connection string.
+            expected_scheme: Expected value of proxy scheme.
+            expected_hostname: Expected value of proxy hostname.
+            expected_port: Expected value of proxy port.
+            expected_credentials: Expected value of credentials.
+                Must be in form '<username>:<password>' or None
+        """
+        proxy_cred = None
+        if expected_credentials:
+            proxy_cred = ProxyCredentials(expected_credentials)
+        self.assertEqual(
+            (
+                expected_scheme,
+                expected_hostname,
+                expected_port,
+                proxy_cred,
+            ),
+            parse_proxy(proxy_string),
+        )
+
+
 class MatrixFederationAgentTests(TestCase):
     def setUp(self):
         self.reactor = ThreadedMemoryReactorClock()
 
     def _make_connection(
-        self, client_factory, server_factory, ssl=False, expected_sni=None
-    ):
+        self,
+        client_factory: IProtocolFactory,
+        server_factory: IProtocolFactory,
+        ssl: bool = False,
+        expected_sni: Optional[bytes] = None,
+        tls_sanlist: Optional[Iterable[bytes]] = None,
+    ) -> IProtocol:
         """Builds a test server, and completes the outgoing client connection
 
         Args:
-            client_factory (interfaces.IProtocolFactory): the the factory that the
+            client_factory: the the factory that the
                 application is trying to use to make the outbound connection. We will
                 invoke it to build the client Protocol
 
-            server_factory (interfaces.IProtocolFactory): a factory to build the
+            server_factory: a factory to build the
                 server-side protocol
 
-            ssl (bool): If true, we will expect an ssl connection and wrap
+            ssl: If true, we will expect an ssl connection and wrap
                 server_factory with a TLSMemoryBIOFactory
 
-            expected_sni (bytes|None): the expected SNI value
+            expected_sni: the expected SNI value
+
+            tls_sanlist: list of SAN entries for the TLS cert presented by the server.
+                 Defaults to [b'DNS:test.com']
 
         Returns:
-            IProtocol: the server Protocol returned by server_factory
+            the server Protocol returned by server_factory
         """
         if ssl:
-            server_factory = _wrap_server_factory_for_tls(server_factory)
+            server_factory = _wrap_server_factory_for_tls(server_factory, tls_sanlist)
 
         server_protocol = server_factory.buildProtocol(None)
 
@@ -99,22 +277,28 @@ class MatrixFederationAgentTests(TestCase):
             self.assertEqual(
                 server_name,
                 expected_sni,
-                "Expected SNI %s but got %s" % (expected_sni, server_name),
+                f"Expected SNI {expected_sni!s} but got {server_name!s}",
             )
 
         return http_protocol
 
-    def _test_request_direct_connection(self, agent, scheme, hostname, path):
+    def _test_request_direct_connection(
+        self,
+        agent: ProxyAgent,
+        scheme: bytes,
+        hostname: bytes,
+        path: bytes,
+    ):
         """Runs a test case for a direct connection not going through a proxy.
 
         Args:
-            agent (ProxyAgent): the proxy agent being tested
+            agent: the proxy agent being tested
 
-            scheme (bytes): expected to be either "http" or "https"
+            scheme: expected to be either "http" or "https"
 
-            hostname (bytes): the hostname to connect to in the test
+            hostname: the hostname to connect to in the test
 
-            path (bytes): the path to connect to in the test
+            path: the path to connect to in the test
         """
         is_https = scheme == b"https"
 
@@ -206,7 +390,98 @@ class MatrixFederationAgentTests(TestCase):
 
     @patch.dict(os.environ, {"http_proxy": "proxy.com:8888", "no_proxy": "unused.com"})
     def test_http_request_via_proxy(self):
-        agent = ProxyAgent(self.reactor, use_proxy=True)
+        """
+        Tests that requests can be made through a proxy.
+        """
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=None
+        )
+
+    @patch.dict(
+        os.environ,
+        {"http_proxy": "bob:pinkponies@proxy.com:8888", "no_proxy": "unused.com"},
+    )
+    def test_http_request_via_proxy_with_auth(self):
+        """
+        Tests that authenticated requests can be made through a proxy.
+        """
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=b"bob:pinkponies"
+        )
+
+    @patch.dict(
+        os.environ, {"http_proxy": "https://proxy.com:8888", "no_proxy": "unused.com"}
+    )
+    def test_http_request_via_https_proxy(self):
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=None
+        )
+
+    @patch.dict(
+        os.environ,
+        {
+            "http_proxy": "https://bob:pinkponies@proxy.com:8888",
+            "no_proxy": "unused.com",
+        },
+    )
+    def test_http_request_via_https_proxy_with_auth(self):
+        self._do_http_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=b"bob:pinkponies"
+        )
+
+    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
+    def test_https_request_via_proxy(self):
+        """Tests that TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=None
+        )
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "bob:pinkponies@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_https_request_via_proxy_with_auth(self):
+        """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=False, expected_auth_credentials=b"bob:pinkponies"
+        )
+
+    @patch.dict(
+        os.environ, {"https_proxy": "https://proxy.com", "no_proxy": "unused.com"}
+    )
+    def test_https_request_via_https_proxy(self):
+        """Tests that TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=None
+        )
+
+    @patch.dict(
+        os.environ,
+        {"https_proxy": "https://bob:pinkponies@proxy.com", "no_proxy": "unused.com"},
+    )
+    def test_https_request_via_https_proxy_with_auth(self):
+        """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
+        self._do_https_request_via_proxy(
+            expect_proxy_ssl=True, expected_auth_credentials=b"bob:pinkponies"
+        )
+
+    def _do_http_request_via_proxy(
+        self,
+        expect_proxy_ssl: bool = False,
+        expected_auth_credentials: Optional[bytes] = None,
+    ):
+        """Send a http request via an agent and check that it is correctly received at
+            the proxy. The proxy can use either http or https.
+        Args:
+            expect_proxy_ssl: True if we expect the request to connect via https to proxy
+            expected_auth_credentials: credentials to authenticate at proxy
+        """
+        if expect_proxy_ssl:
+            agent = ProxyAgent(
+                self.reactor, use_proxy=True, contextFactory=get_test_https_policy()
+            )
+        else:
+            agent = ProxyAgent(self.reactor, use_proxy=True)
 
         self.reactor.lookups["proxy.com"] = "1.2.3.5"
         d = agent.request(b"GET", b"http://test.com")
@@ -220,7 +495,11 @@ class MatrixFederationAgentTests(TestCase):
 
         # make a test server, and wire up the client
         http_server = self._make_connection(
-            client_factory, _get_test_protocol_factory()
+            client_factory,
+            _get_test_protocol_factory(),
+            ssl=expect_proxy_ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if expect_proxy_ssl else None,
+            expected_sni=b"proxy.com" if expect_proxy_ssl else None,
         )
 
         # the FakeTransport is async, so we need to pump the reactor
@@ -230,6 +509,23 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(len(http_server.requests), 1)
 
         request = http_server.requests[0]
+
+        # Check whether auth credentials have been supplied to the proxy
+        proxy_auth_header_values = request.requestHeaders.getRawHeaders(
+            b"Proxy-Authorization"
+        )
+
+        if expected_auth_credentials is not None:
+            # Compute the correct header value for Proxy-Authorization
+            encoded_credentials = base64.b64encode(expected_auth_credentials)
+            expected_header_value = b"Basic " + encoded_credentials
+
+            # Validate the header's value
+            self.assertIn(expected_header_value, proxy_auth_header_values)
+        else:
+            # Check that the Proxy-Authorization header has not been supplied to the proxy
+            self.assertIsNone(proxy_auth_header_values)
+
         self.assertEqual(request.method, b"GET")
         self.assertEqual(request.path, b"http://test.com")
         self.assertEqual(request.requestHeaders.getRawHeaders(b"host"), [b"test.com"])
@@ -242,23 +538,17 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
-    @patch.dict(os.environ, {"https_proxy": "proxy.com", "no_proxy": "unused.com"})
-    def test_https_request_via_proxy(self):
-        """Tests that TLS-encrypted requests can be made through a proxy"""
-        self._do_https_request_via_proxy(auth_credentials=None)
-
-    @patch.dict(
-        os.environ,
-        {"https_proxy": "bob:pinkponies@proxy.com", "no_proxy": "unused.com"},
-    )
-    def test_https_request_via_proxy_with_auth(self):
-        """Tests that authenticated, TLS-encrypted requests can be made through a proxy"""
-        self._do_https_request_via_proxy(auth_credentials="bob:pinkponies")
-
     def _do_https_request_via_proxy(
         self,
-        auth_credentials: Optional[str] = None,
+        expect_proxy_ssl: bool = False,
+        expected_auth_credentials: Optional[bytes] = None,
     ):
+        """Send a https request via an agent and check that it is correctly received at
+            the proxy and client. The proxy can use either http or https.
+        Args:
+            expect_proxy_ssl: True if we expect the request to connect via https to proxy
+            expected_auth_credentials: credentials to authenticate at proxy
+        """
         agent = ProxyAgent(
             self.reactor,
             contextFactory=get_test_https_policy(),
@@ -275,18 +565,15 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(host, "1.2.3.5")
         self.assertEqual(port, 1080)
 
-        # make a test HTTP server, and wire up the client
+        # make a test server to act as the proxy, and wire up the client
         proxy_server = self._make_connection(
-            client_factory, _get_test_protocol_factory()
+            client_factory,
+            _get_test_protocol_factory(),
+            ssl=expect_proxy_ssl,
+            tls_sanlist=[b"DNS:proxy.com"] if expect_proxy_ssl else None,
+            expected_sni=b"proxy.com" if expect_proxy_ssl else None,
         )
-
-        # fish the transports back out so that we can do the old switcheroo
-        s2c_transport = proxy_server.transport
-        client_protocol = s2c_transport.other
-        c2s_transport = client_protocol.transport
-
-        # the FakeTransport is async, so we need to pump the reactor
-        self.reactor.advance(0)
+        assert isinstance(proxy_server, HTTPChannel)
 
         # now there should be a pending CONNECT request
         self.assertEqual(len(proxy_server.requests), 1)
@@ -300,9 +587,9 @@ class MatrixFederationAgentTests(TestCase):
             b"Proxy-Authorization"
         )
 
-        if auth_credentials is not None:
+        if expected_auth_credentials is not None:
             # Compute the correct header value for Proxy-Authorization
-            encoded_credentials = base64.b64encode(b"bob:pinkponies")
+            encoded_credentials = base64.b64encode(expected_auth_credentials)
             expected_header_value = b"Basic " + encoded_credentials
 
             # Validate the header's value
@@ -314,31 +601,49 @@ class MatrixFederationAgentTests(TestCase):
         # tell the proxy server not to close the connection
         proxy_server.persistent = True
 
-        # this just stops the http Request trying to do a chunked response
-        # request.setHeader(b"Content-Length", b"0")
         request.finish()
 
-        # now we can replace the proxy channel with a new, SSL-wrapped HTTP channel
-        ssl_factory = _wrap_server_factory_for_tls(_get_test_protocol_factory())
-        ssl_protocol = ssl_factory.buildProtocol(None)
-        http_server = ssl_protocol.wrappedProtocol
+        # now we make another test server to act as the upstream HTTP server.
+        server_ssl_protocol = _wrap_server_factory_for_tls(
+            _get_test_protocol_factory()
+        ).buildProtocol(None)
 
-        ssl_protocol.makeConnection(
-            FakeTransport(client_protocol, self.reactor, ssl_protocol)
-        )
-        c2s_transport.other = ssl_protocol
+        # Tell the HTTP server to send outgoing traffic back via the proxy's transport.
+        proxy_server_transport = proxy_server.transport
+        server_ssl_protocol.makeConnection(proxy_server_transport)
+
+        # ... and replace the protocol on the proxy's transport with the
+        # TLSMemoryBIOProtocol for the test server, so that incoming traffic
+        # to the proxy gets sent over to the HTTP(s) server.
+        #
+        # This needs a bit of gut-wrenching, which is different depending on whether
+        # the proxy is using TLS or not.
+        #
+        # (an alternative, possibly more elegant, approach would be to use a custom
+        # Protocol to implement the proxy, which starts out by forwarding to an
+        # HTTPChannel (to implement the CONNECT command) and can then be switched
+        # into a mode where it forwards its traffic to another Protocol.)
+        if expect_proxy_ssl:
+            assert isinstance(proxy_server_transport, TLSMemoryBIOProtocol)
+            proxy_server_transport.wrappedProtocol = server_ssl_protocol
+        else:
+            assert isinstance(proxy_server_transport, FakeTransport)
+            client_protocol = proxy_server_transport.other
+            c2s_transport = client_protocol.transport
+            c2s_transport.other = server_ssl_protocol
 
         self.reactor.advance(0)
 
-        server_name = ssl_protocol._tlsConnection.get_servername()
+        server_name = server_ssl_protocol._tlsConnection.get_servername()
         expected_sni = b"test.com"
         self.assertEqual(
             server_name,
             expected_sni,
-            "Expected SNI %s but got %s" % (expected_sni, server_name),
+            f"Expected SNI {expected_sni!s} but got {server_name!s}",
         )
 
         # now there should be a pending request
+        http_server = server_ssl_protocol.wrappedProtocol
         self.assertEqual(len(http_server.requests), 1)
 
         request = http_server.requests[0]
@@ -472,7 +777,7 @@ class MatrixFederationAgentTests(TestCase):
         self.assertEqual(
             server_name,
             expected_sni,
-            "Expected SNI %s but got %s" % (expected_sni, server_name),
+            f"Expected SNI {expected_sni!s} but got {server_name!s}",
         )
 
         # now there should be a pending request
@@ -491,16 +796,48 @@ class MatrixFederationAgentTests(TestCase):
         body = self.successResultOf(treq.content(resp))
         self.assertEqual(body, b"result")
 
+    @patch.dict(os.environ, {"http_proxy": "proxy.com:8888"})
+    def test_proxy_with_no_scheme(self):
+        http_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
+        self.assertIsInstance(http_proxy_agent.http_proxy_endpoint, HostnameEndpoint)
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._hostStr, "proxy.com")
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._port, 8888)
 
-def _wrap_server_factory_for_tls(factory, sanlist=None):
+    @patch.dict(os.environ, {"http_proxy": "socks://proxy.com:8888"})
+    def test_proxy_with_unsupported_scheme(self):
+        with self.assertRaises(ValueError):
+            ProxyAgent(self.reactor, use_proxy=True)
+
+    @patch.dict(os.environ, {"http_proxy": "http://proxy.com:8888"})
+    def test_proxy_with_http_scheme(self):
+        http_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
+        self.assertIsInstance(http_proxy_agent.http_proxy_endpoint, HostnameEndpoint)
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._hostStr, "proxy.com")
+        self.assertEqual(http_proxy_agent.http_proxy_endpoint._port, 8888)
+
+    @patch.dict(os.environ, {"http_proxy": "https://proxy.com:8888"})
+    def test_proxy_with_https_scheme(self):
+        https_proxy_agent = ProxyAgent(self.reactor, use_proxy=True)
+        self.assertIsInstance(https_proxy_agent.http_proxy_endpoint, _WrapperEndpoint)
+        self.assertEqual(
+            https_proxy_agent.http_proxy_endpoint._wrappedEndpoint._hostStr, "proxy.com"
+        )
+        self.assertEqual(
+            https_proxy_agent.http_proxy_endpoint._wrappedEndpoint._port, 8888
+        )
+
+
+def _wrap_server_factory_for_tls(
+    factory: IProtocolFactory, sanlist: Iterable[bytes] = None
+) -> IProtocolFactory:
     """Wrap an existing Protocol Factory with a test TLSMemoryBIOFactory
 
     The resultant factory will create a TLS server which presents a certificate
     signed by our test CA, valid for the domains in `sanlist`
 
     Args:
-        factory (interfaces.IProtocolFactory): protocol factory to wrap
-        sanlist (iterable[bytes]): list of domains the cert should be valid for
+        factory: protocol factory to wrap
+        sanlist: list of domains the cert should be valid for
 
     Returns:
         interfaces.IProtocolFactory
@@ -514,7 +851,7 @@ def _wrap_server_factory_for_tls(factory, sanlist=None):
     )
 
 
-def _get_test_protocol_factory():
+def _get_test_protocol_factory() -> IProtocolFactory:
     """Get a protocol Factory which will build an HTTPChannel
 
     Returns:
@@ -528,6 +865,6 @@ def _get_test_protocol_factory():
     return server_factory
 
 
-def _log_request(request):
+def _log_request(request: str):
     """Implements Factory.log, which is expected by Request.finish"""
-    logger.info("Completed request %s", request)
+    logger.info(f"Completed request {request}")

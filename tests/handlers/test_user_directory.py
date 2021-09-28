@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,16 +11,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from mock import Mock
+from typing import List, Tuple
+from unittest.mock import Mock
+from urllib.parse import quote
 
 from twisted.internet import defer
 
 import synapse.rest.admin
-from synapse.api.constants import EventTypes, RoomEncryptionAlgorithms, UserTypes
+from synapse.api.constants import UserTypes
 from synapse.api.room_versions import RoomVersion, RoomVersions
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import user_directory
+from synapse.rest.client import login, room, user_directory
 from synapse.storage.roommember import ProfileInfo
+from synapse.types import create_requester
 
 from tests import unittest
 from tests.unittest import override_config
@@ -34,7 +35,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
     servlets = [
         login.register_servlets,
-        synapse.rest.admin.register_servlets_for_client_rest_resource,
+        synapse.rest.admin.register_servlets,
         room.register_servlets,
     ]
 
@@ -96,7 +97,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
 
         # deactivate user
         self.get_success(self.store.set_user_deactivated_status(r_user_id, True))
-        self.get_success(self.handler.handle_user_deactivated(r_user_id))
+        self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
 
         # profile is not in directory
         profile = self.get_success(self.store.get_user_in_directory(r_user_id))
@@ -120,7 +121,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         )
 
         self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_user_deactivated(s_user_id))
+        self.get_success(self.handler.handle_local_user_deactivated(s_user_id))
         self.store.remove_from_user_dir.not_called()
 
     def test_handle_user_deactivated_regular_user(self):
@@ -129,8 +130,46 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             self.store.register_user(user_id=r_user_id, password_hash=None)
         )
         self.store.remove_from_user_dir = Mock(return_value=defer.succeed(None))
-        self.get_success(self.handler.handle_user_deactivated(r_user_id))
+        self.get_success(self.handler.handle_local_user_deactivated(r_user_id))
         self.store.remove_from_user_dir.called_once_with(r_user_id)
+
+    def test_reactivation_makes_regular_user_searchable(self):
+        user = self.register_user("regular", "pass")
+        user_token = self.login(user, "pass")
+        admin_user = self.register_user("admin", "pass", admin=True)
+        admin_token = self.login(admin_user, "pass")
+
+        # Ensure the regular user is publicly visible and searchable.
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
+
+        # Deactivate the user and check they're not searchable.
+        deactivate_handler = self.hs.get_deactivate_account_handler()
+        self.get_success(
+            deactivate_handler.deactivate_account(
+                user, erase_data=False, requester=create_requester(admin_user)
+            )
+        )
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(s["results"], [])
+
+        # Reactivate the user
+        channel = self.make_request(
+            "PUT",
+            f"/_synapse/admin/v2/users/{quote(user)}",
+            access_token=admin_token,
+            content={"deactivated": False, "password": "pass"},
+        )
+        self.assertEqual(channel.code, 200)
+        user_token = self.login(user, "pass")
+        self.helper.create_room_as(user, is_public=True, tok=user_token)
+
+        # Check they're searchable.
+        s = self.get_success(self.handler.search_users(admin_user, user, 10))
+        self.assertEqual(len(s["results"]), 1)
+        self.assertEqual(s["results"][0]["user_id"], user)
 
     def test_private_room(self):
         """
@@ -189,100 +228,6 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user3", 10))
         self.assertEqual(len(s["results"]), 0)
 
-    @override_config({"encryption_enabled_by_default_for_room_type": "all"})
-    def test_encrypted_by_default_config_option_all(self):
-        """Tests that invite-only and non-invite-only rooms have encryption enabled by
-        default when the config option encryption_enabled_by_default_for_room_type is "all".
-        """
-        # Create a user
-        user = self.register_user("user", "pass")
-        user_token = self.login(user, "pass")
-
-        # Create an invite-only room as that user
-        room_id = self.helper.create_room_as(user, is_public=False, tok=user_token)
-
-        # Check that the room has an encryption state event
-        event_content = self.helper.get_state(
-            room_id=room_id,
-            event_type=EventTypes.RoomEncryption,
-            tok=user_token,
-        )
-        self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
-
-        # Create a non invite-only room as that user
-        room_id = self.helper.create_room_as(user, is_public=True, tok=user_token)
-
-        # Check that the room has an encryption state event
-        event_content = self.helper.get_state(
-            room_id=room_id,
-            event_type=EventTypes.RoomEncryption,
-            tok=user_token,
-        )
-        self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
-
-    @override_config({"encryption_enabled_by_default_for_room_type": "invite"})
-    def test_encrypted_by_default_config_option_invite(self):
-        """Tests that only new, invite-only rooms have encryption enabled by default when
-        the config option encryption_enabled_by_default_for_room_type is "invite".
-        """
-        # Create a user
-        user = self.register_user("user", "pass")
-        user_token = self.login(user, "pass")
-
-        # Create an invite-only room as that user
-        room_id = self.helper.create_room_as(user, is_public=False, tok=user_token)
-
-        # Check that the room has an encryption state event
-        event_content = self.helper.get_state(
-            room_id=room_id,
-            event_type=EventTypes.RoomEncryption,
-            tok=user_token,
-        )
-        self.assertEqual(event_content, {"algorithm": RoomEncryptionAlgorithms.DEFAULT})
-
-        # Create a non invite-only room as that user
-        room_id = self.helper.create_room_as(user, is_public=True, tok=user_token)
-
-        # Check that the room does not have an encryption state event
-        self.helper.get_state(
-            room_id=room_id,
-            event_type=EventTypes.RoomEncryption,
-            tok=user_token,
-            expect_code=404,
-        )
-
-    @override_config({"encryption_enabled_by_default_for_room_type": "off"})
-    def test_encrypted_by_default_config_option_off(self):
-        """Tests that neither new invite-only nor non-invite-only rooms have encryption
-        enabled by default when the config option
-        encryption_enabled_by_default_for_room_type is "off".
-        """
-        # Create a user
-        user = self.register_user("user", "pass")
-        user_token = self.login(user, "pass")
-
-        # Create an invite-only room as that user
-        room_id = self.helper.create_room_as(user, is_public=False, tok=user_token)
-
-        # Check that the room does not have an encryption state event
-        self.helper.get_state(
-            room_id=room_id,
-            event_type=EventTypes.RoomEncryption,
-            tok=user_token,
-            expect_code=404,
-        )
-
-        # Create a non invite-only room as that user
-        room_id = self.helper.create_room_as(user, is_public=True, tok=user_token)
-
-        # Check that the room does not have an encryption state event
-        self.helper.get_state(
-            room_id=room_id,
-            event_type=EventTypes.RoomEncryption,
-            tok=user_token,
-            expect_code=404,
-        )
-
     def test_spam_checker(self):
         """
         A user which fails the spam checks will not appear in search results.
@@ -313,15 +258,13 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
         self.assertEqual(len(s["results"]), 1)
 
+        async def allow_all(user_profile):
+            # Allow all users.
+            return False
+
         # Configure a spam checker that does not filter any users.
         spam_checker = self.hs.get_spam_checker()
-
-        class AllowAll:
-            async def check_username_for_spam(self, user_profile):
-                # Allow all users.
-                return False
-
-        spam_checker.spam_checkers = [AllowAll()]
+        spam_checker._check_username_for_spam_callbacks = [allow_all]
 
         # The results do not change:
         # We get one search result when searching for user2 by user1.
@@ -329,12 +272,11 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         self.assertEqual(len(s["results"]), 1)
 
         # Configure a spam checker that filters all users.
-        class BlockAll:
-            async def check_username_for_spam(self, user_profile):
-                # All users are spammy.
-                return True
+        async def block_all(user_profile):
+            # All users are spammy.
+            return True
 
-        spam_checker.spam_checkers = [BlockAll()]
+        spam_checker._check_username_for_spam_callbacks = [block_all]
 
         # User1 now gets no search results for any of the other users.
         s = self.get_success(self.handler.search_users(u1, "user2", 10))
@@ -384,7 +326,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             r.add((i["user_id"], i["other_user_id"], i["room_id"]))
         return r
 
-    def get_users_in_public_rooms(self):
+    def get_users_in_public_rooms(self) -> List[Tuple[str, str]]:
         r = self.get_success(
             self.store.db_pool.simple_select_list(
                 "users_in_public_rooms", None, ("user_id", "room_id")
@@ -395,7 +337,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
             retval.append((i["user_id"], i["room_id"]))
         return retval
 
-    def get_users_who_share_private_rooms(self):
+    def get_users_who_share_private_rooms(self) -> List[Tuple[str, str, str]]:
         return self.get_success(
             self.store.db_pool.simple_select_list(
                 "users_who_share_private_rooms",
@@ -509,7 +451,7 @@ class UserDirectoryTestCase(unittest.HomeserverTestCase):
         visible.
         """
         self.handler.search_all_users = True
-        self.hs.config.user_directory_search_all_users = True
+        self.hs.config.userdirectory.user_directory_search_all_users = True
 
         u1 = self.register_user("user1", "pass")
         self.register_user("user2", "pass")
@@ -665,7 +607,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         return hs
 
     def test_disabling_room_list(self):
-        self.config.user_directory_search_enabled = True
+        self.config.userdirectory.user_directory_search_enabled = True
 
         # First we create a room with another user so that user dir is non-empty
         # for our user
@@ -682,7 +624,7 @@ class TestUserDirSearchDisabled(unittest.HomeserverTestCase):
         self.assertTrue(len(channel.json_body["results"]) > 0)
 
         # Disable user directory and check search returns nothing
-        self.config.user_directory_search_enabled = False
+        self.config.userdirectory.user_directory_search_enabled = False
         channel = self.make_request(
             "POST", b"user_directory/search", b'{"search_term":"user2"}'
         )

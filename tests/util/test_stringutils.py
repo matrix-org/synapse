@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,7 +13,7 @@
 # limitations under the License.
 
 from synapse.api.errors import SynapseError
-from synapse.util.stringutils import assert_valid_client_secret
+from synapse.util.stringutils import assert_valid_client_secret, base62_encode
 
 from .. import unittest
 
@@ -46,3 +45,9 @@ class StringUtilsTestCase(unittest.TestCase):
         for client_secret in bad:
             with self.assertRaises(SynapseError):
                 assert_valid_client_secret(client_secret)
+
+    def test_base62_encode(self):
+        self.assertEqual("0", base62_encode(0))
+        self.assertEqual("10", base62_encode(62))
+        self.assertEqual("1c", base62_encode(100))
+        self.assertEqual("001c", base62_encode(100, minwidth=4))

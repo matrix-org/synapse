@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2018 New Vector Ltd
 #
@@ -15,25 +14,41 @@
 # limitations under the License.
 
 import logging
-from collections import namedtuple
+from typing import List, Optional, Tuple
+
+import attr
+
+from synapse.types import PersistedEventPosition
 
 logger = logging.getLogger(__name__)
 
 
-RoomsForUser = namedtuple(
-    "RoomsForUser", ("room_id", "sender", "membership", "event_id", "stream_ordering")
-)
+@attr.s(slots=True, frozen=True, weakref_slot=False, auto_attribs=True)
+class RoomsForUser:
+    room_id: str
+    sender: str
+    membership: str
+    event_id: str
+    stream_ordering: int
+    room_version_id: str
 
-GetRoomsForUserWithStreamOrdering = namedtuple(
-    "GetRoomsForUserWithStreamOrdering", ("room_id", "event_pos")
-)
+
+@attr.s(slots=True, frozen=True, weakref_slot=False, auto_attribs=True)
+class GetRoomsForUserWithStreamOrdering:
+    room_id: str
+    event_pos: PersistedEventPosition
 
 
-# We store this using a namedtuple so that we save about 3x space over using a
-# dict.
-ProfileInfo = namedtuple("ProfileInfo", ("avatar_url", "display_name"))
+@attr.s(slots=True, frozen=True, weakref_slot=False, auto_attribs=True)
+class ProfileInfo:
+    avatar_url: Optional[str]
+    display_name: Optional[str]
 
-# "members" points to a truncated list of (user_id, event_id) tuples for users of
-# a given membership type, suitable for use in calculating heroes for a room.
-# "count" points to the total numberr of users of a given membership type.
-MemberSummary = namedtuple("MemberSummary", ("members", "count"))
+
+@attr.s(slots=True, frozen=True, weakref_slot=False, auto_attribs=True)
+class MemberSummary:
+    # A truncated list of (user_id, event_id) tuples for users of a given
+    # membership type, suitable for use in calculating heroes for a room.
+    members: List[Tuple[str, str]]
+    # The total number of users of a given membership type.
+    count: int

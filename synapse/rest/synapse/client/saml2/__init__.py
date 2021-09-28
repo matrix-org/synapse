@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,17 +13,21 @@
 # limitations under the License.
 
 import logging
+from typing import TYPE_CHECKING
 
 from twisted.web.resource import Resource
 
 from synapse.rest.synapse.client.saml2.metadata_resource import SAML2MetadataResource
 from synapse.rest.synapse.client.saml2.response_resource import SAML2ResponseResource
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 logger = logging.getLogger(__name__)
 
 
 class SAML2Resource(Resource):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         Resource.__init__(self)
         self.putChild(b"metadata.xml", SAML2MetadataResource(hs))
         self.putChild(b"authn_response", SAML2ResponseResource(hs))

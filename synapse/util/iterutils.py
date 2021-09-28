@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
@@ -16,6 +15,7 @@
 import heapq
 from itertools import islice
 from typing import (
+    Collection,
     Dict,
     Generator,
     Iterable,
@@ -27,17 +27,15 @@ from typing import (
     TypeVar,
 )
 
-from synapse.types import Collection
-
 T = TypeVar("T")
 
 
-def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T]]:
+def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T, ...]]:
     """batch an iterable up into tuples with a maximum size
 
     Args:
-        iterable (iterable): the iterable to slice
-        size (int): the maximum batch size
+        iterable: the iterable to slice
+        size: the maximum batch size
 
     Returns:
         an iterator over the chunks
@@ -48,10 +46,7 @@ def batch_iter(iterable: Iterable[T], size: int) -> Iterator[Tuple[T]]:
     return iter(lambda: tuple(islice(sourceiter, size)), ())
 
 
-ISeq = TypeVar("ISeq", bound=Sequence, covariant=True)
-
-
-def chunk_seq(iseq: ISeq, maxlen: int) -> Iterable[ISeq]:
+def chunk_seq(iseq: Sequence[T], maxlen: int) -> Iterable[Sequence[T]]:
     """Split the given sequence into chunks of the given size
 
     The last chunk may be shorter than the given size.
@@ -73,7 +68,7 @@ def sorted_topologically(
     # This is implemented by Kahn's algorithm.
 
     degree_map = {node: 0 for node in nodes}
-    reverse_graph = {}  # type: Dict[T, Set[T]]
+    reverse_graph: Dict[T, Set[T]] = {}
 
     for node, edges in graph.items():
         if node not in degree_map:

@@ -1,12 +1,9 @@
 # Contents
 - [List Room API](#list-room-api)
-  * [Parameters](#parameters)
-  * [Usage](#usage)
 - [Room Details API](#room-details-api)
 - [Room Members API](#room-members-api)
+- [Room State API](#room-state-api)
 - [Delete Room API](#delete-room-api)
-  * [Parameters](#parameters-1)
-  * [Response](#response)
   * [Undoing room shutdowns](#undoing-room-shutdowns)
 - [Make Room Admin API](#make-room-admin-api)
 - [Forward Extremities Admin API](#forward-extremities-admin-api)
@@ -18,7 +15,7 @@ The List Room admin API allows server admins to get a list of rooms on their
 server. There are various parameters available that allow for filtering and
 sorting the returned list. This API supports pagination.
 
-## Parameters
+**Parameters**
 
 The following query parameters are available:
 
@@ -44,6 +41,8 @@ The following query parameters are available:
           this value to `b` will reverse the above sort order. Defaults to `f`.
 * `search_term` - Filter rooms by their room name. Search term can be contained in any
                   part of the room name. Defaults to no filtering.
+
+**Response**
 
 The following fields are possible in the JSON response body:
 
@@ -78,17 +77,15 @@ The following fields are possible in the JSON response body:
                  Use `prev_batch` for the `from` value in the next request to
                  get the "previous page" of results.
 
-## Usage
+The API is:
 
 A standard request with no filtering:
 
 ```
 GET /_synapse/admin/v1/rooms
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```jsonc
 {
@@ -136,11 +133,9 @@ Filtering by room name:
 
 ```
 GET /_synapse/admin/v1/rooms?search_term=TWIM
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -171,11 +166,9 @@ Paginating through a list of rooms:
 
 ```
 GET /_synapse/admin/v1/rooms?order_by=size
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```jsonc
 {
@@ -227,11 +220,9 @@ parameter to the value of `next_token`.
 
 ```
 GET /_synapse/admin/v1/rooms?order_by=size&from=100
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```jsonc
 {
@@ -303,17 +294,13 @@ The following fields are possible in the JSON response body:
 * `history_visibility` - Who can see the room history. One of: ["invited", "joined", "shared", "world_readable"].
 * `state_events` - Total number of state_events of a room. Complexity of the room.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```
 GET /_synapse/admin/v1/rooms/<room_id>
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -346,17 +333,13 @@ The response includes the following fields:
 * `members` - A list of all the members that are present in the room, represented by their ids.
 * `total` - Total number of members in the room.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```
 GET /_synapse/admin/v1/rooms/<room_id>/members
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -377,17 +360,13 @@ The response includes the following fields:
 
 * `state` - The current state of the room at the time of request.
 
-## Usage
-
-A standard request:
+The API is:
 
 ```
 GET /_synapse/admin/v1/rooms/<room_id>/state
-
-{}
 ```
 
-Response:
+A response body like the following is returned:
 
 ```json
 {
@@ -427,10 +406,11 @@ the new room. Users on other servers will be unaffected.
 The API is:
 
 ```
-POST /_synapse/admin/v1/rooms/<room_id>/delete
+DELETE /_synapse/admin/v1/rooms/<room_id>
 ```
 
 with a body of:
+
 ```json
 {
     "new_room_user_id": "@someuser:example.com",
@@ -442,7 +422,7 @@ with a body of:
 ```
 
 To use it, you will need to authenticate by providing an ``access_token`` for a
-server admin: see [README.rst](README.rst).
+server admin: see [Admin API](../usage/administration/admin_api).
 
 A response body like the following is returned:
 
@@ -460,7 +440,7 @@ A response body like the following is returned:
 }
 ```
 
-## Parameters
+**Parameters**
 
 The following parameters should be set in the URL:
 
@@ -490,7 +470,7 @@ The following JSON body parameters are available:
 
 The JSON body must not be empty. The body must be at least `{}`.
 
-## Response
+**Response**
 
 The following fields are returned in the JSON response body:
 
@@ -501,33 +481,54 @@ The following fields are returned in the JSON response body:
 * `new_room_id` - A string representing the room ID of the new room.
 
 
-## Undoing room shutdowns
+## Undoing room deletions
 
-*Note*: This guide may be outdated by the time you read it. By nature of room shutdowns being performed at the database level,
+*Note*: This guide may be outdated by the time you read it. By nature of room deletions being performed at the database level,
 the structure can and does change without notice.
 
-First, it's important to understand that a room shutdown is very destructive. Undoing a shutdown is not as simple as pretending it
+First, it's important to understand that a room deletion is very destructive. Undoing a deletion is not as simple as pretending it
 never happened - work has to be done to move forward instead of resetting the past. In fact, in some cases it might not be possible
 to recover at all:
 
 * If the room was invite-only, your users will need to be re-invited.
 * If the room no longer has any members at all, it'll be impossible to rejoin.
-* The first user to rejoin will have to do so via an alias on a different server.
+* The first user to rejoin will have to do so via an alias on a different
+  server (or receive an invite from a user on a different server).
 
 With all that being said, if you still want to try and recover the room:
 
-1. For safety reasons, shut down Synapse.
-2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
-   * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
-   * The room ID is the same one supplied to the shutdown room API, not the Content Violation room.
-3. Restart Synapse.
+1. If the room was `block`ed, you must unblock it on your server. This can be
+   accomplished as follows:
 
-You will have to manually handle, if you so choose, the following:
+   1. For safety reasons, shut down Synapse.
+   2. In the database, run `DELETE FROM blocked_rooms WHERE room_id = '!example:example.org';`
+      * For caution: it's recommended to run this in a transaction: `BEGIN; DELETE ...;`, verify you got 1 result, then `COMMIT;`.
+      * The room ID is the same one supplied to the delete room API, not the Content Violation room.
+   3. Restart Synapse.
 
-* Aliases that would have been redirected to the Content Violation room.
-* Users that would have been booted from the room (and will have been force-joined to the Content Violation room).
-* Removal of the Content Violation room if desired.
+   This step is unnecessary if `block` was not set.
 
+2. Any room aliases on your server that pointed to the deleted room may have
+   been deleted, or redirected to the Content Violation room. These will need
+   to be restored manually.
+
+3. Users on your server that were in the deleted room will have been kicked
+   from the room. Consider whether you want to update their membership
+   (possibly via the [Edit Room Membership API](room_membership.md)) or let
+   them handle rejoining themselves.
+
+4. If `new_room_user_id` was given, a 'Content Violation' will have been
+   created. Consider whether you want to delete that roomm.
+
+## Deprecated endpoint
+
+The previous deprecated API will be removed in a future release, it was:
+
+```
+POST /_synapse/admin/v1/rooms/<room_id>/delete
+```
+
+It behaves the same way than the current endpoint except the path and the method.
 
 # Make Room Admin API
 
@@ -538,16 +539,16 @@ By default the server admin (the caller) is granted power, but another user can
 optionally be specified, e.g.:
 
 ```
-    POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
-    {
-        "user_id": "@foo:example.com"
-    }
+POST /_synapse/admin/v1/rooms/<room_id_or_alias>/make_room_admin
+{
+    "user_id": "@foo:example.com"
+}
 ```
 
 # Forward Extremities Admin API
 
 Enables querying and deleting forward extremities from rooms. When a lot of forward
-extremities accumulate in a room, performance can become degraded. For details, see 
+extremities accumulate in a room, performance can become degraded. For details, see
 [#1760](https://github.com/matrix-org/synapse/issues/1760).
 
 ## Check for forward extremities
@@ -555,7 +556,7 @@ extremities accumulate in a room, performance can become degraded. For details, 
 To check the status of forward extremities for a room:
 
 ```
-    GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+GET /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
 ```
 
 A response as follows will be returned:
@@ -571,12 +572,12 @@ A response as follows will be returned:
       "received_ts": 1611263016761
     }
   ]
-}    
+}
 ```
 
 ## Deleting forward extremities
 
-**WARNING**: Please ensure you know what you're doing and have read 
+**WARNING**: Please ensure you know what you're doing and have read
 the related issue [#1760](https://github.com/matrix-org/synapse/issues/1760).
 Under no situations should this API be executed as an automated maintenance task!
 
@@ -584,7 +585,7 @@ If a room has lots of forward extremities, the extra can be
 deleted as follows:
 
 ```
-    DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
+DELETE /_synapse/admin/v1/rooms/<room_id_or_alias>/forward_extremities
 ```
 
 A response as follows will be returned, indicating the amount of forward extremities

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,15 +13,12 @@
 # limitations under the License.
 
 from collections import Counter
+from unittest.mock import Mock
 
-from mock import Mock
-
-import synapse.api.errors
-import synapse.handlers.admin
 import synapse.rest.admin
 import synapse.storage
 from synapse.api.constants import EventTypes
-from synapse.rest.client.v1 import login, room
+from synapse.rest.client import login, room
 
 from tests import unittest
 

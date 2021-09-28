@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,23 +15,35 @@
 import json
 import logging
 import re
+import typing
+from typing import Any, Callable, Dict, Generator, Pattern
 
 import attr
 from frozendict import frozendict
 
 from twisted.internet import defer, task
+from twisted.internet.defer import Deferred
+from twisted.internet.interfaces import IDelayedCall, IReactorTime
+from twisted.internet.task import LoopingCall
+from twisted.python.failure import Failure
 
 from synapse.logging import context
+
+if typing.TYPE_CHECKING:
+    pass
 
 logger = logging.getLogger(__name__)
 
 
-def _reject_invalid_json(val):
+_WILDCARD_RUN = re.compile(r"([\?\*]+)")
+
+
+def _reject_invalid_json(val: Any) -> None:
     """Do not allow Infinity, -Infinity, or NaN values in JSON."""
     raise ValueError("Invalid JSON value: '%s'" % val)
 
 
-def _handle_frozendict(obj):
+def _handle_frozendict(obj: Any) -> Dict[Any, Any]:
     """Helper for json_encoder. Makes frozendicts serializable by returning
     the underlying dict
     """
@@ -57,10 +68,10 @@ json_encoder = json.JSONEncoder(
 json_decoder = json.JSONDecoder(parse_constant=_reject_invalid_json)
 
 
-def unwrapFirstError(failure):
+def unwrapFirstError(failure: Failure) -> Failure:
     # defer.gatherResults and DeferredLists wrap failures.
     failure.trap(defer.FirstError)
-    return failure.value.subFailure
+    return failure.value.subFailure  # type: ignore[union-attr]  # Issue in Twisted's annotations
 
 
 @attr.s(slots=True)
@@ -72,25 +83,25 @@ class Clock:
         reactor: The Twisted reactor to use.
     """
 
-    _reactor = attr.ib()
+    _reactor: IReactorTime = attr.ib()
 
-    @defer.inlineCallbacks
-    def sleep(self, seconds):
-        d = defer.Deferred()
+    @defer.inlineCallbacks  # type: ignore[arg-type]  # Issue in Twisted's type annotations
+    def sleep(self, seconds: float) -> "Generator[Deferred[float], Any, Any]":
+        d: defer.Deferred[float] = defer.Deferred()
         with context.PreserveLoggingContext():
             self._reactor.callLater(seconds, d.callback, seconds)
             res = yield d
         return res
 
-    def time(self):
+    def time(self) -> float:
         """Returns the current system time in seconds since epoch."""
         return self._reactor.seconds()
 
-    def time_msec(self):
+    def time_msec(self) -> int:
         """Returns the current system time in milliseconds since epoch."""
         return int(self.time() * 1000)
 
-    def looping_call(self, f, msec, *args, **kwargs):
+    def looping_call(self, f: Callable, msec: float, *args, **kwargs) -> LoopingCall:
         """Call a function repeatedly.
 
         Waits `msec` initially before calling `f` for the first time.
@@ -99,8 +110,8 @@ class Clock:
         other than trivial, you probably want to wrap it in run_as_background_process.
 
         Args:
-            f(function): The function to call repeatedly.
-            msec(float): How long to wait between calls in milliseconds.
+            f: The function to call repeatedly.
+            msec: How long to wait between calls in milliseconds.
             *args: Postional arguments to pass to function.
             **kwargs: Key arguments to pass to function.
         """
@@ -110,7 +121,7 @@ class Clock:
         d.addErrback(log_failure, "Looping call died", consumeErrors=False)
         return call
 
-    def call_later(self, delay, callback, *args, **kwargs):
+    def call_later(self, delay, callback, *args, **kwargs) -> IDelayedCall:
         """Call something later
 
         Note that the function will be called with no logcontext, so if it is anything
@@ -130,7 +141,7 @@ class Clock:
         with context.PreserveLoggingContext():
             return self._reactor.callLater(delay, wrapped_callback, *args, **kwargs)
 
-    def cancel_call_later(self, timer, ignore_errs=False):
+    def cancel_call_later(self, timer: IDelayedCall, ignore_errs: bool = False) -> None:
         try:
             timer.cancel()
         except Exception:
@@ -159,25 +170,54 @@ def log_failure(failure, msg, consumeErrors=True):
         return failure
 
 
-def glob_to_regex(glob):
+def glob_to_regex(glob: str, word_boundary: bool = False) -> Pattern:
     """Converts a glob to a compiled regex object.
 
-    The regex is anchored at the beginning and end of the string.
-
     Args:
-        glob (str)
+        glob: pattern to match
+        word_boundary: If True, the pattern will be allowed to match at word boundaries
+           anywhere in the string. Otherwise, the pattern is anchored at the start and
+           end of the string.
 
     Returns:
-        re.RegexObject
+        compiled regex pattern
     """
-    res = ""
-    for c in glob:
-        if c == "*":
-            res = res + ".*"
-        elif c == "?":
-            res = res + "."
-        else:
-            res = res + re.escape(c)
 
-    # \A anchors at start of string, \Z at end of string
-    return re.compile(r"\A" + res + r"\Z", re.IGNORECASE)
+    # Patterns with wildcards must be simplified to avoid performance cliffs
+    # - The glob `?**?**?` is equivalent to the glob `???*`
+    # - The glob `???*` is equivalent to the regex `.{3,}`
+    chunks = []
+    for chunk in _WILDCARD_RUN.split(glob):
+        # No wildcards? re.escape()
+        if not _WILDCARD_RUN.match(chunk):
+            chunks.append(re.escape(chunk))
+            continue
+
+        # Wildcards? Simplify.
+        qmarks = chunk.count("?")
+        if "*" in chunk:
+            chunks.append(".{%d,}" % qmarks)
+        else:
+            chunks.append(".{%d}" % qmarks)
+
+    res = "".join(chunks)
+
+    if word_boundary:
+        res = re_word_boundary(res)
+    else:
+        # \A anchors at start of string, \Z at end of string
+        res = r"\A" + res + r"\Z"
+
+    return re.compile(res, re.IGNORECASE)
+
+
+def re_word_boundary(r: str) -> str:
+    """
+    Adds word boundary characters to the start and end of an
+    expression to require that the match occur as a whole word,
+    but do so respecting the fact that strings starting or ending
+    with non-word characters will change word boundaries.
+    """
+    # we can't use \b as it chokes on unicode. however \W seems to be okay
+    # as shorthand for [^0-9A-Za-z_].
+    return r"(^|\W)%s(\W|$)" % (r,)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 Dirk Klimpel
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,8 +16,7 @@ import json
 
 import synapse.rest.admin
 from synapse.api.errors import Codes
-from synapse.rest.client.v1 import login, room
-from synapse.rest.client.v2_alpha import report_event
+from synapse.rest.client import login, report_event, room
 
 from tests import unittest
 
@@ -49,23 +47,23 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
         self.helper.join(self.room_id2, user=self.admin_user, tok=self.admin_user_tok)
 
         # Two rooms and two users. Every user sends and reports every room event
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id1,
                 user_tok=self.other_user_tok,
             )
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id2,
                 user_tok=self.other_user_tok,
             )
-        for i in range(5):
+        for _ in range(5):
             self._create_event_and_report(
                 room_id=self.room_id1,
                 user_tok=self.admin_user_tok,
             )
-        for i in range(5):
-            self._create_event_and_report(
+        for _ in range(5):
+            self._create_event_and_report_without_parameters(
                 room_id=self.room_id2,
                 user_tok=self.admin_user_tok,
             )
@@ -375,6 +373,19 @@ class EventReportsTestCase(unittest.HomeserverTestCase):
             "POST",
             "rooms/%s/report/%s" % (room_id, event_id),
             json.dumps({"score": -100, "reason": "this makes me sad"}),
+            access_token=user_tok,
+        )
+        self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])
+
+    def _create_event_and_report_without_parameters(self, room_id, user_tok):
+        """Create and report an event, but omit reason and score"""
+        resp = self.helper.send(room_id, tok=user_tok)
+        event_id = resp["event_id"]
+
+        channel = self.make_request(
+            "POST",
+            "rooms/%s/report/%s" % (room_id, event_id),
+            json.dumps({}),
             access_token=user_tok,
         )
         self.assertEqual(200, int(channel.result["code"]), msg=channel.result["body"])

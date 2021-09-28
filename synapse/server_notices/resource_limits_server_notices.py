@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -206,7 +205,7 @@ class ResourceLimitsServerNotices:
             # The user has yet to join the server notices room
             pass
 
-        referenced_events = []  # type: List[str]
+        referenced_events: List[str] = []
         if pinned_state_event is not None:
             referenced_events = list(pinned_state_event.content.get("pinned", []))
 

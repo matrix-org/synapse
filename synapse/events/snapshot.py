@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -81,9 +80,7 @@ class EventContext:
 
             (type, state_key) -> event_id
 
-            FIXME: what is this for an outlier? it seems ill-defined. It seems like
-            it could be either {}, or the state we were given by the remote
-            server, depending on $THINGS
+            For an outlier, this is {}
 
             Note that this is a private attribute: it should be accessed via
             ``get_current_state_ids``. _AsyncEventContext impl calculates this
@@ -97,7 +94,7 @@ class EventContext:
 
             (type, state_key) -> event_id
 
-            FIXME: again, what is this for an outlier?
+            For an outlier, this is {}
 
             As with _current_state_ids, this is a private attribute. It should be
             accessed via get_prev_state_ids.
@@ -129,6 +126,14 @@ class EventContext:
             state_group_before_event=state_group_before_event,
             prev_group=prev_group,
             delta_ids=delta_ids,
+        )
+
+    @staticmethod
+    def for_outlier():
+        """Return an EventContext instance suitable for persisting an outlier event"""
+        return EventContext(
+            current_state_ids={},
+            prev_state_ids={},
         )
 
     async def serialize(self, event: EventBase, store: "DataStore") -> dict:

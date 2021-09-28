@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -109,7 +108,9 @@ class GroupAttestationSigning:
 
         assert server_name is not None
         await self.keyring.verify_json_for_server(
-            server_name, attestation, now, "Group attestation"
+            server_name,
+            attestation,
+            now,
         )
 
     def create_attestation(self, group_id: str, user_id: str) -> JsonDict:
@@ -143,7 +144,7 @@ class GroupAttestionRenewer:
         self.is_mine_id = hs.is_mine_id
         self.attestations = hs.get_groups_attestation_signing()
 
-        if not hs.config.worker_app:
+        if not hs.config.worker.worker_app:
             self._renew_attestations_loop = self.clock.looping_call(
                 self._start_renew_attestations, 30 * 60 * 1000
             )

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,20 +47,22 @@ class PaginationConfig:
     ) -> "PaginationConfig":
         direction = parse_string(request, "dir", default="f", allowed_values=["f", "b"])
 
-        from_tok = parse_string(request, "from")
-        to_tok = parse_string(request, "to")
+        from_tok_str = parse_string(request, "from")
+        to_tok_str = parse_string(request, "to")
 
         try:
-            if from_tok == "END":
+            from_tok = None
+            if from_tok_str == "END":
                 from_tok = None  # For backwards compat.
-            elif from_tok:
-                from_tok = await StreamToken.from_string(store, from_tok)
+            elif from_tok_str:
+                from_tok = await StreamToken.from_string(store, from_tok_str)
         except Exception:
             raise SynapseError(400, "'from' parameter is invalid")
 
         try:
-            if to_tok:
-                to_tok = await StreamToken.from_string(store, to_tok)
+            to_tok = None
+            if to_tok_str:
+                to_tok = await StreamToken.from_string(store, to_tok_str)
         except Exception:
             raise SynapseError(400, "'to' parameter is invalid")
 
@@ -80,7 +81,7 @@ class PaginationConfig:
             raise SynapseError(400, "Invalid request.")
 
     def __repr__(self) -> str:
-        return ("PaginationConfig(from_tok=%r, to_tok=%r, direction=%r, limit=%r)") % (
+        return "PaginationConfig(from_tok=%r, to_tok=%r, direction=%r, limit=%r)" % (
             self.from_token,
             self.to_token,
             self.direction,

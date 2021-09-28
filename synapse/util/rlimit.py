@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,7 +18,7 @@ import resource
 logger = logging.getLogger("synapse.app.homeserver")
 
 
-def change_resource_limit(soft_file_no):
+def change_resource_limit(soft_file_no: int) -> None:
     try:
         soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
 

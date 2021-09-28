@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -46,7 +45,9 @@ class AdditionalResourceTests(HomeserverTestCase):
         handler = _AsyncTestCustomEndpoint({}, None).handle_request
         resource = AdditionalResource(self.hs, handler)
 
-        channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
+        channel = make_request(
+            self.reactor, FakeSite(resource, self.reactor), "GET", "/"
+        )
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_async"})
@@ -55,7 +56,9 @@ class AdditionalResourceTests(HomeserverTestCase):
         handler = _SyncTestCustomEndpoint({}, None).handle_request
         resource = AdditionalResource(self.hs, handler)
 
-        channel = make_request(self.reactor, FakeSite(resource), "GET", "/")
+        channel = make_request(
+            self.reactor, FakeSite(resource, self.reactor), "GET", "/"
+        )
 
         self.assertEqual(channel.code, 200)
         self.assertEqual(channel.json_body, {"some_key": "some_value_sync"})

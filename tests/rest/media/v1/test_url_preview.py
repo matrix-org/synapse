@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,15 +15,17 @@ import json
 import os
 import re
 
-from mock import patch
-
 from twisted.internet._resolver import HostResolution
 from twisted.internet.address import IPv4Address, IPv6Address
 from twisted.internet.error import DNSLookupError
 from twisted.test.proto_helpers import AccumulatingProtocol
 
+from synapse.config.oembed import OEmbedEndpointConfig
+from synapse.util.stringutils import parse_and_validate_mxc_uri
+
 from tests import unittest
 from tests.server import FakeTransport
+from tests.test_utils import SMALL_PNG
 
 try:
     import lxml
@@ -82,6 +83,27 @@ class URLPreviewTests(unittest.HomeserverTestCase):
         config["media_storage_providers"] = [provider_config]
 
         hs = self.setup_test_homeserver(config=config)
+
+        # After the hs is created, modify the parsed oEmbed config (to avoid
+        # messing with files).
+        #
+        # Note that HTTP URLs are used to avoid having to deal with TLS in tests.
+        hs.config.oembed.oembed_patterns = [
+            OEmbedEndpointConfig(
+                api_endpoint="http://publish.twitter.com/oembed",
+                url_patterns=[
+                    re.compile(r"http://twitter\.com/.+/status/.+"),
+                ],
+                formats=None,
+            ),
+            OEmbedEndpointConfig(
+                api_endpoint="http://www.hulu.com/api/oembed.{format}",
+                url_patterns=[
+                    re.compile(r"http://www\.hulu\.com/watch/.+"),
+                ],
+                formats=["json"],
+            ),
+        ]
 
         return hs
 
@@ -546,123 +568,286 @@ class URLPreviewTests(unittest.HomeserverTestCase):
 
     def test_oembed_photo(self):
         """Test an oEmbed endpoint which returns a 'photo' type which redirects the preview to a new URL."""
-        # Route the HTTP version to an HTTP endpoint so that the tests work.
-        with patch.dict(
-            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
-            {
-                re.compile(
-                    r"http://twitter\.com/.+/status/.+"
-                ): "http://publish.twitter.com/oembed",
-            },
-            clear=True,
-        ):
+        self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+        self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
 
-            self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
-            self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+        result = {
+            "version": "1.0",
+            "type": "photo",
+            "url": "http://cdn.twitter.com/matrixdotorg",
+        }
+        oembed_content = json.dumps(result).encode("utf-8")
 
-            result = {
-                "version": "1.0",
-                "type": "photo",
-                "url": "http://cdn.twitter.com/matrixdotorg",
-            }
-            oembed_content = json.dumps(result).encode("utf-8")
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
 
-            end_content = (
-                b"<html><head>"
-                b"<title>Some Title</title>"
-                b'<meta property="og:description" content="hi" />'
-                b"</head></html>"
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
             )
+            % (len(oembed_content),)
+            + oembed_content
+        )
 
-            channel = self.make_request(
-                "GET",
-                "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
-                shorthand=False,
-                await_result=False,
+        self.pump()
+
+        # Ensure a second request is made to the photo URL.
+        client = self.reactor.tcpClients[1][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b"Content-Type: image/png\r\n\r\n"
             )
-            self.pump()
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
+        )
 
-            client = self.reactor.tcpClients[0][2].buildProtocol(None)
-            server = AccumulatingProtocol()
-            server.makeConnection(FakeTransport(client, self.reactor))
-            client.makeConnection(FakeTransport(server, self.reactor))
-            client.dataReceived(
-                (
-                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                    b'Content-Type: application/json; charset="utf8"\r\n\r\n'
-                )
-                % (len(oembed_content),)
-                + oembed_content
-            )
+        self.pump()
 
-            self.pump()
+        # Ensure the URL is what was requested.
+        self.assertIn(b"/matrixdotorg", server.data)
 
-            client = self.reactor.tcpClients[1][2].buildProtocol(None)
-            server = AccumulatingProtocol()
-            server.makeConnection(FakeTransport(client, self.reactor))
-            client.makeConnection(FakeTransport(server, self.reactor))
-            client.dataReceived(
-                (
-                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                    b'Content-Type: text/html; charset="utf8"\r\n\r\n'
-                )
-                % (len(end_content),)
-                + end_content
-            )
-
-            self.pump()
-
-            self.assertEqual(channel.code, 200)
-            self.assertEqual(
-                channel.json_body, {"og:title": "Some Title", "og:description": "hi"}
-            )
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        self.assertEqual(body["og:url"], "http://twitter.com/matrixdotorg/status/12345")
+        self.assertTrue(body["og:image"].startswith("mxc://"))
+        self.assertEqual(body["og:image:height"], 1)
+        self.assertEqual(body["og:image:width"], 1)
+        self.assertEqual(body["og:image:type"], "image/png")
 
     def test_oembed_rich(self):
         """Test an oEmbed endpoint which returns HTML content via the 'rich' type."""
-        # Route the HTTP version to an HTTP endpoint so that the tests work.
-        with patch.dict(
-            "synapse.rest.media.v1.preview_url_resource._oembed_patterns",
+        self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        result = {
+            "version": "1.0",
+            "type": "rich",
+            # Note that this provides the author, not the title.
+            "author_name": "Alice",
+            "html": "<div>Content Preview</div>",
+        }
+        end_content = json.dumps(result).encode("utf-8")
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
+            )
+            % (len(end_content),)
+            + end_content
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        self.assertEqual(
+            body,
             {
-                re.compile(
-                    r"http://twitter\.com/.+/status/.+"
-                ): "http://publish.twitter.com/oembed",
+                "og:url": "http://twitter.com/matrixdotorg/status/12345",
+                "og:title": "Alice",
+                "og:description": "Content Preview",
             },
-            clear=True,
-        ):
+        )
 
-            self.lookups["publish.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+    def test_oembed_format(self):
+        """Test an oEmbed endpoint which requires the format in the URL."""
+        self.lookups["www.hulu.com"] = [(IPv4Address, "10.1.2.3")]
 
-            result = {
-                "version": "1.0",
-                "type": "rich",
-                "html": "<div>Content Preview</div>",
-            }
-            end_content = json.dumps(result).encode("utf-8")
+        result = {
+            "version": "1.0",
+            "type": "rich",
+            "html": "<div>Content Preview</div>",
+        }
+        end_content = json.dumps(result).encode("utf-8")
 
-            channel = self.make_request(
-                "GET",
-                "preview_url?url=http://twitter.com/matrixdotorg/status/12345",
-                shorthand=False,
-                await_result=False,
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://www.hulu.com/watch/12345",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            (
+                b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
+                b'Content-Type: application/json; charset="utf8"\r\n\r\n'
             )
-            self.pump()
+            % (len(end_content),)
+            + end_content
+        )
 
-            client = self.reactor.tcpClients[0][2].buildProtocol(None)
-            server = AccumulatingProtocol()
-            server.makeConnection(FakeTransport(client, self.reactor))
-            client.makeConnection(FakeTransport(server, self.reactor))
-            client.dataReceived(
-                (
-                    b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\n"
-                    b'Content-Type: application/json; charset="utf8"\r\n\r\n'
-                )
-                % (len(end_content),)
-                + end_content
-            )
+        self.pump()
 
-            self.pump()
-            self.assertEqual(channel.code, 200)
-            self.assertEqual(
-                channel.json_body,
-                {"og:title": None, "og:description": "Content Preview"},
-            )
+        # The {format} should have been turned into json.
+        self.assertIn(b"/api/oembed.json", server.data)
+        # A URL parameter of format=json should be provided.
+        self.assertIn(b"format=json", server.data)
+
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        self.assertEqual(
+            body,
+            {
+                "og:url": "http://www.hulu.com/watch/12345",
+                "og:description": "Content Preview",
+            },
+        )
+
+    def _download_image(self):
+        """Downloads an image into the URL cache.
+
+        Returns:
+            A (host, media_id) tuple representing the MXC URI of the image.
+        """
+        self.lookups["cdn.twitter.com"] = [(IPv4Address, "10.1.2.3")]
+
+        channel = self.make_request(
+            "GET",
+            "preview_url?url=http://cdn.twitter.com/matrixdotorg",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+
+        client = self.reactor.tcpClients[0][2].buildProtocol(None)
+        server = AccumulatingProtocol()
+        server.makeConnection(FakeTransport(client, self.reactor))
+        client.makeConnection(FakeTransport(server, self.reactor))
+        client.dataReceived(
+            b"HTTP/1.0 200 OK\r\nContent-Length: %d\r\nContent-Type: image/png\r\n\r\n"
+            % (len(SMALL_PNG),)
+            + SMALL_PNG
+        )
+
+        self.pump()
+        self.assertEqual(channel.code, 200)
+        body = channel.json_body
+        mxc_uri = body["og:image"]
+        host, _port, media_id = parse_and_validate_mxc_uri(mxc_uri)
+        self.assertIsNone(_port)
+        return host, media_id
+
+    def test_storage_providers_exclude_files(self):
+        """Test that files are not stored in or fetched from storage providers."""
+        host, media_id = self._download_image()
+
+        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        media_store_path = os.path.join(self.media_store_path, rel_file_path)
+        storage_provider_path = os.path.join(self.storage_path, rel_file_path)
+
+        # Check storage
+        self.assertTrue(os.path.isfile(media_store_path))
+        self.assertFalse(
+            os.path.isfile(storage_provider_path),
+            "URL cache file was unexpectedly stored in a storage provider",
+        )
+
+        # Check fetching
+        channel = self.make_request(
+            "GET",
+            f"download/{host}/{media_id}",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # Move cached file into the storage provider
+        os.makedirs(os.path.dirname(storage_provider_path), exist_ok=True)
+        os.rename(media_store_path, storage_provider_path)
+
+        channel = self.make_request(
+            "GET",
+            f"download/{host}/{media_id}",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(
+            channel.code,
+            404,
+            "URL cache file was unexpectedly retrieved from a storage provider",
+        )
+
+    def test_storage_providers_exclude_thumbnails(self):
+        """Test that thumbnails are not stored in or fetched from storage providers."""
+        host, media_id = self._download_image()
+
+        rel_thumbnail_path = (
+            self.preview_url.filepaths.url_cache_thumbnail_directory_rel(media_id)
+        )
+        media_store_thumbnail_path = os.path.join(
+            self.media_store_path, rel_thumbnail_path
+        )
+        storage_provider_thumbnail_path = os.path.join(
+            self.storage_path, rel_thumbnail_path
+        )
+
+        # Check storage
+        self.assertTrue(os.path.isdir(media_store_thumbnail_path))
+        self.assertFalse(
+            os.path.isdir(storage_provider_thumbnail_path),
+            "URL cache thumbnails were unexpectedly stored in a storage provider",
+        )
+
+        # Check fetching
+        channel = self.make_request(
+            "GET",
+            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(channel.code, 200)
+
+        # Remove the original, otherwise thumbnails will regenerate
+        rel_file_path = self.preview_url.filepaths.url_cache_filepath_rel(media_id)
+        media_store_path = os.path.join(self.media_store_path, rel_file_path)
+        os.remove(media_store_path)
+
+        # Move cached thumbnails into the storage provider
+        os.makedirs(os.path.dirname(storage_provider_thumbnail_path), exist_ok=True)
+        os.rename(media_store_thumbnail_path, storage_provider_thumbnail_path)
+
+        channel = self.make_request(
+            "GET",
+            f"thumbnail/{host}/{media_id}?width=32&height=32&method=scale",
+            shorthand=False,
+            await_result=False,
+        )
+        self.pump()
+        self.assertEqual(
+            channel.code,
+            404,
+            "URL cache thumbnail was unexpectedly retrieved from a storage provider",
+        )

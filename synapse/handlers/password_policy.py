@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2019 New Vector Ltd
 # Copyright 2019 The Matrix.org Foundation C.I.C.
 #
@@ -28,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 class PasswordPolicyHandler:
     def __init__(self, hs: "HomeServer"):
-        self.policy = hs.config.password_policy
-        self.enabled = hs.config.password_policy_enabled
+        self.policy = hs.config.auth.password_policy
+        self.enabled = hs.config.auth.password_policy_enabled
 
         # Regexps for the spec'd policy parameters.
         self.regexp_digit = re.compile("[0-9]")

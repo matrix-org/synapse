@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the 'License');
@@ -300,6 +299,93 @@ class PruneEventTestCase(unittest.TestCase):
                 "unsigned": {},
             },
             room_version=RoomVersions.MSC2176,
+        )
+
+    def test_join_rules(self):
+        """Join rules events have changed behavior starting with MSC3083."""
+        self.run_test(
+            {
+                "type": "m.room.join_rules",
+                "event_id": "$test:domain",
+                "content": {
+                    "join_rule": "invite",
+                    "allow": [],
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.join_rules",
+                "event_id": "$test:domain",
+                "content": {"join_rule": "invite"},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+        # After MSC3083, the allow key is protected from redaction.
+        self.run_test(
+            {
+                "type": "m.room.join_rules",
+                "content": {
+                    "join_rule": "invite",
+                    "allow": [],
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.join_rules",
+                "content": {
+                    "join_rule": "invite",
+                    "allow": [],
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V8,
+        )
+
+    def test_member(self):
+        """Member events have changed behavior starting with MSC3375."""
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "event_id": "$test:domain",
+                "content": {
+                    "membership": "join",
+                    "join_authorised_via_users_server": "@user:domain",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "event_id": "$test:domain",
+                "content": {"membership": "join"},
+                "signatures": {},
+                "unsigned": {},
+            },
+        )
+
+        # After MSC3375, the join_authorised_via_users_server key is protected
+        # from redaction.
+        self.run_test(
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "join",
+                    "join_authorised_via_users_server": "@user:domain",
+                    "other_key": "stripped",
+                },
+            },
+            {
+                "type": "m.room.member",
+                "content": {
+                    "membership": "join",
+                    "join_authorised_via_users_server": "@user:domain",
+                },
+                "signatures": {},
+                "unsigned": {},
+            },
+            room_version=RoomVersions.V9,
         )
 
 

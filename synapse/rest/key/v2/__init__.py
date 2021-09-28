@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,14 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from typing import TYPE_CHECKING
+
 from twisted.web.resource import Resource
 
 from .local_key_resource import LocalKey
 from .remote_key_resource import RemoteKey
 
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
+
 
 class KeyApiV2Resource(Resource):
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         Resource.__init__(self)
         self.putChild(b"server", LocalKey(hs))
         self.putChild(b"query", RemoteKey(hs))

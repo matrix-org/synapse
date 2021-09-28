@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -298,7 +297,6 @@ class ClientIpBackgroundUpdateStore(SQLBaseStore):
             #      times, which is fine.
 
             where_clause, where_args = make_tuple_comparison_clause(
-                self.database_engine,
                 [("user_id", last_user_id), ("device_id", last_device_id)],
             )
 
@@ -357,7 +355,7 @@ class ClientIpWorkerStore(ClientIpBackgroundUpdateStore):
 
         self.user_ips_max_age = hs.config.user_ips_max_age
 
-        if hs.config.run_background_tasks and self.user_ips_max_age:
+        if hs.config.worker.run_background_tasks and self.user_ips_max_age:
             self._clock.looping_call(self._prune_old_user_ips, 5 * 1000)
 
     @wrap_as_background_process("prune_old_user_ips")
@@ -438,7 +436,7 @@ class ClientIpStore(ClientIpWorkerStore):
     def __init__(self, database: DatabasePool, db_conn, hs):
 
         self.client_ip_last_seen = LruCache(
-            cache_name="client_ip_last_seen", keylen=4, max_size=50000
+            cache_name="client_ip_last_seen", max_size=50000
         )
 
         super().__init__(database, db_conn, hs)
@@ -557,8 +555,11 @@ class ClientIpStore(ClientIpWorkerStore):
         return ret
 
     async def get_user_ip_and_agents(
-        self, user: UserID
+        self, user: UserID, since_ts: int = 0
     ) -> List[Dict[str, Union[str, int]]]:
+        """
+        Fetch IP/User Agent connection since a given timestamp.
+        """
         user_id = user.to_string()
         results = {}
 
@@ -570,13 +571,23 @@ class ClientIpStore(ClientIpWorkerStore):
             ) = key
             if uid == user_id:
                 user_agent, _, last_seen = self._batch_row_update[key]
-                results[(access_token, ip)] = (user_agent, last_seen)
+                if last_seen >= since_ts:
+                    results[(access_token, ip)] = (user_agent, last_seen)
 
-        rows = await self.db_pool.simple_select_list(
-            table="user_ips",
-            keyvalues={"user_id": user_id},
-            retcols=["access_token", "ip", "user_agent", "last_seen"],
-            desc="get_user_ip_and_agents",
+        def get_recent(txn):
+            txn.execute(
+                """
+                SELECT access_token, ip, user_agent, last_seen FROM user_ips
+                WHERE last_seen >= ? AND user_id = ?
+                ORDER BY last_seen
+                DESC
+                """,
+                (since_ts, user_id),
+            )
+            return txn.fetchall()
+
+        rows = await self.db_pool.runInteraction(
+            desc="get_user_ip_and_agents", func=get_recent
         )
 
         results.update(

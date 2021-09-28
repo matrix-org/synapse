@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,8 +15,7 @@
 
 import json
 from typing import Dict
-
-from mock import ANY, Mock, call
+from unittest.mock import ANY, Mock, call
 
 from twisted.internet import defer
 from twisted.web.resource import Resource
@@ -39,6 +37,9 @@ U_ONION = UserID.from_string("@onion:farm")
 
 # Test room id
 ROOM_ID = "a-room"
+
+# Room we're not in
+OTHER_ROOM_ID = "another-room"
 
 
 def _expect_edu_transaction(edu_type, content, origin="test"):
@@ -88,17 +89,11 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.handler = hs.get_typing_handler()
 
-        self.event_source = hs.get_event_sources().sources["typing"]
+        self.event_source = hs.get_event_sources().sources.typing
 
         self.datastore = hs.get_datastore()
-        retry_timings_res = {
-            "destination": "",
-            "retry_last_ts": 0,
-            "retry_interval": 0,
-            "failure_ts": None,
-        }
         self.datastore.get_destination_retry_timings = Mock(
-            return_value=defer.succeed(retry_timings_res)
+            return_value=defer.succeed(None)
         )
 
         self.datastore.get_device_updates_by_remote = Mock(
@@ -122,6 +117,11 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
             return None
 
         hs.get_auth().check_user_in_room = check_user_in_room
+
+        async def check_host_in_room(room_id, server_name):
+            return room_id == ROOM_ID
+
+        hs.get_event_auth_handler().check_host_in_room = check_host_in_room
 
         def get_joined_hosts_for_room(room_id):
             return {member.domain for member in self.room_members}
@@ -171,7 +171,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.get_success(
-            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+            self.event_source.get_new_events(
+                user=U_APPLE, from_key=0, limit=None, room_ids=[ROOM_ID], is_guest=False
+            )
         )
         self.assertEquals(
             events[0],
@@ -239,7 +241,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.get_success(
-            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+            self.event_source.get_new_events(
+                user=U_APPLE, from_key=0, limit=None, room_ids=[ROOM_ID], is_guest=False
+            )
         )
         self.assertEquals(
             events[0],
@@ -251,6 +255,41 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
                 }
             ],
         )
+
+    def test_started_typing_remote_recv_not_in_room(self):
+        self.room_members = [U_APPLE, U_ONION]
+
+        self.assertEquals(self.event_source.get_current_key(), 0)
+
+        channel = self.make_request(
+            "PUT",
+            "/_matrix/federation/v1/send/1000000",
+            _make_edu_transaction_json(
+                "m.typing",
+                content={
+                    "room_id": OTHER_ROOM_ID,
+                    "user_id": U_ONION.to_string(),
+                    "typing": True,
+                },
+            ),
+            federation_auth_origin=b"farm",
+        )
+        self.assertEqual(channel.code, 200)
+
+        self.on_new_event.assert_not_called()
+
+        self.assertEquals(self.event_source.get_current_key(), 0)
+        events = self.get_success(
+            self.event_source.get_new_events(
+                user=U_APPLE,
+                from_key=0,
+                limit=None,
+                room_ids=[OTHER_ROOM_ID],
+                is_guest=False,
+            )
+        )
+        self.assertEquals(events[0], [])
+        self.assertEquals(events[1], 0)
 
     @override_config({"send_federation": True})
     def test_stopped_typing(self):
@@ -295,7 +334,9 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.get_success(
-            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+            self.event_source.get_new_events(
+                user=U_APPLE, from_key=0, limit=None, room_ids=[ROOM_ID], is_guest=False
+            )
         )
         self.assertEquals(
             events[0],
@@ -321,7 +362,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 1)
         events = self.get_success(
-            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+            self.event_source.get_new_events(
+                user=U_APPLE,
+                from_key=0,
+                limit=None,
+                room_ids=[ROOM_ID],
+                is_guest=False,
+            )
         )
         self.assertEquals(
             events[0],
@@ -340,7 +387,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 2)
         events = self.get_success(
-            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=1)
+            self.event_source.get_new_events(
+                user=U_APPLE,
+                from_key=1,
+                limit=None,
+                room_ids=[ROOM_ID],
+                is_guest=False,
+            )
         )
         self.assertEquals(
             events[0],
@@ -363,7 +416,13 @@ class TypingNotificationsTestCase(unittest.HomeserverTestCase):
 
         self.assertEquals(self.event_source.get_current_key(), 3)
         events = self.get_success(
-            self.event_source.get_new_events(room_ids=[ROOM_ID], from_key=0)
+            self.event_source.get_new_events(
+                user=U_APPLE,
+                from_key=0,
+                limit=None,
+                room_ids=[ROOM_ID],
+                is_guest=False,
+            )
         )
         self.assertEquals(
             events[0],

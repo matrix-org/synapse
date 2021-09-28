@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -74,4 +73,4 @@ class RedisFactory(protocol.ReconnectingClientFactory):
     def buildProtocol(self, addr) -> RedisProtocol: ...
 
 class SubscriberFactory(RedisFactory):
-    def __init__(self): ...
+    def __init__(self) -> None: ...

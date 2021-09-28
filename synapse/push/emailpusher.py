@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -20,8 +19,9 @@ from twisted.internet.error import AlreadyCalled, AlreadyCancelled
 from twisted.internet.interfaces import IDelayedCall
 
 from synapse.metrics.background_process_metrics import run_as_background_process
-from synapse.push import Pusher, PusherConfig, ThrottleParams
+from synapse.push import Pusher, PusherConfig, PusherConfigException, ThrottleParams
 from synapse.push.mailer import Mailer
+from synapse.util.threepids import validate_email
 
 if TYPE_CHECKING:
     from synapse.server import HomeServer
@@ -66,11 +66,17 @@ class EmailPusher(Pusher):
 
         self.store = self.hs.get_datastore()
         self.email = pusher_config.pushkey
-        self.timed_call = None  # type: Optional[IDelayedCall]
-        self.throttle_params = {}  # type: Dict[str, ThrottleParams]
+        self.timed_call: Optional[IDelayedCall] = None
+        self.throttle_params: Dict[str, ThrottleParams] = {}
         self._inited = False
 
         self._is_processing = False
+
+        # Make sure that the email is valid.
+        try:
+            validate_email(self.email)
+        except ValueError:
+            raise PusherConfigException("Invalid email")
 
     def on_started(self, should_check_for_notifs: bool) -> None:
         """Called when this pusher has been started.
@@ -162,7 +168,7 @@ class EmailPusher(Pusher):
             )
         )
 
-        soonest_due_at = None  # type: Optional[int]
+        soonest_due_at: Optional[int] = None
 
         if not unprocessed:
             await self.save_last_stream_ordering_and_success(self.max_stream_ordering)

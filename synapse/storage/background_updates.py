@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -93,14 +92,12 @@ class BackgroundUpdater:
         self.db_pool = database
 
         # if a background update is currently running, its name.
-        self._current_background_update = None  # type: Optional[str]
+        self._current_background_update: Optional[str] = None
 
-        self._background_update_performance = (
-            {}
-        )  # type: Dict[str, BackgroundUpdatePerformance]
-        self._background_update_handlers = (
-            {}
-        )  # type: Dict[str, Callable[[JsonDict, int], Awaitable[int]]]
+        self._background_update_performance: Dict[str, BackgroundUpdatePerformance] = {}
+        self._background_update_handlers: Dict[
+            str, Callable[[JsonDict, int], Awaitable[int]]
+        ] = {}
         self._all_done = False
 
     def start_doing_background_updates(self) -> None:
@@ -412,7 +409,7 @@ class BackgroundUpdater:
             c.execute(sql)
 
         if isinstance(self.db_pool.engine, engines.PostgresEngine):
-            runner = create_index_psql  # type: Optional[Callable[[Connection], None]]
+            runner: Optional[Callable[[Connection], None]] = create_index_psql
         elif psql_only:
             runner = None
         else:

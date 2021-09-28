@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 # Copyright 2019 New Vector Ltd
 # Copyright 2019,2020 The Matrix.org Foundation C.I.C.
@@ -15,7 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-from typing import TYPE_CHECKING, Dict, Iterable, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, Collection, Dict, Iterable, List, Optional, Set, Tuple
 
 from synapse.api import errors
 from synapse.api.constants import EventTypes
@@ -29,7 +28,6 @@ from synapse.api.errors import (
 from synapse.logging.opentracing import log_kv, set_tag, trace
 from synapse.metrics.background_process_metrics import run_as_background_process
 from synapse.types import (
-    Collection,
     JsonDict,
     StreamToken,
     UserID,
@@ -157,8 +155,7 @@ class DeviceWorkerHandler(BaseHandler):
             # The user may have left the room
             # TODO: Check if they actually did or if we were just invited.
             if room_id not in room_ids:
-                for key, event_id in current_state_ids.items():
-                    etype, state_key = key
+                for etype, state_key in current_state_ids.keys():
                     if etype != EventTypes.Member:
                         continue
                     possibly_left.add(state_key)
@@ -180,8 +177,7 @@ class DeviceWorkerHandler(BaseHandler):
                 log_kv(
                     {"event": "encountered empty previous state", "room_id": room_id}
                 )
-                for key, event_id in current_state_ids.items():
-                    etype, state_key = key
+                for etype, state_key in current_state_ids.keys():
                     if etype != EventTypes.Member:
                         continue
                     possibly_changed.add(state_key)
@@ -199,8 +195,7 @@ class DeviceWorkerHandler(BaseHandler):
             for state_dict in prev_state_ids.values():
                 member_event = state_dict.get((EventTypes.Member, user_id), None)
                 if not member_event or member_event != current_member_id:
-                    for key, event_id in current_state_ids.items():
-                        etype, state_key = key
+                    for etype, state_key in current_state_ids.keys():
                         if etype != EventTypes.Member:
                             continue
                         possibly_changed.add(state_key)
@@ -272,7 +267,7 @@ class DeviceHandler(DeviceWorkerHandler):
 
         hs.get_distributor().observe("user_left_room", self.user_left_room)
 
-    def _check_device_name_length(self, name: Optional[str]):
+    def _check_device_name_length(self, name: Optional[str]) -> None:
         """
         Checks whether a device name is longer than the maximum allowed length.
 
@@ -457,7 +452,7 @@ class DeviceHandler(DeviceWorkerHandler):
             user_id
         )
 
-        hosts = set()  # type: Set[str]
+        hosts: Set[str] = set()
         if self.hs.is_mine_id(user_id):
             hosts.update(get_domain_from_id(u) for u in users_who_share_room)
             hosts.discard(self.server_name)
@@ -618,14 +613,14 @@ class DeviceListUpdater:
         self._remote_edu_linearizer = Linearizer(name="remote_device_list")
 
         # user_id -> list of updates waiting to be handled.
-        self._pending_updates = (
-            {}
-        )  # type: Dict[str, List[Tuple[str, str, Iterable[str], JsonDict]]]
+        self._pending_updates: Dict[
+            str, List[Tuple[str, str, Iterable[str], JsonDict]]
+        ] = {}
 
         # Recently seen stream ids. We don't bother keeping these in the DB,
         # but they're useful to have them about to reduce the number of spurious
         # resyncs.
-        self._seen_updates = ExpiringCache(
+        self._seen_updates: ExpiringCache[str, Set[str]] = ExpiringCache(
             cache_name="device_update_edu",
             clock=self.clock,
             max_len=10000,
@@ -715,7 +710,7 @@ class DeviceListUpdater:
                 # This can happen since we batch updates
                 return
 
-            for device_id, stream_id, prev_ids, content in pending_updates:
+            for device_id, stream_id, prev_ids, _ in pending_updates:
                 logger.debug(
                     "Handling update %r/%r, ID: %r, prev: %r ",
                     user_id,
@@ -741,7 +736,7 @@ class DeviceListUpdater:
             else:
                 # Simply update the single device, since we know that is the only
                 # change (because of the single prev_id matching the current cache)
-                for device_id, stream_id, prev_ids, content in pending_updates:
+                for device_id, stream_id, _, content in pending_updates:
                     await self.store.update_remote_device_list_cache_entry(
                         user_id, device_id, content, stream_id
                     )
@@ -760,7 +755,7 @@ class DeviceListUpdater:
         """Given a list of updates for a user figure out if we need to do a full
         resync, or whether we have enough data that we can just apply the delta.
         """
-        seen_updates = self._seen_updates.get(user_id, set())
+        seen_updates: Set[str] = self._seen_updates.get(user_id, set())
 
         extremity = await self.store.get_device_list_last_stream_id_for_remote(user_id)
 
@@ -930,6 +925,10 @@ class DeviceListUpdater:
         else:
             cached_devices = await self.store.get_cached_devices_for_user(user_id)
             if cached_devices == {d["device_id"]: d for d in devices}:
+                logging.info(
+                    "Skipping device list resync for %s, as our cache matches already",
+                    user_id,
+                )
                 devices = []
                 ignore_devices = True
 
@@ -945,6 +944,9 @@ class DeviceListUpdater:
             await self.store.update_remote_device_list_cache(
                 user_id, devices, stream_id
             )
+        # mark the cache as valid, whether or not we actually processed any device
+        # list updates.
+        await self.store.mark_remote_user_device_cache_as_valid(user_id)
         device_ids = [device["device_id"] for device in devices]
 
         # Handle cross-signing keys.

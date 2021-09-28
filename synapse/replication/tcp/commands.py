@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -35,7 +34,7 @@ class Command(metaclass=abc.ABCMeta):
     A full command line on the wire is constructed from `NAME + " " + to_line()`
     """
 
-    NAME = None  # type: str
+    NAME: str
 
     @classmethod
     @abc.abstractmethod
@@ -381,7 +380,7 @@ class RemoteServerUpCommand(_SimpleCommand):
     NAME = "REMOTE_SERVER_UP"
 
 
-_COMMANDS = (
+_COMMANDS: Tuple[Type[Command], ...] = (
     ServerCommand,
     RdataCommand,
     PositionCommand,
@@ -394,7 +393,7 @@ _COMMANDS = (
     UserIpCommand,
     RemoteServerUpCommand,
     ClearUserSyncsCommand,
-)  # type: Tuple[Type[Command], ...]
+)
 
 # Map of command name to command type.
 COMMAND_MAP = {cmd.NAME: cmd for cmd in _COMMANDS}

@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import logging
-from typing import Dict
+from typing import TYPE_CHECKING, Dict
 
 from signedjson.sign import sign_json
 
@@ -21,7 +21,13 @@ from synapse.api.errors import Codes, SynapseError
 from synapse.crypto.keyring import ServerKeyFetcher
 from synapse.http.server import DirectServeJsonResource, respond_with_json
 from synapse.http.servlet import parse_integer, parse_json_object_from_request
+from synapse.http.site import SynapseRequest
+from synapse.types import JsonDict
 from synapse.util import json_decoder
+from synapse.util.async_helpers import yieldable_gather_results
+
+if TYPE_CHECKING:
+    from synapse.server import HomeServer
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +79,6 @@ class RemoteKey(DirectServeJsonResource):
                         "expired_ts": 0, # when the key stop being used.
                     }
                 }
-                "tls_fingerprints": [
-                    { "sha256": # fingerprint }
-                ]
                 "signatures": {
                     "remote.server.example.com": {...}
                     "this.server.example.com": {...}
@@ -87,19 +90,22 @@ class RemoteKey(DirectServeJsonResource):
 
     isLeaf = True
 
-    def __init__(self, hs):
+    def __init__(self, hs: "HomeServer"):
         super().__init__()
 
         self.fetcher = ServerKeyFetcher(hs)
         self.store = hs.get_datastore()
         self.clock = hs.get_clock()
-        self.federation_domain_whitelist = hs.config.federation_domain_whitelist
+        self.federation_domain_whitelist = (
+            hs.config.federation.federation_domain_whitelist
+        )
         self.config = hs.config
 
-    async def _async_render_GET(self, request):
+    async def _async_render_GET(self, request: SynapseRequest) -> None:
+        assert request.postpath is not None
         if len(request.postpath) == 1:
             (server,) = request.postpath
-            query = {server.decode("ascii"): {}}  # type: dict
+            query: dict = {server.decode("ascii"): {}}
         elif len(request.postpath) == 2:
             server, key_id = request.postpath
             minimum_valid_until_ts = parse_integer(request, "minimum_valid_until_ts")
@@ -112,14 +118,19 @@ class RemoteKey(DirectServeJsonResource):
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    async def _async_render_POST(self, request):
+    async def _async_render_POST(self, request: SynapseRequest) -> None:
         content = parse_json_object_from_request(request)
 
         query = content["server_keys"]
 
         await self.query_keys(request, query, query_remote_on_cache_miss=True)
 
-    async def query_keys(self, request, query, query_remote_on_cache_miss=False):
+    async def query_keys(
+        self,
+        request: SynapseRequest,
+        query: JsonDict,
+        query_remote_on_cache_miss: bool = False,
+    ) -> None:
         logger.info("Handling query for keys %r", query)
 
         store_queries = []
@@ -143,9 +154,9 @@ class RemoteKey(DirectServeJsonResource):
         time_now_ms = self.clock.time_msec()
 
         # Note that the value is unused.
-        cache_misses = {}  # type: Dict[str, Dict[str, int]]
-        for (server_name, key_id, from_server), results in cached.items():
-            results = [(result["ts_added_ms"], result) for result in results]
+        cache_misses: Dict[str, Dict[str, int]] = {}
+        for (server_name, key_id, _), key_results in cached.items():
+            results = [(result["ts_added_ms"], result) for result in key_results]
 
             if not results and key_id is not None:
                 cache_misses.setdefault(server_name, {})[key_id] = 0
@@ -206,24 +217,32 @@ class RemoteKey(DirectServeJsonResource):
                 # Cast to bytes since postgresql returns a memoryview.
                 json_results.add(bytes(most_recent_result["key_json"]))
             else:
-                for ts_added, result in results:
+                for _, result in results:
                     # Cast to bytes since postgresql returns a memoryview.
                     json_results.add(bytes(result["key_json"]))
 
         # If there is a cache miss, request the missing keys, then recurse (and
         # ensure the result is sent).
         if cache_misses and query_remote_on_cache_miss:
-            await self.fetcher.get_keys(cache_misses)
+            await yieldable_gather_results(
+                lambda t: self.fetcher.get_keys(*t),
+                (
+                    (server_name, list(keys), 0)
+                    for server_name, keys in cache_misses.items()
+                ),
+            )
             await self.query_keys(request, query, query_remote_on_cache_miss=False)
         else:
             signed_keys = []
             for key_json in json_results:
                 key_json = json_decoder.decode(key_json.decode("utf-8"))
-                for signing_key in self.config.key_server_signing_keys:
-                    key_json = sign_json(key_json, self.config.server_name, signing_key)
+                for signing_key in self.config.key.key_server_signing_keys:
+                    key_json = sign_json(
+                        key_json, self.config.server.server_name, signing_key
+                    )
 
                 signed_keys.append(key_json)
 
-            results = {"server_keys": signed_keys}
+            response = {"server_keys": signed_keys}
 
-            respond_with_json(request, 200, results, canonical_json=True)
+            respond_with_json(request, 200, response, canonical_json=True)

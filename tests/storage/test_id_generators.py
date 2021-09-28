@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -12,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from typing import List, Optional
+
 from synapse.storage.database import DatabasePool
 from synapse.storage.engines import IncorrectDatabaseSetup
 from synapse.storage.util.id_generators import MultiWriterIdGenerator
@@ -26,7 +27,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.db_pool = self.store.db_pool  # type: DatabasePool
+        self.db_pool: DatabasePool = self.store.db_pool
 
         self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
 
@@ -43,7 +44,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -53,7 +54,7 @@ class MultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 instance_name=instance_name,
                 tables=[("foobar", "instance_name", "stream_id")],
                 sequence_name="foobar_seq",
-                writers=writers,
+                writers=writers or ["master"],
             )
 
         return self.get_success_or_raise(self.db_pool.runWithConnection(_create))
@@ -459,7 +460,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.db_pool = self.store.db_pool  # type: DatabasePool
+        self.db_pool: DatabasePool = self.store.db_pool
 
         self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
 
@@ -476,7 +477,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -486,7 +487,7 @@ class BackwardsMultiWriterIdGeneratorTestCase(HomeserverTestCase):
                 instance_name=instance_name,
                 tables=[("foobar", "instance_name", "stream_id")],
                 sequence_name="foobar_seq",
-                writers=writers,
+                writers=writers or ["master"],
                 positive=False,
             )
 
@@ -585,7 +586,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
 
     def prepare(self, reactor, clock, hs):
         self.store = hs.get_datastore()
-        self.db_pool = self.store.db_pool  # type: DatabasePool
+        self.db_pool: DatabasePool = self.store.db_pool
 
         self.get_success(self.db_pool.runInteraction("_setup_db", self._setup_db))
 
@@ -612,7 +613,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
         )
 
     def _create_id_generator(
-        self, instance_name="master", writers=["master"]
+        self, instance_name="master", writers: Optional[List[str]] = None
     ) -> MultiWriterIdGenerator:
         def _create(conn):
             return MultiWriterIdGenerator(
@@ -625,7 +626,7 @@ class MultiTableMultiWriterIdGeneratorTestCase(HomeserverTestCase):
                     ("foobar2", "instance_name", "stream_id"),
                 ],
                 sequence_name="foobar_seq",
-                writers=writers,
+                writers=writers or ["master"],
             )
 
         return self.get_success_or_raise(self.db_pool.runWithConnection(_create))

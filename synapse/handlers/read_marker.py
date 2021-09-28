@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2017 Vector Creations Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -29,7 +28,7 @@ logger = logging.getLogger(__name__)
 class ReadMarkerHandler(BaseHandler):
     def __init__(self, hs: "HomeServer"):
         super().__init__(hs)
-        self.server_name = hs.config.server_name
+        self.server_name = hs.config.server.server_name
         self.store = hs.get_datastore()
         self.account_data_handler = hs.get_account_data_handler()
         self.read_marker_linearizer = Linearizer(name="read_marker")

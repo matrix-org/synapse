@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2020 The Matrix.org Foundation C.I.C.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,6 +13,7 @@
 # limitations under the License.
 
 from twisted.web.resource import Resource
+from twisted.web.server import Request
 
 
 class HealthResource(Resource):
@@ -26,6 +26,6 @@ class HealthResource(Resource):
 
     isLeaf = 1
 
-    def render_GET(self, request):
+    def render_GET(self, request: Request) -> bytes:
         request.setHeader(b"Content-Type", b"text/plain")
         return b"OK"

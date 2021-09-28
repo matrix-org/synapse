@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014 - 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +17,7 @@ from collections import namedtuple
 from typing import (
     Awaitable,
     Callable,
+    Collection,
     Dict,
     Iterable,
     List,
@@ -38,18 +38,13 @@ from synapse.api.constants import EventTypes, HistoryVisibility, Membership
 from synapse.api.errors import AuthError
 from synapse.events import EventBase
 from synapse.handlers.presence import format_user_presence_state
+from synapse.logging import issue9533_logger
 from synapse.logging.context import PreserveLoggingContext
 from synapse.logging.opentracing import log_kv, start_active_span
 from synapse.logging.utils import log_function
 from synapse.metrics import LaterGauge
 from synapse.streams.config import PaginationConfig
-from synapse.types import (
-    Collection,
-    PersistedEventPosition,
-    RoomStreamToken,
-    StreamToken,
-    UserID,
-)
+from synapse.types import PersistedEventPosition, RoomStreamToken, StreamToken, UserID
 from synapse.util.async_helpers import ObservableDeferred, timeout_deferred
 from synapse.util.metrics import Measure
 from synapse.visibility import filter_events_for_client
@@ -116,8 +111,9 @@ class _NotifierUserStream:
         self.last_notified_token = current_token
         self.last_notified_ms = time_now_ms
 
-        with PreserveLoggingContext():
-            self.notify_deferred = ObservableDeferred(defer.Deferred())
+        self.notify_deferred: ObservableDeferred[StreamToken] = ObservableDeferred(
+            defer.Deferred()
+        )
 
     def notify(
         self,
@@ -208,21 +204,21 @@ class Notifier:
     UNUSED_STREAM_EXPIRY_MS = 10 * 60 * 1000
 
     def __init__(self, hs: "synapse.server.HomeServer"):
-        self.user_to_user_stream = {}  # type: Dict[str, _NotifierUserStream]
-        self.room_to_user_streams = {}  # type: Dict[str, Set[_NotifierUserStream]]
+        self.user_to_user_stream: Dict[str, _NotifierUserStream] = {}
+        self.room_to_user_streams: Dict[str, Set[_NotifierUserStream]] = {}
 
         self.hs = hs
         self.storage = hs.get_storage()
         self.event_sources = hs.get_event_sources()
         self.store = hs.get_datastore()
-        self.pending_new_room_events = []  # type: List[_PendingRoomEventEntry]
+        self.pending_new_room_events: List[_PendingRoomEventEntry] = []
 
         # Called when there are new things to stream over replication
-        self.replication_callbacks = []  # type: List[Callable[[], None]]
+        self.replication_callbacks: List[Callable[[], None]] = []
 
         # Called when remote servers have come back online after having been
         # down.
-        self.remote_server_up_callbacks = []  # type: List[Callable[[str], None]]
+        self.remote_server_up_callbacks: List[Callable[[str], None]] = []
 
         self.clock = hs.get_clock()
         self.appservice_handler = hs.get_application_service_handler()
@@ -242,7 +238,7 @@ class Notifier:
         # when rendering the metrics page, which is likely once per minute at
         # most when scraping it.
         def count_listeners():
-            all_user_streams = set()  # type: Set[_NotifierUserStream]
+            all_user_streams: Set[_NotifierUserStream] = set()
 
             for streams in list(self.room_to_user_streams.values()):
                 all_user_streams |= streams
@@ -276,7 +272,7 @@ class Notifier:
         event: EventBase,
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
-        extra_users: Collection[UserID] = [],
+        extra_users: Optional[Collection[UserID]] = None,
     ):
         """Unwraps event and calls `on_new_room_event_args`."""
         self.on_new_room_event_args(
@@ -286,7 +282,7 @@ class Notifier:
             state_key=event.get("state_key"),
             membership=event.content.get("membership"),
             max_room_stream_token=max_room_stream_token,
-            extra_users=extra_users,
+            extra_users=extra_users or [],
         )
 
     def on_new_room_event_args(
@@ -297,7 +293,7 @@ class Notifier:
         membership: Optional[str],
         event_pos: PersistedEventPosition,
         max_room_stream_token: RoomStreamToken,
-        extra_users: Collection[UserID] = [],
+        extra_users: Optional[Collection[UserID]] = None,
     ):
         """Used by handlers to inform the notifier something has happened
         in the room, room event wise.
@@ -313,7 +309,7 @@ class Notifier:
         self.pending_new_room_events.append(
             _PendingRoomEventEntry(
                 event_pos=event_pos,
-                extra_users=extra_users,
+                extra_users=extra_users or [],
                 room_id=room_id,
                 type=event_type,
                 state_key=state_key,
@@ -334,8 +330,8 @@ class Notifier:
         pending = self.pending_new_room_events
         self.pending_new_room_events = []
 
-        users = set()  # type: Set[UserID]
-        rooms = set()  # type: Set[str]
+        users: Set[UserID] = set()
+        rooms: Set[str] = set()
 
         for entry in pending:
             if entry.event_pos.persisted_after(max_room_stream_token):
@@ -382,14 +378,14 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
     ):
         try:
             stream_token = None
             if isinstance(new_token, int):
                 stream_token = new_token
             self.appservice_handler.notify_interested_services_ephemeral(
-                stream_key, stream_token, users
+                stream_key, stream_token, users or []
             )
         except Exception:
             logger.exception("Error notifying application services of event")
@@ -404,13 +400,16 @@ class Notifier:
         self,
         stream_key: str,
         new_token: Union[int, RoomStreamToken],
-        users: Collection[Union[str, UserID]] = [],
-        rooms: Collection[str] = [],
+        users: Optional[Collection[Union[str, UserID]]] = None,
+        rooms: Optional[Collection[str]] = None,
     ):
         """Used to inform listeners that something has happened event wise.
 
         Will wake up all listeners for the given users and rooms.
         """
+        users = users or []
+        rooms = rooms or []
+
         with Measure(self.clock, "on_new_event"):
             user_streams = set()
 
@@ -428,6 +427,13 @@ class Notifier:
 
             for room in rooms:
                 user_streams |= self.room_to_user_streams.get(room, set())
+
+            if stream_key == "to_device_key":
+                issue9533_logger.debug(
+                    "to-device messages stream id %s, awaking streams for %s",
+                    new_token,
+                    users,
+                )
 
             time_now_ms = self.clock.time_msec()
             for user_stream in user_streams:
@@ -480,21 +486,21 @@ class Notifier:
             end_time = self.clock.time_msec() + timeout
 
             while not result:
-                try:
-                    now = self.clock.time_msec()
-                    if end_time <= now:
-                        break
+                with start_active_span("wait_for_events"):
+                    try:
+                        now = self.clock.time_msec()
+                        if end_time <= now:
+                            break
 
-                    # Now we wait for the _NotifierUserStream to be told there
-                    # is a new token.
-                    listener = user_stream.new_listener(prev_token)
-                    listener.deferred = timeout_deferred(
-                        listener.deferred,
-                        (end_time - now) / 1000.0,
-                        self.hs.get_reactor(),
-                    )
+                        # Now we wait for the _NotifierUserStream to be told there
+                        # is a new token.
+                        listener = user_stream.new_listener(prev_token)
+                        listener.deferred = timeout_deferred(
+                            listener.deferred,
+                            (end_time - now) / 1000.0,
+                            self.hs.get_reactor(),
+                        )
 
-                    with start_active_span("wait_for_events.deferred"):
                         log_kv(
                             {
                                 "wait_for_events": "sleep",
@@ -512,27 +518,27 @@ class Notifier:
                             }
                         )
 
-                    current_token = user_stream.current_token
+                        current_token = user_stream.current_token
 
-                    result = await callback(prev_token, current_token)
-                    log_kv(
-                        {
-                            "wait_for_events": "result",
-                            "result": bool(result),
-                        }
-                    )
-                    if result:
+                        result = await callback(prev_token, current_token)
+                        log_kv(
+                            {
+                                "wait_for_events": "result",
+                                "result": bool(result),
+                            }
+                        )
+                        if result:
+                            break
+
+                        # Update the prev_token to the current_token since nothing
+                        # has happened between the old prev_token and the current_token
+                        prev_token = current_token
+                    except defer.TimeoutError:
+                        log_kv({"wait_for_events": "timeout"})
                         break
-
-                    # Update the prev_token to the current_token since nothing
-                    # has happened between the old prev_token and the current_token
-                    prev_token = current_token
-                except defer.TimeoutError:
-                    log_kv({"wait_for_events": "timeout"})
-                    break
-                except defer.CancelledError:
-                    log_kv({"wait_for_events": "cancelled"})
-                    break
+                    except defer.CancelledError:
+                        log_kv({"wait_for_events": "cancelled"})
+                        break
 
         if result is None:
             # This happened if there was no timeout or if the timeout had
@@ -548,7 +554,7 @@ class Notifier:
         pagination_config: PaginationConfig,
         timeout: int,
         is_guest: bool = False,
-        explicit_room_id: str = None,
+        explicit_room_id: Optional[str] = None,
     ) -> EventStreamResult:
         """For the given user and rooms, return any new events for them. If
         there are no new events wait for up to `timeout` milliseconds for any
@@ -575,10 +581,10 @@ class Notifier:
             if after_token == before_token:
                 return EventStreamResult([], (from_token, from_token))
 
-            events = []  # type: List[EventBase]
+            events: List[EventBase] = []
             end_token = from_token
 
-            for name, source in self.event_sources.sources.items():
+            for name, source in self.event_sources.sources.get_sources():
                 keyname = "%s_key" % name
                 before_id = getattr(before_token, keyname)
                 after_id = getattr(after_token, keyname)

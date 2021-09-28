@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -13,22 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import email.mime.multipart
-import email.utils
 import logging
 import urllib.parse
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, TypeVar
 
 import bleach
 import jinja2
 
-from synapse.api.constants import EventTypes, Membership
+from synapse.api.constants import EventTypes, Membership, RoomTypes
 from synapse.api.errors import StoreError
 from synapse.config.emailconfig import EmailSubjectConfig
 from synapse.events import EventBase
-from synapse.logging.context import make_deferred_yieldable
 from synapse.push.presentable_names import (
     calculate_room_name,
     descriptor_from_member_events,
@@ -109,14 +103,14 @@ class Mailer:
         self.template_html = template_html
         self.template_text = template_text
 
-        self.sendmail = self.hs.get_sendmail()
+        self.send_email_handler = hs.get_send_email_handler()
         self.store = self.hs.get_datastore()
         self.state_store = self.hs.get_storage().state
         self.macaroon_gen = self.hs.get_macaroon_generator()
         self.state_handler = self.hs.get_state_handler()
         self.storage = hs.get_storage()
         self.app_name = app_name
-        self.email_subjects = hs.config.email_subjects  # type: EmailSubjectConfig
+        self.email_subjects: EmailSubjectConfig = hs.config.email.email_subjects
 
         logger.info("Created Mailer for app_name %s" % app_name)
 
@@ -136,7 +130,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_synapse/client/password_reset/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -146,7 +140,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.password_reset
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -166,7 +160,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/registration/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -176,7 +170,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -197,7 +191,7 @@ class Mailer:
         """
         params = {"token": token, "client_secret": client_secret, "sid": sid}
         link = (
-            self.hs.config.public_baseurl
+            self.hs.config.server.public_baseurl
             + "_matrix/client/unstable/add_threepid/email/submit_token?%s"
             % urllib.parse.urlencode(params)
         )
@@ -207,7 +201,7 @@ class Mailer:
         await self.send_email(
             email_address,
             self.email_subjects.email_validation
-            % {"server_name": self.hs.config.server_name},
+            % {"server_name": self.hs.config.server.server_name},
             template_vars,
         )
 
@@ -236,7 +230,7 @@ class Mailer:
             [pa["event_id"] for pa in push_actions]
         )
 
-        notifs_by_room = {}  # type: Dict[str, List[Dict[str, Any]]]
+        notifs_by_room: Dict[str, List[Dict[str, Any]]] = {}
         for pa in push_actions:
             notifs_by_room.setdefault(pa["room_id"], []).append(pa)
 
@@ -264,7 +258,7 @@ class Mailer:
         # actually sort our so-called rooms_in_order list, most recent room first
         rooms_in_order.sort(key=lambda r: -(notifs_by_room[r][-1]["received_ts"] or 0))
 
-        rooms = []
+        rooms: List[Dict[str, Any]] = []
 
         for r in rooms_in_order:
             roomvars = await self._get_room_vars(
@@ -311,17 +305,6 @@ class Mailer:
         self, email_address: str, subject: str, extra_template_vars: Dict[str, Any]
     ) -> None:
         """Send an email with the given information and template text"""
-        try:
-            from_string = self.hs.config.email_notif_from % {"app": self.app_name}
-        except TypeError:
-            from_string = self.hs.config.email_notif_from
-
-        raw_from = email.utils.parseaddr(from_string)[1]
-        raw_to = email.utils.parseaddr(email_address)[1]
-
-        if raw_to == "":
-            raise RuntimeError("Invalid 'to' address")
-
         template_vars = {
             "app_name": self.app_name,
             "server_name": self.hs.config.server.server_name,
@@ -330,35 +313,14 @@ class Mailer:
         template_vars.update(extra_template_vars)
 
         html_text = self.template_html.render(**template_vars)
-        html_part = MIMEText(html_text, "html", "utf8")
-
         plain_text = self.template_text.render(**template_vars)
-        text_part = MIMEText(plain_text, "plain", "utf8")
 
-        multipart_msg = MIMEMultipart("alternative")
-        multipart_msg["Subject"] = subject
-        multipart_msg["From"] = from_string
-        multipart_msg["To"] = email_address
-        multipart_msg["Date"] = email.utils.formatdate()
-        multipart_msg["Message-ID"] = email.utils.make_msgid()
-        multipart_msg.attach(text_part)
-        multipart_msg.attach(html_part)
-
-        logger.info("Sending email to %s" % email_address)
-
-        await make_deferred_yieldable(
-            self.sendmail(
-                self.hs.config.email_smtp_host,
-                raw_from,
-                raw_to,
-                multipart_msg.as_string().encode("utf8"),
-                reactor=self.hs.get_reactor(),
-                port=self.hs.config.email_smtp_port,
-                requireAuthentication=self.hs.config.email_smtp_user is not None,
-                username=self.hs.config.email_smtp_user,
-                password=self.hs.config.email_smtp_pass,
-                requireTransportSecurity=self.hs.config.require_transport_security,
-            )
+        await self.send_email_handler.send_email(
+            email_address=email_address,
+            subject=subject,
+            app_name=self.app_name,
+            html=html_text,
+            text=plain_text,
         )
 
     async def _get_room_vars(
@@ -394,13 +356,14 @@ class Mailer:
 
         room_name = await calculate_room_name(self.store, room_state_ids, user_id)
 
-        room_vars = {
+        room_vars: Dict[str, Any] = {
             "title": room_name,
             "hash": string_ordinal_total(room_id),  # See sender avatar hash
             "notifs": [],
             "invite": is_invite,
             "link": self._make_room_link(room_id),
-        }  # type: Dict[str, Any]
+            "avatar_url": await self._get_room_avatar(room_state_ids),
+        }
 
         if not is_invite:
             for n in notifs:
@@ -430,6 +393,27 @@ class Mailer:
                     room_vars["notifs"].append(notifvars)
 
         return room_vars
+
+    async def _get_room_avatar(
+        self,
+        room_state_ids: StateMap[str],
+    ) -> Optional[str]:
+        """
+        Retrieve the avatar url for this room---if it exists.
+
+        Args:
+            room_state_ids: The event IDs of the current room state.
+
+        Returns:
+             room's avatar url if it's present and a string; otherwise None.
+        """
+        event_id = room_state_ids.get((EventTypes.RoomAvatar, ""))
+        if event_id:
+            ev = await self.store.get_event(event_id)
+            url = ev.content.get("url")
+            if isinstance(url, str):
+                return url
+        return None
 
     async def _get_notif_vars(
         self,
@@ -498,9 +482,9 @@ class Mailer:
         type_state_key = ("m.room.member", event.sender)
         sender_state_event_id = room_state_ids.get(type_state_key)
         if sender_state_event_id:
-            sender_state_event = await self.store.get_event(
+            sender_state_event: Optional[EventBase] = await self.store.get_event(
                 sender_state_event_id
-            )  # type: Optional[EventBase]
+            )
         else:
             # Attempt to check the historical state for the room.
             historical_state = await self.state_store.get_state_for_event(
@@ -637,6 +621,22 @@ class Mailer:
                     "person": inviter_name,
                     "app": self.app_name,
                 }
+
+            # If the room is a space, it gets a slightly different topic.
+            create_event_id = room_state_ids.get(("m.room.create", ""))
+            if create_event_id:
+                create_event = await self.store.get_event(
+                    create_event_id, allow_none=True
+                )
+                if (
+                    create_event
+                    and create_event.content.get("room_type") == RoomTypes.SPACE
+                ):
+                    return self.email_subjects.invite_from_person_to_space % {
+                        "person": inviter_name,
+                        "space": room_name,
+                        "app": self.app_name,
+                    }
 
             return self.email_subjects.invite_from_person_to_room % {
                 "person": inviter_name,
@@ -796,8 +796,8 @@ class Mailer:
         Returns:
              A link to open a room in the web client.
         """
-        if self.hs.config.email_riot_base_url:
-            base_url = "%s/#/room" % (self.hs.config.email_riot_base_url)
+        if self.hs.config.email.email_riot_base_url:
+            base_url = "%s/#/room" % (self.hs.config.email.email_riot_base_url)
         elif self.app_name == "Vector":
             # need /beta for Universal Links to work on iOS
             base_url = "https://vector.im/beta/#/room"
@@ -815,9 +815,9 @@ class Mailer:
         Returns:
              A link to open the notification in the web client.
         """
-        if self.hs.config.email_riot_base_url:
+        if self.hs.config.email.email_riot_base_url:
             return "%s/#/room/%s/%s" % (
-                self.hs.config.email_riot_base_url,
+                self.hs.config.email.email_riot_base_url,
                 notif["room_id"],
                 notif["event_id"],
             )
@@ -852,7 +852,7 @@ class Mailer:
 
         # XXX: make r0 once API is stable
         return "%s_matrix/client/unstable/pushers/remove?%s" % (
-            self.hs.config.public_baseurl,
+            self.hs.config.server.public_baseurl,
             urllib.parse.urlencode(params),
         )
 

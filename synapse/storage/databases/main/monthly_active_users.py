@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2018 New Vector
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -64,7 +63,7 @@ class MonthlyActiveUsersWorkerStore(SQLBaseStore):
         """Generates current count of monthly active users broken down by service.
         A service is typically an appservice but also includes native matrix users.
         Since the `monthly_active_users` table is populated from the `user_ips` table
-        `config.track_appservice_user_ips` must be set to `true` for this
+        `config.appservice.track_appservice_user_ips` must be set to `true` for this
         method to return anything other than native matrix users.
 
         Returns:
@@ -298,17 +297,13 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         Args:
             txn (cursor):
             user_id (str): user to add/update
-
-        Returns:
-            bool: True if a new entry was created, False if an
-            existing one was updated.
         """
 
         # Am consciously deciding to lock the table on the basis that is ought
         # never be a big table and alternative approaches (batching multiple
         # upserts into a single txn) introduced a lot of extra complexity.
         # See https://github.com/matrix-org/synapse/issues/3854 for more
-        is_insert = self.db_pool.simple_upsert_txn(
+        self.db_pool.simple_upsert_txn(
             txn,
             table="monthly_active_users",
             keyvalues={"user_id": user_id},
@@ -322,8 +317,6 @@ class MonthlyActiveUsersStore(MonthlyActiveUsersWorkerStore):
         self._invalidate_cache_and_stream(
             txn, self.user_last_seen_monthly_active, (user_id,)
         )
-
-        return is_insert
 
     async def populate_monthly_active_users(self, user_id):
         """Checks on the state of monthly active user limits and optionally

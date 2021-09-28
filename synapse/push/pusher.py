@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2014-2016 OpenMarket Ltd
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -32,16 +31,16 @@ class PusherFactory:
         self.hs = hs
         self.config = hs.config
 
-        self.pusher_types = {
+        self.pusher_types: Dict[str, Callable[[HomeServer, PusherConfig], Pusher]] = {
             "http": HttpPusher
-        }  # type: Dict[str, Callable[[HomeServer, PusherConfig], Pusher]]
+        }
 
-        logger.info("email enable notifs: %r", hs.config.email_enable_notifs)
-        if hs.config.email_enable_notifs:
-            self.mailers = {}  # type: Dict[str, Mailer]
+        logger.info("email enable notifs: %r", hs.config.email.email_enable_notifs)
+        if hs.config.email.email_enable_notifs:
+            self.mailers: Dict[str, Mailer] = {}
 
-            self._notif_template_html = hs.config.email_notif_template_html
-            self._notif_template_text = hs.config.email_notif_template_text
+            self._notif_template_html = hs.config.email.email_notif_template_html
+            self._notif_template_text = hs.config.email.email_notif_template_text
 
             self.pusher_types["email"] = self._create_email_pusher
 
@@ -78,4 +77,4 @@ class PusherFactory:
             if isinstance(brand, str):
                 return brand
 
-        return self.config.email_app_name
+        return self.config.email.email_app_name

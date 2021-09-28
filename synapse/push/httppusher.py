@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2015, 2016 OpenMarket Ltd
 # Copyright 2017 New Vector Ltd
 #
@@ -72,9 +71,11 @@ class HttpPusher(Pusher):
         self.data = pusher_config.data
         self.backoff_delay = HttpPusher.INITIAL_BACKOFF_SEC
         self.failing_since = pusher_config.failing_since
-        self.timed_call = None  # type: Optional[IDelayedCall]
+        self.timed_call: Optional[IDelayedCall] = None
         self._is_processing = False
-        self._group_unread_count_by_room = hs.config.push_group_unread_count_by_room
+        self._group_unread_count_by_room = (
+            hs.config.push.push_group_unread_count_by_room
+        )
         self._pusherpool = hs.get_pusherpool()
 
         self.data = pusher_config.data
@@ -366,7 +367,7 @@ class HttpPusher(Pusher):
         if event.type == "m.room.member" and event.is_state():
             d["notification"]["membership"] = event.content["membership"]
             d["notification"]["user_is_target"] = event.state_key == self.user_id
-        if self.hs.config.push_include_content and event.content:
+        if self.hs.config.push.push_include_content and event.content:
             d["notification"]["content"] = event.content
 
         # We no longer send aliases separately, instead, we send the human

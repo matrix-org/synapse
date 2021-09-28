@@ -1,4 +1,4 @@
-from mock import Mock
+from unittest.mock import Mock
 
 from synapse.storage.background_updates import BackgroundUpdater
 
@@ -7,9 +7,7 @@ from tests import unittest
 
 class BackgroundUpdateTestCase(unittest.HomeserverTestCase):
     def prepare(self, reactor, clock, homeserver):
-        self.updates = (
-            self.hs.get_datastore().db_pool.updates
-        )  # type: BackgroundUpdater
+        self.updates: BackgroundUpdater = self.hs.get_datastore().db_pool.updates
         # the base test class should have run the real bg updates for us
         self.assertTrue(
             self.get_success(self.updates.has_completed_background_updates())
