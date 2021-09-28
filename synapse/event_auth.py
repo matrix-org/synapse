@@ -46,7 +46,6 @@ def check(
     event: EventBase,
     auth_events: StateMap[EventBase],
     do_sig_check: bool = True,
-    do_size_check: bool = True,
 ) -> None:
     """Checks if this event is correctly authed.
 
@@ -56,7 +55,6 @@ def check(
         auth_events: the existing room state.
         do_sig_check: True if it should be verified that the sending server
             signed the event.
-        do_size_check: True if the size of the event fields should be verified.
 
     Raises:
         AuthError if the checks fail
@@ -64,8 +62,7 @@ def check(
     Returns:
          if the auth checks pass.
     """
-    if do_size_check:
-        _check_size_limits(event)
+    _check_size_limits(event)
 
     if not hasattr(event, "room_id"):
         raise AuthError(500, "Event has no room_id: %s" % event)
