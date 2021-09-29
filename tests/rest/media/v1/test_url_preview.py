@@ -21,11 +21,13 @@ from twisted.internet.error import DNSLookupError
 from twisted.test.proto_helpers import AccumulatingProtocol
 
 from synapse.config.oembed import OEmbedEndpointConfig
+from synapse.rest.media.v1.preview_url_resource import IMAGE_CACHE_EXPIRY_MS
 from synapse.util.stringutils import parse_and_validate_mxc_uri
 
 from tests import unittest
 from tests.server import FakeTransport
 from tests.test_utils import SMALL_PNG
+from tests.utils import MockClock
 
 try:
     import lxml
@@ -851,3 +853,32 @@ class URLPreviewTests(unittest.HomeserverTestCase):
             404,
             "URL cache thumbnail was unexpectedly retrieved from a storage provider",
         )
+
+    def test_cache_expiry(self):
+        """Test that URL cache files and thumbnails are cleaned up properly on expiry."""
+        self.preview_url.clock = MockClock()
+
+        _host, media_id = self._download_image()
+
+        file_path = self.preview_url.filepaths.url_cache_filepath(media_id)
+        file_dirs = self.preview_url.filepaths.url_cache_filepath_dirs_to_delete(
+            media_id
+        )
+        thumbnail_dir = self.preview_url.filepaths.url_cache_thumbnail_directory(
+            media_id
+        )
+        thumbnail_dirs = self.preview_url.filepaths.url_cache_thumbnail_dirs_to_delete(
+            media_id
+        )
+
+        self.assertTrue(os.path.isfile(file_path))
+        self.assertTrue(os.path.isdir(thumbnail_dir))
+
+        self.preview_url.clock.advance_time_msec(IMAGE_CACHE_EXPIRY_MS + 1)
+        self.get_success(self.preview_url._expire_url_cache_data())
+
+        for path in [file_path] + file_dirs + [thumbnail_dir] + thumbnail_dirs:
+            self.assertFalse(
+                os.path.exists(path),
+                f"{os.path.relpath(path, self.media_store_path)} was not deleted",
+            )
