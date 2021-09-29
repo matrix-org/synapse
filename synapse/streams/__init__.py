@@ -26,7 +26,6 @@ class EventSource(Generic[K, R]):
     async def get_new_events(
         self,
         user: UserID,
-        *,
         from_key: K,
         limit: Optional[int],
         room_ids: Collection[str],

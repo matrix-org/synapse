@@ -174,7 +174,6 @@ class AccountDataEventSource(EventSource[int, JsonDict]):
     async def get_new_events(
         self,
         user: UserID,
-        *,
         from_key: int,
         limit: Optional[int],
         room_ids: Collection[str],
