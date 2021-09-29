@@ -159,9 +159,11 @@ class TTLCache(Generic[KT, VT]):
             del self._expiry_list[0]
 
 
-@attr.s(frozen=True, slots=True, auto_attribs=True)
+# Manual __slots__ due to https://github.com/python-attrs/attrs/issues/313
+@attr.s(frozen=True, auto_attribs=True)
 class _CacheEntry(Generic[KT, VT]):
     """TTLCache entry"""
+    __slots__ = ["expiry_time", "ttl", "key", "value"]
 
     # expiry_time is the first attribute, so that entries are sorted by expiry.
     expiry_time: float
