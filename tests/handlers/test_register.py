@@ -16,7 +16,12 @@ from unittest.mock import Mock
 
 from synapse.api.auth import Auth
 from synapse.api.constants import UserTypes
-from synapse.api.errors import Codes, ResourceLimitError, SynapseError
+from synapse.api.errors import (
+    CodeMessageException,
+    Codes,
+    ResourceLimitError,
+    SynapseError,
+)
 from synapse.events.spamcheck import load_legacy_spam_checkers
 from synapse.spam_checker_api import RegistrationBehaviour
 from synapse.types import RoomAlias, RoomID, UserID, create_requester
@@ -127,7 +132,15 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         hs_config["max_mau_value"] = 50
         hs_config["limit_usage_by_mau"] = True
 
-        hs = self.setup_test_homeserver(config=hs_config)
+        # Don't attempt to reach out over federation.
+        self.mock_federation_client = Mock()
+        self.mock_federation_client.make_query.side_effect = CodeMessageException(
+            500, ""
+        )
+
+        hs = self.setup_test_homeserver(
+            config=hs_config, federation_client=self.mock_federation_client
+        )
 
         load_legacy_spam_checkers(hs)
 
@@ -138,9 +151,6 @@ class RegistrationTestCase(unittest.HomeserverTestCase):
         return hs
 
     def prepare(self, reactor, clock, hs):
-        self.mock_distributor = Mock()
-        self.mock_distributor.declare("registered_user")
-        self.mock_captcha_client = Mock()
         self.handler = self.hs.get_registration_handler()
         self.store = self.hs.get_datastore()
         self.lots_of_users = 100
