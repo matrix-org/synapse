@@ -15,19 +15,17 @@ Bugfixes
 
 - Fix a long-standing bug that caused an `AssertionError` when purging history in certain rooms. Contributed by @Kokokokoka. ([\#10690](https://github.com/matrix-org/synapse/issues/10690))
 - Fix a long-standing bug which caused deactivated users that were later reactivated to be missing from the user directory. ([\#10782](https://github.com/matrix-org/synapse/issues/10782))
-- Allow sending a membership event to unban a user. Contributed by @aaronraimist. ([\#10807](https://github.com/matrix-org/synapse/issues/10807))
-- Fix a case where logging contexts would go missing when federation requests time out. ([\#10810](https://github.com/matrix-org/synapse/issues/10810))
-- Fix error in deprecated `/initialSync` endpoint when using the undocumented `from` and `to` parameters. ([\#10827](https://github.com/matrix-org/synapse/issues/10827))
+- Fix a long-standing bug that caused unbanning a user by sending a membership event to fail. Contributed by @aaronraimist. ([\#10807](https://github.com/matrix-org/synapse/issues/10807))
+- Fix a long-standing bug where logging contexts would go missing when federation requests time out. ([\#10810](https://github.com/matrix-org/synapse/issues/10810))
+- Fix a long-standing bug causing an error in the deprecated `/initialSync` endpoint when using the undocumented `from` and `to` parameters. ([\#10827](https://github.com/matrix-org/synapse/issues/10827))
 - Fix a bug causing the `remove_stale_pushers` background job to repeatedly fail and log errors. This bug affected Synapse servers that had been upgraded from version 1.28 or older and are using SQLite. ([\#10843](https://github.com/matrix-org/synapse/issues/10843))
-- Fix a bug in Unicode support of the room search admin API breaking search for rooms with non-ASCII characters. ([\#10859](https://github.com/matrix-org/synapse/issues/10859))
+- Fix a long-standing bug in Unicode support of the room search admin API breaking search for rooms with non-ASCII characters. ([\#10859](https://github.com/matrix-org/synapse/issues/10859))
 - Fix a bug introduced in Synapse 1.37.0 which caused `knock` membership events which we sent to remote servers to be incorrectly stored in the local database. ([\#10873](https://github.com/matrix-org/synapse/issues/10873))
-- Fix invalidating one-time key count cache after claiming keys. Contributed by Tulir at Beeper. ([\#10875](https://github.com/matrix-org/synapse/issues/10875))
-- Fix application service users being subject to MAU blocking if MAU had been reached, even if configured not to be blocked. ([\#10881](https://github.com/matrix-org/synapse/issues/10881))
-- Allow the `.` and `~` characters when creating registration tokens as per the change to [MSC3231](https://github.com/matrix-org/matrix-doc/pull/3231). ([\#10887](https://github.com/matrix-org/synapse/issues/10887))
+- Fix invalidating one-time key count cache after claiming keys. The bug was introduced in Synapse v1.41.0. Contributed by Tulir at Beeper. ([\#10875](https://github.com/matrix-org/synapse/issues/10875))
+- Fix a long-standing bug causing application service users to be subject to MAU blocking if the MAU limit had been reached, even if configured not to be blocked. ([\#10881](https://github.com/matrix-org/synapse/issues/10881))
 - Fix a long-standing bug which could cause events pulled over federation to be incorrectly rejected. ([\#10907](https://github.com/matrix-org/synapse/issues/10907))
-- Avoid storing URL cache files in storage providers. Server admins may safely delete the `url_cache/` and `url_cache_thumbnails/` directories from any configured storage providers to reclaim space. ([\#10911](https://github.com/matrix-org/synapse/issues/10911))
-- Fix race conditions when creating media store and config directories. ([\#10913](https://github.com/matrix-org/synapse/issues/10913))
-- Fix debian builds due to dh-virtualenv no longer being able to build their docs. ([\#10931](https://github.com/matrix-org/synapse/issues/10931))
+- Fix a long-standing bug causing URL cache files to be stored in storage providers. Server admins may safely delete the `url_cache/` and `url_cache_thumbnails/` directories from any configured storage providers to reclaim space. ([\#10911](https://github.com/matrix-org/synapse/issues/10911))
+- Fix a long-standing bug leading to race conditions when creating media store and config directories. ([\#10913](https://github.com/matrix-org/synapse/issues/10913))
 
 
 Improved Documentation
@@ -53,7 +51,7 @@ Internal Changes
 - Opt out of cache expiry for `get_users_who_share_room_with_user`, to hopefully improve `/sync` performance when you
   haven't synced recently. ([\#10826](https://github.com/matrix-org/synapse/issues/10826))
 - Track cache eviction rates more finely in Prometheus's monitoring. ([\#10829](https://github.com/matrix-org/synapse/issues/10829))
-- Add missing type hints to handlers. ([\#10831](https://github.com/matrix-org/synapse/issues/10831), [\#10856](https://github.com/matrix-org/synapse/issues/10856))
+- Add missing type hints to `synapse.handlers`. ([\#10831](https://github.com/matrix-org/synapse/issues/10831), [\#10856](https://github.com/matrix-org/synapse/issues/10856))
 - Extend the Module API to let plug-ins check whether an ID is local and to access IP + User Agent data. ([\#10833](https://github.com/matrix-org/synapse/issues/10833))
 - Factor out PNG image data to a constant to be used in several tests. ([\#10834](https://github.com/matrix-org/synapse/issues/10834))
 - Add a test to ensure state events sent by modules get persisted correctly. ([\#10835](https://github.com/matrix-org/synapse/issues/10835))
@@ -63,11 +61,13 @@ Internal Changes
 - Include outlier status when we log V2 or V3 events. ([\#10879](https://github.com/matrix-org/synapse/issues/10879))
 - Break down Grafana's cache expiry time series based on reason for eviction, c.f. [\#10829](https://github.com/matrix-org/synapse/issues/10829). ([\#10880](https://github.com/matrix-org/synapse/issues/10880))
 - Clean up some of the federation event authentication code for clarity. ([\#10883](https://github.com/matrix-org/synapse/issues/10883), [\#10884](https://github.com/matrix-org/synapse/issues/10884), [\#10896](https://github.com/matrix-org/synapse/issues/10896), [\#10901](https://github.com/matrix-org/synapse/issues/10901))
+- Allow the `.` and `~` characters when creating registration tokens as per the change to [MSC3231](https://github.com/matrix-org/matrix-doc/pull/3231). ([\#10887](https://github.com/matrix-org/synapse/issues/10887))
 - Clean up some unnecessary parentheses in places around the codebase. ([\#10889](https://github.com/matrix-org/synapse/issues/10889))
 - Improve type hinting in the user directory code. ([\#10891](https://github.com/matrix-org/synapse/issues/10891))
 - Update development testing script `test_postgresql.sh` to use a supported Python version and make re-runs quicker. ([\#10906](https://github.com/matrix-org/synapse/issues/10906))
-- Document and summarize changes in schema version `61` - `64`. ([\#10917](https://github.com/matrix-org/synapse/issues/10917))
+- Document and summarize changes in schema version `61` – `64`. ([\#10917](https://github.com/matrix-org/synapse/issues/10917))
 - Update release script to sign the newly created git tags. ([\#10925](https://github.com/matrix-org/synapse/issues/10925))
+- Fix Debian builds due to `dh-virtualenv` no longer being able to build their docs. ([\#10931](https://github.com/matrix-org/synapse/issues/10931))
 
 
 Synapse 1.43.0 (2021-09-21)
